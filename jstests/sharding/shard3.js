@@ -15,7 +15,7 @@ assert.eq( 3 , s.getDB( "test" ).foo.find().toArray().length , "normal A" );
 assert.eq( 3 , s2.getDB( "test" ).foo.find().toArray().length , "other A" );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
-s.adminCommand( { moveshard : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
 
 assert( s._connections[0].getDB( "test" ).foo.find().toArray().length > 0 , "blah 1" );
 assert( s._connections[1].getDB( "test" ).foo.find().toArray().length > 0 , "blah 2" );

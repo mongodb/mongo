@@ -194,9 +194,9 @@ namespace mongo {
             }
         } movePrimary;
 
-        class PartitionCmd : public GridAdminCmd {
+        class EnableShardingCmd : public GridAdminCmd {
         public:
-            PartitionCmd() : GridAdminCmd( "enablesharding" ){}
+            EnableShardingCmd() : GridAdminCmd( "enablesharding" ){}
             virtual void help( stringstream& help ) const {
                 help
                     << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
@@ -210,24 +210,24 @@ namespace mongo {
                 }
 
                 DBConfig * config = grid.getDBConfig( dbname );
-                if ( config->isPartitioned() ){
+                if ( config->isShardingEnabled() ){
                     errmsg = "already enabled";
                     return false;
                 }
 
-                config->turnOnPartitioning();
+                config->enableSharding();
                 config->save( true );
 
                 result << "ok" << 1;
                 return true;
             }
-        } partitionCmd;
+        } enableShardingCmd;
 
         // ------------ collection level commands -------------
 
-        class ShardCmd : public GridAdminCmd {
+        class ShardCollectionCmd : public GridAdminCmd {
         public:
-            ShardCmd() : GridAdminCmd( "shardcollection" ){}
+            ShardCollectionCmd() : GridAdminCmd( "shardcollection" ){}
             virtual void help( stringstream& help ) const {
                 help
                     << "Shard a collection.  Sharding must already be enabled for the database.\n"
@@ -241,12 +241,12 @@ namespace mongo {
                 }
 
                 DBConfig * config = grid.getDBConfig( ns );
-                if ( ! config->isPartitioned() ){
+                if ( ! config->isShardingEnabled() ){
                     errmsg = "sharding not enabled for db";
                     return false;
                 }
 
-                if ( config->sharded( ns ) ){
+                if ( config->isSharded( ns ) ){
                     errmsg = "already sharded";
                     return false;
                 }
@@ -257,13 +257,13 @@ namespace mongo {
                     return false;
                 }
 
-                config->turnOnSharding( ns , key );
+                config->shardCollection( ns , key );
                 config->save( true );
 
                 result << "ok" << 1;
                 return true;
             }
-        } shardCmd;
+        } shardCollectionCmd;
 
 
         class SplitCollectionHelper : public GridAdminCmd {
@@ -287,7 +287,7 @@ namespace mongo {
                 }
 
                 DBConfig * config = grid.getDBConfig( ns );
-                if ( ! config->sharded( ns ) ){
+                if ( ! config->isSharded( ns ) ){
                     errmsg = "ns not sharded.  have to shard before can split";
                     return false;
                 }
@@ -356,22 +356,22 @@ namespace mongo {
 
         } splitCollectionCmd;
 
-        class MoveShard : public GridAdminCmd {
+        class MoveChunkCmd : public GridAdminCmd {
         public:
-            MoveShard() : GridAdminCmd( "moveshard" ){}
+            MoveChunkCmd() : GridAdminCmd( "movechunk" ){}
             virtual void help( stringstream& help ) const {
-                help << "{ moveshard : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
+                help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["moveshard"].valuestrsafe();
+                string ns = cmdObj["movechunk"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
                 }
 
                 DBConfig * config = grid.getDBConfig( ns );
-                if ( ! config->sharded( ns ) ){
-                    errmsg = "ns not sharded.  have to split before can move a shard";
+                if ( ! config->isSharded( ns ) ){
+                    errmsg = "ns not sharded.  have to shard before can move a chunk";
                     return false;
                 }
 
@@ -383,37 +383,37 @@ namespace mongo {
 
                 string to = cmdObj["to"].valuestrsafe();
                 if ( ! to.size()  ){
-                    errmsg = "you have to specify where you want to move it";
+                    errmsg = "you have to specify where you want to move the chunk";
                     return false;
                 }
 
                 ChunkManager * info = config->getChunkManager( ns );
-                Chunk& s = info->findChunk( find );
-                string from = s.getShard();
+                Chunk& c = info->findChunk( find );
+                string from = c.getShard();
 
-                if ( s.getShard() == to ){
-                    errmsg = "that shard is already on that server";
+                if ( from == to ){
+                    errmsg = "that chunk is already on that shard";
                     return false;
                 }
 
                 if ( ! grid.knowAboutShard( to ) ){
-                    errmsg = "that server isn't known to me";
+                    errmsg = "that shard isn't known to me";
                     return false;
                 }
 
-                if ( ! s.moveAndCommit( to , errmsg ) )
+                if ( ! c.moveAndCommit( to , errmsg ) )
                     return false;
 
                 result << "ok" << 1;
                 return true;
             }
-        } moveShardCmd;
+        } moveChunkCmd;
 
         // ------------ server level commands -------------
 
-        class ListServers : public GridAdminCmd {
+        class ListShardsCmd : public GridAdminCmd {
         public:
-            ListServers() : GridAdminCmd("listservers") { }
+            ListShardsCmd() : GridAdminCmd("listshards") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
@@ -424,13 +424,13 @@ namespace mongo {
                     all.push_back( o );
                 }
 
-                result.append("servers" , all );
+                result.append("shards" , all );
                 result.append("ok" , 1 );
                 conn.done();
 
                 return true;
             }
-        } listServers;
+        } listShardsCmd;
 
 		/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage partition. */
         class AddShard : public GridAdminCmd {
@@ -439,9 +439,9 @@ namespace mongo {
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj server = BSON( "host" << cmdObj["addshard"].valuestrsafe() );
+                BSONObj shard = BSON( "host" << cmdObj["addshard"].valuestrsafe() );
 
-                BSONObj old = conn->findOne( "config.shards" , server );
+                BSONObj old = conn->findOne( "config.shards" , shard );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
@@ -449,27 +449,32 @@ namespace mongo {
                     return false;
                 }
 
-                conn->insert( "config.shards" , server );
+                conn->insert( "config.shards" , shard );
                 result.append( "ok", 1 );
-                result.append( "added" , server["host"].valuestrsafe() );
+                result.append( "added" , shard["host"].valuestrsafe() );
                 conn.done();
                 return true;
             }
         } addServer;
 
-        class RemoveServer : public GridAdminCmd {
+        class RemoveShardCmd : public GridAdminCmd {
         public:
-            RemoveServer() : GridAdminCmd("removeserver") { }
+            RemoveShardCmd() : GridAdminCmd("removeshard") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                if ( 1 ){
+                    errmsg = "removeshard doesn't work";
+                    return 0;
+                }
+
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
+                BSONObj server = BSON( "host" << cmdObj["removeshard"].valuestrsafe() );
                 conn->remove( "config.shards" , server );
 
                 conn.done();
                 return true;
             }
-        } removeServer;
+        } removeShardCmd;
 
 
         // --------------- public commands ----------------
@@ -503,13 +508,13 @@ namespace mongo {
             }
         } ismaster;
 
-        class CmdShardGetPrevError : public Command {
+        class CmdShardingGetPrevError : public Command {
         public:
             virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;
             }
-            CmdShardGetPrevError() : Command("getpreverror") { }
+            CmdShardingGetPrevError() : Command("getpreverror") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported on mongos";
                 result << "ok" << 0;
@@ -517,13 +522,13 @@ namespace mongo {
             }
         } cmdGetPrevError;
 
-        class CmdShardGetLastError : public Command {
+        class CmdShardingGetLastError : public Command {
         public:
             virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;
             }
-            CmdShardGetLastError() : Command("getplasterror") { }
+            CmdShardingGetLastError() : Command("getplasterror") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getlasterror not working yet";
                 result << "ok" << 0;

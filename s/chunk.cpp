@@ -147,7 +147,7 @@ namespace mongo {
 
         BSONObj startRes;
         bool worked = fromconn->runCommand( "admin" ,
-                                            BSON( "moveshard.start" << _ns << 
+                                            BSON( "movechunk.start" << _ns << 
                                                   "from" << from <<
                                                   "to" << to <<
                                                   "filter" << filter
@@ -156,7 +156,7 @@ namespace mongo {
                                             );
         
         if ( ! worked ){
-            errmsg = (string)"moveshard.start failed: " + startRes.toString();
+            errmsg = (string)"movechunk.start failed: " + startRes.toString();
             return false;
         }
         
@@ -177,7 +177,7 @@ namespace mongo {
             uassert( "version has to be higher" , newVersion > oldVersion );
 
             BSONObjBuilder b;
-            b << "moveshard.finish" << _ns;
+            b << "movechunk.finish" << _ns;
             b << "to" << to;
             b.appendTimestamp( "newVersion" , newVersion );
             b.append( startRes["finishToken"] );
@@ -188,7 +188,7 @@ namespace mongo {
         }
         
         if ( ! worked ){
-            errmsg = (string)"moveshard.finish failed: " + finishRes.toString();
+            errmsg = (string)"movechunk.finish failed: " + finishRes.toString();
             return false;
         }
         
@@ -240,11 +240,11 @@ namespace mongo {
         string newLocation = grid.pickShardForNewDB();
         if ( newLocation == getShard() ){
             // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving shard: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getShard() << endl;
+            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getShard() << endl;
             return 0;
         }
 
-        log() << "moving shard (auto): " << toMove->toString() << " to: " << newLocation << " #objcets: " << toMove->countObjects() << endl;
+        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation << " #objcets: " << toMove->countObjects() << endl;
 
         string errmsg;
         massert( (string)"moveAndCommit failed: " + errmsg , 

@@ -24,7 +24,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 
-s.adminCommand( { moveshard : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
 
 s.printShards();
 

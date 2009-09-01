@@ -41,7 +41,7 @@ namespace mongo {
     void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
 
-        if ( _config->sharded( getns() ) ){
+        if ( _config->isSharded( getns() ) ){
             _shardInfo = _config->getChunkManager( getns() , reload );
             uassert( (string)"no shard info for: " + getns() , _shardInfo );
         }
@@ -74,7 +74,7 @@ namespace mongo {
         Strategy * s = SINGLE;
         
         _d.markSet();
-        if ( getConfig()->isPartitioned() && op == dbQuery ){
+        if ( getConfig()->isShardingEnabled() && op == dbQuery ){
             // there are a few things we need to check here
             // 1. db.eval
             //     TODO:  right now i'm just going to block all

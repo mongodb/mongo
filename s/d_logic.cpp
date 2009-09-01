@@ -243,7 +243,7 @@ namespace mongo {
     
     class MoveShardStartCommand : public MongodShardCommand {
     public:
-        MoveShardStartCommand() : MongodShardCommand( "moveshard.start" ){}
+        MoveShardStartCommand() : MongodShardCommand( "movechunk.start" ){}
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
@@ -253,7 +253,7 @@ namespace mongo {
             // at this point the caller locks me, and updates config db
             // then finish calls finish, and then deletes data when cursors are done
             
-            string ns = cmdObj["moveshard.start"].valuestrsafe();
+            string ns = cmdObj["movechunk.start"].valuestrsafe();
             string to = cmdObj["to"].valuestrsafe();
             string from = cmdObj["from"].valuestrsafe(); // my public address, a tad redundant, but safe
             BSONObj filter = cmdObj.getObjectField( "filter" );
@@ -277,7 +277,7 @@ namespace mongo {
                 return false;
             }
             
-            log() << "got moveshard.start: " << cmdObj << endl;
+            log() << "got movechunk.start: " << cmdObj << endl;
             
             
             BSONObj res;
@@ -296,7 +296,7 @@ namespace mongo {
                 conn.done();
             }
             
-            log() << "   moveshard.start res: " << res << endl;
+            log() << "   movechunk.start res: " << res << endl;
             
             if ( ok ){
                 result.append( res["finishToken"] );
@@ -309,7 +309,7 @@ namespace mongo {
 
     class MoveShardFinishCommand : public MongodShardCommand {
     public:
-        MoveShardFinishCommand() : MongodShardCommand( "moveshard.finish" ){}
+        MoveShardFinishCommand() : MongodShardCommand( "movechunk.finish" ){}
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
@@ -317,7 +317,7 @@ namespace mongo {
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // see MoveShardStartCommand::run
             
-            string ns = cmdObj["moveshard.finish"].valuestrsafe();
+            string ns = cmdObj["movechunk.finish"].valuestrsafe();
             if ( ns.size() == 0 ){
                 errmsg = "need ns as cmd value";
                 return false;

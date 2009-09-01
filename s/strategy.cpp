@@ -150,7 +150,7 @@ namespace mongo {
         if ( ! conf )
             return;
         
-        if ( ! conf->sharded( ns ) )
+        if ( ! conf->isSharded( ns ) )
             return;
         
         

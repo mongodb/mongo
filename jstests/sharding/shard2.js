@@ -43,10 +43,10 @@ placeCheck( 2 );
 // NOTE: at this point we have 2 shard on 1 server
 
 // test move shard
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
-assert.throws( function(){ s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
-s.adminCommand( { moveshard : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
 assert.eq( 2 , seconday.foo.find().length() , "seconday should have 2 after move shard" );
 assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
