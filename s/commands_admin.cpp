@@ -257,9 +257,15 @@ namespace mongo {
                     return false;
                 }
 
+                if ( ns.find( ".system." ) != string::npos ){
+                    errmsg = "can't shard system namespaces";
+                    return false;
+                }
+
                 config->shardCollection( ns , key );
                 config->save( true );
 
+                result << "collectionsharded" << ns;
                 result << "ok" << 1;
                 return true;
             }
