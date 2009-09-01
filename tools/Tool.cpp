@@ -47,11 +47,17 @@ void mongo::Tool::printHelp(ostream &out) {
 int mongo::Tool::main( int argc , char ** argv ){
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
-    po::store( po::command_line_parser( argc , argv ).
-               options( *_options ).
-               positional( _positonalOptions ).run() , _params );
+    try {
+        po::store( po::command_line_parser( argc , argv ).
+                   options( *_options ).
+                   positional( _positonalOptions ).run() , _params );
 
-    po::notify( _params );
+        po::notify( _params );
+    } catch (po::error &e) {
+        cout << "ERROR: " << e.what() << endl << endl;
+        printHelp(cout);
+        return EXIT_BADOPTIONS;
+    }
 
     if ( _params.count( "help" ) ){
         printHelp(cerr);
