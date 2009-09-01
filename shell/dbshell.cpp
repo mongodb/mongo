@@ -151,6 +151,12 @@ bool isBalanced( string code ){
     
     for ( size_t i=0; i<code.size(); i++ ){
         switch( code[i] ){
+        case '/':
+            if ( i+1 < code.size() && code[i+1] == '/' ){
+                while ( i<code.size() && code[i] != '\n' )
+                    i++;
+            }
+            continue;
         case '{': brackets++; break;
         case '}': brackets--; break;
         case '(': parens++; break;
@@ -179,6 +185,8 @@ public:
         assert( isBalanced( "function(){\n}" ) );
         assert( ! isBalanced( "function(){" ) );
         assert( isBalanced( "x = \"{\";" ) );
+        assert( isBalanced( "// {" ) );
+        assert( ! isBalanced( "// \n {" ) );
     }
 } balnaced_test;
 
