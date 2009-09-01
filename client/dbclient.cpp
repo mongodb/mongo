@@ -128,12 +128,13 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const string &_ns, BSONObj query) { 
+    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query) { 
         NamespaceString ns(_ns);
         BSONObj cmd = BSON( "count" << ns.coll << "query" << query );
         BSONObj res;
         if( !runCommand(ns.db.c_str(), cmd, res) )
             uasserted(string("count fails:") + res.toString());
+        cout << "cmd: " << cmd << "\n\t" << res << endl;
         return res.getIntField("n");
     }
 
