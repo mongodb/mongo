@@ -32,7 +32,7 @@
 #include "../db/commands.h"
 
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -196,14 +196,14 @@ namespace mongo {
 
         class PartitionCmd : public GridAdminCmd {
         public:
-            PartitionCmd() : GridAdminCmd( "partition" ){}
+            PartitionCmd() : GridAdminCmd( "enablesharding" ){}
             virtual void help( stringstream& help ) const {
                 help
-                    << "turns on partitioning for a db.  have to do this before sharding, etc.. will work.\n"
-                    << "  { partition : \"alleyinsider\" }\n";
+                    << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
+                    << "  { enablesharding : \"<dbname>\" }\n";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cmdObj["partition"].valuestrsafe();
+                string dbname = cmdObj["enablesharding"].valuestrsafe();
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
                     return false;
@@ -211,7 +211,7 @@ namespace mongo {
 
                 DBConfig * config = grid.getDBConfig( dbname );
                 if ( config->isPartitioned() ){
-                    errmsg = "already partitioned";
+                    errmsg = "already enabled";
                     return false;
                 }
 
@@ -227,9 +227,14 @@ namespace mongo {
 
         class ShardCmd : public GridAdminCmd {
         public:
-            ShardCmd() : GridAdminCmd( "shard" ){}
+            ShardCmd() : GridAdminCmd( "shardcollection" ){}
+            virtual void help( stringstream& help ) const {
+                help
+                    << "Shard a collection.  Sharding must already be enabled for the database.\n"
+                    << "  { enablesharding : \"<dbname>\" }\n";
+            }
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string ns = cmdObj["shard"].valuestrsafe();
+                string ns = cmdObj["shardcollection"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
                     return false;
@@ -237,7 +242,7 @@ namespace mongo {
 
                 DBConfig * config = grid.getDBConfig( ns );
                 if ( ! config->isPartitioned() ){
-                    errmsg = "db not partitioned ";
+                    errmsg = "sharding not enabled for db";
                     return false;
                 }
 
@@ -272,7 +277,7 @@ namespace mongo {
                     ;
             }
 
-            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ) = 0;
+            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ) = 0;
 
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj[_name.c_str()].valuestrsafe();
@@ -299,8 +304,8 @@ namespace mongo {
                     return false;
                 }
 
-                ShardManager * info = config->getShardManager( ns );
-                Shard& old = info->findShard( find );
+                ChunkManager * info = config->getChunkManager( ns );
+                Chunk& old = info->findChunk( find );
 
 
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
@@ -313,7 +318,7 @@ namespace mongo {
         class SplitValueCommand : public SplitCollectionHelper {
         public:
             SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
 
                 result << "shardinfo" << old.toString();
 
@@ -335,7 +340,7 @@ namespace mongo {
         class SplitCollection : public SplitCollectionHelper {
         public:
             SplitCollection() : SplitCollectionHelper( "split" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ShardManager * manager , Shard& old , BSONObj middle ){
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
 
                 log() << "splitting: " << ns << "  shard: " << old << endl;
 
@@ -382,8 +387,8 @@ namespace mongo {
                     return false;
                 }
 
-                ShardManager * info = config->getShardManager( ns );
-                Shard& s = info->findShard( find );
+                ChunkManager * info = config->getChunkManager( ns );
+                Chunk& s = info->findChunk( find );
                 string from = s.getServer();
 
                 if ( s.getServer() == to ){
@@ -413,7 +418,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.servers" , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = conn->query( "config.shards" , BSONObj() );
                 while ( cursor->more() ){
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -427,16 +432,16 @@ namespace mongo {
             }
         } listServers;
 
-
-        class AddServer : public GridAdminCmd {
+		/* a shard is a single mongod server or a replica pair.  add it (them) to the cluster as a storage partition. */
+        class AddShard : public GridAdminCmd {
         public:
-            AddServer() : GridAdminCmd("addserver") { }
+            AddShard() : GridAdminCmd("addshard") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj server = BSON( "host" << cmdObj["addserver"].valuestrsafe() );
+                BSONObj server = BSON( "host" << cmdObj["addshard"].valuestrsafe() );
 
-                BSONObj old = conn->findOne( "config.servers" , server );
+                BSONObj old = conn->findOne( "config.shards" , server );
                 if ( ! old.isEmpty() ){
                     result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
@@ -444,7 +449,7 @@ namespace mongo {
                     return false;
                 }
 
-                conn->insert( "config.servers" , server );
+                conn->insert( "config.shards" , server );
                 result.append( "ok", 1 );
                 result.append( "added" , server["host"].valuestrsafe() );
                 conn.done();
@@ -459,7 +464,7 @@ namespace mongo {
                 ScopedDbConnection conn( configServer.getPrimary() );
 
                 BSONObj server = BSON( "host" << cmdObj["removeserver"].valuestrsafe() );
-                conn->remove( "config.servers" , server );
+                conn->remove( "config.shards" , server );
 
                 conn.done();
                 return true;

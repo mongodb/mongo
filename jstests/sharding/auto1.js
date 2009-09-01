@@ -2,8 +2,8 @@
 
 s = new ShardingTest( "auto1" , 2 , 1 , 1 );
 
-s.adminCommand( { partition : "test" } );
-s.adminCommand( { shard : "test.foo" , key : { num : 1 } } );
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
 bigString = "";
 while ( bigString.length < 1024 * 50 )

@@ -11,6 +11,16 @@
 
 namespace mongo {
 
+    string trim( string s ){
+        while ( s.size() && isspace( s[0] ) )
+            s = s.substr( 1 );
+        
+        while ( s.size() && isspace( s[s.size()-1] ) )
+            s = s.substr( 0 , s.size() - 1 );
+        
+        return s;
+    }
+
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
     boost::recursive_mutex smmutex;
 #define smlock recursive_boostlock ___lk( smmutex );
@@ -294,49 +304,77 @@ namespace mongo {
             return true;
         }
 
-        void addRoot( JSFunction * f );
+        void addRoot( JSFunction * f , const char * name );
 
         JSFunction * compileFunction( const char * code, JSObject * assoc = 0 ){
-            JSFunction * f = _compileFunction( code , assoc );
-            addRoot( f );
+            const char * gcName = "unknown";
+            JSFunction * f = _compileFunction( code , assoc , gcName );
+            //addRoot( f , gcName );
             return f;
         }
 
-        JSFunction * _compileFunction( const char * code, JSObject * assoc ){
-            while (isspace(*code)) {
-                code++;
+        JSFunction * _compileFunction( const char * raw , JSObject * assoc , const char *& gcName ){
+            if ( ! assoc )
+                assoc = JS_GetGlobalObject( _context );
+
+            while (isspace(*raw)) {
+                raw++;
             }
 
-            if ( ! hasFunctionIdentifier( code ) ){
-                string s = code;
+            stringstream fname;
+            fname << "cf_";
+            static int fnum = 1;
+            fname << "_" << fnum++ << "_";
+
+
+            if ( ! hasFunctionIdentifier( raw ) ){
+                string s = raw;
                 if ( isSimpleStatement( s ) ){
                     s = "return " + s;
                 }
-                return JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
+                gcName = "cf anon";
+                fname << "anon";
+                return JS_CompileFunction( _context , assoc , fname.str().c_str() , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_a" , 0 );
             }
 
-            // TODO: there must be a way in spider monkey to do this - this is a total hack
+            string code = raw;
+            
+            size_t start = code.find( '(' );
+            assert( start != string::npos );
+            
+            fname << "_f_" << trim( code.substr( 9 , start - 9 ) );
 
-            string s = "return ";
-            s += code;
-            s += ";";
-
-            JSFunction * func = JS_CompileFunction( _context , assoc , "anonymous" , 0 , 0 , s.c_str() , strlen( s.c_str() ) , "nofile_b" , 0 );
+            code = code.substr( start + 1 );
+            size_t end = code.find( ')' );
+            assert( end != string::npos );
+            
+            string paramString = trim( code.substr( 0 , end ) );
+            code = code.substr( end + 1 );
+            
+            vector<string> params;
+            while ( paramString.size() ){
+                size_t c = paramString.find( ',' );
+                if ( c == string::npos ){
+                    params.push_back( paramString );
+                    break;
+                }
+                params.push_back( trim( paramString.substr( 0 , c ) ) );
+                paramString = trim( paramString.substr( c + 1 ) );
+                paramString = trim( paramString );
+            }
+            
+            const char ** paramArray = new const char*[params.size()];
+            for ( size_t i=0; i<params.size(); i++ )
+                paramArray[i] = params[i].c_str();
+            
+            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+            delete paramArray;
             if ( ! func ){
-                cerr << "compile for hack failed" << endl;
+                cerr << "compile failed for: " << raw << endl;
                 return 0;
             }
-
-            jsval ret;
-            if ( ! JS_CallFunction( _context , 0 , func , 0 , 0 , &ret ) ){
-                cerr << "call function for hack failed" << endl;
-                return 0;
-            }
-
-            addRoot( func );
-
-            uassert( "return for compile hack failed" , JS_TypeOfValue( _context , ret ) == JSTYPE_FUNCTION );
-            return JS_ValueToFunction( _context , ret );
+            gcName = "cf normal";
+            return func;
         }
 
 
@@ -564,7 +602,17 @@ namespace mongo {
             return toString( getProperty( o , field ) );
         }
 
+        JSClass * getClass( JSObject * o , const char * field ){
+            jsval v;
+            assert( JS_GetProperty( _context , o , field , &v ) );
+            if ( ! JSVAL_IS_OBJECT( v ) )
+                return 0;
+            return JS_GET_CLASS( _context , JSVAL_TO_OBJECT( v ) );
+        }
+
         JSContext * _context;
+
+
     };
 
 
@@ -734,6 +782,7 @@ namespace mongo {
         Convertor c( cx );
 
         BSONHolder * holder = GETHOLDER( cx , obj );
+        assert( holder );
         holder->check();
         
         string s = c.toString( id );
@@ -797,6 +846,12 @@ namespace mongo {
 
         virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }
 
+#ifdef XULRUNNER
+        JSClass * _dateClass;
+        JSClass * _regexClass;
+#endif
+
+
     private:
         JSRuntime * _runtime;
         friend class SMScope;
@@ -847,7 +902,7 @@ namespace mongo {
 
     class SMScope : public Scope {
     public:
-        SMScope(){
+        SMScope() : _this( 0 ) , _externalSetup( false ) , _localConnect( false ) {
             smlock;
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
@@ -871,10 +926,9 @@ namespace mongo {
             assert( JS_DefineFunction( _context , _convertor->getGlobalPrototype( "Object" ) ,
                                        "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
-            _this = 0;
-            _externalSetup = false;
-            _localConnect = false;
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
+
+            _postCreateHacks();
         }
         
         ~SMScope(){
@@ -1047,12 +1101,15 @@ namespace mongo {
 
         void setThis( const BSONObj * obj ){
             smlock;
-            if ( _this )
+            if ( _this ){
                 JS_RemoveRoot( _context , &_this );
+                _this = 0;
+            }
             
-            _this = _convertor->toJSObject( obj );
-
-            JS_AddNamedRoot( _context , &_this , "scope this" );
+            if ( obj ){
+                _this = _convertor->toJSObject( obj );
+                JS_AddNamedRoot( _context , &_this , "scope this" );
+            }
         }
 
         // ---- functions -----
@@ -1081,6 +1138,14 @@ namespace mongo {
             return JS_FALSE;
         }
 
+#ifdef SM181
+#warning JS_SetOperationCallback not supported yet
+        void installCheckTimeout( int timeoutMs ) {
+        }
+
+        void uninstallCheckTimeout( int timeoutMs ){
+        }
+#else
         void installCheckTimeout( int timeoutMs ) {
             if ( timeoutMs > 0 ) {
                 TimeoutSpec *spec = new TimeoutSpec;
@@ -1099,7 +1164,7 @@ namespace mongo {
                 JS_SetContextPrivate( _context, 0 );
             }
         }
-
+#endif
         void precall(){
             _error = "";
             currentScope.reset( this );
@@ -1135,7 +1200,6 @@ namespace mongo {
         int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
             smlock;
             precall();
-            jsval rval;
 
             int nargs = args.nFields();
             auto_ptr<jsval> smargsPtr( new jsval[nargs] );
@@ -1146,7 +1210,7 @@ namespace mongo {
                 for ( int i=0; i<nargs; i++ )
                     smargs[i] = _convertor->toval( it.next() );
             }
-
+            
             if ( args.isEmpty() ){
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
@@ -1155,7 +1219,8 @@ namespace mongo {
             }
 
             installCheckTimeout( timeoutMs );
-            JSBool ret = JS_CallFunction( _context , _this , func , nargs , smargs , &rval );
+            jsval rval;
+            JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargs , &rval );
             uninstallCheckTimeout( timeoutMs );
 
             if ( !ret ) {
@@ -1197,8 +1262,18 @@ namespace mongo {
         }
 
         JSContext *context() const { return _context; }
-
+        
     private:
+
+        void _postCreateHacks(){
+#ifdef XULRUNNER
+            exec( "__x__ = new Date(1);" );
+            globalSMEngine->_dateClass = _convertor->getClass( _global , "__x__" );
+            exec( "__x__ = /abc/i" );
+            globalSMEngine->_regexClass = _convertor->getClass( _global , "__x__" );
+#endif
+        }
+        
         JSContext * _context;
         Convertor * _convertor;
 
@@ -1213,6 +1288,7 @@ namespace mongo {
         string _dbName;
         
         set<string> _initFieldNames;
+        
     };
 
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report ){
@@ -1272,20 +1348,28 @@ namespace mongo {
         s.exec( "db.bar.silly.verify();" );
         s.exec( "assert.eq( 'foo.bar.silly' , db.bar.silly._fullName )" );
         s.exec( "assert.eq( 'function' , typeof _mongo.find , 'mongo.find is not a function' )" );
+
+        assert( (string)"abc" == trim( "abc" ) );
+        assert( (string)"abc" == trim( " abc" ) );
+        assert( (string)"abc" == trim( "abc " ) );
+        assert( (string)"abc" == trim( " abc " ) );
+
     }
 
     Scope * SMEngine::createScope(){
         return new SMScope();
     }
 
-    void Convertor::addRoot( JSFunction * f ){
+    void Convertor::addRoot( JSFunction * f , const char * name ){
         if ( ! f )
             return;
 
         SMScope * scope = currentScope.get();
         uassert( "need a scope" , scope );
-
-        scope->addRoot( f , "cf" );
+        
+        JSObject * o = JS_GetFunctionObject( f );
+        assert( o );
+        scope->addRoot( &o , name );
     }
 
 }

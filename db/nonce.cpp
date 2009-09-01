@@ -19,9 +19,9 @@
 #include "stdafx.h"
 #include "nonce.h"
 
-namespace mongo {
+extern int do_md5_test(void);
 
-    extern "C" int do_md5_test(void);
+namespace mongo {
     
     Security::Security(){
 #if defined(__linux__)

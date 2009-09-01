@@ -2,8 +2,8 @@
 
 s = new ShardingTest( "shard6" , 2 , 0 , 1 );
 
-s.adminCommand( { partition : "test" } );
-s.adminCommand( { shard : "test.data" , key : { num : 1 } } );
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.data" , key : { num : 1 } } );
 
 db = s.getDB( "test" );
 

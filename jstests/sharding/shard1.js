@@ -10,11 +10,11 @@ db.foo.insert( { num : 2 , name : "sara" } );
 db.foo.insert( { num : -1 , name : "joe" } );
 assert.eq( 3 , db.foo.find().length() );
 
-shardCommand = { shard : "test.foo" , key : { num : 1 } };
+shardCommand = { shardcollection : "test.foo" , key : { num : 1 } };
 
 assert.throws( function(){ s.adminCommand( shardCommand ); } );
 
-s.adminCommand( { partition : "test" } );
+s.adminCommand( { enablesharding : "test" } );
 assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );

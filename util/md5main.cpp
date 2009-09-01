@@ -140,3 +140,4 @@ md5main(int argc, char *argv[])
     puts(usage);
     return 0;
 }
+

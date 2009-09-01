@@ -3,8 +3,8 @@
 s = new ShardingTest( "keystring" , 2 );
 
 db = s.getDB( "test" );
-s.adminCommand( { partition : "test" } )
-s.adminCommand( { shard : "test.foo" , key : { name : 1 } } );
+s.adminCommand( { enablesharding : "test" } )
+s.adminCommand( { shardcollection : "test.foo" , key : { name : 1 } } );
 
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );

@@ -334,7 +334,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\commands.cpp"
+				RelativePath=".\commands_admin.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\commands_public.cpp"
 				>
 			</File>
 			<File
@@ -469,26 +473,10 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\util\md5main.c"
+					RelativePath="..\util\md5main.cpp"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug Recstore|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"

@@ -2,9 +2,9 @@ db.capped2.drop();
 db._dbCommand( { create: "capped2", capped: true, size: 1000, $nExtents: 11, autoIndexId: false } );
 t = db.capped2;
 
-var val = new Array( 1000 );
+var val = new Array( 2000 );
 var c = "";
-for( i = 0; i < 1000; ++i, c += "-" ) {
+for( i = 0; i < 2000; ++i, c += "-" ) {
     val[ i ] = { a: c };
 }
 

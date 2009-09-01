@@ -2,7 +2,7 @@
 
 #include "stdafx.h"
 #include "request.h"
-#include "shard.h"
+#include "chunk.h"
 #include "cursors.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"
@@ -19,17 +19,17 @@ namespace mongo {
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( "something is wrong, shouldn't see a command here" );
 
-            ShardManager * info = r.getShardManager();
+            ChunkManager * info = r.getChunkManager();
             assert( info );
             
             Query query( q.query );
 
-            vector<Shard*> shards;
-            info->getShardsForQuery( shards , query.getFilter()  );
+            vector<Chunk*> shards;
+            info->getChunksForQuery( shards , query.getFilter()  );
             
             set<ServerAndQuery> servers;
             map<string,int> serverCounts;
-            for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
+            for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                 servers.insert( (*i)->getServer() );
                 int& num = serverCounts[(*i)->getServer()];
                 num++;
@@ -48,8 +48,8 @@ namespace mongo {
                 if ( shardKeyOrder ){
                     // 2. sort on shard key, can do in serial intelligently
                     set<ServerAndQuery> buckets;
-                    for ( vector<Shard*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                        Shard * s = *i;
+                    for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
+                        Chunk * s = *i;
                         BSONObj extra = BSONObj();
                         if ( serverCounts[s->getServer()] > 1 ){
                             BSONObjBuilder b;
@@ -98,7 +98,7 @@ namespace mongo {
             cursorCache.remove( id );
         }
         
-        void _insert( Request& r , DbMessage& d, ShardManager* manager ){
+        void _insert( Request& r , DbMessage& d, ChunkManager* manager ){
             
             while ( d.moreJSObjs() ){
                 BSONObj o = d.nextJsObj();
@@ -107,15 +107,15 @@ namespace mongo {
                     throw UserException( "tried to insert object without shard key" );
                 }
                 
-                Shard& s = manager->findShard( o );
-                log(4) << "  server:" << s.getServer() << " " << o << endl;
-                insert( s.getServer() , r.getns() , o );
+                Chunk& c = manager->findChunk( o );
+                log(4) << "  server:" << c.getServer() << " " << o << endl;
+                insert( c.getServer() , r.getns() , o );
                 
-                s.splitIfShould( o.objsize() );
+                c.splitIfShould( o.objsize() );
             }            
         }
 
-        void _update( Request& r , DbMessage& d, ShardManager* manager ){
+        void _update( Request& r , DbMessage& d, ChunkManager* manager ){
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
@@ -138,13 +138,13 @@ namespace mongo {
                 throw UserException( "change would move shards!" );
             }
 
-            Shard& s = manager->findShard( toupdate );
-            doWrite( dbUpdate , r , s.getServer() );
+            Chunk& c = manager->findChunk( toupdate );
+            doWrite( dbUpdate , r , c.getServer() );
 
-            s.splitIfShould( d.msg().data->dataLen() );
+            c.splitIfShould( d.msg().data->dataLen() );
         }
         
-        void _delete( Request& r , DbMessage& d, ShardManager* manager ){
+        void _delete( Request& r , DbMessage& d, ChunkManager* manager ){
 
             int flags = d.pullInt();
             bool justOne = flags & 1;
@@ -153,24 +153,24 @@ namespace mongo {
             BSONObj pattern = d.nextJsObj();
             
             if ( manager->hasShardKey( pattern ) ){
-                Shard& s = manager->findShard( pattern );
-                doWrite( dbDelete , r , s.getServer() );
+                Chunk& c = manager->findChunk( pattern );
+                doWrite( dbDelete , r , c.getServer() );
                 return;
             }
             
             if ( ! justOne && ! pattern.hasField( "_id" ) )
                 throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
             
-            vector<Shard*> shards;
-            manager->getShardsForQuery( shards , pattern );
+            vector<Chunk*> chunks;
+            manager->getChunksForQuery( chunks , pattern );
             
             set<string> seen;
-            for ( vector<Shard*>::iterator i=shards.begin(); i!=shards.end(); i++){
-                Shard * s = *i;
-                if ( seen.count( s->getServer() ) )
+            for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
+                Chunk * c = *i;
+                if ( seen.count( c->getServer() ) )
                     continue;
-                seen.insert( s->getServer() );
-                doWrite( dbDelete , r , s->getServer() );
+                seen.insert( c->getServer() );
+                doWrite( dbDelete , r , c->getServer() );
             }
         }
         
@@ -179,7 +179,7 @@ namespace mongo {
             log(3) << "write: " << ns << endl;
             
             DbMessage& d = r.d();
-            ShardManager * info = r.getShardManager();
+            ChunkManager * info = r.getChunkManager();
             assert( info );
             
             if ( op == dbInsert ){

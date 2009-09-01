@@ -96,8 +96,18 @@ using namespace std;
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr.hpp>
 #define BOOST_SPIRIT_THREADSAFE
+
+#include <boost/version.hpp>
+
+#if BOOST_VERSION >= 103800
+#define BOOST_SPIRIT_USE_OLD_NAMESPACE
+#include <boost/spirit/include/classic_core.hpp>
+#include <boost/spirit/include/classic_loops.hpp>
+#else
 #include <boost/spirit/core.hpp>
 #include <boost/spirit/utility/loops.hpp>
+#endif
+
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>

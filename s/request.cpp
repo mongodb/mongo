@@ -27,7 +27,7 @@
 
 #include "request.h"
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 
 namespace mongo {
 
@@ -42,7 +42,7 @@ namespace mongo {
         _config = grid.getDBConfig( getns() );
 
         if ( _config->sharded( getns() ) ){
-            _shardInfo = _config->getShardManager( getns() , reload );
+            _shardInfo = _config->getChunkManager( getns() , reload );
             uassert( (string)"no shard info for: " + getns() , _shardInfo );
         }
         else {
@@ -55,9 +55,9 @@ namespace mongo {
     
     string Request::singleServerName(){
         if ( _shardInfo ){
-            if ( _shardInfo->numShards() > 1 )
+            if ( _shardInfo->numChunks() > 1 )
                 throw UserException( "can't call singleServerName on a sharded collection" );
-            return _shardInfo->findShard( _shardInfo->getShardKey().globalMin() ).getServer();
+            return _shardInfo->findChunk( _shardInfo->getShardKey().globalMin() ).getServer();
         }
         string s = _config->getServer( getns() );
         uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );

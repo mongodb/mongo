@@ -17,6 +17,7 @@ import re
 import shutil
 import urllib
 import urllib2
+import buildscripts
 
 # --- options ----
 AddOption('--prefix',
@@ -142,6 +143,13 @@ AddOption( "--extrapath",
            action="store",
            help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
 
+AddOption( "--cxx",
+           dest="cxx",
+           type="string",
+           nargs=1,
+           action="store",
+           help="compiler to use" )
+
 
 AddOption( "--boost-compiler",
            dest="boostCompiler",
@@ -149,6 +157,13 @@ AddOption( "--boost-compiler",
            nargs=1,
            action="store",
            help="compiler used for boost (gcc41)" )
+
+AddOption( "--boost-version",
+           dest="boostVersion",
+           type="string",
+           nargs=1,
+           action="store",
+           help="boost version for linking(1_38)" )
 
 AddOption( "--pg",
            dest="profile",
@@ -201,6 +216,9 @@ usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
 env = Environment( MSVS_ARCH=msarch )
+if GetOption( "cxx" ) is not None:
+    env["CC"] = GetOption( "cxx" )
+    env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
@@ -215,6 +233,12 @@ if boostCompiler is None:
     boostCompiler = ""
 else:
     boostCompiler = "-" + boostCompiler
+
+boostVersion = GetOption( "boostVersion" )
+if boostVersion is None:
+    boostVersion = ""
+else:
+    boostVersion = "-" + boostVersion
 
 if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
@@ -232,7 +256,7 @@ if GetOption( "extrapath" ) is not None:
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" , "util/httpclient.cpp" ]
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
@@ -266,7 +290,7 @@ else:
     nojni = True
 
 coreShardFiles = []
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
@@ -353,9 +377,7 @@ elif "linux2" == os.sys.platform:
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
 
-        if force64:
-            print( "error: force64 doesn't make sense on a 64-bit machine" )
-            Exit(1)
+        force64 = False
 
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
@@ -515,6 +537,11 @@ if nix:
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
 
+if "uname" in dir(os):
+    hacks = buildscripts.findHacks( os.uname() )
+    if hacks is not None:
+        hacks.insert( env , { "linux64" : linux64 } )
+        
 try:
     umask = os.umask(022)
 except OSError:
@@ -634,10 +661,12 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" , l + boostCompiler ] , release or not shell)
+        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion , 
+                      l + boostCompiler + boostVersion ] , 
+                    release or not shell)
 
     # this will add it iff it exists and works
-    myCheckLib( "boost_system" + boostCompiler + "-mt" )
+    myCheckLib( "boost_system" + boostCompiler + "-mt" + boostVersion )
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
@@ -660,12 +689,14 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     else:
         myenv.Append( CPPDEFINES=[ "XP_UNIX" ] )
 
+    if solaris:
+        conf.CheckLib( "nsl" )
+
     if usesm:
 
         myCheckLib( [ "js" , "mozjs" ] , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
-            myenv.Append( CPPDEFINES=[ "MOZJS" ] )
             mozHeader = "mozjs"
 
         if not conf.CheckHeader( mozHeader + "/jsapi.h" ):
@@ -841,7 +872,7 @@ if release and ( ( darwin and force64 ) or linux64 ):
 if noshell:
     print( "not building shell" )
 elif not onlyServer:
-    weird = force64 and not windows
+    weird = force64 and not windows and not solaris
 
     if weird:
         shellEnv["CFLAGS"].remove("-m64")
@@ -1174,7 +1205,7 @@ def getDistName( sofar ):
 
     if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         version = getCodeVersion()
-        if not version.endswith( "+" ):
+        if not version.endswith( "+" ) and not version.endswith("-"):
             print( "got real code version, doing release build for: " + version )
             dontReplacePackage = True
             distName = version

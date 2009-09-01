@@ -36,7 +36,7 @@ namespace mongo {
     extern ConfigServer configServer;
     extern Grid grid;
 
-    class ShardManager;
+    class ChunkManager;
     
     /**
        top level grid configuration for an entire database
@@ -55,14 +55,14 @@ namespace mongo {
         }
         
         void turnOnPartitioning();
-        ShardManager* turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder );
+        ChunkManager* turnOnSharding( const string& ns , ShardKeyPattern fieldsAndOrder );
         
         /**
          * @return whether or not this partition is partitioned
          */
         bool sharded( const string& ns );
         
-        ShardManager* getShardManager( const string& ns , bool reload = false );
+        ChunkManager* getChunkManager( const string& ns , bool reload = false );
 
         /**
          * @return the correct for machine for the ns
@@ -97,7 +97,7 @@ namespace mongo {
         bool _partitioned;
         
         map<string,ShardKeyPattern> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-        map<string,ShardManager*> _shards; // this will only have entries for things that have been looked at
+        map<string,ChunkManager*> _shards; // this will only have entries for things that have been looked at
 
         friend class Grid;
     };

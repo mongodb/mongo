@@ -49,7 +49,6 @@
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/bin/mongod
 DATA=/var/lib/mongodb
-DAEMON_OPTS="--dbpath $DATA run"
 NAME=MongoDB
 DESC=database
 
@@ -72,6 +71,7 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
                             # 'restart' will not work
 
 LOGFILE=$LOGDIR/$NAME.log  # Server logfile
+DAEMON_OPTS="--dbpath $DATA --logpath $LOGFILE run"
 
 
 # Include mongodb defaults if available

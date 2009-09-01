@@ -12,8 +12,8 @@ s = new ShardingTest( "shard2" , 2 , 5 );
 
 db = s.getDB( "test" );
 
-s.adminCommand( { partition : "test" } );
-s.adminCommand( { shard : "test.foo" , key : { num : 1 } } );
+s.adminCommand( { enablesharding : "test" } );
+s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 assert.eq( 1 , s.config.shard.count()  , "sanity check 1" );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 0 } } );
