@@ -46,25 +46,25 @@ public:
         out << "\t list - list all files.  takes an optional filename.  the file has to start with the filename" << endl;
         out << "\t search - search all files for something that contains the string" << endl;
     }
-    
+
     void display( GridFS * grid , BSONObj obj ){
         auto_ptr<DBClientCursor> c = grid->list( obj );
         while ( c->more() ){
             BSONObj obj = c->next();
-            cout 
-                << obj["filename"].str() << "\t" 
-                << (long)obj["length"].number() 
+            cout
+                << obj["filename"].str() << "\t"
+                << (long)obj["length"].number()
                 << endl;
         }
     }
-    
+
     int run(){
         string cmd = getParam( "command" );
         if ( cmd.size() == 0 ){
             cerr << "need command" << endl;
             return -1;
         }
-        
+
         GridFS g( conn() , _db );
         auth();
 
@@ -102,13 +102,13 @@ public:
             cout << "done write to: " << out << endl;
             return 0;
         }
-        
+
         if ( cmd == "put" ){
             cout << "file object: " << g.storeFile( filename ) << endl;
             cout << "done!";
             return 0;
         }
-        
+
         cerr << "unknown command: " << cmd << endl;
         return -1;
     }
