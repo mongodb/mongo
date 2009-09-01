@@ -187,6 +187,8 @@ public:
         assert( isBalanced( "x = \"{\";" ) );
         assert( isBalanced( "// {" ) );
         assert( ! isBalanced( "// \n {" ) );
+        assert( ! isBalanced( "\"//\" {" ) );
+
     }
 } balnaced_test;
 
