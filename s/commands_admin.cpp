@@ -449,6 +449,18 @@ namespace mongo {
                     return false;
                 }
 
+                try {
+                    ScopedDbConnection newShardConn( shard["host"].valuestrsafe() );
+                    newShardConn->getLastError();
+                }
+                catch ( DBException& e ){
+                    errmsg = "couldn't connect to new shard";
+                    result.append( "host" , shard["host"].valuestrsafe() );
+                    result.append( "exception" , e.what() );
+                    result.append( "ok" , 0 );
+                    return false;
+                }
+
                 conn->insert( "config.shards" , shard );
                 result.append( "ok", 1 );
                 result.append( "added" , shard["host"].valuestrsafe() );
