@@ -39,5 +39,5 @@ def foundxulrunner( env , options ):
     env.Prepend( CPPPATH=[ incroot + "stable/" , 
                            incroot + "unstable/" ] )
     
-    env.Append( CPPDEFINES=[ "XULRUNNER" ] )
+    env.Append( CPPDEFINES=[ "XULRUNNER" , "OLDJS" ] )
     return True
