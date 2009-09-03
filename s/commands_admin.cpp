@@ -272,6 +272,12 @@ namespace mongo {
                         errmsg = "can't shard collection with unique indexes";
                         return false;
                     }
+
+                    BSONObj res = conn->findOne( config->getName() + ".system.namespaces" , BSON( "name" << ns ) );
+                    if ( res["options"].type() == Object && res["options"].embeddedObject()["capped"].trueValue() ){
+                        errmsg = "can't shard capped collection";
+                        return false;
+                    }
                 }
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );

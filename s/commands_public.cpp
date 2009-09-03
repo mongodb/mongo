@@ -41,21 +41,32 @@ namespace mongo {
             virtual bool adminOnly() {
                 return false;
             }
-        };
+        protected:
+            string getDBName( string ns ){
+                return ns.substr( 0 , ns.size() - 5 );
+            } 
 
+            bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+                ScopedDbConnection conn( conf->getPrimary() );
+                BSONObj res;
+                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                result.appendElements( res );
+                return ok;
+            }
+        };
+        
 
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 
-                string dbName = ns;
-                dbName = dbName.substr( 0 , dbName.size() - 5 );
+                string dbName = getDBName( ns );
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
                 BSONObj filter = cmdObj["query"].embeddedObject();
-
+                
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
@@ -83,5 +94,24 @@ namespace mongo {
                 return true;
             }
         } countCmd;
+
+        class ConvertToCappedCmd : public PublicGridCommand {
+        public:
+            ConvertToCappedCmd() : PublicGridCommand("convertToCapped"){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                errmsg = "can't make a sharded collection capped";
+                return false;
+            }
+        } convertToCappedCmd;
     }
 }

@@ -79,4 +79,29 @@ assert.eq( 2 , b.foo4.getIndexes().length , "ub2" );
 assert( a.foo4.getIndexes()[1].unique , "ua3" );
 assert( b.foo4.getIndexes()[1].unique , "ub3" );
 
+// --- don't let you convertToCapped ----
+assert( ! db.foo4.isCapped() , "ca1" );
+assert( ! a.foo4.isCapped() , "ca2" );
+assert( ! b.foo4.isCapped() , "ca3" );
+assert( ! db.foo4.convertToCapped( 30000 ).ok , "ca30" );
+assert( ! db.foo4.isCapped() , "ca4" );
+assert( ! a.foo4.isCapped() , "ca5" );
+assert( ! b.foo4.isCapped() , "ca6" );
+
+//      make sure i didn't break anything
+db.foo4a.save( { a : 1 } );
+assert( ! db.foo4a.isCapped() , "ca7" );
+db.foo4a.convertToCapped( 30000 );
+assert( db.foo4a.isCapped() , "ca8" );
+
+// --- don't let you shard a capped collection
+
+db.createCollection("foo5", {capped:true, size:30000});
+assert( db.foo5.isCapped() , "cb1" );
+assert( ! s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } ).ok , "shard capped" );
+
+
+
+
+
 s.stop()
