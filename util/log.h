@@ -97,13 +97,6 @@ namespace mongo {
         }        
         template< class T >
         Nullstream& operator<<(const shared_ptr<T> p ){
-			/*
-            T * t = p.get();
-            if ( ! t )
-                *this << "null";
-            else 
-                *this << t;
-				*/
             return *this;
         }
         template< class T >
@@ -121,6 +114,7 @@ namespace mongo {
     extern Nullstream nullstream;
     
 #define LOGIT { boostlock lk(mutex); cout << x; return *this; }
+
     class Logstream : public Nullstream {
         static boost::mutex &mutex;
     public:
@@ -158,6 +152,17 @@ namespace mongo {
             cout << _hex;
             return *this;
         }
+
+        template< class T >
+        Nullstream& operator<<(const shared_ptr<T> p ){
+            T * t = p.get();
+            if ( ! t )
+                *this << "null";
+            else 
+                *this << t;
+            return *this;
+        }
+
         Logstream& prolog(bool withNs = false) {
             char now[64];
             time_t_to_String(time(0), now);
@@ -169,6 +174,7 @@ namespace mongo {
                 cout << curNs << ' ';
             return *this;
         }
+
     };
     extern Logstream logstream;
 
