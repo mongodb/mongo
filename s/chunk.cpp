@@ -348,7 +348,7 @@ namespace mongo {
     
     void Chunk::ensureIndex(){
         ScopedDbConnection conn( getShard() );
-        conn->ensureIndex( _ns , _manager->getShardKey().key() );
+        conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
         conn.done();
     }
 
@@ -367,7 +367,8 @@ namespace mongo {
 
     unsigned long long ChunkManager::NextSequenceNumber = 1;
 
-    ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern ) : _config( config ) , _ns( ns ) , _key( pattern ){
+    ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
+        _config( config ) , _ns( ns ) , _key( pattern ) , _unique( unique ){
         Chunk temp(0);
         
         ScopedDbConnection conn( temp.modelServer() );

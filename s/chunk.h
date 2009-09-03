@@ -154,7 +154,7 @@ namespace mongo {
     class ChunkManager {
     public:
 
-        ChunkManager( DBConfig * config , string ns ,ShardKeyPattern pattern );
+        ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique );
         virtual ~ChunkManager();
 
         string getns(){
@@ -169,6 +169,7 @@ namespace mongo {
         Chunk* findChunkOnServer( const string& server ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
+        bool isUnique(){ return _unique; }
         
         /**
          * makes sure the shard index is on all servers
@@ -199,6 +200,7 @@ namespace mongo {
         DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;
+        bool _unique;
         
         vector<Chunk*> _chunks;
         

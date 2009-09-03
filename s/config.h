@@ -37,6 +37,15 @@ namespace mongo {
     extern Grid grid;
 
     class ChunkManager;
+
+    class CollectionInfo {
+    public:
+        CollectionInfo( ShardKeyPattern _key = BSONObj() , bool _unique = false ) : 
+            key( _key ) , unique( _unique ){}
+
+        ShardKeyPattern key;
+        bool unique;
+    };
     
     /**
        top level grid configuration for an entire database
@@ -55,7 +64,7 @@ namespace mongo {
         }
         
         void enableSharding();
-        ChunkManager* shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder );
+        ChunkManager* shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
         
         /**
          * @return whether or not this partition is partitioned
@@ -96,7 +105,7 @@ namespace mongo {
         string _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
         
-        map<string,ShardKeyPattern> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+        map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
         map<string,ChunkManager*> _shards; // this will only have entries for things that have been looked at
 
         friend class Grid;

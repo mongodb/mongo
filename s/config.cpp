@@ -53,7 +53,7 @@ namespace mongo {
         _shardingEnabled = true; 
     }
     
-    ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder ){
+    ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
         if ( ! _shardingEnabled )
             throw UserException( "db doesn't have sharding enabled" );
         
@@ -64,9 +64,9 @@ namespace mongo {
         if ( isSharded( ns ) )
             throw UserException( "already sharded" );
 
-        _sharded[ns] = fieldsAndOrder;
+        _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
 
-        info = new ChunkManager( this , ns , fieldsAndOrder );
+        info = new ChunkManager( this , ns , fieldsAndOrder , unique );
         _shards[ns] = info;
         return info;
 
@@ -80,7 +80,7 @@ namespace mongo {
         uassert( (string)"not sharded:" + ns , isSharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
-        m = new ChunkManager( this , ns , _sharded[ ns ] );
+        m = new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique );
         _shards[ns] = m;
         return m;
     }
@@ -92,8 +92,11 @@ namespace mongo {
         
         if ( _sharded.size() > 0 ){
             BSONObjBuilder a;
-            for ( map<string,ShardKeyPattern>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
-                a.append( i->first.c_str() , i->second.key() );
+            for ( map<string,CollectionInfo>::reverse_iterator i=_sharded.rbegin(); i != _sharded.rend(); i++){
+                BSONObjBuilder temp;
+                temp.append( "key" , i->second.key.key() );
+                temp.appendBool( "unique" , i->second.unique );
+                a.append( i->first.c_str() , temp.obj() );
             }
             to.append( "sharded" , a.obj() );
         }
@@ -111,7 +114,10 @@ namespace mongo {
             while ( i.more() ){
                 BSONElement e = i.next();
                 uassert( "sharded things have to be objects" , e.type() == Object );
-                _sharded[e.fieldName()] = e.embeddedObject();
+                BSONObj c = e.embeddedObject();
+                uassert( "key has to be an object" , c["key"].type() == Object );
+                _sharded[e.fieldName()] = CollectionInfo( c["key"].embeddedObject() , 
+                                                          c["unique"].trueValue() );
             }
         }
     }
@@ -365,8 +371,8 @@ namespace mongo {
             b << "primary" << "myserver";
             
             BSONObjBuilder a;
-            a << "abc.foo" << BSON( "a" << 1 );
-            a << "abc.bar" << BSON( "b" << -1 );
+            a << "abc.foo" << fromjson( "{ 'key' : { 'a' : 1 } , 'unique' : false }" );
+            a << "abc.bar" << fromjson( "{ 'key' : { 'kb' : -1 } , 'unique' : true }" );
             
             b.appendArray( "sharded" , a.obj() );
 
