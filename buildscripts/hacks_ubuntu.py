@@ -4,7 +4,7 @@ import os
 def insert( env , options ):
     
     if not foundxulrunner( env , options ):
-        myenv.Append( CPPDEFINES=[ "MOZJS" ] )
+        env.Append( CPPDEFINES=[ "MOZJS" ] )
 
 
 def foundxulrunner( env , options ):
@@ -29,8 +29,8 @@ def foundxulrunner( env , options ):
         libroot += "64";
     libroot += "/" + best
     
-    if not os.path.exists( "/usr/lib64/" + best ):
-        print( "warning: found xulrunner include but not lib" )
+    if not os.path.exists( libroot ):
+        print( "warning: found xulrunner include but not lib for: " + best )
         return False
     
     env.Prepend( LIBPATH=[ libroot ] )

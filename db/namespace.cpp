@@ -70,7 +70,10 @@ namespace mongo {
         if( boost::filesystem::exists(nsPath) ) { 
 			p = f.map(pathString.c_str());
 			len = f.length();
-			uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+            if ( len % (1024*1024) != 0 ){
+                log() << "bad .ns file: " << pathString << endl;
+                uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+            }
 		}
 		else {
 			// use lenForNewNsFiles, we are making a new database

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "../stdafx.h"
-#include "shard.h"
+#include "chunk.h"
 #include "request.h"
 
 namespace mongo {
@@ -29,7 +29,7 @@ namespace mongo {
 
     void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
     
-    bool setShardVersion( DBClientBase & conn , const string& ns , ServerShardVersion version , bool authoritative , BSONObj& result );
+    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
 
     bool lockNamespaceOnServer( const string& server , const string& ns );
     bool lockNamespaceOnServer( DBClientBase& conn , const string& ns );

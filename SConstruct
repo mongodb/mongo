@@ -158,6 +158,13 @@ AddOption( "--boost-compiler",
            action="store",
            help="compiler used for boost (gcc41)" )
 
+AddOption( "--boost-version",
+           dest="boostVersion",
+           type="string",
+           nargs=1,
+           action="store",
+           help="boost version for linking(1_38)" )
+
 AddOption( "--pg",
            dest="profile",
            type="string",
@@ -227,6 +234,12 @@ if boostCompiler is None:
 else:
     boostCompiler = "-" + boostCompiler
 
+boostVersion = GetOption( "boostVersion" )
+if boostVersion is None:
+    boostVersion = ""
+else:
+    boostVersion = "-" + boostVersion
+
 if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
     Exit(1)
@@ -277,7 +290,7 @@ else:
     nojni = True
 
 coreShardFiles = []
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" ] + [ "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
@@ -364,9 +377,7 @@ elif "linux2" == os.sys.platform:
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
 
-        if force64:
-            print( "error: force64 doesn't make sense on a 64-bit machine" )
-            Exit(1)
+        force64 = False
 
     if force32:
         env.Append( LIBPATH=["/usr/lib32"] )
@@ -650,10 +661,12 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" , l + boostCompiler ] , release or not shell)
+        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion , 
+                      l + boostCompiler + boostVersion ] , 
+                    release or not shell)
 
     # this will add it iff it exists and works
-    myCheckLib( "boost_system" + boostCompiler + "-mt" )
+    myCheckLib( "boost_system" + boostCompiler + "-mt" + boostVersion )
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )

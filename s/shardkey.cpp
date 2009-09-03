@@ -17,7 +17,7 @@
 */
 
 #include "stdafx.h"
-#include "shard.h"
+#include "chunk.h"
 #include "../db/jsobj.h"
 #include "../util/unittest.h"
 
@@ -336,17 +336,11 @@ normal:
         return L.woCompare(q) <= 0 && R.woCompare(q) > 0;
     }
 
-    bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Shard * shard ){
-/*        if ( ! hasShardKey( query ) ){
-            // if the shard key isn't in the query, then we have to go everywhere
-            // therefore this shard is relevant
-            return true;
-        }
-*/
+    bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Chunk * chunk ){
         massert("not done for compound patterns", patternfields.size() == 1);
 
-        bool rel = relevant(query, shard->getMin(), shard->getMax());
-        if( !hasShardKey( query ) )
+        bool rel = relevant(query, chunk->getMin(), chunk->getMax());
+        if( ! hasShardKey( query ) )
             assert(rel);
 
         return rel;
@@ -464,15 +458,15 @@ normal:
         void rfq() {
             ShardKeyPattern k( BSON( "key" << 1 ) );
             BSONObj q = BSON( "key" << 3 );
-            Shard s(0);
+            Chunk c(0);
             BSONObj z = fromjson("{ ns : \"alleyinsider.fs.chunks\" , min : {key:2} , max : {key:20} , server : \"localhost:30001\" }");
-            s.unserialize(z);
-            assert( k.relevantForQuery(q, &s) );
-            assert( k.relevantForQuery(fromjson("{foo:9,key:4}"), &s) );
-            assert( !k.relevantForQuery(fromjson("{foo:9,key:43}"), &s) );
-            assert( k.relevantForQuery(fromjson("{foo:9,key:{$gt:10}}"), &s) );
-            assert( !k.relevantForQuery(fromjson("{foo:9,key:{$gt:22}}"), &s) );
-            assert( k.relevantForQuery(fromjson("{foo:9}"), &s) );
+            c.unserialize(z);
+            assert( k.relevantForQuery(q, &c) );
+            assert( k.relevantForQuery(fromjson("{foo:9,key:4}"), &c) );
+            assert( !k.relevantForQuery(fromjson("{foo:9,key:43}"), &c) );
+            assert( k.relevantForQuery(fromjson("{foo:9,key:{$gt:10}}"), &c) );
+            assert( !k.relevantForQuery(fromjson("{foo:9,key:{$gt:22}}"), &c) );
+            assert( k.relevantForQuery(fromjson("{foo:9}"), &c) );
         }
         void getfilt() { 
             ShardKeyPattern k( BSON( "key" << 1 ) );

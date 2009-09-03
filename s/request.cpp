@@ -27,7 +27,7 @@
 
 #include "request.h"
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 
 namespace mongo {
 
@@ -41,12 +41,12 @@ namespace mongo {
     void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
 
-        if ( _config->sharded( getns() ) ){
-            _shardInfo = _config->getShardManager( getns() , reload );
-            uassert( (string)"no shard info for: " + getns() , _shardInfo );
+        if ( _config->isSharded( getns() ) ){
+            _chunkManager = _config->getChunkManager( getns() , reload );
+            uassert( (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
-            _shardInfo = 0;
+            _chunkManager = 0;
         }        
 
         _m.data->id = _id;
@@ -54,12 +54,12 @@ namespace mongo {
     }
     
     string Request::singleServerName(){
-        if ( _shardInfo ){
-            if ( _shardInfo->numShards() > 1 )
+        if ( _chunkManager ){
+            if ( _chunkManager->numChunks() > 1 )
                 throw UserException( "can't call singleServerName on a sharded collection" );
-            return _shardInfo->findShard( _shardInfo->getShardKey().globalMin() ).getServer();
+            return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() ).getShard();
         }
-        string s = _config->getServer( getns() );
+        string s = _config->getShard( getns() );
         uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
         return s;
     }
@@ -74,7 +74,7 @@ namespace mongo {
         Strategy * s = SINGLE;
         
         _d.markSet();
-        if ( getConfig()->isPartitioned() && op == dbQuery ){
+        if ( getConfig()->isShardingEnabled() && op == dbQuery ){
             // there are a few things we need to check here
             // 1. db.eval
             //     TODO:  right now i'm just going to block all
@@ -98,9 +98,8 @@ namespace mongo {
             _d.markReset();
         }
 
-        if ( _shardInfo ){
-            //if ( _shardInfo->numShards() > 1 )
-                s = SHARDED;
+        if ( _chunkManager ){
+            s = SHARDED;
         }
 
         if ( op == dbQuery ) {

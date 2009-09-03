@@ -25,7 +25,7 @@
 #include "server.h"
 #include "request.h"
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 
 namespace mongo {
 
@@ -156,7 +156,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 1;
     }
 
-    log() << argv[0] << " v0.0.2 starting (--help for usage)" << endl;
+    log() << argv[0] << " v0.2- (alpha 2) starting (--help for usage)" << endl;
     printGitVersion();
     printSysInfo();
 

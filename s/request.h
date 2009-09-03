@@ -33,9 +33,12 @@ namespace mongo {
         DBConfig * getConfig(){
             return _config;
         }
+        bool isShardingEnabled(){
+            return _config->isShardingEnabled();
+        }
         
-        ShardManager * getShardManager(){
-            return _shardInfo;
+        ChunkManager * getChunkManager(){
+            return _chunkManager;
         }
 
         // ---- remote location info -----
@@ -69,7 +72,7 @@ namespace mongo {
         
         MSGID _id;
         DBConfig * _config;
-        ShardManager * _shardInfo;
+        ChunkManager * _chunkManager;
     };
     
     class StaleConfigException : public std::exception {

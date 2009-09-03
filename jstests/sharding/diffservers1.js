@@ -12,5 +12,8 @@ test1.save( { a : 2 } );
 test1.save( { a : 3 } );
 assert( 3 , test1.count() );
 
+assert( ! s.admin.runCommand( { addshard: "sdd$%" } ).ok , "bad hostname" );
+assert( ! s.admin.runCommand( { addshard: "127.0.0.1:43415" } ).ok , "host not up" );
+
 s.stop();
 

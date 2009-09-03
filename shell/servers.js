@@ -195,6 +195,10 @@ ShardingTest.prototype.printShards = function(){
     print( this.getShardString() );
 }
 
+ShardingTest.prototype.sync = function(){
+    this.adminCommand( "connpoolsync" );
+}
+
 MongodRunner = function( port, dbpath, peer, arbiter, extraArgs ) {
     this.port_ = port;
     this.dbpath_ = dbpath;

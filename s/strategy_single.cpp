@@ -64,8 +64,51 @@ namespace mongo {
 
         }
         
+        void handleIndexWrite( int op , Request& r ){
+            
+            DbMessage& d = r.d();
+
+            if ( op == dbInsert ){
+                while( d.moreJSObjs() ){
+                    BSONObj o = d.nextJsObj();
+                    const char * ns = o["ns"].valuestr();
+                    if ( r.getConfig()->isSharded( ns ) ){
+                        uassert( "can't use unique indexes with sharding" , ! o["unique"].trueValue() );
+                        ChunkManager * cm = r.getConfig()->getChunkManager( ns );
+                        assert( cm );
+                        for ( int i=0; i<cm->numChunks();i++)
+                            doWrite( op , r , cm->getChunk(i)->getShard() );
+                    }
+                    else {
+                        doWrite( op , r , r.singleServerName() );
+                    }
+                }
+            }
+            else if ( op == dbUpdate ){
+                throw UserException( "can't update system.indexes" );
+            }
+            else if ( op == dbDelete ){
+                // TODO
+                throw UserException( "can't delete indexes on sharded collection yet" );
+            }
+            else {
+                log() << "handleIndexWrite invalid write op: " << op << endl;
+                throw UserException( "handleIndexWrite invalid write op" );
+            }
+                    
+        }
+
         virtual void writeOp( int op , Request& r ){
             const char *ns = r.getns();
+            
+            if ( r.isShardingEnabled() && 
+                 strstr( ns , ".system.indexes" ) == strstr( ns , "." ) && 
+                 strstr( ns , "." ) ){
+                log(1) << " .system.indexes write for: " << ns << endl;
+                handleIndexWrite( op , r );
+                return;
+            }
+            
             log(3) << "single write: " << ns << endl;
             doWrite( op , r , r.singleServerName() );
         }

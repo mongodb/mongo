@@ -22,7 +22,7 @@
 
 namespace mongo {
     
-    class Shard;
+    class Chunk;
 
     /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
        Analogous to an index key pattern.
@@ -84,7 +84,7 @@ namespace mongo {
               s:     x:2..x:7
                -> true
          */
-        bool relevantForQuery( const BSONObj& q , Shard * s );
+        bool relevantForQuery( const BSONObj& q , Chunk * s );
         
         /**
            Returns if the given sort pattern can be ordered by the shard key pattern.

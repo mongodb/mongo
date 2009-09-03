@@ -24,7 +24,7 @@
 #include "../db/commands.h"
 
 #include "config.h"
-#include "shard.h"
+#include "chunk.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -58,7 +58,7 @@ namespace mongo {
 
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
-                if ( ! conf || ! conf->isPartitioned() || ! conf->sharded( fullns ) ){
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
                     ScopedDbConnection conn( conf->getPrimary() );
                     result.append( "n" , (double)conn->count( fullns , filter ) );
                     conn.done();
@@ -66,16 +66,16 @@ namespace mongo {
                     return true;
                 }
                 
-                ShardManager * sm = conf->getShardManager( fullns );
-                massert( "how could shard manager be null!" , sm );
+                ChunkManager * cm = conf->getChunkManager( fullns );
+                massert( "how could chunk manager be null!" , cm );
                 
-                vector<Shard*> shards;
-                sm->getShardsForQuery( shards , filter );
+                vector<Chunk*> chunks;
+                cm->getChunksForQuery( chunks , filter );
                 
                 unsigned long long total = 0;
-                for ( vector<Shard*>::iterator i = shards.begin() ; i != shards.end() ; i++ ){
-                    Shard * s = *i;
-                    total += s->countObjects();
+                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    Chunk * c = *i;
+                    total += c->countObjects();
                 }
                 
                 result.append( "n" , (double)total );
