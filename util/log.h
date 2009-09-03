@@ -97,11 +97,13 @@ namespace mongo {
         }        
         template< class T >
         Nullstream& operator<<(const shared_ptr<T> p ){
+			/*
             T * t = p.get();
             if ( ! t )
                 *this << "null";
             else 
                 *this << t;
+				*/
             return *this;
         }
         template< class T >
