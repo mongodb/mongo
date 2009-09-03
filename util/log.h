@@ -113,14 +113,19 @@ namespace mongo {
     };
     extern Nullstream nullstream;
     
-#define LOGIT { boostlock lk(mutex); cout << x; return *this; }
+#define LOGIT { ss << x; return *this; }
 
     class Logstream : public Nullstream {
         static boost::mutex &mutex;
+        stringstream ss;
     public:
         void flush() {
-            boostlock lk(mutex);
-            cout.flush();
+            {
+                boostlock lk(mutex);
+                cout << ss.str();
+                cout.flush();
+            }
+            ss.str("");
         }
         Logstream& operator<<(const char *x) LOGIT
         Logstream& operator<<(char *x) LOGIT
@@ -137,19 +142,16 @@ namespace mongo {
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(bool x) LOGIT
         Logstream& operator<<(const LazyString& x) {
-            string res = x.val();
-            boostlock lk(mutex);
-            cout << res;
+            ss << x.val();
             return *this;
         }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
-            boostlock lk(mutex);
-            cout << _endl;
+            ss << '\n';
+            flush();
             return *this;
         }
         Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
-            boostlock lk(mutex);
-            cout << _hex;
+            ss << _hex;
             return *this;
         }
 
@@ -167,11 +169,9 @@ namespace mongo {
             char now[64];
             time_t_to_String(time(0), now);
             now[20] = 0;
-
-            boostlock lk(mutex);
-            cout << now;
+            ss << now;
             if ( withNs && /*database && */curNs )
-                cout << curNs << ' ';
+                ss << curNs << ' ';
             return *this;
         }
 
