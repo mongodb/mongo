@@ -38,7 +38,7 @@ namespace mongo {
     private:
         const T& t_;
     };
-    
+
     class Nullstream {
     public:
         virtual ~Nullstream() {}
@@ -169,39 +169,47 @@ namespace mongo {
                 cout << curNs << ' ';
             return *this;
         }
+    private:
+        static thread_specific_ptr<Logstream> tsp;
+    public:
+        static Logstream& get() {
+            Logstream *p = tsp.get();
+            if( p == 0 )
+                tsp.reset( p = new Logstream() );
+            return *p;
+        }
     };
-    extern Logstream logstream;
 
     extern int logLevel;
 
     inline Nullstream& problem( int level = 0 ) {
         if ( level > logLevel )
             return nullstream;
-        return logstream.prolog(true);
+        return Logstream::get().prolog(true);
     }
     
     inline Nullstream& out( int level = 0 ) {
         if ( level > logLevel )
             return nullstream;
-        return logstream;
+        return Logstream::get();
     }
     
     /* flush the log stream if the log level is 
        at the specified level or higher. */
     inline void logflush(int level = 0) { 
         if( level > logLevel )
-            logstream.flush();
+            Logstream::get().flush();
     }
 
     inline Nullstream& log( int level = 0 ){
         if ( level > logLevel )
             return nullstream;
-        return logstream.prolog();
+        return Logstream::get().prolog();
     }
 
+    /* TODOCONCURRENCY */
     inline ostream& stdcout() {
         return cout;
     }
-
 
 } // namespace mongo
