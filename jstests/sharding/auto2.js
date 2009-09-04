@@ -31,7 +31,7 @@ s.adminCommand( "connpoolsync" );
 print( "done inserting data" );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
-s.printShards();
+s.printChunks();
 
 counta = s._connections[0].getDB( "test" ).foo.count(); 
 countb = s._connections[1].getDB( "test" ).foo.count(); 

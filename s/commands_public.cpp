@@ -126,5 +126,18 @@ namespace mongo {
             }
             
         } convertToCappedCmd;
+
+
+        class GroupCmd : public NotAllowedOnShardedCollectionCmd  {
+        public:
+            GroupCmd() : NotAllowedOnShardedCollectionCmd("group"){}
+            
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ){
+                return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
+            }
+            
+        } groupCmd;
+
+
     }
 }

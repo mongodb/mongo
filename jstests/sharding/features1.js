@@ -101,7 +101,25 @@ assert( db.foo5.isCapped() , "cb1" );
 assert( ! s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } ).ok , "shard capped" );
 
 
+// ----- group ----
 
+db.foo6.save( { a : 1 } );
+db.foo6.save( { a : 3 } );
+db.foo6.save( { a : 3 } );
+s.sync();
+
+assert.eq( 2 , db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , 
+                                reduce : function(z,prev){ prev.count++; } } ).length );
+
+assert.eq( 3 , db.foo6.find().count() );
+assert( s.admin.runCommand( { shardcollection : "test.foo6" , key : { a : 2 } } ).ok );
+assert.eq( 3 , db.foo6.find().count() );
+
+s.adminCommand( { split : "test.foo6" , middle : { a : 2 } } );
+s.adminCommand( { movechunk : "test.foo6" , find : { a : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+
+assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , reduce : function(z,prev){ prev.count++; } } ); } );;
 
 
 s.stop()
+

@@ -187,12 +187,15 @@ ShardingTest.prototype.adminCommand = function(cmd){
     throw "command " + tojson( cmd ) + " failed: " + tojson( res );
 }
 
-ShardingTest.prototype.getShardString = function(){
-    return Array.tojson( this.config.shard.find().toArray() , "\n" );
+ShardingTest.prototype.getChunksString = function( ns ){
+    var q = {}
+    if ( ns )
+        q.ns = ns;
+    return Array.tojson( this.config.chunks.find( q ).toArray() , "\n" );
 }
 
-ShardingTest.prototype.printShards = function(){
-    print( this.getShardString() );
+ShardingTest.prototype.printChunks = function( ns ){
+    print( this.getChunksString( ns ) );
 }
 
 ShardingTest.prototype.sync = function(){

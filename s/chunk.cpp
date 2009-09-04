@@ -174,7 +174,10 @@ namespace mongo {
         {
 
             ShardChunkVersion newVersion = _manager->getVersion( from );
-            uassert( "version has to be higher" , newVersion > oldVersion );
+            if ( newVersion <= oldVersion ){
+                log() << "newVersion: " << newVersion << " oldVersion: " << oldVersion << endl;
+                uassert( "version has to be higher" , newVersion > oldVersion );
+            }
 
             BSONObjBuilder b;
             b << "movechunk.finish" << _ns;
