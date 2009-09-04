@@ -55,6 +55,28 @@ namespace mongo {
             }
         };
         
+        class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
+        public:
+            NotAllowedOnShardedCollectionCmd( const char * n ) : PublicGridCommand( n ){}
+
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
+            
+            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                string dbName = getDBName( ns );
+                string fullns = getFullNS( dbName , cmdObj );
+                
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                errmsg = "can't do command: " + name + " on sharded collection";
+                return false;
+            }
+        };
+        
+        // ----
 
         class CountCmd : public PublicGridCommand {
         public:
@@ -95,23 +117,14 @@ namespace mongo {
             }
         } countCmd;
 
-        class ConvertToCappedCmd : public PublicGridCommand {
+        class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
-            ConvertToCappedCmd() : PublicGridCommand("convertToCapped"){}
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
-                string dbName = getDBName( ns );
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
-
-                DBConfig * conf = grid.getDBConfig( dbName , false );
-                
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
-                    return passthrough( conf , cmdObj , result );
-                }
-                errmsg = "can't make a sharded collection capped";
-                return false;
+            ConvertToCappedCmd() : NotAllowedOnShardedCollectionCmd("convertToCapped"){}
+            
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ){
+                return dbName + "." + cmdObj.firstElement().valuestrsafe();
             }
+            
         } convertToCappedCmd;
     }
 }
