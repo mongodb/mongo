@@ -72,6 +72,10 @@ namespace mongo {
 
     JSBool internal_cursor_next(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         DBClientCursor *cursor = getCursor( cx, obj );
+        if ( ! cursor->more() ){
+            JS_ReportError( cx , "cursor at the end" );
+            return JS_FALSE;
+        }
         Convertor c(cx);
 
         BSONObj n = cursor->next();
