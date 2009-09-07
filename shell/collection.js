@@ -294,6 +294,10 @@ DBCollection.prototype.drop = function(){
     return this._db.runCommand( { drop: this.getName() } );
 }
 
+DBCollection.prototype.renameCollection = function( newName ){
+    return this._db._adminCommand( { renameCollection : this._fullName , to : this._db._name + "." + newName } ).ok;
+}
+
 DBCollection.prototype.validate = function() {
     var res = this._db.runCommand( { validate: this.getName() } );
 
