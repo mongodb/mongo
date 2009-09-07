@@ -1429,6 +1429,13 @@ namespace mongo {
 
     extern BSONObj maxKey;
     extern BSONObj minKey;
+	
+    // a BoundList contains intervals specified by inclusive start
+    // and end bounds.  The intervals should be nonoverlapping and occur in
+    // the specified direction of traversal.  For example, given a simple index {i:1}
+    // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
+    // would be valid for index {i:-1} with direction -1.
+    typedef vector< pair< BSONObj, BSONObj > > BoundList;	
 
     /*- just for testing -- */
 

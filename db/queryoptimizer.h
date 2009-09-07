@@ -46,8 +46,6 @@ namespace mongo {
            requested sort order */
         bool unhelpful() const { return unhelpful_; }
         int direction() const { return direction_; }
-        BSONObj startKey() const { return startKey_; }
-        BSONObj endKey() const { return endKey_; }
         auto_ptr< Cursor > newCursor( const DiskLoc &startLoc = DiskLoc() ) const;
         auto_ptr< Cursor > newReverseCursor() const;
         BSONObj indexKey() const;
@@ -56,6 +54,8 @@ namespace mongo {
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
         void registerSelf( long long nScanned ) const;
+        // just for testing
+        BoundList indexBounds() const { return indexBounds_; }
     private:
         NamespaceDetails *d;
         int idxNo;
@@ -66,8 +66,7 @@ namespace mongo {
         bool scanAndOrderRequired_;
         bool exactKeyMatch_;
         int direction_;
-        BSONObj startKey_;
-        BSONObj endKey_;
+        BoundList indexBounds_;
         bool endKeyInclusive_;
         bool unhelpful_;
     };

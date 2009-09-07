@@ -243,6 +243,23 @@ namespace mongo {
         return qp;
     }
     
+    BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
+        BSONObjBuilder startKeyBuilder;
+        BSONObjBuilder endKeyBuilder;
+        BSONObjIterator i( keyPattern );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const FieldRange &fr = range( e.fieldName() );
+            int number = (int) e.number(); // returns 0.0 if not numeric
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
+            startKeyBuilder.appendAs( forward ? fr.min() : fr.max(), "" );
+            endKeyBuilder.appendAs( forward ? fr.max() : fr.min(), "" );			
+        }
+        BoundList ret;
+        ret.push_back( make_pair( startKeyBuilder.obj(), endKeyBuilder.obj() ) );
+        return ret;
+    }
+    
     void FieldMatcher::add( const BSONObj& o ){
         BSONObjIterator i( o );
         while ( i.more() ){
