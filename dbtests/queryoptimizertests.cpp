@@ -273,6 +273,28 @@ namespace QueryOptimizerTests {
                 ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
             }
         };
+		
+		class MultiBound {
+		public:
+			void run() {
+                FieldRangeSet frs1( "", fromjson( "{a:{$in:[1,3,5,7,9]}}" ) );
+                FieldRangeSet frs2( "", fromjson( "{a:{$in:[2,3,5,8,9]}}" ) );
+				FieldRange fr1 = frs1.range( "a" );
+				FieldRange fr2 = frs2.range( "a" );
+				fr1 &= fr2;
+                ASSERT( fr1.min().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
+                ASSERT( fr1.max().woCompare( BSON( "a" << 9.0 ).firstElement(), false ) == 0 );
+				vector< FieldInterval > intervals = fr1.intervals();
+				vector< FieldInterval >::const_iterator j = intervals.begin();
+				double expected[] = { 3, 5, 9 };
+				for( int i = 0; i < 3; ++i, ++j ) {
+					ASSERT_EQUALS( expected[ i ], j->lower_.bound_.number() );
+					ASSERT( j->lower_.inclusive_ );
+					ASSERT( j->lower_ == j->upper_ );
+				}
+				ASSERT( j == intervals.end() );
+			}
+		};
         
     } // namespace FieldRangeTests
     
@@ -1015,6 +1037,7 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::Numeric >();
             add< FieldRangeTests::InLowerBound >();
             add< FieldRangeTests::InUpperBound >();
+            add< FieldRangeTests::MultiBound >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();

@@ -63,6 +63,7 @@ namespace mongo {
                 maxKey.firstElement().woCompare( max(), false ) != 0;
         }
         bool empty() const { return intervals_.empty(); }
+		vector< FieldInterval > intervals() const { return intervals_; }
     private:
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
