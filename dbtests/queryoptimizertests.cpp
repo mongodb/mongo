@@ -1019,6 +1019,80 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class InQueryIntervals : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                double expected[] = { 2, 3, 6, 9 };
+                for( int i = 0; i < 4; ++i, c->advance() ) {
+                    ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
+                }
+                ASSERT( !c->ok() );
+                
+                // now check reverse
+                {
+                    QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ), &hintElt );
+                    QueryPlan qp( nsd(), 1, s.fbs(), BSON( "a" << -1 ) );
+                    auto_ptr< Cursor > c = qp.newCursor();
+                    double expected[] = { 9, 6, 3, 2 };
+                    for( int i = 0; i < 4; ++i, c->advance() ) {
+                        ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
+                    }
+                    ASSERT( !c->ok() );                    
+                }
+            }
+        };
+        
+        class EqualityThenIn : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << 5 << "b" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                double expected[] = { 2, 3, 6, 9 };
+                for( int i = 0; i < 4; ++i, c->advance() ) {
+                    ASSERT_EQUALS( expected[ i ], c->current().getField( "b" ).number() );
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
+        class NotEqualityThenIn : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << 5 << "b" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                for( int i = 2; i < 10; ++i, c->advance() ) {
+                    ASSERT_EQUALS( i, c->current().getField( "b" ).number() );
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+
     } // namespace QueryPlanSetTests
     
     class All : public Suite {
@@ -1080,6 +1154,9 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::DeleteOneScan >();
             add< QueryPlanSetTests::DeleteOneIndex >();
             add< QueryPlanSetTests::TryOtherPlansBeforeFinish >();
+            add< QueryPlanSetTests::InQueryIntervals >();
+            add< QueryPlanSetTests::EqualityThenIn >();
+            add< QueryPlanSetTests::NotEqualityThenIn >();
         }
     };
     
