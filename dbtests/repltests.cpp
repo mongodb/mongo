@@ -768,6 +768,40 @@ namespace ReplTests {
             }            
         };
 
+        class Pop : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:1}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                log() << "Pop test disabled" << endl;
+//                ASSERT_EQUALS( 1, count() );
+//                check( fromjson( "{'_id':0,a:[4,5]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
+            }            
+        };
+
+        class PopReverse : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:-1}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                log() << "Pop reverse test disabled" << endl;
+//                ASSERT_EQUALS( 1, count() );
+//                check( fromjson( "{'_id':0,a:[5,6]}" ), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[4,5,6]}" ) );
+            }            
+        };
+
     } // namespace Idempotence
     
     class DeleteOpIsIdBased : public Base {
@@ -939,6 +973,8 @@ namespace ReplTests {
             add< Idempotence::Pull >();
             add< Idempotence::PullNothing >();
             add< Idempotence::PullAll >();
+            add< Idempotence::Pop >();
+            add< Idempotence::PopReverse >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();
