@@ -53,10 +53,8 @@ namespace mongo {
             boundIndex_()
     {
         assert( !bounds_.empty() );
-        startKey = bounds_[ 0 ].first;
-        endKey = bounds_[ 0 ].second;
         audit();
-        init();
+        initInterval();
     }
 
     void BtreeCursor::audit() {
@@ -78,10 +76,16 @@ namespace mongo {
         bool found;
         bucket = indexDetails.head.btree()->
         locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
-        
         skipUnusedKeys();
-        
-        checkEnd();         
+        checkEnd();        
+    }
+    
+    void BtreeCursor::initInterval() {
+        do {
+            startKey = bounds_[ boundIndex_ ].first;
+            endKey = bounds_[ boundIndex_ ].second;
+            init();
+        } while ( !ok() && ++boundIndex_ < bounds_.size() );
     }
     
     /* skip unused keys. */
@@ -127,11 +131,8 @@ namespace mongo {
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");
         skipUnusedKeys();
         checkEnd();
-        while( !ok() && ++boundIndex_ < bounds_.size() ) {
-            startKey = bounds_[ boundIndex_ ].first;
-            endKey = bounds_[ boundIndex_ ].second;
-            init();
-        }
+        if( !ok() && ++boundIndex_ < bounds_.size() )
+            initInterval();
         return !bucket.isNull();
     }
 

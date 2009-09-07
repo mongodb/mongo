@@ -315,8 +315,11 @@ namespace mongo {
         // selective audits on construction
         void audit();
 
-        // init start / end keys with a new range
+        // set initial bucket
         void init();
+
+        // init start / end keys with a new range
+        void initInterval();
 
         friend class BtreeBucket;
         NamespaceDetails *d;
