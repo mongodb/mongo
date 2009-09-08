@@ -44,8 +44,7 @@ __wt_db_open(WT_TOC *toc)
 		stoc->id = ++ienv->sq_next;
 		stoc->running = 1;
 		stoc->ienv = ienv;
-		if (__wt_thread_create(env, &stoc->tid, __wt_workq, stoc) != 0)
-			return (WT_ERROR);
+		WT_RET(__wt_thread_create(env, &stoc->tid, __wt_workq, stoc));
 	}
 	idb->stoc = stoc;
 	stoc->idb = idb;
