@@ -42,6 +42,7 @@ os_posix/os_mtx.c
 os_posix/os_open.c
 os_posix/os_rw.c
 os_posix/os_sleep.c
+os_posix/os_thread.c
 os_posix/os_yield.c
 support/api.c
 support/cksum.c

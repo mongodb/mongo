@@ -39,7 +39,7 @@ __wt_db_close(WT_TOC *toc)
 	if (!F_ISSET(ienv, WT_SINGLE_THREADED)) {
 		stoc->running = 0;
 		WT_FLUSH_MEMORY;
-		(void)pthread_join(stoc->tid, NULL);
+		__wt_thread_join(stoc->tid);
 	}
 
 	/* Remove from the environment's list. */

@@ -41,13 +41,7 @@ __wt_env_start(ENV *env, u_int32_t flags)
 		return (0);
 	}
 
-	/* Spawn our primary thread. */
-	if (pthread_create(&stoc->tid, NULL, __wt_workq, stoc) != 0) {
-		__wt_env_err(env, errno, "Env.start: primary server thread");
-		return (WT_ERROR);
-	}
-
-	return (0);
+	return (__wt_thread_create(env, &stoc->tid, __wt_workq, stoc));
 }
 
 /*
@@ -83,7 +77,7 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 		if (stoc->running) {
 			stoc->running = 0;
 			WT_FLUSH_MEMORY;
-			(void)pthread_join(stoc->tid, NULL);
+			__wt_thread_join(stoc->tid);
 		}
 
 	return (0);

@@ -191,6 +191,11 @@ int
 __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 void
 __wt_sleep(long seconds, long micro_seconds);
+int
+__wt_thread_create(
+    ENV *env, pthread_t *tidret, void *(*func)(void *), void *arg);
+void
+__wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 void
