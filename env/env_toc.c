@@ -101,8 +101,8 @@ __wt_env_toc_sched(WT_TOC *toc)
 	/*
 	 * Otherwise, schedule the call and go to sleep until it completes.
 	 *
-	 * Decide what server to use: use the specified server if doing a DB
-	 * handle operation, all other calls are handled by the primary server.
+	 * Choose a server thread: use the DB's server if doing a DB operation,
+	 * all other calls are handled by the primary server.
 	 */
 	if (toc->db == NULL || (stoc = toc->db->idb->stoc) == NULL)
 		stoc = toc->env->ienv->sq;
