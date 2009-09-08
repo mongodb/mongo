@@ -261,7 +261,9 @@ namespace mongo {
             // For capped case, signal that we are doing initial extent allocation.
             if ( capped )
                 deletedList[ 1 ].setInvalid();
-            version = 0;
+			assert( sizeof(dataFileVersion) == 2 );
+			dataFileVersion = 0;
+			indexFileVersion = 0;
             multiKeyIndexBits = 0;
             memset(reserved, 0, sizeof(reserved));
         }
@@ -281,8 +283,10 @@ namespace mongo {
         DiskLoc capFirstNewRecord;
 
         /* NamespaceDetails version.  So we can do backward compatibility in the future.
+		   See filever.h
         */
-        unsigned version;
+		unsigned short dataFileVersion;
+		unsigned short indexFileVersion;
 
         unsigned multiKeyIndexBits;
 
@@ -395,7 +399,6 @@ namespace mongo {
         void checkMigrate();
 
         long long storageSize();
-
 
     private:
         bool cappedMayDelete() const {
