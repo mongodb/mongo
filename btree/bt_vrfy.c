@@ -51,7 +51,7 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 	 * Read the database description chunk to get the allocation and
 	 * page sizes.
 	 */
-	WT_RET((__wt_bt_desc_read(db)));
+	WT_RET(__wt_bt_desc_read(db));
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -73,14 +73,14 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		__wt_db_errx(db, "file is too large to verify");
 		return (WT_ERROR);
 	}
-	WT_RET((bit_alloc(env, (int)frags, &fragbits)));
+	WT_RET(bit_alloc(env, (int)frags, &fragbits));
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		WT_RET((
-		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page)));
+		WT_RET(
+		    __wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page));
 		ret = __wt_bt_verify_page(db, page, fragbits, fp);
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 		if (ret != 0)
 			goto err;
 	} else {
@@ -90,8 +90,8 @@ __wt_bt_verify_int(DB *db, FILE *fp)
 		 * level in the DESC structure, so there's no way to know
 		 * what the correct level is yet.
 		 */
-		WT_ERR((__wt_bt_verify_level(
-		    db, idb->root_addr, 0, fragbits, fp)));
+		WT_ERR(__wt_bt_verify_level(
+		    db, idb->root_addr, 0, fragbits, fp));
 	}
 
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
@@ -205,10 +205,10 @@ __wt_bt_verify_level(
 	    addr != WT_ADDR_INVALID;
 	    addr = hdr->nextaddr, prev = page, page = NULL) {
 		/* Get the next page and set the address. */
-		WT_ERR((__wt_bt_page_in(db, addr, isleaf, 0, &page)));
+		WT_ERR(__wt_bt_page_in(db, addr, isleaf, 0, &page));
 
 		/* Verify the page. */
-		WT_ERR((__wt_bt_verify_page(db, page, fragbits, fp)));
+		WT_ERR(__wt_bt_verify_page(db, page, fragbits, fp));
 
 		/*
 		 * If we're walking an internal page, we'll want to descend
@@ -241,10 +241,10 @@ __wt_bt_verify_level(
 		 * we don't have it already.
 		 */
 		if (page->indx_count == 0)
-			WT_ERR((__wt_bt_page_inmem(db, page)));
+			WT_ERR(__wt_bt_page_inmem(db, page));
 
 		/* Verify its connections. */
-		WT_ERR((__wt_bt_verify_connections(db, page, fragbits)));
+		WT_ERR(__wt_bt_verify_connections(db, page, fragbits));
 
 		if (prev == NULL)
 			continue;
@@ -257,10 +257,10 @@ __wt_bt_verify_level(
 		 */
 		prev_indx = prev->indx + (prev->indx_count - 1);
 		if (prev_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, prev, prev_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, prev, prev_indx));
 		page_indx = page->indx;
 		if (page_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, page, page_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, page, page_indx));
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
@@ -270,13 +270,13 @@ __wt_bt_verify_level(
 		}
 
 		/* We're done with the previous page. */
-		WT_ERR((__wt_bt_page_out(db, prev, 0)));
+		WT_ERR(__wt_bt_page_out(db, prev, 0));
 	}
 
 err:	if (prev != NULL)
-		WT_TRET((__wt_bt_page_out(db, prev, 0)));
+		WT_TRET(__wt_bt_page_out(db, prev, 0));
 	if (page != NULL)
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 
 	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
 		ret = __wt_bt_verify_level(
@@ -356,7 +356,7 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	WT_RET((__wt_bt_page_in(db, hdr->prntaddr, 0, 1, &parent)));
+	WT_RET(__wt_bt_page_in(db, hdr->prntaddr, 0, 1, &parent));
 
 	/*
 	 * Search the parent for the reference to this page -- because we've
@@ -415,9 +415,9 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx;
 		if (child_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, child, child_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, child, child_indx));
 		if (parent_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, parent, parent_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, parent, parent_indx));
 
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
@@ -455,11 +455,11 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		}
 
 		/* Switch for the subsequent page at the parent level. */
-		WT_RET((__wt_bt_page_out(db, parent, 0)));
+		WT_RET(__wt_bt_page_out(db, parent, 0));
 		if (nextaddr == WT_ADDR_INVALID)
 			parent = NULL;
 		else {
-			WT_RET((__wt_bt_page_in(db, nextaddr, 0, 1, &parent)));
+			WT_RET(__wt_bt_page_in(db, nextaddr, 0, 1, &parent));
 			parent_indx = parent->indx;
 		}
 	} else
@@ -469,9 +469,9 @@ __wt_bt_verify_connections(DB *db, WT_PAGE *child, bitstr_t *fragbits)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx + (child->indx_count - 1);
 		if (child_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, child, child_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, child, child_indx));
 		if (parent_indx->data == NULL)
-			WT_ERR((__wt_bt_ovfl_to_indx(db, parent, parent_indx)));
+			WT_ERR(__wt_bt_ovfl_to_indx(db, parent, parent_indx));
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
 			__wt_db_errx(db,
@@ -487,7 +487,7 @@ err_set:	ret = WT_ERROR;
 	}
 
 err:	if (parent != NULL)
-		WT_TRET((__wt_bt_page_out(db, parent, 0)));
+		WT_TRET(__wt_bt_page_out(db, parent, 0));
 
 	return (ret);
 }
@@ -563,11 +563,11 @@ __wt_bt_verify_page(DB *db, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 
 	/* Page 0 has the descriptor record. */
 	if (addr == WT_ADDR_FIRST_PAGE)
-		WT_RET((__wt_bt_desc_verify(db, page)));
+		WT_RET(__wt_bt_desc_verify(db, page));
 
 	/* Verify the items on the page. */
 	if (hdr->type != WT_PAGE_OVFL)
-		WT_RET((__wt_bt_verify_item(db, page, fragbits, fp)));
+		WT_RET(__wt_bt_verify_item(db, page, fragbits, fp));
 
 	return (0);
 }
@@ -721,18 +721,18 @@ eop:			__wt_db_errx(db,
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
-				WT_ERR((__wt_bt_verify_ovfl(db,
+				WT_ERR(__wt_bt_verify_ovfl(db,
 				    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
-				    fragbits, fp)));
+				    fragbits, fp));
 				break;
 			case WT_ITEM_OFFP_INTL:
 			case WT_ITEM_OFFP_LEAF:
 				if (hdr->type == WT_PAGE_LEAF)
-					WT_ERR((__wt_bt_verify_level(db,
+					WT_ERR(__wt_bt_verify_level(db,
 					    ((WT_ITEM_OFFP *)
 					    WT_ITEM_BYTE(item))->addr,
 					    item_type == WT_ITEM_OFFP_LEAF ?
-					    1 : 0, fragbits, fp)));
+					    1 : 0, fragbits, fp));
 				break;
 			default:
 				break;
@@ -758,8 +758,8 @@ eop:			__wt_db_errx(db,
 		case WT_ITEM_DUP_OVFL:
 			current->indx = item_num;
 			current->item = &current->item_ovfl;
-			WT_ERR((__wt_bt_ovfl_to_dbt(db, (WT_ITEM_OVFL *)
-			    WT_ITEM_BYTE(item), current->item)));
+			WT_ERR(__wt_bt_ovfl_to_dbt(db, (WT_ITEM_OVFL *)
+			    WT_ITEM_BYTE(item), current->item));
 			break;
 		default:
 			break;
@@ -829,11 +829,11 @@ __wt_bt_verify_ovfl(DB *db, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits, FILE *fp)
 	WT_PAGE *ovfl_page;
 	int ret;
 
-	WT_RET((__wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page)));
+	WT_RET(__wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page));
 
 	ret = __wt_bt_verify_page(db, ovfl_page, fragbits, fp);
 
-	WT_TRET((__wt_bt_page_out(db, ovfl_page, 0)));
+	WT_TRET(__wt_bt_page_out(db, ovfl_page, 0));
 
 	return (ret);
 }

@@ -52,9 +52,9 @@ __wt_open(ENV *env,
 		return (WT_ERROR);
 	}
 
-	WT_RET((__wt_calloc(env, 1, sizeof(WT_FH), &fh)));
-	WT_ERR((__wt_stat_alloc_fh_stats(env, &fh->stats)));
-	WT_ERR((__wt_strdup(env, name, &fh->name)));
+	WT_RET(__wt_calloc(env, 1, sizeof(WT_FH), &fh));
+	WT_ERR(__wt_stat_alloc_fh_stats(env, &fh->stats));
+	WT_ERR(__wt_strdup(env, name, &fh->name));
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
 	/*
@@ -75,7 +75,7 @@ __wt_open(ENV *env,
 	*fhp = fh;
 
 	/* Set the file's size. */
-	WT_ERR((__wt_filesize(env, fh, &fh->file_size)));
+	WT_ERR(__wt_filesize(env, fh, &fh->file_size));
 
 	return (0);
 

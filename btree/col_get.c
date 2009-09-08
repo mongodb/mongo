@@ -35,7 +35,7 @@ __wt_db_get(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
 	/* Search the primary btree for the key. */
-	WT_RET((__wt_bt_search(db, key, &page, &indx)));
+	WT_RET(__wt_bt_search(db, key, &page, &indx));
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -52,7 +52,7 @@ __wt_db_get(WT_TOC *toc)
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page)
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 
 	return (ret);
 
@@ -81,7 +81,7 @@ __wt_db_get_recno(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
 
 	/* Search the primary btree for the key. */
-	WT_RET((__wt_bt_search_recno(db, recno, &page, &indx)));
+	WT_RET(__wt_bt_search_recno(db, recno, &page, &indx));
 
 	/*
 	 * The Db.get_recno method can only return single key/data pairs.
@@ -98,7 +98,7 @@ __wt_db_get_recno(WT_TOC *toc)
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page)
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 
 	return (ret);
 }
@@ -140,7 +140,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 */
 			ip = page->indx + indx;
 			if (ip->data == NULL)
-				WT_ERR((__wt_bt_ovfl_to_indx(db, page, ip)));
+				WT_ERR(__wt_bt_ovfl_to_indx(db, page, ip));
 
 			/*
 			 * If we're about to compare an application key with
@@ -195,7 +195,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET((__wt_bt_page_out(db, page, 0)));
+			WT_RET(__wt_bt_page_out(db, page, 0));
 
 		/*
 		 * Failed to match on a leaf page -- we're done, return the
@@ -206,7 +206,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET((__wt_bt_page_in(db, addr, isleaf, 1, &page)));
+		WT_RET(__wt_bt_page_in(db, addr, isleaf, 1, &page));
 	}
 	/* NOTREACHED */
 
@@ -228,7 +228,7 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 	WT_PAGE *page;
 	u_int64_t total;
 	u_int32_t addr, i;
-	int isleaf, next_isleaf, put_page, ret;
+	int isleaf, next_isleaf, put_page;
 
 	idb = db->idb;
 
@@ -265,12 +265,12 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET((__wt_bt_page_out(db, page, 0)));
+			WT_RET(__wt_bt_page_out(db, page, 0));
 
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET((__wt_bt_page_in(db, addr, isleaf, 1, &page)));
+		WT_RET(__wt_bt_page_in(db, addr, isleaf, 1, &page));
 	}
 
 	/* Discard any page we've read other than the root page. */

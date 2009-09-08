@@ -50,10 +50,10 @@ __wt_bt_dbt_return(DB *db,
 	 */
 	if (key_return) {
 		if (ip->data == NULL)
-			WT_RET((__wt_bt_ovfl_to_indx(db, page, ip)));
+			WT_RET(__wt_bt_ovfl_to_indx(db, page, ip));
 		if (callback == NULL) {
-			WT_RET((__wt_bt_dbt_copyout(
-			    db, key, &idb->key, ip->data, ip->size)));
+			WT_RET(__wt_bt_dbt_copyout(
+			    db, key, &idb->key, ip->data, ip->size));
 		} else {
 			key->data = ip->data;
 			key->size = ip->size;
@@ -70,9 +70,9 @@ __wt_bt_dbt_return(DB *db,
 			goto overflow;
 
 		if (callback == NULL) {
-			WT_RET((__wt_bt_dbt_copyout(db, data,
+			WT_RET(__wt_bt_dbt_copyout(db, data,
 			    &idb->data, WT_ITEM_BYTE(item),
-			    (u_int32_t)WT_ITEM_LEN(item))));
+			    (u_int32_t)WT_ITEM_LEN(item)));
 		} else {
 			data->data = WT_ITEM_BYTE(item);
 			data->size = (u_int32_t)WT_ITEM_LEN(item);
@@ -83,8 +83,8 @@ __wt_bt_dbt_return(DB *db,
 			goto overflow;
 
 		if (callback == NULL) {
-			WT_RET((__wt_bt_dbt_copyout(db, data,
-			    &idb->data, ip->data, ip->size)));
+			WT_RET(__wt_bt_dbt_copyout(db, data,
+			    &idb->data, ip->data, ip->size));
 		} else {
 			data->data = ip->data;
 			data->size = ip->size;
@@ -106,9 +106,9 @@ overflow:	/*
 			if (F_ISSET(data, WT_DBT_APPMEM) &&
 			    data->data_len < ovfl->len)
 				return (WT_TOOSMALL);
-			WT_RET((__wt_bt_ovfl_to_dbt(db, ovfl, data)));
+			WT_RET(__wt_bt_ovfl_to_dbt(db, ovfl, data));
 		} else {
-			WT_RET((__wt_bt_ovfl_to_dbt(db, ovfl, &idb->data)));
+			WT_RET(__wt_bt_ovfl_to_dbt(db, ovfl, &idb->data));
 			data->data = idb->data.data;
 			data->size = idb->data.size;
 		}
@@ -140,8 +140,8 @@ __wt_bt_dbt_copyout(
 	 */
 	if (F_ISSET(dbt, WT_DBT_ALLOC)) {
 		if (dbt->data_len < size) {
-			WT_RET((__wt_realloc(
-			    env, dbt->data_len, size, &dbt->data)));
+			WT_RET(__wt_realloc(
+			    env, dbt->data_len, size, &dbt->data));
 			dbt->data_len = size;
 		}
 	} else if (F_ISSET(dbt, WT_DBT_APPMEM)) {
@@ -149,8 +149,8 @@ __wt_bt_dbt_copyout(
 			return (WT_TOOSMALL);
 	} else {
 		if (local_dbt->data_len < size) {
-			WT_RET((__wt_realloc(
-			    env, size, size + 40, &local_dbt->data)));
+			WT_RET(__wt_realloc(
+			    env, size, size + 40, &local_dbt->data));
 			local_dbt->data_len = size + 40;
 		}
 		dbt->data = local_dbt->data;

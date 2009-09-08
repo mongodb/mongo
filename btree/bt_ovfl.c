@@ -23,8 +23,8 @@ __wt_bt_ovfl_in(DB *db, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
 	env = db->env;
 	stoc = db->idb->stoc;
 
-	WT_RET((__wt_cache_in(
-	    stoc, WT_ADDR_TO_OFF(db, addr), WT_OVFL_BYTES(db, len), 0, &page)));
+	WT_RET(__wt_cache_in(
+	    stoc, WT_ADDR_TO_OFF(db, addr), WT_OVFL_BYTES(db, len), 0, &page));
 
 	/* Verify the page. */
 	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
@@ -47,8 +47,7 @@ __wt_bt_ovfl_write(DB *db, DBT *dbt, u_int32_t *addrp)
 	stoc = db->idb->stoc;
 
 	/* Allocate a chunk of file space. */
-	WT_RET((
-	    __wt_cache_alloc(stoc, WT_OVFL_BYTES(db, dbt->size), &page)));
+	WT_RET(__wt_cache_alloc(stoc, WT_OVFL_BYTES(db, dbt->size), &page));
 
 	/* Initialize the page and copy the overflow item in. */
 	page->hdr->type = WT_PAGE_OVFL;
@@ -80,7 +79,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	int ret;
 
 	/* Read in the overflow record. */
-	WT_RET((__wt_bt_ovfl_in(db, from->addr, from->len, &ovfl_page)));
+	WT_RET(__wt_bt_ovfl_in(db, from->addr, from->len, &ovfl_page));
 
 	/*
 	 * Copy the overflow record to a new location, and set our return
@@ -93,7 +92,7 @@ __wt_bt_ovfl_copy(DB *db, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
 	copy->len = from->len;
 
 	/* Discard the overflow record. */
-	WT_TRET((__wt_bt_page_out(db, ovfl_page, 0)));
+	WT_TRET(__wt_bt_page_out(db, ovfl_page, 0));
 
 	return (ret);
 }
@@ -108,12 +107,12 @@ __wt_bt_ovfl_to_dbt(DB *db, WT_ITEM_OVFL *ovfl, DBT *copy)
 	WT_PAGE *ovfl_page;
 	int ret;
 
-	WT_RET((__wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page)));
+	WT_RET(__wt_bt_ovfl_in(db, ovfl->addr, ovfl->len, &ovfl_page));
 
 	ret = __wt_bt_data_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
 
-	WT_TRET((__wt_bt_page_out(db, ovfl_page, 0)));
+	WT_TRET(__wt_bt_page_out(db, ovfl_page, 0));
 
 	return (ret);
 }
@@ -127,20 +126,19 @@ __wt_bt_ovfl_to_indx(DB *db, WT_PAGE *page, WT_INDX *ip)
 {
 	ENV *env;
 	WT_PAGE *ovfl_page;
-	int ret;
 
 	env = db->env;
 
-	WT_RET((
-	    __wt_bt_ovfl_in(db, WT_INDX_OVFL_ADDR(ip), ip->size, &ovfl_page)));
+	WT_RET(
+	    __wt_bt_ovfl_in(db, WT_INDX_OVFL_ADDR(ip), ip->size, &ovfl_page));
 
-	WT_RET((__wt_calloc(env, ip->size, 1, &ip->data)));
+	WT_RET(__wt_calloc(env, ip->size, 1, &ip->data));
 	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
 
-	WT_TRET((__wt_bt_page_out(db, ovfl_page, 0)));
+	WT_RET(__wt_bt_page_out(db, ovfl_page, 0));
 
 	F_SET(ip, WT_ALLOCATED);
 	F_SET(page, WT_ALLOCATED);
 
-	return (ret);
+	return (0);
 }

@@ -29,9 +29,9 @@ __wt_bt_stat(DB *db)
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		WT_RET((__wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page)));
+		WT_RET(__wt_bt_page_in(db, WT_ADDR_FIRST_PAGE, 1, 0, &page));
 		ret = __wt_bt_stat_page(db, page);
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 		return (ret);
 	}
 
@@ -55,7 +55,7 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		WT_RET((__wt_bt_page_in(db, addr, isleaf, 0, &page)));
+		WT_RET(__wt_bt_page_in(db, addr, isleaf, 0, &page));
 
 		ret = __wt_bt_stat_page(db, page);
 
@@ -74,7 +74,7 @@ __wt_bt_stat_level(DB *db, u_int32_t addr, int isleaf)
 				    page, &addr_arg, &isleaf_arg);
 		}
 
-		WT_TRET((__wt_bt_page_out(db, page, 0)));
+		WT_TRET(__wt_bt_page_out(db, page, 0));
 		if (ret != 0)
 			return (ret);
 	}
@@ -174,10 +174,10 @@ __wt_bt_stat_page(DB *db, WT_PAGE *page)
 		case WT_ITEM_OFFP_LEAF:
 			if (hdr->type != WT_PAGE_LEAF)
 				break;
-			WT_RET((__wt_bt_stat_level(db,
+			WT_RET(__wt_bt_stat_level(db,
 			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
 			    WT_ITEM_TYPE(item) ==
-			    WT_ITEM_OFFP_LEAF ? 1 : 0)));
+			    WT_ITEM_OFFP_LEAF ? 1 : 0));
 			break;
 		default:
 			break;

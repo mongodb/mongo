@@ -31,8 +31,8 @@ __wt_env_db_create(WT_TOC *toc)
 	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_WT_DB_CREATE);
 
 	/* Create the DB and IDB structures. */
-	WT_ERR((__wt_calloc(env, 1, sizeof(DB), &db)));
-	WT_ERR((__wt_calloc(env, 1, sizeof(IDB), &idb)));
+	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
+	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
 
 	/* Connect everything together. */
 	toc->db = db;
@@ -42,8 +42,8 @@ __wt_env_db_create(WT_TOC *toc)
 	db->ienv = env->ienv;
 
 	/* Configure the DB and the IDB. */
-	WT_ERR((__wt_db_config_default(db)));
-	WT_ERR((__wt_idb_config_default(db)));
+	WT_ERR(__wt_db_config_default(db));
+	WT_ERR(__wt_idb_config_default(db));
 
 	/* Insert the database on the environment's list. */
 	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
@@ -86,7 +86,7 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
 	/* Discard the underlying IDB structure. */
-	WT_TRET((__wt_idb_destroy(db, 0)));
+	WT_TRET(__wt_idb_destroy(db, 0));
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, db->hstats);
@@ -115,8 +115,8 @@ __wt_db_config_default(DB *db)
 
 	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
 
-	WT_RET((__wt_stat_alloc_db_hstats(env, &db->hstats)));
-	WT_RET((__wt_stat_alloc_db_dstats(env, &db->dstats)));
+	WT_RET(__wt_stat_alloc_db_hstats(env, &db->hstats));
+	WT_RET(__wt_stat_alloc_db_dstats(env, &db->dstats));
 
 	return (0);
 }
@@ -159,7 +159,7 @@ __wt_idb_destroy(DB *db, int refresh)
 	 * by DB configuration, we'd lose that configuration here.
 	 */
 	memset(idb, 0, sizeof(idb));
-	WT_RET((__wt_idb_config_default(db)));
+	WT_RET(__wt_idb_config_default(db));
 
 	return (0);
 }

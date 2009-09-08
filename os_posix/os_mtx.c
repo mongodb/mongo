@@ -112,11 +112,11 @@ __wt_unlock(WT_MTX *mtx)
 int
 __wt_mtx_destroy(WT_MTX *mtx)
 {
-	int ret, tret;
+	int ret;
 
 	ret = pthread_cond_destroy(&mtx->cond);
 
-	WT_TRET((pthread_mutex_destroy(&mtx->mtx)));
+	WT_TRET(pthread_mutex_destroy(&mtx->mtx));
 
 	return (ret == 0 ? 0 : WT_ERROR);
 }

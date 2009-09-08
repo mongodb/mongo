@@ -26,17 +26,17 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 
 	WT_ENV_FCHK(env, "wt_toc_create", flags, WT_APIMASK_ENV_TOC_CREATE);
 
-	WT_RET((__wt_calloc(env, 1, sizeof(WT_TOC), &toc)));
-	WT_ERR((__wt_calloc(env, 1, sizeof(WT_MTX), &toc->block)));
+	WT_RET(__wt_calloc(env, 1, sizeof(WT_TOC), &toc));
+	WT_ERR(__wt_calloc(env, 1, sizeof(WT_MTX), &toc->block));
 
 	/* The mutex is self-blocking, so it's normal state is locked. */
-	WT_ERR((__wt_mtx_init(toc->block)));
-	WT_ERR((__wt_lock(toc->block)));
+	WT_ERR(__wt_mtx_init(toc->block));
+	WT_ERR(__wt_lock(toc->block));
 
 	/* Get a server slot ID. */
-	WT_ERR((__wt_lock(&ienv->mtx)));
+	WT_ERR(__wt_lock(&ienv->mtx));
 	toc->slot = ienv->toc_slot++;
-	WT_ERR((__wt_unlock(&ienv->mtx)));
+	WT_ERR(__wt_unlock(&ienv->mtx));
 	if (toc->slot >= WT_SERVER_QSIZE) {
 		__wt_env_errx(env, "wt_env_toc_create: too many threads");
 		ret = WT_ERROR;
@@ -70,7 +70,7 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 	WT_ENV_FCHK_NOTFATAL(
 	    env, "WtToc.destroy", flags, WT_APIMASK_TOC_DESTROY, ret);
 
-	WT_TRET((__wt_mtx_destroy(toc->block)));
+	WT_TRET(__wt_mtx_destroy(toc->block));
 
 	WT_FREE_AND_CLEAR(env, toc->block);
 
@@ -86,10 +86,7 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 int
 __wt_env_toc_sched(WT_TOC *toc)
 {
-	IENV *ienv;
 	WT_STOC *stoc;
-	WT_TOC **q, **eq;
-	u_int sid;
 
 	/*
 	 * The engine may be single-threaded or threads of control may re-enter

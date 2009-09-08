@@ -30,10 +30,10 @@ __wt_db_close(WT_TOC *toc)
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
 	/* Close the underlying Btree. */
-	WT_TRET((__wt_bt_close(db)));
+	WT_TRET(__wt_bt_close(db));
 
 	/* Discard the cache. */
-	WT_TRET((__wt_cache_close(db)));
+	WT_TRET(__wt_cache_close(db));
 
 	/* Discard the server thread. */
 	if (!F_ISSET(ienv, WT_SINGLE_THREADED)) {
@@ -46,7 +46,7 @@ __wt_db_close(WT_TOC *toc)
 	TAILQ_REMOVE(&env->dbqh, db, q);
 
 	/* Re-cycle the underlying IDB structure. */
-	WT_TRET((__wt_idb_destroy(db, 1)));
+	WT_TRET(__wt_idb_destroy(db, 1));
 
 	/*
 	 * Reset the methods that are permitted.

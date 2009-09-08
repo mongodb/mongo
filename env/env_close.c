@@ -25,7 +25,7 @@ __wt_env_close(WT_TOC *toc)
 	    env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE, ret);
 
 	/* Re-cycle the underlying IENV structure. */
-	WT_TRET((__wt_ienv_destroy(env, 1)));
+	WT_TRET(__wt_ienv_destroy(env, 1));
 
 	/*
 	 * Reset the methods that are permitted.

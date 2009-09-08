@@ -42,7 +42,7 @@ __wt_env_stat_print(WT_TOC *toc)
 
 	fprintf(stream, "%s\n", ienv->sep);
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		WT_RET((db->stat_print(db, toc, stream, flags)));
+		WT_RET(db->stat_print(db, toc, stream, flags));
 	return (0);
 }
 
@@ -61,7 +61,7 @@ __wt_env_stat_clear(WT_TOC *toc)
 
 	ret = 0;
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		WT_TRET((db->stat_clear(db, toc, flags)));
-	WT_TRET((__wt_stat_clear_env_hstats(env->hstats)));
+		WT_TRET(db->stat_clear(db, toc, flags));
+	WT_TRET(__wt_stat_clear_env_hstats(env->hstats));
 	return (ret);
 }

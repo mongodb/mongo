@@ -31,7 +31,7 @@ __wt_db_open(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
 	/* Initialize the IDB structure. */
-	WT_RET((__wt_db_idb_open(db, dbname, mode, flags)));
+	WT_RET(__wt_db_idb_open(db, dbname, mode, flags));
 
 	/*
 	 * If we're using a single thread, reference it.   Otherwise create
@@ -50,7 +50,7 @@ __wt_db_open(WT_TOC *toc)
 	stoc->idb = idb;
 
 	/* Open the underlying Btree. */
-	WT_RET((__wt_bt_open(db)));
+	WT_RET(__wt_bt_open(db));
 
 	/* Turn on the methods that require open. */
 	__wt_db_config_methods_open(db);
@@ -73,7 +73,7 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	ienv = env->ienv;
 	idb = db->idb;
 
-	WT_RET((__wt_strdup(env, dbname, &idb->dbname)));
+	WT_RET(__wt_strdup(env, dbname, &idb->dbname));
 	idb->mode = mode;
 
 	idb->file_id = ++ienv->file_id;

@@ -7,8 +7,8 @@ __wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET((__wt_calloc(env,
-	    WT_STAT_DB_DSTATS_TOTAL + 1, sizeof(WT_STATS), &stats)));
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_DB_DSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_EXTSIZE].desc = "database extent size";
@@ -66,8 +66,8 @@ __wt_stat_alloc_db_hstats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET((__wt_calloc(env,
-	    WT_STAT_DB_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats)));
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_DB_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
 	    "bulk duplicate data pairs read";
@@ -103,8 +103,8 @@ __wt_stat_alloc_env_hstats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET((__wt_calloc(env,
-	    WT_STAT_ENV_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats)));
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_ENV_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_CLEAN].desc = "clean pages in the cache";
@@ -140,8 +140,8 @@ __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET((__wt_calloc(env,
-	    WT_STAT_FH_STATS_TOTAL + 1, sizeof(WT_STATS), &stats)));
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_FH_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_READ_IO].desc = "count of read I/Os";
 	stats[WT_STAT_WRITE_IO].desc = "count of write I/Os";
@@ -163,8 +163,8 @@ __wt_stat_alloc_stoc_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET((__wt_calloc(env,
-	    WT_STAT_STOC_STATS_TOTAL + 1, sizeof(WT_STATS), &stats)));
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_STOC_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_STOC_ARRAY].desc = "server thread array passes";
 	stats[WT_STAT_STOC_OPS].desc = "server thread operations";

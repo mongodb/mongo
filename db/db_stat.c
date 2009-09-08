@@ -20,7 +20,6 @@ __wt_db_stat_print(WT_TOC *toc)
 	IDB *idb;
 	IENV *ienv;
 	WT_STATS *stats;
-	WT_STOC *stoc;
 
 	idb = db->idb;
 	ienv = toc->env->ienv;
@@ -30,8 +29,8 @@ __wt_db_stat_print(WT_TOC *toc)
 	fprintf(stream, "Database statistics: %s\n", db->idb->dbname);
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
-	WT_RET((__wt_stat_clear_db_dstats(db->dstats)));
-	WT_RET((__wt_bt_stat(db)));
+	WT_RET(__wt_stat_clear_db_dstats(db->dstats));
+	WT_RET(__wt_bt_stat(db));
 
 	for (stats = db->dstats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
@@ -79,9 +78,9 @@ __wt_db_stat_clear(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 
 	ret = __wt_stat_clear_db_hstats(db->hstats);
-	WT_TRET((__wt_stat_clear_db_dstats(db->dstats)));
+	WT_TRET(__wt_stat_clear_db_dstats(db->dstats));
 	if (idb->fh != NULL)
-		WT_TRET((__wt_stat_clear_fh_stats(idb->fh->stats)));
+		WT_TRET(__wt_stat_clear_fh_stats(idb->fh->stats));
 
 	return (ret);
 }

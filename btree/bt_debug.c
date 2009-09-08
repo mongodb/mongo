@@ -57,7 +57,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	WT_STOC *stoc;
 	off_t offset;
 	u_int32_t bytes;
-	int ret, tret;
+	int ret;
 
 	stoc = db->idb->stoc;
 
@@ -72,8 +72,8 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * should have in-memory page information.
 	 */
 	offset = WT_ADDR_TO_OFF(db, addr);
-	WT_RET((__wt_cache_in(
-	    stoc, offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page)));
+	WT_RET(__wt_cache_in(
+	    stoc, offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
 	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
 		case WT_PAGE_OVFL:
@@ -90,13 +90,13 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 			break;
 		WT_DEFAULT_FORMAT(db);
 		}
-		WT_RET((__wt_cache_out(stoc, page, WT_UNFORMATTED)));
-		WT_RET((__wt_cache_in(stoc, offset, bytes, 0, &page)));
+		WT_RET(__wt_cache_out(stoc, page, WT_UNFORMATTED));
+		WT_RET(__wt_cache_in(stoc, offset, bytes, 0, &page));
 	}
 
 	ret = __wt_bt_dump_page(db, page, ofile, fp);
 
-	WT_TRET((__wt_cache_out(stoc, page, 0)));
+	WT_TRET(__wt_cache_out(stoc, page, 0));
 
 	return (ret);
 }

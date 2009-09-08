@@ -80,23 +80,23 @@ extern "C" {
 		return (__wt_database_format(db))
 
 /*
- * Standard macros that set return values and optionally branch to an error
- * label.
+ * Standard macros to handle simple return values and optionally branch to
+ *  an error label.
  */
-#define	WT_ERR(a) {							\
-	if ((ret = a) != 0)						\
+#define	WT_ERR(a) do {							\
+	if ((ret = (a)) != 0)						\
 		goto err;						\
-}
-#define	WT_RET(a) {							\
+} while (0)
+#define	WT_RET(a) do {							\
 	int __ret;							\
-	if ((__ret = a) != 0)						\
+	if ((__ret = (a)) != 0)						\
 		return (__ret);						\
-}
-#define	WT_TRET(a) {							\
+} while (0)
+#define	WT_TRET(a) do {							\
 	int __ret;							\
-	if ((__ret = a) != 0 && ret == 0)				\
+	if ((__ret = (a)) != 0 && ret == 0)				\
 		ret = __ret;						\
-}
+} while (0)
 
 #if defined(__cplusplus)
 }

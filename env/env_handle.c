@@ -30,8 +30,8 @@ wt_env_create(u_int32_t flags, ENV **envp)
 	 * that can handle NULL structures are the memory allocation and free
 	 * functions, no other functions may be called.
 	 */
-	WT_RET((__wt_calloc(NULL, 1, sizeof(ENV), &env)));
-	WT_ERR((__wt_calloc(NULL, 1, sizeof(IENV), &ienv)));
+	WT_RET(__wt_calloc(NULL, 1, sizeof(ENV), &env));
+	WT_ERR(__wt_calloc(NULL, 1, sizeof(IENV), &ienv));
 
 	/* Connect everything together. */
 	env->ienv = ienv;
@@ -44,8 +44,8 @@ wt_env_create(u_int32_t flags, ENV **envp)
 		goto err;
 
 	/* Configure the ENV and the IENV. */
-	WT_ERR((__wt_env_config_default(env)));
-	WT_ERR((__wt_ienv_config_default(env)));
+	WT_ERR(__wt_env_config_default(env));
+	WT_ERR(__wt_ienv_config_default(env));
 
 	*envp = env;
 	return (0);
@@ -77,7 +77,7 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 *
 	 * Discard the underlying IENV structure.
 	 */
-	WT_TRET((__wt_ienv_destroy(env, 0)));
+	WT_TRET(__wt_ienv_destroy(env, 0));
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, env->hstats);
@@ -108,7 +108,7 @@ __wt_env_config_default(ENV *env)
 
 	TAILQ_INIT(&env->dbqh);
 
-	WT_RET((__wt_stat_alloc_env_hstats(env, &env->hstats)));
+	WT_RET(__wt_stat_alloc_env_hstats(env, &env->hstats));
 
 	return (0);
 }
@@ -144,7 +144,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	 * by ENV configuration, we'd lose that configuration here.
 	 */
 	memset(ienv, 0, sizeof(ienv));
-	WT_RET((__wt_ienv_config_default(env)));
+	WT_RET(__wt_ienv_config_default(env));
 
 	return (0);
 }
@@ -177,13 +177,13 @@ __wt_ienv_config_default(ENV *env)
 	 */
 #define	WT_SERVERQ_SIZE	64
 	ienv->sq_entries = WT_SERVERQ_SIZE;
-	WT_RET((__wt_calloc(
-	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq)));
+	WT_RET(__wt_calloc(
+	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq));
 	WT_STOC_FOREACH(ienv, stoc, i)
-		WT_RET((__wt_stat_alloc_stoc_stats(NULL, &stoc->stats)));
+		WT_RET(__wt_stat_alloc_stoc_stats(NULL, &stoc->stats));
 
 	/* Initialize the global mutex. */
-	WT_RET((__wt_mtx_init(&ienv->mtx)));
+	WT_RET(__wt_mtx_init(&ienv->mtx));
 
 	/* Diagnostic output separator. */
 	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";

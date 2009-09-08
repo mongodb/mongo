@@ -27,7 +27,7 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	 * No matter what we're doing, we end up here before we do any real
 	 * work.   Check the build itself.
 	 */
-	WT_RET((__wt_build_verify()));
+	WT_RET(__wt_build_verify());
 
 	/* Create the primary thread-of-control structure. */
 	stoc = ienv->sq  + ienv->sq_next;
@@ -92,7 +92,7 @@ __wt_workq(void *arg)
 {
 	WT_STOC *stoc;
 	WT_TOC **q, **eq, *toc;
-	int maxsleep, not_found;
+	int not_found;
 
 	stoc = arg;
 

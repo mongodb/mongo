@@ -19,11 +19,11 @@ __wt_build_verify(void)
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
-	WT_RET((__wt_bt_build_verify()));
+	WT_RET(__wt_bt_build_verify());
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Load debug code the compiler might optimize out. */
-	WT_RET((__wt_breakpoint()));
+	WT_RET(__wt_breakpoint());
 #endif
 
 	return (0);

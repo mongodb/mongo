@@ -29,7 +29,7 @@ __wt_db_bulk_load(WT_TOC *toc)
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	u_int32_t dup_count, dup_space, len;
-	int ret, tret;
+	int ret;
 
 	env = toc->env;
 
@@ -52,7 +52,7 @@ __wt_db_bulk_load(WT_TOC *toc)
 	 * case we would allocate page 0 as an overflow page, which is, for
 	 * lack of a better phrase, "bad".
 	 */
-	WT_RET((__wt_bt_page_alloc(db, 1, &page)));
+	WT_RET(__wt_bt_page_alloc(db, 1, &page));
 	page->hdr->type = WT_PAGE_LEAF;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -120,11 +120,11 @@ skip_read:
 			 */
 			if (LF_ISSET(WT_DUPLICATES)) {
 				lastkey = &lastkey_ovfl;
-				WT_ERR((__wt_bt_dbt_copy(env, key, lastkey)));
+				WT_ERR(__wt_bt_dbt_copy(env, key, lastkey));
 			}
 
 			key_ovfl.len = key->size;
-			WT_ERR((__wt_bt_ovfl_write(db, key, &key_ovfl.addr)));
+			WT_ERR(__wt_bt_ovfl_write(db, key, &key_ovfl.addr));
 			key->data = &key_ovfl;
 			key->size = sizeof(key_ovfl);
 
@@ -136,7 +136,7 @@ skip_read:
 
 		if (data->size > db->leafitemsize) {
 			data_ovfl.len = data->size;
-			WT_ERR((__wt_bt_ovfl_write(db, data, &data_ovfl.addr)));
+			WT_ERR(__wt_bt_ovfl_write(db, data, &data_ovfl.addr));
 			data->data = &data_ovfl;
 			data->size = sizeof(data_ovfl);
 
@@ -156,7 +156,7 @@ skip_read:
 		 */
 		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
-			WT_ERR((__wt_bt_page_alloc(db, 1, &next)));
+			WT_ERR(__wt_bt_page_alloc(db, 1, &next));
 			next->hdr->type = WT_PAGE_LEAF;
 			next->hdr->prevaddr = page->addr;
 			page->hdr->nextaddr = next->addr;
@@ -226,10 +226,9 @@ skip_read:
 			 * sets the page's parent address, which is the same for
 			 * the newly allocated page.
 			 */
-			WT_ERR(
-			    (__wt_bt_promote(db, page, page->records, NULL)));
+			WT_ERR(__wt_bt_promote(db, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			WT_ERR((__wt_bt_page_out(db, page, WT_MODIFIED)));
+			WT_ERR(__wt_bt_page_out(db, page, WT_MODIFIED));
 
 			/* Switch to the next page. */
 			page = next;
@@ -312,8 +311,8 @@ skip_read:
 			 * Move the duplicate set offpage and read in the
 			 * rest of the duplicate set.
 			 */
-			WT_ERR((__wt_bt_dup_offpage(db, page, &key,
-			    &data, lastkey, dup_data, dup_count, cb)));
+			WT_ERR(__wt_bt_dup_offpage(db, page, &key,
+			    &data, lastkey, dup_data, dup_count, cb));
 
 			/*
 			 * Reset local counters -- on-page information was
@@ -332,7 +331,7 @@ skip_read:
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(db, page, page->records, NULL);
-			WT_TRET((__wt_bt_page_out(db, page, WT_MODIFIED)));
+			WT_TRET(__wt_bt_page_out(db, page, WT_MODIFIED));
 			page = NULL;
 		}
 	}
@@ -403,7 +402,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 	 * Allocate and initialize a new page, and copy the duplicate set into
 	 * place.
 	 */
-	WT_RET((__wt_bt_page_alloc(db, 1, &page)));
+	WT_RET(__wt_bt_page_alloc(db, 1, &page));
 	page->hdr->type = WT_PAGE_DUP_LEAF;
 	page->hdr->u.entries = dup_count;
 	page->records = dup_count;
@@ -445,8 +444,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 		/* Create overflow objects if the data won't fit. */
 		if (data->size > db->leafitemsize) {
 			data_local.len = data->size;
-			WT_RET((__wt_bt_ovfl_write(
-			    db, data, &data_local.addr)));
+			WT_RET(__wt_bt_ovfl_write(db, data, &data_local.addr));
 			data->data = &data_local;
 			data->size = sizeof(data_local);
 			WT_ITEM_TYPE_SET(&data_item, WT_ITEM_DUP_OVFL);
@@ -459,7 +457,7 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 		 * page.
 		 */
 		if (WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
-			WT_RET((__wt_bt_page_alloc(db, 1, &next)));
+			WT_RET(__wt_bt_page_alloc(db, 1, &next));
 			next->hdr->type = WT_PAGE_DUP_LEAF;
 			next->hdr->prevaddr = page->addr;
 			page->hdr->nextaddr = next->addr;
@@ -473,10 +471,10 @@ __wt_bt_dup_offpage(DB *db, WT_PAGE *leaf_page,
 			 * If we promoted a key, we might have split, and so
 			 * there may be a new offpage duplicates root page.
 			 */
-			WT_RET((__wt_bt_promote(
-			    db, page, page->records, &root_addr)));
+			WT_RET(__wt_bt_promote(
+			    db, page, page->records, &root_addr));
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			WT_RET((__wt_bt_page_out(db, page, WT_MODIFIED)));
+			WT_RET(__wt_bt_page_out(db, page, WT_MODIFIED));
 
 			/* Switch to the next page. */
 			page = next;
@@ -541,7 +539,7 @@ __wt_bt_promote(
 	WT_ITEM_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	u_int32_t parent_addr, tmp_root_addr;
-	int need_promotion, ret, root_split, tret;
+	int need_promotion, ret, root_split;
 
 	WT_CLEAR(key);
 	WT_CLEAR(item);
@@ -568,8 +566,8 @@ __wt_bt_promote(
 	case WT_ITEM_DUP_OVFL:
 	case WT_ITEM_KEY_OVFL:
 		WT_CLEAR(tmp_ovfl);
-		WT_RET((__wt_bt_ovfl_copy(db,
-		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item), &tmp_ovfl)));
+		WT_RET(__wt_bt_ovfl_copy(db,
+		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item), &tmp_ovfl));
 		key.data = &tmp_ovfl;
 		key.size = sizeof(tmp_ovfl);
 		WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
@@ -638,7 +636,7 @@ __wt_bt_promote(
 	 */
 	parent_addr = page->hdr->prntaddr;
 	if (parent_addr == WT_ADDR_INVALID) {
-split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
+split:		WT_ERR(__wt_bt_page_alloc(db, 0, &next));
 		next->hdr->type =
 		    page->hdr->type == WT_PAGE_INT ||
 		    page->hdr->type == WT_PAGE_LEAF ?
@@ -671,15 +669,15 @@ split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
 			 */
 			if (parent->hdr->prntaddr == WT_ADDR_INVALID) {
 				root_split = 1;
-				WT_ERR((__wt_bt_promote(
-				    db, parent, increment, root_addrp)));
+				WT_ERR(__wt_bt_promote(
+				    db, parent, increment, root_addrp));
 			} else
 				root_split = 0;
 
 			next->hdr->prntaddr = parent->hdr->prntaddr;
 
 			/* Discard the old parent page, we have a new one. */
-			WT_ERR((__wt_bt_page_out(db, parent, WT_MODIFIED)));
+			WT_ERR(__wt_bt_page_out(db, parent, WT_MODIFIED));
 
 			need_promotion = 1;
 		}
@@ -693,14 +691,14 @@ split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
 		 * Update the returned database level.
 		 */
 		if (root_split && next->hdr->type == WT_PAGE_INT)
-			WT_ERR((__wt_bt_desc_write(db, *root_addrp)));
+			WT_ERR(__wt_bt_desc_write(db, *root_addrp));
 
 		/* There's a new parent page, update the page's parent ref. */
 		page->hdr->prntaddr = next->addr;
 		parent = next;
 		next = NULL;
 	} else {
-		WT_ERR((__wt_bt_page_in(db, parent_addr, 0, 1, &parent)));
+		WT_ERR(__wt_bt_page_in(db, parent_addr, 0, 1, &parent));
 
 		need_promotion = 0;
 	}
@@ -741,8 +739,7 @@ split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
 	parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
 
 	/* Append the new parent key index to the in-memory page structures. */
-	WT_ERR((
-	    __wt_bt_page_inmem_append(db, parent, parent_key, parent_data)));
+	WT_ERR(__wt_bt_page_inmem_append(db, parent, parent_key, parent_data));
 	parent->records += page->records;
 
 	/*
@@ -761,10 +758,9 @@ split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
 			if ((parent_addr =
 			    parent->hdr->prntaddr) == WT_ADDR_INVALID)
 				break;
-			WT_ERR((__wt_bt_page_out(db, parent, WT_MODIFIED)));
+			WT_ERR(__wt_bt_page_out(db, parent, WT_MODIFIED));
 			parent = NULL;
-			WT_ERR(
-			    (__wt_bt_page_in(db, parent_addr, 0, 1, &parent)));
+			WT_ERR(__wt_bt_page_in(db, parent_addr, 0, 1, &parent));
 
 			/*
 			 * Because of the bulk load pattern, we're always adding
@@ -779,9 +775,9 @@ split:		WT_ERR((__wt_bt_page_alloc(db, 0, &next)));
 
 err:	/* Discard the parent page. */
 	if (parent != NULL)
-		WT_TRET((__wt_bt_page_out(db, parent, WT_MODIFIED)));
+		WT_TRET(__wt_bt_page_out(db, parent, WT_MODIFIED));
 	if (next != NULL)
-		WT_TRET((__wt_bt_page_out(db, next, WT_MODIFIED)));
+		WT_TRET(__wt_bt_page_out(db, next, WT_MODIFIED));
 
 	return (ret);
 }
@@ -794,8 +790,8 @@ static int
 __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
 	if (copy->data == NULL || copy->data_len < orig->size) {
-		WT_RET((__wt_realloc(
-		    env, copy->data_len, orig->size, &copy->data)));
+		WT_RET(__wt_realloc(
+		    env, copy->data_len, orig->size, &copy->data));
 		copy->data_len = orig->size;
 	}
 	memcpy(copy->data, orig->data, copy->size = orig->size);

@@ -172,7 +172,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
 	 */
 
 	len = strlen(str) + 1;
-	WT_RET((__wt_calloc(env, len, 1, &p)));
+	WT_RET(__wt_calloc(env, len, 1, &p));
 
 	memcpy(p, str, len);
 

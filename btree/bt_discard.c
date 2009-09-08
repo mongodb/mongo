@@ -23,7 +23,6 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_STOC *stoc;
-	int ret;
 
 	stoc = db->idb->stoc;
 
@@ -209,7 +208,6 @@ __wt_bt_page_inmem_append(DB *db,
 	WT_INDX *indx;
 	WT_ITEM_OVFL *ovfl;
 	u_int32_t n;
-	int ret;
 
 	env = db->env;
 	idb = db->idb;
