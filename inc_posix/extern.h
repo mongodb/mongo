@@ -125,6 +125,8 @@ __wt_cache_close(DB *db);
 int
 __wt_cache_sync(DB *db);
 int
+__wt_cache_stoc_lru(WT_STOC *stoc, ENV *env);
+int
 __wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep);
 int
 __wt_cache_in(WT_STOC *stoc,

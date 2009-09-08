@@ -108,7 +108,9 @@ __wt_env_toc_sched(WT_TOC *toc)
 	 * handle operation, all other calls are handled by the primary server.
 	 */
 	if (toc->db == NULL || (stoc = toc->db->idb->stoc) == NULL)
-		stoc = ienv->sq;
+		stoc = toc->env->ienv->sq;
+
+	stoc->ops[toc->slot] = toc;
 
 	(void)__wt_lock(toc->block);
 

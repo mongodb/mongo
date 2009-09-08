@@ -22,13 +22,14 @@ struct __wt_stoc {
 
 	int running;				/* Thread active */
 
+	IENV *ienv;				/* Enclosing environment */
 	IDB *idb;				/* Enclosing DB */
 
 	/*
 	 * Per-server thread cache of database pages.
 	 */
 #define	WT_CACHE_DEFAULT_SIZE		(20)		/* 20MB */
-
+	u_int64_t cache_max;			/* Cache bytes maximum */
 	u_int64_t cache_bytes;			/* Cache bytes allocated */
 
 	/*

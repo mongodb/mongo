@@ -33,6 +33,7 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	stoc = ienv->sq  + ienv->sq_next;
 	stoc->id = ++ienv->sq_next;
 	stoc->running = 1;
+	stoc->ienv = ienv;
 
 	/* If we're single-threaded, we're done. */
 	if (LF_ISSET(WT_SINGLE_THREADED)) {
@@ -45,10 +46,6 @@ __wt_env_start(ENV *env, u_int32_t flags)
 		__wt_env_err(env, errno, "Env.start: primary server thread");
 		return (WT_ERROR);
 	}
-
-	/* We're running. */
-	ienv->running = 1;
-	WT_FLUSH_MEMORY;
 
 	return (0);
 }
@@ -82,9 +79,6 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 		return (0);
 
 	/* Flag all running threads to quit, and wait for them to exit. */
-	ienv->running = 0;
-	WT_FLUSH_MEMORY;
-
 	WT_STOC_FOREACH(ienv, stoc, i)
 		if (stoc->running) {
 			stoc->running = 0;
@@ -102,13 +96,11 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 void *
 __wt_workq(void *arg)
 {
-	IENV *ienv;
 	WT_STOC *stoc;
 	WT_TOC **q, **eq, *toc;
 	int maxsleep, not_found;
 
 	stoc = arg;
-	ienv = stoc->idb->db->env->ienv;
 
 	/* Walk the queue, executing work. */
 	not_found = 1;
@@ -142,7 +134,7 @@ __wt_workq(void *arg)
 			if (not_found++)
 				if (not_found > 10) {
 					if (not_found > 80)
-						not_found = 40;
+						not_found = 80;
 					WT_STAT_INCR(stoc->stats,
 					    STOC_SLEEP, "server thread sleeps");
 					__wt_sleep(0, not_found * 25000);
@@ -153,7 +145,7 @@ __wt_workq(void *arg)
 				}
 			q = stoc->ops;
 		}
-	} while (ienv->running == 1 && stoc->running == 1);
+	} while (stoc->running == 1);
 
 	return (NULL);
 }

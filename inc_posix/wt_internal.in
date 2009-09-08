@@ -103,7 +103,6 @@ struct __ienv {
 	ENV *env;			/* Public object */
 
 	WT_MTX mtx;			/* Global mutex */
-	int running;			/* Environment active */
 
 	WT_STOC *sq;			/* Server thread queue */
 	int sq_next;			/* Next server slot */

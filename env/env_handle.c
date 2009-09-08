@@ -168,7 +168,7 @@ __wt_ienv_config_default(ENV *env)
 	 * We need an address for memory flushing -- it doesn't matter which
 	 * one we choose.
 	 */
-	__wt_addr = &ienv->running;
+	__wt_addr = &ienv->env;
 
 	/*
 	 * Allocate an initial list of server slots.
