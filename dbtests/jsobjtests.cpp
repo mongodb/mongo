@@ -145,6 +145,51 @@ namespace JsobjTests {
             }
         };
         
+        class MultiKeySortOrder : public Base {
+        public:
+            void run(){
+                ASSERT( BSON( "x" << "a" ).woCompare( BSON( "x" << "b" ) ) < 0 );
+                ASSERT( BSON( "x" << "b" ).woCompare( BSON( "x" << "a" ) ) > 0 );
+
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "a" << "y" << "b" ) ) < 0 );
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "b" << "y" << "a" ) ) < 0 );
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "b" ) ) < 0 );
+
+                ASSERT( BSON( "x" << "c" ).woCompare( BSON( "x" << "b" << "y" << "h" ) ) > 0 );
+                ASSERT( BSON( "x" << "b" << "y" << "b" ).woCompare( BSON( "x" << "c" ) ) < 0 );
+
+                BSONObj key = BSON( "x" << 1 << "y" << 1 );
+                
+                ASSERT( BSON( "x" << "c" ).woSortOrder( BSON( "x" << "b" << "y" << "h" ) , key ) > 0 );
+                ASSERT( BSON( "x" << "b" << "y" << "b" ).woCompare( BSON( "x" << "c" ) , key ) < 0 );
+
+                key = BSON( "" << 1 << "" << 1 );
+
+                ASSERT( BSON( "" << "c" ).woSortOrder( BSON( "" << "b" << "" << "h" ) , key ) > 0 );
+                ASSERT( BSON( "" << "b" << "" << "b" ).woCompare( BSON( "" << "c" ) , key ) < 0 );
+                
+                {
+                    BSONObjBuilder b;
+                    b.append( "" , "c" );
+                    b.appendNull( "" );
+                    BSONObj o = b.obj();
+                    ASSERT( o.woSortOrder( BSON( "" << "b" << "" << "h" ) , key ) > 0 );
+                    ASSERT( BSON( "" << "b" << "" << "h" ).woSortOrder( o , key ) < 0 );
+                    
+                }
+                
+                
+                ASSERT( BSON( "" << "a" ).woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 );
+                {
+                    BSONObjBuilder b;
+                    b.append( "" , "a" );
+                    b.appendNull( "" );
+                    //ASSERT(  b.obj().woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 ); // SERVER-282
+                }
+                
+            }
+        };
+        
         class TimestampTest : public Base {
         public:
             void run() {
@@ -688,6 +733,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
+            add< BSONObjTests::MultiKeySortOrder > ();
             add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
             add< BSONObjTests::Validation::BadType >();
