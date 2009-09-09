@@ -255,6 +255,46 @@ namespace QueryOptimizerTests {
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
             }
         };
+
+        class InLowerBound {
+        public:
+            void run() {
+                FieldRangeSet f( "", fromjson( "{a:{$gt:4,$in:[1,2,3,4,5,6]}}" ) );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 5.0 ).firstElement(), false ) == 0 );
+                ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 6.0 ).firstElement(), false ) == 0 );
+            }
+        };
+
+        class InUpperBound {
+        public:
+            void run() {
+                FieldRangeSet f( "", fromjson( "{a:{$lt:4,$in:[1,2,3,4,5,6]}}" ) );
+                ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 1.0 ).firstElement(), false ) == 0 );
+                ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
+            }
+        };
+		
+		class MultiBound {
+		public:
+			void run() {
+                FieldRangeSet frs1( "", fromjson( "{a:{$in:[1,3,5,7,9]}}" ) );
+                FieldRangeSet frs2( "", fromjson( "{a:{$in:[2,3,5,8,9]}}" ) );
+				FieldRange fr1 = frs1.range( "a" );
+				FieldRange fr2 = frs2.range( "a" );
+				fr1 &= fr2;
+                ASSERT( fr1.min().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
+                ASSERT( fr1.max().woCompare( BSON( "a" << 9.0 ).firstElement(), false ) == 0 );
+				vector< FieldInterval > intervals = fr1.intervals();
+				vector< FieldInterval >::const_iterator j = intervals.begin();
+				double expected[] = { 3, 5, 9 };
+				for( int i = 0; i < 3; ++i, ++j ) {
+					ASSERT_EQUALS( expected[ i ], j->lower_.bound_.number() );
+					ASSERT( j->lower_.inclusive_ );
+					ASSERT( j->lower_ == j->upper_ );
+				}
+				ASSERT( j == intervals.end() );
+			}
+		};
         
     } // namespace FieldRangeTests
     
@@ -292,6 +332,14 @@ namespace QueryOptimizerTests {
             int indexno( const BSONObj &key ) {
                 return nsd()->idxNo( *index(key) );
             }
+            BSONObj startKey( const QueryPlan &p ) const {
+                BoundList bl = p.indexBounds();
+                return bl[ 0 ].first.getOwned();
+            }
+            BSONObj endKey( const QueryPlan &p ) const {
+                BoundList bl = p.indexBounds();
+                return bl[ bl.size() - 1 ].second.getOwned();
+            }
         private:
             dblock lk_;
             int indexNum_;
@@ -327,14 +375,14 @@ namespace QueryOptimizerTests {
                 
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FBS( BSONObj() ), BSON( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
-                ASSERT( !p.startKey().woCompare( start ) );
-                ASSERT( !p.endKey().woCompare( end ) );
+                ASSERT( !startKey( p ).woCompare( start ) );
+                ASSERT( !endKey( p ).woCompare( end ) );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FBS( BSONObj() ), BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FBS( BSONObj() ), BSON( "b" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
-                ASSERT( !p3.startKey().woCompare( start ) );
-                ASSERT( !p3.endKey().woCompare( end ) );
+                ASSERT( !startKey( p3 ).woCompare( start ) );
+                ASSERT( !endKey( p3 ).woCompare( end ) );
             }
         };
         
@@ -375,8 +423,8 @@ namespace QueryOptimizerTests {
                 QueryPlan p( nsd(),  INDEXNO( "a" << -1 << "b" << 1 ),FBS( BSONObj() ), BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p.direction() );
-                ASSERT( !p.startKey().woCompare( start ) );
-                ASSERT( !p.endKey().woCompare( end ) );
+                ASSERT( !startKey( p ).woCompare( start ) );
+                ASSERT( !endKey( p ).woCompare( end ) );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FBS( BSONObj() ), BSON( "a" << -1 << "b" << -1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );                
                 ASSERT_EQUALS( -1, p2.direction() );
@@ -399,12 +447,12 @@ namespace QueryOptimizerTests {
                 BSONObj end = b2.obj();
                 QueryPlan p( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FBS( BSON( "a" << 3 ) ), BSONObj() );
                 ASSERT( !p.scanAndOrderRequired() );                
-                ASSERT( !p.startKey().woCompare( start ) );
-                ASSERT( !p.endKey().woCompare( end ) );
+                ASSERT( !startKey( p ).woCompare( start ) );
+                ASSERT( !endKey( p ).woCompare( end ) );
                 QueryPlan p2( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FBS( BSON( "a" << 3 ) ), BSONObj() );
                 ASSERT( !p2.scanAndOrderRequired() );                
-                ASSERT( !p.startKey().woCompare( start ) );
-                ASSERT( !p.endKey().woCompare( end ) );
+                ASSERT( !startKey( p ).woCompare( start ) );
+                ASSERT( !endKey( p ).woCompare( end ) );
             }            
         };
         
@@ -971,6 +1019,80 @@ namespace QueryOptimizerTests {
             }
         };
         
+        class InQueryIntervals : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                double expected[] = { 2, 3, 6, 9 };
+                for( int i = 0; i < 4; ++i, c->advance() ) {
+                    ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
+                }
+                ASSERT( !c->ok() );
+                
+                // now check reverse
+                {
+                    QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ), &hintElt );
+                    QueryPlan qp( nsd(), 1, s.fbs(), BSON( "a" << -1 ) );
+                    auto_ptr< Cursor > c = qp.newCursor();
+                    double expected[] = { 9, 6, 3, 2 };
+                    for( int i = 0; i < 4; ++i, c->advance() ) {
+                        ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
+                    }
+                    ASSERT( !c->ok() );                    
+                }
+            }
+        };
+        
+        class EqualityThenIn : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << 5 << "b" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                double expected[] = { 2, 3, 6, 9 };
+                for( int i = 0; i < 4; ++i, c->advance() ) {
+                    ASSERT_EQUALS( expected[ i ], c->current().getField( "b" ).number() );
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+        
+        class NotEqualityThenIn : public Base {
+        public:
+            void run() {
+                Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
+                for( int i = 0; i < 10; ++i ) {
+                    BSONObj temp = BSON( "a" << 5 << "b" << i );
+                    theDataFileMgr.insert( ns(), temp );
+                }
+                BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
+                BSONElement hintElt = hint.firstElement();
+                QueryPlanSet s( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
+                QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
+                auto_ptr< Cursor > c = qp.newCursor();
+                for( int i = 2; i < 10; ++i, c->advance() ) {
+                    ASSERT_EQUALS( i, c->current().getField( "b" ).number() );
+                }
+                ASSERT( !c->ok() );
+            }
+        };
+
     } // namespace QueryPlanSetTests
     
     class All : public Suite {
@@ -995,6 +1117,9 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::QueryPatternTest >();
             add< FieldRangeTests::NoWhere >();
             add< FieldRangeTests::Numeric >();
+            add< FieldRangeTests::InLowerBound >();
+            add< FieldRangeTests::InUpperBound >();
+            add< FieldRangeTests::MultiBound >();
             add< QueryPlanTests::NoIndex >();
             add< QueryPlanTests::SimpleOrder >();
             add< QueryPlanTests::MoreIndexThanNeeded >();
@@ -1029,6 +1154,9 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::DeleteOneScan >();
             add< QueryPlanSetTests::DeleteOneIndex >();
             add< QueryPlanSetTests::TryOtherPlansBeforeFinish >();
+            add< QueryPlanSetTests::InQueryIntervals >();
+            add< QueryPlanSetTests::EqualityThenIn >();
+            add< QueryPlanSetTests::NotEqualityThenIn >();
         }
     };
     

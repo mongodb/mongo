@@ -852,7 +852,7 @@
 			buildConfigurationList = 93A47B0F0FAF474A00E760DD /* Build configuration list for PBXLegacyTarget "scons debug all" */;
 			buildPhases = (
 			);
-			buildToolPath = /usr/local/bin/scons;
+			buildToolPath = /opt/local/bin/scons;
 			dependencies = (
 			);
 			name = "scons debug all";
@@ -865,7 +865,7 @@
 			buildConfigurationList = 93A8D0710F36AE0200C92B85 /* Build configuration list for PBXLegacyTarget "scons debug test" */;
 			buildPhases = (
 			);
-			buildToolPath = /usr/local/bin/scons;
+			buildToolPath = /opt/local/bin/scons;
 			dependencies = (
 			);
 			name = "scons debug test";

@@ -279,6 +279,18 @@ namespace mongo {
         bool operator<( const Mod &other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
         }
+        
+        bool arrayDep() const {
+            switch (op){
+            case PUSH:
+            case PUSH_ALL:
+            case POP:
+                return true;
+            default:
+                return false;
+            }
+        }
+        
     };
 
     class ModSet {
@@ -368,15 +380,15 @@ namespace mongo {
             }
             return 0;
         }
-        bool havePush() const {
+        bool haveArrayDepMod() const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
-                if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL )
+                if ( i->arrayDep() )
                     return true;
             return false;
         }
-        void appendSizeSpecForPushes( BSONObjBuilder &b ) const {
+        void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
             for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
-                if ( i->op == Mod::PUSH || i->op == Mod::PUSH_ALL ) {
+                if ( i->arrayDep() ){
                     if ( i->pushStartSize == -1 )
                         b.appendNull( i->fieldName );
                     else
@@ -584,17 +596,21 @@ namespace mongo {
                     arr.done();
                 }
                 else if ( m->op == Mod::POP ){
+                    int startCount = 0;
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     if ( m->elt.isNumber() && m->elt.number() < 0 ){
                         if ( i.more() ) i.next();
                         int count = 0;
+                        startCount++;
                         while( i.more() ) {
                             arr.appendAs( i.next() , arr.numStr( count++ ).c_str() );
+                            startCount++;
                         }
                     }
                     else {
                         while( i.more() ) {
+                            startCount++;
                             BSONElement arrI = i.next();
                             if ( i.more() ){
                                 arr.append( arrI );
@@ -602,7 +618,7 @@ namespace mongo {
                         }
                     }
                     arr.done();
-   
+                    m->pushStartSize = startCount;
                 }
                 ++m;
                 ++p;
@@ -653,10 +669,8 @@ namespace mongo {
             Mod::Op op = opFromStr( fn );
             if ( op == Mod::INC )
                 strcpy((char *) fn, "$set"); // rewrite for op log
-            while ( jt.moreWithEOO() ) {
+            while ( jt.more() ) {
                 BSONElement f = jt.next();
-                if ( f.eoo() )
-                    break;
                 Mod m;
                 m.op = op;
                 m.fieldName = f.fieldName();
@@ -789,10 +803,10 @@ namespace mongo {
                 }
                 if ( logop ) {
                     if ( mods.size() ) {
-                        if ( mods.havePush() ) {
+                        if ( mods.haveArrayDepMod() ) {
                             BSONObjBuilder patternBuilder;
                             patternBuilder.appendElements( pattern );
-                            mods.appendSizeSpecForPushes( patternBuilder );
+                            mods.appendSizeSpecForArrayDepMods( patternBuilder );
                             pattern = patternBuilder.obj();                        
                         }
                         logOp("u", ns, updateobj, &pattern );

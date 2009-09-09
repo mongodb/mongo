@@ -59,8 +59,8 @@ end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
 both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ).hint( { a: 1, b: 1 } ) );
 
-both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).hint( { a: 1, b: 1 } ) );
-both( { a: 1, b: 2 }, f.find( { a: { $gt: 1, $lt: 1 }, b: 2 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
+both( { a: 1, b: 2 }, f.find( { a: { $gte: 1, $lte: 1 }, b: 2 } ).hint( { a: 1, b: 1 } ) );
+both( { a: 1, b: 2 }, f.find( { a: { $gte: 1, $lte: 1 }, b: 2 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
 f.drop();
 f.ensureIndex( { b: 1, a: 1 } );

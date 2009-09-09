@@ -119,7 +119,7 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BtreeCursor::BoundList b;
+                BoundList b;
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 1 ), BSON( "" << 2 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 4 ), BSON( "" << 6 ) ) );
                 setClient( ns );
@@ -148,7 +148,7 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BtreeCursor::BoundList b;
+                BoundList b;
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << -50 ), BSON( "" << 2 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 40 ), BSON( "" << 60 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 109 ), BSON( "" << 200 ) ) );
@@ -176,7 +176,7 @@ namespace CursorTests {
                         c.insert( ns, BSON( "a" << i ) );
                     ASSERT( c.ensureIndex( ns, BSON( "a" << 1 ) ) );
                 }
-                BtreeCursor::BoundList b;
+                BoundList b;
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 6 ), BSON( "" << 4 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 2 ), BSON( "" << 1 ) ) );
                 setClient( ns );

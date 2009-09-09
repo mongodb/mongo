@@ -42,10 +42,14 @@ namespace mongo {
     scanAndOrderRequired_( true ),
     exactKeyMatch_( false ),
     direction_( 0 ),
-    startKey_( startKey ),
-    endKey_( endKey ),
-    endKeyInclusive_( endKey_.isEmpty() ),
+    endKeyInclusive_( endKey.isEmpty() ),
     unhelpful_( false ) {
+
+        if ( !fbs_.matchPossible() ) {
+            unhelpful_ = true;
+            scanAndOrderRequired_ = false;
+            return;
+        }
 
         if( idxNo >= 0 ) {
             index_ = &d->indexes[idxNo];
@@ -94,17 +98,11 @@ namespace mongo {
         bool stillOptimalIndexedQueryCount = true;
         set< string > orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
-        BSONObjBuilder startKeyBuilder;
-        BSONObjBuilder endKeyBuilder;
         while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
             const FieldRange &fb = fbs.range( e.fieldName() );
-            int number = (int) e.number(); // returns 0.0 if not numeric
-            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction_ >= 0 ? 1 : -1 ) > 0 );
-            startKeyBuilder.appendAs( forward ? fb.min() : fb.max(), "" );
-            endKeyBuilder.appendAs( forward ? fb.max() : fb.min(), "" );
             if ( stillOptimalIndexedQueryCount ) {
                 if ( fb.nontrivial() )
                     ++optimalIndexedQueryCount;
@@ -130,10 +128,21 @@ namespace mongo {
             exactIndexedQueryCount == fbs.query().nFields() ) {
             exactKeyMatch_ = true;
         }
-        if ( startKey_.isEmpty() )
-            startKey_ = startKeyBuilder.obj();
-        if ( endKey_.isEmpty() )
-            endKey_ = endKeyBuilder.obj();
+        indexBounds_ = fbs.indexBounds( idxKey, direction_ );
+        if ( !startKey.isEmpty() || !endKey.isEmpty() ) {
+            BSONObj newStart, newEnd;
+            if ( !startKey.isEmpty() )
+                newStart = startKey;
+            else
+                newStart = indexBounds_[ 0 ].first;
+            if ( !endKey.isEmpty() )
+                newEnd = endKey;
+            else
+                newEnd = indexBounds_[ indexBounds_.size() - 1 ].second;
+            BoundList newBounds;
+            newBounds.push_back( make_pair( newStart, newEnd ) );
+            indexBounds_ = newBounds;
+        }
         if ( ( scanAndOrderRequired_ || order_.isEmpty() ) &&
             !fbs.range( idxKey.firstElement().fieldName() ).nontrivial() )
             unhelpful_ = true;
@@ -145,8 +154,12 @@ namespace mongo {
         if ( !index_ )
             return findTableScan( fbs_.ns(), order_, startLoc );
         massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
-        //TODO This constructor should really take a const ref to the index details.
-        return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *const_cast< IndexDetails* >( index_ ), startKey_, endKey_, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+        if ( indexBounds_.size() < 2 ) {
+            // we are sure to spec endKeyInclusive_
+            return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+        } else {
+            return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
+        }
     }
 
     auto_ptr< Cursor > QueryPlan::newReverseCursor() const {
@@ -169,7 +182,8 @@ namespace mongo {
     }
     
     void QueryPlan::registerSelf( long long nScanned ) const {
-        NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
+        if ( fbs_.matchPossible() )
+            NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
     }
     
     QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
@@ -289,7 +303,7 @@ namespace mongo {
             return;
 
         // If table scan is optimal or natural order requested
-        if ( ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
+        if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
             addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );

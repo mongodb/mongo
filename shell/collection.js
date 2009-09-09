@@ -44,6 +44,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.dropIndex(name)");
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.drop() drop the collection");
+    print("\tdb.foo.renameCollection( newName ) renames the collection");
     print("\tdb.foo.validate() - SLOW");
     print("\tdb.foo.stats()");
     print("\tdb.foo.dataSize()");
@@ -292,6 +293,10 @@ DBCollection.prototype.dropIndexes = function(){
 DBCollection.prototype.drop = function(){
     this.resetIndexCache();
     return this._db.runCommand( { drop: this.getName() } );
+}
+
+DBCollection.prototype.renameCollection = function( newName ){
+    return this._db._adminCommand( { renameCollection : this._fullName , to : this._db._name + "." + newName } ).ok;
 }
 
 DBCollection.prototype.validate = function() {
