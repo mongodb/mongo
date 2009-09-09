@@ -39,6 +39,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.update(query, object[, upsert_bool])");
+    print("\tdb.foo.remove(query)" );
     print("\tdb.foo.ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
     print("\tdb.foo.dropIndexes()");
     print("\tdb.foo.dropIndex(name)");

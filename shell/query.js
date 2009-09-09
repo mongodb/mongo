@@ -20,6 +20,17 @@ if ( typeof DBQuery == "undefined" ){
     print( "DBQuery probably won't have array access " );
 }
 
+DBQuery.prototype.help = function(){
+    print( "DBQuery help" );
+    print( "\t.sort( {...} )" )
+    print( "\t.limit( n )" )
+    print( "\t.skip( n )" )
+    print( "\t.count()" )
+    print( "\t.explain()" )
+    print( "\t.forEach( func )" )
+    print( "\t.map( func )" )
+
+}
 
 DBQuery.prototype.clone = function(){
     var q =  new DBQuery( this._mongo , this._db , this._collection , this._ns , 
