@@ -125,7 +125,7 @@ namespace mongo {
             BSONObj k = order.getKeyFromObject(o);
             if ( (int) best.size() < limit ) {
                 approxSize += k.objsize();
-                uassert( "too much key data for sort() with no index", approxSize < 1 * 1024 * 1024 );
+                uassert( "too much key data for sort() with no index.  add an index or specify a smaller limit", approxSize < 1 * 1024 * 1024 );
                 _add(k, o);
                 return;
             }
