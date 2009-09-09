@@ -540,7 +540,7 @@ if nix:
         env.Append( LINKFLAGS=" -pg " )
 
     # pre-compiled headers
-    if 'Gch' in dir( env ):
+    if False and 'Gch' in dir( env ):
         print( "using precompiled headers" )
         env['Gch'] = env.Gch( [ "stdafx.h" ] )[0]
         #Depends( "stdafx.o" , "stdafx.h.gch" )
