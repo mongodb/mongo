@@ -215,7 +215,7 @@ nojni = not GetOption( "nojni" ) is None
 usesm = not GetOption( "usesm" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
-env = Environment( MSVS_ARCH=msarch )
+env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
     env["CC"] = GetOption( "cxx" )
     env["CXX"] = GetOption( "cxx" )
@@ -294,6 +294,8 @@ shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_ad
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
+
+allCXXFiles = allClientFiles + coreShardFiles + shardServerFiles + serverOnlyFiles;
 
 # ---- other build setup -----
 
@@ -511,7 +513,7 @@ if not nojni and useJavaHome:
     env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
 
 if nix:
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas" )
+    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
     env.Append( LINKFLAGS=" -fPIC -pthread " )
     env.Append( LIBS=[] )
@@ -536,6 +538,14 @@ if nix:
 
     if GetOption( "profile" ) is not None:
         env.Append( LINKFLAGS=" -pg " )
+
+    # pre-compiled headers
+    if 'Gch' in dir( env ):
+        print( "using precompiled headers" )
+        env['Gch'] = env.Gch( [ "stdafx.h" ] )[0]
+        #Depends( "stdafx.o" , "stdafx.h.gch" )
+        #SideEffect( "dummyGCHSideEffect" , "stdafx.h.gch" )
+        
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
