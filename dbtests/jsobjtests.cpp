@@ -184,7 +184,7 @@ namespace JsobjTests {
                     BSONObjBuilder b;
                     b.append( "" , "a" );
                     b.appendNull( "" );
-                    //ASSERT(  b.obj().woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 ); // SERVER-282
+                    ASSERT(  b.obj().woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 ); // SERVER-282
                 }
                 
             }
@@ -707,12 +707,14 @@ namespace JsobjTests {
 
         void run(){
             for ( int t=1; t<JSTypeMax; t++ ){
-                if ( t == CodeWScope )
-                    continue;
-                assert( min( t ).woCompare( max( t ) ) < 0 );
-                assert( max( t ).woCompare( min( t ) ) > 0 );
-                assert( min( t ).woCompare( min( t ) ) == 0 );
-                assert( max( t ).woCompare( max( t ) ) == 0 );
+                stringstream ss;
+                ss << "type: " << t;
+                string s = ss.str();
+                massert( s , min( t ).woCompare( max( t ) ) < 0 );
+                massert( s , max( t ).woCompare( min( t ) ) > 0 );
+                massert( s , min( t ).woCompare( min( t ) ) == 0 );
+                massert( s , max( t ).woCompare( max( t ) ) == 0 );
+                massert( s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
             }
         }
         

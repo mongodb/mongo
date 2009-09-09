@@ -208,17 +208,51 @@ namespace mongo {
         
         /** returns the tyoe of the element fixed for the main type
             the main purpose is numbers.  any numeric type will return NumberDouble
+            Note: if the order changes, indexes have to be re-built or than can be corruption
          */
-        BSONType canonicalType() const {
+        int canonicalType() const {
             BSONType t = type();
             switch ( t ){
+            case MinKey:
+            case MaxKey:
+                return t;
+            case EOO:
+            case Undefined:
+                return 0;
+            case jstNULL:
+                return 5;
+            case NumberDouble:
             case NumberInt:
             case NumberLong:
-                return NumberDouble;
+                return 10;
+            case String:
             case Symbol:
-                return String;
+                return 15;
+            case Object:
+                return 20;
+            case Array:
+                return 25;
+            case BinData:
+                return 30;
+            case jstOID:
+                return 35;
+            case Bool:
+                return 40;
+            case Date:
+                return 45;
+            case RegEx:
+                return 50;
+            case DBRef:
+                return 55;
+            case Code:
+                return 60;
+            case CodeWScope:
+                return 65;
+            case Timestamp:
+                return 70;
             default:
-                return t;
+                assert(0);
+                return -1;
             }
         }
 

@@ -338,12 +338,12 @@ namespace NamespaceTests {
                 id().getKeysFromObject( b.done(), keys );
                 checkSize( 4, keys );
                 BSONObjSetDefaultOrder::iterator i = keys.begin();
+                assertEquals( nullObj(), *i++ );
                 for ( int j = 1; j < 4; ++i, ++j ) {
                     BSONObjBuilder b;
                     b.append( "", j );
                     assertEquals( b.obj(), *i );
                 }
-                assertEquals( nullObj(), *i++ );
             }
         private:
             virtual BSONObj key() const {
@@ -474,15 +474,16 @@ namespace NamespaceTests {
                 BSONObjSetDefaultOrder::iterator i = keys.begin();
                 {
                     BSONObjBuilder e;
+                    e.appendNull( "" );
+                    e.append( "", 2 );
+                    assertEquals( e.obj(), *i++ );
+                }
+
+                {
+                    BSONObjBuilder e;
                     e.append( "", 1 );
                     e.appendNull( "" );
                     assertEquals( e.obj(), *i++ );
-                }
-                {
-                    BSONObjBuilder e;
-                    e.appendNull( "" );
-                    e.append( "", 2 );
-                    assertEquals( e.obj(), *i );
                 }
             }
         private:

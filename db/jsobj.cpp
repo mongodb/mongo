@@ -1448,6 +1448,9 @@ namespace mongo {
         case NumberLong:
             append( field.c_str() , numeric_limits<double>::max() ); 
             break;
+        case BinData:
+            appendMinForType( field , jstOID );
+            break;
         case jstOID: 
             { 
                 OID o;
@@ -1455,6 +1458,9 @@ namespace mongo {
                 appendOID( field.c_str() , &o);
                 break;
             }
+        case Undefined:
+        case jstNULL:
+            appendMinForType( field , NumberInt );
         case Bool: appendBool( field.c_str() , true); break;
         case Date: appendDate( field.c_str() , 0xFFFFFFFFFFFFFFFFLL ); break;
         case Symbol:
