@@ -924,9 +924,7 @@ namespace mongo {
             if ( e.eoo() )
                 break;
             BSONElement x = getFieldDotted(e.fieldName());
-            if ( x.eoo() )
-                b.appendNull( e.fieldName() );
-            else
+            if ( ! x.eoo() )
                 b.append(x);
         }
         return b.obj();
