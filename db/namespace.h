@@ -84,6 +84,7 @@ namespace mongo {
             *this = ns;
         }
         Namespace& operator=(const char *ns) {
+            uassert("ns name too long, max size is 128", strlen(ns) < MaxNsLen);
             memset(buf, 0, MaxNsLen); /* this is just to keep stuff clean in the files for easy dumping and reading */
             strcpy_s(buf, MaxNsLen, ns);
             return *this;
