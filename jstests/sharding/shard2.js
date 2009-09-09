@@ -50,7 +50,7 @@ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : seconday.ge
 assert.eq( 2 , seconday.foo.find().length() , "seconday should have 2 after move shard" );
 assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
-assert.eq( 2 , s.config.chunks.count() , "still should have 2 shards after move not:" + s.getShardString() );
+assert.eq( 2 , s.config.chunks.count() , "still should have 2 shards after move not:" + s.getChunksString() );
 chunks = s.config.chunks.find().toArray();
 assert.neq( chunks[0].shard , chunks[1].shard , "servers should NOT be the same after the move" );
 

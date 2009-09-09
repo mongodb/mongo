@@ -218,13 +218,7 @@ namespace mongo {
     public:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
 
-        // a BoundList contains intervals specified by inclusive start
-        // and end bounds.  The intervals should be nonoverlapping and occur in
-        // the specified direction of traversal.  For example, given a simple index {i:1}
-        // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
-        // would be valid for index {i:-1} with direction -1.
-        typedef vector< pair< BSONObj, BSONObj > > BoundList;
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const vector< pair< BSONObj, BSONObj > > &_bounds, int _direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const BoundList &_bounds, int _direction );
 
         virtual bool ok() {
             return !bucket.isNull();
@@ -321,8 +315,11 @@ namespace mongo {
         // selective audits on construction
         void audit();
 
-        // init start / end keys with a new range
+        // set initial bucket
         void init();
+
+        // init start / end keys with a new range
+        void initInterval();
 
         friend class BtreeBucket;
         NamespaceDetails *d;

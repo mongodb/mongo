@@ -26,7 +26,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } );
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "joe" } , to : seconday.getMongo().name } );
 
-s.printShards();
+s.printChunks();
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , seconday.foo.find().toArray().length , "secondary count" );

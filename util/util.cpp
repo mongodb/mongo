@@ -29,7 +29,9 @@ namespace mongo {
     bool UnitTest::running = false;
 
     Nullstream nullstream;
-    Logstream logstream;
+
+    thread_specific_ptr<Logstream> Logstream::tsp;
+
     int logLevel = 0;
     boost::mutex &Logstream::mutex = *( new boost::mutex );
 

@@ -38,14 +38,14 @@ for ( ; i<1500; i++ ){
 }
 
 assert.eq( 3 , s.config.chunks.count() , "shard didn't split A " );
-s.printShards();
+s.printChunks();
 
 for ( ; i<3000; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
 assert.eq( 4 , s.config.chunks.count() , "shard didn't split B " );
-s.printShards();
+s.printChunks();
 
 
 s.stop();

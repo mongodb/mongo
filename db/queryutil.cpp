@@ -19,109 +19,130 @@
 #include "stdafx.h"
 
 #include "btree.h"
+#include "matcher.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
 
 namespace mongo {
     
     FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
-        lower() = minKey.firstElement();
-        lowerInclusive() = true;
-        upper() = maxKey.firstElement();
-        upperInclusive() = true;
+        if ( !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
+            set< BSONElement, element_lt > vals;
+            BSONObjIterator i( e.embeddedObject() );
+            while( i.more() )
+                vals.insert( i.next() );
+            for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i ) {
+                FieldInterval equalityInterval;
+                equalityInterval.lower_.bound_ = equalityInterval.upper_.bound_ = *i;
+                equalityInterval.lower_.inclusive_ = equalityInterval.upper_.inclusive_ = true;
+                intervals_.push_back( equalityInterval );
+            }
+            return;
+        }
+
+        intervals_.push_back( FieldInterval() );
+        FieldInterval &initial = intervals_[ 0 ];
+        BSONElement &lower = initial.lower_.bound_;
+        bool &lowerInclusive = initial.lower_.inclusive_;
+        BSONElement &upper = initial.upper_.bound_;
+        bool &upperInclusive = initial.upper_.inclusive_;
+        lower = minKey.firstElement();
+        lowerInclusive = true;
+        upper = maxKey.firstElement();
+        upperInclusive = true;
+
         if ( e.eoo() )
             return;
         if ( e.type() == RegEx ) {
             const string r = e.simpleRegex();
             if ( r.size() ) {
-                lower() = addObj( BSON( "" << r ) ).firstElement();
-                upper() = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
-                upperInclusive() = false;
+                lower = addObj( BSON( "" << r ) ).firstElement();
+                upper = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
+                upperInclusive = false;
             }            
             return;
         }
         switch( e.getGtLtOp() ) {
         case BSONObj::Equality:
-            lower() = e;
-            upper() = e;
+            lower = upper = e;
             break;
         case BSONObj::LT:
-            upperInclusive() = false;
+            upperInclusive = false;
         case BSONObj::LTE:
-            upper() = e;
+            upper = e;
             break;
         case BSONObj::GT:
-            lowerInclusive() = false;
+            lowerInclusive = false;
         case BSONObj::GTE:
-            lower() = e;
+            lower = e;
             break;
-	    case BSONObj::opALL: {
-	        massert( "$all requires array", e.type() == Array );
+        case BSONObj::opALL: {
+            massert( "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
-            if ( i.moreWithEOO() ) {
-                BSONElement f = i.next();
-                if ( !f.eoo() )
-                    lower() = upper() = f;
-            }
-            break;
-	    }
-        case BSONObj::opMOD: {
+            if ( i.more() )
+                lower = upper = i.next();
             break;
         }
-	    case BSONObj::opIN: {
-            massert( "$in requires array", e.type() == Array );
-            BSONElement max = minKey.firstElement();
-            BSONElement min = maxKey.firstElement();
-            BSONObjIterator i( e.embeddedObject() );
-            while( i.moreWithEOO() ) {
-                BSONElement f = i.next();
-                if ( f.eoo() )
-                    break;
-                if ( max.woCompare( f, false ) < 0 )
-                    max = f;
-                if ( min.woCompare( f, false ) > 0 )
-                    min = f;
-            }
-            lower() = min;
-            upper() = max;
+        case BSONObj::opMOD: {
+            break;
         }
         default:
             break;
         }
         
         if ( optimize ){
-            if ( lower().type() != MinKey && upper().type() == MaxKey && lower().isSimpleType() ){ // TODO: get rid of isSimpleType
+            if ( lower.type() != MinKey && upper.type() == MaxKey && lower.isSimpleType() ){ // TODO: get rid of isSimpleType
                 BSONObjBuilder b;
-                b.appendMaxForType( lower().fieldName() , lower().type() );
-                upper() = addObj( b.obj() ).firstElement();
+                b.appendMaxForType( lower.fieldName() , lower.type() );
+                upper = addObj( b.obj() ).firstElement();
             }
-            else if ( lower().type() == MinKey && upper().type() != MaxKey && upper().isSimpleType() ){ // TODO: get rid of isSimpleType
+            else if ( lower.type() == MinKey && upper.type() != MaxKey && upper.isSimpleType() ){ // TODO: get rid of isSimpleType
                 BSONObjBuilder b;
-                b.appendMinForType( upper().fieldName() , upper().type() );
-                lower() = addObj( b.obj() ).firstElement();
+                b.appendMinForType( upper.fieldName() , upper.type() );
+                lower = addObj( b.obj() ).firstElement();
             }
         }
 
     }
+
+    // as called, these functions find the max/min of a bound in the
+    // opposite direction, so inclusive bounds are considered less
+    // superlative
+    FieldBound maxFieldBound( const FieldBound &a, const FieldBound &b ) {
+        int cmp = a.bound_.woCompare( b.bound_, false );
+        if ( ( cmp == 0 && !b.inclusive_ ) || cmp < 0 )
+            return b;
+        return a;
+    }
+
+    FieldBound minFieldBound( const FieldBound &a, const FieldBound &b ) {
+        int cmp = a.bound_.woCompare( b.bound_, false );
+        if ( ( cmp == 0 && !b.inclusive_ ) || cmp > 0 )
+            return b;
+        return a;
+    }
+
+    bool fieldIntervalOverlap( const FieldInterval &one, const FieldInterval &two, FieldInterval &result ) {
+        result.lower_ = maxFieldBound( one.lower_, two.lower_ );
+        result.upper_ = minFieldBound( one.upper_, two.upper_ );
+        return result.valid();
+    }
     
+	// NOTE Not yet tested for complex $or bounds, just for simple bounds generated by $in
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
-        int cmp;
-        cmp = other.max().woCompare( upper(), false );
-        if ( cmp == 0 )
-            if ( !other.maxInclusive() )
-                upperInclusive() = false;
-        if ( cmp < 0 ) {
-            upper() = other.max();
-            upperInclusive() = other.maxInclusive();
+        vector< FieldInterval > newIntervals;
+        vector< FieldInterval >::const_iterator i = intervals_.begin();
+        vector< FieldInterval >::const_iterator j = other.intervals_.begin();
+        while( i != intervals_.end() && j != other.intervals_.end() ) {
+            FieldInterval overlap;
+            if ( fieldIntervalOverlap( *i, *j, overlap ) )
+                newIntervals.push_back( overlap );
+            if ( i->upper_ == minFieldBound( i->upper_, j->upper_ ) )
+                ++i;
+            else
+                ++j;      
         }
-        cmp = other.min().woCompare( lower(), false );
-        if ( cmp == 0 )
-            if ( !other.minInclusive() )
-                lowerInclusive() = false;
-        if ( cmp > 0 ) {
-            lower() = other.min();
-            lowerInclusive() = other.minInclusive();
-        }
+        intervals_ = newIntervals;
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );
         return *this;
@@ -186,6 +207,7 @@ namespace mongo {
                 break;
             const char *name = e.fieldName();
             const FieldRange &range = ranges_[ name ];
+            assert( !range.empty() );
             if ( range.equality() )
                 b.appendAs( range.min(), name );
             else if ( range.nontrivial() ) {
@@ -203,6 +225,7 @@ namespace mongo {
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         QueryPattern qp;
         for( map< string, FieldRange >::const_iterator i = ranges_.begin(); i != ranges_.end(); ++i ) {
+            assert( !i->second.empty() );
             if ( i->second.equality() ) {
                 qp.fieldTypes_[ i->first ] = QueryPattern::Equality;
             } else if ( i->second.nontrivial() ) {
@@ -218,6 +241,60 @@ namespace mongo {
         }
         qp.setSort( sort );
         return qp;
+    }
+    
+    BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
+        BSONObjBuilder equalityBuilder;
+        typedef vector< pair< shared_ptr< BSONObjBuilder >, shared_ptr< BSONObjBuilder > > > BoundBuilders;
+        BoundBuilders builders;
+        BSONObjIterator i( keyPattern );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const FieldRange &fr = range( e.fieldName() );
+            int number = (int) e.number(); // returns 0.0 if not numeric
+            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
+            if ( builders.empty() ) {
+                if ( fr.equality() ) {
+                    equalityBuilder.appendAs( fr.min(), "" );
+                } else {
+                    BSONObj equalityObj = equalityBuilder.done();
+                    const vector< FieldInterval > &intervals = fr.intervals();
+                    if ( forward ) {
+                        for( vector< FieldInterval >::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
+                            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                            builders.back().first->appendElements( equalityObj );
+                            builders.back().second->appendElements( equalityObj );
+                            builders.back().first->appendAs( j->lower_.bound_, "" );
+                            builders.back().second->appendAs( j->upper_.bound_, "" );
+                        }
+                    } else {
+                        for( vector< FieldInterval >::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
+                            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+                            builders.back().first->appendElements( equalityObj );
+                            builders.back().second->appendElements( equalityObj );
+                            builders.back().first->appendAs( j->upper_.bound_, "" );
+                            builders.back().second->appendAs( j->lower_.bound_, "" );
+                        }                       
+                    }
+                }
+            } else {
+                for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
+                    j->first->appendAs( forward ? fr.min() : fr.max(), "" );
+                    j->second->appendAs( forward ? fr.max() : fr.min(), "" );
+                }
+            }
+        }
+        if ( builders.empty() ) {
+            BSONObj equalityObj = equalityBuilder.done();
+            assert( !equalityObj.isEmpty() );
+            builders.push_back( make_pair( shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ), shared_ptr< BSONObjBuilder >( new BSONObjBuilder() ) ) );
+            builders.back().first->appendElements( equalityObj );
+            builders.back().second->appendElements( equalityObj );            
+        }
+        BoundList ret;
+        for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
+            ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
+        return ret;
     }
     
     void FieldMatcher::add( const BSONObj& o ){

@@ -174,7 +174,15 @@ namespace mongo {
             // receivedQuery() does its own authorization processing.
             receivedQuery(dbresponse, m, ss, true);
         }
+        else if ( m.data->operation() == dbGetMore ) {
+            // receivedQuery() does its own authorization processing.
+            OPREAD;
+            DEV log = true;
+            ss << "getmore ";
+            receivedGetMore(dbresponse, m, ss);
+        }
         else if ( m.data->operation() == dbMsg ) {
+			/* deprecated / rarely used.  intended for connection diagnostics. */
             ss << "msg ";
             char *p = m.data->_data;
             int len = strlen(p);
@@ -190,13 +198,6 @@ namespace mongo {
             //dbMsgPort.reply(m, resp);
             if ( end )
                 return false;
-        }
-        else if ( m.data->operation() == dbGetMore ) {
-            // receivedQuery() does its own authorization processing.
-            OPREAD;
-            DEV log = true;
-            ss << "getmore ";
-            receivedGetMore(dbresponse, m, ss);
         }
         else {
             const char *ns = m.data->_data + 4;

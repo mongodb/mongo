@@ -62,5 +62,64 @@ printjson( db.system.indexes.find( { ns : "test.foo3" } ).toArray() );
 assert( ! s.admin.runCommand( { shardcollection : "test.foo3" , key : { num : 1 } } ).ok , "shard with unique index" );
 
 
+// ---- unique shard key ----
+
+assert( s.admin.runCommand( { shardcollection : "test.foo4" , key : { num : 1 } , unique : true } ).ok , "shard with index and unique" );
+s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
+s.adminCommand( { movechunk : "test.foo4" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+db.foo4.save( { num : 5 } );
+db.foo4.save( { num : 15 } );
+s.sync();
+assert.eq( 1 , a.foo4.count() , "ua1" );
+assert.eq( 1 , b.foo4.count() , "ub1" );
+
+assert.eq( 2 , a.foo4.getIndexes().length , "ua2" );
+assert.eq( 2 , b.foo4.getIndexes().length , "ub2" );
+
+assert( a.foo4.getIndexes()[1].unique , "ua3" );
+assert( b.foo4.getIndexes()[1].unique , "ub3" );
+
+// --- don't let you convertToCapped ----
+assert( ! db.foo4.isCapped() , "ca1" );
+assert( ! a.foo4.isCapped() , "ca2" );
+assert( ! b.foo4.isCapped() , "ca3" );
+assert( ! db.foo4.convertToCapped( 30000 ).ok , "ca30" );
+assert( ! db.foo4.isCapped() , "ca4" );
+assert( ! a.foo4.isCapped() , "ca5" );
+assert( ! b.foo4.isCapped() , "ca6" );
+
+//      make sure i didn't break anything
+db.foo4a.save( { a : 1 } );
+assert( ! db.foo4a.isCapped() , "ca7" );
+db.foo4a.convertToCapped( 30000 );
+assert( db.foo4a.isCapped() , "ca8" );
+
+// --- don't let you shard a capped collection
+
+db.createCollection("foo5", {capped:true, size:30000});
+assert( db.foo5.isCapped() , "cb1" );
+assert( ! s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } ).ok , "shard capped" );
+
+
+// ----- group ----
+
+db.foo6.save( { a : 1 } );
+db.foo6.save( { a : 3 } );
+db.foo6.save( { a : 3 } );
+s.sync();
+
+assert.eq( 2 , db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , 
+                                reduce : function(z,prev){ prev.count++; } } ).length );
+
+assert.eq( 3 , db.foo6.find().count() );
+assert( s.admin.runCommand( { shardcollection : "test.foo6" , key : { a : 2 } } ).ok );
+assert.eq( 3 , db.foo6.find().count() );
+
+s.adminCommand( { split : "test.foo6" , middle : { a : 2 } } );
+s.adminCommand( { movechunk : "test.foo6" , find : { a : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+
+assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , reduce : function(z,prev){ prev.count++; } } ); } );;
+
 
 s.stop()
+

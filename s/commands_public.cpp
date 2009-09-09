@@ -41,21 +41,54 @@ namespace mongo {
             virtual bool adminOnly() {
                 return false;
             }
-        };
+        protected:
+            string getDBName( string ns ){
+                return ns.substr( 0 , ns.size() - 5 );
+            } 
 
+            bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+                ScopedDbConnection conn( conf->getPrimary() );
+                BSONObj res;
+                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                result.appendElements( res );
+                return ok;
+            }
+        };
+        
+        class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
+        public:
+            NotAllowedOnShardedCollectionCmd( const char * n ) : PublicGridCommand( n ){}
+
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
+            
+            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                string dbName = getDBName( ns );
+                string fullns = getFullNS( dbName , cmdObj );
+                
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                errmsg = "can't do command: " + name + " on sharded collection";
+                return false;
+            }
+        };
+        
+        // ----
 
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 
-                string dbName = ns;
-                dbName = dbName.substr( 0 , dbName.size() - 5 );
+                string dbName = getDBName( ns );
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
                 BSONObj filter = cmdObj["query"].embeddedObject();
-
+                
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
@@ -83,5 +116,28 @@ namespace mongo {
                 return true;
             }
         } countCmd;
+
+        class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd  {
+        public:
+            ConvertToCappedCmd() : NotAllowedOnShardedCollectionCmd("convertToCapped"){}
+            
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ){
+                return dbName + "." + cmdObj.firstElement().valuestrsafe();
+            }
+            
+        } convertToCappedCmd;
+
+
+        class GroupCmd : public NotAllowedOnShardedCollectionCmd  {
+        public:
+            GroupCmd() : NotAllowedOnShardedCollectionCmd("group"){}
+            
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ){
+                return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
+            }
+            
+        } groupCmd;
+
+
     }
 }

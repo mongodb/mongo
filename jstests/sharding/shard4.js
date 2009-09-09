@@ -31,7 +31,7 @@ assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other B" );
 
 s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
 //s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
-s.printShards();
+s.printChunks();
 
 print( "* A" );
 

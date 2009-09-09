@@ -8,6 +8,12 @@ t.save( {a:{b:{c:1}}} );
 t.save( {a:{b:{c:{d:null}}}} );
 
 assert.eq( 5, t.count() );
+assert.eq( 1, t.count( {a:null} ) );
+assert.eq( 2, t.count( {'a.b':null} ) );
+assert.eq( 3, t.count( {'a.b.c':null} ) );
+assert.eq( 5, t.count( {'a.b.c.d':null} ) );
+
+assert.eq( 5, t.count() );
 assert.eq( 4, t.count( {a:{$ne:null}} ) );
 assert.eq( 3, t.count( {'a.b':{$ne:null}} ) );
 assert.eq( 2, t.count( {'a.b.c':{$ne:null}} ) );

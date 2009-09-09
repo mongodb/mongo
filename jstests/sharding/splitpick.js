@@ -26,7 +26,7 @@ assert.eq( s.admin.runCommand( { splitvalue : "test.foo" , find : { a : 3 } } ).
 s.adminCommand( { split : "test.foo" , find : { a : 99 } } );
 
 assert.eq( s.config.chunks.count() , 3 );
-s.printShards();
+s.printChunks();
 
 assert.eq( s.admin.runCommand( { splitvalue : "test.foo" , find : { a : 50 } } ).middle.a , 10 , "splitvalue 4 " );
 

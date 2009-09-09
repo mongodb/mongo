@@ -231,7 +231,7 @@ namespace mongo {
             ShardCollectionCmd() : GridAdminCmd( "shardcollection" ){}
             virtual void help( stringstream& help ) const {
                 help
-                    << "Shard a collection.  Sharding must already be enabled for the database.\n"
+                    << "Shard a collection.  Requires key.  Optional unique. Sharding must already be enabled for the database.\n"
                     << "  { enablesharding : \"<dbname>\" }\n";
             }
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
@@ -272,9 +272,15 @@ namespace mongo {
                         errmsg = "can't shard collection with unique indexes";
                         return false;
                     }
+
+                    BSONObj res = conn->findOne( config->getName() + ".system.namespaces" , BSON( "name" << ns ) );
+                    if ( res["options"].type() == Object && res["options"].embeddedObject()["capped"].trueValue() ){
+                        errmsg = "can't shard capped collection";
+                        return false;
+                    }
                 }
 
-                config->shardCollection( ns , key );
+                config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
                 config->save( true );
 
                 result << "collectionsharded" << ns;

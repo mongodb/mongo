@@ -179,6 +179,16 @@ Array.unique = function( a ){
     return u;
 }
 
+Array.shuffle = function( arr ){
+    for ( var i=0; i<arr.length-1; i++ ){
+        var pos = i+Math.floor(Math.random()*(arr.length-i));
+        var save = arr[i];
+        arr[i] = arr[pos];
+        arr[pos] = save;
+    }
+    return arr;
+}
+
 
 Array.tojson = function( a , sepLines ){
     var s = "[";
