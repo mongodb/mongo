@@ -24,6 +24,7 @@
 *.idb
 *.pdb
 *.manifest
+*.gch
 *#
 .#*
 shell/mongo.cpp

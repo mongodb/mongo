@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "../stdafx.h"
-
 namespace mongo {
     
     inline void * ourmalloc(size_t size) {

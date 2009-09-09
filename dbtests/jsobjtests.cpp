@@ -145,6 +145,51 @@ namespace JsobjTests {
             }
         };
         
+        class MultiKeySortOrder : public Base {
+        public:
+            void run(){
+                ASSERT( BSON( "x" << "a" ).woCompare( BSON( "x" << "b" ) ) < 0 );
+                ASSERT( BSON( "x" << "b" ).woCompare( BSON( "x" << "a" ) ) > 0 );
+
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "a" << "y" << "b" ) ) < 0 );
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "b" << "y" << "a" ) ) < 0 );
+                ASSERT( BSON( "x" << "a" << "y" << "a" ).woCompare( BSON( "x" << "b" ) ) < 0 );
+
+                ASSERT( BSON( "x" << "c" ).woCompare( BSON( "x" << "b" << "y" << "h" ) ) > 0 );
+                ASSERT( BSON( "x" << "b" << "y" << "b" ).woCompare( BSON( "x" << "c" ) ) < 0 );
+
+                BSONObj key = BSON( "x" << 1 << "y" << 1 );
+                
+                ASSERT( BSON( "x" << "c" ).woSortOrder( BSON( "x" << "b" << "y" << "h" ) , key ) > 0 );
+                ASSERT( BSON( "x" << "b" << "y" << "b" ).woCompare( BSON( "x" << "c" ) , key ) < 0 );
+
+                key = BSON( "" << 1 << "" << 1 );
+
+                ASSERT( BSON( "" << "c" ).woSortOrder( BSON( "" << "b" << "" << "h" ) , key ) > 0 );
+                ASSERT( BSON( "" << "b" << "" << "b" ).woCompare( BSON( "" << "c" ) , key ) < 0 );
+                
+                {
+                    BSONObjBuilder b;
+                    b.append( "" , "c" );
+                    b.appendNull( "" );
+                    BSONObj o = b.obj();
+                    ASSERT( o.woSortOrder( BSON( "" << "b" << "" << "h" ) , key ) > 0 );
+                    ASSERT( BSON( "" << "b" << "" << "h" ).woSortOrder( o , key ) < 0 );
+                    
+                }
+                
+                
+                ASSERT( BSON( "" << "a" ).woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 );
+                {
+                    BSONObjBuilder b;
+                    b.append( "" , "a" );
+                    b.appendNull( "" );
+                    ASSERT(  b.obj().woCompare( BSON( "" << "a" << "" << "c" ) ) < 0 ); // SERVER-282
+                }
+                
+            }
+        };
+        
         class TimestampTest : public Base {
         public:
             void run() {
@@ -662,17 +707,79 @@ namespace JsobjTests {
 
         void run(){
             for ( int t=1; t<JSTypeMax; t++ ){
-                if ( t == CodeWScope )
-                    continue;
-                assert( min( t ).woCompare( max( t ) ) < 0 );
-                assert( max( t ).woCompare( min( t ) ) > 0 );
-                assert( min( t ).woCompare( min( t ) ) == 0 );
-                assert( max( t ).woCompare( max( t ) ) == 0 );
+                stringstream ss;
+                ss << "type: " << t;
+                string s = ss.str();
+                massert( s , min( t ).woCompare( max( t ) ) < 0 );
+                massert( s , max( t ).woCompare( min( t ) ) > 0 );
+                massert( s , min( t ).woCompare( min( t ) ) == 0 );
+                massert( s , max( t ).woCompare( max( t ) ) == 0 );
+                massert( s , abs( min( t ).firstElement().canonicalType() - max( t ).firstElement().canonicalType() ) <= 10 );
             }
         }
         
 
         
+    };
+    
+    class ExtractFieldsTest {
+    public:
+        void run(){
+            BSONObj x = BSON( "a" << 10 << "b" << 11 );
+            assert( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
+            assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
+            assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
+
+            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElement().fieldName() );
+        }
+    };
+    
+    class ComparatorTest {
+    public:
+        BSONObj one( string s ){
+            return BSON( "x" << s );
+        }
+        BSONObj two( string x , string y ){
+            BSONObjBuilder b;
+            b.append( "x" , x );
+            if ( y.size() )
+                b.append( "y" , y );
+            else
+                b.appendNull( "y" );
+            return b.obj();
+        }
+        
+        void test( BSONObj order , BSONObj l , BSONObj r , bool wanted ){
+            BSONObjCmp c( order );
+            bool got = c(l,r);
+            if ( got == wanted )
+                return;
+            cout << " order: " << order << " l: " << l << "r: " << r << " wanted: " << wanted << " got: " << got << endl;
+        }
+
+        void lt( BSONObj order , BSONObj l , BSONObj r ){
+            test( order , l , r , 1 );
+        }
+        
+        void run(){
+            BSONObj s = BSON( "x" << 1 );
+            BSONObj c = BSON( "x" << 1 << "y" << 1 );
+            test( s , one( "A" ) , one( "B" ) , 1 );
+            test( s , one( "B" ) , one( "A" ) , 0 );
+
+            test( c , two( "A" , "A" ) , two( "A" , "B" ) , 1 );
+            test( c , two( "A" , "A" ) , two( "B" , "A" ) , 1 );
+            test( c , two( "B" , "A" ) , two( "A" , "B" ) , 0 );
+
+            lt( c , one("A") , two( "A" , "A" ) );
+            lt( c , one("A") , one( "B" ) );
+            lt( c , two("A","") , two( "B" , "A" ) );
+
+            lt( c , two("B","A") , two( "C" , "A" ) );
+            lt( c , two("B","A") , one( "C" ) );
+            lt( c , two("B","A") , two( "C" , "" ) );
+            
+        }
     };
     
     class All : public Suite {
@@ -688,6 +795,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
+            add< BSONObjTests::MultiKeySortOrder > ();
             add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
             add< BSONObjTests::Validation::BadType >();
@@ -736,6 +844,8 @@ namespace JsobjTests {
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
             add< MinMaxElementTest >();
+            add< ComparatorTest >();
+            add< ExtractFieldsTest >();
         }
     };
     
