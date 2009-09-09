@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include "../stdafx.h"
-
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO)
