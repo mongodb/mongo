@@ -1258,6 +1258,52 @@ namespace mongo {
         }
         
     } cmdGroup;
+
+
+    class DistinctCommand : public Command {
+    public:
+        DistinctCommand() : Command("distinct"){}
+        virtual bool slaveOk() { return true; }
+        
+        virtual void help( stringstream &help ) const {
+            help << "{ distinct : 'collection name' , key : 'a.b' }";
+        }
+        
+        bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            static DBDirectClient db;
+            
+            string ns = database->name + '.' + cmdObj.findElement(name).valuestr();            
+            string key = cmdObj["key"].valuestrsafe();
+            
+            BSONObj keyPattern = BSON( key << 1 );
+            
+            set<BSONObj,BSONObjCmp> map;
+
+            double totalSize = 1;
+            double totalObjects = 1;
+
+            auto_ptr<DBClientCursor> cursor = db.query( ns , BSONObj() , 0 , 0 , &keyPattern );
+            while ( cursor->more() ){
+                BSONObj o = cursor->next();
+                BSONObj value = o.extractFields( keyPattern );
+                map.insert( value );
+                totalSize += o.objsize();
+                totalObjects++;
+            }
+            
+            BSONObjBuilder b( map.size() * ( totalSize / totalObjects ) );
+            int n=0;
+            for ( set<BSONObj,BSONObjCmp>::iterator i = map.begin() ; i != map.end(); i++ ){
+                b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );
+            }
+
+            result.appendArray( "values" , b.obj() );
+
+            return true;
+        }
+        
+    } distinctCmd;
+
     
     extern map<string,Command*> *commands;
 

@@ -455,6 +455,13 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
+DBCollection.prototype.distinct = function( keyString ){
+    var res = this._dbCommand( { distinct : this._shortName , key : keyString } );
+    if ( ! res.ok )
+        throw "distinct failed: " + tojson( res );
+    return res.values;
+}
+
 DBCollection.prototype.group = function( params ){
     params.ns = this._shortName;
     return this._db.group( params );
