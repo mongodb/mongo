@@ -722,6 +722,66 @@ namespace JsobjTests {
         
     };
     
+    class ExtractFieldsTest {
+    public:
+        void run(){
+            BSONObj x = BSON( "a" << 10 << "b" << 11 );
+            assert( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
+            assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
+            assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
+
+            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElement().fieldName() );
+        }
+    };
+    
+    class ComparatorTest {
+    public:
+        BSONObj one( string s ){
+            return BSON( "x" << s );
+        }
+        BSONObj two( string x , string y ){
+            BSONObjBuilder b;
+            b.append( "x" , x );
+            if ( y.size() )
+                b.append( "y" , y );
+            else
+                b.appendNull( "y" );
+            return b.obj();
+        }
+        
+        void test( BSONObj order , BSONObj l , BSONObj r , bool wanted ){
+            BSONObjCmp c( order );
+            bool got = c(l,r);
+            if ( got == wanted )
+                return;
+            cout << " order: " << order << " l: " << l << "r: " << r << " wanted: " << wanted << " got: " << got << endl;
+        }
+
+        void lt( BSONObj order , BSONObj l , BSONObj r ){
+            test( order , l , r , 1 );
+        }
+        
+        void run(){
+            BSONObj s = BSON( "x" << 1 );
+            BSONObj c = BSON( "x" << 1 << "y" << 1 );
+            test( s , one( "A" ) , one( "B" ) , 1 );
+            test( s , one( "B" ) , one( "A" ) , 0 );
+
+            test( c , two( "A" , "A" ) , two( "A" , "B" ) , 1 );
+            test( c , two( "A" , "A" ) , two( "B" , "A" ) , 1 );
+            test( c , two( "B" , "A" ) , two( "A" , "B" ) , 0 );
+
+            lt( c , one("A") , two( "A" , "A" ) );
+            lt( c , one("A") , one( "B" ) );
+            lt( c , two("A","") , two( "B" , "A" ) );
+
+            lt( c , two("B","A") , two( "C" , "A" ) );
+            lt( c , two("B","A") , one( "C" ) );
+            lt( c , two("B","A") , two( "C" , "" ) );
+            
+        }
+    };
+    
     class All : public Suite {
     public:
         All() {
@@ -784,6 +844,8 @@ namespace JsobjTests {
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
             add< MinMaxElementTest >();
+            add< ComparatorTest >();
+            add< ExtractFieldsTest >();
         }
     };
     

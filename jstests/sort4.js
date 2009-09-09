@@ -33,15 +33,11 @@ t.save({name: 'A'})
 nice( {name:1, prename:1} , "A,AB,AC,BB,BD" , "e1" );          
 
 t.save({name: 'C'})               
+nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2" ); // SERVER-282
 
-//nice({name:1, prename:1})
-//nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2" ); // SERVER-282
+t.ensureIndex( { name : 1 , prename : 1 } );
+nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2ia" ); // SERVER-282
 
-//t.ensureIndex( { name : 1 , prename : 1 } );
-//nice({name:1, prename:1})
-//nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2ia" ); // SERVER-282
-
-//t.dropIndexes();
-//t.ensureIndex( { name : 1  } );
-//nice({name:1, prename:1})
-//nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2ib" ); // SERVER-282
+t.dropIndexes();
+t.ensureIndex( { name : 1  } );
+nice( {name:1, prename:1} , "A,AB,AC,BB,BD,C" , "e2ib" ); // SERVER-282
