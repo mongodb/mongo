@@ -1161,19 +1161,7 @@ namespace mongo {
         }
 
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , const string keyFunction , double avgSize ){
-            BSONObjBuilder b( (int)(avgSize * 1.1) );
-
-            BSONObjIterator i( keyPattern );
-            while ( i.more() ){
-                const char * n = i.next().fieldName();
-                BSONElement e = obj[n];
-                if ( e.eoo() )
-                    b.appendNull( n );
-                else
-                    b.append( e );
-            }
-
-            return b.obj();
+            return obj.extractFields( keyPattern );
         }
         
         bool group( string realdbname , auto_ptr<DBClientCursor> cursor , BSONObj keyPattern , string keyFunction , string reduceCode , BSONObj initial , string& errmsg , BSONObjBuilder& result ){

@@ -38,3 +38,23 @@ c = {key: {a:1}, cond: {}, initial: {"count": 0}, reduce: function(obj, prev) { 
 assert.eq( t.group( c ) , t.groupcmd( c ) , "ZZZZ" );
 
 
+t.drop();
+
+t.save( { name : { first : "a" , last : "A" } } );
+t.save( { name : { first : "b" , last : "B" } } );
+t.save( { name : { first : "a" , last : "A" } } );
+
+
+p = { key : { 'name.first' : true } , 
+      reduce : function(obj,prev) { prev.count++; },
+      initial: { count: 0 }
+    };
+
+res = t.group( p );
+assert.eq( 2 , res.length , "Z1" );
+assert.eq( "a" , res[0].first , "Z2" )
+assert.eq( "b" , res[1].first , "Z3" )
+assert.eq( 2 , res[0].count , "Z4" )
+assert.eq( 1 , res[1].count , "Z5" )
+
+
