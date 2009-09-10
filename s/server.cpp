@@ -46,6 +46,7 @@ namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns ){
         assert( 0 );
+        return false;
     }
 
     void usage( char * argv[] ){
