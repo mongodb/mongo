@@ -26,6 +26,10 @@ ret = t.groupcmd( { key : {} , reduce : p.reduce , initial : p.initial } );
 assert.eq( 1 , ret.length , "ZZ 2" );
 assert.eq( 5 , ret[0].count , "ZZ 3" );
 
+ret = t.groupcmd( { key : {} , reduce : function(obj,prev){ prev.sum += obj.n } , initial : { sum : 0 } } );
+assert.eq( 1 , ret.length , "ZZ 4" );
+assert.eq( 15 , ret[0].sum , "ZZ 5" );
+
 t.drop();
 
 t.save( { "a" : 2 } );
