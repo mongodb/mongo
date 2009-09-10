@@ -30,7 +30,7 @@ DBCollection.prototype.help = function(){
     print("DBCollection help");
     print("\tdb.foo.getDB() get DB object associated with collection");
     print("\tdb.foo.findOne(...)");
-    print("\tdb.foo.find(...)");
+    print("\tdb.foo.find( [{..}] , [{...}]) - first parameters is an optional filter, 2nd paramter is optional and what fields to return.  db.foo.find( { x : 1 } , { name : 1 , x : 1 } )");
     print("\tdb.foo.find(...).sort(...)");
     print("\tdb.foo.find(...).limit(n)");
     print("\tdb.foo.find(...).skip(n)");
