@@ -827,7 +827,7 @@ namespace mongo {
 			x and y elements of this object, if they are present.
            returns elements with original field names
         */
-        BSONObj extractFields(const BSONObj &pattern) const;
+        BSONObj extractFields(const BSONObj &pattern , bool fillWithNull=false) const;
         
         BSONObj filterFieldsUndotted(const BSONObj &filter, bool inFilter) const;
 

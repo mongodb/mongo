@@ -916,7 +916,7 @@ namespace mongo {
         return b.obj();
     }
 
-    BSONObj BSONObj::extractFields(const BSONObj& pattern) const {
+    BSONObj BSONObj::extractFields(const BSONObj& pattern , bool fillWithNull ) const {
         BSONObjBuilder b(32); // scanandorder.h can make a zillion of these, so we start the allocation very small
         BSONObjIterator i(pattern);
         while ( i.moreWithEOO() ) {
@@ -926,6 +926,8 @@ namespace mongo {
             BSONElement x = getFieldDotted(e.fieldName());
             if ( ! x.eoo() )
                 b.append(x);
+            else if ( fillWithNull )
+                b.appendNull( e.fieldName() );
         }
         return b.obj();
     }
