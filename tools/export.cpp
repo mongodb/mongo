@@ -37,7 +37,7 @@ public:
     Export() : Tool( "export" ){
         add_options()
             ("query,q" , po::value<string>() , "query filter, as a JSON string" )
-            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f=name,age " )
+            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f name,age" )
             ("csv","export to csv instead of json")
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
             ;
@@ -63,14 +63,15 @@ public:
             printHelp(cerr);
             return 1;
         }
-        
+
         auth();
 
         if ( hasParam( "fields" ) ){
 
             BSONObjBuilder b;
 
-            pcrecpp::StringPiece input( getParam( "fields" ) );
+            string fields_arg = getParam("fields");
+            pcrecpp::StringPiece input(fields_arg);
 
             string f;
             pcrecpp::RE re("(\\w+),?" );
