@@ -29,6 +29,8 @@
 
 namespace mongo {
 
+    int ConfigServer::VERSION = 2;
+
     /* --- DBConfig --- */
 
     string DBConfig::modelServer() {
@@ -313,6 +315,48 @@ namespace mongo {
         }
         
         return true;
+    }
+    
+    int ConfigServer::dbConfigVersion(){
+        ScopedDbConnection conn( _primary );
+        int version = dbConfigVersion( conn.conn() );
+        conn.done();
+        return version;
+    }
+    
+    int ConfigServer::dbConfigVersion( DBClientBase& conn ){
+        auto_ptr<DBClientCursor> c = conn.query( "config.version" , BSONObj() );
+        int version = 0;
+        if ( c->more() ){
+            BSONObj o = c->next();
+            version = o["version"].numberInt();
+            uassert( "should only have 1 thing in config.version" , ! c->more() );
+        }
+        else {
+            if ( conn.count( "config.shard" ) || conn.count( "config.databases" ) ){
+                version = 1;
+            }
+        }
+        
+        return version;
+    }
+    
+    int ConfigServer::checkConfigVersion(){
+        int cur = dbConfigVersion();
+        if ( cur == VERSION )
+            return 0;
+        
+        if ( cur == 0 ){
+            ScopedDbConnection conn( _primary );
+            conn->insert( "config.version" , BSON( "version" << VERSION ) );
+            pool.flush();
+            assert( VERSION == dbConfigVersion( conn.conn() ) );
+            conn.done();
+            return 0;
+        }
+
+        log() << "don't know how to upgrade " << cur << " to " << VERSION << endl;
+        return -8;
     }
 
     string ConfigServer::getHost( string name , bool withPort ){

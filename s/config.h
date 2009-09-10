@@ -29,7 +29,7 @@
 #include "shardkey.h"
 
 namespace mongo {
-
+    
     class Grid;
     class ConfigServer;
 
@@ -150,6 +150,16 @@ namespace mongo {
            call at startup, this will initiate connection to the grid db 
         */
         bool init( vector<string> configHosts , bool infer );
+        
+        int dbConfigVersion();
+        int dbConfigVersion( DBClientBase& conn );
+
+        /**
+         * @return 0 = ok, otherwise error #
+         */
+        int checkConfigVersion();
+        
+        static int VERSION;
 
     private:
         string getHost( string name , bool withPort );
