@@ -1279,19 +1279,19 @@ namespace mongo {
             
             set<BSONObj,BSONObjCmp> map;
 
-            double totalSize = 1;
-            double totalObjects = 1;
-
+            long long size = 0;
+            
             auto_ptr<DBClientCursor> cursor = db.query( ns , BSONObj() , 0 , 0 , &keyPattern );
             while ( cursor->more() ){
                 BSONObj o = cursor->next();
                 BSONObj value = o.extractFields( keyPattern );
-                map.insert( value );
-                totalSize += o.objsize();
-                totalObjects++;
+                if ( map.insert( value ).second ){
+                    size += o.objsize() + 20;
+                    uassert( "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
+                }
             }
             
-            BSONObjBuilder b( map.size() * ( totalSize / totalObjects ) );
+            BSONObjBuilder b( size );
             int n=0;
             for ( set<BSONObj,BSONObjCmp>::iterator i = map.begin() ; i != map.end(); i++ ){
                 b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );
