@@ -8,7 +8,14 @@
 namespace mongo {
 
     class SingleStrategy : public Strategy {
+        
+    public:
+        SingleStrategy(){
+            _commandsSafeToPass.insert( "$eval" );
+            _commandsSafeToPass.insert( "create" );
+        }
 
+    private:
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
             
@@ -27,7 +34,8 @@ namespace mongo {
                     }
                     
                     string commandName = q.query.firstElement().fieldName();
-                    log() << "passing through command: " << commandName << " " << q.query << endl;
+                    if (  ! _commandsSafeToPass.count( commandName ) )
+                        log() << "passing through unknown command: " << commandName << " " << q.query << endl;
                 }
 
                 lateAssert = true;
@@ -112,6 +120,8 @@ namespace mongo {
             log(3) << "single write: " << ns << endl;
             doWrite( op , r , r.singleServerName() );
         }
+
+        set<string> _commandsSafeToPass;
     };
     
     Strategy * SINGLE = new SingleStrategy();
