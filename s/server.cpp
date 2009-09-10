@@ -44,6 +44,10 @@ namespace mongo {
         return "?";
     }
 
+    bool haveLocalShardingInfo( const string& ns ){
+        assert( 0 );
+    }
+
     void usage( char * argv[] ){
         out() << argv[0] << " usage:\n\n";
         out() << " -v+  verbose\n";

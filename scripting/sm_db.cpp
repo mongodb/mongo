@@ -4,6 +4,8 @@
 
 namespace mongo {
 
+    bool haveLocalShardingInfo( const string& ns );
+
     // ------------    some defs needed ---------------
     
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
@@ -298,6 +300,13 @@ namespace mongo {
          assert( JS_SetProperty( cx , obj , "_db" , &(argv[1]) ) );
          assert( JS_SetProperty( cx , obj , "_shortName" , &(argv[2]) ) );
          assert( JS_SetProperty( cx , obj , "_fullName" , &(argv[3]) ) );
+         
+         Convertor c(cx);
+         if ( haveLocalShardingInfo( c.toString( argv[3] ) ) ){
+             JS_ReportError( cx , "can't use sharded collection from db.eval" );
+             return JS_FALSE;
+         }
+         
          return JS_TRUE;
      }
 
@@ -327,6 +336,8 @@ namespace mongo {
              return JS_TRUE;
 
          JSObject * coll = doCreateCollection( cx , JSVAL_TO_OBJECT( db ) , name );
+         if ( ! coll )
+             return JS_FALSE;
          c.setProperty( obj , collname.c_str() , OBJECT_TO_JSVAL( coll ) );
          *objp = obj;
          return JS_TRUE;
@@ -355,6 +366,11 @@ namespace mongo {
          name += "." + shortName;
          c.setProperty( coll , "_fullName" , c.toval( name.c_str() ) );
          
+         if ( haveLocalShardingInfo( name ) ){
+             JS_ReportError( cx , "can't use sharded collection from db.eval" );
+             return 0;
+         }
+
          return coll;
     }
     
@@ -388,6 +404,8 @@ namespace mongo {
             return JS_TRUE;
 
         JSObject * coll = doCreateCollection( cx , obj , collname );
+        if ( ! coll )
+            return JS_FALSE;
         c.setProperty( obj , collname.c_str() , OBJECT_TO_JSVAL( coll ) );
         
         *objp = obj;

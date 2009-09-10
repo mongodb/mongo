@@ -26,4 +26,8 @@ namespace mongo {
     string getDbContext() {
         return "in client only mode";
     }
+
+    bool haveLocalShardingInfo( const string& ns ){
+        return false;
+    }
 }

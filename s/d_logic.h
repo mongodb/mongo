@@ -7,6 +7,11 @@
 namespace mongo {
 
     /**
+     * @return true if we have any shard info for the ns
+     */
+    bool haveLocalShardingInfo( const string& ns );
+    
+    /**
      * @return true if the current threads shard version is ok, or not in sharded version
      */
     bool shardVersionOk( const string& ns , string& errmsg );

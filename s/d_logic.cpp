@@ -390,6 +390,22 @@ namespace mongo {
         
     } moveShardFinishCmd;
     
+    bool haveLocalShardingInfo( const string& ns ){
+        if ( shardConfigServer.empty() )
+            return false;
+        
+
+        unsigned long long version = myVersions[ns];
+        if ( version == 0 )
+            return false;
+        
+        NSVersions * versions = clientShardVersions.get();
+        if ( ! versions )
+            return false;
+        
+        return true;
+    }
+
     /**
      * @ return true if not in sharded mode
                      or if version for this client is ok
