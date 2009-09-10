@@ -293,7 +293,10 @@ namespace mongo {
         msg(m, "127.0.0.1", CmdLine::DefaultDBPort, extras);
     }
 
+    bool shouldRepairDatabases = 0;
+
     void repairDatabases() {
+
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -303,14 +306,32 @@ namespace mongo {
             MongoDataFile *p = database->getFile( 0 );
             MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() ) {
-                // QUESTION: Repair even if file format is higher version than code?
-                log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                string errmsg;
-                assert( repairDatabase( dbName.c_str(), errmsg ) );
+                log() << "****" << endl;
+                log() << "****" << endl;
+                log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
+                      << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+                if ( shouldRepairDatabases ){
+                    // QUESTION: Repair even if file format is higher version than code?
+                    log() << "\t starting repair" << endl;
+                    string errmsg;
+                    assert( repairDatabase( dbName.c_str(), errmsg ) );
+                }
+                else {
+                    log() << "\t Not repairing, exiting!" << endl;
+                    log() << "\t run --upgrade to upgrade dbs, then start again" << endl;
+                    log() << "****" << endl;
+                    dbexit( EXIT_NEED_UPGRADE );
+                    shouldRepairDatabases = 1;
+                    return;
+                }
             } else {
                 closeClient( dbName.c_str() );
             }
+        }
+
+        if ( shouldRepairDatabases ){
+            log() << "finished checking dbs" << endl;
+            dbexit( EXIT_CLEAN );
         }
     }
 
@@ -396,6 +417,8 @@ namespace mongo {
         }
 
         repairDatabases();
+        if ( shouldRepairDatabases )
+            return;
         /* this is for security on certain platforms */
         srand(curTimeMicros() ^ startupSrandTimer.micros());
 
@@ -491,6 +514,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
+        ("upgrade", "upgrade db if needed")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -681,6 +705,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
             return 0;
+        }
+        if (params.count("upgrade")) {
+            shouldRepairDatabases = 1;
         }
         if (params.count("deDupMem")) {
             uasserted("deprecated");
