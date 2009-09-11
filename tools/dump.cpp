@@ -30,7 +30,7 @@ class Dump : public Tool {
 public:
     Dump() : Tool( "dump" , "*" ){
         add_options()
-            ("out,o" , po::value<string>() , "output directory" )
+            ("out,o", po::value<string>()->default_value("dump"), "output directory")
             ;
     }
 
@@ -81,7 +81,7 @@ public:
 
     int run(){
 
-        path root( getParam( "out" , "dump" ) );
+        path root( getParam("out") );
         string db = _db;
 
         if ( db == "*" ){
