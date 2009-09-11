@@ -95,7 +95,6 @@ namespace mongo {
         }
         
         int id = m.data->id & 0xFFFF0000;
-        cout << "eliot id: " << id << endl;
         setID( id );
         LastError * le = get( true);
         le->nPrev++;
