@@ -205,8 +205,8 @@ namespace mongo {
                     break;
                 }
 
-                le->nPrev++;
-
+                lastError.startRequest( m , le );
+                
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse, dbMsgPort.farEnd.sa ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;

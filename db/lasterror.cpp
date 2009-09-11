@@ -3,6 +3,8 @@
 #include "stdafx.h"
 
 #include "../util/unittest.h"
+#include "../util/message.h"
+
 
 #include "lasterror.h"
 #include "jsobj.h"
@@ -31,14 +33,24 @@ namespace mongo {
         _id.reset( id );
     }
     
-    LastError * LastErrorHolder::get(){
+    int LastErrorHolder::getID(){
+        return _id.get();
+    }
+
+    LastError * LastErrorHolder::get( bool create ){
         int id = _id.get();
         if ( id == 0 )
             return _tl.get();
         
         LastErrorIDMap::iterator i = _ids.find( id );
-        if ( i == _ids.end() )
-            return 0;
+        if ( i == _ids.end() ){
+            if ( ! create )
+                return 0;
+            
+            LastError * le = new LastError();
+            _ids[id] = make_pair( time(0) , le );
+            return le;
+        }
         
         LastErrorStatus & status = i->second;
         status.first = time(0);
@@ -75,6 +87,20 @@ namespace mongo {
         status.first = time(0);
         status.second = le;
     }
+    
+    void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ){
+        if ( connectionOwned && ! connectionOwned->overridenById ){
+            connectionOwned->nPrev++;
+            return;
+        }
+        
+        int id = m.data->id & 0xFFFF0000;
+        cout << "eliot id: " << id << endl;
+        setID( id );
+        LastError * le = get( true);
+        le->nPrev++;
+    }
+
 
     struct LastErrorHolderTest : public UnitTest {
     public:

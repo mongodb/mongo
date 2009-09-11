@@ -24,13 +24,15 @@
 
 namespace mongo {
     class BSONObjBuilder;
-    
+    class Message;
+
     struct LastError {
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         int nObjects;
         int nPrev;
         bool valid;
+        bool overridenById;
         void raiseError(const char *_msg) {
             reset( true );
             msg = _msg;
@@ -45,6 +47,7 @@ namespace mongo {
             nObjects = nDeleted;
         }
         LastError() {
+            overridenById = false;
             reset();
         }
         void reset( bool _valid = false ) {
@@ -68,16 +71,19 @@ namespace mongo {
         
         LastErrorHolder() : _id( 0 ){}
 
-        LastError * get();
+        LastError * get( bool create = false );
         void reset( LastError * le );
         
         /**
          * id of 0 means should use thread local management
          */
         void setID( int id );
-        
+        int getID();
+
         void remove( int id );
         void release();
+        
+        void startRequest( Message& m , LastError * connectionOwned = 0 );
     private:
         
         ThreadLocalInt _id;
