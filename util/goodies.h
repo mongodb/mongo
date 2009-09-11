@@ -305,5 +305,25 @@ namespace mongo {
 #else
     typedef void *HANDLE;
 #endif
+    
+    class ThreadLocalInt {
+    public:
+        ThreadLocalInt( int def = 0 ) : _def( def ){}
+
+        int get(){
+            int * val = _val.get();
+            if ( val )
+                return *val;
+            return _def;
+        }
+        void reset( int i ){
+            int * val = new int[1];
+            *val = i;
+            _val.reset( val );
+        }
+    private:
+        int _def;
+        boost::thread_specific_ptr<int> _val;
+    };
 
 } // namespace mongo

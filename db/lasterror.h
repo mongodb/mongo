@@ -56,9 +56,37 @@ namespace mongo {
         }
         void appendSelf( BSONObjBuilder &b );
         static LastError noError;
+
+        
     };
 
-    extern boost::thread_specific_ptr<LastError> lastError;
+    typedef pair<int,LastError*> LastErrorStatus ;
+    typedef map<int,LastErrorStatus> LastErrorIDMap;
+
+    class LastErrorHolder {
+    public:
+        
+        LastErrorHolder() : _id( 0 ){}
+
+        LastError * get();
+        void reset( LastError * le );
+        
+        /**
+         * id of 0 means should use thread local management
+         */
+        void setID( int id );
+        
+        void remove( int id );
+        void release();
+    private:
+        
+        ThreadLocalInt _id;
+        boost::thread_specific_ptr<LastError> _tl;
+        
+        LastErrorIDMap _ids;        
+    };
+    
+    extern LastErrorHolder lastError;
 
     inline void raiseError(const char *msg) {
         LastError *le = lastError.get();
