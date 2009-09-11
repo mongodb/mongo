@@ -439,7 +439,10 @@ DB.prototype.forceError = function(){
 }
 
 DB.prototype.getLastError = function(){
-    return this.runCommand( { getlasterror : 1 } ).err;
+    var res = this.runCommand( { getlasterror : 1 } );
+    if ( ! res.ok )
+        throw "getlasterror failed: " + tojson( res );
+    return res.err;
 }
 
 /* Return the last error which has occurred, even if not the very last error.
