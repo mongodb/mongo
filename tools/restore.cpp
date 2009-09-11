@@ -37,13 +37,13 @@ public:
             ;
         addPositionArg( "dir" , 1 );
     }
-    
+
     int run(){
         auth();
         drillDown( getParam( "dir" ) );
         return 0;
     }
-    
+
     void drillDown( path root ) {
 
         if ( is_directory( root ) ) {
@@ -56,15 +56,15 @@ public:
             }
             return;
         }
-        
+
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
             cerr << "don't know what to do with [" << root.string() << "]" << endl;
             return;
         }
-        
+
         out() << root.string() << endl;
-        
+
         string ns;
         {
             string dir = root.branch_path().string();
@@ -73,39 +73,39 @@ public:
             else
                 ns += dir.substr( dir.find_last_of( "/" ) + 1 );
         }
-        
+
         {
             string l = root.leaf();
             l = l.substr( 0 , l.find_last_of( "." ) );
             ns += "." + l;
         }
-        
+
         if ( boost::filesystem::file_size( root ) == 0 ) {
             out() << "file " + root.native_file_string() + " empty, skipping" << endl;
             return;
         }
 
         out() << "\t going into namespace [" << ns << "]" << endl;
-        
+
         MemoryMappedFile mmf;
         long fileLength;
         assert( mmf.map( root.string().c_str() , fileLength ) );
-        
+
         log(1) << "\t file size: " << fileLength << endl;
 
         char * data = (char*)mmf.viewOfs();
         long read = 0;
-        
+
         long num = 0;
-        
+
         int msgDelay = (int)(1000 * ( 1 + ( mmf.length() / ( 1024.0 * 1024 * 400 ) ) ) );
         log(1) << "\t msg delay: " << msgDelay << endl;
 
         while ( read < mmf.length() ) {
             BSONObj o( data );
-            
+
             conn().insert( ns.c_str() , o );
-            
+
             read += o.objsize();
             data += o.objsize();
 
@@ -113,7 +113,7 @@ public:
             if ( logLevel > 0 && num < 10 || ! ( num % msgDelay ) )
                 out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)( (read * 100) / mmf.length()) << "%) " << num << " objects" << endl;
         }
-        
+
         out() << "\t "  << num << " objects" << endl;
     }
 };
