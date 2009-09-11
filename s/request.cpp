@@ -74,29 +74,6 @@ namespace mongo {
         Strategy * s = SINGLE;
         
         _d.markSet();
-        if ( getConfig()->isShardingEnabled() && op == dbQuery ){
-            // there are a few things we need to check here
-            // 1. db.eval
-            //     TODO:  right now i'm just going to block all
-            //            will need to make it look at function later
-            // 2. $where - can't access DB
-            //              TODO: make it smarter
-            //cerr << "E1.b" << endl;
-            QueryMessage q( _d );
-            BSONObj query = q.query;
-            
-            if ( q.ntoreturn == 1 && 
-                 strstr( q.ns , ".$cmd" ) &&
-                 strcmp( "$eval" , query.firstElement().fieldName() ) == 0 ){
-                log() << "trying to eval: " << q.query << endl;
-                throw UserException( "eval not supported on partitioned databases yet" );
-            }
-            
-            if ( query.hasField( "$where" ) )
-                throw UserException( "$where not supported for partitioned databases yet" );
-
-            _d.markReset();
-        }
 
         if ( _chunkManager ){
             s = SHARDED;
