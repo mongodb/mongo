@@ -33,7 +33,7 @@ namespace mongo {
 
     // pdfile versions
     const int VERSION = 4;
-    const int VERSION_MINOR = 4;
+    const int VERSION_MINOR = 5;
     
     // mongo version
     extern const char versionString[];
@@ -42,6 +42,7 @@ namespace mongo {
         EXIT_CLEAN = 0 , 
         EXIT_BADOPTIONS = 2 , 
         EXIT_REPLICATION_ERROR = 3 ,
+        EXIT_NEED_UPGRADE = 4 ,
         EXIT_KILL = 12 ,
         EXIT_ABRUBT = 14 ,
         EXIT_NTSERVICE_ERROR = 20 ,
