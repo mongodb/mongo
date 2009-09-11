@@ -988,11 +988,8 @@ namespace mongo {
     of a BSONObj, particularly when assembling a Query.  For example,
     BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
-
-    Use BSONwithID to create a BSON object with an object id (_id) auto prepended.
 */
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
-
 
     /* Utility class to auto assign object IDs.
        Example: 
