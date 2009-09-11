@@ -222,7 +222,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
          << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
          << " " << d.getns()
          << "  " << m.data->len << " bytes "
-         << m.data->id;
+         << " id:" << hex << m.data->id << dec << "\t" << m.data->id;
 
     if ( m.data->operation() == mongo::opReply )
         cout << " - " << m.data->responseTo;
