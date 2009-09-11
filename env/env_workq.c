@@ -25,13 +25,13 @@ __wt_env_start(ENV *env, u_int32_t flags)
 
 	/*
 	 * No matter what we're doing, we end up here before we do any real
-	 * work.   Check the build itself.
+	 * work.   Check the build itself, and do some global stuff.
 	 */
 	WT_RET(__wt_build_verify());
 
 	/* Create the primary thread-of-control structure. */
-	stoc = ienv->sq  + ienv->sq_next;
-	stoc->id = ++ienv->sq_next;
+	stoc = ienv->sq  + ienv->sq_next_id;
+	stoc->id = ++ienv->sq_next_id;
 	stoc->running = 1;
 
 	/* If we're single-threaded, we're done. */
@@ -51,7 +51,7 @@ int
 __wt_env_stop(ENV *env, u_int32_t flags)
 {
 	IENV *ienv;
-	DB *db;
+	IDB *idb;
 	WT_STOC *stoc;
 	u_int i;
 
@@ -63,9 +63,9 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 	 * We don't close open databases -- we need a TOC to do that, and we
 	 * don't have one.   Complain and kill any running threads.
 	 */
-	TAILQ_FOREACH(db, &env->dbqh, q)
+	TAILQ_FOREACH(idb, &ienv->dbqh, q)
 		__wt_env_errx(env,
-		    "Env.stop: database %s left open", db->idb->dbname);
+		    "Env.stop: database %s left open", idb->dbname);
 
 	/* If we're single-threaded, we're done. */
 	if (F_ISSET(ienv, WT_SINGLE_THREADED))

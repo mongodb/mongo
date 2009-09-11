@@ -20,7 +20,7 @@ struct __wt_stoc {
 #define	WT_SERVER_QSIZE		 40		/* Queued operations max */
 	WT_TOC *ops[WT_SERVER_QSIZE];		/* Queued operations */
 
-	u_int32_t id;				/* Server ID */
+	u_int id;				/* Server ID (array offset) */
 	pthread_t tid;				/* System thread ID */
 
 	int running;				/* Thread active */

@@ -35,9 +35,9 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 
 	/* Get a server slot ID. */
 	WT_ERR(__wt_lock(&ienv->mtx));
-	toc->slot = ienv->toc_slot++;
+	toc->id = ienv->toc_next_id++;
 	WT_ERR(__wt_unlock(&ienv->mtx));
-	if (toc->slot >= WT_SERVER_QSIZE) {
+	if (toc->id >= WT_SERVER_QSIZE) {
 		__wt_env_errx(env, "wt_env_toc_create: too many threads");
 		ret = WT_ERROR;
 		goto err;
@@ -112,7 +112,7 @@ __wt_env_toc_sched(WT_TOC *toc, int stoc_id)
 		stoc->db = toc->db;
 		__wt_api_switch(stoc);
 	} else {
-		stoc->ops[toc->slot] = toc;
+		stoc->ops[toc->id] = toc;
 		(void)__wt_lock(toc->block);
 	}
 	return (toc->ret);

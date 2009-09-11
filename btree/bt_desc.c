@@ -45,18 +45,21 @@ __wt_bt_desc_init(DB *db, WT_PAGE *page)
 void
 __wt_bt_desc_stats(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	WT_PAGE_DESC desc;
+
+	idb = db->idb;
 
 	memcpy(
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
-	WT_STAT_SET(db->dstats, MAGIC, "magic number", desc.magic);
-	WT_STAT_SET(db->dstats, MAJOR, "major version number", desc.majorv);
-	WT_STAT_SET(db->dstats, MINOR, "minor version number", desc.minorv);
-	WT_STAT_SET(db->dstats, LEAFSIZE, "leaf page size", desc.leafsize);
-	WT_STAT_SET(db->dstats, INTLSIZE, "internal page size", desc.intlsize);
+	WT_STAT_SET(idb->dstats, MAGIC, "magic number", desc.magic);
+	WT_STAT_SET(idb->dstats, MAJOR, "major version number", desc.majorv);
+	WT_STAT_SET(idb->dstats, MINOR, "minor version number", desc.minorv);
+	WT_STAT_SET(idb->dstats, LEAFSIZE, "leaf page size", desc.leafsize);
+	WT_STAT_SET(idb->dstats, INTLSIZE, "internal page size", desc.intlsize);
 	WT_STAT_SET(
-	    db->dstats, BASE_RECNO, "base record number", desc.base_recno);
+	    idb->dstats, BASE_RECNO, "base record number", desc.base_recno);
 }
 
 /*

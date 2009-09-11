@@ -27,7 +27,7 @@ __wt_bt_stat(WT_STOC *stoc)
 	db = stoc->db;
 	idb = db->idb;
 
-	WT_STAT_INCR(db->dstats, TREE_LEVEL, "number of levels in the Btree");
+	WT_STAT_INCR(idb->dstats, TREE_LEVEL, "number of levels in the Btree");
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
@@ -48,12 +48,14 @@ static int
 __wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
 {
 	DB *db;
+	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr_arg;
 	int first, isleaf_arg, ret;
 
 	db = stoc->db;
+	idb = db->idb;
 	ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
@@ -84,7 +86,7 @@ __wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
 	}
 
 	if (addr_arg != WT_ADDR_INVALID) {
-		WT_STAT_INCR(db->dstats, TREE_LEVEL, NULL);
+		WT_STAT_INCR(idb->dstats, TREE_LEVEL, NULL);
 		ret = __wt_bt_stat_level(stoc, addr_arg, isleaf_arg);
 	}
 
@@ -99,45 +101,47 @@ static int
 __wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
 {
 	DB *db;
+	IDB *idb;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, i;
 
 	db = stoc->db;
+	idb = db->idb;
 	hdr = page->hdr;
 	addr = page->addr;
 
 	/* Page 0 has the descriptor record, get all-database statistics. */
 	if (addr == WT_ADDR_FIRST_PAGE) {
 		__wt_bt_desc_stats(db, page);
-		WT_STAT_SET(db->dstats,
+		WT_STAT_SET(idb->dstats,
 		    FRAGSIZE, "database fragment size", db->allocsize);
-		WT_STAT_SET(db->dstats,
+		WT_STAT_SET(idb->dstats,
 		    EXTSIZE, "database extent size", db->extsize);
 	}
 
 	/* Count the free space. */
-	WT_STAT_INCRV(db->dstats,
+	WT_STAT_INCRV(idb->dstats,
 	    PAGE_FREE, "unused on-page space in bytes", page->space_avail);
 
 	/* Count the page type. */
 	switch (hdr->type) {
 	case WT_PAGE_INT:
 		WT_STAT_INCR(
-		    db->dstats, PAGE_INTERNAL, "primary internal pages");
+		    idb->dstats, PAGE_INTERNAL, "primary internal pages");
 		break;
 	case WT_PAGE_DUP_INT:
 		WT_STAT_INCR(
-		    db->dstats, PAGE_DUP_INTERNAL, "duplicate internal pages");
+		    idb->dstats, PAGE_DUP_INTERNAL, "duplicate internal pages");
 		break;
 	case WT_PAGE_LEAF:
-		WT_STAT_INCR(db->dstats, PAGE_LEAF, "primary leaf pages");
+		WT_STAT_INCR(idb->dstats, PAGE_LEAF, "primary leaf pages");
 		break;
 	case WT_PAGE_DUP_LEAF:
-		WT_STAT_INCR(db->dstats, PAGE_DUP_LEAF, "duplicate leaf pages");
+		WT_STAT_INCR(idb->dstats, PAGE_DUP_LEAF, "duplicate leaf pages");
 		break;
 	case WT_PAGE_OVFL:
-		WT_STAT_INCR(db->dstats, PAGE_OVERFLOW, "overflow pages");
+		WT_STAT_INCR(idb->dstats, PAGE_OVERFLOW, "overflow pages");
 		break;
 	WT_DEFAULT_FORMAT(db);
 	}
@@ -150,12 +154,12 @@ __wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(
-			    db->dstats, ITEM_KEY_OVFL, "overflow keys");
+			    idb->dstats, ITEM_KEY_OVFL, "overflow keys");
 			break;
 		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_DATA_OVFL:
 			WT_STAT_INCR(
-			    db->dstats, ITEM_DATA_OVFL, "overflow data items");
+			    idb->dstats, ITEM_DATA_OVFL, "overflow data items");
 			break;
 		default:
 			break;
@@ -164,16 +168,16 @@ __wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
 			WT_STAT_INCR(
-			    db->dstats, ITEM_TOTAL_KEY, "total database keys");
+			    idb->dstats, ITEM_TOTAL_KEY, "total database keys");
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
 			WT_STAT_INCR(
-			    db->dstats, ITEM_DUP_DATA, "duplicate data items");
+			    idb->dstats, ITEM_DUP_DATA, "duplicate data items");
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-			WT_STAT_INCR(db->dstats,
+			WT_STAT_INCR(idb->dstats,
 			    ITEM_TOTAL_DATA, "total database data items");
 			break;
 		case WT_ITEM_OFFP_INTL:

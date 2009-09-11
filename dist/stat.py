@@ -7,7 +7,7 @@
 
 # Read the source files and output the statistics #defines and allocation code.
 
-import re, sys
+import re, string, sys
 from dist import compare_srcfile
 from dist import source_paths_list
 
@@ -19,11 +19,11 @@ def stat_build():
 	    re.DOTALL)
 	for file in source_paths_list():
 		for match in stat_re.finditer(open('../' + file, 'r').read()):
-			stats.setdefault(\
-			    match.group(2).replace('->', '_'),[]).append(\
-			    [match.group(4), match.group(6)])
+			name = string.split(match.group(2), '->')
+			name = name[-2] + "_" + name[-1]
+			stats.setdefault\
+			    (name,[]).append([match.group(4), match.group(6)])
 	return (stats)
-
 
 # Read the source files and build a dictionary of handles and stat counters.
 stats = stat_build()

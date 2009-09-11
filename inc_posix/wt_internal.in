@@ -72,6 +72,8 @@ struct __idb {
 	char	 *dbname;		/* Database name */
 	mode_t	  mode;			/* Database file create mode */
 
+	TAILQ_ENTRY(__idb) q;		/* Linked list of databases */
+
 	u_int32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
@@ -81,6 +83,9 @@ struct __idb {
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
 	DBT	  key, data;		/* Returned key/data pairs */
+
+	WT_STATS *stats;		/* Handle statistics */
+	WT_STATS *dstats;		/* Database statistics */
 
 	u_int32_t flags;
 };
@@ -103,9 +108,15 @@ struct __ienv {
 	WT_MTX mtx;			/* Global mutex */
 
 	WT_STOC *sq;			/* Server thread queue */
-	int sq_next;			/* Next server slot */
-	int sq_entries;			/* Total server entries */
-	int toc_slot;			/* TOC server slot */
+	u_int sq_next_id;		/* Next server ID (array offset) */
+	u_int sq_entries;		/* Total server entries */
+
+					/* Linked list of databases */
+	TAILQ_HEAD(__wt_db_qh, __idb) dbqh;
+
+	WT_STATS *stats;		/* Handle statistics */
+
+	u_int toc_next_id;		/* Next TOC ID (array offset) */
 
 	u_int file_id;			/* Serial file ID */
 

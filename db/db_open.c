@@ -19,13 +19,6 @@ int
 __wt_db_open(WT_STOC *stoc)
 {
 	wt_args_db_open_unpack;
-	ENV *env;
-	IENV *ienv;
-	IDB *idb;
-
-	env = stoc->env;
-	ienv = env->ienv;
-	idb = db->idb;
 
 	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 

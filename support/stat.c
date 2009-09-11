@@ -3,12 +3,35 @@
 #include "wt_internal.h"
 
 int
-__wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
 	WT_RET(__wt_calloc(env,
-	    WT_STAT_DB_DSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
+	    WT_STAT_FH_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
+
+	stats[WT_STAT_READ_IO].desc = "count of read I/Os";
+	stats[WT_STAT_WRITE_IO].desc = "count of write I/Os";
+
+	*statsp = stats;
+	return (0);
+}
+
+int
+__wt_stat_clear_fh_stats(WT_STATS *stats)
+{
+	stats[WT_STAT_READ_IO].v = 0;
+	stats[WT_STAT_WRITE_IO].v = 0;
+	return (0);
+}
+
+int
+__wt_stat_alloc_idb_dstats(ENV *env, WT_STATS **statsp)
+{
+	WT_STATS *stats;
+
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_IDB_DSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_EXTSIZE].desc = "database extent size";
@@ -36,7 +59,7 @@ __wt_stat_alloc_db_dstats(ENV *env, WT_STATS **statsp)
 }
 
 int
-__wt_stat_clear_db_dstats(WT_STATS *stats)
+__wt_stat_clear_idb_dstats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_EXTSIZE].v = 0;
@@ -62,12 +85,12 @@ __wt_stat_clear_db_dstats(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_db_hstats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_idb_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
 	WT_RET(__wt_calloc(env,
-	    WT_STAT_DB_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
+	    WT_STAT_IDB_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
 	    "bulk duplicate data pairs read";
@@ -86,7 +109,7 @@ __wt_stat_alloc_db_hstats(ENV *env, WT_STATS **statsp)
 }
 
 int
-__wt_stat_clear_db_hstats(WT_STATS *stats)
+__wt_stat_clear_idb_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
@@ -99,12 +122,12 @@ __wt_stat_clear_db_hstats(WT_STATS *stats)
 }
 
 int
-__wt_stat_alloc_env_hstats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
 	WT_RET(__wt_calloc(env,
-	    WT_STAT_ENV_HSTATS_TOTAL + 1, sizeof(WT_STATS), &stats));
+	    WT_STAT_IENV_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_CLEAN].desc = "clean pages in the cache";
@@ -122,7 +145,7 @@ __wt_stat_alloc_env_hstats(ENV *env, WT_STATS **statsp)
 }
 
 int
-__wt_stat_clear_env_hstats(WT_STATS *stats)
+__wt_stat_clear_ienv_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_CACHE_CLEAN].v = 0;
@@ -132,29 +155,6 @@ __wt_stat_clear_env_hstats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_WRITE].v = 0;
 	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
-	return (0);
-}
-
-int
-__wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
-{
-	WT_STATS *stats;
-
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_FH_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
-
-	stats[WT_STAT_READ_IO].desc = "count of read I/Os";
-	stats[WT_STAT_WRITE_IO].desc = "count of write I/Os";
-
-	*statsp = stats;
-	return (0);
-}
-
-int
-__wt_stat_clear_fh_stats(WT_STATS *stats)
-{
-	stats[WT_STAT_READ_IO].v = 0;
-	stats[WT_STAT_WRITE_IO].v = 0;
 	return (0);
 }
 

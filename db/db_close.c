@@ -17,10 +17,12 @@ int
 __wt_db_close(WT_STOC *stoc)
 {
 	wt_args_db_close_unpack;
-	ENV *env;
+	IDB *idb;
+	IENV *ienv;
 	int ret;
 
-	env = stoc->env;
+	ienv = stoc->env->ienv;
+	idb = db->idb;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
@@ -32,7 +34,7 @@ __wt_db_close(WT_STOC *stoc)
 	WT_TRET(__wt_cache_close(stoc));
 
 	/* Remove from the environment's list. */
-	TAILQ_REMOVE(&env->dbqh, db, q);
+	TAILQ_REMOVE(&ienv->dbqh, idb, q);
 
 	/* Re-cycle the underlying IDB structure. */
 	WT_TRET(__wt_idb_destroy(db, 1));

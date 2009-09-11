@@ -61,8 +61,10 @@ err:	(void)__wt_env_destroy(env, 0);
 int
 __wt_env_destroy(ENV *env, u_int32_t flags)
 {
+	IENV *ienv;
 	int ret;
 
+	ienv = env->ienv;
 	ret = 0;
 
 	WT_ENV_FCHK_NOTFATAL(
@@ -80,10 +82,10 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	WT_TRET(__wt_ienv_destroy(env, 0));
 
 	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, env->hstats);
+	WT_FREE_AND_CLEAR(env, ienv->stats);
 
 	/* Complain if DB handles weren't closed. */
-	if (TAILQ_FIRST(&env->dbqh) != NULL) {
+	if (TAILQ_FIRST(&ienv->dbqh) != NULL) {
 		__wt_env_errx(env,
 		    "This Env handle has open Db handles attached to it");
 		if (ret == 0)
@@ -105,10 +107,6 @@ static int
 __wt_env_config_default(ENV *env)
 {
 	__wt_env_config_methods(env);
-
-	TAILQ_INIT(&env->dbqh);
-
-	WT_RET(__wt_stat_alloc_env_hstats(env, &env->hstats));
 
 	return (0);
 }
@@ -149,8 +147,6 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	return (0);
 }
 
-void *__wt_addr;				/* Memory flush address. */
-
 /*
  * __wt_ienv_config_default --
  *	Set default configuration for a just-created IENV handle.
@@ -164,26 +160,21 @@ __wt_ienv_config_default(ENV *env)
 
 	ienv = env->ienv;
 
-	/*
-	 * We need an address for memory flushing -- it doesn't matter which
-	 * one we choose.
-	 */
-	__wt_addr = &ienv->env;
+	/* Initialize the global mutex. */
+	WT_RET(__wt_mtx_init(&ienv->mtx));
 
-	/*
-	 * Allocate an initial list of server slots.
-	 *
-	 * The normal state of the blocking mutex is locked.
-	 */
+	/* Initial list of server slots. */
 #define	WT_SERVERQ_SIZE	64
 	ienv->sq_entries = WT_SERVERQ_SIZE;
-	WT_RET(__wt_calloc(
-	    NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq));
+	WT_RET(__wt_calloc(NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq));
 	WT_STOC_FOREACH(ienv, stoc, i)
 		WT_RET(__wt_stat_alloc_stoc_stats(NULL, &stoc->stats));
 
-	/* Initialize the global mutex. */
-	WT_RET(__wt_mtx_init(&ienv->mtx));
+	/* Database queue. */
+	TAILQ_INIT(&ienv->dbqh);
+
+	/* Statistics. */
+	WT_RET(__wt_stat_alloc_ienv_stats(env, &ienv->stats));
 
 	/* Diagnostic output separator. */
 	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";

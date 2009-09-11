@@ -23,10 +23,12 @@ __wt_env_db_create(WT_STOC *stoc)
 	wt_args_env_db_create_unpack;
 	DB *db;
 	IDB *idb;
+	IENV *ienv;
 	int ret;
 
 	db = NULL;
 	idb = NULL;
+	ienv = env->ienv;
 
 	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_WT_DB_CREATE);
 
@@ -39,14 +41,14 @@ __wt_env_db_create(WT_STOC *stoc)
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
-	db->ienv = env->ienv;
+	db->ienv = ienv;
 
 	/* Configure the DB and the IDB. */
 	WT_ERR(__wt_db_config_default(db));
 	WT_ERR(__wt_idb_config_default(db));
 
 	/* Insert the database on the environment's list. */
-	TAILQ_INSERT_TAIL(&env->dbqh, db, q);
+	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
 
 	*dbp = db;
 	return (0);
@@ -76,10 +78,12 @@ __wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
+	IDB *idb;
 	int ret;
 
 	db = stoc->db;
 	env = stoc->env;
+	idb = db->idb;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(
@@ -89,8 +93,8 @@ __wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
 	WT_TRET(__wt_idb_destroy(db, 0));
 
 	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, db->hstats);
-	WT_FREE_AND_CLEAR(env, db->dstats);
+	WT_FREE_AND_CLEAR(env, idb->stats);
+	WT_FREE_AND_CLEAR(env, idb->dstats);
 
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
@@ -110,15 +114,17 @@ static int
 __wt_db_config_default(DB *db)
 {
 	ENV *env;
+	IDB *idb;
 
 	env = db->env;
+	idb = db->idb;
 
 	__wt_db_config_methods(db);
 
 	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
 
-	WT_RET(__wt_stat_alloc_db_hstats(env, &db->hstats));
-	WT_RET(__wt_stat_alloc_db_dstats(env, &db->dstats));
+	WT_RET(__wt_stat_alloc_idb_stats(env, &idb->stats));
+	WT_RET(__wt_stat_alloc_idb_dstats(env, &idb->dstats));
 
 	return (0);
 }

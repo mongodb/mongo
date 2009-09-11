@@ -17,8 +17,8 @@ extern "C" {
 #ifdef	HAVE_STATISTICS
 
 struct __wt_stats {
-	u_int64_t	 v;				/* Value */
-	const char	*desc;				/* Description */
+	u_int64_t	 v;				/* 64-bit value */
+	const char	*desc;				/* text description */
 };
 
 #define	WT_STAT_SET(stats, def, str, value)				\
@@ -36,7 +36,14 @@ struct __wt_stats {
 /* Statistics section: BEGIN */
 
 /*
- * Statistics entries for DB_DSTATS
+ * Statistics entries for FH_STATS
+ */
+#define	WT_STAT_READ_IO			    0
+#define	WT_STAT_WRITE_IO		    1
+#define	WT_STAT_FH_STATS_TOTAL		    2
+
+/*
+ * Statistics entries for IDB_DSTATS
  */
 #define	WT_STAT_BASE_RECNO		    0
 #define	WT_STAT_EXTSIZE			    1
@@ -58,10 +65,10 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_LEAF		   17
 #define	WT_STAT_PAGE_OVERFLOW		   18
 #define	WT_STAT_TREE_LEVEL		   19
-#define	WT_STAT_DB_DSTATS_TOTAL		   20
+#define	WT_STAT_IDB_DSTATS_TOTAL	   20
 
 /*
- * Statistics entries for DB_HSTATS
+ * Statistics entries for IDB_STATS
  */
 #define	WT_STAT_BULK_DUP_DATA_READ	    0
 #define	WT_STAT_BULK_OVERFLOW_DATA	    1
@@ -70,10 +77,10 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_ALLOC		    4
 #define	WT_STAT_DB_CACHE_HIT		    5
 #define	WT_STAT_DB_CACHE_MISS		    6
-#define	WT_STAT_DB_HSTATS_TOTAL		    7
+#define	WT_STAT_IDB_STATS_TOTAL		    7
 
 /*
- * Statistics entries for ENV_HSTATS
+ * Statistics entries for IENV_STATS
  */
 #define	WT_STAT_CACHE_ALLOC		    0
 #define	WT_STAT_CACHE_CLEAN		    1
@@ -83,14 +90,7 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_MISS		    5
 #define	WT_STAT_CACHE_WRITE		    6
 #define	WT_STAT_CACHE_WRITE_EVICT	    7
-#define	WT_STAT_ENV_HSTATS_TOTAL	    8
-
-/*
- * Statistics entries for FH_STATS
- */
-#define	WT_STAT_READ_IO			    0
-#define	WT_STAT_WRITE_IO		    1
-#define	WT_STAT_FH_STATS_TOTAL		    2
+#define	WT_STAT_IENV_STATS_TOTAL	    8
 
 /*
  * Statistics entries for STOC_STATS

@@ -17,19 +17,19 @@ int
 __wt_open(ENV *env,
     const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
 {
-	DB *db;
 	IDB *idb;
+	IENV *ienv;
 	WT_FH *fh;
 	int f, fd, ret;
 
 	fh = NULL;
+	ienv = env->ienv;
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env, "fileops: %s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
-	TAILQ_FOREACH(db, &env->dbqh, q) {
-		idb = db->idb;
+	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 		if ((fh = idb->fh) == NULL)
 			continue;
 		if (strcmp(name, idb->dbname) == 0) {

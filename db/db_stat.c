@@ -26,26 +26,26 @@ __wt_db_stat_print(WT_STOC *stoc)
 
 	WT_DB_FCHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
-	fprintf(stream, "Database statistics: %s\n", db->idb->dbname);
+	fprintf(stream, "Database statistics: %s\n", idb->dbname);
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
-	WT_RET(__wt_stat_clear_db_dstats(db->dstats));
+	WT_RET(__wt_stat_clear_idb_dstats(idb->dstats));
 	WT_RET(__wt_bt_stat(stoc));
 
-	for (stats = db->dstats; stats->desc != NULL; ++stats)
+	for (stats = idb->dstats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	/* Database handle statistics. */
 	fprintf(stream, "%s\n", ienv->sep);
-	fprintf(stream, "Database handle statistics: %s\n", db->idb->dbname);
-	for (stats = db->hstats; stats->desc != NULL; ++stats)
+	fprintf(stream, "Database handle statistics: %s\n", idb->dbname);
+	for (stats = idb->stats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	/* Underlying file handle statistics. */
 	if (idb->fh != NULL) {
 		fprintf(stream, "%s\n", ienv->sep);
 		fprintf(stream,
-		    "Underlying file I/O statistics: %s\n", db->idb->dbname);
+		    "Underlying file I/O statistics: %s\n", idb->dbname);
 		for (stats = idb->fh->stats; stats->desc != NULL; ++stats)
 			fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	}
@@ -77,8 +77,8 @@ __wt_db_stat_clear(WT_STOC *stoc)
 
 	WT_DB_FCHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 
-	ret = __wt_stat_clear_db_hstats(db->hstats);
-	WT_TRET(__wt_stat_clear_db_dstats(db->dstats));
+	ret = __wt_stat_clear_idb_stats(idb->stats);
+	WT_TRET(__wt_stat_clear_idb_dstats(idb->dstats));
 	if (idb->fh != NULL)
 		WT_TRET(__wt_stat_clear_fh_stats(idb->fh->stats));
 

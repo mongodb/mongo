@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+void *__wt_addr;				/* Memory flush address. */
+
 /*
  * __wt_build_verify --
  *	Verify the build itself.
@@ -16,6 +18,12 @@
 int
 __wt_build_verify(void)
 {
+	/*
+	 * We need an address for memory flushing -- it doesn't matter which
+	 * one we choose.
+	 */
+	__wt_addr = &__wt_addr;
+
 	/*
 	 * Check the build & compiler itself before going further.
 	 */
