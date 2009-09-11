@@ -46,9 +46,10 @@ public:
         out << "usage: " << _name << " [options] command [filename]" << endl;
         out << "command:" << endl;
         out << "  one of (list|search|put|get)" << endl;
-        out << "  list - list all files.  takes an optional filename. " << endl;
-        out << "         listed files must start with the filename." << endl;
-        out << "  search - search all files for something that contains the string" << endl;
+        out << "  list - list all files.  takes an optional prefix " << endl;
+        out << "         which listed filenames must begin with." << endl;
+        out << "  search - search all files. takes an optional substring " << endl;
+        out << "           which listed filenames must contain." << endl;
         out << "  put - add a file" << endl;
         out << "  get - get a file" << endl;
     }
