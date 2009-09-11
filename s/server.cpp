@@ -58,6 +58,13 @@ namespace mongo {
 //        out() << "                                           in our hostname with \"-grid\".\n";
         out() << endl;
     }
+
+    class ShardingConnectionHook : public DBConnectionHook {
+    public:
+        virtual void onCreate( DBClientBase * conn ){
+            conn->simpleCommand( "admin" , 0 , "switchtoclienterrors" );
+        }
+    } shardingConnectionHook;
     
     class ShardedMessageHandler : public MessageHandler {
     public:
@@ -65,6 +72,7 @@ namespace mongo {
         virtual void process( Message& m , AbstractMessagingPort* p ){
             Request r( m , p );
             try {
+                setClientId( p->remotePort() << 16 );
                 r.process();
             }
             catch ( DBException& e ){
@@ -149,6 +157,8 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 0;
     }
     
+    pool.addHook( &shardingConnectionHook );
+
     if ( argc <= 1 ) {
         usage( argv );
         return 3;

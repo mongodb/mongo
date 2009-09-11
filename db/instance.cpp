@@ -487,9 +487,12 @@ namespace mongo {
         void reply(Message& received, Message& response) {
             container = response;
         }
+        unsigned remotePort(){
+            return 1;
+        }
         Message & container;
     };
-
+    
     /* a call from java/js to the database locally.
 
          m - inbound message

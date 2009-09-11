@@ -45,12 +45,13 @@ namespace mongo {
             string getDBName( string ns ){
                 return ns.substr( 0 , ns.size() - 5 );
             } 
-
+            
             bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
                 ScopedDbConnection conn( conf->getPrimary() );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 result.appendElements( res );
+                conn.done();
                 return ok;
             }
         };

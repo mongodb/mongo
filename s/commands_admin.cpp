@@ -582,10 +582,18 @@ namespace mongo {
                 help << "check for an error on the last command executed";
             }
             CmdShardingGetLastError() : Command("getlasterror") { }
-            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-                errmsg += "getlasterror not working yet for sharded environments";
-                result << "ok" << 0;
-                return false;
+            virtual bool run(const char *nsraw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                string dbName = nsraw;
+                dbName = dbName.substr( 0 , dbName.size() - 5 );
+                
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                ScopedDbConnection conn( conf->getPrimary() );
+                BSONObj res;
+                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                result.appendElements( res );
+                conn.done();
+                return ok;
             }
         } cmdGetLastError;
 

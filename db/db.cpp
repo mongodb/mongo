@@ -145,18 +145,6 @@ namespace mongo {
         }
     }
 
-    class JniMessagingPort : public AbstractMessagingPort {
-    public:
-        JniMessagingPort(Message& _container) : container(_container) { }
-        void reply(Message& received, Message& response, MSGID) {
-            container = response;
-        }
-        void reply(Message& received, Message& response) {
-            container = response;
-        }
-        Message & container;
-    };
-
 } // namespace mongo
 
 #include "lasterror.h"

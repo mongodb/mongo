@@ -135,14 +135,6 @@ namespace mongo {
         char * _cur;
     };
 
-    MSGID NextMsgId;
-    struct MsgStart {
-        MsgStart() {
-            NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
-            assert(MsgDataHeaderSize == 16);
-        }
-    } msgstart;
-
     class Ports { 
         set<MessagingPort*>& ports;
         boost::mutex& m;
@@ -380,9 +372,7 @@ again:
 
     void MessagingPort::say(Message& toSend, int responseTo) {
         mmm( out() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
-        MSGID msgid = NextMsgId;
-        ++NextMsgId;
-        toSend.data->id = msgid;
+        toSend.data->id = nextMessageId();
         toSend.data->responseTo = responseTo;
 
         int x = -100;
@@ -418,9 +408,7 @@ again:
         }
 
         // we're going to be storing this, so need to set it up
-        MSGID msgid = NextMsgId;
-        ++NextMsgId;
-        toSend.data->id = msgid;
+        toSend.data->id = nextMessageId();
         toSend.data->responseTo = responseTo;
 
         if ( ! piggyBackData )
@@ -429,14 +417,41 @@ again:
         piggyBackData->append( toSend );
     }
 
+    unsigned MessagingPort::remotePort(){
+        return farEnd.getPort();
+    }
+
+    MSGID NextMsgId;
+    bool usingClientIds = 0;
+    ThreadLocalInt clientId;
+
+    struct MsgStart {
+        MsgStart() {
+            NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
+            assert(MsgDataHeaderSize == 16);
+        }
+    } msgstart;
+    
     MSGID nextMessageId(){
         MSGID msgid = NextMsgId;
         ++NextMsgId;
+        
+        if ( usingClientIds ){
+            msgid = msgid & 0xFFFF;
+            msgid = msgid | clientId.get();
+        }
+
         return msgid;
     }
 
     bool doesOpGetAResponse( int op ){
         return op == dbQuery || op == dbGetMore;
     }
-
+    
+    void setClientId( int id ){
+        usingClientIds = true;
+        id = id & 0xFFFF0000;
+        massert( "invalid id" , id );
+        clientId.reset( id );
+    }
 } // namespace mongo

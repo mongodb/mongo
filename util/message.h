@@ -48,16 +48,18 @@ namespace mongo {
         virtual ~AbstractMessagingPort() { }
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
         virtual void reply(Message& received, Message& response) = 0;
+        
+        virtual unsigned remotePort() = 0 ;
     };
 
     class MessagingPort : public AbstractMessagingPort {
     public:
         MessagingPort(int sock, SockAddr& farEnd);
         MessagingPort();
-        ~MessagingPort();
+        virtual ~MessagingPort();
 
         void shutdown();
-
+        
         bool connect(SockAddr& farEnd);
 
         /* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.
@@ -71,6 +73,7 @@ namespace mongo {
 
         void piggyBack( Message& toSend , int responseTo = -1 );
 
+        virtual unsigned remotePort();
     private:
         int sock;
         PiggyBackData * piggyBackData;
@@ -199,4 +202,5 @@ namespace mongo {
 
     MSGID nextMessageId();
 
+    void setClientId( int id );
 } // namespace mongo
