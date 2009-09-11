@@ -4,6 +4,8 @@
 t=/tmp/__configure.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
+(
+echo '/* DO NOT EDIT: automatically built by dist/s_prototypes. */'
 for i in `sed -e '/^[a-z]/! d' filelist`; do
 	sed -n \
 	    -e '/^__wt_[a-z]/!{' \
@@ -20,7 +22,7 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e x \
 	    -e 's/$/;/p' \
 	    < ../$i
-done > $t
+done) > $t
 
 f=../inc_posix/extern.h
 cmp $t $f > /dev/null 2>&1 ||
