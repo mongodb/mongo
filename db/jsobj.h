@@ -977,15 +977,29 @@ namespace mongo {
     typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
 /** Use BSON macro to build a BSONObj from a stream 
+
     e.g., 
        BSON( "name" << "joe" << "age" << 33 )
+
+    with auto-generated object id:
+       BSON( GENOID << "name" << "joe" << "age" << 33 )
  
     The labels GT, GTE, LT, LTE, NE can be helpful for stream-oriented construction
     of a BSONObj, particularly when assembling a Query.  For example,
     BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
+
+    Use BSONwithID to create a BSON object with an object id (_id) auto prepended.
 */
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
+
+
+    /* Utility class to auto assign object IDs.
+       Example: 
+         cout << BSON( GENOID << z << 3 ); // { _id : ..., z : 3 }
+    */
+    extern struct IDLabeler { } GENOID;
+    BSONObjBuilder& operator<<(BSONObjBuilder& b, IDLabeler& id);
 
     // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
