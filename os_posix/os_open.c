@@ -85,7 +85,7 @@ err:	if (fh != NULL) {
 		__wt_free(env, fh);
 	}
 	(void)close(fd);
-	return (WT_ERROR);
+	return (ret);
 }
 
 /*

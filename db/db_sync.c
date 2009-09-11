@@ -14,12 +14,14 @@
  *	Flush a database to the backing file.
  */
 int
-__wt_db_sync(WT_TOC *toc)
+__wt_db_sync(WT_STOC *stoc)
 {
 	wt_args_db_sync_unpack;
+
+	db = stoc->db;
 
 	WT_DB_FCHK(db, "Db.sync", flags, WT_APIMASK_DB_SYNC);
 
 	/* Close the underlying Btree. */
-	return (__wt_bt_sync(db));
+	return (__wt_bt_sync(stoc));
 }

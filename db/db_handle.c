@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_db_config_default(DB *);
-static int __wt_db_destroy_int(WT_TOC *, u_int32_t);
+static int __wt_db_destroy_int(WT_STOC *, u_int32_t);
 static int __wt_idb_config_default(DB *);
 
 /*
@@ -18,7 +18,7 @@ static int __wt_idb_config_default(DB *);
  *	DB constructor.
  */
 int
-__wt_env_db_create(WT_TOC *toc)
+__wt_env_db_create(WT_STOC *stoc)
 {
 	wt_args_env_db_create_unpack;
 	DB *db;
@@ -35,7 +35,7 @@ __wt_env_db_create(WT_TOC *toc)
 	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
 
 	/* Connect everything together. */
-	toc->db = db;
+	stoc->db = stoc->toc->db = db;
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
@@ -51,7 +51,7 @@ __wt_env_db_create(WT_TOC *toc)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_destroy_int(toc, 0);
+err:	(void)__wt_db_destroy_int(stoc, 0);
 	return (ret);
 }
 
@@ -60,11 +60,11 @@ err:	(void)__wt_db_destroy_int(toc, 0);
  *	Db.destroy method (DB destructor).
  */
 int
-__wt_db_destroy(WT_TOC *toc)
+__wt_db_destroy(WT_STOC *stoc)
 {
 	wt_args_db_destroy_unpack;
 
-	return (__wt_db_destroy_int(toc, flags));
+	return (__wt_db_destroy_int(stoc, flags));
 }
 
 /*
@@ -72,14 +72,14 @@ __wt_db_destroy(WT_TOC *toc)
  *	Db.destroy method (DB destructor), internal version.
  */
 static int
-__wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
+__wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
 	int ret;
 
-	db = toc->db;
-	env = toc->env;
+	db = stoc->db;
+	env = stoc->env;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(
@@ -95,7 +95,9 @@ __wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 	/* Free the DB structure. */
 	memset(db, OVERWRITE_BYTE, sizeof(db));
 	__wt_free(env, db);
-	toc->db = NULL;
+
+	/* The TOC can't even find it. */
+	stoc->toc->db = NULL;
 
 	return (ret);
 }

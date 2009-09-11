@@ -9,15 +9,15 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_search(DB *, DBT *, WT_PAGE **, WT_INDX **);
-static int __wt_bt_search_recno(DB *, u_int64_t, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search(WT_STOC *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search_recno(WT_STOC *, u_int64_t, WT_PAGE **, WT_INDX **);
 
 /*
  * __wt_db_get --
  *	Db.get method.
  */
 int
-__wt_db_get(WT_TOC *toc)
+__wt_db_get(WT_STOC *stoc)
 {
 	wt_args_db_get_unpack;
 	ENV *env;
@@ -27,7 +27,7 @@ __wt_db_get(WT_TOC *toc)
 	u_int32_t type;
 	int ret;
 
-	env = toc->env;
+	env = stoc->env;
 	idb = db->idb;
 
 	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
@@ -35,7 +35,7 @@ __wt_db_get(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
 	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search(db, key, &page, &indx));
+	WT_RET(__wt_bt_search(stoc, key, &page, &indx));
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -48,11 +48,11 @@ __wt_db_get(WT_TOC *toc)
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(db, key, data, page, indx, 0);
+		ret = __wt_bt_dbt_return(stoc, key, data, page, indx, 0);
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(db, page, 0));
+		WT_TRET(__wt_bt_page_out(stoc, page, 0));
 
 	return (ret);
 
@@ -63,7 +63,7 @@ __wt_db_get(WT_TOC *toc)
  *	Db.get_recno method.
  */
 int
-__wt_db_get_recno(WT_TOC *toc)
+__wt_db_get_recno(WT_STOC *stoc)
 {
 	wt_args_db_get_recno_unpack;
 	ENV *env;
@@ -73,7 +73,7 @@ __wt_db_get_recno(WT_TOC *toc)
 	u_int32_t type;
 	int ret;
 
-	env = toc->env;
+	env = stoc->env;
 	idb = db->idb;
 
 	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
@@ -81,7 +81,7 @@ __wt_db_get_recno(WT_TOC *toc)
 	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
 
 	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search_recno(db, recno, &page, &indx));
+	WT_RET(__wt_bt_search_recno(stoc, recno, &page, &indx));
 
 	/*
 	 * The Db.get_recno method can only return single key/data pairs.
@@ -94,11 +94,11 @@ __wt_db_get_recno(WT_TOC *toc)
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(db, key, data, page, indx, 1);
+		ret = __wt_bt_dbt_return(stoc, key, data, page, indx, 1);
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(db, page, 0));
+		WT_TRET(__wt_bt_page_out(stoc, page, 0));
 
 	return (ret);
 }
@@ -108,14 +108,16 @@ __wt_db_get_recno(WT_TOC *toc)
  *	Search the tree for a specific key.
  */
 static int
-__wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
+__wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 {
+	DB *db;
 	IDB *idb;
 	WT_INDX *ip;
 	WT_PAGE *page;
 	u_int32_t addr, base, indx, limit;
 	int cmp, isleaf, next_isleaf, put_page, ret;
 
+	db = stoc->db;
 	idb = db->idb;
 
 	/* Check for an empty tree. */
@@ -140,7 +142,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 */
 			ip = page->indx + indx;
 			if (ip->data == NULL)
-				WT_ERR(__wt_bt_ovfl_to_indx(db, page, ip));
+				WT_ERR(__wt_bt_ovfl_to_indx(stoc, page, ip));
 
 			/*
 			 * If we're about to compare an application key with
@@ -195,7 +197,7 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET(__wt_bt_page_out(db, page, 0));
+			WT_RET(__wt_bt_page_out(stoc, page, 0));
 
 		/*
 		 * Failed to match on a leaf page -- we're done, return the
@@ -206,13 +208,13 @@ __wt_bt_search(DB *db, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(db, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 1, &page));
 	}
 	/* NOTREACHED */
 
 	/* Discard any page we've read other than the root page. */
 err:	if (put_page)
-		(void)__wt_bt_page_out(db, page, 0);
+		(void)__wt_bt_page_out(stoc, page, 0);
 	return (ret);
 }
 
@@ -221,7 +223,8 @@ err:	if (put_page)
  *	Search the tree for a specific record-based key.
  */
 static int
-__wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
+__wt_bt_search_recno(
+    WT_STOC *stoc, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
 	WT_INDX *ip;
@@ -230,7 +233,7 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 	u_int32_t addr, i;
 	int isleaf, next_isleaf, put_page;
 
-	idb = db->idb;
+	idb = stoc->db->idb;
 
 	/* Check for an empty tree. */
 	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
@@ -265,16 +268,16 @@ __wt_bt_search_recno(DB *db, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET(__wt_bt_page_out(db, page, 0));
+			WT_RET(__wt_bt_page_out(stoc, page, 0));
 
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(db, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 1, &page));
 	}
 
 	/* Discard any page we've read other than the root page. */
 	if (put_page)
-		(void)__wt_bt_page_out(db, page, 0);
+		(void)__wt_bt_page_out(stoc, page, 0);
 	return (WT_NOTFOUND);
 }

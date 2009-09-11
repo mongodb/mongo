@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int  __wt_bt_dump_offpage(DB *, DBT *,
+static int  __wt_bt_dump_offpage(WT_STOC *stoc, DBT *,
     WT_ITEM *, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
 static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
@@ -28,7 +28,7 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_db_dump(WT_TOC *toc)
+__wt_db_dump(WT_STOC *stoc)
 {
 	wt_args_db_dump_unpack;
 	DBT last_key_ovfl, last_key_std, *last_key;
@@ -40,13 +40,13 @@ __wt_db_dump(WT_TOC *toc)
 	int dup_ahead, ret;
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
 
-	env = toc->env;
+	env = db->env;
 
 	WT_DB_FCHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
-		return (__wt_bt_dump_debug(db, NULL, stream));
+		return (__wt_bt_dump_debug(stoc, NULL, stream));
 #else
 		__wt_db_errx(db, "library not built for debugging");
 		return (WT_ERROR);
@@ -65,7 +65,7 @@ __wt_db_dump(WT_TOC *toc)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		WT_RET(__wt_bt_page_in(db, addr, 1, 0, &page));
+		WT_RET(__wt_bt_page_in(stoc, addr, 1, 0, &page));
 
 		WT_ITEM_FOREACH(page, item, i) {
 			item_len = WT_ITEM_LEN(item);
@@ -103,7 +103,7 @@ __wt_db_dump(WT_TOC *toc)
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				WT_RET(__wt_bt_ovfl_in(db,
+				WT_RET(__wt_bt_ovfl_in(stoc,
 				    ovfl->addr, ovfl->len, &ovfl_page));
 
 				/*
@@ -129,19 +129,19 @@ __wt_db_dump(WT_TOC *toc)
 					func(WT_PAGE_BYTE(ovfl_page),
 					    ovfl->len, stream);
 
-				WT_RET(__wt_bt_page_out(db, ovfl_page, 0));
+				WT_RET(__wt_bt_page_out(stoc, ovfl_page, 0));
 				break;
 			case WT_ITEM_OFFP_INTL:
 			case WT_ITEM_OFFP_LEAF:
 				WT_RET(__wt_bt_dump_offpage(
-				    db, last_key, item, stream, func));
+				    stoc, last_key, item, stream, func));
 				break;
 			WT_DEFAULT_FORMAT(db);
 			}
 		}
 
 		addr = page->hdr->nextaddr;
-		WT_RET(__wt_bt_page_out(db, page, 0));
+		WT_RET(__wt_bt_page_out(stoc, page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
 	}
@@ -157,14 +157,16 @@ __wt_db_dump(WT_TOC *toc)
  *	Dump a set of off-page duplicates.
  */
 static int
-__wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
+__wt_bt_dump_offpage(WT_STOC *stoc, DBT *key, WT_ITEM *item,
     FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
+	DB *db;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE *page, *ovfl_page;
 	u_int32_t addr, i;
 	int isleaf, ret;
 
+	db = stoc->db;
 	page = NULL;
 
 	/*
@@ -177,14 +179,14 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		WT_RET(__wt_bt_page_in(db, addr, isleaf, 0, &page));
+		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 0, &page));
 		if (isleaf)
 			break;
 
 		/* Get the page's first WT_ITEM_OFFP. */
 		__wt_bt_first_offp(page, &addr, &isleaf);
 
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(stoc, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
@@ -200,30 +202,30 @@ __wt_bt_dump_offpage(DB *db, DBT *key, WT_ITEM *item,
 				break;
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				WT_ERR(__wt_bt_ovfl_in(db,
+				WT_ERR(__wt_bt_ovfl_in(stoc,
 				    ovfl->addr, ovfl->len, &ovfl_page));
 				func(
 				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
-				WT_ERR(__wt_bt_page_out(db, ovfl_page, 0));
+				WT_ERR(__wt_bt_page_out(stoc, ovfl_page, 0));
 				break;
 			WT_DEFAULT_FORMAT(db);
 			}
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_bt_page_out(db, page, 0)) != 0) {
+		if ((ret = __wt_bt_page_out(stoc, page, 0)) != 0) {
 			page = NULL;
 			goto err;
 		}
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		WT_ERR(__wt_bt_page_in(db, addr, 1, 0, &page));
+		WT_ERR(__wt_bt_page_in(stoc, addr, 1, 0, &page));
 	}
 
 	if (0) {
 err:		if (page != NULL)
-			(void)__wt_bt_page_out(db, page, 0);
+			(void)__wt_bt_page_out(stoc, page, 0);
 	}
 	return (ret);
 }

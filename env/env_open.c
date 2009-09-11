@@ -14,7 +14,7 @@
  *	Open a Env handle.
  */
 int
-__wt_env_open(WT_TOC *toc)
+__wt_env_open(WT_STOC *stoc)
 {
 	wt_args_env_open_unpack;
 

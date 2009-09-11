@@ -14,7 +14,7 @@
  *	Verify an argument to the Env.set_verbose setter.
  */
 int
-__wt_env_set_verbose_verify(WT_TOC *toc)
+__wt_env_set_verbose_verify(WT_STOC *stoc)
 {
 	wt_args_env_set_verbose_unpack;
 

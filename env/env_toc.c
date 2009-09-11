@@ -84,33 +84,36 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
  *	Schedule an operation.
  */
 int
-__wt_env_toc_sched(WT_TOC *toc)
+__wt_env_toc_sched(WT_TOC *toc, int stoc_id)
 {
 	WT_STOC *stoc;
 
+	/* Get a reference to the server that's going to do the work. */
+	stoc = &toc->env->ienv->sq[stoc_id];
+
 	/*
-	 * The engine may be single-threaded or threads of control may re-enter
-	 * the API.  Instead of coding internal versions of the routines, allow
-	 * calls through the standard API layer.
+	 * Threads of control may re-enter the API or the engine may simply be
+	 * single-threaded.  Rather than duplicate the API routines, allow
+	 * calls through the standard API layer, continuing using the current
+	 * server.
+	 *
+	 * Otherwise, schedule the call and wait for it to complete.
 	 */
 	if (F_ISSET(toc, WT_RUNNING | WT_SINGLE_THREADED)) {
-		__wt_api_switch(toc);
-		return (toc->ret);
+		/*
+		 * !!!
+		 * I don't think there's any way we can come through here
+		 * with different ENV/DB handles than on the original call;
+		 * if that's possible, we'd have to pop/restore the ENV/DB
+		 * handle values.
+		 */
+		stoc->toc = toc;
+		stoc->env = toc->env;
+		stoc->db = toc->db;
+		__wt_api_switch(stoc);
+	} else {
+		stoc->ops[toc->slot] = toc;
+		(void)__wt_lock(toc->block);
 	}
-
-	/*
-	 * Otherwise, schedule the call and go to sleep until it completes.
-	 *
-	 * Choose a server thread: use the DB's server if doing a DB operation,
-	 * all other calls are handled by the primary server.
-	 */
-	if (toc->db == NULL || (stoc = toc->db->idb->stoc) == NULL)
-		stoc = toc->env->ienv->sq;
-
-	stoc->ops[toc->slot] = toc;
-
-	(void)__wt_lock(toc->block);
-
-	/* Return the operation's code. */
 	return (toc->ret);
 }

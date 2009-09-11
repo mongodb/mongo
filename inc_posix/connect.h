@@ -11,8 +11,11 @@
 extern "C" {
 #endif
 
-#define	WT_PSTOC_ID		1
+#define	WT_PSTOC_MASTER		0
 
+/*******************************************
+ * Server thread-of-control information
+ *******************************************/
 struct __wt_stoc {
 #define	WT_SERVER_QSIZE		 40		/* Queued operations max */
 	WT_TOC *ops[WT_SERVER_QSIZE];		/* Queued operations */
@@ -22,8 +25,15 @@ struct __wt_stoc {
 
 	int running;				/* Thread active */
 
-	IENV *ienv;				/* Enclosing environment */
-	IDB *idb;				/* Enclosing DB */
+	/*
+	 * Payload: when a WT_STOC starts performing an operation, it loads
+	 * some handles used by underlying functions to figure out what to
+	 * do.  This is a simply cache, just so the called functions don't
+	 * have to dig through the WT_TOC.
+	 */
+	WT_TOC *toc;				/* API thread of control */
+	ENV *env;				/* Enclosing ENV */
+	DB *db;					/* Enclosing DB */
 
 	/*
 	 * Per-server thread cache of database pages.

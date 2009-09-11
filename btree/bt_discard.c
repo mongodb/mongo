@@ -18,13 +18,13 @@ static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
  *	Allocate a new btree page from the cache.
  */
 int
-__wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
+__wt_bt_page_alloc(WT_STOC *stoc, int isleaf, WT_PAGE **pagep)
 {
+	DB *db;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_STOC *stoc;
 
-	stoc = db->idb->stoc;
+	db = stoc->db;
 
 	WT_RET((__wt_cache_alloc(
 	    stoc, isleaf ? db->leafsize : db->intlsize, &page)));
@@ -52,20 +52,21 @@ __wt_bt_page_alloc(DB *db, int isleaf, WT_PAGE **pagep)
  *	Read a btree page from the cache.
  */
 int
-__wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
+__wt_bt_page_in(
+    WT_STOC *stoc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
 {
+	DB *db;
 	ENV *env;
 	WT_PAGE *page;
-	WT_STOC *stoc;
 
-	env = db->env;
-	stoc = db->idb->stoc;
+	db = stoc->db;
+	env = stoc->env;
 
 	WT_RET((__wt_cache_in(stoc, WT_ADDR_TO_OFF(db, addr),
 	    isleaf ? db->leafsize : db->intlsize, 0, &page)));
 
 	/* Verify the page. */
-	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(env, __wt_bt_verify_page(stoc, page, NULL, NULL) == 0);
 
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
@@ -80,16 +81,14 @@ __wt_bt_page_in(DB *db, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
  *	Write a btree page to the cache.
  */
 int
-__wt_bt_page_out(DB *db, WT_PAGE *page, u_int32_t flags)
+__wt_bt_page_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
-	WT_STOC *stoc;
 
-	env = db->env;
-	stoc = db->idb->stoc;
+	env = stoc->env;
 
 	/* Verify the page. */
-	WT_ASSERT(env, __wt_bt_verify_page(db, page, NULL, NULL) == 0);
+	WT_ASSERT(env, __wt_bt_verify_page(stoc, page, NULL, NULL) == 0);
 
 	return (__wt_cache_out(stoc, page, flags));
 }

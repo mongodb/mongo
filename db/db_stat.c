@@ -14,15 +14,15 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_db_stat_print(WT_TOC *toc)
+__wt_db_stat_print(WT_STOC *stoc)
 {
 	wt_args_db_stat_print_unpack;
 	IDB *idb;
 	IENV *ienv;
 	WT_STATS *stats;
 
-	idb = db->idb;
-	ienv = toc->env->ienv;
+	idb = stoc->db->idb;
+	ienv = stoc->env->ienv;
 
 	WT_DB_FCHK(db, "Db.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
@@ -30,7 +30,7 @@ __wt_db_stat_print(WT_TOC *toc)
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	WT_RET(__wt_stat_clear_db_dstats(db->dstats));
-	WT_RET(__wt_bt_stat(db));
+	WT_RET(__wt_bt_stat(stoc));
 
 	for (stats = db->dstats; stats->desc != NULL; ++stats)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
@@ -51,11 +51,11 @@ __wt_db_stat_print(WT_TOC *toc)
 	}
 
 	/* Underlying server thread statistics. */
-	if (!F_ISSET(ienv, WT_SINGLE_THREADED) && idb->stoc != NULL) {
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED) && stoc != NULL) {
 		fprintf(stream, "%s\n", ienv->sep);
 		fprintf(stream,
 		    "Database handle's server thread statistics\n");
-		for (stats = idb->stoc->stats; stats->desc != NULL; ++stats)
+		for (stats = stoc->stats; stats->desc != NULL; ++stats)
 			fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	}
 
@@ -67,13 +67,13 @@ __wt_db_stat_print(WT_TOC *toc)
  *	Clear DB handle statistics.
  */
 int
-__wt_db_stat_clear(WT_TOC *toc)
+__wt_db_stat_clear(WT_STOC *stoc)
 {
 	wt_args_db_stat_clear_unpack;
 	IDB *idb;
 	int ret;
 
-	idb = db->idb;
+	idb = stoc->db->idb;
 
 	WT_DB_FCHK(db, "Db.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 

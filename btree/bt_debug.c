@@ -10,17 +10,17 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static int  __wt_bt_dump_addr(DB *, u_int32_t, char *, FILE *);
+static int  __wt_bt_dump_addr(WT_STOC *, u_int32_t, char *, FILE *);
 static void __wt_bt_dump_dbt(DBT *, FILE *);
-static void __wt_bt_dump_item(DB *, WT_ITEM *, FILE *);
-static void __wt_bt_dump_item_data (DB *, WT_ITEM *, FILE *);
+static void __wt_bt_dump_item(WT_STOC *, WT_ITEM *, FILE *);
+static void __wt_bt_dump_item_data(WT_STOC *, WT_ITEM *, FILE *);
 
 /*
  * __wt_bt_dump_debug --
  *	Dump a database in debugging mode.
  */
 int
-__wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
+__wt_bt_dump_debug(WT_STOC *stoc, char *ofile, FILE *fp)
 {
 	int do_close, ret;
 
@@ -38,7 +38,7 @@ __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_bt_verify_int(db, fp);
+	ret = __wt_bt_verify_int(stoc, fp);
 
 	if (do_close)
 		(void)fclose(fp);
@@ -51,15 +51,15 @@ __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
  *	Dump a single page in debugging mode.
  */
 static int
-__wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
+__wt_bt_dump_addr(WT_STOC *stoc, u_int32_t addr, char *ofile, FILE *fp)
 {
+	DB *db;
 	WT_PAGE *page;
-	WT_STOC *stoc;
 	off_t offset;
 	u_int32_t bytes;
 	int ret;
 
-	stoc = db->idb->stoc;
+	db = stoc->db;
 
 	/*
 	 * Read in a single fragment.   If we get the page from the cache,
@@ -94,7 +94,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 		WT_RET(__wt_cache_in(stoc, offset, bytes, 0, &page));
 	}
 
-	ret = __wt_bt_dump_page(db, page, ofile, fp);
+	ret = __wt_bt_dump_page(stoc, page, ofile, fp);
 
 	WT_TRET(__wt_cache_out(stoc, page, 0));
 
@@ -106,7 +106,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
  *	Dump a single in-memory page in debugging mode.
  */
 int
-__wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_bt_dump_ipage(WT_STOC *stoc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	WT_INDX *indx;
 	u_int32_t i;
@@ -129,7 +129,7 @@ __wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		}
 		if (indx->ditem != NULL) {
 			fprintf(fp, "\tditem: ");
-			__wt_bt_dump_item(db, indx->ditem, fp);
+			__wt_bt_dump_item(stoc, indx->ditem, fp);
 		}
 	}
 
@@ -144,13 +144,16 @@ __wt_bt_dump_ipage(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
  *	Dump a single page in debugging mode.
  */
 int
-__wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
+__wt_bt_dump_page(WT_STOC *stoc, WT_PAGE *page, char *ofile, FILE *fp)
 {
+	DB *db;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 	u_int8_t *p;
 	int do_close;
+
+	db = stoc->db;
 
 	/* Optionally dump to a file, else to a stream, default to stdout. */
 	do_close = 0;
@@ -202,7 +205,7 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
 		    (u_long)i, __wt_bt_item_type(item),
 		    (u_long)WT_ITEM_LEN(item), (u_long)(p - (u_int8_t *)hdr));
-		__wt_bt_dump_item_data(db, item, fp);
+		__wt_bt_dump_item_data(stoc, item, fp);
 		fprintf(fp, "}\n");
 		p += WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
 	}
@@ -219,14 +222,14 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp)
  *	Dump a single item in debugging mode.
  */
 static void
-__wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
+__wt_bt_dump_item(WT_STOC *stoc, WT_ITEM *item, FILE *fp)
 {
 	if (fp == NULL)
 		fp = stdout;
 
 	fprintf(fp, "%s {", __wt_bt_item_type(item));
 
-	__wt_bt_dump_item_data(db, item, fp);
+	__wt_bt_dump_item_data(stoc, item, fp);
 
 	fprintf(fp, "}\n");
 }
@@ -236,7 +239,7 @@ __wt_bt_dump_item(DB *db, WT_ITEM *item, FILE *fp)
  *	Dump a single item's data in debugging mode.
  */
 static void
-__wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
+__wt_bt_dump_item_data (WT_STOC *stoc, WT_ITEM *item, FILE *fp)
 {
 	WT_ITEM_OVFL *ovfl;
 	WT_ITEM_OFFP *offp;
@@ -255,10 +258,10 @@ __wt_bt_dump_item_data (DB *db, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
-		if (__wt_bt_ovfl_in(db,
+		if (__wt_bt_ovfl_in(stoc,
 		    ovfl->addr, (u_int32_t)ovfl->len, &page) == 0) {
 			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
-			(void)__wt_bt_page_out(db, page, 0);
+			(void)__wt_bt_page_out(stoc, page, 0);
 		}
 		break;
 	case WT_ITEM_OFFP_INTL:

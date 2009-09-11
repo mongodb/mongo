@@ -14,7 +14,7 @@
  *	Verify arguments to the Db.set_btree_compare_int setter.
  */
 int
-__wt_db_set_btree_compare_int_verify(WT_TOC *toc)
+__wt_db_set_btree_compare_int_verify(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_compare_int_unpack;
 

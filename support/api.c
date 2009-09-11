@@ -754,8 +754,8 @@ static int __wt_api_env_stat_print(
 	wt_args_env_toc_sched(WT_OP_ENV_STAT_PRINT);
 }
 
-static int __wt_db_get_btree_compare(WT_TOC *toc);
-static int __wt_db_get_btree_compare(WT_TOC *toc)
+static int __wt_db_get_btree_compare(WT_STOC *stoc);
+static int __wt_db_get_btree_compare(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_compare_unpack;
 
@@ -763,8 +763,8 @@ static int __wt_db_get_btree_compare(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_btree_compare_int(WT_TOC *toc);
-static int __wt_db_get_btree_compare_int(WT_TOC *toc)
+static int __wt_db_get_btree_compare_int(WT_STOC *stoc);
+static int __wt_db_get_btree_compare_int(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_compare_int_unpack;
 
@@ -772,8 +772,8 @@ static int __wt_db_get_btree_compare_int(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_btree_dup_compare(WT_TOC *toc);
-static int __wt_db_get_btree_dup_compare(WT_TOC *toc)
+static int __wt_db_get_btree_dup_compare(WT_STOC *stoc);
+static int __wt_db_get_btree_dup_compare(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_dup_compare_unpack;
 
@@ -781,8 +781,8 @@ static int __wt_db_get_btree_dup_compare(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_btree_dup_offpage(WT_TOC *toc);
-static int __wt_db_get_btree_dup_offpage(WT_TOC *toc)
+static int __wt_db_get_btree_dup_offpage(WT_STOC *stoc);
+static int __wt_db_get_btree_dup_offpage(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_dup_offpage_unpack;
 
@@ -790,8 +790,8 @@ static int __wt_db_get_btree_dup_offpage(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_btree_itemsize(WT_TOC *toc);
-static int __wt_db_get_btree_itemsize(WT_TOC *toc)
+static int __wt_db_get_btree_itemsize(WT_STOC *stoc);
+static int __wt_db_get_btree_itemsize(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_itemsize_unpack;
 
@@ -800,8 +800,8 @@ static int __wt_db_get_btree_itemsize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_btree_pagesize(WT_TOC *toc);
-static int __wt_db_get_btree_pagesize(WT_TOC *toc)
+static int __wt_db_get_btree_pagesize(WT_STOC *stoc);
+static int __wt_db_get_btree_pagesize(WT_STOC *stoc)
 {
 	wt_args_db_get_btree_pagesize_unpack;
 
@@ -812,8 +812,8 @@ static int __wt_db_get_btree_pagesize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_errcall(WT_TOC *toc);
-static int __wt_db_get_errcall(WT_TOC *toc)
+static int __wt_db_get_errcall(WT_STOC *stoc);
+static int __wt_db_get_errcall(WT_STOC *stoc)
 {
 	wt_args_db_get_errcall_unpack;
 
@@ -821,8 +821,8 @@ static int __wt_db_get_errcall(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_errfile(WT_TOC *toc);
-static int __wt_db_get_errfile(WT_TOC *toc)
+static int __wt_db_get_errfile(WT_STOC *stoc);
+static int __wt_db_get_errfile(WT_STOC *stoc)
 {
 	wt_args_db_get_errfile_unpack;
 
@@ -830,8 +830,8 @@ static int __wt_db_get_errfile(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_get_errpfx(WT_TOC *toc);
-static int __wt_db_get_errpfx(WT_TOC *toc)
+static int __wt_db_get_errpfx(WT_STOC *stoc);
+static int __wt_db_get_errpfx(WT_STOC *stoc)
 {
 	wt_args_db_get_errpfx_unpack;
 
@@ -839,8 +839,8 @@ static int __wt_db_get_errpfx(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_btree_compare(WT_TOC *toc);
-static int __wt_db_set_btree_compare(WT_TOC *toc)
+static int __wt_db_set_btree_compare(WT_STOC *stoc);
+static int __wt_db_set_btree_compare(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_compare_unpack;
 
@@ -848,18 +848,18 @@ static int __wt_db_set_btree_compare(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_btree_compare_int(WT_TOC *toc);
-static int __wt_db_set_btree_compare_int(WT_TOC *toc)
+static int __wt_db_set_btree_compare_int(WT_STOC *stoc);
+static int __wt_db_set_btree_compare_int(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_compare_int_unpack;
 
-	WT_RET((__wt_db_set_btree_compare_int_verify(toc)));
+	WT_RET((__wt_db_set_btree_compare_int_verify(stoc)));
 	db->btree_compare_int = btree_compare_int;
 	return (0);
 }
 
-static int __wt_db_set_btree_dup_compare(WT_TOC *toc);
-static int __wt_db_set_btree_dup_compare(WT_TOC *toc)
+static int __wt_db_set_btree_dup_compare(WT_STOC *stoc);
+static int __wt_db_set_btree_dup_compare(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_dup_compare_unpack;
 
@@ -867,8 +867,8 @@ static int __wt_db_set_btree_dup_compare(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_btree_dup_offpage(WT_TOC *toc);
-static int __wt_db_set_btree_dup_offpage(WT_TOC *toc)
+static int __wt_db_set_btree_dup_offpage(WT_STOC *stoc);
+static int __wt_db_set_btree_dup_offpage(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_dup_offpage_unpack;
 
@@ -876,8 +876,8 @@ static int __wt_db_set_btree_dup_offpage(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_btree_itemsize(WT_TOC *toc);
-static int __wt_db_set_btree_itemsize(WT_TOC *toc)
+static int __wt_db_set_btree_itemsize(WT_STOC *stoc);
+static int __wt_db_set_btree_itemsize(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_itemsize_unpack;
 
@@ -886,8 +886,8 @@ static int __wt_db_set_btree_itemsize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_btree_pagesize(WT_TOC *toc);
-static int __wt_db_set_btree_pagesize(WT_TOC *toc)
+static int __wt_db_set_btree_pagesize(WT_STOC *stoc);
+static int __wt_db_set_btree_pagesize(WT_STOC *stoc)
 {
 	wt_args_db_set_btree_pagesize_unpack;
 
@@ -898,8 +898,8 @@ static int __wt_db_set_btree_pagesize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_errcall(WT_TOC *toc);
-static int __wt_db_set_errcall(WT_TOC *toc)
+static int __wt_db_set_errcall(WT_STOC *stoc);
+static int __wt_db_set_errcall(WT_STOC *stoc)
 {
 	wt_args_db_set_errcall_unpack;
 
@@ -907,8 +907,8 @@ static int __wt_db_set_errcall(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_errfile(WT_TOC *toc);
-static int __wt_db_set_errfile(WT_TOC *toc)
+static int __wt_db_set_errfile(WT_STOC *stoc);
+static int __wt_db_set_errfile(WT_STOC *stoc)
 {
 	wt_args_db_set_errfile_unpack;
 
@@ -916,8 +916,8 @@ static int __wt_db_set_errfile(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_db_set_errpfx(WT_TOC *toc);
-static int __wt_db_set_errpfx(WT_TOC *toc)
+static int __wt_db_set_errpfx(WT_STOC *stoc);
+static int __wt_db_set_errpfx(WT_STOC *stoc)
 {
 	wt_args_db_set_errpfx_unpack;
 
@@ -925,8 +925,8 @@ static int __wt_db_set_errpfx(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_get_cachesize(WT_TOC *toc);
-static int __wt_env_get_cachesize(WT_TOC *toc)
+static int __wt_env_get_cachesize(WT_STOC *stoc);
+static int __wt_env_get_cachesize(WT_STOC *stoc)
 {
 	wt_args_env_get_cachesize_unpack;
 
@@ -934,8 +934,8 @@ static int __wt_env_get_cachesize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_get_errcall(WT_TOC *toc);
-static int __wt_env_get_errcall(WT_TOC *toc)
+static int __wt_env_get_errcall(WT_STOC *stoc);
+static int __wt_env_get_errcall(WT_STOC *stoc)
 {
 	wt_args_env_get_errcall_unpack;
 
@@ -943,8 +943,8 @@ static int __wt_env_get_errcall(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_get_errfile(WT_TOC *toc);
-static int __wt_env_get_errfile(WT_TOC *toc)
+static int __wt_env_get_errfile(WT_STOC *stoc);
+static int __wt_env_get_errfile(WT_STOC *stoc)
 {
 	wt_args_env_get_errfile_unpack;
 
@@ -952,8 +952,8 @@ static int __wt_env_get_errfile(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_get_errpfx(WT_TOC *toc);
-static int __wt_env_get_errpfx(WT_TOC *toc)
+static int __wt_env_get_errpfx(WT_STOC *stoc);
+static int __wt_env_get_errpfx(WT_STOC *stoc)
 {
 	wt_args_env_get_errpfx_unpack;
 
@@ -961,8 +961,8 @@ static int __wt_env_get_errpfx(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_get_verbose(WT_TOC *toc);
-static int __wt_env_get_verbose(WT_TOC *toc)
+static int __wt_env_get_verbose(WT_STOC *stoc);
+static int __wt_env_get_verbose(WT_STOC *stoc)
 {
 	wt_args_env_get_verbose_unpack;
 
@@ -970,8 +970,8 @@ static int __wt_env_get_verbose(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_set_cachesize(WT_TOC *toc);
-static int __wt_env_set_cachesize(WT_TOC *toc)
+static int __wt_env_set_cachesize(WT_STOC *stoc);
+static int __wt_env_set_cachesize(WT_STOC *stoc)
 {
 	wt_args_env_set_cachesize_unpack;
 
@@ -979,8 +979,8 @@ static int __wt_env_set_cachesize(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_set_errcall(WT_TOC *toc);
-static int __wt_env_set_errcall(WT_TOC *toc)
+static int __wt_env_set_errcall(WT_STOC *stoc);
+static int __wt_env_set_errcall(WT_STOC *stoc)
 {
 	wt_args_env_set_errcall_unpack;
 
@@ -988,8 +988,8 @@ static int __wt_env_set_errcall(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_set_errfile(WT_TOC *toc);
-static int __wt_env_set_errfile(WT_TOC *toc)
+static int __wt_env_set_errfile(WT_STOC *stoc);
+static int __wt_env_set_errfile(WT_STOC *stoc)
 {
 	wt_args_env_set_errfile_unpack;
 
@@ -997,8 +997,8 @@ static int __wt_env_set_errfile(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_set_errpfx(WT_TOC *toc);
-static int __wt_env_set_errpfx(WT_TOC *toc)
+static int __wt_env_set_errpfx(WT_STOC *stoc);
+static int __wt_env_set_errpfx(WT_STOC *stoc)
 {
 	wt_args_env_set_errpfx_unpack;
 
@@ -1006,12 +1006,12 @@ static int __wt_env_set_errpfx(WT_TOC *toc)
 	return (0);
 }
 
-static int __wt_env_set_verbose(WT_TOC *toc);
-static int __wt_env_set_verbose(WT_TOC *toc)
+static int __wt_env_set_verbose(WT_STOC *stoc);
+static int __wt_env_set_verbose(WT_STOC *stoc)
 {
 	wt_args_env_set_verbose_unpack;
 
-	WT_RET((__wt_env_set_verbose_verify(toc)));
+	WT_RET((__wt_env_set_verbose_verify(stoc)));
 	env->verbose = verbose;
 	return (0);
 }
@@ -1263,147 +1263,147 @@ __wt_db_config_methods_lockout(DB *db)
 }
 
 void
-__wt_api_switch(WT_TOC *toc)
+__wt_api_switch(WT_STOC *stoc)
 {
 	int ret;
 
-	switch (toc->op) {
+	switch (stoc->toc->op) {
 	case WT_OP_DB_BULK_LOAD:
-		ret = __wt_db_bulk_load(toc);
+		ret = __wt_db_bulk_load(stoc);
 		break;
 	case WT_OP_DB_CLOSE:
-		ret = __wt_db_close(toc);
+		ret = __wt_db_close(stoc);
 		break;
 	case WT_OP_DB_DESTROY:
-		ret = __wt_db_destroy(toc);
+		ret = __wt_db_destroy(stoc);
 		break;
 	case WT_OP_DB_DUMP:
-		ret = __wt_db_dump(toc);
+		ret = __wt_db_dump(stoc);
 		break;
 	case WT_OP_DB_GET:
-		ret = __wt_db_get(toc);
+		ret = __wt_db_get(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_COMPARE:
-		ret = __wt_db_get_btree_compare(toc);
+		ret = __wt_db_get_btree_compare(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_COMPARE_INT:
-		ret = __wt_db_get_btree_compare_int(toc);
+		ret = __wt_db_get_btree_compare_int(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_DUP_COMPARE:
-		ret = __wt_db_get_btree_dup_compare(toc);
+		ret = __wt_db_get_btree_dup_compare(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_DUP_OFFPAGE:
-		ret = __wt_db_get_btree_dup_offpage(toc);
+		ret = __wt_db_get_btree_dup_offpage(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_ITEMSIZE:
-		ret = __wt_db_get_btree_itemsize(toc);
+		ret = __wt_db_get_btree_itemsize(stoc);
 		break;
 	case WT_OP_DB_GET_BTREE_PAGESIZE:
-		ret = __wt_db_get_btree_pagesize(toc);
+		ret = __wt_db_get_btree_pagesize(stoc);
 		break;
 	case WT_OP_DB_GET_ERRCALL:
-		ret = __wt_db_get_errcall(toc);
+		ret = __wt_db_get_errcall(stoc);
 		break;
 	case WT_OP_DB_GET_ERRFILE:
-		ret = __wt_db_get_errfile(toc);
+		ret = __wt_db_get_errfile(stoc);
 		break;
 	case WT_OP_DB_GET_ERRPFX:
-		ret = __wt_db_get_errpfx(toc);
+		ret = __wt_db_get_errpfx(stoc);
 		break;
 	case WT_OP_DB_GET_RECNO:
-		ret = __wt_db_get_recno(toc);
+		ret = __wt_db_get_recno(stoc);
 		break;
 	case WT_OP_DB_OPEN:
-		ret = __wt_db_open(toc);
+		ret = __wt_db_open(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_COMPARE:
-		ret = __wt_db_set_btree_compare(toc);
+		ret = __wt_db_set_btree_compare(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_COMPARE_INT:
-		ret = __wt_db_set_btree_compare_int(toc);
+		ret = __wt_db_set_btree_compare_int(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_DUP_COMPARE:
-		ret = __wt_db_set_btree_dup_compare(toc);
+		ret = __wt_db_set_btree_dup_compare(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_DUP_OFFPAGE:
-		ret = __wt_db_set_btree_dup_offpage(toc);
+		ret = __wt_db_set_btree_dup_offpage(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_ITEMSIZE:
-		ret = __wt_db_set_btree_itemsize(toc);
+		ret = __wt_db_set_btree_itemsize(stoc);
 		break;
 	case WT_OP_DB_SET_BTREE_PAGESIZE:
-		ret = __wt_db_set_btree_pagesize(toc);
+		ret = __wt_db_set_btree_pagesize(stoc);
 		break;
 	case WT_OP_DB_SET_ERRCALL:
-		ret = __wt_db_set_errcall(toc);
+		ret = __wt_db_set_errcall(stoc);
 		break;
 	case WT_OP_DB_SET_ERRFILE:
-		ret = __wt_db_set_errfile(toc);
+		ret = __wt_db_set_errfile(stoc);
 		break;
 	case WT_OP_DB_SET_ERRPFX:
-		ret = __wt_db_set_errpfx(toc);
+		ret = __wt_db_set_errpfx(stoc);
 		break;
 	case WT_OP_DB_STAT_CLEAR:
-		ret = __wt_db_stat_clear(toc);
+		ret = __wt_db_stat_clear(stoc);
 		break;
 	case WT_OP_DB_STAT_PRINT:
-		ret = __wt_db_stat_print(toc);
+		ret = __wt_db_stat_print(stoc);
 		break;
 	case WT_OP_DB_SYNC:
-		ret = __wt_db_sync(toc);
+		ret = __wt_db_sync(stoc);
 		break;
 	case WT_OP_DB_VERIFY:
-		ret = __wt_db_verify(toc);
+		ret = __wt_db_verify(stoc);
 		break;
 	case WT_OP_ENV_CLOSE:
-		ret = __wt_env_close(toc);
+		ret = __wt_env_close(stoc);
 		break;
 	case WT_OP_ENV_DB_CREATE:
-		ret = __wt_env_db_create(toc);
+		ret = __wt_env_db_create(stoc);
 		break;
 	case WT_OP_ENV_GET_CACHESIZE:
-		ret = __wt_env_get_cachesize(toc);
+		ret = __wt_env_get_cachesize(stoc);
 		break;
 	case WT_OP_ENV_GET_ERRCALL:
-		ret = __wt_env_get_errcall(toc);
+		ret = __wt_env_get_errcall(stoc);
 		break;
 	case WT_OP_ENV_GET_ERRFILE:
-		ret = __wt_env_get_errfile(toc);
+		ret = __wt_env_get_errfile(stoc);
 		break;
 	case WT_OP_ENV_GET_ERRPFX:
-		ret = __wt_env_get_errpfx(toc);
+		ret = __wt_env_get_errpfx(stoc);
 		break;
 	case WT_OP_ENV_GET_VERBOSE:
-		ret = __wt_env_get_verbose(toc);
+		ret = __wt_env_get_verbose(stoc);
 		break;
 	case WT_OP_ENV_OPEN:
-		ret = __wt_env_open(toc);
+		ret = __wt_env_open(stoc);
 		break;
 	case WT_OP_ENV_SET_CACHESIZE:
-		ret = __wt_env_set_cachesize(toc);
+		ret = __wt_env_set_cachesize(stoc);
 		break;
 	case WT_OP_ENV_SET_ERRCALL:
-		ret = __wt_env_set_errcall(toc);
+		ret = __wt_env_set_errcall(stoc);
 		break;
 	case WT_OP_ENV_SET_ERRFILE:
-		ret = __wt_env_set_errfile(toc);
+		ret = __wt_env_set_errfile(stoc);
 		break;
 	case WT_OP_ENV_SET_ERRPFX:
-		ret = __wt_env_set_errpfx(toc);
+		ret = __wt_env_set_errpfx(stoc);
 		break;
 	case WT_OP_ENV_SET_VERBOSE:
-		ret = __wt_env_set_verbose(toc);
+		ret = __wt_env_set_verbose(stoc);
 		break;
 	case WT_OP_ENV_STAT_CLEAR:
-		ret = __wt_env_stat_clear(toc);
+		ret = __wt_env_stat_clear(stoc);
 		break;
 	case WT_OP_ENV_STAT_PRINT:
-		ret = __wt_env_stat_print(toc);
+		ret = __wt_env_stat_print(stoc);
 		break;
 	default:
 		ret = WT_ERROR;
 		break;
 	}
 
-	toc->ret = ret;
+	stoc->toc->ret = ret;
 }

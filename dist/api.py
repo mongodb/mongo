@@ -118,7 +118,7 @@ def func_getset(handle, method, flags, args, f):
 		rettype = 'int'
 	
 	s = 'static ' +\
-	    rettype + ' __wt_' + handle + '_' + method + '(WT_TOC *toc)'
+	    rettype + ' __wt_' + handle + '_' + method + '(WT_STOC *stoc)'
 	f.write(s + ';\n')
 	f.write(s + '\n{\n')
 	f.write('\twt_args_' + handle + '_' + method  + '_unpack;\n')
@@ -128,7 +128,7 @@ def func_getset(handle, method, flags, args, f):
 	# if the verification routine fails.
 	if flags.count('verify'):
 		f.write('\n\tWT_RET((__wt_' +\
-		    handle + '_' + method + '_verify(toc)));\n')
+		    handle + '_' + method + '_verify(stoc)));\n')
 	else:
 		f.write('\n')
 
@@ -159,7 +159,6 @@ def func_connect_hdr(handle, method, flags, args, f):
 	f.write('} ' + lv + ';\n')
 
 	f.write('#define\t' + lv + '_pack\\\n')
-
 	sep = ''
 	for l in args:
 		f.write(sep + '\t' +\
@@ -169,12 +168,13 @@ def func_connect_hdr(handle, method, flags, args, f):
 
 	f.write('#define\t' + lv + '_unpack\\\n')
 	f.write('\t' +\
-	    handle.upper() + ' *' + handle + ' = toc->' + handle + ';\\\n')
+	    handle.upper() + ' *' + handle + ' = stoc->' + handle + ';\\\n')
 	sep = ''
 	for l in args:
 		f.write(sep + '\t' +\
 		    l.split('\t')[1].replace('@S', l.split('\t')[0]) +\
-		    ' = ((' + lv + ' *)(toc->argp))->' + l.split('\t')[0])
+		    ' =\\\n\t    ((' +\
+		    lv + ' *)(stoc->toc->argp))->' + l.split('\t')[0])
 		sep = ';\\\n'
 	f.write('\n')
 
@@ -212,7 +212,7 @@ def func_connect_switch(handle, method, flags, args, f):
 	f.write('\t\t')
 	if not flags.count('methodV'):
 		f.write('ret = ')
-	f.write('__wt_' + handle + '_' + method + '(toc);\n')
+	f.write('__wt_' + handle + '_' + method + '(stoc);\n')
 	f.write('\t\tbreak;\n')
 
 #####################################################################
@@ -226,19 +226,22 @@ func_input()
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 
+tfile.write('/*\n')
+tfile.write(' * Do not clear the DB handle in the ENV schedule macro, we may be doing\n')
+tfile.write(' * an ENV call from within a DB call.\n')
+tfile.write(' */\n')
 tfile.write('#define\twt_args_env_toc_sched(oparg)\\\n')
 tfile.write('\ttoc->op = (oparg);\\\n')
 tfile.write('\ttoc->env = env;\\\n')
-tfile.write('\ttoc->db = NULL;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_env_toc_sched(toc))\n')
+tfile.write('\treturn (__wt_env_toc_sched(toc, WT_PSTOC_MASTER))\n')
 
 tfile.write('#define\twt_args_db_toc_sched(oparg)\\\n')
 tfile.write('\ttoc->op = (oparg);\\\n')
 tfile.write('\ttoc->env = db->env;\\\n')
 tfile.write('\ttoc->db = db;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_env_toc_sched(toc))\n')
+tfile.write('\treturn (__wt_env_toc_sched(toc, WT_PSTOC_MASTER))\n')
 
 # Write the connect structures.
 for i in sorted(\
@@ -295,9 +298,9 @@ for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 tfile.write('}\n\n')
 
 # Write the API connection switch.
-tfile.write('void\n__wt_api_switch(WT_TOC *toc)\n{\n')
+tfile.write('void\n__wt_api_switch(WT_STOC *stoc)\n{\n')
 tfile.write('\tint ret;\n\n')
-tfile.write('\tswitch (toc->op) {\n')
+tfile.write('\tswitch (stoc->toc->op) {\n')
 for i in sorted(
     filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
 	func_connect_switch(\
@@ -306,7 +309,7 @@ tfile.write('\tdefault:\n')
 tfile.write('\t\tret = WT_ERROR;\n')
 tfile.write('\t\tbreak;\n')
 tfile.write('\t}\n\n')
-tfile.write('\ttoc->ret = ret;\n')
+tfile.write('\tstoc->toc->ret = ret;\n')
 tfile.write('}\n')
 
 tfile.close()

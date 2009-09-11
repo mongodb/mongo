@@ -14,33 +14,22 @@
  *	Close a DB handle.
  */
 int
-__wt_db_close(WT_TOC *toc)
+__wt_db_close(WT_STOC *stoc)
 {
 	wt_args_db_close_unpack;
 	ENV *env;
-	IENV *ienv;
-	WT_STOC *stoc;
 	int ret;
 
-	env = toc->env;
-	ienv = env->ienv;
-	stoc = db->idb->stoc;
+	env = stoc->env;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
 	/* Close the underlying Btree. */
-	WT_TRET(__wt_bt_close(db));
+	WT_TRET(__wt_bt_close(stoc));
 
 	/* Discard the cache. */
-	WT_TRET(__wt_cache_close(db));
-
-	/* Discard the server thread. */
-	if (!F_ISSET(ienv, WT_SINGLE_THREADED)) {
-		stoc->running = 0;
-		WT_FLUSH_MEMORY;
-		__wt_thread_join(stoc->tid);
-	}
+	WT_TRET(__wt_cache_close(stoc));
 
 	/* Remove from the environment's list. */
 	TAILQ_REMOVE(&env->dbqh, db, q);

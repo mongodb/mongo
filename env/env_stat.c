@@ -14,14 +14,14 @@
  *	Print ENV handle statistics to a stream.
  */
 int
-__wt_env_stat_print(WT_TOC *toc)
+__wt_env_stat_print(WT_STOC *stoc)
 {
 	wt_args_env_stat_print_unpack;
 	DB *db;
 	IENV *ienv;
 	WT_STATS *stats;
-	WT_STOC *stoc;
-	u_int i;
+	WT_STOC *tmp_stoc;
+	int i;
 
 	ienv = env->ienv;
 
@@ -32,17 +32,17 @@ __wt_env_stat_print(WT_TOC *toc)
 		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 
 	fprintf(stream, "%s\n", ienv->sep);
-	WT_STOC_FOREACH(ienv, stoc, i) {
-		if (!stoc->running)
+	WT_STOC_FOREACH(ienv, tmp_stoc, i) {
+		if (!tmp_stoc->running)
 			continue;
-		fprintf(stream, "Server #%d thread statistics\n", stoc->id);
-		for (stats = stoc->stats; stats->desc != NULL; ++stats)
+		fprintf(stream, "Server #%d thread statistics\n", tmp_stoc->id);
+		for (stats = tmp_stoc->stats; stats->desc != NULL; ++stats)
 			fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);
 	}
 
 	fprintf(stream, "%s\n", ienv->sep);
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		WT_RET(db->stat_print(db, toc, stream, flags));
+		WT_RET(db->stat_print(db, stoc->toc, stream, flags));
 	return (0);
 }
 
@@ -51,7 +51,7 @@ __wt_env_stat_print(WT_TOC *toc)
  *	Clear ENV handle statistics.
  */
 int
-__wt_env_stat_clear(WT_TOC *toc)
+__wt_env_stat_clear(WT_STOC *stoc)
 {
 	wt_args_env_stat_clear_unpack;
 	DB *db;
@@ -61,7 +61,7 @@ __wt_env_stat_clear(WT_TOC *toc)
 
 	ret = 0;
 	TAILQ_FOREACH(db, &env->dbqh, q)
-		WT_TRET(db->stat_clear(db, toc, flags));
+		WT_TRET(db->stat_clear(db, stoc->toc, flags));
 	WT_TRET(__wt_stat_clear_env_hstats(env->hstats));
 	return (ret);
 }

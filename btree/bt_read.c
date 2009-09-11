@@ -21,16 +21,14 @@ static int __wt_cache_dump(WT_STOC *, char *, FILE *);
  *	Open an underlying database file in a cache.
  */
 int
-__wt_cache_open(DB *db)
+__wt_cache_open(WT_STOC *stoc)
 {
-	WT_STOC *stoc;
 	ENV *env;
 	IDB *idb;
 	u_int32_t i;
 
-	env = db->env;
-	idb = db->idb;
-	stoc = idb->stoc;
+	env = stoc->env;
+	idb = stoc->db->idb;
 
 	/*
 	 * Initialize the cache page queues.  Size for a cache filled with
@@ -54,17 +52,15 @@ __wt_cache_open(DB *db)
  *	Close an underlying database file in a cache.
  */
 int
-__wt_cache_close(DB *db)
+__wt_cache_close(WT_STOC *stoc)
 {
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_STOC *stoc;
 	int ret;
 
-	env = db->env;
-	idb = db->idb;
-	stoc = idb->stoc; 
+	env = stoc->env;
+	idb = stoc->db->idb;
 	ret = 0;
 
 	/*
@@ -101,14 +97,12 @@ __wt_cache_close(DB *db)
  *	Flush an underlying database file to disk.
  */
 int
-__wt_cache_sync(DB *db)
+__wt_cache_sync(WT_STOC *stoc)
 {
 	ENV *env;
 	WT_PAGE *page;
-	WT_STOC *stoc;
 
-	env = db->env;
-	stoc = db->idb->stoc;
+	env = stoc->env;
 
 	/* Write any modified pages. */
 	TAILQ_FOREACH(page, &stoc->lqh, q) {
@@ -181,9 +175,9 @@ __wt_cache_alloc(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 
 	*pagep = NULL;
 
-	idb = stoc->idb;
-	db = idb->db;
-	env = db->env;
+	db = stoc->db;
+	env = stoc->env;
+	idb = stoc->db->idb;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
@@ -225,9 +219,9 @@ __wt_cache_in(WT_STOC *stoc,
 
 	*pagep = NULL;
 
-	idb = stoc->idb;
-	db = idb->db;
-	env = db->env;
+	db = stoc->db;
+	env = stoc->env;
+	idb = stoc->db->idb;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 	WT_ENV_FCHK(env, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_IN);
@@ -306,7 +300,7 @@ __wt_cache_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
 
-	env = stoc->idb->db->env;
+	env = stoc->env;
 
 	WT_ENV_FCHK(env, "__wt_cache_out", flags, WT_APIMASK_WT_CACHE_OUT);
 
@@ -351,7 +345,7 @@ __wt_cache_clean(WT_STOC *stoc, u_int32_t bytes, WT_PAGE **pagep)
 
 	*pagep = NULL;
 
-	env = stoc->idb->db->env;
+	env = stoc->env;
 	bytes_free = 0;
 	bytes_need_free = bytes * 3;
 
@@ -410,8 +404,8 @@ __wt_cache_write(WT_STOC *stoc, WT_PAGE *page)
 	IDB *idb;
 	WT_PAGE_HDR *hdr;
 
-	idb = stoc->idb;
-	env = idb->db->env;
+	env = stoc->env;
+	idb = stoc->db->idb;
 
 	WT_STAT_INCR(env->hstats, CACHE_WRITE, "writes from the cache");
 
@@ -440,7 +434,7 @@ __wt_cache_discard(WT_STOC *stoc, WT_PAGE *page)
 {
 	ENV *env;
 
-	env = stoc->idb->db->env;
+	env = stoc->env;
 
 	WT_ASSERT(env, page->ref == 0);
 

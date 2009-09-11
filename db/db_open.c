@@ -16,15 +16,14 @@ static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
  *	Open a DB handle.
  */
 int
-__wt_db_open(WT_TOC *toc)
+__wt_db_open(WT_STOC *stoc)
 {
 	wt_args_db_open_unpack;
 	ENV *env;
 	IENV *ienv;
-	WT_STOC *stoc;
 	IDB *idb;
 
-	env = toc->env;
+	env = stoc->env;
 	ienv = env->ienv;
 	idb = db->idb;
 
@@ -33,24 +32,8 @@ __wt_db_open(WT_TOC *toc)
 	/* Initialize the IDB structure. */
 	WT_RET(__wt_db_idb_open(db, dbname, mode, flags));
 
-	/*
-	 * If we're using a single thread, reference it.   Otherwise create
-	 * a server thread.
-	 */
-	if (F_ISSET(ienv, WT_SINGLE_THREADED))
-		stoc = ienv->sq;
-	else {
-		stoc = ienv->sq + ienv->sq_next;
-		stoc->id = ++ienv->sq_next;
-		stoc->running = 1;
-		stoc->ienv = ienv;
-		WT_RET(__wt_thread_create(env, &stoc->tid, __wt_workq, stoc));
-	}
-	idb->stoc = stoc;
-	stoc->idb = idb;
-
 	/* Open the underlying Btree. */
-	WT_RET(__wt_bt_open(db));
+	WT_RET(__wt_bt_open(stoc));
 
 	/* Turn on the methods that require open. */
 	__wt_db_config_methods_open(db);

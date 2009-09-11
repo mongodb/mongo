@@ -14,7 +14,7 @@
  *	Sync a Btree.
  */
 int
-__wt_bt_sync(DB *db)
+__wt_bt_sync(WT_STOC *stoc)
 {
-	return (__wt_cache_sync(db));
+	return (__wt_cache_sync(stoc));
 }

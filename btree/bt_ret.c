@@ -17,15 +17,17 @@ static int __wt_bt_dbt_copyout(DB *, DBT *, DBT *, u_int8_t *, u_int32_t);
  *	application.
  */
 int
-__wt_bt_dbt_return(DB *db,
+__wt_bt_dbt_return(WT_STOC *stoc,
     DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return)
 {
+	DB *db;
 	IDB *idb;
 	DBT local_key, local_data;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	int (*callback)(DB *, DBT *, DBT *);
 
+	db = stoc->db;
 	idb = db->idb;
 
 	/*
@@ -50,7 +52,7 @@ __wt_bt_dbt_return(DB *db,
 	 */
 	if (key_return) {
 		if (ip->data == NULL)
-			WT_RET(__wt_bt_ovfl_to_indx(db, page, ip));
+			WT_RET(__wt_bt_ovfl_to_indx(stoc, page, ip));
 		if (callback == NULL) {
 			WT_RET(__wt_bt_dbt_copyout(
 			    db, key, &idb->key, ip->data, ip->size));
@@ -106,9 +108,9 @@ overflow:	/*
 			if (F_ISSET(data, WT_DBT_APPMEM) &&
 			    data->data_len < ovfl->len)
 				return (WT_TOOSMALL);
-			WT_RET(__wt_bt_ovfl_to_dbt(db, ovfl, data));
+			WT_RET(__wt_bt_ovfl_to_dbt(stoc, ovfl, data));
 		} else {
-			WT_RET(__wt_bt_ovfl_to_dbt(db, ovfl, &idb->data));
+			WT_RET(__wt_bt_ovfl_to_dbt(stoc, ovfl, &idb->data));
 			data->data = idb->data.data;
 			data->size = idb->data.size;
 		}

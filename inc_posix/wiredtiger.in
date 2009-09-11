@@ -82,16 +82,21 @@ struct __dbt {
 };
 
 /*******************************************
- * Connection information
+ * API thread-of-control information
  *******************************************/
 struct __wt_toc {
 	WT_MTX  *block;			/* Thread's blocking mutex */
 
+	/*
+	 * Payload: when the WT_TOC crosses the API layer, it gets loaded with
+	 * the following information used by underlying functions to figure out
+	 * what to do.
+	 */
 	int	 op;			/* Operation code */
 	ENV	*env;			/* Operation environment */
 	DB	*db;			/* Operation database */
 	void	*argp;			/* Operation parameters */
-	int	 ret;			/* Operation result */
+	int      ret;			/* Operation return code */
 
 	int	 slot;			/* Server slot */
 

@@ -14,17 +14,17 @@
  *	Close a Btree.
  */
 int
-__wt_bt_close(DB *db)
+__wt_bt_close(WT_STOC *stoc)
 {
 	IDB *idb;
 	int ret;
 
-	idb = db->idb;
+	idb = stoc->db->idb;
 	ret = 0;
 
 	/* Discard any root page we've pinned. */
 	if (idb->root_page != NULL) {
-		ret = __wt_bt_page_out(db, idb->root_page, 0);
+		ret = __wt_bt_page_out(stoc, idb->root_page, 0);
 		idb->root_page = NULL;
 	}
 

@@ -33,7 +33,6 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	stoc = ienv->sq  + ienv->sq_next;
 	stoc->id = ++ienv->sq_next;
 	stoc->running = 1;
-	stoc->ienv = ienv;
 
 	/* If we're single-threaded, we're done. */
 	if (LF_ISSET(WT_SINGLE_THREADED)) {
@@ -108,11 +107,15 @@ __wt_workq(void *arg)
 			toc = *q;
 			not_found = 0;
 
+			/* Initialize the WT_STOC handles and run the job. */
+			stoc->toc = toc;
+			stoc->env = toc->env;
+			stoc->db = toc->db;
 			F_SET(toc, WT_RUNNING);
-			__wt_api_switch(toc);
+			__wt_api_switch(stoc);
 			F_CLR(toc, WT_RUNNING);
 
-			/* Clear the TOC entry and wake the process. */
+			/* Clear the slot and wake the application thread. */
 			*q = NULL;
 			(void)__wt_unlock(toc->block);
 		}
