@@ -139,6 +139,66 @@ namespace mongo {
             
         } groupCmd;
 
+        class DistinctCmd : public PublicGridCommand {
+        public:
+            DistinctCmd() : PublicGridCommand("distinct"){}
+            virtual void help( stringstream &help ) const {
+                help << "{ distinct : 'collection name' , key : 'a.b' }";
+            }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                ChunkManager * cm = conf->getChunkManager( fullns );
+                massert( "how could chunk manager be null!" , cm );
+                
+                vector<Chunk*> chunks;
+                cm->getChunksForQuery( chunks , BSONObj() );
+                
+                set<BSONObj,BSONObjCmp> all;
+                int size = 32;
+                
+                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    Chunk * c = *i;
+
+                    ScopedDbConnection conn( c->getShard() );
+                    BSONObj res;
+                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    conn.done();
+                    
+                    if ( ! ok ){
+                        result.appendElements( res );
+                        return false;
+                    }
+                    
+                    BSONObjIterator it( res["values"].embeddedObjectUserCheck() );
+                    while ( it.more() ){
+                        BSONElement nxt = it.next();
+                        BSONObjBuilder temp(32);
+                        temp.appendAs( nxt , "x" );
+                        all.insert( temp.obj() );
+                    }
+
+                }
+                
+                BSONObjBuilder b( size );
+                int n=0;
+                for ( set<BSONObj,BSONObjCmp>::iterator i = all.begin() ; i != all.end(); i++ ){
+                    b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );
+                }
+                
+                result.appendArray( "values" , b.obj() );
+                result.append( "ok" , 1 );
+                return true;
+            }
+        } disinctCmd;
     }
 }
