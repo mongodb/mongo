@@ -74,7 +74,7 @@ public:
             pcrecpp::StringPiece input(fields_arg);
 
             string f;
-            pcrecpp::RE re("(\\w+),?" );
+            pcrecpp::RE re("([\\w\\.]+),?" );
             while ( re.Consume( &input, &f ) ){
                 fields.push_back( f );
                 b.append( f.c_str() , 1 );
@@ -107,9 +107,10 @@ public:
                 for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
                     if ( i != fields.begin() )
                         out << ",";
-                    const BSONElement & e = obj[i->c_str()];
-                    if ( ! e.eoo() )
-                        out << e.jsonString( TenGen , false );
+                    const BSONElement & e = obj.getFieldDotted(i->c_str());
+                    if ( ! e.eoo() ){
+                        out << e.jsonString( Strict , false );
+                    }
                 }
                 out << endl;
             }
