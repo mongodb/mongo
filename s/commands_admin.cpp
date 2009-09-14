@@ -588,15 +588,54 @@ namespace mongo {
                 
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
-                ScopedDbConnection conn( conf->getPrimary() );
-                BSONObj res;
-                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
-                result.appendElements( res );
-                conn.done();
-                return ok;
+                ClientInfo * client = ClientInfo::get();
+                set<string> * shards = client->getPrev();
+                
+                if ( shards->size() == 0 ){
+                    result.appendNull( "err" );
+                    result.append( "ok" , 1 );
+                    return true;
+                }
+                
+                if ( shards->size() == 1 ){
+                    string theShard = *(shards->begin() );
+                    result.append( "theshard" , theShard.c_str() );
+                    ScopedDbConnection conn( theShard );
+                    BSONObj res;
+                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                    result.appendElements( res );
+                    conn.done();
+                    return ok;
+                }
+                
+                vector<string> errors;
+                for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
+                    string theShard = *i;
+                    ScopedDbConnection conn( theShard );
+                    string temp = conn->getLastError();
+                    if ( temp.size() )
+                        errors.push_back( temp );
+                    conn.done();
+                }
+                
+                if ( errors.size() == 0 ){
+                    result.appendNull( "err" );
+                    result.append( "ok" , 1 );
+                    return true;
+                }
+                
+                result.append( "err" , errors[0].c_str() );
+                
+                BSONObjBuilder all;
+                for ( unsigned i=0; i<errors.size(); i++ ){
+                    all.append( all.numStr( i ).c_str() , errors[i].c_str() );
+                }
+                result.appendArray( "errs" , all.obj() );
+                result.append( "ok" , 1 );
+                return true;
             }
         } cmdGetLastError;
-
+        
     }
 
 } // namespace mongo

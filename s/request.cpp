@@ -31,9 +31,15 @@
 
 namespace mongo {
 
-    Request::Request( Message& m, AbstractMessagingPort* p ) : _m(m) , _d( m ) , _p(p){
+    Request::Request( Message& m, AbstractMessagingPort* p ) : 
+        _m(m) , _d( m ) , _p(p){
+        
         assert( _d.getns() );
         _id = _m.data->id;
+        
+        _clientId = p->remotePort() << 16;
+        _clientInfo = ClientInfo::get( _clientId );
+        _clientInfo->newRequest();
         
         reset();
     }
@@ -102,4 +108,66 @@ namespace mongo {
         }
     }
     
+    
+    ClientInfo::ClientInfo( int clientId ) : _id( clientId ){
+        _cur = &_a;
+        _prev = &_b;
+        newRequest();
+    }
+    
+    ClientInfo::~ClientInfo(){
+        boostlock lk( _clientsLock );
+        ClientCache::iterator i = _clients.find( _id );
+        if ( i != _clients.end() ){
+            _clients.erase( i );
+        }
+    }
+    
+    void ClientInfo::addShard( const string& shard ){
+        _cur->insert( shard );
+    }
+    
+    void ClientInfo::newRequest(){
+        _lastAccess = time(0);
+        
+        set<string> * temp = _cur;
+        _cur = _prev;
+        _prev = temp;
+        _cur->clear();
+    }
+    
+    void ClientInfo::disconnect(){
+        _lastAccess = 0;
+    }
+        
+    ClientInfo * ClientInfo::get( int clientId , bool create ){
+        
+        if ( ! clientId )
+            clientId = getClientId();
+        
+        if ( ! clientId ){
+            ClientInfo * info = _tlInfo.get();
+            if ( ! info ){
+                info = new ClientInfo( 0 );
+                _tlInfo.reset( info );
+            }
+            info->newRequest();
+            return info;
+        }
+        
+        boostlock lk( _clientsLock );
+        ClientCache::iterator i = _clients.find( clientId );
+        if ( i != _clients.end() )
+            return i->second;
+        if ( ! create )
+            return 0;
+        ClientInfo * info = new ClientInfo( clientId );
+        _clients[clientId] = info;
+        return info;
+    }
+        
+    map<int,ClientInfo*> ClientInfo::_clients;
+    mutex ClientInfo::_clientsLock;
+    thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
+
 } // namespace mongo

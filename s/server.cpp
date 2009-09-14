@@ -64,6 +64,9 @@ namespace mongo {
         virtual void onCreate( DBClientBase * conn ){
             conn->simpleCommand( "admin" , 0 , "switchtoclienterrors" );
         }
+        virtual void onHandedOut( DBClientBase * conn ){
+            ClientInfo::get()->addShard( conn->getServerAddress() );
+        }
     } shardingConnectionHook;
     
     class ShardedMessageHandler : public MessageHandler {
@@ -72,7 +75,7 @@ namespace mongo {
         virtual void process( Message& m , AbstractMessagingPort* p ){
             Request r( m , p );
             try {
-                setClientId( p->remotePort() << 16 );
+                setClientId( r.getClientId() );
                 r.process();
             }
             catch ( DBException& e ){
