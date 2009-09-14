@@ -30,7 +30,10 @@ namespace mongo {
     class DBConnectionHook {
     public:
         virtual ~DBConnectionHook(){}
-        virtual void onCreate( DBClientBase * conn ) = 0;
+
+        virtual void onCreate( DBClientBase * conn ){}
+        virtual void onHandedOut( DBClientBase * conn ){}
+
     };
 
     /** Database connection pool.
@@ -52,7 +55,9 @@ namespace mongo {
         boost::mutex poolMutex;
         map<string,PoolForHost*> pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
+        
         void onCreate( DBClientBase * conn );
+        void onHandedOut( DBClientBase * conn );
     public:
         void flush();
         DBClientBase *get(const string& host);

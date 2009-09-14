@@ -60,6 +60,7 @@ namespace mongo {
         }
         DBClientBase *c = p->pool.top();
         p->pool.pop();
+        onHandedOut( c );
         return c;
     }
 
@@ -93,6 +94,15 @@ namespace mongo {
         
         for ( list<DBConnectionHook*>::iterator i = _hooks.begin(); i != _hooks.end(); i++ ){
             (*i)->onCreate( conn );
+        }
+    }
+
+    void DBConnectionPool::onHandedOut( DBClientBase * conn ){
+        if ( _hooks.size() == 0 )
+            return;
+        
+        for ( list<DBConnectionHook*>::iterator i = _hooks.begin(); i != _hooks.end(); i++ ){
+            (*i)->onHandedOut( conn );
         }
     }
 
