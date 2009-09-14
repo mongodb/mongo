@@ -454,4 +454,9 @@ again:
         massert( "invalid id" , id );
         clientId.reset( id );
     }
+    
+    int getClientId(){
+        return clientId.get();
+    }
+    
 } // namespace mongo
