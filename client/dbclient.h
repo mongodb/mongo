@@ -611,6 +611,8 @@ namespace mongo {
             resetIndexCache();
             return ret;
         }        
+        
+        virtual bool isFailed() const = 0;
 
     private:
         set<string> _seenIndexes;
@@ -801,7 +803,11 @@ namespace mongo {
         virtual void say( Message &toSend ) { assert(false); }
         virtual void sayPiggyBack( Message &toSend ) { assert(false); }
         virtual void checkResponse( const char *data, int nReturned ) { assert(false); }
-
+        
+        bool isFailed() const {
+            // TODO: this really should check isFailed on current master as well
+            return master > NotSetR;
+        }
     };
     
 

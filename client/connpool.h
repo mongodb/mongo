@@ -62,6 +62,8 @@ namespace mongo {
         void flush();
         DBClientBase *get(const string& host);
         void release(const string& host, DBClientBase *c) {
+            if ( c->isFailed() )
+                return;
             boostlock L(poolMutex);
             pools[host]->pool.push(c);
         }
@@ -123,7 +125,7 @@ namespace mongo {
         }
 
         ~ScopedDbConnection() {
-            if ( _conn ) {
+            if ( _conn && ! _conn->isFailed() ) {
                 /* see done() comments above for why we log this line */
                 log() << "~ScopedDBConnection: _conn != null" << endl;
                 kill();
