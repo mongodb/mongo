@@ -139,9 +139,14 @@ namespace mongo {
 
     BSONObj getlasterrorcmdobj = fromjson("{getlasterror:1}");
 
-    string DBClientWithCommands::getLastError() { 
+    BSONObj DBClientWithCommands::getLastErrorDetailed() { 
         BSONObj info;
         runCommand("admin", getlasterrorcmdobj, info);
+		return info;
+    }
+
+    string DBClientWithCommands::getLastError() { 
+        BSONObj info = getLastErrorDetailed();
         BSONElement e = info["err"];
         if( e.eoo() ) return "";
         if( e.type() == Object ) return e.toString();
