@@ -490,7 +490,7 @@ public:
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
                 number = real_p[ numberValue( self.b ) ];
-                
+
                 // We allow a subset of valid js identifier names here.
                 unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) | ch_p( '_' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_'  )) ) ];
 

@@ -33,14 +33,14 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{}", BSONObj().jsonString( Strict ) );
             }
         };
-        
+
         class SingleStringMember {
         public:
             void run() {
                 ASSERT_EQUALS( "{ \"a\" : \"b\" }", BSON( "a" << "b" ).jsonString( Strict ) );
             }
         };
-        
+
         class EscapedCharacters {
         public:
             void run() {
@@ -49,7 +49,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         // per http://www.ietf.org/rfc/rfc4627.txt, control characters are
         // (U+0000 through U+001F).  U+007F is not mentioned as a control character.
         class AdditionalControlCharacters {
@@ -60,7 +60,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : \"\\u0001 \\u001f\" }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class ExtendedAscii {
         public:
             void run() {
@@ -69,7 +69,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : \"\x80\" }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class EscapeFieldName {
         public:
             void run() {
@@ -78,7 +78,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"\\t\" : \"b\" }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class SingleIntMember {
         public:
             void run() {
@@ -87,7 +87,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : 1 }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class SingleNumberMember {
         public:
             void run() {
@@ -96,24 +96,24 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : 1.5 }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class InvalidNumbers {
         public:
             void run() {
                 BSONObjBuilder b;
                 b.append( "a", numeric_limits< double >::infinity() );
                 ASSERT_EXCEPTION( b.done().jsonString( Strict ), AssertionException );
-                
+
                 BSONObjBuilder c;
                 c.append( "a", numeric_limits< double >::quiet_NaN() );
                 ASSERT_EXCEPTION( c.done().jsonString( Strict ), AssertionException );
-                
+
                 BSONObjBuilder d;
                 d.append( "a", numeric_limits< double >::signaling_NaN() );
                 ASSERT_EXCEPTION( d.done().jsonString( Strict ), AssertionException );
             }
         };
-        
+
         class NumberPrecision {
         public:
             void run() {
@@ -122,7 +122,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : 123456789 }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class NegativeNumber {
         public:
             void run() {
@@ -131,20 +131,20 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : -1 }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class SingleBoolMember {
         public:
             void run() {
                 BSONObjBuilder b;
                 b.appendBool( "a", true );
                 ASSERT_EQUALS( "{ \"a\" : true }", b.done().jsonString( Strict ) );
-                
+
                 BSONObjBuilder c;
                 c.appendBool( "a", false );
                 ASSERT_EQUALS( "{ \"a\" : false }", c.done().jsonString( Strict ) );
             }
         };
-        
+
         class SingleNullMember {
         public:
             void run() {
@@ -153,7 +153,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : null }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class SingleObjectMember {
         public:
             void run() {
@@ -162,7 +162,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : {} }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class TwoMembers {
         public:
             void run() {
@@ -172,7 +172,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : 1, \"b\" : 2 }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class EmptyArray {
         public:
             void run() {
@@ -182,7 +182,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : [] }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class Array {
         public:
             void run() {
@@ -194,7 +194,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : [ 1, 2 ] }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class DBRef {
         public:
             void run() {
@@ -211,7 +211,7 @@ namespace JsonTests {
                               built.jsonString( TenGen ) );
             }
         };
-        
+
         class DBRefZero {
         public:
             void run() {
@@ -223,7 +223,7 @@ namespace JsonTests {
                               b.done().jsonString( Strict ) );
             }
         };
-        
+
         class ObjectId {
         public:
             void run() {
@@ -238,7 +238,7 @@ namespace JsonTests {
                               built.jsonString( TenGen ) );
             }
         };
-        
+
         class BinData {
         public:
             void run() {
@@ -250,19 +250,19 @@ namespace JsonTests {
                 b.appendBinData( "a", 3, ByteArray, z );
                 ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"02\" } }",
                               b.done().jsonString( Strict ) );
-                
+
                 BSONObjBuilder c;
                 c.appendBinData( "a", 2, ByteArray, z );
                 ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"02\" } }",
                               c.done().jsonString( Strict ) );
-                
+
                 BSONObjBuilder d;
                 d.appendBinData( "a", 1, ByteArray, z );
                 ASSERT_EQUALS( "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"02\" } }",
                               d.done().jsonString( Strict ) );
             }
         };
-        
+
         class Symbol {
         public:
             void run() {
@@ -271,7 +271,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : \"b\" }", b.done().jsonString( Strict ) );
             }
         };
-        
+
         class Date {
         public:
             void run() {
@@ -283,7 +283,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( JS ) );
             }
         };
-        
+
         class Regex {
         public:
             void run() {
@@ -296,7 +296,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : /abc/i }", built.jsonString( JS ) );
             }
         };
-        
+
         class RegexEscape {
         public:
             void run() {
@@ -309,7 +309,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( JS ) );
             }
         };
-        
+
         class RegexManyOptions {
         public:
             void run() {
@@ -322,11 +322,11 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"a\" : /z/gim }", built.jsonString( JS ) );
             }
         };
-        
+
     } // namespace JsonStringTests
-    
+
     namespace FromJsonTests {
-        
+
         class Base {
         public:
             virtual ~Base() {}
@@ -349,7 +349,7 @@ namespace JsonTests {
                 ASSERT( !expected.woCompare( actual ) );
             }
         };
-        
+
         class Bad {
         public:
             virtual ~Bad() {}
@@ -359,7 +359,7 @@ namespace JsonTests {
         protected:
             virtual string json() const = 0;
         };
-        
+
         class Empty : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -369,7 +369,7 @@ namespace JsonTests {
                 return "{}";
             }
         };
-        
+
         class EmptyWithSpace : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -379,7 +379,7 @@ namespace JsonTests {
                 return "{ }";
             }
         };
-        
+
         class SingleString : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -390,7 +390,7 @@ namespace JsonTests {
                 return "{ \"a\" : \"b\" }";
             }
         };
-        
+
         class EmptyStrings : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -401,13 +401,13 @@ namespace JsonTests {
                 return "{ \"\" : \"\" }";
             }
         };
-        
+
         class ReservedFieldName : public Bad {
             virtual string json() const {
                 return "{ \"$ns\" : \"b\" }";
             }
         };
-        
+
         class OkDollarFieldName : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -418,7 +418,7 @@ namespace JsonTests {
                 return "{ \"$where\" : 1 }";
             }
         };
-        
+
         class SingleNumber : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -429,7 +429,7 @@ namespace JsonTests {
                 return "{ \"a\" : 1 }";
             }
         };
-        
+
         class FancyNumber {
         public:
             virtual ~FancyNumber() {}
@@ -446,7 +446,7 @@ namespace JsonTests {
                 return "{ \"a\" : -4.4433e-2 }";
             }
         };
-        
+
         class TwoElements : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -458,7 +458,7 @@ namespace JsonTests {
                 return "{ \"a\" : 1, \"b\" : \"foo\" }";
             }
         };
-        
+
         class Subobject : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -471,7 +471,7 @@ namespace JsonTests {
                 return "{ \"z\" : { \"a\" : 1 } }";
             }
         };
-        
+
         class ArrayEmpty : public Base {
             virtual BSONObj bson() const {
                 vector< int > arr;
@@ -483,7 +483,7 @@ namespace JsonTests {
                 return "{ \"a\" : [] }";
             }
         };
-        
+
         class Array : public Base {
             virtual BSONObj bson() const {
                 vector< int > arr;
@@ -498,7 +498,7 @@ namespace JsonTests {
                 return "{ \"a\" : [ 1, 2, 3 ] }";
             }
         };
-        
+
         class True : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -509,7 +509,7 @@ namespace JsonTests {
                 return "{ \"a\" : true }";
             }
         };
-        
+
         class False : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -520,7 +520,7 @@ namespace JsonTests {
                 return "{ \"a\" : false }";
             }
         };
-        
+
         class Null : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -531,7 +531,7 @@ namespace JsonTests {
                 return "{ \"a\" : null }";
             }
         };
-        
+
         class EscapedCharacters : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -542,7 +542,7 @@ namespace JsonTests {
                 return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }";
             }
         };
-        
+
         class AllowedControlCharacter : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -553,7 +553,7 @@ namespace JsonTests {
                 return "{ \"a\" : \"\x7f\" }";
             }
         };
-        
+
         class EscapeFieldName : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -564,7 +564,7 @@ namespace JsonTests {
                 return "{ \"\\n\" : \"b\" }";
             }
         };
-        
+
         class EscapedUnicodeToUtf8 : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -585,24 +585,24 @@ namespace JsonTests {
                 return "{ \"a\" : \"\\ua000\\uA000\" }";
             }
         };
-        
+
         class Utf8AllOnes : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 char u[ 8 ];
                 u[ 0 ] = 0x01;
-                
+
                 u[ 1 ] = 0x7f;
-                
+
                 u[ 2 ] = 0xdf;
                 u[ 3 ] = 0xbf;
-                
+
                 u[ 4 ] = 0xef;
                 u[ 5 ] = 0xbf;
                 u[ 6 ] = 0xbf;
-                
+
                 u[ 7 ] = 0;
-                
+
                 b.append( "a", u );
                 return b.obj();
             }
@@ -610,20 +610,20 @@ namespace JsonTests {
                 return "{ \"a\" : \"\\u0001\\u007f\\u07ff\\uffff\" }";
             }
         };
-        
+
         class Utf8FirstByteOnes : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 char u[ 6 ];
                 u[ 0 ] = 0xdc;
                 u[ 1 ] = 0x80;
-                
+
                 u[ 2 ] = 0xef;
                 u[ 3 ] = 0xbc;
                 u[ 4 ] = 0x80;
-                
+
                 u[ 5 ] = 0;
-                
+
                 b.append( "a", u );
                 return b.obj();
             }
@@ -631,7 +631,7 @@ namespace JsonTests {
                 return "{ \"a\" : \"\\u0700\\uff00\" }";
             }
         };
-        
+
         class DBRef : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -645,7 +645,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$ns\" : \"foo\", \"$id\" : \"000000000000000000000000\" } }";
             }
         };
-        
+
         class Oid : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -656,7 +656,7 @@ namespace JsonTests {
                 return "{ \"_id\" : \"000000000000000000000000\" }";
             }
         };
-        
+
         class Oid2 : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -684,7 +684,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$binary\" : \"YWJj\", \"$type\" : \"02\" } }";
             }
         };
-        
+
         class BinDataPaddedSingle : public Base {
             virtual BSONObj bson() const {
                 char z[ 2 ];
@@ -698,7 +698,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$binary\" : \"YWI=\", \"$type\" : \"02\" } }";
             }
         };
-        
+
         class BinDataPaddedDouble : public Base {
             virtual BSONObj bson() const {
                 char z[ 1 ];
@@ -711,7 +711,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$binary\" : \"YQ==\", \"$type\" : \"02\" } }";
             }
         };
-        
+
         class BinDataAllChars : public Base {
             virtual BSONObj bson() const {
                 char z[] = {
@@ -729,7 +729,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$binary\" : \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\", \"$type\" : \"02\" } }";
             }
         };
-        
+
         class Date : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -740,7 +740,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$date\" : 0 } }";
             }
         };
-        
+
         class DateNonzero : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -751,7 +751,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$date\" : 100 } }";
             }
         };
-        
+
         class DateTooLong : public Bad {
             virtual string json() const {
                 stringstream ss;
@@ -759,7 +759,7 @@ namespace JsonTests {
                 return ss.str();
             }
         };
-        
+
         class Regex : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -770,7 +770,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"i\" } }";
             }
         };
-        
+
         class RegexEscape : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -781,7 +781,7 @@ namespace JsonTests {
                 return "{ \"a\" : { \"$regex\" : \"\\t\", \"$options\" : \"i\" } }";
             }
         };
-        
+
         class RegexWithQuotes : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -792,25 +792,25 @@ namespace JsonTests {
                 return "{ \"a\" : /\"/ }";
             }
         };
-        
+
         class RegexInvalidOption : public Bad {
             virtual string json() const {
                 return "{ \"a\" : { \"$regex\" : \"b\", \"$options\" : \"1\" } }";
             }
         };
-        
+
         class RegexInvalidOption2 : public Bad {
             virtual string json() const {
                 return "{ \"a\" : /b/c }";
             }
         };
-        
+
         class Malformed : public Bad {
             string json() const {
                 return "{";
             }
         };
-        
+
         class UnquotedFieldName : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -819,9 +819,9 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ a_b : 1 }";
-            }            
+            }
         };
-        
+
         class UnquotedFieldNameDollar : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -830,7 +830,7 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ $a_b : 1 }";
-            }            
+            }
         };
 
         class SingleQuotes : public Base {
@@ -841,9 +841,9 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ 'ab\\'c\"' : 'bb\\b \\'\"' }";
-            }            
+            }
         };
-        
+
         class ObjectId : public Base {
             virtual BSONObj bson() const {
                 OID id;
@@ -854,11 +854,11 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ \"_id\": ObjectId( \"deadbeeff00ddeadbeeff00d\" ) }";
-            }                        
+            }
         };
 
     } // namespace FromJsonTests
-    
+
     class All : public Suite {
     public:
         All() {
@@ -924,14 +924,14 @@ namespace JsonTests {
             add< FromJsonTests::RegexWithQuotes >();
             add< FromJsonTests::RegexInvalidOption >();
             add< FromJsonTests::RegexInvalidOption2 >();
-            add< FromJsonTests::Malformed >();            
-            add< FromJsonTests::UnquotedFieldName >();            
-            add< FromJsonTests::UnquotedFieldNameDollar >();            
-            add< FromJsonTests::SingleQuotes >();            
-            add< FromJsonTests::ObjectId >();            
+            add< FromJsonTests::Malformed >();
+            add< FromJsonTests::UnquotedFieldName >();
+            add< FromJsonTests::UnquotedFieldNameDollar >();
+            add< FromJsonTests::SingleQuotes >();
+            add< FromJsonTests::ObjectId >();
         }
     };
-    
+
 } // namespace JsonTests
 
 UnitTest::TestPtr jsonTests() {
