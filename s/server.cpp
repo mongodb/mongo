@@ -74,6 +74,9 @@ namespace mongo {
         virtual ~ShardedMessageHandler(){}
         virtual void process( Message& m , AbstractMessagingPort* p ){
             Request r( m , p );
+            if ( logLevel > 5 ){
+                log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
+            }
             try {
                 setClientId( r.getClientId() );
                 r.process();
@@ -87,7 +90,7 @@ namespace mongo {
             }
         }
     };
-
+    
     void init(){
         serverID.init();
     }

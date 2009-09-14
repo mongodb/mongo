@@ -37,6 +37,7 @@ namespace mongo {
             {
                 QueryResult *qr = (QueryResult *) response.data;
                 if ( qr->resultFlags() & QueryResult::ResultFlag_ShardConfigStale ){
+                    dbcon.done();
                     throw StaleConfigException( r.getns() , "Strategy::doQuery" );
                 }
             }
@@ -82,6 +83,7 @@ namespace mongo {
                         cmd.appendOID( "writebacklisten" , &serverID );
                         if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ){
                             log() <<  "writebacklisten command failed!  "  << result << endl;
+                            conn.done();
                             continue;
                         }
 

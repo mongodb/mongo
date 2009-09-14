@@ -270,14 +270,18 @@ namespace mongo {
                     b.appendBool( "unique" , true ); 
                     if ( conn->count( config->getName() + ".system.indexes" , b.obj() ) ){
                         errmsg = "can't shard collection with unique indexes";
+                        conn.done();
                         return false;
                     }
 
                     BSONObj res = conn->findOne( config->getName() + ".system.namespaces" , BSON( "name" << ns ) );
                     if ( res["options"].type() == Object && res["options"].embeddedObject()["capped"].trueValue() ){
                         errmsg = "can't shard capped collection";
+                        conn.done();
                         return false;
                     }
+
+                    conn.done();
                 }
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
@@ -481,12 +485,14 @@ namespace mongo {
                 try {
                     ScopedDbConnection newShardConn( shard["host"].valuestrsafe() );
                     newShardConn->getLastError();
+                    newShardConn.done();
                 }
                 catch ( DBException& e ){
                     errmsg = "couldn't connect to new shard";
                     result.append( "host" , shard["host"].valuestrsafe() );
                     result.append( "exception" , e.what() );
                     result.append( "ok" , 0 );
+                    conn.done();
                     return false;
                 }
 

@@ -127,9 +127,9 @@ namespace mongo {
         set<string> * _prev;
         int _lastAccess;
         
-        static mutex _clientsLock;
+        static boost::mutex _clientsLock;
         static ClientCache _clients;
-        static thread_specific_ptr<ClientInfo> _tlInfo;
+        static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };
 }
 

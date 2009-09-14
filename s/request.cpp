@@ -37,7 +37,7 @@ namespace mongo {
         assert( _d.getns() );
         _id = _m.data->id;
         
-        _clientId = p->remotePort() << 16;
+        _clientId = p ? p->remotePort() << 16 : 0;
         _clientInfo = ClientInfo::get( _clientId );
         _clientInfo->newRequest();
         
@@ -167,7 +167,7 @@ namespace mongo {
     }
         
     map<int,ClientInfo*> ClientInfo::_clients;
-    mutex ClientInfo::_clientsLock;
-    thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
+    boost::mutex ClientInfo::_clientsLock;
+    boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 
 } // namespace mongo
