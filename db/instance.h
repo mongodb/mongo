@@ -106,6 +106,9 @@ namespace mongo {
 // --- local client ---
     
     class DBDirectClient : public DBClientBase {
+        virtual bool isFailed() const {
+            return false;
+        }
         virtual string toString() {
             return "DBDirectClient";
         }

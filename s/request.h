@@ -9,6 +9,8 @@
 
 namespace mongo {
     
+    class ClientInfo;
+    
     class Request : boost::noncopyable {
     public:
         Request( Message& m, AbstractMessagingPort* p );
@@ -39,6 +41,13 @@ namespace mongo {
         
         ChunkManager * getChunkManager(){
             return _chunkManager;
+        }
+        
+        int getClientId(){
+            return _clientId;
+        }
+        ClientInfo * getClientInfo(){
+            return _clientInfo;
         }
 
         // ---- remote location info -----
@@ -73,6 +82,9 @@ namespace mongo {
         MSGID _id;
         DBConfig * _config;
         ChunkManager * _chunkManager;
+        
+        int _clientId;
+        ClientInfo * _clientInfo;
     };
     
     class StaleConfigException : public std::exception {
@@ -90,6 +102,34 @@ namespace mongo {
         }
     private:
         string _msg;
+    };
+
+    typedef map<int,ClientInfo*> ClientCache;
+    
+    class ClientInfo {
+    public:
+        ClientInfo( int clientId );
+        ~ClientInfo();
+        
+        void addShard( const string& shard );
+        set<string> * getPrev() const { return _prev; };
+        
+        void newRequest();
+        void disconnect();
+
+        static ClientInfo * get( int clientId = 0 , bool create = true );
+        
+    private:
+        int _id;
+        set<string> _a;
+        set<string> _b;
+        set<string> * _cur;
+        set<string> * _prev;
+        int _lastAccess;
+        
+        static boost::mutex _clientsLock;
+        static ClientCache _clients;
+        static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };
 }
 

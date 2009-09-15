@@ -203,4 +203,5 @@ namespace mongo {
     MSGID nextMessageId();
 
     void setClientId( int id );
+    int getClientId();
 } // namespace mongo

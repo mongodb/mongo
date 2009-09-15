@@ -157,6 +157,7 @@ namespace mongo {
         
         if ( ! worked ){
             errmsg = (string)"movechunk.start failed: " + startRes.toString();
+            fromconn.done();
             return false;
         }
         
@@ -192,6 +193,7 @@ namespace mongo {
         
         if ( ! worked ){
             errmsg = (string)"movechunk.finish failed: " + finishRes.toString();
+            fromconn.done();
             return false;
         }
         

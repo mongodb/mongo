@@ -16,13 +16,19 @@ doassert = function( msg ){
 }
 
 assert = function( b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( b )
         return;
     
     doassert( "assert failed : " + msg );
 }
 
+assert._debug = false;
+
 assert.eq = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( a == b )
         return;
 
@@ -33,6 +39,7 @@ assert.eq = function( a , b , msg ){
 }
 
 assert.neq = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
     if ( a != b )
         return;
 
@@ -40,6 +47,8 @@ assert.neq = function( a , b , msg ){
 }
 
 assert.soon = function( f, msg, timeout, interval ) {
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     var start = new Date();
     timeout = timeout || 30000;
     interval = interval || 200;
@@ -62,7 +71,7 @@ assert.soon = function( f, msg, timeout, interval ) {
 }
 
 assert.throws = function( func , params , msg ){
-
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
     try {
         func.apply( null , params );
     }
@@ -74,6 +83,8 @@ assert.throws = function( func , params , msg ){
 }
 
 assert.commandWorked = function( res , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( res.ok == 1 )
         return;
     
@@ -81,6 +92,8 @@ assert.commandWorked = function( res , msg ){
 }
 
 assert.commandFailed = function( res , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( res.ok == 0 )
         return;
     
@@ -88,6 +101,8 @@ assert.commandFailed = function( res , msg ){
 }
 
 assert.isnull = function( what , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( what == null )
         return;
     
@@ -95,12 +110,16 @@ assert.isnull = function( what , msg ){
 }
 
 assert.lt = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( a < b )
         return;
     doassert( a + " is not less than " + b + " : " + msg );
 }
 
 assert.gt = function( a , b , msg ){
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
     if ( a > b )
         return;
     doassert( a + " is not greater than " + b + " : " + msg );
