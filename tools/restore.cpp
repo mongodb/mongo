@@ -45,6 +45,7 @@ public:
     }
 
     void drillDown( path root ) {
+        log(2) << "drillDown: " << root.string() << endl;
 
         if ( is_directory( root ) ) {
             directory_iterator end;
@@ -80,40 +81,51 @@ public:
             ns += "." + l;
         }
 
-        if ( boost::filesystem::file_size( root ) == 0 ) {
+        long long fileLength = file_size( root );
+
+        if ( fileLength == 0 ) {
             out() << "file " + root.native_file_string() + " empty, skipping" << endl;
             return;
         }
 
         out() << "\t going into namespace [" << ns << "]" << endl;
-
-        MemoryMappedFile mmf;
-        long fileLength;
-        assert( mmf.map( root.string().c_str() , fileLength ) );
-
-        log(1) << "\t file size: " << fileLength << endl;
-
-        char * data = (char*)mmf.viewOfs();
-        long read = 0;
-
-        long num = 0;
-
-        int msgDelay = (int)(1000 * ( 1 + ( mmf.length() / ( 1024.0 * 1024 * 400 ) ) ) );
-        log(1) << "\t msg delay: " << msgDelay << endl;
-
-        while ( read < mmf.length() ) {
-            BSONObj o( data );
-
-            conn().insert( ns.c_str() , o );
-
-            read += o.objsize();
-            data += o.objsize();
-
-            num++;
-            if ( logLevel > 0 && num < 10 || ! ( num % msgDelay ) )
-                out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)( (read * 100) / mmf.length()) << "%) " << num << " objects" << endl;
+        
+        string fileString = root.string();
+        ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
+        if ( ! file.is_open() ){
+            log() << "error opening file: " << fileString << endl;
+            return;
         }
+        
+        log(1) << "\t file size: " << fileLength << endl;
+        
+        long long read = 0;
+        long long num = 0;
 
+        int msgDelay = (int)(1000 * ( 1 + ( fileLength / ( 1024.0 * 1024 * 400 ) ) ) );
+        log(1) << "\t msg delay: " << msgDelay << endl;
+        
+        const int BUF_SIZE = 1024 * 1024 * 5;
+        char * buf = (char*)malloc( BUF_SIZE );
+
+        while ( read < fileLength ) {
+            file.read( buf , 4 );
+            int size = ((int*)buf)[0];
+            assert( size < BUF_SIZE );
+            
+            file.read( buf + 4 , size - 4 );
+            
+            BSONObj o( buf );
+            conn().insert( ns.c_str() , o );
+            
+            read += o.objsize();
+            num++;
+            
+            if ( ( logLevel > 0 && num < 10 ) || ! ( num % msgDelay ) )
+                out() << "read " << read << "/" << fileLength << " bytes so far. (" << (int)( (read * 100) / fileLength) << "%) " << num << " objects" << endl;
+        }
+        
+        free( buf );
         out() << "\t "  << num << " objects" << endl;
     }
 };
