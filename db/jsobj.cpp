@@ -260,11 +260,17 @@ namespace mongo {
             break;
         }
         case jstOID:
-            if ( format == TenGen )
+            if ( format == TenGen ) {
                 s << "ObjectId( ";
+            } else {
+                s << "{ \"$oid\" : ";
+            }
             s << '"' << __oid() << '"';
-            if ( format == TenGen )
+            if ( format == TenGen ) {
                 s << " )";
+            } else {
+                s << " }";
+            }
             break;
         case BinData: {
             int len = *(int *)( value() );
