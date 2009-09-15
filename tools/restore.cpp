@@ -33,14 +33,18 @@ class Restore : public Tool {
 public:
     Restore() : Tool( "restore" ){
         add_options()
-            ("dir",po::value<string>() , "directory to restore from" )
+            ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
-        addPositionArg( "dir" , 1 );
     }
 
     int run(){
         auth();
-        drillDown( getParam( "dir" ) );
+        path root = getParam("dir");
+        if (!is_directory(root)) {
+            cerr << "\"" << root.string() << "\" is not a valid directory" << endl;
+            return EXIT_BADOPTIONS;
+        }
+        drillDown(root);
         return 0;
     }
 
