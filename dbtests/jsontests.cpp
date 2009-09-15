@@ -232,7 +232,7 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendOID( "a", &oid );
                 BSONObj built = b.done();
-                ASSERT_EQUALS( "{ \"a\" : \"ffffffffffffffffffffffff\" }",
+                ASSERT_EQUALS( "{ \"a\" : { \"$oid\" : \"ffffffffffffffffffffffff\" } }",
                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : ObjectId( \"ffffffffffffffffffffffff\" ) }",
                               built.jsonString( TenGen ) );
@@ -669,7 +669,7 @@ namespace JsonTests {
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"_id\" : \"000000000000000000000000\" }";
+                return "{ \"_id\" : { \"$oid\" : \"000000000000000000000000\" } }";
             }
         };
 
@@ -682,7 +682,18 @@ namespace JsonTests {
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"_id\" : \"0f0f0f0f0f0f0f0f0f0f0f0f\" }";
+                return "{ \"_id\" : ObjectId( \"0f0f0f0f0f0f0f0f0f0f0f0f\" ) }";
+            }
+        };
+
+        class StringId : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append("_id", "000000000000000000000000");
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"_id\" : \"000000000000000000000000\" }";
             }
         };
 
@@ -873,6 +884,19 @@ namespace JsonTests {
             }
         };
 
+        class ObjectId2 : public Base {
+            virtual BSONObj bson() const {
+                OID id;
+                id.init( "deadbeeff00ddeadbeeff00d" );
+                BSONObjBuilder b;
+                b.appendOID( "foo", &id );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"foo\": ObjectId( \"deadbeeff00ddeadbeeff00d\" ) }";
+            }
+        };
+
     } // namespace FromJsonTests
 
     class All : public Suite {
@@ -929,6 +953,7 @@ namespace JsonTests {
             add< FromJsonTests::NewDBRef >();
             add< FromJsonTests::Oid >();
             add< FromJsonTests::Oid2 >();
+            add< FromJsonTests::StringId >();
             add< FromJsonTests::BinData >();
             add< FromJsonTests::BinDataPaddedSingle >();
             add< FromJsonTests::BinDataPaddedDouble >();
@@ -946,6 +971,7 @@ namespace JsonTests {
             add< FromJsonTests::UnquotedFieldNameDollar >();
             add< FromJsonTests::SingleQuotes >();
             add< FromJsonTests::ObjectId >();
+            add< FromJsonTests::ObjectId2 >();
         }
     };
 
