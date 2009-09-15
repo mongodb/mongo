@@ -1152,14 +1152,14 @@ namespace mongo {
         }
 
         /** Append a BSON Object ID (OID type). */
-        void appendOID(const char *fieldName, OID *oid = 0 , bool gen = false ) {
+        void appendOID(const char *fieldName, OID *oid = 0 , bool generateIfBlank = false ) {
             b.append((char) jstOID);
             b.append(fieldName);
             if ( oid )
                 b.append( (void *) oid, 12 );
             else {
                 OID tmp;
-                if ( gen )
+                if ( generateIfBlank )
                     tmp.init();
                 else
                     memset( &tmp, 0, 12 );
