@@ -646,6 +646,22 @@ namespace JsonTests {
             }
         };
 
+        class NewDBRef : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0, 12 );
+                b.append( "$ref", "items" );
+                b.appendOID( "$id", &o );
+                BSONObjBuilder c;
+                c.append( "refval", b.done() );
+                return c.obj();
+            }
+            virtual string json() const {
+                return "{ \"refval\" : { \"$ref\" : \"items\", \"$id\" : ObjectId( \"000000000000000000000000\" ) } }";
+            }
+        };
+
         class Oid : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -910,6 +926,7 @@ namespace JsonTests {
             add< FromJsonTests::Utf8AllOnes >();
             add< FromJsonTests::Utf8FirstByteOnes >();
             add< FromJsonTests::DBRef >();
+            add< FromJsonTests::NewDBRef >();
             add< FromJsonTests::Oid >();
             add< FromJsonTests::Oid2 >();
             add< FromJsonTests::BinData >();
