@@ -503,6 +503,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
+        ("notablescan", "do not allow table scans")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -696,6 +697,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
+        }
+        if (params.count("notablescan")) {
+            cmdLine.notablescan = true;
         }
         if (params.count("deDupMem")) {
             uasserted("deprecated");

@@ -26,13 +26,15 @@ namespace mongo {
         string source;         // --source
         string only;           // --only
         bool quiet;            // --quiet
-
+        
+        bool notablescan;     // --notablescan
+        
         enum { 
             DefaultDBPort = 27017
         };
 
         CmdLine() : 
-            port(27017), quiet(false)
+            port(27017), quiet(false), notablescan(false)
         { } 
 
     };
