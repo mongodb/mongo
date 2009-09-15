@@ -1191,7 +1191,10 @@ namespace mongo {
             return obj.extractFields( keyPattern , true );
         }
         
-        bool group( string realdbname , auto_ptr<DBClientCursor> cursor , BSONObj keyPattern , string keyFunction , string reduceCode , BSONObj initial , string& errmsg , BSONObjBuilder& result ){
+        bool group( string realdbname , auto_ptr<DBClientCursor> cursor , 
+                    BSONObj keyPattern , string keyFunction , string reduceCode , const char * reduceScope ,
+                    BSONObj initial , 
+                    string& errmsg , BSONObjBuilder& result ){
 
             if ( keyFunction.size() ){
                 errmsg = "can't only handle real keys right now, not functions";
@@ -1200,6 +1203,9 @@ namespace mongo {
 
             auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname );
             s->localConnect( realdbname.c_str() );
+            
+            if ( reduceScope )
+                s->init( reduceScope );
 
             s->setObject( "$initial" , initial , true );
             
@@ -1281,7 +1287,12 @@ namespace mongo {
                 // no key specified, will use entire object as key
             }
 
-            return group( realdbname , cursor , key , keyf , p["$reduce"].ascode() , p["initial"].embeddedObjectUserCheck() , errmsg , result );
+            BSONElement reduce = p["$reduce"];
+            
+            return group( realdbname , cursor , 
+                          key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
+                          p["initial"].embeddedObjectUserCheck() , 
+                          errmsg , result );
         }
         
     } cmdGroup;
