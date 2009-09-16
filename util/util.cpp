@@ -122,9 +122,9 @@ namespace mongo {
 #if defined(_WIN32)
         (std::cout << now << " " << s).flush();
 #else
-        write( STDOUT_FILENO, now, 20 );
-        write( STDOUT_FILENO, " ", 1 );
-        write( STDOUT_FILENO, s.c_str(), s.length() );
+        assert( write( STDOUT_FILENO, now, 20 ) > 0 );
+        assert( write( STDOUT_FILENO, " ", 1 ) > 0 );
+        assert( write( STDOUT_FILENO, s.c_str(), s.length() ) > 0 );
         fsync( STDOUT_FILENO );        
 #endif
     }
