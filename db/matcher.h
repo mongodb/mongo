@@ -24,6 +24,8 @@
 #include <pcrecpp.h>
 
 namespace mongo {
+
+    class KeyValJSMatcher;
     
     class RegexMatcher {
     public:
@@ -155,6 +157,8 @@ namespace mongo {
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > builders_;
+
+        friend class KeyValJSMatcher;
     };
     
     // If match succeeds on index key, then attempt to match full record.
@@ -166,6 +170,7 @@ namespace mongo {
     private:
         JSMatcher keyMatcher_;
         JSMatcher recordMatcher_;
+        bool needRecord;
     };
-
+    
 } // namespace mongo

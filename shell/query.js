@@ -199,6 +199,7 @@ DBQuery.prototype.explain = function(){
     var n = this.clone();
     n._ensureSpecial();
     n._query.$explain = true;
+    n._limit = n._limit * -1;
     return n.next();
 }
 

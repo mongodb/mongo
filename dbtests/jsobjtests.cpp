@@ -579,6 +579,22 @@ namespace JsobjTests {
                 ASSERT( a == b );
             }
         };
+
+        class append {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.appendOID( "a" , 0 );
+                b.appendOID( "b" , 0 , false );
+                b.appendOID( "c" , 0 , true );
+                BSONObj o = b.obj();
+                
+                ASSERT( o["a"].__oid().str() == "000000000000000000000000" );
+                ASSERT( o["b"].__oid().str() == "000000000000000000000000" );
+                ASSERT( o["c"].__oid().str() != "000000000000000000000000" );
+
+            }
+        };
     } // namespace OIDTests
     
     namespace ValueStreamTests {
@@ -834,6 +850,7 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::Fuzz >( .001 );
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
+            add< OIDTests::append >();
             add< ValueStreamTests::LabelBasic >();
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();

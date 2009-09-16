@@ -212,7 +212,7 @@ namespace mongo {
             string name = b.popString();
             massert( "Invalid use of reserved field name",
                      name != "$ns" &&
-                     name != "$id" &&
+                     name != "$oid" &&
                      name != "$binary" &&
                      name != "$type" &&
                      name != "$date" &&
@@ -324,7 +324,7 @@ namespace mongo {
     struct oidEnd {
         oidEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            b.back()->appendOID( "_id", &b.oid );
+            b.back()->appendOID( b.fieldName(), &b.oid );
         }
         ObjectBuilder &b;
     };
@@ -436,10 +436,7 @@ public:
         struct definition {
             definition( JsonGrammar const &self ) {
                 object = ch_p( '{' )[ objectStart( self.b ) ] >> !members >> '}';
-                members = pair >> !( ',' >> members );
-                pair =
-                    oid[ oidEnd( self.b ) ] |
-                    fieldName >> ':' >> value;
+                members = fieldName >> ':' >> value >> !( ',' >> members );
                 fieldName =
                     str[ fieldNameEnd( self.b ) ] |
                     singleQuoteStr[ fieldNameEnd( self.b ) ] |
@@ -447,6 +444,7 @@ public:
                 array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
                 elements = value >> !( ch_p( ',' )[ arrayNext( self.b ) ] >> elements );
                 value =
+                    oid[ oidEnd( self.b ) ] |
                     dbref[ dbrefEnd( self.b ) ] |
                     bindata[ binDataEnd( self.b ) ] |
                     date[ dateEnd( self.b ) ] |
@@ -490,7 +488,7 @@ public:
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
                 number = real_p[ numberValue( self.b ) ];
-                
+
                 // We allow a subset of valid js identifier names here.
                 unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) | ch_p( '_' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_'  )) ) ];
 
@@ -500,10 +498,9 @@ public:
                 dbrefT = str_p( "Dbref" ) >> '(' >> str[ dbrefNS( self.b ) ] >> ',' >>
                          quotedOid >> ')';
 
-                // FIXME Only object id if top level field?
                 oid = oidS | oidT;
-                oidS = str_p( "\"_id\"" ) >> ':' >> quotedOid;
-                oidT = str_p( "\"_id\"" ) >> ':' >> "ObjectId" >> '(' >> quotedOid >> ')';
+                oidS = ch_p( '{' ) >> "\"$oid\"" >> ':' >> quotedOid >> '}';
+                oidT = str_p( "ObjectId" ) >> '(' >> quotedOid >> ')';
 
                 quotedOid = lexeme_d[ '"' >> ( repeat_p( 24 )[ xdigit_p ] )[ oidValue( self.b ) ] >> '"' ];
 
@@ -532,7 +529,7 @@ public:
                                       ( ~range_p( 0x00, 0x1f ) & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
-            rule< ScannerT > object, members, pair, array, elements, value, str, number,
+            rule< ScannerT > object, members, array, elements, value, str, number,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
             regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {

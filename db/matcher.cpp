@@ -114,6 +114,10 @@ namespace mongo {
     KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
     keyMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
     recordMatcher_(_jsobj) {
+        needRecord = ! ( 
+                        recordMatcher_.keyMatch() && 
+                        keyMatcher_.jsobj.nFields() == recordMatcher_.jsobj.nFields()
+                         );
     }
     
     bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
@@ -122,6 +126,11 @@ namespace mongo {
                 return false;
             }
         }
+        
+        if ( ! needRecord ){
+            return true;
+        }
+
         return recordMatcher_.matches(recLoc.rec(), deep);
     }
     

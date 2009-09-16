@@ -31,27 +31,50 @@ namespace po = boost::program_options;
 
 class Restore : public Tool {
 public:
-    Restore() : Tool( "restore" ){
+    Restore() : Tool( "restore" , "" ){
         add_options()
-            ("dir",po::value<string>() , "directory to restore from" )
+            ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
-        addPositionArg( "dir" , 1 );
     }
 
     int run(){
         auth();
-        drillDown( getParam( "dir" ) );
-        return 0;
+        path root = getParam("dir");
+        if (!is_directory(root)) {
+            cerr << "\"" << root.string() << "\" is not a valid directory" << endl;
+            return EXIT_BADOPTIONS;
+        }
+
+        /* If _db is not "" then the user specified a db name to restore as.
+         *
+         * In that case we better be given a root directory that contains only
+         * .bson files (a db)
+         */
+        drillDown(root, _db != "");
+        return EXIT_CLEAN;
     }
 
-    void drillDown( path root ) {
+    void drillDown( path root, bool use_db = false ) {
+        log(2) << "drillDown: " << root.string() << endl;
 
         if ( is_directory( root ) ) {
             directory_iterator end;
             directory_iterator i(root);
             while ( i != end ) {
                 path p = *i;
-                drillDown( p );
+
+                if (use_db) {
+                    if (is_directory(p) ||
+                        !(endsWith(p.string().c_str(), ".bson") ||
+                          endsWith(p.string().c_str(), ".bin" ))) {
+                        cerr << "ERROR: root directory must be a dump of a single database" << endl;
+                        cerr << "       when specifying a db name with --db" << endl;
+                        printHelp(cout);
+                        return;
+                    }
+                }
+
+                drillDown(p, use_db);
                 i++;
             }
             return;
@@ -66,7 +89,9 @@ public:
         out() << root.string() << endl;
 
         string ns;
-        {
+        if (use_db) {
+            ns += _db;
+        } else {
             string dir = root.branch_path().string();
             if ( dir.find( "/" ) == string::npos )
                 ns += dir;
@@ -80,40 +105,51 @@ public:
             ns += "." + l;
         }
 
-        if ( boost::filesystem::file_size( root ) == 0 ) {
+        long long fileLength = file_size( root );
+
+        if ( fileLength == 0 ) {
             out() << "file " + root.native_file_string() + " empty, skipping" << endl;
             return;
         }
 
         out() << "\t going into namespace [" << ns << "]" << endl;
 
-        MemoryMappedFile mmf;
-        long fileLength;
-        assert( mmf.map( root.string().c_str() , fileLength ) );
+        string fileString = root.string();
+        ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
+        if ( ! file.is_open() ){
+            log() << "error opening file: " << fileString << endl;
+            return;
+        }
 
         log(1) << "\t file size: " << fileLength << endl;
 
-        char * data = (char*)mmf.viewOfs();
-        long read = 0;
+        long long read = 0;
+        long long num = 0;
 
-        long num = 0;
-
-        int msgDelay = (int)(1000 * ( 1 + ( mmf.length() / ( 1024.0 * 1024 * 400 ) ) ) );
+        int msgDelay = (int)(1000 * ( 1 + ( fileLength / ( 1024.0 * 1024 * 400 ) ) ) );
         log(1) << "\t msg delay: " << msgDelay << endl;
 
-        while ( read < mmf.length() ) {
-            BSONObj o( data );
+        const int BUF_SIZE = 1024 * 1024 * 5;
+        char * buf = (char*)malloc( BUF_SIZE );
 
+        while ( read < fileLength ) {
+            file.read( buf , 4 );
+            int size = ((int*)buf)[0];
+            assert( size < BUF_SIZE );
+
+            file.read( buf + 4 , size - 4 );
+
+            BSONObj o( buf );
             conn().insert( ns.c_str() , o );
 
             read += o.objsize();
-            data += o.objsize();
-
             num++;
-            if ( logLevel > 0 && num < 10 || ! ( num % msgDelay ) )
-                out() << "read " << read << "/" << mmf.length() << " bytes so far. (" << (int)( (read * 100) / mmf.length()) << "%) " << num << " objects" << endl;
+
+            if ( ( logLevel > 0 && num < 10 ) || ! ( num % msgDelay ) )
+                out() << "read " << read << "/" << fileLength << " bytes so far. (" << (int)( (read * 100) / fileLength) << "%) " << num << " objects" << endl;
         }
 
+        free( buf );
         out() << "\t "  << num << " objects" << endl;
     }
 };

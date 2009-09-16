@@ -493,7 +493,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("auth", "run with security")
         ("objcheck", "inspect client data for validity on receipt")
         ("quota", "enable db quota management")
-        ("appsrvpath", po::value<string>(), "root directy for the babble app server")
+        ("appsrvpath", po::value<string>(), "root directory for the babble app server")
         ("nocursors", "diagnostic/debugging option")
         ("nohints", "ignore query hints")
         ("nohttpinterface", "disable http interface")
@@ -503,6 +503,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
+        ("notablescan", "do not allow table scans")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -696,6 +697,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
+        }
+        if (params.count("notablescan")) {
+            cmdLine.notablescan = true;
         }
         if (params.count("deDupMem")) {
             uasserted("deprecated");

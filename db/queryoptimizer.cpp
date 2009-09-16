@@ -22,9 +22,21 @@
 #include "btree.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
+#include "cmdline.h"
 
 namespace mongo {
 
+    void checkTableScanAllowed( const char * ns ){
+        if ( ! cmdLine.notablescan )
+            return;
+        
+        if ( strstr( ns , ".system." ) ||
+             strstr( ns , "local." ) )
+            return;
+        
+        uassert( "table scans not allowed" , ! cmdLine.notablescan );
+    }
+    
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();
@@ -149,11 +161,17 @@ namespace mongo {
     }
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc ) const {
-        if ( !fbs_.matchPossible() )
+        if ( !fbs_.matchPossible() ){
+            checkTableScanAllowed( fbs_.ns() );
             return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
-        if ( !index_ )
+        }
+        if ( !index_ ){
+            checkTableScanAllowed( fbs_.ns() );
             return findTableScan( fbs_.ns(), order_, startLoc );
+        }
+
         massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
+        
         if ( indexBounds_.size() < 2 ) {
             // we are sure to spec endKeyInclusive_
             return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
@@ -161,7 +179,7 @@ namespace mongo {
             return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
         }
     }
-
+    
     auto_ptr< Cursor > QueryPlan::newReverseCursor() const {
         if ( !fbs_.matchPossible() )
             return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
