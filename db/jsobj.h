@@ -116,6 +116,9 @@ namespace mongo {
         };
         unsigned b;
     public:
+		/** initialize to 'null' */
+		void clear() { a = 0; b = 0; }
+
         const unsigned char *getData() const { return data; }
 
         bool operator==(const OID& r) {
@@ -1162,7 +1165,7 @@ namespace mongo {
                 if ( generateIfBlank )
                     tmp.init();
                 else
-                    memset( &tmp, 0, 12 );
+                    tmp.clear();
                 b.append( (void *) &tmp, 12 );
             }
         }
