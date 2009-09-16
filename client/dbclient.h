@@ -302,18 +302,23 @@ namespace mongo {
         bool isOk(const BSONObj&);
     public:
 
+		/** helper function.  run a simple command where the command expression is simply
+			  { command : 1 }
+            @param info -- where to put result object.  may be null if caller doesn't need that info
+            @param command -- command name
+			@return true if the command returned "ok".
+		*/
         bool simpleCommand(const string &dbname, BSONObj *info, const string &command);
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
-           commands have prebuilt helper functions -- see below.  If a helper is not available you can
-           directly call runCommand.
+            commands have prebuilt helper functions -- see below.  If a helper is not available you can
+			directly call runCommand.
 
-           @param dbname database name.  Use "admin" for global administrative commands.
-           @param cmd  the command object to execute.  For example, { ismaster : 1 }
-           @param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
-                       set.
-
-           @return true if the command returned "ok".
+            @param dbname database name.  Use "admin" for global administrative commands.
+			@param cmd  the command object to execute.  For example, { ismaster : 1 }
+			@param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
+			       set.
+			@return true if the command returned "ok".
         */
         bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info);
 
