@@ -21,6 +21,7 @@
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
 #include "../db/repl.h"
+#include "../db/extsort.h"
 
 #include "dbtests.h"
 
@@ -797,6 +798,107 @@ namespace JsobjTests {
             
         }
     };
+
+    namespace external_sort {
+        class Basic1 {
+        public:
+            void run(){
+                BSONObjExternalSorter sorter;
+                sorter.add( BSON( "x" << 10 ) , 5  , 1);
+                sorter.add( BSON( "x" << 2 ) , 3 , 1 );
+                sorter.add( BSON( "x" << 5 ) , 6 , 1 );
+                sorter.add( BSON( "x" << 5 ) , 7 , 1 );
+                
+                sorter.sort();
+
+                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                int num=0;
+                while ( i.more() ){
+                    pair<BSONObj,DiskLoc> p = i.next();
+                    if ( num == 0 )
+                        assert( p.first["x"].number() == 2 );
+                    else if ( num <= 2 )
+                        assert( p.first["x"].number() == 5 );
+                    else if ( num == 3 )
+                        assert( p.first["x"].number() == 10 );
+                    else 
+                        ASSERT( 0 );
+                    num++;
+                }
+                
+            }
+        };
+
+        class Basic2 {
+        public:
+            void run(){
+                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                sorter.add( BSON( "x" << 10 ) , 5  , 11 );
+                sorter.add( BSON( "x" << 2 ) , 3 , 1 );
+                sorter.add( BSON( "x" << 5 ) , 6 , 1 );
+                sorter.add( BSON( "x" << 5 ) , 7 , 1 );
+                
+                sorter.sort();
+
+                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                int num=0;
+                while ( i.more() ){
+                    pair<BSONObj,DiskLoc> p = i.next();
+                    if ( num == 0 ){
+                        assert( p.first["x"].number() == 2 );
+                        ASSERT_EQUALS( p.second.toString() , "3:1" );
+                    }
+                    else if ( num <= 2 )
+                        assert( p.first["x"].number() == 5 );
+                    else if ( num == 3 ){
+                        assert( p.first["x"].number() == 10 );
+                        ASSERT_EQUALS( p.second.toString() , "5:b" );
+                    }
+                    else 
+                        ASSERT( 0 );
+                    num++;
+                }
+                
+            }
+        };
+
+        class Basic3 {
+        public:
+            void run(){
+                BSONObjExternalSorter sorter( BSONObj() , 10 );
+                sorter.sort();
+
+                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                assert( ! i.more() );
+                
+            }
+        };
+
+        class Big1 {
+        public:
+            void run(){
+                BSONObjExternalSorter sorter( BSONObj() , 2000 );
+                for ( int i=0; i<10000; i++ ){
+                    sorter.add( BSON( "x" << rand() % 10000 ) , 5  , i );
+                }
+                
+                sorter.sort();
+                
+                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                int num=0;
+                double prev = 0;
+                while ( i.more() ){
+                    pair<BSONObj,DiskLoc> p = i.next();
+                    num++;
+                    double cur = p.first["x"].number();
+                    assert( cur >= prev );
+                    prev = cur;
+                }
+                assert( num == 10000 );
+            }
+        };
+
+    }
     
     class All : public Suite {
     public:
@@ -863,6 +965,10 @@ namespace JsobjTests {
             add< MinMaxElementTest >();
             add< ComparatorTest >();
             add< ExtractFieldsTest >();
+            add< external_sort::Basic1 >();
+            add< external_sort::Basic2 >();
+            add< external_sort::Basic3 >();
+            add< external_sort::Big1 >();
         }
     };
     
