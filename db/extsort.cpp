@@ -22,6 +22,8 @@
 #include "namespace.h"
 #include "../util/file.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 namespace mongo {
@@ -31,7 +33,7 @@ namespace mongo {
           _map(0), _mapSizeSoFar(0), _largestObject(0),  _sorted(0){
         
         stringstream rootpath;
-        rootpath << dbpath << "/esort_" << time(0) << "_" << rand() << "/";
+        rootpath << dbpath << "/esort." << time(0) << "." << rand() << "/";
         _root = rootpath.str();
         
         create_directories( _root );
