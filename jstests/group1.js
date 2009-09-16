@@ -56,8 +56,8 @@ p = { key : { 'name.first' : true } ,
 
 res = t.group( p );
 assert.eq( 2 , res.length , "Z1" );
-assert.eq( "a" , res[0].first , "Z2" )
-assert.eq( "b" , res[1].first , "Z3" )
+assert.eq( "a" , res[0]['name.first'] , "Z2" )
+assert.eq( "b" , res[1]['name.first'] , "Z3" )
 assert.eq( 2 , res[0].count , "Z4" )
 assert.eq( 1 , res[1].count , "Z5" )
 
