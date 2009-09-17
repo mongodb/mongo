@@ -93,9 +93,13 @@ namespace mongo {
                          bind( &MessageServerSession::handleWriteDone , shared_from_this() , placeholders::error ) );
         }
 
-
+        
+        virtual unsigned remotePort(){
+            return _socket.remote_endpoint().port();
+        }
+        
     private:        
-
+        
         void _startHeaderRead(){
             _inHeader.len = 0;
             async_read( _socket , 
