@@ -1202,7 +1202,7 @@ namespace mongo {
         
         bool group( string realdbname , auto_ptr<DBClientCursor> cursor , 
                     BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
-                    BSONObj initial , 
+                    BSONObj initial , string finalize ,
                     string& errmsg , BSONObjBuilder& result ){
 
 
@@ -1258,6 +1258,19 @@ namespace mongo {
                     throw UserException( (string)"reduce invoke failed: " + s->getError() );
                 }
             }
+
+            if (!finalize.empty()){
+                s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
+                ScriptingFunction g = s->createFunction(
+                    "function(){ "
+                    "  for(var i=0; i < $arr.length; i++){ "
+                    "  var ret = $finalize($arr[i]); "
+                    "  if (ret !== undefined) "
+                    "    $arr[i] = ret; "
+                    "  } "
+                    "}" );
+                s->invoke( g , BSONObj() , 0 , true );
+            }
             
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
@@ -1306,10 +1319,14 @@ namespace mongo {
             }
 
             BSONElement reduce = p["$reduce"];
+
+            string finalize;
+            if (p["finalize"].type())
+                finalize = p["finalize"].ascode();
             
             return group( realdbname , cursor , 
                           key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
-                          p["initial"].embeddedObjectUserCheck() , 
+                          p["initial"].embeddedObjectUserCheck() , finalize ,
                           errmsg , result );
         }
         
