@@ -609,7 +609,10 @@ namespace JSTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "js" ) {
+        }
+        
+        void setupTests(){
             add< Fundamental >();
             add< BasicScope >();
             add< FalseTests >();
@@ -632,10 +635,7 @@ namespace JSTests {
 
             add< VarTests >();
         }
-    };
+    } myall;
     
 } // namespace JavaJSTests
 
-UnitTest::TestPtr jsTests() {
-    return UnitTest::createSuite< JSTests::All >();
-}

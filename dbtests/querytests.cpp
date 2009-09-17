@@ -692,7 +692,10 @@ namespace QueryTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "query" ) {
+        }
+        
+        void setupTests(){
             add< CountBasic >();
             add< CountQuery >();
             add< CountFields >();
@@ -727,10 +730,7 @@ namespace QueryTests {
             add< DifferentNumbers >();
             add< SymbolStringSame >();
         }
-    };
+    } myall;
     
 } // namespace QueryTests
 
-UnitTest::TestPtr queryTests() {
-    return UnitTest::createSuite< QueryTests::All >();
-}

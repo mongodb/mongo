@@ -326,7 +326,10 @@ namespace PairingTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "pairing" ){
+        }
+        
+        void setupTests(){
             add< ReplPairTests::Create >();
             add< ReplPairTests::Dominant >();
             add< ReplPairTests::SetMaster >();
@@ -336,9 +339,6 @@ namespace PairingTests {
             add< NegotiateWithCatchup >();
             add< NobodyCaughtUp >();
         }
-    };
+    } myall;
 } // namespace PairingTests
 
-UnitTest::TestPtr pairingTests() {
-    return UnitTest::createSuite< PairingTests::All >();
-}

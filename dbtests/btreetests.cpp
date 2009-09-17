@@ -213,9 +213,12 @@ namespace BtreeTests {
         }
     };
 
-    class All : public UnitTest::Suite {
+    class All : public Suite {
     public:
-        All() {
+        All() : Suite( "btree" ){
+        }
+        
+        void setupTests(){
             add< Create >();
             add< SimpleInsertDelete >();
             add< SplitRightHeavyBucket >();
@@ -223,9 +226,6 @@ namespace BtreeTests {
             add< MissingLocate >();
             add< MissingLocateMultiBucket >();
         }
-    };
+    } myall;
 }
 
-UnitTest::TestPtr btreeTests() {
-    return UnitTest::createSuite< BtreeTests::All >();
-}
