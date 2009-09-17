@@ -1216,11 +1216,18 @@ namespace mongo {
             
             s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
             s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
-            ScriptingFunction f = s->createFunction( "function(){ "
-                                                     "  if ( $arr[n] == null ){ next = {}; Object.extend( next , $key ); Object.extend( next , $initial ); $arr[n] = next; next = null; }"
-                                                     "  $reduce( obj , $arr[n] ); "
-                                                     "}" );
-            
+            ScriptingFunction f = s->createFunction(
+                "function(){ "
+                "  if ( $arr[n] == null ){ "
+                "    next = {}; "
+                "    Object.extend( next , $key ); "
+                "    Object.extend( next , $initial ); "
+                "    $arr[n] = next; "
+                "    next = null; "
+                "  } "
+                "  $reduce( obj , $arr[n] ); "
+                "}" );
+
             ScriptingFunction keyFunction = 0;
             if ( keyFunctionCode.size() ){
                 keyFunction = s->createFunction( keyFunctionCode.c_str() );
