@@ -33,7 +33,10 @@ namespace mongo {
           _map(0), _mapSizeSoFar(0), _largestObject(0),  _sorted(0){
         
         stringstream rootpath;
-        rootpath << dbpath << "/esort." << time(0) << "." << rand() << "/";
+        rootpath << dbpath;
+	if ( dbpath[dbpath.size()-1] != '/' )
+	  rootpath << "/";
+	rootpath << "esort." << time(0) << "." << rand() << "/";
         _root = rootpath.str();
         
         create_directories( _root );
