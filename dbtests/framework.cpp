@@ -90,30 +90,23 @@ namespace mongo {
             return r;
         }
 
-        int Suite::run( int argc , char ** argv ){
-            list<string> torun;
-
-            for ( int i=1; i<argc; i++ ){
-
-                string s = argv[i];
-
-                if ( s == "-list" ){
-                    for ( map<string,Suite*>::iterator i=_suites->begin() ; i!=_suites->end(); i++ )
-                        cout << i->first << endl;
-                    return 0;
-                }
-
-                if ( s == "-debug" ){
-                    logLevel = 1;
-                    continue;
-                }
-
-                torun.push_back( s );
-                if ( _suites->find( s ) == _suites->end() ){
-                    cout << "invalid test [" << s << "]  use -list to see valid names" << endl;
+        int Suite::run( bool debug , bool list_suites, vector<string> suites ){
+            if ( list_suites ) {
+                for ( map<string,Suite*>::iterator i = _suites->begin() ; i != _suites->end(); i++ )
+                    cout << i->first << endl;
+                return 0;
+            }
+            if ( debug ) {
+                logLevel = 1;
+            }
+            for ( unsigned int i = 0; i < suites.size(); i++ ) {
+                if ( _suites->find( suites[i] ) == _suites->end() ) {
+                    cout << "invalid test [" << suites[i] << "], use --list to see valid names" << endl;
                     return -1;
                 }
             }
+
+            list<string> torun(suites.begin(), suites.end());
 
             if ( torun.size() == 0 )
                 for ( map<string,Suite*>::iterator i=_suites->begin() ; i!=_suites->end(); i++ )
