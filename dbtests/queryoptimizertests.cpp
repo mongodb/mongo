@@ -1097,7 +1097,9 @@ namespace QueryOptimizerTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "queryoptimizer" ){}
+        
+        void setupTests(){
             add< FieldRangeTests::Empty >();
             add< FieldRangeTests::Eq >();
             add< FieldRangeTests::DupEq >();
@@ -1158,10 +1160,7 @@ namespace QueryOptimizerTests {
             add< QueryPlanSetTests::EqualityThenIn >();
             add< QueryPlanSetTests::NotEqualityThenIn >();
         }
-    };
+    } myall;
     
 } // namespace QueryOptimizerTests
 
-UnitTest::TestPtr queryOptimizerTests() {
-    return UnitTest::createSuite< QueryOptimizerTests::All >();
-}

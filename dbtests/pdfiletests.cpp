@@ -303,7 +303,9 @@ namespace PdfileTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "pdfile" ){}
+        
+        void setupTests(){
             add< ScanCapped::Empty >();
             add< ScanCapped::EmptyLooped >();
             add< ScanCapped::EmptyMultiExtentLooped >();
@@ -319,10 +321,7 @@ namespace PdfileTests {
             add< ScanCapped::LastInExtent >();
             add< Insert::UpdateDate >();
         }
-    };
+    } myall;
 
 } // namespace PdfileTests
 
-UnitTest::TestPtr pdfileTests() {
-    return UnitTest::createSuite< PdfileTests::All >();
-}

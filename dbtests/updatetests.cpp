@@ -481,7 +481,9 @@ namespace UpdateTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "update" ) {
+        }
+        void setupTests(){
             add< ModId >();
             add< ModNonmodMix >();
             add< InvalidMod >();
@@ -530,10 +532,7 @@ namespace UpdateTests {
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
         }
-    };
+    } myall;
 
 } // namespace UpdateTests
 
-UnitTest::TestPtr updateTests() {
-    return UnitTest::createSuite< UpdateTests::All >();
-}

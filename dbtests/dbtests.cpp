@@ -22,8 +22,6 @@
 #include "../db/instance.h"
 #include "../util/file_allocator.h"
 
-#include <unittest/Registry.hpp>
-
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -34,13 +32,9 @@ using namespace std;
 
 namespace mongo {
     extern string dbpath;
-} // namespace mongo
-string dbpathSpec = "/tmp/unittest/";
-
-Suite::~Suite() {
-    DBDirectClient c;
-    c.dropDatabase( "unittests" );
 }
+
+string dbpathSpec = "/tmp/unittest/";
 
 void usage() {
     string instructions =
@@ -97,29 +91,10 @@ int main( int argc, char** argv ) {
     out() << "random seed: " << seed << endl;
 
     theFileAllocator().start();
-    
-    UnitTest::Registry tests;
 
-    // NOTE Starting JNI changes global state (for example, locale and FPU precision);
-    // make sure all tests run with this setup, by running javajs tests first.
-    tests.add( jsTests(), "js" );
-
-    tests.add( basicTests(), "basic" );
-    tests.add( btreeTests(), "btree" );
-    tests.add( cursorTests(), "cursor" );
-    tests.add( jsobjTests(), "jsobj" );
-    tests.add( jsonTests(), "json" );
-    tests.add( matcherTests(), "matcher" );
-    tests.add( namespaceTests(), "namespace" );
-    tests.add( pairingTests(), "pairing" );
-    tests.add( pdfileTests(), "pdfile" );
-    tests.add( queryTests(), "query" );
-    tests.add( queryOptimizerTests(), "queryoptimizer" );
-    tests.add( replTests(), "repl" );
-    tests.add( sockTests(), "sock" );
-    tests.add( updateTests(), "update" );
     
-    int ret = tests.run( argc, argv );
+
+    int ret = mongo::regression::Suite::run( argc, argv );
     
 #if !defined(_WIN32) && !defined(__sunos__)
     flock( lockFile, LOCK_UN );

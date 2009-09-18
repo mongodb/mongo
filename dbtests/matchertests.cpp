@@ -110,7 +110,10 @@ namespace MatcherTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "matcher" ){
+        }
+        
+        void setupTests(){
             add< Basic >();
             add< DoubleEqual >();
             add< MixedNumericEqual >();
@@ -118,10 +121,7 @@ namespace MatcherTests {
             add< MixedNumericIN >();
             add< Size >();
         }
-    };
+    } dball;
     
 } // namespace MatcherTests
 
-UnitTest::TestPtr matcherTests() {
-    return UnitTest::createSuite< MatcherTests::All >();
-}

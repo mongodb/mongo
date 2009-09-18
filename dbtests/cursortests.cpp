@@ -194,18 +194,16 @@ namespace CursorTests {
      
     } // namespace MultiBtreeCursorTests
     
-    class All : public ::Suite {
+    class All : public Suite {
     public:
-        All() {
+        All() : Suite( "cursor" ){}
+        
+        void setupTests(){
             add< IdSetTests::BasicSize >();
             add< IdSetTests::Upgrade >();
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();
         }
-    };
+    } myall;
 } // namespace CursorTests
-
-UnitTest::TestPtr cursorTests() {
-    return UnitTest::createSuite< CursorTests::All >();
-}

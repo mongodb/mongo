@@ -17,28 +17,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <unittest/UnitTest.hpp>
+#include "framework.h"
 
 using namespace mongo;
+using namespace mongo::regression;
 
-// Utility class to handle per suite cleanup
-class Suite : public UnitTest::Suite {
-public:
-    ~Suite();
-};
-
-UnitTest::TestPtr basicTests();
-UnitTest::TestPtr btreeTests();
-UnitTest::TestPtr cursorTests();
-UnitTest::TestPtr jsTests();
-UnitTest::TestPtr jsobjTests();
-UnitTest::TestPtr jsonTests();
-UnitTest::TestPtr matcherTests();
-UnitTest::TestPtr namespaceTests();
-UnitTest::TestPtr pairingTests();
-UnitTest::TestPtr pdfileTests();
-UnitTest::TestPtr queryTests();
-UnitTest::TestPtr queryOptimizerTests();
-UnitTest::TestPtr replTests();
-UnitTest::TestPtr sockTests();
-UnitTest::TestPtr updateTests();

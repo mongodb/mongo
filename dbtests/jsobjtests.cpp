@@ -902,7 +902,10 @@ namespace JsobjTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "jsobj" ){
+        }
+        
+        void setupTests(){
             add< BufBuilderBasic >();
             add< BSONElementBasic >();
             add< BSONObjTests::Create >();
@@ -970,10 +973,7 @@ namespace JsobjTests {
             add< external_sort::Basic3 >();
             add< external_sort::Big1 >();
         }
-    };
+    } myall;
     
 } // namespace JsobjTests
 
-UnitTest::TestPtr jsobjTests() {
-    return UnitTest::createSuite< JsobjTests::All >();
-}

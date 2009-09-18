@@ -149,6 +149,7 @@ namespace mongo {
         while ( c->more() ){
             BSONObj s = c->next();
             all.push_back( s["host"].valuestrsafe() );
+            // look at s["maxSize"] if exists
         }
         conn.done();
         

@@ -935,7 +935,10 @@ namespace ReplTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "repl" ){
+        }
+        
+        void setupTests(){
             add< LogBasic >();
             add< Idempotence::InsertTimestamp >();
             add< Idempotence::InsertAutoId >();
@@ -978,10 +981,7 @@ namespace ReplTests {
             add< MemIdsTest >();
             add< IdTrackerTest >();
         }
-    };
+    } myall;
     
 } // namespace ReplTests
 
-UnitTest::TestPtr replTests() {
-    return UnitTest::createSuite< ReplTests::All >();
-}

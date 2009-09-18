@@ -901,7 +901,10 @@ namespace JsonTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "json" ){
+        }
+        
+        void setupTests(){
             add< JsonStringTests::Empty >();
             add< JsonStringTests::SingleStringMember >();
             add< JsonStringTests::EscapedCharacters >();
@@ -973,10 +976,7 @@ namespace JsonTests {
             add< FromJsonTests::ObjectId >();
             add< FromJsonTests::ObjectId2 >();
         }
-    };
+    } myall;
 
 } // namespace JsonTests
 
-UnitTest::TestPtr jsonTests() {
-    return UnitTest::createSuite< JsonTests::All >();
-}
