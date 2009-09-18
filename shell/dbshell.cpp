@@ -74,7 +74,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
         return readline( prompt );
     if ( setjmp( jbuf ) ){
         gotInterrupted = 1;
-		sigrelse(SIGINT);
+        sigrelse(SIGINT);
         signal( SIGINT , quitNicely );
         return 0;
     }
@@ -148,7 +148,7 @@ string fixHost( string url , string host , string port ){
 bool isBalanced( string code ){
     int brackets = 0;
     int parens = 0;
-    
+
     for ( size_t i=0; i<code.size(); i++ ){
         switch( code[i] ){
         case '/':
@@ -163,15 +163,15 @@ bool isBalanced( string code ){
         case ')': parens--; break;
         case '"':
             i++;
-            while ( i < code.size() && code[i] != '"' ) i++; 
+            while ( i < code.size() && code[i] != '"' ) i++;
             break;
         case '\'':
             i++;
-            while ( i < code.size() && code[i] != '\'' ) i++; 
+            while ( i < code.size() && code[i] != '\'' ) i++;
             break;
         }
     }
-    
+
     return brackets == 0 && parens == 0;
 }
 
@@ -201,7 +201,7 @@ string finishCode( string code ){
             return "";
         if ( ! line )
             return "";
-        code += line; 
+        code += line;
     }
     return code;
 }
@@ -267,62 +267,58 @@ int _main(int argc, char* argv[]) {
 
     cmdline_options.add(shell_options).add(hidden_options);
 
-    if (argc >= 2) {
-        po::variables_map params;
+    po::variables_map params;
 
-        /* using the same style as db.cpp uses because eventually we're going
-         * to merge some of this stuff. */
-        int command_line_style = (((po::command_line_style::unix_style ^
-                                    po::command_line_style::allow_guessing) |
-                                   po::command_line_style::allow_long_disguise) ^
-                                  po::command_line_style::allow_sticky);
+    /* using the same style as db.cpp uses because eventually we're going
+     * to merge some of this stuff. */
+    int command_line_style = (((po::command_line_style::unix_style ^
+                                po::command_line_style::allow_guessing) |
+                               po::command_line_style::allow_long_disguise) ^
+                              po::command_line_style::allow_sticky);
 
-        try {
-            po::store(po::command_line_parser(argc, argv).options(cmdline_options).
-                      positional(positional_options).
-                      style(command_line_style).run(), params);
-            po::notify(params);
-        } catch (po::error &e) {
-            cout << "ERROR: " << e.what() << endl << endl;
-            show_help_text(argv[0], shell_options);
-            return mongo::EXIT_BADOPTIONS;
-        }
+    try {
+        po::store(po::command_line_parser(argc, argv).options(cmdline_options).
+                  positional(positional_options).
+                  style(command_line_style).run(), params);
+        po::notify(params);
+    } catch (po::error &e) {
+        cout << "ERROR: " << e.what() << endl << endl;
+        show_help_text(argv[0], shell_options);
+        return mongo::EXIT_BADOPTIONS;
+    }
 
-        if (params.count("shell")) {
-            runShell = true;
-        }
-        if (params.count("nodb")) {
-            nodb = true;
-        }
-        if (params.count("help")) {
-            show_help_text(argv[0], shell_options);
-            return mongo::EXIT_CLEAN;
-        }
-
-        if (params.count("files")) {
-            files = params["files"].as< vector<string> >();
-        }
-
-        /* This is a bit confusing, here are the rules:
-         *
-         * if nodb is set then all positional parameters are files
-         * otherwise the first positional parameter might be a dbaddress, but
-         * only if one of these conditions is met:
-         *   - it contains no '.' after the last appearance of '\' or '/'
-         *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
-        if (params.count("dbaddress")) {
-            string dbaddress = params["dbaddress"].as<string>();
-            if (nodb) {
-                files.insert(files.begin(), dbaddress);
+    if (params.count("shell")) {
+        runShell = true;
+    }
+    if (params.count("nodb")) {
+        nodb = true;
+    }
+    if (params.count("help")) {
+        show_help_text(argv[0], shell_options);
+        return mongo::EXIT_CLEAN;
+    }
+    if (params.count("files")) {
+        files = params["files"].as< vector<string> >();
+    }
+    /* This is a bit confusing, here are the rules:
+     *
+     * if nodb is set then all positional parameters are files
+     * otherwise the first positional parameter might be a dbaddress, but
+     * only if one of these conditions is met:
+     *   - it contains no '.' after the last appearance of '\' or '/'
+     *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
+    if (params.count("dbaddress")) {
+        string dbaddress = params["dbaddress"].as<string>();
+        if (nodb) {
+            files.insert(files.begin(), dbaddress);
+        } else {
+            string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
+            path p(dbaddress);
+            if (basename.find_first_of('.') == string::npos ||
+                (basename.find(".js", basename.size() - 3) == string::npos && !boost::filesystem::exists(p))) {
+                url = dbaddress;
             } else {
-                string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
-                path p(dbaddress);
-                if (basename.find_first_of('.') == string::npos ||
-                    (basename.find(".js", basename.size() - 3) == string::npos && !boost::filesystem::exists(p))) {
-                    url = dbaddress;
-                } else {
-                    files.insert(files.begin(), dbaddress);
-                }
+                files.insert(files.begin(), dbaddress);
             }
         }
     }
@@ -364,7 +360,7 @@ int _main(int argc, char* argv[]) {
 
         if ( files.size() > 1 )
             cout << "loading file: " << files[i] << endl;
-            
+
         if ( ! scope->execFile( files[i] , false , true , false ) ){
             cout << "failed to load: " << files[i] << endl;
             return -3;
@@ -389,11 +385,11 @@ int _main(int argc, char* argv[]) {
             inMultiLine = 0;
             gotInterrupted = 0;
             char * line = shellReadline( "> " );
-            
+
             if ( line )
                 while ( line[0] == ' ' )
                     line++;
-            
+
             if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ){
                 cout << "bye" << endl;
                 break;
@@ -405,7 +401,7 @@ int _main(int argc, char* argv[]) {
             }
             if ( code.size() == 0 )
                 continue;
-            
+
             code = finishCode( code );
             if ( gotInterrupted ){
                 cout << endl;
