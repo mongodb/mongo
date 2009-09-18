@@ -176,6 +176,9 @@ namespace mongo {
         }
 
         string demangleName( const type_info& typeinfo ){
+#ifdef _WIN32
+            return typeinfo.name();
+#else
             int status;
 
             char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
@@ -185,6 +188,7 @@ namespace mongo {
             string s = niceName;
             free(niceName);
             return s;
+#endif
         }
 
         void MyAsserts::printLocation(){
