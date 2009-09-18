@@ -24,6 +24,7 @@
 
 #ifndef _WIN32
 #include <cxxabi.h>
+#include <sys/file.h>
 #endif
 
 namespace po = boost::program_options;

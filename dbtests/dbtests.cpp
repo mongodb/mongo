@@ -19,10 +19,6 @@
 
 #include "stdafx.h"
 
-#if !defined(_WIN32)
-#include <sys/file.h>
-#endif
-
 #include "dbtests.h"
 
 int main( int argc, char** argv ) {
