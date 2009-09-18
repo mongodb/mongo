@@ -472,7 +472,14 @@ namespace mongo {
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
 
-                BSONObj shard = BSON( "host" << cmdObj["addshard"].valuestrsafe() );
+                BSONObj shard;
+                {
+                    BSONObjBuilder b;
+                    b.append( "host" , cmdObj["addshard"].valuestrsafe() );
+                    if ( cmdObj["maxSize"].isNumber() )
+                        b.append( cmdObj["maxSize"] );
+                    shard = b.obj();
+                }
 
                 BSONObj old = conn->findOne( "config.shards" , shard );
                 if ( ! old.isEmpty() ){
