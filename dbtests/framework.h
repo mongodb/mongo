@@ -42,18 +42,18 @@
 namespace mongo {
 
     namespace regression {
-        
+
         class Result;
 
         string demangleName( const type_info& typeinfo );
-        
+
         class TestCase {
         public:
             virtual ~TestCase(){}
             virtual void run() = 0;
             virtual string getName() = 0;
         };
-        
+
         template< class T >
         class TestHolderBase : public TestCase {
         public:
@@ -77,7 +77,7 @@ namespace mongo {
                 return new T();
             }
         };
-        
+
         template< class T , typename A  >
         class TestHolder1 : public TestHolderBase<T> {
         public:
@@ -94,42 +94,42 @@ namespace mongo {
                 registerSuite( name , this );
                 _ran = 0;
             }
-            
+
             virtual ~Suite() {
                 if ( _ran ){
                     DBDirectClient c;
                     c.dropDatabase( "unittests" );
                 }
             }
-            
+
             template<class T>
             void add(){
                 _tests.push_back( new TestHolder0<T>() );
             }
-            
+
             template<class T , typename A >
             void add( const A& a ){
                 _tests.push_back( new TestHolder1<T,A>(a) );
             }
-            
+
             Result * run();
-            
+
             static int run( int argc , char ** argv );
 
-            
+
         protected:
             virtual void setupTests() = 0;
-            
+
         private:
             string _name;
             list<TestCase*> _tests;
             bool _ran;
-            
+
             static map<string,Suite*> * _suites;
-        
+
             void registerSuite( string name , Suite * s );
         };
-        
+
         void assert_pass();
         void assert_fail( const char * exp , const char * file , unsigned line );
         void fail( const char * exp , const char * file , unsigned line );
@@ -138,12 +138,12 @@ namespace mongo {
         public:
             MyAsserts( const char * aexp , const char * bexp , const char * file , unsigned line )
                 : _aexp( aexp ) , _bexp( bexp ) , _file( file ) , _line( line ){
-                
+
             }
-            
+
             void ae( double a , double b );
             void ae( string a , string b );
-            
+
             void printLocation();
 
         private:
