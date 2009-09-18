@@ -1062,6 +1062,11 @@ assert( !eloc.isNull() );
         l << endl;
     }
 
+    void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+        idx.head = BtreeBucket::addHead(idx);
+        addExistingToIndex(ns.c_str(), d, idx, idxNo);
+    }
+
     /* add keys to indexes for a new record */
     void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
         BSONObj obj((const char *)buf);
@@ -1337,10 +1342,9 @@ assert( !eloc.isNull() );
             int idxNo = tableToIndex->nIndexes;
             IndexDetails& idx = tableToIndex->indexes[idxNo];
             idx.info = loc;
-            idx.head = BtreeBucket::addHead(idx);
-            tableToIndex->addingIndex(tabletoidxns.c_str(), idx);
+            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh
             try {
-                addExistingToIndex(tabletoidxns.c_str(), tableToIndex, idx, idxNo);
+                buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
                 // roll back this index
                 string name = idx.indexName();

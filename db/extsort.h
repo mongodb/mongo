@@ -61,7 +61,6 @@ namespace mongo {
             vector<FileIterator*> _files;
             vector< pair<Data,bool> > _stash;
         };
-
         
         BSONObjExternalSorter( const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
         ~BSONObjExternalSorter();
