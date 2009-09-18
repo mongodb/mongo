@@ -140,7 +140,7 @@ namespace mongo {
         b.append( "n" , n );
 
         BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
-        assert( ! o.isEmpty() );
+        uassert( "chunk is empty!" , ! o.isEmpty() );
         return Chunk(o);
     }
 

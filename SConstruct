@@ -813,7 +813,7 @@ removeIfInList( l , "pcrecpp" )
 
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
-testEnv.Prepend( LIBS=[ "mongotestfiles" , "unittest" ] )
+testEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 testEnv.Prepend( LIBPATH=["."] )
 
 
@@ -853,7 +853,7 @@ clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
-perftest = testEnv.Program( "perftest", "dbtests/perf/perftest.cpp" )
+perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
