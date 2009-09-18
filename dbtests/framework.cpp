@@ -16,12 +16,17 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/program_options.hpp>
+
 #include "../stdafx.h"
 #include "framework.h"
+#include "../util/file_allocator.h"
 
 #ifndef _WIN32
 #include <cxxabi.h>
 #endif
+
+namespace po = boost::program_options;
 
 namespace mongo {
 
@@ -90,15 +95,102 @@ namespace mongo {
             return r;
         }
 
-        int Suite::run( bool debug , bool list_suites, vector<string> suites ){
-            if ( list_suites ) {
+        void show_help_text(const char* name, po::options_description options) {
+            cout << "usage: " << name << " [options] [suite]..." << endl
+                 << options << "suite: run the specified test suite(s) only" << endl;
+        }
+
+        int Suite::run( int argc , char** argv , string default_dbpath ) {
+            unsigned long long seed = time( 0 );
+            string dbpathSpec;
+
+            po::options_description shell_options("options");
+            po::options_description hidden_options("Hidden options");
+            po::options_description cmdline_options("Command line options");
+            po::positional_options_description positional_options;
+
+            shell_options.add_options()
+                ("help,h", "show this usage information")
+                ("dbpath", po::value<string>(&dbpathSpec)->default_value(default_dbpath),
+                 "db data path for this test run. NOTE: the contents of this "
+                 "directory will be overwritten if it already exists")
+                ("debug", "run tests with verbose output")
+                ("list,l", "list available test suites")
+                ("seed", po::value<unsigned long long>(&seed), "random number seed")
+                ;
+
+            hidden_options.add_options()
+                ("suites", po::value< vector<string> >(), "test suites to run")
+                ;
+
+            positional_options.add("suites", -1);
+
+            cmdline_options.add(shell_options).add(hidden_options);
+
+            po::variables_map params;
+            int command_line_style = (((po::command_line_style::unix_style ^
+                                        po::command_line_style::allow_guessing) |
+                                       po::command_line_style::allow_long_disguise) ^
+                                      po::command_line_style::allow_sticky);
+
+            try {
+                po::store(po::command_line_parser(argc, argv).options(cmdline_options).
+                          positional(positional_options).
+                          style(command_line_style).run(), params);
+                po::notify(params);
+            } catch (po::error &e) {
+                cout << "ERROR: " << e.what() << endl << endl;
+                show_help_text(argv[0], shell_options);
+                return EXIT_BADOPTIONS;
+            }
+
+            if (params.count("help")) {
+                show_help_text(argv[0], shell_options);
+                return EXIT_CLEAN;
+            }
+
+            if (params.count("debug")) {
+                logLevel = 1;
+            }
+
+            if (params.count("list")) {
                 for ( map<string,Suite*>::iterator i = _suites->begin() ; i != _suites->end(); i++ )
                     cout << i->first << endl;
                 return 0;
             }
-            if ( debug ) {
-                logLevel = 1;
+
+            boost::filesystem::path p(dbpathSpec);
+            if (boost::filesystem::exists(p)) {
+                boost::filesystem::remove_all(p);
             }
+            boost::filesystem::create_directory(p);
+            string dbpathString = p.native_directory_string();
+            dbpath = dbpathString.c_str();
+
+            acquirePathLock();
+
+            srand( seed );
+            printGitVersion();
+            printSysInfo();
+            out() << "random seed: " << seed << endl;
+
+            theFileAllocator().start();
+
+            vector<string> suites;
+            if (params.count("suites")) {
+                suites = params["suites"].as< vector<string> >();
+            }
+            int ret = run(suites);
+
+#if !defined(_WIN32) && !defined(__sunos__)
+            flock( lockFile, LOCK_UN );
+#endif
+
+            dbexit( (ExitCode)ret ); // so everything shuts down cleanly
+            return ret;
+        }
+
+        int Suite::run( vector<string> suites ){
             for ( unsigned int i = 0; i < suites.size(); i++ ) {
                 if ( _suites->find( suites[i] ) == _suites->end() ) {
                     cout << "invalid test [" << suites[i] << "], use --list to see valid names" << endl;

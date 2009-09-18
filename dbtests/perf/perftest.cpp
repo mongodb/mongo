@@ -688,22 +688,8 @@ namespace Plan {
 } // namespace Plan
 
 int main( int argc, char **argv ) {
-    printGitVersion();
-    printSysInfo();
-
     logLevel = -1;
-
-    boost::filesystem::path p( "/data/db/perftest" );
-    if ( boost::filesystem::exists( p ) )
-        boost::filesystem::remove_all( p );
-    boost::filesystem::create_directory( p );
-    string dbpathString = p.native_directory_string();
-    dbpath = dbpathString.c_str();
-
-    theFileAllocator().start();
-
     client_ = new DBDirectClient();
 
-    //return Suite::run( argc, argv );     // MIKE FIX
-    return 0;
+    return Suite::run(argc, argv, "/data/db/perftest/");
 }

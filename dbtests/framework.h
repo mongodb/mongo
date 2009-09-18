@@ -114,8 +114,8 @@ namespace mongo {
 
             Result * run();
 
-            static int run( bool debug , bool list, vector<string> suites );
-            static int run( int argc , char ** argv );
+            static int run( vector<string> suites );
+            static int run( int argc , char ** argv , string default_dbpath );
 
 
         protected:
