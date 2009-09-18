@@ -161,10 +161,19 @@ namespace mongo {
             }
 
             boost::filesystem::path p(dbpathSpec);
-            if (boost::filesystem::exists(p)) {
-                boost::filesystem::remove_all(p);
-            }
-            boost::filesystem::create_directory(p);
+
+            /* try removing and recreating the directory
+             *
+             * we let this fail because some of the test machines have
+             * special setups for /tmp/unittest/ which we don't want
+             * to destroy. */
+            try {
+                if (boost::filesystem::exists(p)) {
+                    boost::filesystem::remove_all(p);
+                }
+                boost::filesystem::create_directory(p);
+            } catch (boost::filesystem::basic_filesystem_error<boost::filesystem::path> &e) {}
+
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
 
