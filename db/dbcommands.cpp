@@ -1250,6 +1250,8 @@ namespace mongo {
                 if ( n == 0 ){
                     n = map.size();
                     s->setObject( "$key" , key , true );
+
+                    uassert( "group() can't handle more than 10000 unique keys" , n < 10000 );
                 }
                 
                 s->setObject( "obj" , obj , true );
@@ -1258,7 +1260,7 @@ namespace mongo {
                     throw UserException( (string)"reduce invoke failed: " + s->getError() );
                 }
             }
-
+            
             if (!finalize.empty()){
                 s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
                 ScriptingFunction g = s->createFunction(
