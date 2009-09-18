@@ -25,20 +25,16 @@
 #include "../../db/queryoptimizer.h"
 #include "../../util/file_allocator.h"
 
-#include <unittest/Registry.hpp>
-#include <unittest/UnitTest.hpp>
+#include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
     extern string dbpath;
 } // namespace mongo
 
-// Very useful function, hacky way of getting at at.
-namespace UnitTest { namespace Private {
-    extern std::string demangledName(const std::type_info &typeinfo);
-} }
 
 using namespace mongo;
+using namespace mongo::regression;
 
 DBClientBase *client_;
 
@@ -46,7 +42,7 @@ DBClientBase *client_;
 // (ie allocation) work for another test.
 template< class T >
 string testDb( T *t = 0 ) {
-    string name = UnitTest::Private::demangledName( typeid( T ) );
+    string name = mongo::regression::demangleName( typeid( T ) );
     // Make filesystem safe.
     for( string::iterator i = name.begin(); i != name.end(); ++i )
         if ( *i == ':' )
@@ -83,11 +79,13 @@ public:
     }
 };
 
-class RunnerSuite : public UnitTest::Suite {
+class RunnerSuite : public Suite {
+public:
+    RunnerSuite( string name ) : Suite( name ){}
 protected:
     template< class T >
     void add() {
-        UnitTest::Suite::add< Runner< T > >();
+        Suite::add< Runner< T > >();
     }
 };
 
@@ -170,7 +168,9 @@ namespace Insert {
     
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite( "insert" ){}
+        
+        void setupTests(){
             add< IdIndex >();
             add< TwoIndex >();
             add< TenIndex >();
@@ -178,7 +178,7 @@ namespace Insert {
             add< OneIndexReverse >();
             add< OneIndexHighLow >();
         }
-    };
+    } all;
 } // namespace Insert
 
 namespace Update {
@@ -252,14 +252,15 @@ namespace Update {
 
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite( "update" ){}
+        void setupTests(){
             add< Smaller >();
             add< Bigger >();
             add< Inc >();
             add< Set >();
             add< SetGrow >();
         }
-    };
+    } all;
 } // namespace Update
 
 namespace BSON {
@@ -331,13 +332,14 @@ namespace BSON {
 
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite( "bson" ){}
+        void setupTests(){
             add< Parse >();
             add< ShopwikiParse >();
             add< Json >();
             add< ShopwikiJson >();
         }
-    };
+    } all;
     
 } // namespace BSON
 
@@ -400,13 +402,14 @@ namespace Index {
     
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite( "index" ){}
+        void setupTests(){
             add< Int >();
             add< ObjectId >();
             add< String >();
             add< Object >();
         }
-    };
+    } all;
     
 } // namespace Index
 
@@ -518,7 +521,7 @@ namespace QueryTests {
         string ns_;
         auto_ptr< DBClientCursor > c_;
     };
-
+    
     class GetMoreKeyMatchHelps {
     public:
         GetMoreKeyMatchHelps() : ns_( testNs( this ) ) {
@@ -537,8 +540,9 @@ namespace QueryTests {
     };
     
     class All : public RunnerSuite {
-    public:
-        All() {
+    public: 
+        All() : RunnerSuite( "query" ){}
+        void setupTests(){
             add< NoMatch >();
             add< NoMatchIndex >();
             add< NoMatchLong >();
@@ -548,7 +552,7 @@ namespace QueryTests {
             add< GetMoreIndex >();
             add< GetMoreKeyMatchHelps >();
         }
-    };    
+    } all;    
     
 } // namespace QueryTests
 
@@ -598,12 +602,13 @@ namespace Count {
     
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite( "count" ){}
+        void setupTests(){
             add< Count >();
             add< CountIndex >();
             add< CountSimpleIndex >();
         }
-    };    
+    } all;    
         
 } // namespace Count
 
@@ -672,19 +677,15 @@ namespace Plan {
     
     class All : public RunnerSuite {
     public:
-        All() {
+        All() : RunnerSuite("plan" ){}
+        void setupTests(){
             add< Hint >();
             add< Sort >();
             add< Query >();
         }
-    };    
+    } all; 
     
 } // namespace Plan
-
-template< class T >
-UnitTest::TestPtr suite() {
-    return UnitTest::createSuite< T >();
-}
 
 int main( int argc, char **argv ) {
     printGitVersion();
@@ -703,14 +704,6 @@ int main( int argc, char **argv ) {
     
     client_ = new DBDirectClient();
 
-    UnitTest::Registry tests;
-    tests.add( suite< Insert::All >(), "insert" );
-    tests.add( suite< Update::All >(), "update" );
-    tests.add( suite< BSON::All >(), "bson" );
-    tests.add( suite< Index::All >(), "index" );
-    tests.add( suite< QueryTests::All >(), "query" );
-    tests.add( suite< Count::All >(), "count" );
-    tests.add( suite< Plan::All >(), "plan" );
-
-    return tests.run( argc, argv );    
+    //return Suite::run( argc, argv );     // MIKE FIX 
+    return 0;
 }
