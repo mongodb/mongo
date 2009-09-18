@@ -172,7 +172,7 @@ namespace mongo {
                     boost::filesystem::remove_all(p);
                 }
                 boost::filesystem::create_directory(p);
-            } catch (boost::filesystem::basic_filesystem_error<boost::filesystem::path> &e) {}
+            } catch (std::runtime_error &e) {}
 
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
