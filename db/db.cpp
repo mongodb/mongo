@@ -562,7 +562,11 @@ int main(int argc, char* argv[], char *envp[] )
 
     UnitTest::runTests();
 
-    if (argc >= 2) {
+    if (argc == 1) {
+        cout << dbExecCommand << " --help for help and startup options" << endl;
+    }
+
+    {
         bool installService = false;
         bool removeService = false;
         bool startService = false;
@@ -826,9 +830,6 @@ int main(int argc, char* argv[], char *envp[] )
             dbexit( EXIT_CLEAN );
         }
 #endif
-    }
-    else {
-        cout << dbExecCommand << " --help for help and startup options" << endl;
     }
 
     initAndListen(cmdLine.port, appsrvPath);
