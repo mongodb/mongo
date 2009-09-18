@@ -471,7 +471,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.Size";
             client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
-            ASSERT( client().query( ns, QUERY( "a" << SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
+            ASSERT( client().query( ns, QUERY( "a" << mongo::SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
         }
     };
 
