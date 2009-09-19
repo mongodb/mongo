@@ -1202,7 +1202,7 @@ namespace mongo {
         
         bool group( string realdbname , auto_ptr<DBClientCursor> cursor , 
                     BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
-                    BSONObj initial , 
+                    BSONObj initial , string finalize ,
                     string& errmsg , BSONObjBuilder& result ){
 
 
@@ -1216,11 +1216,18 @@ namespace mongo {
             
             s->exec( "$reduce = " + reduceCode , "reduce setup" , false , true , true , 100 );
             s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
-            ScriptingFunction f = s->createFunction( "function(){ "
-                                                     "  if ( $arr[n] == null ){ next = {}; Object.extend( next , $key ); Object.extend( next , $initial ); $arr[n] = next; next = null; }"
-                                                     "  $reduce( obj , $arr[n] ); "
-                                                     "}" );
-            
+            ScriptingFunction f = s->createFunction(
+                "function(){ "
+                "  if ( $arr[n] == null ){ "
+                "    next = {}; "
+                "    Object.extend( next , $key ); "
+                "    Object.extend( next , $initial ); "
+                "    $arr[n] = next; "
+                "    next = null; "
+                "  } "
+                "  $reduce( obj , $arr[n] ); "
+                "}" );
+
             ScriptingFunction keyFunction = 0;
             if ( keyFunctionCode.size() ){
                 keyFunction = s->createFunction( keyFunctionCode.c_str() );
@@ -1243,6 +1250,8 @@ namespace mongo {
                 if ( n == 0 ){
                     n = map.size();
                     s->setObject( "$key" , key , true );
+
+                    uassert( "group() can't handle more than 10000 unique keys" , n < 10000 );
                 }
                 
                 s->setObject( "obj" , obj , true );
@@ -1250,6 +1259,19 @@ namespace mongo {
                 if ( s->invoke( f , BSONObj() , 0 , true ) ){
                     throw UserException( (string)"reduce invoke failed: " + s->getError() );
                 }
+            }
+            
+            if (!finalize.empty()){
+                s->exec( "$finalize = " + finalize , "finalize define" , false , true , true , 100 );
+                ScriptingFunction g = s->createFunction(
+                    "function(){ "
+                    "  for(var i=0; i < $arr.length; i++){ "
+                    "  var ret = $finalize($arr[i]); "
+                    "  if (ret !== undefined) "
+                    "    $arr[i] = ret; "
+                    "  } "
+                    "}" );
+                s->invoke( g , BSONObj() , 0 , true );
             }
             
             result.appendArray( "retval" , s->getObject( "$arr" ) );
@@ -1299,10 +1321,14 @@ namespace mongo {
             }
 
             BSONElement reduce = p["$reduce"];
+
+            string finalize;
+            if (p["finalize"].type())
+                finalize = p["finalize"].ascode();
             
             return group( realdbname , cursor , 
                           key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
-                          p["initial"].embeddedObjectUserCheck() , 
+                          p["initial"].embeddedObjectUserCheck() , finalize ,
                           errmsg , result );
         }
         

@@ -699,7 +699,10 @@ namespace NamespaceTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "namespace" ){
+        }
+
+        void setupTests(){
             add< IndexDetailsTests::Create >();
             add< IndexDetailsTests::GetKeysFromObjectSimple >();
             add< IndexDetailsTests::GetKeysFromObjectDotted >();
@@ -727,9 +730,6 @@ namespace NamespaceTests {
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
         }
-    };
+    } myall;
 } // namespace NamespaceTests
 
-UnitTest::TestPtr namespaceTests() {
-    return UnitTest::createSuite< NamespaceTests::All >();
-}

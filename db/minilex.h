@@ -19,6 +19,51 @@
 
 namespace mongo {
 
+#if defined(_WIN32)
+    
+} // namespace mongo
+
+#include <hash_map>
+using namespace stdext;
+
+namespace mongo {
+    
+    typedef const char * MyStr;
+    struct less_str {
+        bool operator()(const MyStr & x, const MyStr & y) const {
+            if ( strcmp(x, y) > 0)
+                return true;
+            
+            return false;
+        }
+    };
+    
+    typedef hash_map<const char*, int, hash_compare<const char *, less_str> > strhashmap;
+    
+#else
+    
+} // namespace mongo
+
+#include <ext/hash_map>
+
+namespace mongo {
+    
+    using namespace __gnu_cxx;
+
+    typedef const char * MyStr;
+    struct eq_str {
+        bool operator()(const MyStr & x, const MyStr & y) const {
+            if ( strcmp(x, y) == 0)
+                return true;
+            
+            return false;
+        }
+    };
+    
+    typedef hash_map<const char*, int, hash<const char *>, eq_str > strhashmap;
+    
+#endif
+    
     struct MiniLex {
         strhashmap reserved;
         bool ic[256]; // ic=Identifier Character

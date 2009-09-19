@@ -16,19 +16,6 @@ BUILDING
 
   http://www.mongodb.org/display/DOCS/Building
 
-  
-- Pre-requisite for 'test' binary, the MongoDB unit test suite:
-  This is not required for building or running the database
-  
-  To compile the unit tests, you need to install the unit test framework from:
-     http://unittest.red-bean.com/
-
-   $ cd ..
-   $ svn co http://svn.red-bean.com/unittest/trunk/ unittest
-   $ cd unittest
-   $ ./configure
-   $ make
-   $ sudo make install
 
 - Then use scons to build.
 
@@ -41,7 +28,7 @@ BUILDING
      $ scons
 
   To install
-     
+
      $ scons --prefix=/opt/mongo install
 
 RUNNING

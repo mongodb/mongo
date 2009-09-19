@@ -68,7 +68,7 @@ namespace QueryTests {
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
         }
     };
-    
+
     class CountBasic : public Base {
     public:
         void run() {
@@ -78,7 +78,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
         }
     };
-    
+
     class CountQuery : public Base {
     public:
         void run() {
@@ -88,9 +88,9 @@ namespace QueryTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
             string err;
             ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
-        }        
+        }
     };
-    
+
     class CountFields : public Base {
     public:
         void run() {
@@ -99,7 +99,7 @@ namespace QueryTests {
             BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
             string err;
             ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }        
+        }
     };
 
     class CountQueryFields : public Base {
@@ -111,20 +111,20 @@ namespace QueryTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
             string err;
             ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }        
+        }
     };
 
     class CountIndexedRegex : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );            
+            insert( "{\"a\":\"c\"}" );
             BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
             string err;
             ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
         }
     };
-    
+
     class ClientBase {
     public:
         // NOTE: Not bothering to backup the old error record.
@@ -149,7 +149,7 @@ namespace QueryTests {
         static DBDirectClient client_;
     };
     DBDirectClient ClientBase::client_;
-    
+
     class BoundedKey : public ClientBase {
     public:
         void run() {
@@ -163,7 +163,7 @@ namespace QueryTests {
             ASSERT( !client().findOne( ns, QUERY( "a" << limit ).hint( BSON( "a" << 1 ) ) ).isEmpty() );
         }
     };
-    
+
     class GetMore : public ClientBase {
     public:
         ~GetMore() {
@@ -183,7 +183,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
         }
     };
-    
+
     class ReturnOneOfManyAndTail : public ClientBase {
     public:
         ~ReturnOneOfManyAndTail() {
@@ -201,7 +201,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 1, c->next().getIntField( "a" ) );
         }
     };
-    
+
     class TailNotAtEnd : public ClientBase {
     public:
         ~TailNotAtEnd() {
@@ -225,7 +225,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 3, c->next().getIntField( "a" ) );
         }
     };
-    
+
     class EmptyTail : public ClientBase {
     public:
         ~EmptyTail() {
@@ -238,7 +238,7 @@ namespace QueryTests {
             ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
         }
     };
-    
+
     class TailableDelete : public ClientBase {
     public:
         ~TailableDelete() {
@@ -278,12 +278,12 @@ namespace QueryTests {
             ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
             ASSERT( !c->more() );
         }
-    };    
-    
+    };
+
     class OplogReplayMode : public ClientBase {
     public:
         ~OplogReplayMode() {
-            client().dropCollection( "unittests.querytests.OplogReplayMode" );            
+            client().dropCollection( "unittests.querytests.OplogReplayMode" );
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplayMode";
@@ -297,7 +297,7 @@ namespace QueryTests {
             ASSERT( !c->more() );
         }
     };
-    
+
     class BasicCount : public ClientBase {
     public:
         ~BasicCount() {
@@ -321,7 +321,7 @@ namespace QueryTests {
             ASSERT_EQUALS( c, client().count( "unittests.querytests.BasicCount", BSON( "a" << 4 ) ) );
         }
     };
-    
+
     class ArrayId : public ClientBase {
     public:
         ~ArrayId() {
@@ -339,7 +339,7 @@ namespace QueryTests {
     class UnderscoreNs : public ClientBase {
     public:
         ~UnderscoreNs() {
-            client().dropCollection( "unittests.querytests._UnderscoreNs" );            
+            client().dropCollection( "unittests.querytests._UnderscoreNs" );
         }
         void run() {
             const char *ns = "unittests.querytests._UnderscoreNs";
@@ -353,21 +353,21 @@ namespace QueryTests {
     class EmptyFieldSpec : public ClientBase {
     public:
         ~EmptyFieldSpec() {
-            client().dropCollection( "unittests.querytests.EmptyFieldSpec" );            
+            client().dropCollection( "unittests.querytests.EmptyFieldSpec" );
         }
         void run() {
             const char *ns = "unittests.querytests.EmptyFieldSpec";
             client().insert( ns, BSON( "a" << 1 ) );
             ASSERT( !client().findOne( ns, "" ).isEmpty() );
             BSONObj empty;
-            ASSERT( !client().findOne( ns, "", &empty ).isEmpty() );            
-        }        
+            ASSERT( !client().findOne( ns, "", &empty ).isEmpty() );
+        }
     };
 
     class MultiNe : public ClientBase {
     public:
         ~MultiNe() {
-            client().dropCollection( "unittests.querytests.Ne" );            
+            client().dropCollection( "unittests.querytests.Ne" );
         }
         void run() {
             const char *ns = "unittests.querytests.Ne";
@@ -375,19 +375,19 @@ namespace QueryTests {
             ASSERT( client().findOne( ns, fromjson( "{a:{$ne:1}}" ) ).isEmpty() );
             BSONObj spec = fromjson( "{a:{$ne:1,$ne:2}}" );
             ASSERT( client().findOne( ns, spec ).isEmpty() );
-        }                
+        }
     };
-    
+
     class EmbeddedNe : public ClientBase {
     public:
         ~EmbeddedNe() {
-            client().dropCollection( "unittests.querytests.NestedNe" );            
+            client().dropCollection( "unittests.querytests.NestedNe" );
         }
         void run() {
             const char *ns = "unittests.querytests.NestedNe";
             client().insert( ns, fromjson( "{a:[{b:1},{b:2}]}" ) );
             ASSERT( client().findOne( ns, fromjson( "{'a.b':{$ne:1}}" ) ).isEmpty() );
-        }                        
+        }
     };
 
     class AutoResetIndexCache : public ClientBase {
@@ -401,7 +401,7 @@ namespace QueryTests {
         void noIndex() const { ASSERT( client().findOne( idxNs(), BSON( "name" << NE << "_id_" ) ).isEmpty() ); }
         void checkIndex() {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
-            index();            
+            index();
         }
         void run() {
             client().dropDatabase( "unittests" );
@@ -448,7 +448,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 0U, client().count( "unittests.system.indexes", BSON( "ns" << ns << "name" << NE << "_id_" ) ) );
         }
     };
-    
+
     class SubobjectInArray : public ClientBase {
     public:
         ~SubobjectInArray() {
@@ -471,10 +471,10 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.Size";
             client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
-            ASSERT( client().query( ns, QUERY( "a" << SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
-        }        
+            ASSERT( client().query( ns, QUERY( "a" << mongo::SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
+        }
     };
-    
+
     class FullArray : public ClientBase {
     public:
         ~FullArray() {
@@ -486,7 +486,7 @@ namespace QueryTests {
             ASSERT( client().query( ns, Query( "{a:[1,2,3]}" ) )->more() );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             //ASSERT( client().query( ns, Query( "{a:[1,2,3]}" ).hint( BSON( "a" << 1 ) ) )->more() ); // TODO: turn this back on when SERVER-146 is fixed
-        }        
+        }
     };
 
     class InsideArray : public ClientBase {
@@ -500,14 +500,14 @@ namespace QueryTests {
             check( "$natural" );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             //check( "a" ); // TODO: turn this back on when SERVER-146 is fixed
-        }        
+        }
     private:
         void check( const string &hintField ) {
             const char *ns = "unittests.querytests.InsideArray";
-            ASSERT( client().query( ns, Query( "{a:[[1],2]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( client().query( ns, Query( "{a:[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( client().query( ns, Query( "{a:2}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( !client().query( ns, Query( "{a:1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{a:[[1],2]}" ).hint( BSON( hintField << 1 ) ) )->more() );
+            ASSERT( client().query( ns, Query( "{a:[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );
+            ASSERT( client().query( ns, Query( "{a:2}" ).hint( BSON( hintField << 1 ) ) )->more() );
+            ASSERT( !client().query( ns, Query( "{a:1}" ).hint( BSON( hintField << 1 ) ) )->more() );
         }
     };
 
@@ -522,9 +522,9 @@ namespace QueryTests {
             client().insert( ns, fromjson( "{'_id':2,a:[[1]]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             ASSERT_EQUALS( 2, client().query( ns, Query( "{a:[1]}" ).hint( BSON( "a" << 1 ) ) )->next().getIntField( "_id" ) );
-        }        
+        }
     };
-    
+
     class SubobjArr : public ClientBase {
     public:
         ~SubobjArr() {
@@ -536,12 +536,12 @@ namespace QueryTests {
             check( "$natural" );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
             check( "a" );
-        }        
+        }
     private:
         void check( const string &hintField ) {
             const char *ns = "unittests.querytests.SubobjArr";
-            ASSERT( client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );            
-            ASSERT( !client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );            
+            ASSERT( client().query( ns, Query( "{'a.b':1}" ).hint( BSON( hintField << 1 ) ) )->more() );
+            ASSERT( !client().query( ns, Query( "{'a.b':[1]}" ).hint( BSON( hintField << 1 ) ) )->more() );
         }
     };
 
@@ -557,7 +557,7 @@ namespace QueryTests {
             client().insert( ns, BSON( "a" << 1 << "b" << 2 ) );
             client().insert( ns, BSON( "a" << 2 << "b" << 1 ) );
             client().insert( ns, BSON( "a" << 2 << "b" << 2 ) );
-            
+
             ASSERT_EQUALS( 4, count( client().query( ns, BSONObj() ) ) );
             BSONObj hints[] = { BSONObj(), BSON( "a" << 1 << "b" << 1 ) };
             for( int i = 0; i < 2; ++i ) {
@@ -599,7 +599,7 @@ namespace QueryTests {
         static BSONObj empty_;
     };
     BSONObj MinMax::empty_;
-    
+
     class DirectLocking : public ClientBase {
     public:
         void run() {
@@ -615,7 +615,7 @@ namespace QueryTests {
     public:
         ~FastCountIn() {
             client().dropCollection( "unittests.querytests.FastCountIn" );
-        }        
+        }
         void run() {
             const char *ns = "unittests.querytests.FastCountIn";
             client().insert( ns, BSON( "i" << "a" ) );
@@ -639,7 +639,7 @@ namespace QueryTests {
             ASSERT_EQUALS( 2U, client().count( ns, BSON( "foo.bar" << "spam" ) ) );
         }
     };
-    
+
     class DifferentNumbers : public ClientBase {
     public:
         ~DifferentNumbers(){
@@ -651,7 +651,7 @@ namespace QueryTests {
                 BSONObj o = cursor->next();
                 cout << " foo " << o << endl;
             }
-            
+
         }
         void run() {
             const char *ns = "unittests.querytests.DifferentNumbers";
@@ -661,13 +661,13 @@ namespace QueryTests {
             { BSONObjBuilder b; b.append( "7" , "b" ); client().insert( ns , b.obj() ); }
             { BSONObjBuilder b; b.appendNull( "8" ); client().insert( ns , b.obj() ); }
             { BSONObjBuilder b; b.append( "7" , (double)3.7 ); client().insert( ns , b.obj() ); }
-            
+
             t(ns);
             client().ensureIndex( ns , BSON( "7" << 1 ) );
             t(ns);
         }
     };
-    
+
     class SymbolStringSame : public ClientBase {
     public:
         ~SymbolStringSame(){
@@ -679,9 +679,9 @@ namespace QueryTests {
         void run(){
             { BSONObjBuilder b; b.appendSymbol( "x" , "eliot" ); b.append( "z" , 17 ); client().insert( ns() , b.obj() ); }
             ASSERT_EQUALS( 17 , client().findOne( ns() , BSONObj() )["z"].number() );
-            { 
-                BSONObjBuilder b; 
-                b.appendSymbol( "x" , "eliot" ); 
+            {
+                BSONObjBuilder b;
+                b.appendSymbol( "x" , "eliot" );
                 ASSERT_EQUALS( 17 , client().findOne( ns() , b.obj() )["z"].number() );
             }
             ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
@@ -692,7 +692,10 @@ namespace QueryTests {
 
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "query" ) {
+        }
+
+        void setupTests(){
             add< CountBasic >();
             add< CountQuery >();
             add< CountFields >();
@@ -727,10 +730,7 @@ namespace QueryTests {
             add< DifferentNumbers >();
             add< SymbolStringSame >();
         }
-    };
-    
+    } myall;
+
 } // namespace QueryTests
 
-UnitTest::TestPtr queryTests() {
-    return UnitTest::createSuite< QueryTests::All >();
-}

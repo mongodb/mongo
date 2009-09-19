@@ -219,21 +219,21 @@ namespace mongo {
             reset();
         }
         int millis() {
-            return micros() / 1000;
+            return (long)(micros() / 1000);
         }
-        int micros() {
-            unsigned n = curTimeMicros();
-            return tdiff(old, n);
+        unsigned long long micros() {
+            unsigned long long n = curTimeMicros64();
+            return n - old;
         }
-        int micros(unsigned& n) { // returns cur time in addition to timer result
-            n = curTimeMicros();
-            return tdiff(old, n);
+        unsigned long long micros(unsigned long long & n) { // returns cur time in addition to timer result
+            n = curTimeMicros64();
+            return n - old;
         }
         void reset() {
-            old = curTimeMicros();
+            old = curTimeMicros64();
         }
     private:
-        unsigned old;
+        unsigned long long old;
     };
 
     /*

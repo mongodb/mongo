@@ -31,7 +31,7 @@ public:
 };
 
 #if defined(_WIN32) 
-
+#include <io.h>
 std::wstring toWideString(const char *s);
 
 class File : public FileInterface { 

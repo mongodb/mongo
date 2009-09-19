@@ -33,13 +33,11 @@ namespace SockTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "sock" ){}
+        void setupTests(){
             add< HostByName >();
         }
-    };
+    } myall;
     
 } // namespace SockTests
 
-UnitTest::TestPtr sockTests() {
-    return UnitTest::createSuite< SockTests::All >();
-}

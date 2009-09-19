@@ -49,13 +49,13 @@ namespace BasicTests {
     
     class All : public Suite {
     public:
-        All() {
+        All() : Suite( "basic" ){
+        }
+        
+        void setupTests(){
             add< Rarely >();
         }
-    };
+    } myall;
     
 } // namespace BasicTests
 
-UnitTest::TestPtr basicTests() {
-    return UnitTest::createSuite< BasicTests::All >();
-}
