@@ -220,6 +220,16 @@ void show_help_text(const char* name, po::options_description options) {
          << "unless --shell is specified" << endl;
 };
 
+bool fileExists( string file ){
+    try {
+        path p(file);
+        return boost::filesystem::exists( file );
+    }
+    catch (...){
+        return false;
+    }
+}
+
 int _main(int argc, char* argv[]) {
     setupSignals();
 
@@ -313,9 +323,8 @@ int _main(int argc, char* argv[]) {
             files.insert(files.begin(), dbaddress);
         } else {
             string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
-            path p(dbaddress);
             if (basename.find_first_of('.') == string::npos ||
-                (basename.find(".js", basename.size() - 3) == string::npos && !boost::filesystem::exists(p))) {
+                (basename.find(".js", basename.size() - 3) == string::npos && !fileExists(dbaddress))) {
                 url = dbaddress;
             } else {
                 files.insert(files.begin(), dbaddress);
