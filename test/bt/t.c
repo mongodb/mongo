@@ -20,6 +20,7 @@ int keys_cnt = 0;				/* Count of keys in this run */
 int leafsize = 0;				/* Leaf page size */
 int nodesize = 0;				/* Node page size */
 int runs = 0;					/* Runs: default forever */
+int singlethread = 0;				/* Single-threaded */
 int stats = 0;					/* Show statistics */
 
 const char *progname;
@@ -34,7 +35,7 @@ int
 main(int argc, char *argv[])
 {
 	u_int r;
-	int ch, defkeys, defleafsize, defnodesize, i, ret, run_cnt;
+	int ch, defkeys, defleafsize, defnodesize, defthread, i, ret, run_cnt;
 
 	ret = 0;
 	_malloc_options = "AJZ";
@@ -45,8 +46,8 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
-	defkeys = defleafsize = defnodesize = 1;
-	while ((ch = getopt(argc, argv, "c:dk:l:n:R:r:s")) != EOF)
+	defkeys = defleafsize = defnodesize = defthread = 1;
+	while ((ch = getopt(argc, argv, "c:dk:l:mn:R:r:Ss")) != EOF)
 		switch (ch) {
 		case 'c':
 			cachesize = atoi(optarg);
@@ -62,6 +63,9 @@ main(int argc, char *argv[])
 			defleafsize = 0;
 			leafsize = atoi(optarg);
 			break;
+		case 'm':
+			defthread = singlethread = 0;
+			break;
 		case 'n':
 			defnodesize = 0;
 			nodesize = atoi(optarg);
@@ -72,8 +76,12 @@ main(int argc, char *argv[])
 		case 'r':
 			runs = atoi(optarg);
 			break;
-		case 's':
+		case 'S':
 			stats = 1;
+			break;
+		case 's':
+			defthread = 0;
+			singlethread = 1;
 			break;
 		case '?':
 		default:
@@ -104,9 +112,13 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
+		if (defthread)
+			singlethread = rand () % 2;
+
 		(void)printf(
-		    "%s: %4d { -k %6d -l %6d -n %6d -R %#010lx }\n\t",
-		    progname, run_cnt, keys, leafsize, nodesize, r);
+		    "%s: %4d { %s -k %6d -l %6d -n %6d -R %#010lx }\n\t",
+		    progname, run_cnt,
+		    singlethread ? "-s" : "-m", keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		keys_cnt = 0;
@@ -149,7 +161,7 @@ load()
 	DB *db;
 	FILE *fp;
 
-	__wt_single_thread_setup(progname, &toc, &db);
+	__wt_simple_setup(progname, singlethread, &toc, &db);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(
@@ -182,10 +194,9 @@ load()
 	if (stats) {
 		(void)printf("\nLoad statistics:\n");
 		assert(db->stat_print(db, toc, stdout, 0) == 0);
-		(void)printf("\n");
 	}
 
-	__wt_single_thread_teardown(progname, toc, db);
+	__wt_simple_teardown(progname, toc, db);
 
 	return (0);
 }
@@ -203,7 +214,7 @@ read_check()
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
 
-	__wt_single_thread_setup(progname, &toc, &db);
+	__wt_simple_setup(progname, singlethread, &toc, &db);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(db->env, toc, (u_int32_t)cachesize) == 0);
@@ -279,10 +290,9 @@ read_check()
 	if (stats) {
 		(void)printf("\nVerify statistics:\n");
 		assert(db->stat_print(db, toc, stdout, 0) == 0);
-		(void)printf("\n");
 	}
 
-	__wt_single_thread_teardown(progname, toc, db);
+	__wt_simple_teardown(progname, toc, db);
 	return (0);
 
 }
@@ -350,7 +360,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: get [-ds] [-c cachesize] [-k keys] [-l leafsize] "
+	    "usage: get [-dmSs] [-c cachesize] [-k keys] [-l leafsize] "
 	    "[-n nodesize] [-R rand] [-r runs]\n");
 	exit(1);
 }
