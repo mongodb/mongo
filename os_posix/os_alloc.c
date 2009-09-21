@@ -37,34 +37,36 @@ program under a debugger.
 */
 
 #define	WT_MEMORY_FILE	"memory.out"
+
+static void __wt_debug_loadme(ENV *, const char *, void *);
+static void  __wt_open_mfp(ENV *);
+
 static FILE *__wt_mfp;
 static void *debug_addr;
 static int debug_count;
 
 static void
-__wt_debug_loadme(const char *msg, void *addr)
+__wt_debug_loadme(ENV *env, const char *msg, void *addr)
 {
 	fprintf(stderr, "memory: %lx: %s\n", (u_long)addr, msg);
 	if (debug_count > 0 && --debug_count == 0)
-		abort();
+		__wt_abort(env);
 }
 
-static int
+static void
 __wt_open_mfp(ENV *env)
 {
 	char *v;
 
 	if ((__wt_mfp = fopen(WT_MEMORY_FILE, "w")) == NULL) {
 		__wt_env_err(env, errno, "%s: open", WT_MEMORY_FILE);
-		return (1);
+		__wt_abort(env);
 	}
 
 	if (debug_addr == 0 && (v = getenv("WT_MEMORY_VALUE")) != NULL)
 		debug_addr = (void *)strtoul(v, NULL, 0);
 	if (debug_count == 0 && (v = getenv("WT_MEMORY_N")) != NULL)
 		debug_count = (int)atoi(v);
-		
-	return (0);
 }
 #endif
 
@@ -87,24 +89,23 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 	void *p;
 
 	/*
-	 * The ENV * argument isn't used, but routines at this layer
-	 * are always passed one.
-	 *
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	if ((p = calloc(number, (size_t)size)) == NULL)
+	if ((p = calloc(number, (size_t)size)) == NULL) {
+		__wt_env_err(env, errno, "memory allocation");
 		return (WT_ERROR);
+	}
+	*(void **)retp = p;
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
-	if (__wt_mfp == NULL && __wt_open_mfp(env) != 0)
-		return (WT_ERROR);
+	if (__wt_mfp == NULL)
+		__wt_open_mfp(env);
 	if (debug_addr == p)
-		__wt_debug_loadme("allocation", p);
+		__wt_debug_loadme(env, "allocation", p);
 	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
 #endif
 
-	*(void **)retp = p;
 	return (0);
 }
 
@@ -121,8 +122,8 @@ __wt_realloc(ENV *env,
 	p = *(void **)retp;
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
-	if (__wt_mfp == NULL && __wt_open_mfp(env) != 0)
-		return (WT_ERROR);
+	if (__wt_mfp == NULL)
+		__wt_open_mfp(env);
 #endif
 	/*
 	 * !!!
@@ -132,12 +133,14 @@ __wt_realloc(ENV *env,
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (p != NULL) {
 		if (debug_addr == p)
-			__wt_debug_loadme("free", p);
+			__wt_debug_loadme(env, "free", p);
 		fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
 	}
 #endif
-	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL)
+	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL) {
+		__wt_env_err(env, errno, "memory allocation");
 		return (WT_ERROR);
+	}
 
 	/*
 	 * Clear allocated memory -- see comment above concerning __wt_malloc
@@ -148,7 +151,7 @@ __wt_realloc(ENV *env,
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
-		__wt_debug_loadme("allocation", p);
+		__wt_debug_loadme(env, "allocation", p);
 	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
 #endif
 
@@ -196,12 +199,12 @@ __wt_free(ENV *env, void *p)
 	 */
 	WT_ASSERT(env, env == NULL || p != NULL);
 
-	if (p != NULL)			/* ANSI C free semantics */
-		free(p);
-
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
-		__wt_debug_loadme("free", p);
+		__wt_debug_loadme(env, "free", p);
 	fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
 #endif
+
+	if (p != NULL)			/* ANSI C free semantics */
+		free(p);
 }
