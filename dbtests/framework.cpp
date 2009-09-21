@@ -164,8 +164,7 @@ namespace mongo {
 
             /* remove the contents of the test directory if it exists. */
             if (boost::filesystem::exists(p)) {
-                /* TODO maybe should check for symlinks to regular files too */
-                if (boost::filesystem::is_regular_file(p)) {
+                if (!boost::filesystem::is_directory(p)) {
                     cout << "ERROR: path \"" << p << "\" is not a directory" << endl << endl;
                     show_help_text(argv[0], shell_options);
                     return EXIT_BADOPTIONS;
