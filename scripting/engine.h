@@ -34,6 +34,8 @@ namespace mongo {
 
         virtual int type( const char *field ) = 0;
 
+        void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
+
         virtual void setNumber( const char *field , double val ) = 0;
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;

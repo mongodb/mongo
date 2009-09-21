@@ -99,28 +99,9 @@ namespace mongo {
             errmsg += s->getError();
             return false;
         }
+        
+        s->append( result , "retval" , "return" );
 
-        int type = s->type("return");
-        if ( type == Object )
-            result.append("retval", s->getObject("return"));
-        else if ( type == Array )
-            result.appendArray("retval", s->getObject("return"));
-        else if ( type == NumberDouble )
-            result.append("retval", s->getNumber("return"));
-        else if ( type == String )
-            result.append("retval", s->getString("return").c_str());
-        else if ( type == Bool )
-            result.appendBool("retval", s->getBoolean("return"));
-        else if ( type == jstNULL || type == Undefined )
-            result.appendNull("retval");
-        else if ( type == Date )
-            result.appendDate( "retval" , (unsigned long long) s->getNumber( "return" ) );
-        else {
-            stringstream temp;
-            temp << "can't handle return type from db.eval:";
-            temp << type;
-            uassert( temp.str() , 0 );
-        }
         return true;
     }
 
