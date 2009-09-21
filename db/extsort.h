@@ -35,19 +35,20 @@ namespace mongo {
         
         typedef pair<BSONObj,DiskLoc> Data;
 
+    private:
         class FileIterator : boost::noncopyable {
         public:
-            FileIterator( string file , int bufSize );
+            FileIterator( string file );
             ~FileIterator();
             bool more();
             Data next();            
         private:
-            int _fd;
+            MemoryMappedFile _file;
             char * _buf;
-            long _read;
-            long _length;
+            char * _end;
         };
         
+    public:
         class Iterator {
         public:
             

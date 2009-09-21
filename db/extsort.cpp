@@ -33,13 +33,13 @@ namespace mongo {
         
         stringstream rootpath;
         rootpath << dbpath;
-	if ( dbpath[dbpath.size()-1] != '/' )
-	  rootpath << "/";
-	rootpath << "esort." << time(0) << "." << rand() << "/";
+        if ( dbpath[dbpath.size()-1] != '/' )
+            rootpath << "/";
+        rootpath << "esort." << time(0) << "." << rand() << "/";
         _root = rootpath.str();
         
         create_directories( _root );
-
+        
     }
     
     BSONObjExternalSorter::~BSONObjExternalSorter(){
@@ -123,7 +123,7 @@ namespace mongo {
 
     BSONObjExternalSorter::Iterator::Iterator( BSONObjExternalSorter * sorter ) : _cmp( sorter->_order ){
         for ( list<string>::iterator i=sorter->_files.begin(); i!=sorter->_files.end(); i++ ){
-            _files.push_back( new FileIterator( *i , sorter->_largestObject + 256 ) );
+            _files.push_back( new FileIterator( *i ) );
             _stash.push_back( pair<Data,bool>( Data( BSONObj() , DiskLoc() ) , false ) );
         }
     }
@@ -172,44 +172,25 @@ namespace mongo {
 
     // -----------------------------------
     
-    BSONObjExternalSorter::FileIterator::FileIterator( string file , int bufSize ) : _fd(0),_buf(0){
-        _fd = open( file.c_str() , O_RDONLY );
-        uassert( (string)"couldn't open file:" + file , _fd > 0 );
-
-        _buf = (char*)malloc( bufSize );
-        assert( _buf );
-
-        _length = file_size( file );
-        _read = 0;
+    BSONObjExternalSorter::FileIterator::FileIterator( string file ){
+        long length;
+        _buf = (char*)_file.map( file.c_str() , length );
+        assert( (unsigned long)length == file_size( file ) );
+        _end = _buf + length;
     }
     BSONObjExternalSorter::FileIterator::~FileIterator(){
-        if ( _fd ){
-            close( _fd );
-            _fd = 0;
-        }
-        
-        if ( _buf ){
-            free( _buf );
-            _buf = 0;
-        }
     }
     
     bool BSONObjExternalSorter::FileIterator::more(){
-        return _read < _length;
+        return _buf < _end;
     }
     
     pair<BSONObj,DiskLoc> BSONObjExternalSorter::FileIterator::next(){
-        assert( 4 == read( _fd , _buf , 4 ) );
-        int toread = ((int*)_buf)[0] - 4;
-        assert( toread == read( _fd , _buf + 4 , toread ) );
-        
         BSONObj o( _buf );
-        DiskLoc l;
-        assert( sizeof( DiskLoc ) == read( _fd , &l , sizeof( DiskLoc ) ) );
-        
-        _read += 4 + toread + sizeof( DiskLoc );
-
-        return Data( o , l );
+        _buf += o.objsize();
+        DiskLoc * l = (DiskLoc*)_buf;
+        _buf += 8;
+        return Data( o , *l );
     }
     
 }

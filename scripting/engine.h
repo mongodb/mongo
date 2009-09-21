@@ -34,6 +34,8 @@ namespace mongo {
 
         virtual int type( const char *field ) = 0;
 
+        void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
+
         virtual void setNumber( const char *field , double val ) = 0;
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;
@@ -57,6 +59,9 @@ namespace mongo {
         }
 
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;
+        virtual void execSetup( const string& code , const string& name = "setup" ){
+            exec( code , name , false , true , true , 0 );
+        }
         virtual bool execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 );
         
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
