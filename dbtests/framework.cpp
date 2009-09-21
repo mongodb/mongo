@@ -172,7 +172,7 @@ namespace mongo {
                 boost::filesystem::directory_iterator end_iter;
                 for (boost::filesystem::directory_iterator dir_iter(p);
                      dir_iter != end_iter; ++dir_iter) {
-                    boost::filesystem::remove_all(dir_iter->path());
+                    boost::filesystem::remove_all(*dir_iter);
                 }
             } else {
                 boost::filesystem::create_directory(p);
