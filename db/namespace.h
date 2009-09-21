@@ -226,6 +226,7 @@ namespace mongo {
                 isIdIndex();
         }
 
+        /* if set, when building index, if any duplicates, drop the duplicating object */
         bool dropDups() const {
             return info.obj().getBoolField( "dropDups" );
         }

@@ -70,6 +70,7 @@ namespace mongo {
             add( o , DiskLoc( a , b ) );
         }
 
+        /* call after adding values, and before fetching the iterator */
         void sort();
         
         Iterator iterator(){

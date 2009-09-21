@@ -16,12 +16,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 
 #include "extsort.h"
 #include "namespace.h"
 #include "../util/file.h"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
