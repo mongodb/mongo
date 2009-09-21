@@ -149,11 +149,17 @@ namespace mongo {
                                 ss << "couldn't open " << name << ' ' << errno;
                                 massert( ss.str(), fd <= 0 );
                             }
-                            
+
+#if defined(POSIX_FADV_DONTNEED)
+                            if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) { 
+                                log() << "warning: posix_fadvise fails " << name << ' ' << errno << endl;
+                            }
+#endif
+  
                             /* make sure the file is the full desired length */
                             off_t filelen = lseek(fd, 0, SEEK_END);
                             if ( filelen < size ) {
-                                massert( "failure mapping new file", filelen == 0 );
+                                massert( "failure creating new datafile", filelen == 0 );
                                 // Check for end of disk.
                                 massert( "Unable to allocate file of desired size",
                                         size - 1 == lseek(fd, size - 1, SEEK_SET) );
@@ -162,7 +168,7 @@ namespace mongo {
                                 lseek(fd, 0, SEEK_SET);
                                 log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                                 Timer t;
-                                long z = 8192;
+                                long z = 256 * 1024;
                                 char buf[z];
                                 memset(buf, 0, z);
                                 long left = size;
@@ -174,7 +180,7 @@ namespace mongo {
                                     massert( "write failed", z == write(fd, buf, z) );
                                     left -= z;
                                 }
-                                log() << "done allocating datafile " << name << ", size: " << size << ", took " << ((double)t.millis())/1000.0 << " secs" << endl;
+                                log() << "done allocating datafile " << name << ", size: " << size/1024/1024 << "MB, took " << ((double)t.millis())/1000.0 << " secs" << endl;
                             }                            
                             close( fd );
                             
