@@ -15,10 +15,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72EBEDD-342D-4371-8B0D-D7505902FA69}"
 	ProjectSection(SolutionItems) = preProject
 		..\dbtests\btreetests.cpp = ..\dbtests\btreetests.cpp
-		..\dbtests\matchertests.cpp = ..\dbtests\matchertests.cpp
-		..\dbtests\pairingtests.cpp = ..\dbtests\pairingtests.cpp
-		..\dbtests\pdfiletests.cpp = ..\dbtests\pdfiletests.cpp
-		..\dbtests\socktests.cpp = ..\dbtests\socktests.cpp
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"

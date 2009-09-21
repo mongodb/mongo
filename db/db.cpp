@@ -264,7 +264,7 @@ namespace mongo {
 
             Timer t;
             bool ok = p.call(send, response);
-            double tm = t.micros() + 1;
+            double tm = ((double) t.micros()) + 1;
             out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
                  ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
             if (  q+1 < Loops ) {
@@ -407,8 +407,9 @@ namespace mongo {
         repairDatabases();
         if ( shouldRepairDatabases )
             return;
-        /* this is for security on certain platforms */
-        srand(curTimeMicros() ^ startupSrandTimer.micros());
+
+        /* this is for security on certain platforms (nonce generation) */
+        srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
         listen(listenPort);
 
