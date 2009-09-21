@@ -1157,7 +1157,9 @@ namespace mongo {
             saveClientCursor_(),
             findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
             findingStartCursor_()
-        {}
+        {
+            uassert("bad skip value in query", ntoskip >= 0);
+        }
 
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
