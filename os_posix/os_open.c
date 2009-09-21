@@ -95,6 +95,7 @@ err:	if (fh != NULL) {
 int
 __wt_close(ENV *env, WT_FH *fh)
 {
+	WT_ASSERT(env, fh->refcnt > 0);
 	if (--fh->refcnt == 0) {
 		__wt_free(env, fh->name);
 		__wt_free(env, fh->stats);
