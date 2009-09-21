@@ -41,7 +41,7 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = __wt_single_thread_setup(progname, &toc, &db)) == 0) {
+	if ((ret = __wt_simple_setup(progname, 1, &toc, &db)) == 0) {
 		if ((ret = db->open(db, toc, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
 			    progname, *argv, wt_strerror(ret));
@@ -57,8 +57,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret =
-	    __wt_single_thread_teardown(progname, toc, db)) != 0 && ret == 0)
+	if ((tret = __wt_simple_teardown(progname, toc, db)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

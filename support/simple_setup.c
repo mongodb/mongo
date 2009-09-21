@@ -14,11 +14,12 @@ extern const char *progname;
 static ENV *env;
 
 /*
- * __wt_single_thread_setup --
- *	Standard setup for single-threaded applications.
+ * __wt_simple_setup --
+ *	Standard setup for simple applications.
  */
 int
-__wt_single_thread_setup(const char *progname, WT_TOC **tocp, DB **dbp)
+__wt_simple_setup(
+    const char *progname, int singlethread, WT_TOC **tocp, DB **dbp)
 {
 	DB *db;
 	WT_TOC *toc;
@@ -33,7 +34,8 @@ __wt_single_thread_setup(const char *progname, WT_TOC **tocp, DB **dbp)
 		    "%s: wt_env_create: %s\n", progname, wt_strerror(ret));
 		return (ret);
 	}
-	if ((ret = env->start(env, WT_SINGLE_THREADED)) != 0) {
+	if ((ret = env->start(
+	    env, singlethread ? WT_SINGLE_THREADED : 0)) != 0) {
 		fprintf(stderr,
 		    "%s: Env.start: %s\n", progname, wt_strerror(ret));
 		goto err;
@@ -53,16 +55,16 @@ __wt_single_thread_setup(const char *progname, WT_TOC **tocp, DB **dbp)
 	*dbp = db;
 	return (EXIT_SUCCESS);
 
-err:	(void)__wt_single_thread_teardown(progname, toc, db);
+err:	(void)__wt_simple_teardown(progname, toc, db);
 	return (EXIT_FAILURE);
 }
 
 /*
- * __wt_single_thread_teardown --
- *	Standard teardown for single-threaded applications.
+ * __wt_simple_teardown --
+ *	Standard teardown for simple applications.
  */
 int
-__wt_single_thread_teardown(const char *progname, WT_TOC *toc, DB *db)
+__wt_simple_teardown(const char *progname, WT_TOC *toc, DB *db)
 {
 	int ret, tret;
 

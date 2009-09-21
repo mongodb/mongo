@@ -80,7 +80,7 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	if ((ret = __wt_single_thread_setup(progname, &toc, &db)) == 0) {
+	if ((ret = __wt_simple_setup(progname, 1, &toc, &db)) == 0) {
 		if (config_process(db, toc, config_list) != 0)
 			goto err;
 
@@ -103,8 +103,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret =
-	    __wt_single_thread_teardown(progname, toc, db)) != 0 && ret == 0)
+	if ((tret = __wt_simple_teardown(progname, toc, db)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
