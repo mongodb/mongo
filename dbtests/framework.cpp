@@ -162,17 +162,22 @@ namespace mongo {
 
             boost::filesystem::path p(dbpathSpec);
 
-            /* try removing and recreating the directory
-             *
-             * we let this fail because some of the test machines have
-             * special setups for /tmp/unittest/ which we don't want
-             * to destroy. */
-            try {
-                if (boost::filesystem::exists(p)) {
-                    boost::filesystem::remove_all(p);
+            /* remove the contents of the test directory if it exists. */
+            if (boost::filesystem::exists(p)) {
+                /* TODO maybe should check for symlinks to regular files too */
+                if (boost::filesystem::is_regular_file(p)) {
+                    cout << "ERROR: path \"" << p << "\" is not a directory" << endl << endl;
+                    show_help_text(argv[0], shell_options);
+                    return EXIT_BADOPTIONS;
                 }
+                boost::filesystem::directory_iterator end_iter;
+                for (boost::filesystem::directory_iterator dir_iter(p);
+                     dir_iter != end_iter; ++dir_iter) {
+                    boost::filesystem::remove_all(dir_iter->path());
+                }
+            } else {
                 boost::filesystem::create_directory(p);
-            } catch (std::runtime_error &e) {}
+            }
 
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();

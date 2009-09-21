@@ -691,5 +691,5 @@ int main( int argc, char **argv ) {
     logLevel = -1;
     client_ = new DBDirectClient();
 
-    return Suite::run(argc, argv, "/data/db/perftest/");
+    return Suite::run(argc, argv, "/data/db/perftest");
 }
