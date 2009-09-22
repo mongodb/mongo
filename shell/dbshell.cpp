@@ -210,6 +210,7 @@ string finishCode( string code ){
 namespace po = boost::program_options;
 
 void show_help_text(const char* name, po::options_description options) {
+    cout << "MongoDB shell version: " << mongo::versionString << endl;
     cout << "usage: " << name << " [options] [db address] [file names (ending in .js)]" << endl
          << "db address can be:" << endl
          << "  foo                   foo database on local machine" << endl
@@ -265,6 +266,7 @@ int _main(int argc, char* argv[]) {
         ("username,u", po::value<string>(&username), "username for authentication")
         ("password,p", po::value<string>(&password), "password for authentication")
         ("help,h", "show this usage information")
+        ("version", "show version information")
         ;
 
     hidden_options.add_options()
@@ -310,6 +312,11 @@ int _main(int argc, char* argv[]) {
     if (params.count("files")) {
         files = params["files"].as< vector<string> >();
     }
+    if (params.count("version")) {
+        cout << "MongoDB shell version: " << mongo::versionString << endl;
+        return mongo::EXIT_CLEAN;
+    }
+
     /* This is a bit confusing, here are the rules:
      *
      * if nodb is set then all positional parameters are files
