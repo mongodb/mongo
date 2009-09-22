@@ -317,7 +317,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
         //if( database->profile )
@@ -345,7 +345,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
         int flags = d.pullInt();
@@ -463,7 +463,7 @@ namespace mongo {
         DbMessage d(m);
 		const char *ns = d.getns();
 		assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
 		setClient(ns);
         Top::setWrite();
 		ss << ns;

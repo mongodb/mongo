@@ -1548,7 +1548,6 @@ namespace mongo {
             try {
                 int nApplied = 0;
                 s = _replMain(sources, nApplied);
-                int sorig = s;
                 if( s == 1 ) { 
                     if( nApplied == 0 ) s = 2;
                     else if( nApplied > 100 ) { 

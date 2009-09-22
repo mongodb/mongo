@@ -114,8 +114,10 @@ namespace mongo {
 		if( !slave ) 
 			return true;
 
-        if ( !client )
+        if ( !client ) {
+            assert( database );
             client = database->name.c_str();
+        }
 
         if ( replAllDead )
             return strcmp( client, "local" ) == 0;
