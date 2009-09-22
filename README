@@ -65,7 +65,7 @@ COMPILING
 
 
 --- ubuntu ---
- scons libboost-dev libpcre++-dev libmozjs-dev
+ scons libboost-dev libpcre++-dev xulrunner-1.9.1-dev
 
 --- FreeBSD ---
 
