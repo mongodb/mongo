@@ -141,7 +141,7 @@ namespace mongo {
                 
                 cursor = db.query( resultColl, Query().sort( BSON( "key" << 1 ) ) );
                 while ( cursor->more() ){
-                    BSONObj o = cursor->next();
+                    BSONObj o = cursor->next().getOwned();
 
                     if ( o.woSortOrder( prev , sortKey ) == 0 ){
                         all.push_back( o );
