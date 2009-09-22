@@ -432,7 +432,7 @@ int _main(int argc, char* argv[]) {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
-
+                
                 if ( cmd.find( "\"" ) == string::npos ){
                     scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
                     if ( scope->getBoolean( "__iscmd__" )  ){
@@ -444,8 +444,13 @@ int _main(int argc, char* argv[]) {
             }
 
             if ( ! wascmd ){
-                scope->exec( code.c_str() , "(shell)" , false , true , false );
-                scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                try {
+                    scope->exec( code.c_str() , "(shell)" , false , true , false );
+                    scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                }
+                catch ( std::exception& e ){
+                    cout << "error:" << e.what() << endl;
+                }
             }
 
 
