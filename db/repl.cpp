@@ -119,7 +119,7 @@ namespace mongo {
         auto_ptr<DBClientConnection> conn( newClientConnection() );
         string errmsg;
         if ( !conn->connect(arbHost.c_str(), errmsg) ) {
-            log() << "pull:   cantconn arbiter " << errmsg << endl;
+            log() << "repl:   cantconn arbiter " << errmsg << endl;
             setMasterLocked(State_CantArb, "can't connect to arb");
             return;
         }
@@ -1045,14 +1045,14 @@ namespace mongo {
     }
     
     /* note: not yet in mutex at this point. */
-    bool ReplSource::sync_pullOpLog() {
+    bool ReplSource::sync_pullOpLog(int& nApplied) {
         string ns = string("local.oplog.$") + sourceName();
         log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
         bool tailing = true;
         DBClientCursor *c = cursor.get();
         if ( c && c->isDead() ) {
-            log() << "pull:   old cursor isDead, initiating a new one\n";
+            log() << "repl:   old cursor isDead, initiating a new one\n";
             c = 0;
         }
 
@@ -1111,9 +1111,8 @@ namespace mongo {
         }
 
         if ( c == 0 ) {
-            problem() << "pull:   dbclient::query returns null (conn closed?)" << endl;
+            problem() << "repl:   dbclient::query returns null (conn closed?)" << endl;
             resetConnection();
-            sleepsecs(3);
             return false;
         }
 
@@ -1133,7 +1132,7 @@ namespace mongo {
             if ( tailing ) {
                 log(2) << "repl: tailing & no new activity\n";
             } else {
-                log() << "pull:   " << ns << " oplog is empty\n";
+                log() << "repl:   " << ns << " oplog is empty\n";
             }
             {
                 dblock lk;
@@ -1146,7 +1145,6 @@ namespace mongo {
                 }
                 save();            
             }
-            sleepsecs(3);
             return true;
         }
 
@@ -1156,12 +1154,12 @@ namespace mongo {
         if ( ts.type() != Date ) {
             string err = op.getStringField("$err");
             if ( !err.empty() ) {
-                problem() << "pull: $err reading remote oplog: " + err << '\n';
+                problem() << "repl: $err reading remote oplog: " + err << '\n';
                 massert( "got $err reading remote oplog", false );
             }
             else {
-                problem() << "pull: bad object read from remote oplog: " << op.toString() << '\n';
-                massert("pull: bad object read from remote oplog", false);
+                problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
+                massert("repl: bad object read from remote oplog", false);
             }
         }
         
@@ -1182,7 +1180,7 @@ namespace mongo {
         log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
         if ( tailing || initial ) {
             if ( initial )
-                log(1) << "pull:   initial run\n";
+                log(1) << "repl:   initial run\n";
             else
                 assert( syncedTo < nextOpTime );
             sync_pullOpLog_applyOperation(op, &localLogTail);
@@ -1190,16 +1188,16 @@ namespace mongo {
         }
         else if ( nextOpTime != syncedTo ) {
             Nullstream& l = log();
-            l << "pull:   nextOpTime " << nextOpTime.toStringLong() << ' ';
+            l << "repl:   nextOpTime " << nextOpTime.toStringLong() << ' ';
             if ( nextOpTime < syncedTo )
                 l << "<??";
             else
                 l << ">";
 
             l << " syncedTo " << syncedTo.toStringLong() << '\n';
-            log() << "pull:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
-            log() << "pull:   tailing: " << tailing << '\n';
-            log() << "pull:   data too stale, halting replication" << endl;
+            log() << "repl:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
+            log() << "repl:   tailing: " << tailing << '\n';
+            log() << "repl:   data too stale, halting replication" << endl;
             replInfo = replAllDead = "data too stale halted replication";
             assert( syncedTo < nextOpTime );
             throw SyncException();
@@ -1225,7 +1223,8 @@ namespace mongo {
                     }
                     syncedTo = nextOpTime;
                     save(); // note how far we are synced up to now
-                    log() << "pull:   applied " << n << " operations" << endl;
+                    log() << "repl:   applied " << n << " operations" << endl;
+                    nApplied = n;
                     log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
                 }
@@ -1236,7 +1235,7 @@ namespace mongo {
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
 					save();
-                    log() << "pull:   applied " << n << " operations" << endl;
+                    log() << "repl:   applied " << n << " operations" << endl;
                     log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
 					saveLast = time(0);
 					n = 0;
@@ -1305,7 +1304,7 @@ namespace mongo {
             ReplInfo r("trying to connect to sync source");
             if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
                 resetConnection();
-                log() << "pull:   cantconn " << errmsg << endl;
+                log() << "repl: " << errmsg << endl;
                 return false;
             }
         }
@@ -1315,15 +1314,15 @@ namespace mongo {
     /* note: not yet in mutex at this point.
        returns true if everything happy.  return false if you want to reconnect.
     */
-    bool ReplSource::sync() {
+    bool ReplSource::sync(int& nApplied) {
         ReplInfo r("sync");
         if ( !cmdLine.quiet )
-            log() << "pull: " << sourceName() << '@' << hostName << endl;
+            log() << "repl: " << sourceName() << '@' << hostName << endl;
         nClonedThisPass = 0;
 
         // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
         if ( (string("localhost") == hostName || string("127.0.0.1") == hostName) && cmdLine.port == CmdLine::DefaultDBPort ) {
-            log() << "pull:   can't sync from self (localhost). sources configuration may be wrong." << endl;
+            log() << "repl:   can't sync from self (localhost). sources configuration may be wrong." << endl;
             sleepsecs(5);
             return false;
         }
@@ -1334,8 +1333,7 @@ namespace mongo {
                 replPair->arbitrate();
             }
             {
-                ReplInfo r("can't connect to sync source, sleeping");
-                sleepsecs(1);
+                ReplInfo r("can't connect to sync source");
             }
             return false;            
         }
@@ -1354,7 +1352,7 @@ namespace mongo {
         	BSONObj o = conn->findOne("admin.$cmd", opTimeQuery);
         	BSONElement e = o.findElement("optime");
         	if( e.eoo() ) {
-        		log() << "pull:   failed to get cur optime from master" << endl;
+        		log() << "repl:   failed to get cur optime from master" << endl;
         		log() << "        " << o.toString() << endl;
         		return false;
         	}
@@ -1362,7 +1360,7 @@ namespace mongo {
         	OpTime serverCurTime;
         	serverCurTime.asDate() = e.date();
         */
-        return sync_pullOpLog();
+        return sync_pullOpLog(nApplied);
     }
 
     /* -- Logging of operations -------------------------------------*/
@@ -1467,8 +1465,11 @@ namespace mongo {
     _ reuse that cursor when we can
     */
 
-    /* returns: # of seconds to sleep before next pass */
-    int _replMain(ReplSource::SourceVector& sources) {
+    /* returns: # of seconds to sleep before next pass 
+                0 = no sleep recommended
+                1 = special sentinel indicating adaptive sleep recommended
+    */
+    int _replMain(ReplSource::SourceVector& sources, int& nApplied) {
         {
             ReplInfo r("replMain load sources");
             dblock lk;
@@ -1482,38 +1483,43 @@ namespace mongo {
             return 20;
         }
 
-        bool sleep = true;
+        int sleepAdvice = 1;
         for ( ReplSource::SourceVector::iterator i = sources.begin(); i != sources.end(); i++ ) {
             ReplSource *s = i->get();
             bool ok = false;
             try {
-                ok = s->sync();
+                ok = s->sync(nApplied);
                 bool moreToSync = s->haveMoreDbsToSync();
-                sleep = !moreToSync;
+                if( !ok ) { 
+                    sleepAdvice = 3;
+                }
+                else if( moreToSync ) {
+                    sleepAdvice = 0;
+                }
                 if ( ok && !moreToSync /*&& !s->syncedTo.isNull()*/ ) {
                     pairSync->setInitialSyncCompletedLocking();
                 }
             }
             catch ( const SyncException& ) {
-                log() << "caught SyncException, sleeping 10 secs" << endl;
+                log() << "caught SyncException" << endl;
                 return 10;
             }
             catch ( AssertionException& e ) {
                 if ( e.severe() ) {
-                    log() << "replMain AssertionException " << e.what() << ", sleeping 1 minutes" << endl;
+                    log() << "replMain AssertionException " << e.what() << endl;
                     return 60;
                 }
                 else {
-                    log() << "replMain AssertionException " << e.what() << '\n';
+                    log() << "repl: AssertionException " << e.what() << '\n';
                 }
                 replInfo = "replMain caught AssertionException";
             }
             catch ( const DBException& e ) {
-                log() << "replMain DBException " << e.what() << endl;
+                log() << "repl: DBException " << e.what() << endl;
                 replInfo = "replMain caught DBException";
             }
             catch ( const std::exception &e ) {
-                log() << "replMain std::exception " << e.what() << endl;
+                log() << "repl: std::exception " << e.what() << endl;
                 replInfo = "replMain caught std::exception";                
             }
             catch ( ... ) { 
@@ -1523,10 +1529,7 @@ namespace mongo {
             if ( !ok )
                 s->resetConnection();
         }
-        if ( sleep ) {
-            return 3;
-        }
-        return 0;
+        return sleepAdvice;
     }
 
     void replMain() {
@@ -1543,9 +1546,20 @@ namespace mongo {
                 syncing++;
             }
             try {
-                s = _replMain(sources);
+                int nApplied = 0;
+                s = _replMain(sources, nApplied);
+                int sorig = s;
+                if( s == 1 ) { 
+                    if( nApplied == 0 ) s = 2;
+                    else if( nApplied > 100 ) { 
+                        // sleep very little - just enought that we aren't truly hammering master
+                        sleepmillis(75);
+                        s = 0;
+                    }
+                }
             } catch (...) {
-                out() << "TEMP: caught exception in _replMain" << endl;
+                out() << "caught exception in _replMain" << endl;
+                s = 4;
             }
             {
                 dblock lk;
@@ -1554,11 +1568,11 @@ namespace mongo {
             }
             if ( s ) {
                 stringstream ss;
-                ss << "replMain: sleep " << s << " before next pass";
+                ss << "repl: sleep " << s << "sec before next pass";
                 string msg = ss.str();
+                log() << msg << endl;
                 ReplInfo r(msg.c_str());
                 sleepsecs(s);
-                log() << msg << endl;
             }
         }
     }

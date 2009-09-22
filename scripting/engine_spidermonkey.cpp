@@ -831,7 +831,7 @@ namespace mongo {
             uassert( "JS_NewRuntime failed" , _runtime );
             
             if ( ! utf8Ok() ){
-                cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
+                log() << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
         }
 
