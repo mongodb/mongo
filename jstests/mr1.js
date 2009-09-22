@@ -25,8 +25,18 @@ r = function( key , values ){
 };
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
-printjson( res );
+assert.eq( 4 , res.numObjects , "A" );
+x = db[res.result];
 
-print( Array.tojson( db[res.result].find().toArray() , "\n" ) );
+assert.eq( 3 , x.find().count() , "B" );
+z = {};
+x.find().forEach( function(a){ z[a.key] = a.value.count; } );
+assert.eq( 3 , z.keySet().length , "C" );
+assert.eq( 2 , z.a , "D" );
+assert.eq( 3 , z.b , "E" );
+assert.eq( 3 , z.c , "F" );
+
+x.drop();
+
 
 
