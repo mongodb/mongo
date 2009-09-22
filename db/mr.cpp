@@ -35,7 +35,7 @@ namespace mongo {
         string tempCollectionName( string coll ){
             static int inc = 1;
             stringstream ss;
-            ss << database->name << ".mr." << coll << "." << time(0) << inc++;
+            ss << database->name << ".mr." << coll << "." << time(0) << "." << inc++;
             return ss.str();
         }
         
@@ -86,7 +86,8 @@ namespace mongo {
         }
         
         bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            
+            Timer t;
+
             string ns = database->name + '.' + cmdObj.firstElement().valuestr();
             log(1) << "mr ns: " << ns << endl;
             
@@ -104,15 +105,9 @@ namespace mongo {
             try {
                 s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"];" , "tempcoll1" );
                 
-                s->execSetup( "$num = 0;"
-                              "emit = function( k , v ){"
-                              "  $num = $num + 1;"
-                              "  if ( $num % 100 > 0 ){"
-                              "      tempcoll.insert( { key : k , value : v } );"
-                              "  }"
-                              "  else { "
-                              "     throw 12;"
-                              "  }"
+                s->execSetup( "emit = function( k , v ){"
+                              "  $lastKey = k;"
+                              "  tempcoll.insert( { key : k , value : v } );"
                               "}" , "emit1" );
                 
                 ScriptingFunction mapFunction = s->createFunction( cmdObj["map"].ascode().c_str() );
@@ -130,7 +125,13 @@ namespace mongo {
                         throw UserException( (string)"map invoke failed: " + s->getError() );
                     
                     num++;
+                    if ( num % 100 == 0 ){
+                        //assert( 0 );
+                    }
                 }
+
+
+                result.append( "timeMillis.emit" , t.millis() );
 
                 // final reduce
                 
@@ -164,6 +165,7 @@ namespace mongo {
             
             result.append( "result" , resultCollShort );
             result.append( "numObjects" , num );
+            result.append( "timeMillis" , t.millis() );
             
             return false;
         }

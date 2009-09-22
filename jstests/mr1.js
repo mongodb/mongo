@@ -39,4 +39,17 @@ assert.eq( 3 , z.c , "F" );
 x.drop();
 
 
+for ( i=5; i<1000; i++ ){
+    t.save( { x : i , tags : [ "b" , "d" ] } );
+}
+
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+printjson( res );
+assert.eq( 999 , res.numObjects , "Z1" );
+x = db[res.result];
+
+assert.eq( 4 , x.find().count() , "Z2" );
+assert.eq( "a,b,c,d" , x.distinct( "key" ) , "Z3" );
+
+x.find().forEach( printjson );
 
