@@ -1016,7 +1016,6 @@ assert( !eloc.isNull() );
             }
             assert( !newRecordLoc.isNull() );
             try {
-log() << *i << endl;
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
                                          *i, order, dupsAllowed, idx);
             }
