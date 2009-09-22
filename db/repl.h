@@ -76,7 +76,7 @@ namespace mongo {
     */
     class ReplSource {
         bool resync(string db);
-        bool sync_pullOpLog();
+        bool sync_pullOpLog(int& nApplied);
         void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
@@ -126,7 +126,7 @@ namespace mongo {
         typedef vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(SourceVector&);
         explicit ReplSource(BSONObj);
-        bool sync();
+        bool sync(int& nApplied);
         void save(); // write ourself to local.sources
         void resetConnection() {
             cursor = auto_ptr<DBClientCursor>(0);
