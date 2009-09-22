@@ -477,6 +477,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("help,h", "show this usage information")
+        ("version", "show version information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
         ("port", po::value<int>(&cmdLine.port)->default_value(CmdLine::DefaultDBPort), "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
@@ -614,6 +615,11 @@ int main(int argc, char* argv[], char *envp[] )
 
         if (params.count("help")) {
             show_help_text(visible_options);
+            return 0;
+        }
+        if (params.count("version")) {
+            cout << mongodVersion() << endl;
+            printGitVersion();
             return 0;
         }
         dbpath = params["dbpath"].as<string>();
