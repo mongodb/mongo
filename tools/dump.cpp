@@ -36,22 +36,23 @@ public:
 
     void doCollection( const string coll , path outputFile ) {
         cout << "\t" << coll << " to " << outputFile.string() << endl;
-
-        int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
-        assert( out );
+        
+        ofstream out;
+        out.open( outputFile.string().c_str() );
+        uassert( "couldn't open file" , out.good() );
 
         auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
 
         int num = 0;
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
-            write( out , obj.objdata() , obj.objsize() );
+            out.write( obj.objdata() , obj.objsize() );
             num++;
         }
 
         cout << "\t\t " << num << " objects" << endl;
 
-        close( out );
+        out.close();
     }
 
     void go( const string db , const path outdir ) {

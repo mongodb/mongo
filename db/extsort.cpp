@@ -100,21 +100,22 @@ namespace mongo {
         ss << _root.string() << "file." << _files.size();
         string file = ss.str();
         
-        int out = open( file.c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
-        uassert( (string)"couldn't open file: " + file , out > 0 );
+        ofstream out;
+        out.open( file.c_str() );
+        uassert( (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;
         for ( multimap<BSONObj,DiskLoc,BSONObjCmp>::iterator i=_map->begin(); i != _map->end(); i++ ){
             pair<BSONObj,DiskLoc> p = *i;
-            assert( write( out , p.first.objdata() , p.first.objsize() ) > 0 );
-            assert( write( out , & p.second , sizeof( DiskLoc ) ) > 0 );
+            out.write( p.first.objdata() , p.first.objsize() );
+            out.write( (char*)(&p.second) , sizeof( DiskLoc ) );
             num++;
         }
         
         _map->clear();
         
         _files.push_back( file );
-        close( out );
+        out.close();
 
         log(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
     }
