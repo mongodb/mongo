@@ -122,9 +122,18 @@ inline void setupSignals() {}
 #endif
 
 string fixHost( string url , string host , string port ){
+    //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
+    
     if ( host.size() == 0 && port.size() == 0 ){
-        if ( url.find( "/" ) == string::npos && url.find( "." ) != string::npos )
-            return url + "/test";
+        if ( url.find( "/" ) == string::npos ){
+            // check for ips
+            if ( url.find( "." ) != string::npos )
+                return url + "/test";
+            
+            if ( url.find( ":" ) != string::npos &&
+                 isdigit( url[url.find(":")+1] ) )
+                return url + "/test";
+        }
         return url;
     }
 
