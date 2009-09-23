@@ -738,16 +738,18 @@ namespace mongo {
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
         Convertor c(cx);
         uassert( "native_helper needs at least 1 arg" , argc >= 1 );
-
-        NativeFunction func = (NativeFunction)JSVAL_TO_PRIVATE( argv[0] );
-
+        
+        NativeFunction func = (NativeFunction)((long long)c.toNumber( argv[0] ));
+        assert( func );
+        
         BSONObjBuilder args;
         for ( uintN i=1; i<argc; i++ ){
             c.append( args , args.numStr( i ) , argv[i] );
         }
-
-        BSONObj out = func( args.obj() );
-
+        
+        BSONObj a = args.obj();
+        BSONObj out = func( a );
+        
         if ( out.isEmpty() ){
             *rval = JSVAL_VOID;
         }
@@ -833,6 +835,11 @@ namespace mongo {
             if ( ! utf8Ok() ){
                 log() << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
+
+            int x = 0;
+            assert( x = 1 );
+            if ( x != 1 )
+                throw -1;
         }
 
         ~SMEngine(){
@@ -1254,7 +1261,7 @@ namespace mongo {
         void injectNative( const char *field, NativeFunction func ){
             smlock;
             string name = field;
-            _convertor->setProperty( _global , (name + "_").c_str() , PRIVATE_TO_JSVAL( func ) );
+            _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
             stringstream code;
             code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
