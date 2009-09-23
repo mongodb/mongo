@@ -26,6 +26,7 @@ main(int argc, char *argv[])
 
 	WT_UTILITY_INTRO(progname, argv);
 
+	flags = 0;
 	while ((ch = getopt(argc, argv, "df:p")) != EOF)
 		switch (ch) {
 		case 'd':
