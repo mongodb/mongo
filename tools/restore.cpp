@@ -128,7 +128,7 @@ public:
 
         const int BUF_SIZE = 1024 * 1024 * 5;
         char * buf = (char*)malloc( BUF_SIZE );
-        
+
         ProgressMeter m( fileLength );
 
         while ( read < fileLength ) {
@@ -146,7 +146,7 @@ public:
 
             m.hit( o.objsize() );
         }
-        
+
         free( buf );
 
         uassert( "counts don't match" , m.done() == fileLength );
