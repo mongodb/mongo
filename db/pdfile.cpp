@@ -1029,14 +1029,16 @@ assert( !eloc.isNull() );
         }
     }
 
-    int fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+    /* _ TODO dropDups */
+    unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups();
         BSONObj order = idx.keyPattern();
 
-        int n = 0;
+        /* get and sort all the keys ----- */
+        unsigned long long n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-        BSONObjExternalSorter sorter;
+        BSONObjExternalSorter sorter(order);
         int nkeys = 0;
         while ( c->ok() ) {
             BSONObj o = c->current();
@@ -1057,24 +1059,23 @@ assert( !eloc.isNull() );
         };
         sorter.sort();
 
+        /* build index --- */ 
+        BtreeBuilder btBuilder(dupsAllowed, idx);
         BSONObj keyLast;
         BSONObjExternalSorter::Iterator i = sorter.iterator();
-        int m = 0;
         while( i.more() ) { 
             BSONObjExternalSorter::Data d = i.next();
-            if( !dupsAllowed ) { 
-                if( keyLast.woCompare(d.first) == 0 && m > 0 ) { 
-                    // duplicate
-                    if( dropDups ) { 
-                        // ...
-                    }
-                }
-                keyLast = d.first;
+            try { 
+                btBuilder.addKey(d.first, d.second);
             }
-            m++;
+            catch( AssertionException& ) { 
+                massert("finish code!!!", !dupsAllowed); // todo dupsAllowed handle.
+                throw;
+            }
         }
+        btBuilder.commit();
 
-        wassert( m == nkeys );
+        wassert( btBuilder.getn() == nkeys || dropDups ); 
         return n;
     }
 
@@ -1113,10 +1114,10 @@ assert( !eloc.isNull() );
         l.flush();
         Timer t;
 
-        idx.head = BtreeBucket::addHead(idx);
+        idx.head = BtreeBucket::addBucket(idx);
         int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
 
-        l << "done for " << n << " records";
+        l << "done for " << n << " records " << t.millis() / 1000.0 << "secs";
         l << endl;
     }
 
