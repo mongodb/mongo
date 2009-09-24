@@ -28,7 +28,7 @@
 namespace mongo {
 
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
-        : _order( order ) , _maxFilesize( maxFileSize ) , 
+        : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
           _map(0), _mapSizeSoFar(0), _largestObject(0),  _sorted(0){
         
         stringstream rootpath;
@@ -77,7 +77,7 @@ namespace mongo {
             _map = new InMemory( _order );
         }
         
-        _map->insert( pair<BSONObj,DiskLoc>( o , loc ) );
+        _map->insert( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
 
         long size = o.objsize();
         _mapSizeSoFar += size + sizeof( DiskLoc );

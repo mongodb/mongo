@@ -1029,12 +1029,44 @@ assert( !eloc.isNull() );
         }
     }
 
+    void testSorting() 
+    {
+        BSONObjBuilder b;
+        b.appendNull("");
+        BSONObj x = b.obj();
+
+        BSONObjExternalSorter sorter;
+
+        sorter.add(x, DiskLoc(3,7));
+        sorter.add(x, DiskLoc(4,7));
+        sorter.add(x, DiskLoc(2,7));
+        sorter.add(x, DiskLoc(1,7));
+        sorter.add(x, DiskLoc(3,77));
+
+        sorter.sort();
+
+        BSONObjExternalSorter::Iterator i = sorter.iterator();
+        while( i.more() ) { 
+            BSONObjExternalSorter::Data d = i.next();
+            cout << d.second.toString() << endl;
+            cout << d.first.objsize() << endl;
+            cout<<"SORTER next:" << d.first.toString() << endl;
+        }
+    }
+
     /* _ TODO dropDups 
     */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+        testSorting();
+
+        cout << "\n\nBuildindex " << ns << " idxNo:" << idxNo;
+        cout << ' ' << idx.info.obj().toString() << endl;
+
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups();
         BSONObj order = idx.keyPattern();
+
+        idx.head.Null();
 
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
@@ -1051,6 +1083,7 @@ assert( !eloc.isNull() );
             for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
                 if( ++k == 2 )
                     d->setIndexIsMultikey(idxNo);
+cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
                 sorter.add(*i, loc);
                 nkeys++;
             }
@@ -1060,36 +1093,56 @@ assert( !eloc.isNull() );
         };
         sorter.sort();
 
+        if( idxNo == 1 ) { 
+            // TEMP!
+
+            BSONObjExternalSorter::Iterator i = sorter.iterator();
+            while( i.more() ) { 
+                BSONObjExternalSorter::Data d = i.next();
+                cout << d.second.toString() << endl;
+                cout << d.first.objsize() << endl;
+                cout<<"SORTER next:" << d.first.toString() << endl;
+            }
+
+            cout << "stop here" << endl;
+            cout << "stop here" << endl;
+        }
+
         list<DiskLoc> dupsToDrop;
 
         /* build index --- */ 
-        BtreeBuilder btBuilder(dupsAllowed, idx);
-        BSONObj keyLast;
-        BSONObjExternalSorter::Iterator i = sorter.iterator();
-        while( i.more() ) { 
-            BSONObjExternalSorter::Data d = i.next();
-            try { 
-                btBuilder.addKey(d.first, d.second);
-            }
-            catch( AssertionException& ) { 
-                if( !dupsAllowed ) { 
-                    if( dropDups ) { 
-                        /* we could queue these on disk, but normally there are very few dups, so instead we 
-                           keep in ram and have a limit.
-                        */
-                        dupsToDrop.push_back(d.second);
-                        uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
-                    }
+        {
+            BtreeBuilder btBuilder(dupsAllowed, idx);
+            BSONObj keyLast;
+            BSONObjExternalSorter::Iterator i = sorter.iterator();
+            while( i.more() ) { 
+                BSONObjExternalSorter::Data d = i.next();
+                cout<<"TEMP SORTER next " << d.first.toString() << endl;
+//zzz
+                try { 
+                    btBuilder.addKey(d.first, d.second);
+                }
+                catch( AssertionException& ) { 
+                    if( !dupsAllowed ) { 
+                        if( dropDups ) { 
+                            /* we could queue these on disk, but normally there are very few dups, so instead we 
+                            keep in ram and have a limit.
+                            */
+                            dupsToDrop.push_back(d.second);
+                            uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+                        }
                     else
                         throw;
+                    }
                 }
             }
+            btBuilder.commit();
+            wassert( btBuilder.getn() == nkeys || dropDups ); 
         }
+
         for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
-        btBuilder.commit();
 
-        wassert( btBuilder.getn() == nkeys || dropDups ); 
         return n;
     }
 
@@ -1415,7 +1468,7 @@ assert( !eloc.isNull() );
             int idxNo = tableToIndex->nIndexes;
             IndexDetails& idx = tableToIndex->indexes[idxNo];
             idx.info = loc;
-            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh
+            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh; increments nIndexes
             try {
                 buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {

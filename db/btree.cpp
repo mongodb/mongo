@@ -913,7 +913,7 @@ namespace mongo {
 
     void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) { 
         if( n > 0 ) {
-            int cmp = keyLast.woCompare(key);
+            int cmp = keyLast.woCompare(key, order);
             massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
             if( cmp == 0 && !dupsAllowed )
                 uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
@@ -988,7 +988,17 @@ namespace mongo {
     }
 
     BtreeBuilder::~BtreeBuilder() { 
-        /* TODO: ROLLBACK CODE */
+        if( !committed ) { 
+            log() << "TEMP ROLLING back partially built index space" << endl;
+            DiskLoc x = first;
+            while( !x.isNull() ) { 
+                DiskLoc next = x.btree()->tempNext();
+                btreeStore->deleteRecord(idx.indexNamespace().c_str(), x);
+                x = next;
+            }
+            assert( idx.head.isNull() );
+            log() << "TEMP done rollback" << endl;
+        }
     }
 
 }

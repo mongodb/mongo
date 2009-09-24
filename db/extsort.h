@@ -65,7 +65,7 @@ namespace mongo {
 
         typedef set<Data,MyCmp> InMemory;
 
-        class Iterator {
+        class Iterator : boost::noncopyable {
         public:
             
             Iterator( BSONObjExternalSorter * sorter );

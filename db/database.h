@@ -65,7 +65,7 @@ namespace mongo {
                 if( n >= RecCache::Base && n <= RecCache::Base+1000 )
                     massert("getFile(): bad file number - using recstore db w/nonrecstore db build?", false);
 #endif
-                massert("getFile(): bad file number value (corrupt db?)", false);
+                massert("getFile(): bad file number value (corrupt db?): run repair", false);
             }
             DEV {
                 if ( n > 100 )
