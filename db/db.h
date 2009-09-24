@@ -38,7 +38,7 @@ namespace mongo {
        Note also we sometimes do work with objects slightly larger - an object in the replication local.oplog
        could be slightly larger.
     */
-    const unsigned MaxBSONObjectSize = 4 * 1024 * 1024;
+    const int MaxBSONObjectSize = 4 * 1024 * 1024;
 
     // tempish...move to TLS or pass all the way down as a parm
     extern map<string,Database*> databases;
