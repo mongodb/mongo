@@ -1058,10 +1058,10 @@ assert( !eloc.isNull() );
         sorter.sort();
 
         BSONObj keyLast;
-        BSONObjExternalSorter::Iterator i = sorter.iterator();
+        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
         int m = 0;
-        while( i.more() ) { 
-            BSONObjExternalSorter::Data d = i.next();
+        while( i->more() ) { 
+            BSONObjExternalSorter::Data d = i->next();
             if( !dupsAllowed ) { 
                 if( keyLast.woCompare(d.first) == 0 && m > 0 ) { 
                     // duplicate

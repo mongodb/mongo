@@ -811,10 +811,10 @@ namespace JsobjTests {
 
                 sorter.sort();
                 
-                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
-                while ( i.more() ){
-                    pair<BSONObj,DiskLoc> p = i.next();
+                while ( i->more() ){
+                    pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 )
                         assert( p.first["x"].number() == 2 );
                     else if ( num <= 2 ){
@@ -840,11 +840,11 @@ namespace JsobjTests {
                 sorter.add( BSON( "x" << 5 ) , 7 , 1 );
 
                 sorter.sort();
-
-                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
-                while ( i.more() ){
-                    pair<BSONObj,DiskLoc> p = i.next();
+                while ( i->more() ){
+                    pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 ){
                         assert( p.first["x"].number() == 2 );
                         ASSERT_EQUALS( p.second.toString() , "3:1" );
@@ -869,8 +869,8 @@ namespace JsobjTests {
                 BSONObjExternalSorter sorter( BSONObj() , 10 );
                 sorter.sort();
 
-                BSONObjExternalSorter::Iterator i = sorter.iterator();
-                assert( ! i.more() );
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+                assert( ! i->more() );
 
             }
         };
@@ -888,10 +888,10 @@ namespace JsobjTests {
                 
                 sorter.sort();
 
-                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
-                while ( i.more() ){
-                    pair<BSONObj,DiskLoc> p = i.next();
+                while ( i->more() ){
+                    pair<BSONObj,DiskLoc> p = i->next();
                     cout << "HERE: " << p.first << "\t" << p.second.toString() << endl;
                     if ( num == 0 )
                         assert( p.first["x"].number() == 2 );
@@ -921,11 +921,11 @@ namespace JsobjTests {
 
                 sorter.sort();
 
-                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
                 double prev = 0;
-                while ( i.more() ){
-                    pair<BSONObj,DiskLoc> p = i.next();
+                while ( i->more() ){
+                    pair<BSONObj,DiskLoc> p = i->next();
                     num++;
                     double cur = p.first["x"].number();
                     assert( cur >= prev );
