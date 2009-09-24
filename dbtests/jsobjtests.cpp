@@ -810,15 +810,16 @@ namespace JsobjTests {
                 sorter.add( BSON( "x" << 5 ) , 7 , 1 );
 
                 sorter.sort();
-
+                
                 BSONObjExternalSorter::Iterator i = sorter.iterator();
                 int num=0;
                 while ( i.more() ){
                     pair<BSONObj,DiskLoc> p = i.next();
                     if ( num == 0 )
                         assert( p.first["x"].number() == 2 );
-                    else if ( num <= 2 )
+                    else if ( num <= 2 ){
                         assert( p.first["x"].number() == 5 );
+                    }
                     else if ( num == 3 )
                         assert( p.first["x"].number() == 10 );
                     else
@@ -873,6 +874,42 @@ namespace JsobjTests {
 
             }
         };
+
+
+        class ByDiskLock {
+        public:
+            void run(){
+                BSONObjExternalSorter sorter;
+                sorter.add( BSON( "x" << 10 ) , 5  , 4);
+                sorter.add( BSON( "x" << 2 ) , 3 , 0 );
+                sorter.add( BSON( "x" << 5 ) , 6 , 2 );
+                sorter.add( BSON( "x" << 5 ) , 7 , 3 );
+                sorter.add( BSON( "x" << 5 ) , 2 , 1 );
+                
+                sorter.sort();
+
+                BSONObjExternalSorter::Iterator i = sorter.iterator();
+                int num=0;
+                while ( i.more() ){
+                    pair<BSONObj,DiskLoc> p = i.next();
+                    cout << "HERE: " << p.first << "\t" << p.second.toString() << endl;
+                    if ( num == 0 )
+                        assert( p.first["x"].number() == 2 );
+                    else if ( num <= 3 ){
+                        assert( p.first["x"].number() == 5 );
+                    }
+                    else if ( num == 4 )
+                        assert( p.first["x"].number() == 10 );
+                    else
+                        ASSERT( 0 );
+                    ASSERT_EQUALS( num , p.second.getOfs() );
+                    num++;
+                }
+
+
+            }
+        };
+
 
         class Big1 {
         public:
@@ -971,6 +1008,7 @@ namespace JsobjTests {
             add< external_sort::Basic1 >();
             add< external_sort::Basic2 >();
             add< external_sort::Basic3 >();
+            add< external_sort::ByDiskLock >();
             add< external_sort::Big1 >();
         }
     } myall;

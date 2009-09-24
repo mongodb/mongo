@@ -26,7 +26,7 @@
 #include <map>
 
 namespace mongo {
-    
+
     /**
        for sorting by BSONObj and attaching a value
      */
@@ -34,7 +34,7 @@ namespace mongo {
     public:
         
         typedef pair<BSONObj,DiskLoc> Data;
-
+        
     private:
         class FileIterator : boost::noncopyable {
         public:
@@ -47,8 +47,24 @@ namespace mongo {
             char * _buf;
             char * _end;
         };
+
+        class MyCmp {
+        public:
+            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
+            bool operator()( const Data &l, const Data &r ) const {
+                int x = l.first.woCompare( r.first , _order );
+                if ( x )
+                    return x < 0;
+                return l.second.compare( r.second ) < 0;
+            };
+        private:
+            BSONObj _order;
+        };
         
     public:
+
+        typedef set<Data,MyCmp> InMemory;
+
         class Iterator {
         public:
             
@@ -58,7 +74,7 @@ namespace mongo {
             Data next();
             
         private:
-            BSONObjCmp _cmp;
+            MyCmp _cmp;
             vector<FileIterator*> _files;
             vector< pair<Data,bool> > _stash;
         };
@@ -88,7 +104,7 @@ namespace mongo {
         long _maxFilesize;
         path _root;
         
-        multimap<BSONObj,DiskLoc,BSONObjCmp> * _map;
+        InMemory * _map;
         long _mapSizeSoFar;
         
         long _largestObject;

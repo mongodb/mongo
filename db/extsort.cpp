@@ -74,7 +74,7 @@ namespace mongo {
         uassert( "sorted already" , ! _sorted );
         
         if ( ! _map ){
-            _map = new multimap<BSONObj,DiskLoc,BSONObjCmp>( _order );
+            _map = new InMemory( _order );
         }
         
         _map->insert( pair<BSONObj,DiskLoc>( o , loc ) );
@@ -105,8 +105,8 @@ namespace mongo {
         uassert( (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;
-        for ( multimap<BSONObj,DiskLoc,BSONObjCmp>::iterator i=_map->begin(); i != _map->end(); i++ ){
-            pair<BSONObj,DiskLoc> p = *i;
+        for ( InMemory::iterator i=_map->begin(); i != _map->end(); i++ ){
+            Data p = *i;
             out.write( p.first.objdata() , p.first.objsize() );
             out.write( (char*)(&p.second) , sizeof( DiskLoc ) );
             num++;
@@ -158,7 +158,7 @@ namespace mongo {
                     continue;
             }
             
-            if ( slot == -1 || _cmp( best.first , _stash[i].first.first ) == 0 ){
+            if ( slot == -1 || _cmp( best , _stash[i].first ) == 0 ){
                 best = _stash[i].first;
                 slot = i;
             }
