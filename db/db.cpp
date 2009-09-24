@@ -513,7 +513,7 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
         ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
         ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
-        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server (default 30)" )
+        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
         ;
 
     replication_options.add_options()
