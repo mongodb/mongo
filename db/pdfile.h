@@ -115,10 +115,11 @@ namespace mongo {
 
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
-    private:
 
+        /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
+    private:
         vector<MongoDataFile *> files;
     };
 
@@ -406,6 +407,7 @@ namespace mongo {
         }
         return &database->namespaceIndex;
     }
+
 
     inline NamespaceDetails* nsdetails(const char *ns) {
         // if this faults, did you set the current db first?  (DBContext + dblock)

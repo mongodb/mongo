@@ -914,8 +914,8 @@ namespace mongo {
     void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) { 
         if( n > 0 ) {
             int cmp = keyLast.woCompare(key);
-            massert( "bad key order in BtreeBuilder - server internal error", cmp >= 0 );
-            if( !dupsAllowed )
+            massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
+            if( cmp == 0 && !dupsAllowed )
                 uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
         }
         keyLast = key;
@@ -933,6 +933,7 @@ namespace mongo {
                 b->pushBack(loc, key, order, DiskLoc());
             }
         }
+        n++;
     }
 
     void BtreeBuilder::buildNextLevel(DiskLoc loc) { 

@@ -1029,7 +1029,8 @@ assert( !eloc.isNull() );
         }
     }
 
-    /* _ TODO dropDups */
+    /* _ TODO dropDups 
+    */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups();
@@ -1059,6 +1060,8 @@ assert( !eloc.isNull() );
         };
         sorter.sort();
 
+        list<DiskLoc> dupsToDrop;
+
         /* build index --- */ 
         BtreeBuilder btBuilder(dupsAllowed, idx);
         BSONObj keyLast;
@@ -1069,10 +1072,21 @@ assert( !eloc.isNull() );
                 btBuilder.addKey(d.first, d.second);
             }
             catch( AssertionException& ) { 
-                massert("finish code!!!", !dupsAllowed); // todo dupsAllowed handle.
-                throw;
+                if( !dupsAllowed ) { 
+                    if( dropDups ) { 
+                        /* we could queue these on disk, but normally there are very few dups, so instead we 
+                           keep in ram and have a limit.
+                        */
+                        dupsToDrop.push_back(d.second);
+                        uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+                    }
+                    else
+                        throw;
+                }
             }
         }
+        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
+            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
         btBuilder.commit();
 
         wassert( btBuilder.getn() == nkeys || dropDups ); 
@@ -1114,8 +1128,10 @@ assert( !eloc.isNull() );
         l.flush();
         Timer t;
 
-        idx.head = BtreeBucket::addBucket(idx);
-        int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+        unsigned long long n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
+        assert( !idx.head.isNull() );
+        //idx.head = BtreeBucket::addBucket(idx);
+        //int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
 
         l << "done for " << n << " records " << t.millis() / 1000.0 << "secs";
         l << endl;
@@ -1685,5 +1701,7 @@ namespace mongo {
             i++;
         }
     }
+
+    NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
 } // namespace mongo
