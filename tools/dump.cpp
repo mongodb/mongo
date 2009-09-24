@@ -18,7 +18,7 @@
 
 #include "../stdafx.h"
 #include "../client/dbclient.h"
-#include "Tool.h"
+#include "tool.h"
 
 #include <fcntl.h>
 
@@ -36,22 +36,24 @@ public:
 
     void doCollection( const string coll , path outputFile ) {
         cout << "\t" << coll << " to " << outputFile.string() << endl;
+        
+        ofstream out;
+        out.open( outputFile.string().c_str() );
+        uassert( "couldn't open file" , out.good() );
 
-        int out = open( outputFile.string().c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
-        assert( out );
+        ProgressMeter m( conn( true ).count( coll.c_str() ) );
 
         auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
 
-        int num = 0;
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
-            write( out , obj.objdata() , obj.objsize() );
-            num++;
+            out.write( obj.objdata() , obj.objsize() );
+            m.hit();
         }
 
-        cout << "\t\t " << num << " objects" << endl;
+        cout << "\t\t " << m.done() << " objects" << endl;
 
-        close( out );
+        out.close();
     }
 
     void go( const string db , const path outdir ) {
@@ -60,7 +62,7 @@ public:
         create_directories( outdir );
 
         string sns = db + ".system.namespaces";
-
+        
         auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
