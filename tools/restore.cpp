@@ -40,15 +40,11 @@ public:
     int run(){
         auth();
         path root = getParam("dir");
-        if (!is_directory(root)) {
-            cerr << "\"" << root.string() << "\" is not a valid directory" << endl;
-            return EXIT_BADOPTIONS;
-        }
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
-         * In that case we better be given a root directory that contains only
-         * .bson files (a db)
+         * In that case we better be given either a root directory that
+         * contains only .bson files or a single .bson file  (a db).
          */
         drillDown(root, _db != "");
         return EXIT_CLEAN;
