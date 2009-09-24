@@ -58,17 +58,11 @@ namespace mongo {
         uassert( "compile failed" , func );
         return invoke( func , args, timeoutMs );
     }
-
+    
     bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
         
         path p( filename );
-        if ( is_directory( p ) ){
-            cerr << "can't read directory [" << filename << "]" << endl;
-            if ( assertOnError )
-                assert( 0 );
-            return false;
-        }
-        
+
         if ( ! exists( p ) ){
             cerr << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
@@ -76,6 +70,13 @@ namespace mongo {
             return false;
         }
 
+        if ( is_directory( p ) ){
+            cerr << "can't read directory [" << filename << "]" << endl;
+            if ( assertOnError )
+                assert( 0 );
+            return false;
+        }
+        
         File f;
         f.open( filename.c_str() );
 
