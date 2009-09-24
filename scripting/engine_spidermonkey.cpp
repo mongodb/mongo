@@ -1208,27 +1208,31 @@ namespace mongo {
 
             return worked;
         }
-
+        
         int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
             smlock;
             precall();
 
+            assert( JS_EnterLocalRootScope( _context ) );
+                
             int nargs = args.nFields();
             auto_ptr<jsval> smargsPtr( new jsval[nargs] );
             jsval* smargs = smargsPtr.get();
             if ( nargs ){
-                
                 BSONObjIterator it( args );
-                for ( int i=0; i<nargs; i++ )
+                for ( int i=0; i<nargs; i++ ){
                     smargs[i] = _convertor->toval( it.next() );
+                }
             }
-            
+
             if ( args.isEmpty() ){
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
             else {
                 setObject( "args" , args , true ); // this is for backwards compatability
             }
+
+            JS_LeaveLocalRootScope( _context );
 
             installCheckTimeout( timeoutMs );
             jsval rval;
