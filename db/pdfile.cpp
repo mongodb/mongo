@@ -1057,7 +1057,7 @@ assert( !eloc.isNull() );
     /* _ TODO dropDups 
     */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-        testSorting();
+//        testSorting();
 
         cout << "\n\nBuildindex " << ns << " idxNo:" << idxNo;
         cout << ' ' << idx.info.obj().toString() << endl;
@@ -1083,7 +1083,7 @@ assert( !eloc.isNull() );
             for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
                 if( ++k == 2 )
                     d->setIndexIsMultikey(idxNo);
-cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
+//cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
                 sorter.add(*i, loc);
                 nkeys++;
             }
@@ -1093,7 +1093,7 @@ cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
         };
         sorter.sort();
 
-        if( idxNo == 1 ) { 
+/*        if( 0 && idxNo == 1 ) { 
             // TEMP!
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
@@ -1107,7 +1107,7 @@ cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
             cout << "stop here" << endl;
             cout << "stop here" << endl;
         }
-
+*/
         list<DiskLoc> dupsToDrop;
 
         /* build index --- */ 
@@ -1117,8 +1117,7 @@ cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             while( i->more() ) { 
                 BSONObjExternalSorter::Data d = i->next();
-                cout<<"TEMP SORTER next " << d.first.toString() << endl;
-//zzz
+//                cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }

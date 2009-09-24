@@ -29,7 +29,7 @@ namespace mongo {
 
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
         : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
-          _map(0), _mapSizeSoFar(0), _largestObject(0),  _sorted(0){
+          _map(0), _mapSizeSoFar(0), _sorted(0){
         
         stringstream rootpath;
         rootpath << dbpath;
@@ -81,8 +81,6 @@ namespace mongo {
 
         long size = o.objsize();
         _mapSizeSoFar += size + sizeof( DiskLoc );
-        if ( size > _largestObject )
-            _largestObject = size;
         
         if ( _mapSizeSoFar > _maxFilesize )
             finishMap();
@@ -101,7 +99,7 @@ namespace mongo {
         string file = ss.str();
         
         ofstream out;
-        out.open( file.c_str() );
+        out.open( file.c_str() , ios_base::out | ios_base::binary );
         uassert( (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;

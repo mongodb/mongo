@@ -107,8 +107,6 @@ namespace mongo {
         InMemory * _map;
         long _mapSizeSoFar;
         
-        long _largestObject;
-
         list<string> _files;
         bool _sorted;
     };

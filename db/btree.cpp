@@ -978,7 +978,8 @@ namespace mongo {
             loc = upStart;
         }
 
-        log() << "TEMP " << "levels: " << levels << endl;
+        if( levels > 1 )
+            log(2) << "btree levels: " << levels << endl;
     }
 
     /* when all addKeys are done, we then build the higher levels of the tree */
@@ -989,7 +990,7 @@ namespace mongo {
 
     BtreeBuilder::~BtreeBuilder() { 
         if( !committed ) { 
-            log() << "TEMP ROLLING back partially built index space" << endl;
+            log(2) << "Rolling back partially built index space" << endl;
             DiskLoc x = first;
             while( !x.isNull() ) { 
                 DiskLoc next = x.btree()->tempNext();
@@ -997,7 +998,7 @@ namespace mongo {
                 x = next;
             }
             assert( idx.head.isNull() );
-            log() << "TEMP done rollback" << endl;
+            log(2) << "done rollback" << endl;
         }
     }
 
