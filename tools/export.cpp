@@ -20,7 +20,7 @@
 #include "client/dbclient.h"
 #include "db/json.h"
 
-#include "Tool.h"
+#include "tool.h"
 
 #include <fstream>
 #include <iostream>

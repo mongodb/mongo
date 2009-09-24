@@ -19,7 +19,7 @@
 #include "../stdafx.h"
 #include "../client/dbclient.h"
 #include "../util/mmap.h"
-#include "Tool.h"
+#include "tool.h"
 
 #include <boost/program_options.hpp>
 

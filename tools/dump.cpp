@@ -18,7 +18,7 @@
 
 #include "../stdafx.h"
 #include "../client/dbclient.h"
-#include "Tool.h"
+#include "tool.h"
 
 #include <fcntl.h>
 

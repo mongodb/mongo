@@ -20,7 +20,7 @@
 #include "client/gridfs.h"
 #include "client/dbclient.h"
 
-#include "Tool.h"
+#include "tool.h"
 
 #include <fstream>
 #include <iostream>

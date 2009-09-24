@@ -1,6 +1,6 @@
 // Tool.cpp
 
-#include "Tool.h"
+#include "tool.h"
 
 #include <iostream>
 
