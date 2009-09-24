@@ -29,8 +29,10 @@ assert.eq( 4 , res.numObjects , "A" );
 x = db[res.result];
 
 assert.eq( 3 , x.find().count() , "B" );
+x.find().forEach( printjson );
 z = {};
 x.find().forEach( function(a){ z[a.key] = a.value.count; } );
+printjson( z );
 assert.eq( 3 , z.keySet().length , "C" );
 assert.eq( 2 , z.a , "D" );
 assert.eq( 3 , z.b , "E" );
@@ -47,9 +49,15 @@ res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
 printjson( res );
 assert.eq( 999 , res.numObjects , "Z1" );
 x = db[res.result];
-
+x.find().forEach( printjson )
 assert.eq( 4 , x.find().count() , "Z2" );
 assert.eq( "a,b,c,d" , x.distinct( "key" ) , "Z3" );
+assert.eq( 2 , x.findOne( { key : "a" } ).value.count , "ZA" );
+assert.eq( 998 , x.findOne( { key : "b" } ).value.count , "ZB" );
+assert.eq( 3 , x.findOne( { key : "c" } ).value.count , "ZC" );
+assert.eq( 995 , x.findOne( { key : "d" } ).value.count , "ZD" );
 
-x.find().forEach( printjson );
-
+print( Date.timeFunc( 
+    function(){
+        db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+    } , 10 ) );    
