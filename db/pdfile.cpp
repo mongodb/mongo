@@ -1045,9 +1045,9 @@ assert( !eloc.isNull() );
 
         sorter.sort();
 
-        BSONObjExternalSorter::Iterator i = sorter.iterator();
-        while( i.more() ) { 
-            BSONObjExternalSorter::Data d = i.next();
+        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+        while( i->more() ) { 
+            BSONObjExternalSorter::Data d = i->next();
             cout << d.second.toString() << endl;
             cout << d.first.objsize() << endl;
             cout<<"SORTER next:" << d.first.toString() << endl;
@@ -1096,9 +1096,9 @@ cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
         if( idxNo == 1 ) { 
             // TEMP!
 
-            BSONObjExternalSorter::Iterator i = sorter.iterator();
-            while( i.more() ) { 
-                BSONObjExternalSorter::Data d = i.next();
+            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+            while( i->more() ) { 
+                BSONObjExternalSorter::Data d = i->next();
                 cout << d.second.toString() << endl;
                 cout << d.first.objsize() << endl;
                 cout<<"SORTER next:" << d.first.toString() << endl;
@@ -1114,9 +1114,9 @@ cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
         {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
-            BSONObjExternalSorter::Iterator i = sorter.iterator();
-            while( i.more() ) { 
-                BSONObjExternalSorter::Data d = i.next();
+            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+            while( i->more() ) { 
+                BSONObjExternalSorter::Data d = i->next();
                 cout<<"TEMP SORTER next " << d.first.toString() << endl;
 //zzz
                 try { 

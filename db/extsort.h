@@ -90,9 +90,9 @@ namespace mongo {
         /* call after adding values, and before fetching the iterator */
         void sort();
         
-        Iterator iterator(){
+        auto_ptr<Iterator> iterator(){
             uassert( "not sorted" , _sorted );
-            return Iterator( this );
+            return auto_ptr<Iterator>( new Iterator( this ) );
         }
         
     private:
