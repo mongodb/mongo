@@ -84,4 +84,27 @@ namespace mongo {
 
     };
 
+    class ProgressMeter {
+    public:
+        ProgressMeter( long long total , int secondsBetween = 3 );
+        
+        void hit( int n = 1 );
+
+        long long done(){
+            return _done;
+        }
+        
+        long long hits(){
+            return _hits;
+        }
+
+    private:
+        
+        long long _total;
+        int _secondsBetween;
+
+        long long _done;
+        long long _hits;
+        int _lastTime;
+    };
 }

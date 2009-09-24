@@ -41,16 +41,17 @@ public:
         out.open( outputFile.string().c_str() );
         uassert( "couldn't open file" , out.good() );
 
+        ProgressMeter m( conn( true ).count( coll.c_str() ) );
+
         auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
 
-        int num = 0;
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             out.write( obj.objdata() , obj.objsize() );
-            num++;
+            m.hit();
         }
 
-        cout << "\t\t " << num << " objects" << endl;
+        cout << "\t\t " << m.done() << " objects" << endl;
 
         out.close();
     }
@@ -61,7 +62,7 @@ public:
         create_directories( outdir );
 
         string sns = db + ".system.namespaces";
-
+        
         auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();

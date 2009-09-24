@@ -126,11 +126,10 @@ public:
         long long read = 0;
         long long num = 0;
 
-        int msgDelay = (int)(1000 * ( 1 + ( fileLength / ( 1024.0 * 1024 * 400 ) ) ) );
-        log(1) << "\t msg delay: " << msgDelay << endl;
-
         const int BUF_SIZE = 1024 * 1024 * 5;
         char * buf = (char*)malloc( BUF_SIZE );
+        
+        ProgressMeter m( fileLength );
 
         while ( read < fileLength ) {
             file.read( buf , 4 );
@@ -145,12 +144,13 @@ public:
             read += o.objsize();
             num++;
 
-            if ( ( logLevel > 0 && num < 10 ) || ! ( num % msgDelay ) )
-                out() << "read " << read << "/" << fileLength << " bytes so far. (" << (int)( (read * 100) / fileLength) << "%) " << num << " objects" << endl;
+            m.hit( o.objsize() );
         }
-
+        
         free( buf );
-        out() << "\t "  << num << " objects" << endl;
+
+        uassert( "counts don't match" , m.done() == fileLength );
+        out() << "\t "  << m.hits() << " objects" << endl;
     }
 };
 
