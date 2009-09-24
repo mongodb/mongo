@@ -54,14 +54,16 @@ namespace mongo {
 
         /**
          * puts the file reference by fileName into the db
-         * @param fileName relative to process
+         * @param fileName local filename relative to process
+         * @param remoteName optional filename to use for file stored in GridFS
+         *                   (default is to use fileName parameter)
          * @return the file object
          */
-        BSONObj storeFile( const string& fileName );
+        BSONObj storeFile( const string& fileName , const string& remoteName="" );
 
         /**
          * removes file referenced by fileName from the db
-         * @param fileName relative to process
+         * @param fileName filename (in GridFS) of the file to remove
          * @return the file object
          */
         void removeFile( const string& fileName );
