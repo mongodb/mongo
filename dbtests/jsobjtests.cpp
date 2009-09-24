@@ -892,7 +892,6 @@ namespace JsobjTests {
                 int num=0;
                 while ( i->more() ){
                     pair<BSONObj,DiskLoc> p = i->next();
-                    cout << "HERE: " << p.first << "\t" << p.second.toString() << endl;
                     if ( num == 0 )
                         assert( p.first["x"].number() == 2 );
                     else if ( num <= 3 ){
@@ -935,8 +934,34 @@ namespace JsobjTests {
             }
         };
 
-    }
+        class D1 {
+        public:
+            void run(){
+                
+                BSONObjBuilder b;
+                b.appendNull("");
+                BSONObj x = b.obj();
+                
+                BSONObjExternalSorter sorter;
+                sorter.add(x, DiskLoc(3,7));
+                sorter.add(x, DiskLoc(4,7));
+                sorter.add(x, DiskLoc(2,7));
+                sorter.add(x, DiskLoc(1,7));
+                sorter.add(x, DiskLoc(3,77));
 
+                sorter.sort();
+                
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+                while( i->more() ) {
+                    BSONObjExternalSorter::Data d = i->next();
+                    cout << d.second.toString() << endl;
+                    cout << d.first.objsize() << endl;
+                    cout<<"SORTER next:" << d.first.toString() << endl;
+                }
+            }
+        };
+    }
+        
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1010,6 +1035,7 @@ namespace JsobjTests {
             add< external_sort::Basic3 >();
             add< external_sort::ByDiskLock >();
             add< external_sort::Big1 >();
+            add< external_sort::D1 >();
         }
     } myall;
 
