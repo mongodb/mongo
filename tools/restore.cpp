@@ -32,9 +32,14 @@ namespace po = boost::program_options;
 class Restore : public Tool {
 public:
     Restore() : Tool( "restore" , "" ){
-        add_options()
+        add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
+        addPositionArg("dir", 1);
+    }
+
+    virtual void printExtraHelp(ostream& out) {
+        out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
     }
 
     int run(){
