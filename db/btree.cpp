@@ -217,8 +217,10 @@ namespace mongo {
     }
 
     /* add a key.  must be > all existing.  be careful to set next ptr right. */
-    void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
+    bool BucketBasics::_pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
+        if ( bytesNeeded > emptySize )
+            return false;
         assert( bytesNeeded <= emptySize );
         assert( n == 0 || keyNode(n-1).key.woCompare(key, order) <= 0 );
         emptySize -= sizeof(_KeyNode);
@@ -228,6 +230,7 @@ namespace mongo {
         kn.setKeyDataOfs( (short) _alloc(key.objsize()) );
         char *p = dataAt(kn.keyDataOfs());
         memcpy(p, key.objdata(), key.objsize());
+        return true;
     }
     /*void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild) { 
         pushBack(recordLoc, key, order, prevChild);
@@ -920,9 +923,7 @@ namespace mongo {
         }
         keyLast = key;
 
-        try {
-            b->pushBack(loc, key, order, DiskLoc());
-        } catch( AssertionException& ) { 
+        if ( ! b->_pushBack(loc, key, order, DiskLoc()) ){
             // no room
             if ( key.objsize() > KeyMax ) {
                 problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
@@ -959,10 +960,8 @@ namespace mongo {
                 assert( rchild.isNull() );
                 if( x->n == 0 )
                     log() << "warning: empty bucket on BtreeBuild " << k.toString() << endl;
-                try { 
-                    up->pushBack(r, k, order, xloc);
-                }
-                catch(AssertionException&) { 
+
+                if ( ! up->_pushBack(r, k, order, xloc) ){
                     // current bucket full
                     DiskLoc n = BtreeBucket::addBucket(idx);
                     up->tempNext() = n;

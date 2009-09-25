@@ -30,7 +30,7 @@
 namespace po = boost::program_options;
 
 namespace mongo {
-
+    
     namespace regression {
 
         map<string,Suite*> * mongo::regression::Suite::_suites = 0;
@@ -78,19 +78,34 @@ namespace mongo {
                 r->_tests++;
 
                 bool passes = false;
-
+                
                 log(1) << "\t" << tc->getName() << endl;
-
+                
+                stringstream err;
+                err << tc->getName() << "\t";
+                
                 try {
                     tc->run();
                     passes = true;
                 }
-                catch ( ... ){
-                    log() << "unknown exception in test: " << tc->getName() << endl;
+                catch ( MyAssertionException * ae ){
+                    err << ae->ss.str();
+                    delete( ae );
                 }
-
-                if ( ! passes )
+                catch ( std::exception& e ){
+                    err << " exception " << " : " << e.what();
+                }
+                catch ( int x ){
+                    err << " caught int : " << x << endl;
+                }
+                catch ( ... ){
+                    cerr << "unknown exception in test: " << tc->getName() << endl;
+                }
+                
+                if ( ! passes ){
                     r->_fails++;
+                    r->_messages.push_back( err.str() );
+                }
             }
 
             return r;
@@ -270,7 +285,7 @@ namespace mongo {
         void assert_fail( const char * exp , const char * file , unsigned line ){
             Result::cur->_asserts++;
             Result::cur->_fails++;
-
+            
             stringstream ss;
             ss << "ASSERT FAILED! " << file << ":" << line << endl;
             log() << ss.str() << endl;
@@ -297,6 +312,12 @@ namespace mongo {
 #endif
         }
 
+        MyAssertionException * MyAsserts::getBase(){
+            MyAssertionException * e = new MyAssertionException();
+            e->ss << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
+            return e;
+        }
+        
         void MyAsserts::printLocation(){
             log() << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
         }
@@ -307,18 +328,24 @@ namespace mongo {
                 return;
 
             printLocation();
-            log() << a << " != " << b << endl;
-            throw -1;
+
+            MyAssertionException * e = getBase();
+            e->ss << a << " != " << b << endl;
+            log() << e->ss.str() << endl;
+            throw e;
         }
 
         void MyAsserts::ae( string a , string b ){
             Result::cur->_asserts++;
             if ( a == b )
                 return;
-
+            
             printLocation();
-            log() << a << " != " << b << endl;
-            throw -1;
+
+            MyAssertionException * e = getBase();
+            e->ss << a << " != " << b << endl;
+            log() << e->ss.str() << endl;
+            throw e;
         }
 
     }

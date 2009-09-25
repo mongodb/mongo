@@ -102,7 +102,14 @@ namespace mongo {
            keypos is where to insert -- inserted after that key #.  so keypos=0 is the leftmost one.
         */
         bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const BSONObj &order);
-        void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
+        
+        /**
+         * @return true if works, false if not enough space
+         */
+        bool _pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
+        void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild){
+            assert( _pushBack( recordLoc , key , order , prevChild ) );
+        }
         //void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild);
         void popBack(DiskLoc& recLoc, BSONObj& key, DiskLoc& rchild);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
