@@ -16,12 +16,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 
 #include "extsort.h"
 #include "namespace.h"
 #include "../util/file.h"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -29,18 +28,18 @@
 namespace mongo {
 
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
-        : _order( order ) , _maxFilesize( maxFileSize ) , 
-          _map(0), _mapSizeSoFar(0), _largestObject(0),  _sorted(0){
+        : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
+          _map(0), _mapSizeSoFar(0), _sorted(0){
         
         stringstream rootpath;
         rootpath << dbpath;
-	if ( dbpath[dbpath.size()-1] != '/' )
-	  rootpath << "/";
-	rootpath << "esort." << time(0) << "." << rand() << "/";
+        if ( dbpath[dbpath.size()-1] != '/' )
+            rootpath << "/";
+        rootpath << "esort." << time(0) << "." << rand() << "/";
         _root = rootpath.str();
         
         create_directories( _root );
-
+        
     }
     
     BSONObjExternalSorter::~BSONObjExternalSorter(){
@@ -75,15 +74,13 @@ namespace mongo {
         uassert( "sorted already" , ! _sorted );
         
         if ( ! _map ){
-            _map = new multimap<BSONObj,DiskLoc,BSONObjCmp>( _order );
+            _map = new InMemory( _order );
         }
         
-        _map->insert( pair<BSONObj,DiskLoc>( o , loc ) );
+        _map->insert( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
 
         long size = o.objsize();
         _mapSizeSoFar += size + sizeof( DiskLoc );
-        if ( size > _largestObject )
-            _largestObject = size;
         
         if ( _mapSizeSoFar > _maxFilesize )
             finishMap();
@@ -101,21 +98,22 @@ namespace mongo {
         ss << _root.string() << "file." << _files.size();
         string file = ss.str();
         
-        int out = open( file.c_str() , O_WRONLY | O_CREAT | O_TRUNC , 0666 );
-        uassert( (string)"couldn't open file: " + file , out > 0 );
+        ofstream out;
+        out.open( file.c_str() , ios_base::out | ios_base::binary );
+        uassert( (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;
-        for ( multimap<BSONObj,DiskLoc,BSONObjCmp>::iterator i=_map->begin(); i != _map->end(); i++ ){
-            pair<BSONObj,DiskLoc> p = *i;
-            assert( write( out , p.first.objdata() , p.first.objsize() ) > 0 );
-            assert( write( out , & p.second , sizeof( DiskLoc ) ) > 0 );
+        for ( InMemory::iterator i=_map->begin(); i != _map->end(); i++ ){
+            Data p = *i;
+            out.write( p.first.objdata() , p.first.objsize() );
+            out.write( (char*)(&p.second) , sizeof( DiskLoc ) );
             num++;
         }
         
         _map->clear();
         
         _files.push_back( file );
-        close( out );
+        out.close();
 
         log(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
     }
@@ -124,7 +122,7 @@ namespace mongo {
 
     BSONObjExternalSorter::Iterator::Iterator( BSONObjExternalSorter * sorter ) : _cmp( sorter->_order ){
         for ( list<string>::iterator i=sorter->_files.begin(); i!=sorter->_files.end(); i++ ){
-            _files.push_back( new FileIterator( *i , sorter->_largestObject + 256 ) );
+            _files.push_back( new FileIterator( *i ) );
             _stash.push_back( pair<Data,bool>( Data( BSONObj() , DiskLoc() ) , false ) );
         }
     }
@@ -158,7 +156,7 @@ namespace mongo {
                     continue;
             }
             
-            if ( slot == -1 || _cmp( best.first , _stash[i].first.first ) == 0 ){
+            if ( slot == -1 || _cmp( best , _stash[i].first ) == 0 ){
                 best = _stash[i].first;
                 slot = i;
             }
@@ -173,44 +171,25 @@ namespace mongo {
 
     // -----------------------------------
     
-    BSONObjExternalSorter::FileIterator::FileIterator( string file , int bufSize ) : _fd(0),_buf(0){
-        _fd = open( file.c_str() , O_RDONLY );
-        uassert( (string)"couldn't open file:" + file , _fd > 0 );
-
-        _buf = (char*)malloc( bufSize );
-        assert( _buf );
-
-        _length = file_size( file );
-        _read = 0;
+    BSONObjExternalSorter::FileIterator::FileIterator( string file ){
+        long length;
+        _buf = (char*)_file.map( file.c_str() , length );
+        assert( (unsigned long)length == file_size( file ) );
+        _end = _buf + length;
     }
     BSONObjExternalSorter::FileIterator::~FileIterator(){
-        if ( _fd ){
-            close( _fd );
-            _fd = 0;
-        }
-        
-        if ( _buf ){
-            free( _buf );
-            _buf = 0;
-        }
     }
     
     bool BSONObjExternalSorter::FileIterator::more(){
-        return _read < _length;
+        return _buf < _end;
     }
     
     pair<BSONObj,DiskLoc> BSONObjExternalSorter::FileIterator::next(){
-        assert( 4 == read( _fd , _buf , 4 ) );
-        int toread = ((int*)_buf)[0] - 4;
-        assert( toread == read( _fd , _buf + 4 , toread ) );
-        
         BSONObj o( _buf );
-        DiskLoc l;
-        assert( sizeof( DiskLoc ) == read( _fd , &l , sizeof( DiskLoc ) ) );
-        
-        _read += 4 + toread + sizeof( DiskLoc );
-
-        return Data( o , l );
+        _buf += o.objsize();
+        DiskLoc * l = (DiskLoc*)_buf;
+        _buf += 8;
+        return Data( o , *l );
     }
     
 }

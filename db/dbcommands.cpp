@@ -1365,8 +1365,9 @@ namespace mongo {
                     uassert( "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
                 }
             }
-            
-            BSONObjBuilder b( size );
+
+            assert( size <= 0x7fffffff );            
+            BSONObjBuilder b( (int) size );
             int n=0;
             for ( set<BSONObj,BSONObjCmp>::iterator i = map.begin() ; i != map.end(); i++ ){
                 b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );

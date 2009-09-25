@@ -317,7 +317,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
         //if( database->profile )
@@ -328,7 +328,7 @@ namespace mongo {
         assert( d.moreJSObjs() );
         assert( query.objsize() < m.data->dataLen() );
         BSONObj toupdate = d.nextJsObj();
-
+        uassert("update object too large", toupdate.objsize() <= MaxBSONObjectSize);
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
         bool upsert = flags & 1;
@@ -337,7 +337,7 @@ namespace mongo {
             ss << " query: " << s;
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
-        bool updatedExisting = updateObjects(ns, toupdate, query, flags & 1, ss);
+        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss);
         recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
     }
 
@@ -345,7 +345,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
         int flags = d.pullInt();
@@ -463,14 +463,14 @@ namespace mongo {
         DbMessage d(m);
 		const char *ns = d.getns();
 		assert(*ns);
-        uassert( "not master", isMaster( ns ) );
+        uassert( "not master", isMasterNs( ns ) );
 		setClient(ns);
         Top::setWrite();
 		ss << ns;
 		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
-
+            uassert("object to insert too large", js.objsize() <= MaxBSONObjectSize);
             theDataFileMgr.insert(ns, js, false);
             logOp("i", ns, js);
         }

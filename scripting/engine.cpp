@@ -18,22 +18,51 @@ namespace mongo {
     ScriptEngine::~ScriptEngine(){
     }
 
+    void Scope::append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName ){
+        int t = type( scopeName );
+        
+        switch ( t ){
+        case Object:
+            builder.append( fieldName , getObject( scopeName ) );
+            break;
+        case Array:
+            builder.appendArray( fieldName , getObject( scopeName ) );
+            break;
+        case NumberDouble:
+            builder.append( fieldName , getNumber( scopeName ) );
+            break;
+        case String:
+            builder.append( fieldName , getString( scopeName ).c_str() );
+            break;
+        case Bool:
+            builder.appendBool( fieldName , getBoolean( scopeName ) );
+            break;
+        case jstNULL:
+        case Undefined:
+            builder.appendNull( fieldName );
+            break;
+        case Date:
+            builder.appendDate( fieldName , (unsigned long long) getNumber( scopeName ) );
+            break;
+        default:
+            stringstream temp;
+            temp << "can't append type from:";
+            temp << t;
+            uassert( temp.str() , 0 );
+        }
+        
+    }
+
     int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ){
         ScriptingFunction func = createFunction( code );
         uassert( "compile failed" , func );
         return invoke( func , args, timeoutMs );
     }
-
+    
     bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
         
         path p( filename );
-        if ( is_directory( p ) ){
-            cerr << "can't read directory [" << filename << "]" << endl;
-            if ( assertOnError )
-                assert( 0 );
-            return false;
-        }
-        
+
         if ( ! exists( p ) ){
             cerr << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
@@ -41,6 +70,13 @@ namespace mongo {
             return false;
         }
 
+        if ( is_directory( p ) ){
+            cerr << "can't read directory [" << filename << "]" << endl;
+            if ( assertOnError )
+                assert( 0 );
+            return false;
+        }
+        
         File f;
         f.open( filename.c_str() );
 

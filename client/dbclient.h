@@ -196,6 +196,18 @@ namespace mongo {
             return o;
         }
 
+        /**
+           iterate the rest of the cursor and return the number if items
+         */
+        int itcount(){
+            int c = 0;
+            while ( more() ){
+                next();
+                c++;
+            }
+            return c;
+        }
+
         /** cursor no longer valid -- use with tailable cursors.
            note you should only rely on this once more() returns false;
            'dead' may be preset yet some data still queued and locally
@@ -604,6 +616,20 @@ namespace mongo {
            clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
          */
         virtual void resetIndexCache();
+
+        virtual auto_ptr<DBClientCursor> getIndexes( const string &ns );
+        
+        virtual void dropIndex( const string& ns , BSONObj keys );
+        virtual void dropIndex( const string& ns , const string& indexName );
+        
+        /**
+           drops all indexes for the collection
+         */
+        virtual void dropIndexes( const string& ns );
+
+        virtual void reIndex( const string& ns );
+        
+        string genIndexName( const BSONObj& keys );
         
         virtual string getServerAddress() const = 0;
         

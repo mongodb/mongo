@@ -114,8 +114,10 @@ namespace mongo {
 		if( !slave ) 
 			return true;
 
-        if ( !client )
+        if ( !client ) {
+            assert( database );
             client = database->name.c_str();
+        }
 
         if ( replAllDead )
             return strcmp( client, "local" ) == 0;
@@ -124,6 +126,13 @@ namespace mongo {
 			if( replPair->state == ReplPair::State_Master )
 				return true;
 		}
+        else { 
+            if( master ) {
+                // if running with --master --slave, allow.  note that master is also true 
+                // for repl pairs so the check for replPair above is important.
+                return true;
+            }
+        }
 
         return strcmp( client, "local" ) == 0;
     }

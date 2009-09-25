@@ -78,6 +78,7 @@ namespace mongo {
 
     /* this class is all about the storage management */
     class BucketBasics {
+        friend class BtreeBuilder;
         friend class KeyNode;
     public:
         void dumpTree(DiskLoc thisLoc, const BSONObj &order);
@@ -86,10 +87,6 @@ namespace mongo {
         int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
     protected:
         void modified(const DiskLoc& thisLoc);
-        DiskLoc& getChild(int pos) {
-            assert( pos >= 0 && pos <= n );
-            return pos == n ? nextChild : k(pos).prevChildBucket;
-        }
         KeyNode keyNode(int i) const {
             assert( i < n );
             return KeyNode(*this, k(i));
@@ -106,6 +103,8 @@ namespace mongo {
         */
         bool basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const BSONObj &order);
         void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
+        //void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild);
+        void popBack(DiskLoc& recLoc, BSONObj& key, DiskLoc& rchild);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 
         /* !Packed means there is deleted fragment space within the bucket.
@@ -114,7 +113,7 @@ namespace mongo {
            */
         enum Flags { Packed=1 };
 
-        DiskLoc childForPos(int p) {
+        DiskLoc& childForPos(int p) {
             return p == n ? nextChild : k(p).prevChildBucket;
         }
 
@@ -125,6 +124,12 @@ namespace mongo {
         int _alloc(int bytes);
         void truncateTo(int N, const BSONObj &order);
         void markUnused(int keypos);
+
+        /* BtreeBuilder uses the parent var as a temp place to maintain a linked list chain. 
+           we use tempNext() when we do that to be less confusing. (one might have written a union in C)
+           */
+        DiskLoc& tempNext() { return parent; }
+
     public:
         DiskLoc parent;
 
@@ -171,7 +176,7 @@ namespace mongo {
         */
         bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
 
-        static DiskLoc addHead(IndexDetails&); /* start a new index off, empty */
+        static DiskLoc addBucket(IndexDetails&); /* start a new index off, empty */
 
 	static void renameIndexNamespace(const char *oldNs, const char *newNs);
 
@@ -211,7 +216,9 @@ namespace mongo {
                     DiskLoc lChild, DiskLoc rChild, IndexDetails&);
         bool find(const IndexDetails& idx, const BSONObj& key, DiskLoc recordLoc, const BSONObj &order, int& pos, bool assertIfDup);
         static void findLargestKey(const DiskLoc& thisLoc, DiskLoc& largestLoc, int& largestKey);
-        string dupKeyError( const IndexDetails& idx , const BSONObj& key );
+    public:
+        // simply builds and returns a dup key error message string
+        static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
     };
 
     class BtreeCursor : public Cursor {
@@ -345,5 +352,37 @@ namespace mongo {
     inline bool IndexDetails::hasKey(const BSONObj& key) { 
         return head.btree()->exists(*this, head, key, keyPattern());
     }
+
+    /* build btree from the bottom up */
+    /* _ TODO dropDups */
+    class BtreeBuilder {
+        bool dupsAllowed; 
+        IndexDetails& idx;
+        unsigned long long n;
+        BSONObj keyLast;
+        BSONObj order;
+        bool committed;
+
+        DiskLoc cur, first;
+        BtreeBucket *b;
+
+        void newBucket();
+        void buildNextLevel(DiskLoc);
+
+    public:
+        ~BtreeBuilder();
+
+        BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx);
+
+        /* keys must be added in order */
+        void addKey(BSONObj& key, DiskLoc loc);
+
+        /* commit work.  if not called, destructor will clean up partially completed work 
+           (in case exception has happened).
+        */
+        void commit();
+
+        unsigned long long getn() { return n; }
+    };
 
 } // namespace mongo;

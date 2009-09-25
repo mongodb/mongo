@@ -38,6 +38,7 @@ _ disallow system* manipulations from the database.
 #include "dbhelpers.h"
 #include "namespace.h"
 #include "queryutil.h"
+#include "extsort.h"
 
 namespace mongo {
 
@@ -1028,16 +1029,128 @@ assert( !eloc.isNull() );
         }
     }
 
+    void testSorting() 
+    {
+        BSONObjBuilder b;
+        b.appendNull("");
+        BSONObj x = b.obj();
+
+        BSONObjExternalSorter sorter;
+
+        sorter.add(x, DiskLoc(3,7));
+        sorter.add(x, DiskLoc(4,7));
+        sorter.add(x, DiskLoc(2,7));
+        sorter.add(x, DiskLoc(1,7));
+        sorter.add(x, DiskLoc(3,77));
+
+        sorter.sort();
+
+        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+        while( i->more() ) { 
+            BSONObjExternalSorter::Data d = i->next();
+            cout << d.second.toString() << endl;
+            cout << d.first.objsize() << endl;
+            cout<<"SORTER next:" << d.first.toString() << endl;
+        }
+    }
+
+    /* _ TODO dropDups 
+    */
+    unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+//        testSorting();
+
+        cout << "\n\nBuildindex " << ns << " idxNo:" << idxNo;
+        cout << ' ' << idx.info.obj().toString() << endl;
+
+        bool dupsAllowed = !idx.unique();
+        bool dropDups = idx.dropDups();
+        BSONObj order = idx.keyPattern();
+
+        idx.head.Null();
+
+        /* get and sort all the keys ----- */
+        unsigned long long n = 0;
+        auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+        BSONObjExternalSorter sorter(order);
+        int nkeys = 0;
+        while ( c->ok() ) {
+            BSONObj o = c->current();
+            DiskLoc loc = c->currLoc();
+
+            BSONObjSetDefaultOrder keys;
+            idx.getKeysFromObject(o, keys);
+            int k = 0;
+            for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                if( ++k == 2 )
+                    d->setIndexIsMultikey(idxNo);
+//cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
+                sorter.add(*i, loc);
+                nkeys++;
+            }
+
+            c->advance();
+            n++;
+        };
+        sorter.sort();
+
+/*        if( 0 && idxNo == 1 ) { 
+            // TEMP!
+
+            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+            while( i->more() ) { 
+                BSONObjExternalSorter::Data d = i->next();
+                cout << d.second.toString() << endl;
+                cout << d.first.objsize() << endl;
+                cout<<"SORTER next:" << d.first.toString() << endl;
+            }
+
+            cout << "stop here" << endl;
+            cout << "stop here" << endl;
+        }
+*/
+        list<DiskLoc> dupsToDrop;
+
+        /* build index --- */ 
+        {
+            BtreeBuilder btBuilder(dupsAllowed, idx);
+            BSONObj keyLast;
+            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+            while( i->more() ) { 
+                BSONObjExternalSorter::Data d = i->next();
+//                cout<<"TEMP SORTER next " << d.first.toString() << endl;
+                try { 
+                    btBuilder.addKey(d.first, d.second);
+                }
+                catch( AssertionException& ) { 
+                    if( !dupsAllowed ) { 
+                        if( dropDups ) { 
+                            /* we could queue these on disk, but normally there are very few dups, so instead we 
+                            keep in ram and have a limit.
+                            */
+                            dupsToDrop.push_back(d.second);
+                            uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+                        }
+                    else
+                        throw;
+                    }
+                }
+            }
+            btBuilder.commit();
+            wassert( btBuilder.getn() == nkeys || dropDups ); 
+        }
+
+        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
+            theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
+
+        return n;
+    }
+
     /* note there are faster ways to build an index in bulk, that can be
        done eventually */
-    void addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+    int addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups();
 
-        Timer t;
-        Nullstream& l = log();
-        l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
-        l.flush();
         int n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         while ( c->ok() ) {
@@ -1051,20 +1164,29 @@ assert( !eloc.isNull() );
                     c->advance();
                     theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
                 } else {
-                    l << endl;
+                    _log() << endl;
                     log(2) << "addExistingToIndex exception " << e.what() << endl;
                     throw;
                 }
             }
             n++;
         };
-        l << "done for " << n << " records";
-        l << endl;
+        return n;
     }
 
     void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
-        idx.head = BtreeBucket::addHead(idx);
-        addExistingToIndex(ns.c_str(), d, idx, idxNo);
+        Nullstream& l = log();
+        l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
+        l.flush();
+        Timer t;
+
+        unsigned long long n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
+        assert( !idx.head.isNull() );
+        //idx.head = BtreeBucket::addBucket(idx);
+        //int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+
+        l << "done for " << n << " records " << t.millis() / 1000.0 << "secs";
+        l << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1078,7 +1200,10 @@ assert( !eloc.isNull() );
                 _indexRecord(d, i, obj, newRecordLoc, /*dupsAllowed*/!unique);
             }
             catch( DBException& ) { 
-                // try to roll back previously added index entries
+                /* try to roll back previously added index entries
+                   note <= i (not < i) is important here as the index we were just attempted
+                   may be multikey and require some cleanup.
+                */
                 for( int j = 0; j <= i; j++ ) { 
                     try {
                         _unindexRecord(d->indexes[j], obj, newRecordLoc, false);
@@ -1342,7 +1467,7 @@ assert( !eloc.isNull() );
             int idxNo = tableToIndex->nIndexes;
             IndexDetails& idx = tableToIndex->indexes[idxNo];
             idx.info = loc;
-            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh
+            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh; increments nIndexes
             try {
                 buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
@@ -1628,5 +1753,7 @@ namespace mongo {
             i++;
         }
     }
+
+    NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
 } // namespace mongo

@@ -70,7 +70,8 @@ namespace mongo {
             assert(!isNull());
         }
         void setInvalid() {
-            fileNo = -2;
+            fileNo = -2; 
+            ofs = 0;
         }
         bool isValid() const {
             return fileNo != -2;

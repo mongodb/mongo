@@ -24,6 +24,8 @@ public:
     /* insert specified data as a record */
     virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) = 0;
 
+    virtual void deleteRecord(const char *ns, DiskLoc d) { massert("not implemented RecStoreInterface::deleteRecord", false); }
+
     /* drop the collection */
     virtual void drop(const char *ns) = 0;
 

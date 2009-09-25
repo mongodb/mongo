@@ -35,7 +35,7 @@ namespace BtreeTests {
             BSONObj bobj = builder.done();
             idx_.info =
                 theDataFileMgr.insert( ns(), bobj.objdata(), bobj.objsize() );
-            idx_.head = BtreeBucket::addHead( idx_ );
+            idx_.head = BtreeBucket::addBucket( idx_ );
         }
         ~Base() {
             // FIXME cleanup all btree buckets.

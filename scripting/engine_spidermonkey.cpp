@@ -738,16 +738,18 @@ namespace mongo {
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
         Convertor c(cx);
         uassert( "native_helper needs at least 1 arg" , argc >= 1 );
-
-        NativeFunction func = (NativeFunction)JSVAL_TO_PRIVATE( argv[0] );
-
+        
+        NativeFunction func = (NativeFunction)((long long)c.toNumber( argv[0] ));
+        assert( func );
+        
         BSONObjBuilder args;
         for ( uintN i=1; i<argc; i++ ){
             c.append( args , args.numStr( i ) , argv[i] );
         }
-
-        BSONObj out = func( args.obj() );
-
+        
+        BSONObj a = args.obj();
+        BSONObj out = func( a );
+        
         if ( out.isEmpty() ){
             *rval = JSVAL_VOID;
         }
@@ -831,8 +833,13 @@ namespace mongo {
             uassert( "JS_NewRuntime failed" , _runtime );
             
             if ( ! utf8Ok() ){
-                cerr << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
+                log() << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
             }
+
+            int x = 0;
+            assert( x = 1 );
+            if ( x != 1 )
+                throw -1;
         }
 
         ~SMEngine(){
@@ -1201,27 +1208,31 @@ namespace mongo {
 
             return worked;
         }
-
+        
         int invoke( JSFunction * func , const BSONObj& args, int timeoutMs , bool ignoreReturn ){
             smlock;
             precall();
 
+            assert( JS_EnterLocalRootScope( _context ) );
+                
             int nargs = args.nFields();
             auto_ptr<jsval> smargsPtr( new jsval[nargs] );
             jsval* smargs = smargsPtr.get();
             if ( nargs ){
-                
                 BSONObjIterator it( args );
-                for ( int i=0; i<nargs; i++ )
+                for ( int i=0; i<nargs; i++ ){
                     smargs[i] = _convertor->toval( it.next() );
+                }
             }
-            
+
             if ( args.isEmpty() ){
                 _convertor->setProperty( _global , "args" , JSVAL_NULL );
             }
             else {
                 setObject( "args" , args , true ); // this is for backwards compatability
             }
+
+            JS_LeaveLocalRootScope( _context );
 
             installCheckTimeout( timeoutMs );
             jsval rval;
@@ -1254,7 +1265,7 @@ namespace mongo {
         void injectNative( const char *field, NativeFunction func ){
             smlock;
             string name = field;
-            _convertor->setProperty( _global , (name + "_").c_str() , PRIVATE_TO_JSVAL( func ) );
+            _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
             stringstream code;
             code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";

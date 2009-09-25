@@ -554,6 +554,70 @@ namespace mongo {
         say( toSend );
     }
 
+    auto_ptr<DBClientCursor> DBClientBase::getIndexes( const string &ns ){
+        return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
+    }
+    
+    void DBClientBase::dropIndex( const string& ns , BSONObj keys ){
+        dropIndex( ns , genIndexName( keys ) );
+    }
+
+
+    void DBClientBase::dropIndex( const string& ns , const string& indexName ){
+        BSONObj info;
+        if ( ! runCommand( nsToClient( ns.c_str() ) , 
+                           BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
+                           info ) ){
+            log() << "dropIndex failed: " << info << endl;
+            uassert( "dropIndex failed" , 0 );
+        }
+        resetIndexCache();
+    }
+    
+    void DBClientBase::dropIndexes( const string& ns ){
+        BSONObj info;
+        uassert( "dropIndexes failed" , runCommand( nsToClient( ns.c_str() ) , 
+                                                    BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") , 
+                                                    info ) );
+        resetIndexCache();
+    }
+
+    void DBClientBase::reIndex( const string& ns ){
+        list<BSONObj> all;
+        auto_ptr<DBClientCursor> i = getIndexes( ns );
+        while ( i->more() ){
+            all.push_back( i->next().getOwned() );
+        }
+        
+        dropIndexes( ns );
+        
+        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ){
+            BSONObj o = *i;
+            insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
+        }
+        
+    }
+    
+
+    string DBClientBase::genIndexName( const BSONObj& keys ){
+        stringstream ss;
+        
+        bool first = 1;
+        for ( BSONObjIterator i(keys); i.more(); ) {
+            BSONElement f = i.next();
+            
+            if ( first )
+                first = 0;
+            else
+                ss << "_";
+            
+            ss << f.fieldName() << "_";
+            if( f.isNumber() )
+                ss << f.numberInt();
+        }
+        return ss.str();
+    }
+
     bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
@@ -567,24 +631,9 @@ namespace mongo {
             cacheKey += name;
         }
         else {
-            stringstream ss;
-            
-            bool first = 1;
-            for ( BSONObjIterator i(keys); i.more(); ) {
-                BSONElement f = i.next();
-
-                if ( first )
-                    first = 0;
-                else
-                    ss << "_";
-
-                ss << f.fieldName() << "_";
-                if( f.isNumber() )
-                    ss << f.numberInt();
-            }
-
-            toSave.append( "name" , ss.str() );
-            cacheKey += ss.str();
+            string nn = genIndexName( keys );
+            toSave.append( "name" , nn );
+            cacheKey += nn;
         }
         
         if ( unique )

@@ -20,7 +20,7 @@
 #include "client/gridfs.h"
 #include "client/dbclient.h"
 
-#include "Tool.h"
+#include "tool.h"
 
 #include <fstream>
 #include <iostream>
@@ -34,6 +34,9 @@ namespace po = boost::program_options;
 class Files : public Tool {
 public:
     Files() : Tool( "files" ){
+        add_options()
+            ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
+            ;
         add_hidden_options()
             ( "command" , po::value<string>() , "command (list|search|put|get)" )
             ( "file" , po::value<string>() , "filename for get|put" )
@@ -43,15 +46,15 @@ public:
     }
 
     virtual void printExtraHelp( ostream & out ){
-        out << "usage: " << _name << " [options] command [filename]" << endl;
+        out << "usage: " << _name << " [options] command [gridfs filename]" << endl;
         out << "command:" << endl;
         out << "  one of (list|search|put|get)" << endl;
-        out << "  list - list all files.  takes an optional prefix " << endl;
+        out << "  list - list all files.  'gridfs filename' is an optional prefix " << endl;
         out << "         which listed filenames must begin with." << endl;
-        out << "  search - search all files. takes an optional substring " << endl;
+        out << "  search - search all files. 'gridfs filename' is a substring " << endl;
         out << "           which listed filenames must contain." << endl;
-        out << "  put - add a file" << endl;
-        out << "  get - get a file" << endl;
+        out << "  put - add a file with filename 'gridfs filename'" << endl;
+        out << "  get - get a file with filename 'gridfs filename'" << endl;
     }
 
     void display( GridFS * grid , BSONObj obj ){
@@ -68,7 +71,8 @@ public:
     int run(){
         string cmd = getParam( "command" );
         if ( cmd.size() == 0 ){
-            cerr << "need command" << endl;
+            cerr << "ERROR: need command" << endl << endl;
+            printHelp(cout);
             return -1;
         }
 
@@ -86,7 +90,8 @@ public:
         }
 
         if ( filename.size() == 0 ){
-            cerr << "need a filename" << endl;
+            cerr << "ERROR: need a filename" << endl << endl;
+            printHelp(cout);
             return -1;
         }
 
@@ -100,23 +105,24 @@ public:
         if ( cmd == "get" ){
             GridFile f = g.findFile( filename );
             if ( ! f.exists() ){
-                cerr << "file not found" << endl;
+                cerr << "ERROR: file not found" << endl;
                 return -2;
             }
 
-            string out = f.getFilename();
+            string out = getParam("local", f.getFilename());
             f.write( out );
             cout << "done write to: " << out << endl;
             return 0;
         }
 
         if ( cmd == "put" ){
-            cout << "file object: " << g.storeFile( filename ) << endl;
+            cout << "file object: " << g.storeFile(getParam("local", filename), filename) << endl;
             cout << "done!";
             return 0;
         }
 
-        cerr << "unknown command: " << cmd << endl;
+        cerr << "ERROR: unknown command '" << cmd << "'" << endl << endl;
+        printHelp(cout);
         return -1;
     }
 };

@@ -26,7 +26,7 @@
 #include <map>
 
 namespace mongo {
-    
+
     /**
        for sorting by BSONObj and attaching a value
      */
@@ -34,21 +34,38 @@ namespace mongo {
     public:
         
         typedef pair<BSONObj,DiskLoc> Data;
-
+        
+    private:
         class FileIterator : boost::noncopyable {
         public:
-            FileIterator( string file , int bufSize );
+            FileIterator( string file );
             ~FileIterator();
             bool more();
             Data next();            
         private:
-            int _fd;
+            MemoryMappedFile _file;
             char * _buf;
-            long _read;
-            long _length;
+            char * _end;
+        };
+
+        class MyCmp {
+        public:
+            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
+            bool operator()( const Data &l, const Data &r ) const {
+                int x = l.first.woCompare( r.first , _order );
+                if ( x )
+                    return x < 0;
+                return l.second.compare( r.second ) < 0;
+            };
+        private:
+            BSONObj _order;
         };
         
-        class Iterator {
+    public:
+
+        typedef set<Data,MyCmp> InMemory;
+
+        class Iterator : boost::noncopyable {
         public:
             
             Iterator( BSONObjExternalSorter * sorter );
@@ -57,7 +74,7 @@ namespace mongo {
             Data next();
             
         private:
-            BSONObjCmp _cmp;
+            MyCmp _cmp;
             vector<FileIterator*> _files;
             vector< pair<Data,bool> > _stash;
         };
@@ -70,11 +87,12 @@ namespace mongo {
             add( o , DiskLoc( a , b ) );
         }
 
+        /* call after adding values, and before fetching the iterator */
         void sort();
         
-        Iterator iterator(){
+        auto_ptr<Iterator> iterator(){
             uassert( "not sorted" , _sorted );
-            return Iterator( this );
+            return auto_ptr<Iterator>( new Iterator( this ) );
         }
         
     private:
@@ -86,11 +104,9 @@ namespace mongo {
         long _maxFilesize;
         path _root;
         
-        multimap<BSONObj,DiskLoc,BSONObjCmp> * _map;
+        InMemory * _map;
         long _mapSizeSoFar;
         
-        long _largestObject;
-
         list<string> _files;
         bool _sorted;
     };

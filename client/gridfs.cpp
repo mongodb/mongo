@@ -43,7 +43,7 @@ namespace mongo {
 
     }
 
-    BSONObj GridFS::storeFile( const string& fileName ){
+    BSONObj GridFS::storeFile( const string& fileName , const string& remoteName ){
         uassert( "file doesn't exist" , boost::filesystem::exists( fileName ) );
 
         gridfs_offset length = boost::filesystem::file_size( fileName );
@@ -56,7 +56,7 @@ namespace mongo {
             id.init();
             fileObject.appendOID( "_id" , &id );
 
-            fileObject << "filename" << fileName ;
+            fileObject << "filename" << (remoteName.empty() ? fileName : remoteName) ;
             massert("large files not yet implemented", length <= 0xffffffff);
             fileObject << "length" << (unsigned) length ;
             fileObject << "chunkSize" << DEFAULT_CHUNK_SIZE ;

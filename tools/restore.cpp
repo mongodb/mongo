@@ -19,7 +19,7 @@
 #include "../stdafx.h"
 #include "../client/dbclient.h"
 #include "../util/mmap.h"
-#include "Tool.h"
+#include "tool.h"
 
 #include <boost/program_options.hpp>
 
@@ -32,23 +32,24 @@ namespace po = boost::program_options;
 class Restore : public Tool {
 public:
     Restore() : Tool( "restore" , "" ){
-        add_options()
+        add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
+        addPositionArg("dir", 1);
+    }
+
+    virtual void printExtraHelp(ostream& out) {
+        out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
     }
 
     int run(){
         auth();
         path root = getParam("dir");
-        if (!is_directory(root)) {
-            cerr << "\"" << root.string() << "\" is not a valid directory" << endl;
-            return EXIT_BADOPTIONS;
-        }
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
-         * In that case we better be given a root directory that contains only
-         * .bson files (a db)
+         * In that case we better be given either a root directory that
+         * contains only .bson files or a single .bson file  (a db).
          */
         drillDown(root, _db != "");
         return EXIT_CLEAN;
@@ -126,11 +127,10 @@ public:
         long long read = 0;
         long long num = 0;
 
-        int msgDelay = (int)(1000 * ( 1 + ( fileLength / ( 1024.0 * 1024 * 400 ) ) ) );
-        log(1) << "\t msg delay: " << msgDelay << endl;
-
         const int BUF_SIZE = 1024 * 1024 * 5;
         char * buf = (char*)malloc( BUF_SIZE );
+
+        ProgressMeter m( fileLength );
 
         while ( read < fileLength ) {
             file.read( buf , 4 );
@@ -145,12 +145,13 @@ public:
             read += o.objsize();
             num++;
 
-            if ( ( logLevel > 0 && num < 10 ) || ! ( num % msgDelay ) )
-                out() << "read " << read << "/" << fileLength << " bytes so far. (" << (int)( (read * 100) / fileLength) << "%) " << num << " objects" << endl;
+            m.hit( o.objsize() );
         }
 
         free( buf );
-        out() << "\t "  << num << " objects" << endl;
+
+        uassert( "counts don't match" , m.done() == fileLength );
+        out() << "\t "  << m.hits() << " objects" << endl;
     }
 };
 

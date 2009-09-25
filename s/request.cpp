@@ -128,7 +128,7 @@ namespace mongo {
     }
     
     void ClientInfo::newRequest(){
-        _lastAccess = time(0);
+        _lastAccess = (int) time(0);
         
         set<string> * temp = _cur;
         _cur = _prev;

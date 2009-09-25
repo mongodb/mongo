@@ -27,7 +27,20 @@ namespace mongo {
 
     void jniCallback(Message& m, Message& out);
 
-// tempish...move to TLS or pass all the way down as a parm
+    /* Note the limit here is rather arbitrary and is simply a standard. generally the code works
+       with any object that fits in ram.
+
+       Also note that the server has some basic checks to enforce this limit but those checks are not exhaustive
+       for example need to check for size too big after
+         update $push (append) operation
+         various db.eval() type operations
+
+       Note also we sometimes do work with objects slightly larger - an object in the replication local.oplog
+       could be slightly larger.
+    */
+    const int MaxBSONObjectSize = 4 * 1024 * 1024;
+
+    // tempish...move to TLS or pass all the way down as a parm
     extern map<string,Database*> databases;
     extern Database *database;
     extern const char *curNs;
@@ -45,11 +58,11 @@ namespace mongo {
            variables.
         */
         requireInWriteLock();
-        
+
         log( 5 ) << "setClient: " << ns << endl;
-        
+
         Top::clientStart( ns );
-        
+
         curNs = ns;
         string key = getKey( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
@@ -101,7 +114,7 @@ namespace mongo {
     inline bool clientIsEmpty() {
         return !database->namespaceIndex.allocated();
     }
-    
+
     struct dbtemprelease {
         string clientname;
         string clientpath;

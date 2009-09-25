@@ -1,6 +1,6 @@
 // Tool.cpp
 
-#include "Tool.h"
+#include "tool.h"
 
 #include <iostream>
 
@@ -12,6 +12,26 @@ using namespace std;
 using namespace mongo;
 
 namespace po = boost::program_options;
+
+mongo::ProgressMeter::ProgressMeter( long long total , int secondsBetween )
+    : _total( total ) , _secondsBetween( secondsBetween ) , _done(0) , _hits(0) , _lastTime( time(0) ){
+
+}
+
+void mongo::ProgressMeter::hit( int n ){
+    _done += n;
+    _hits++;
+    if ( _hits % 100 )
+        return;
+    
+    int t = time(0);
+    if ( t - _lastTime < _secondsBetween )
+        return;
+
+    int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
+    cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
+    _lastTime = t;
+}
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
     _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {

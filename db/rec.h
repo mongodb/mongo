@@ -21,12 +21,18 @@ namespace mongo {
    storage
 */
 
+NamespaceDetails* nsdetails_notinline(const char *ns);
+
 class MongoMemMapped_RecStore : public RecStoreInterface { 
 public:
     virtual char* get(DiskLoc d, unsigned len) { return d.rec()->data; }
 
     virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theDataFileMgr.insert(ns, obuf, len, god);
+    }
+
+    virtual void deleteRecord(const char *ns, DiskLoc d) { 
+        theDataFileMgr._deleteRecord(nsdetails_notinline(ns), ns, d.rec(), d);
     }
 
     virtual void modified(DiskLoc d) { }

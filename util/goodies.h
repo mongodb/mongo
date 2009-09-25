@@ -26,18 +26,13 @@ namespace mongo {
 } // namespace mongo
 
 #include <pthread.h>
+#include <execinfo.h>
 
 namespace mongo {
 
     inline pthread_t GetCurrentThreadId() {
         return pthread_self();
     }
-
-} // namespace mongo
-
-#include <execinfo.h>
-
-namespace mongo {
 
     /* use "addr2line -CFe <exe>" to parse. */
     inline void printStackTrace( ostream &o = cout ) {

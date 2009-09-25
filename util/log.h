@@ -207,7 +207,14 @@ namespace mongo {
             Logstream::get().flush();
     }
 
-    inline Nullstream& log( int level = 0 ){
+    /* without prolog */
+    inline Nullstream& _log( int level = 0 ){
+        if ( level > logLevel )
+            return nullstream;
+        return Logstream::get();
+    }
+
+    inline Nullstream& log( int level = 0 ) {
         if ( level > logLevel )
             return nullstream;
         return Logstream::get().prolog();

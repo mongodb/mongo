@@ -264,7 +264,7 @@ namespace mongo {
 
             Timer t;
             bool ok = p.call(send, response);
-            double tm = t.micros() + 1;
+            double tm = ((double) t.micros()) + 1;
             out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
                  ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
             if (  q+1 < Loops ) {
@@ -407,8 +407,9 @@ namespace mongo {
         repairDatabases();
         if ( shouldRepairDatabases )
             return;
-        /* this is for security on certain platforms */
-        srand(curTimeMicros() ^ startupSrandTimer.micros());
+
+        /* this is for security on certain platforms (nonce generation) */
+        srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
         listen(listenPort);
 
@@ -476,6 +477,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("help,h", "show this usage information")
+        ("version", "show version information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
         ("port", po::value<int>(&cmdLine.port)->default_value(CmdLine::DefaultDBPort), "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
@@ -511,7 +513,7 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
         ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
         ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
-        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server (default 30)" )
+        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
         ;
 
     replication_options.add_options()
@@ -613,6 +615,11 @@ int main(int argc, char* argv[], char *envp[] )
 
         if (params.count("help")) {
             show_help_text(visible_options);
+            return 0;
+        }
+        if (params.count("version")) {
+            cout << mongodVersion() << endl;
+            printGitVersion();
             return 0;
         }
         dbpath = params["dbpath"].as<string>();

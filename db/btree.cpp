@@ -202,6 +202,20 @@ namespace mongo {
         setNotPacked();
     }
 
+    /* pull rightmost key from the bucket 
+    */
+    void BucketBasics::popBack(DiskLoc& recLoc, BSONObj& key, DiskLoc& rchild) { 
+        massert( "n==0 in btree popBack()", n > 0 );
+        assert( k(n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
+        KeyNode kn = keyNode(n-1);
+        recLoc = kn.recordLoc;
+        key = kn.key;
+        DiskLoc& rc = childForPos(n);
+        rchild = rc;
+        rc.Null();
+        n--;
+    }
+
     /* add a key.  must be > all existing.  be careful to set next ptr right. */
     void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild) {
         int bytesNeeded = key.objsize() + sizeof(_KeyNode);
@@ -215,6 +229,10 @@ namespace mongo {
         char *p = dataAt(kn.keyDataOfs());
         memcpy(p, key.objdata(), key.objsize());
     }
+    /*void BucketBasics::pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild) { 
+        pushBack(recordLoc, key, order, prevChild);
+        childForPos(n) = nextChild;
+    }*/
 
     /* insert a key in a bucket with no complexity -- no splits required */
     bool BucketBasics::basicInsert(const DiskLoc& thisLoc, int keypos, const DiskLoc& recordLoc, const BSONObj& key, const BSONObj &order) {
@@ -646,16 +664,16 @@ found:
     }
 
     /* start a new index off, empty */
-    DiskLoc BtreeBucket::addHead(IndexDetails& id) {
+    DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
         BtreeBucket *p = allocTemp();
         DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), p, p->Size(), true);
         free(p);
         return loc;
     }
 
-  void BtreeBucket::renameIndexNamespace(const char *oldNs, const char *newNs) {
-    btreeStore->rename( oldNs, newNs );
-  }
+    void BtreeBucket::renameIndexNamespace(const char *oldNs, const char *newNs) {
+        btreeStore->rename( oldNs, newNs );
+    }
 
     DiskLoc BtreeBucket::getHead(const DiskLoc& thisLoc) {
         DiskLoc p = thisLoc;
@@ -678,7 +696,7 @@ found:
         if ( !nextDown.isNull() ) {
             while ( 1 ) {
                 keyOfs = direction>0 ? 0 : nextDown.btree()->n - 1;
-                DiskLoc loc= nextDown.btree()->childForPos(keyOfs + adj);
+                DiskLoc loc = nextDown.btree()->childForPos(keyOfs + adj);
                 if ( loc.isNull() )
                     break;
                 nextDown = loc;
@@ -776,7 +794,7 @@ found:
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
-        DiskLoc& child = getChild(pos);
+        DiskLoc& child = childForPos(pos);
         if ( insert_debug )
             out() << "    getChild(" << pos << "): " << child.toString() << endl;
         if ( child.isNull() || !rChild.isNull() /* means an 'internal' insert */ ) {
@@ -858,7 +876,7 @@ namespace mongo {
 
         b->dumpTree(id.head, order);
 
-/*        b->bt_insert(id.head, B, key, order, false, id);
+        /*        b->bt_insert(id.head, B, key, order, false, id);
         b->k(1).setUnused();
 
         b->dumpTree(id.head, order);
@@ -873,6 +891,115 @@ namespace mongo {
         b->bt_insert(id.head, C, key, order, false, id);
 
         b->dumpTree(id.head, order);
+    }
+
+    /* --- BtreeBuilder --- */
+
+    BtreeBuilder::BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx) : 
+      dupsAllowed(_dupsAllowed), idx(_idx), n(0) 
+    {
+        first = cur = BtreeBucket::addBucket(idx);
+        b = cur.btreemod();
+        order = idx.keyPattern();
+        committed = false;
+    }
+
+    void BtreeBuilder::newBucket() { 
+        DiskLoc L = BtreeBucket::addBucket(idx);
+        b->tempNext() = L;
+        cur = L;
+        b = cur.btreemod();
+    }
+
+    void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) { 
+        if( n > 0 ) {
+            int cmp = keyLast.woCompare(key, order);
+            massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
+            if( cmp == 0 && !dupsAllowed )
+                uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
+        }
+        keyLast = key;
+
+        try {
+            b->pushBack(loc, key, order, DiskLoc());
+        } catch( AssertionException& ) { 
+            // no room
+            if ( key.objsize() > KeyMax ) {
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
+            }
+            else { 
+                // bucket was full
+                newBucket();
+                b->pushBack(loc, key, order, DiskLoc());
+            }
+        }
+        n++;
+    }
+
+    void BtreeBuilder::buildNextLevel(DiskLoc loc) { 
+        int levels = 1;
+        while( 1 ) { 
+            if( loc.btree()->tempNext().isNull() ) { 
+                // only 1 bucket at this level. we are done.
+                idx.head = loc;
+                break;
+            }
+            levels++;
+
+            DiskLoc upLoc = BtreeBucket::addBucket(idx);
+            DiskLoc upStart = upLoc;
+            BtreeBucket *up = upLoc.btreemod();
+
+            DiskLoc xloc = loc;
+            while( !xloc.isNull() ) { 
+                BtreeBucket *x = xloc.btreemod();
+                BSONObj k; 
+                DiskLoc r, rchild;
+                x->popBack(r,k,rchild);
+                assert( rchild.isNull() );
+                if( x->n == 0 )
+                    log() << "warning: empty bucket on BtreeBuild " << k.toString() << endl;
+                try { 
+                    up->pushBack(r, k, order, xloc);
+                }
+                catch(AssertionException&) { 
+                    // current bucket full
+                    DiskLoc n = BtreeBucket::addBucket(idx);
+                    up->tempNext() = n;
+                    upLoc = n; 
+                    up = upLoc.btreemod();
+                    up->pushBack(r, k, order, xloc);
+                }
+
+                xloc = x->tempNext(); /* get next in chain at current level */
+                x->parent = upLoc;
+            }
+            
+            loc = upStart;
+        }
+
+        if( levels > 1 )
+            log(2) << "btree levels: " << levels << endl;
+    }
+
+    /* when all addKeys are done, we then build the higher levels of the tree */
+    void BtreeBuilder::commit() { 
+        buildNextLevel(first);
+        committed = true;
+    }
+
+    BtreeBuilder::~BtreeBuilder() { 
+        if( !committed ) { 
+            log(2) << "Rolling back partially built index space" << endl;
+            DiskLoc x = first;
+            while( !x.isNull() ) { 
+                DiskLoc next = x.btree()->tempNext();
+                btreeStore->deleteRecord(idx.indexNamespace().c_str(), x);
+                x = next;
+            }
+            assert( idx.head.isNull() );
+            log(2) << "done rollback" << endl;
+        }
     }
 
 }

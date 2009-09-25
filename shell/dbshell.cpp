@@ -122,9 +122,18 @@ inline void setupSignals() {}
 #endif
 
 string fixHost( string url , string host , string port ){
+    //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
+    
     if ( host.size() == 0 && port.size() == 0 ){
-        if ( url.find( "/" ) == string::npos && url.find( "." ) != string::npos )
-            return url + "/test";
+        if ( url.find( "/" ) == string::npos ){
+            // check for ips
+            if ( url.find( "." ) != string::npos )
+                return url + "/test";
+            
+            if ( url.find( ":" ) != string::npos &&
+                 isdigit( url[url.find(":")+1] ) )
+                return url + "/test";
+        }
         return url;
     }
 
@@ -210,6 +219,7 @@ string finishCode( string code ){
 namespace po = boost::program_options;
 
 void show_help_text(const char* name, po::options_description options) {
+    cout << "MongoDB shell version: " << mongo::versionString << endl;
     cout << "usage: " << name << " [options] [db address] [file names (ending in .js)]" << endl
          << "db address can be:" << endl
          << "  foo                   foo database on local machine" << endl
@@ -265,6 +275,7 @@ int _main(int argc, char* argv[]) {
         ("username,u", po::value<string>(&username), "username for authentication")
         ("password,p", po::value<string>(&password), "password for authentication")
         ("help,h", "show this usage information")
+        ("version", "show version information")
         ;
 
     hidden_options.add_options()
@@ -310,6 +321,11 @@ int _main(int argc, char* argv[]) {
     if (params.count("files")) {
         files = params["files"].as< vector<string> >();
     }
+    if (params.count("version")) {
+        cout << "MongoDB shell version: " << mongo::versionString << endl;
+        return mongo::EXIT_CLEAN;
+    }
+
     /* This is a bit confusing, here are the rules:
      *
      * if nodb is set then all positional parameters are files
@@ -425,7 +441,7 @@ int _main(int argc, char* argv[]) {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
-
+                
                 if ( cmd.find( "\"" ) == string::npos ){
                     scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
                     if ( scope->getBoolean( "__iscmd__" )  ){
@@ -437,8 +453,13 @@ int _main(int argc, char* argv[]) {
             }
 
             if ( ! wascmd ){
-                scope->exec( code.c_str() , "(shell)" , false , true , false );
-                scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                try {
+                    scope->exec( code.c_str() , "(shell)" , false , true , false );
+                    scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                }
+                catch ( std::exception& e ){
+                    cout << "error:" << e.what() << endl;
+                }
             }
 
 
