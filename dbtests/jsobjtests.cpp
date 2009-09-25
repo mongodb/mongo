@@ -933,6 +933,31 @@ namespace JsobjTests {
                 assert( num == 10000 );
             }
         };
+        
+        class Big2 {
+        public:
+            void run(){
+                const int total = 100000;
+                BSONObjExternalSorter sorter( BSONObj() , total * 2 );
+                for ( int i=0; i<total; i++ ){
+                    sorter.add( BSON( "a" << "b" ) , 5  , i );
+                }
+
+                sorter.sort();
+
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+                int num=0;
+                double prev = 0;
+                while ( i->more() ){
+                    pair<BSONObj,DiskLoc> p = i->next();
+                    num++;
+                    double cur = p.first["x"].number();
+                    assert( cur >= prev );
+                    prev = cur;
+                }
+                assert( num == total );
+            }
+        };
 
         class D1 {
         public:
@@ -948,7 +973,7 @@ namespace JsobjTests {
                 sorter.add(x, DiskLoc(2,7));
                 sorter.add(x, DiskLoc(1,7));
                 sorter.add(x, DiskLoc(3,77));
-
+                
                 sorter.sort();
                 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
@@ -1035,6 +1060,7 @@ namespace JsobjTests {
             add< external_sort::Basic3 >();
             add< external_sort::ByDiskLock >();
             add< external_sort::Big1 >();
+            add< external_sort::Big2 >();
             add< external_sort::D1 >();
         }
     } myall;
