@@ -135,6 +135,16 @@ namespace mongo {
         void assert_fail( const char * exp , const char * file , unsigned line );
         void fail( const char * exp , const char * file , unsigned line );
 
+        class AssertionException : boost::noncopyable {
+        public:
+            AssertionException(){
+                ss << "assertion: ";
+            }
+            stringstream ss;
+        };
+
+
+
         class MyAsserts {
         public:
             MyAsserts( const char * aexp , const char * bexp , const char * file , unsigned line )
@@ -144,10 +154,13 @@ namespace mongo {
 
             void ae( double a , double b );
             void ae( string a , string b );
-
+            
             void printLocation();
 
         private:
+            
+            AssertionException * getBase();
+            
             string _aexp;
             string _bexp;
             string _file;
