@@ -826,7 +826,9 @@ namespace JsobjTests {
                         ASSERT( 0 );
                     num++;
                 }
-
+                
+                
+                ASSERT_EQUALS( 0 , sorter.numFiles() );
             }
         };
 
@@ -944,7 +946,7 @@ namespace JsobjTests {
                 }
 
                 sorter.sort();
-
+                
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
                 double prev = 0;
@@ -956,6 +958,7 @@ namespace JsobjTests {
                     prev = cur;
                 }
                 assert( num == total );
+                ASSERT( sorter.numFiles() > 2 );
             }
         };
 

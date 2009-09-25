@@ -56,6 +56,10 @@ namespace mongo {
 
         _sorted = true;
 
+        if ( _map && _files.size() == 0 ){
+            return;
+        }
+        
         if ( _map ){
             finishMap();
         }
@@ -120,11 +124,20 @@ namespace mongo {
     
     // ---------------------------------
 
-    BSONObjExternalSorter::Iterator::Iterator( BSONObjExternalSorter * sorter ) : _cmp( sorter->_order ){
+    BSONObjExternalSorter::Iterator::Iterator( BSONObjExternalSorter * sorter ) :
+        _cmp( sorter->_order ) , _in( 0 ){
+        
         for ( list<string>::iterator i=sorter->_files.begin(); i!=sorter->_files.end(); i++ ){
             _files.push_back( new FileIterator( *i ) );
             _stash.push_back( pair<Data,bool>( Data( BSONObj() , DiskLoc() ) , false ) );
         }
+        
+        if ( _files.size() == 0 && sorter->_map ){
+            _in = sorter->_map;
+            _it = sorter->_map->begin();
+        }
+
+        
     }
     
     BSONObjExternalSorter::Iterator::~Iterator(){
@@ -134,6 +147,10 @@ namespace mongo {
     }
     
     bool BSONObjExternalSorter::Iterator::more(){
+
+        if ( _in )
+            return _it != _in->end();
+        
         for ( vector<FileIterator*>::iterator i=_files.begin(); i!=_files.end(); i++ )
             if ( (*i)->more() )
                 return true;
@@ -144,6 +161,11 @@ namespace mongo {
     }
         
     pair<BSONObj,DiskLoc> BSONObjExternalSorter::Iterator::next(){
+        
+        if ( _in ){
+            return *(_it++);
+        }
+        
         Data best;
         int slot = -1;
         
