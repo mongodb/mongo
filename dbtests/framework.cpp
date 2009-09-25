@@ -88,7 +88,7 @@ namespace mongo {
                     tc->run();
                     passes = true;
                 }
-                catch ( AssertionException * ae ){
+                catch ( MyAssertionException * ae ){
                     err << ae->ss.str();
                     delete( ae );
                 }
@@ -312,8 +312,8 @@ namespace mongo {
 #endif
         }
 
-        AssertionException * MyAsserts::getBase(){
-            AssertionException * e = new AssertionException();
+        MyAssertionException * MyAsserts::getBase(){
+            MyAssertionException * e = new MyAssertionException();
             e->ss << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
             return e;
         }
@@ -329,7 +329,7 @@ namespace mongo {
 
             printLocation();
 
-            AssertionException * e = getBase();
+            MyAssertionException * e = getBase();
             e->ss << a << " != " << b << endl;
             log() << e->ss.str() << endl;
             throw e;
@@ -339,10 +339,10 @@ namespace mongo {
             Result::cur->_asserts++;
             if ( a == b )
                 return;
-
+            
             printLocation();
 
-            AssertionException * e = getBase();
+            MyAssertionException * e = getBase();
             e->ss << a << " != " << b << endl;
             log() << e->ss.str() << endl;
             throw e;
