@@ -545,13 +545,13 @@ if nix:
         env['Gch'] = env.Gch( [ "stdafx.h" ] )[0]
         #Depends( "stdafx.o" , "stdafx.h.gch" )
         #SideEffect( "dummyGCHSideEffect" , "stdafx.h.gch" )
-        
+
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
     if hacks is not None:
         hacks.insert( env , { "linux64" : linux64 } )
-        
+
 try:
     umask = os.umask(022)
 except OSError:
@@ -671,8 +671,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     for b in boostLibs:
         l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion , 
-                      l + boostCompiler + boostVersion ] , 
+        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
+                      l + boostCompiler + boostVersion ] ,
                     release or not shell)
 
     # this will add it iff it exists and works
@@ -1096,60 +1096,8 @@ testEnv.AlwaysBuild( "smokeAllNoJs" )
 import atexit
 atexit.register( stopMongodForTests )
 
-def machine_info(extra_info=""):
-    """Get a dict representing the "machine" section of a benchmark result.
-
-    ie:
-    {
-        "os_name": "OS X",
-        "os_version": "10.5",
-        "processor": "2.4 GHz Intel Core 2 Duo",
-        "memory": "3 GB 667 MHz DDR2 SDRAM",
-        "extra_info": "Python 2.6"
-    }
-
-    Must have a settings.py file on sys.path that defines "processor" and "memory"
-    variables.
-    """
-    sys.path.append("")
-    import settings
-
-    machine = {}
-    (machine["os_name"], _, machine["os_version"], _, _) = os.uname()
-    machine["processor"] = settings.processor
-    machine["memory"] = settings.memory
-    machine["extra_info"] = extra_info
-    return machine
-
-def post_data(data, machine_extra_info="", post_url="http://mongo-db.appspot.com/benchmark"):
-    """Post a benchmark data point.
-
-    data should be a Python dict that looks like:
-        {
-          "benchmark": {
-            "project": "http://github.com/mongodb/mongo-python-driver",
-            "name": "insert test",
-            "description": "test inserting 10000 documents with the C extension enabled",
-            "tags": ["insert", "python"]
-          },
-          "trial": {
-            "server_hash": "4f5a8d52f47507a70b6c625dfb5dbfc87ba5656a",
-            "client_hash": "8bf2ad3d397cbde745fd92ad41c5b13976fac2b5",
-            "result": 67.5,
-            "extra_info": "some logs or something"
-          }
-        }
-    """
-    try:
-        import json
-    except:
-        import simplejson as json # needed for python < 2.6
-
-    data["machine"] = machine_info(machine_extra_info)
-    print( data )
-    urllib2.urlopen(post_url, urllib.urlencode({"payload": json.dumps(data)}))
-
 def recordPerformance( env, target, source ):
+    from buildscripts import benchmark_tools
     global perftest
     import subprocess, re
     p = subprocess.Popen( [ perftest[0].abspath ], stdout=subprocess.PIPE )
@@ -1171,7 +1119,7 @@ def recordPerformance( env, target, source ):
         sub[ "trial" ][ "client_hash" ] = ""
         sub[ "trial" ][ "result" ] = val
         try:
-            post_data(sub)
+            print(benchmark_tools.post_data(sub))
         except:
             print( "exception posting perf results" )
             print( sys.exc_info() )
@@ -1179,8 +1127,8 @@ def recordPerformance( env, target, source ):
 
 addSmoketest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
 
-from buildscripts import test_shell
 def run_shell_tests(env, target, source):
+    from buildscripts import test_shell
     test_shell.mongo_path = windows and "mongo.exe" or "mongo"
     test_shell.run_tests()
 
