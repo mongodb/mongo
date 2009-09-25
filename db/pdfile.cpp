@@ -1059,8 +1059,7 @@ assert( !eloc.isNull() );
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
 //        testSorting();
 
-        cout << "\n\nBuildindex " << ns << " idxNo:" << idxNo;
-        cout << ' ' << idx.info.obj().toString() << endl;
+        log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups();
@@ -1072,7 +1071,7 @@ assert( !eloc.isNull() );
         unsigned long long n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
-        int nkeys = 0;
+        unsigned long long nkeys = 0;
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1117,6 +1116,7 @@ assert( !eloc.isNull() );
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             while( i->more() ) { 
                 BSONObjExternalSorter::Data d = i->next();
+
 //                cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
@@ -1138,6 +1138,8 @@ assert( !eloc.isNull() );
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 
         }
+        
+        log(1) << "\t\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
         for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
@@ -1176,7 +1178,7 @@ assert( !eloc.isNull() );
 
     void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
         Nullstream& l = log();
-        l << "building new index on " << idx.keyPattern() << " for " << ns << "...";
+        l << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         l.flush();
         Timer t;
 
@@ -1185,8 +1187,7 @@ assert( !eloc.isNull() );
         //idx.head = BtreeBucket::addBucket(idx);
         //int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
 
-        l << "done for " << n << " records " << t.millis() / 1000.0 << "secs";
-        l << endl;
+        l << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
 
     /* add keys to indexes for a new record */
