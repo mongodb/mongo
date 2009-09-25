@@ -28,7 +28,6 @@ import os
 
 """Exit codes for MongoDB."""
 BADOPTS = 2
-BADHOST = 14
 NOCONNECT = 255
 
 """Path to the mongo shell executable to be tested."""
@@ -53,7 +52,7 @@ class TestShell(unittest.TestCase):
 
         out = mongo_h.communicate()
         self.assertEqual(out, mongo_help.communicate())
-        self.assert_(out[0].startswith("usage:"))
+        self.assert_("usage:" in out[0])
 
         self.assertEqual(0, mongo_h.returncode)
         self.assertEqual(0, mongo_help.returncode)
@@ -164,7 +163,7 @@ class TestShell(unittest.TestCase):
         out = mongo.communicate()
         self.assert_("url: " + test in out[0])
         self.assert_("connecting to: " + test in out[0])
-        self.assertEqual(BADHOST, mongo.returncode)
+        self.assertEqual(NOCONNECT, mongo.returncode)
 
         mongo = self.open_mongo([non_exist_js, test, test_txt])
         out = mongo.communicate()
@@ -176,7 +175,7 @@ class TestShell(unittest.TestCase):
         out = mongo.communicate()
         self.assert_("url: " + non_exist_txt in out[0])
         self.assert_("connecting to: " + non_exist_txt in out[0])
-        self.assertEqual(BADHOST, mongo.returncode)
+        self.assertEqual(NOCONNECT, mongo.returncode)
 
     def test_multiple_files(self):
         dirname = os.path.dirname(__file__)

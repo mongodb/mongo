@@ -123,13 +123,13 @@ inline void setupSignals() {}
 
 string fixHost( string url , string host , string port ){
     //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
-    
+
     if ( host.size() == 0 && port.size() == 0 ){
         if ( url.find( "/" ) == string::npos ){
             // check for ips
             if ( url.find( "." ) != string::npos )
                 return url + "/test";
-            
+
             if ( url.find( ":" ) != string::npos &&
                  isdigit( url[url.find(":")+1] ) )
                 return url + "/test";
@@ -441,7 +441,7 @@ int _main(int argc, char* argv[]) {
                 string cmd = line;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
-                
+
                 if ( cmd.find( "\"" ) == string::npos ){
                     scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
                     if ( scope->getBoolean( "__iscmd__" )  ){
@@ -478,6 +478,7 @@ int main(int argc, char* argv[]) {
     }
     catch ( mongo::DBException& e ){
         cerr << "exception: " << e.what() << endl;
+        return -1;
     }
 }
 
