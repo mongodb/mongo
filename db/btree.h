@@ -111,7 +111,7 @@ namespace mongo {
             assert( _pushBack( recordLoc , key , order , prevChild ) );
         }
         //void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild);
-        void popBack(DiskLoc& recLoc, BSONObj& key, DiskLoc& rchild);
+        void popBack(DiskLoc& recLoc, BSONObj& key);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 
         /* !Packed means there is deleted fragment space within the bucket.

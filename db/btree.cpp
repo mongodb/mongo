@@ -202,17 +202,21 @@ namespace mongo {
         setNotPacked();
     }
 
-    /* pull rightmost key from the bucket 
+    /* pull rightmost key from the bucket.  this version requires its right child to be null so it 
+	   does not bother returning that value.
     */
-    void BucketBasics::popBack(DiskLoc& recLoc, BSONObj& key, DiskLoc& rchild) { 
+    void BucketBasics::popBack(DiskLoc& recLoc, BSONObj& key) { 
         massert( "n==0 in btree popBack()", n > 0 );
         assert( k(n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
         KeyNode kn = keyNode(n-1);
         recLoc = kn.recordLoc;
         key = kn.key;
-        DiskLoc& rc = childForPos(n);
-        rchild = rc;
-        rc.Null();
+
+		massert("rchild not null in btree popBack()", nextChild.isNull());
+
+		/* weirdly, we also put the rightmost down pointer in nextchild, even when bucket isn't full. */
+		nextChild = kn.prevChildBucket;
+
         n--;
     }
 
@@ -918,8 +922,10 @@ namespace mongo {
         if( n > 0 ) {
             int cmp = keyLast.woCompare(key, order);
             massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
-            if( cmp == 0 && !dupsAllowed )
-                uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
+            if( cmp == 0 ) {
+				if( !dupsAllowed )
+					uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
+			}
         }
         keyLast = key;
 
@@ -955,9 +961,8 @@ namespace mongo {
             while( !xloc.isNull() ) { 
                 BtreeBucket *x = xloc.btreemod();
                 BSONObj k; 
-                DiskLoc r, rchild;
-                x->popBack(r,k,rchild);
-                assert( rchild.isNull() );
+                DiskLoc r;
+                x->popBack(r,k);
                 if( x->n == 0 )
                     log() << "warning: empty bucket on BtreeBuild " << k.toString() << endl;
 
