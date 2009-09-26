@@ -77,6 +77,10 @@ namespace mongo {
             MyCmp _cmp;
             vector<FileIterator*> _files;
             vector< pair<Data,bool> > _stash;
+            
+            InMemory * _in;
+            InMemory::iterator _it;
+            
         };
         
         BSONObjExternalSorter( const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
@@ -95,6 +99,10 @@ namespace mongo {
             return auto_ptr<Iterator>( new Iterator( this ) );
         }
         
+        int numFiles(){
+            return _files.size();
+        }
+
     private:
         
         void sort( string file );
