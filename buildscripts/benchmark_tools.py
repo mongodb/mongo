@@ -1,6 +1,8 @@
 import os
 import urllib
 import urllib2
+import sys
+
 try:
     import json
 except:
