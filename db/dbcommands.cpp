@@ -573,7 +573,7 @@ namespace mongo {
         
         // delete a specific index or all?
         if ( *name == '*' && name[1] == 0 ) {
-            log() << "  d->nIndexes was " << d->nIndexes << '\n';
+            log(4) << "  d->nIndexes was " << d->nIndexes << '\n';
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) { 

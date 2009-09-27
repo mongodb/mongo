@@ -1182,13 +1182,18 @@ assert( !eloc.isNull() );
     void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         Timer t;
-
-        unsigned long long n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
-        assert( !idx.head.isNull() );
-        //idx.head = BtreeBucket::addBucket(idx);
-        //int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
-
-        log() << "\t done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
+		unsigned long long n;
+        if( 1 ) {
+			//cout << "fastBuild\n";
+			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
+			assert( !idx.head.isNull() );
+		}
+		else {
+			cout << "oldBuild\n";
+			idx.head = BtreeBucket::addBucket(idx);
+			n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+		}
+        log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1284,6 +1289,9 @@ assert( !eloc.isNull() );
         return loc;
     }
 
+    /* note: if god==true, you may pass in obuf of NULL and then popular the returned DiskLoc 
+             after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
+    */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         uassert("cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
@@ -1443,7 +1451,8 @@ assert( !eloc.isNull() );
             memcpy(r->data+4+newId->size(), ((char *)obuf)+4, addID-4);
         }
         else {
-            memcpy(r->data, obuf, len);
+            if( obuf )
+                memcpy(r->data, obuf, len);
         }
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {

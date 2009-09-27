@@ -601,9 +601,8 @@ found:
 
         int mid = n / 2;
 
-        BtreeBucket *r = allocTemp();
-        DiskLoc rLoc;
-
+        DiskLoc rLoc = addBucket(idx);
+        BtreeBucket *r = rLoc.btreemod();allocTemp();
         if ( split_debug )
             out() << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
         for ( int i = mid+1; i < n; i++ ) {
@@ -613,10 +612,8 @@ found:
         r->nextChild = nextChild;
         r->assertValid( order );
 
-        rLoc = btreeStore->insert(idx.indexNamespace().c_str(), r, r->Size(), true);
         if ( split_debug )
             out() << "     new rLoc:" << rLoc.toString() << endl;
-        free(r);
         r = 0;
         rLoc.btree()->fixParentPtrs(rLoc);
 
@@ -630,14 +627,14 @@ found:
             // promote middle to a parent node
             if ( parent.isNull() ) {
                 // make a new parent if we were the root
-                BtreeBucket *p = allocTemp();
+                DiskLoc L = addBucket(idx);
+                BtreeBucket *p = L.btreemod();
                 p->pushBack(middle.recordLoc, middle.key, order, thisLoc);
                 p->nextChild = rLoc;
                 p->assertValid( order );
-                parent = idx.head = btreeStore->insert(idx.indexNamespace().c_str(), p, p->Size(), true);
+                parent = idx.head = L;
                 if ( split_debug )
                     out() << "    we were root, making new root:" << hex << parent.getOfs() << dec << endl;
-                free(p);
                 rLoc.btreemod()->parent = parent;
             }
             else {
@@ -672,9 +669,9 @@ found:
 
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
-        BtreeBucket *p = allocTemp();
-        DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), p, p->Size(), true);
-        free(p);
+        DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), 0, BucketSize, true);
+        BtreeBucket *b = loc.btreemod();
+        b->init();
         return loc;
     }
 
@@ -919,15 +916,17 @@ namespace mongo {
     }
 
     void BtreeBuilder::addKey(BSONObj& key, DiskLoc loc) { 
-        if( n > 0 ) {
-            int cmp = keyLast.woCompare(key, order);
-            massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
-            if( cmp == 0 ) {
-				if( !dupsAllowed )
-					uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
-			}
+        if( !dupsAllowed ) {
+            if( n > 0 ) {
+                int cmp = keyLast.woCompare(key, order);
+                massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
+                if( cmp == 0 ) {
+                    //if( !dupsAllowed )
+                    uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
+                }
+            }
+            keyLast = key;
         }
-        keyLast = key;
 
         if ( ! b->_pushBack(loc, key, order, DiskLoc()) ){
             // no room

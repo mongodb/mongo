@@ -260,7 +260,7 @@ namespace mongo {
             }
         }
         ms = t.millis();
-        log = log || (++ctr % 512 == 0 && !quiet);
+        log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
         if ( log || ms > 100 ) {
             ss << ' ' << t.millis() << "ms";
