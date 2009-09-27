@@ -26,10 +26,12 @@
 #include <fcntl.h>
 
 namespace mongo {
-
+    
+    unsigned long long BSONObjExternalSorter::_compares = 0;
+    
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
         : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
-          _map(0), _mapSizeSoFar(0), _sorted(0){
+          _cur(0), _curSizeSoFar(0), _sorted(0){
         
         stringstream rootpath;
         rootpath << dbpath;
@@ -39,13 +41,13 @@ namespace mongo {
         _root = rootpath.str();
         
         create_directories( _root );
-        
+        _compares = 0;
     }
     
     BSONObjExternalSorter::~BSONObjExternalSorter(){
-        if ( _map ){
-            delete _map;
-            _map = 0;
+        if ( _cur ){
+            delete _cur;
+            _cur = 0;
         }
         
         remove_all( _root );
@@ -56,17 +58,19 @@ namespace mongo {
 
         _sorted = true;
 
-        if ( _map && _files.size() == 0 ){
+        if ( _cur && _files.size() == 0 ){
+            _cur->sort( MyCmp( _order ) );
+            log(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
             return;
         }
         
-        if ( _map ){
+        if ( _cur ){
             finishMap();
         }
         
-        if ( _map ){
-            delete _map;
-            _map = 0;
+        if ( _cur ){
+            delete _cur;
+            _cur = 0;
         }
         
         if ( _files.size() == 0 )
@@ -77,26 +81,28 @@ namespace mongo {
     void BSONObjExternalSorter::add( const BSONObj& o , const DiskLoc & loc ){
         uassert( "sorted already" , ! _sorted );
         
-        if ( ! _map ){
-            _map = new InMemory( _order );
+        if ( ! _cur ){
+            _cur = new InMemory();
         }
         
-        _map->insert( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
+        _cur->push_back( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
 
         long size = o.objsize();
-        _mapSizeSoFar += size + sizeof( DiskLoc );
+        _curSizeSoFar += size + sizeof( DiskLoc );
         
-        if ( _mapSizeSoFar > _maxFilesize )
+        if ( _curSizeSoFar > _maxFilesize )
             finishMap();
 
     }
     
     void BSONObjExternalSorter::finishMap(){
-        uassert( "bad" , _map );
+        uassert( "bad" , _cur );
         
-        _mapSizeSoFar = 0;
-        if ( _map->size() == 0 )
+        _curSizeSoFar = 0;
+        if ( _cur->size() == 0 )
             return;
+        
+        _cur->sort( MyCmp( _order ) );
         
         stringstream ss;
         ss << _root.string() << "file." << _files.size();
@@ -107,14 +113,14 @@ namespace mongo {
         uassert( (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;
-        for ( InMemory::iterator i=_map->begin(); i != _map->end(); i++ ){
+        for ( InMemory::iterator i=_cur->begin(); i != _cur->end(); i++ ){
             Data p = *i;
             out.write( p.first.objdata() , p.first.objsize() );
             out.write( (char*)(&p.second) , sizeof( DiskLoc ) );
             num++;
         }
         
-        _map->clear();
+        _cur->clear();
         
         _files.push_back( file );
         out.close();
@@ -132,9 +138,9 @@ namespace mongo {
             _stash.push_back( pair<Data,bool>( Data( BSONObj() , DiskLoc() ) , false ) );
         }
         
-        if ( _files.size() == 0 && sorter->_map ){
-            _in = sorter->_map;
-            _it = sorter->_map->begin();
+        if ( _files.size() == 0 && sorter->_cur ){
+            _in = sorter->_cur;
+            _it = sorter->_cur->begin();
         }
 
         

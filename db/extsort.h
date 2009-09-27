@@ -50,8 +50,9 @@ namespace mongo {
 
         class MyCmp {
         public:
-            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ) {}
+            MyCmp( const BSONObj & order = BSONObj() ) : _order( order ){}
             bool operator()( const Data &l, const Data &r ) const {
+                _compares++;
                 int x = l.first.woCompare( r.first , _order );
                 if ( x )
                     return x < 0;
@@ -63,7 +64,7 @@ namespace mongo {
         
     public:
 
-        typedef set<Data,MyCmp> InMemory;
+        typedef list<Data> InMemory;
 
         class Iterator : boost::noncopyable {
         public:
@@ -112,10 +113,12 @@ namespace mongo {
         long _maxFilesize;
         path _root;
         
-        InMemory * _map;
-        long _mapSizeSoFar;
+        InMemory * _cur;
+        long _curSizeSoFar;
         
         list<string> _files;
         bool _sorted;
+
+        static unsigned long long _compares;
     };
 }
