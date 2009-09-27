@@ -602,7 +602,7 @@ found:
         int mid = n / 2;
 
         DiskLoc rLoc = addBucket(idx);
-        BtreeBucket *r = rLoc.btreemod();allocTemp();
+        BtreeBucket *r = rLoc.btreemod();
         if ( split_debug )
             out() << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
         for ( int i = mid+1; i < n; i++ ) {
