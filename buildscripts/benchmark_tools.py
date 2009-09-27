@@ -6,6 +6,12 @@ try:
 except:
     import simplejson as json # need simplejson for python < 2.6
 
+sys.path.append( "." )
+sys.path.append( ".." )
+sys.path.append( "../../" )
+sys.path.append( "../../../" )
+
+
 import settings
 
 def machine_info(extra_info=""):
