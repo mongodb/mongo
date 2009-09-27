@@ -1044,7 +1044,7 @@ assert( !eloc.isNull() );
         sorter.add(x, DiskLoc(3,77));
 
         sorter.sort();
-
+        
         auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
         while( i->more() ) { 
             BSONObjExternalSorter::Data d = i->next();
@@ -1058,6 +1058,7 @@ assert( !eloc.isNull() );
     */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
 //        testSorting();
+        Timer t;
 
         log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
@@ -1091,6 +1092,8 @@ assert( !eloc.isNull() );
             n++;
         };
         sorter.sort();
+
+        log(1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << (double)t.millis() / 1000 << " secs" << endl;
 
 /*        if( 0 && idxNo == 1 ) { 
             // TEMP!
@@ -1139,7 +1142,7 @@ assert( !eloc.isNull() );
             wassert( btBuilder.getn() == nkeys || dropDups ); 
         }
         
-        log(1) << "\t\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
+        log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
         for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ )
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false, true );
@@ -1177,9 +1180,7 @@ assert( !eloc.isNull() );
     }
 
     void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
-        Nullstream& l = log();
-        l << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
-        l.flush();
+        log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         Timer t;
 
         unsigned long long n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
@@ -1187,7 +1188,7 @@ assert( !eloc.isNull() );
         //idx.head = BtreeBucket::addBucket(idx);
         //int n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
 
-        l << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
+        log() << "\t done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
 
     /* add keys to indexes for a new record */
