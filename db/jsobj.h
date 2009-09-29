@@ -1093,6 +1093,10 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        void append(const string& fieldName , BSONObj subObj) {
+            append( fieldName.c_str() , subObj );
+        }
+
         /** add header for a new subobject and return bufbuilder for writing to
             the subobject's body */
         BufBuilder &subobjStart(const char *fieldName) {
