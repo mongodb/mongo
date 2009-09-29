@@ -180,6 +180,12 @@ namespace mongo {
         reserved = 0;
     }
 
+    /* see _alloc */
+    inline void BucketBasics::_unalloc(int bytes) {
+        topSize -= bytes;
+        emptySize += bytes;
+    }
+
     /* we allocate space from the end of the buffer for data.
        the keynodes grow from the front.
     */
@@ -211,6 +217,7 @@ namespace mongo {
         KeyNode kn = keyNode(n-1);
         recLoc = kn.recordLoc;
         key = kn.key;
+        int keysize = kn.key.objsize();
 
 		massert("rchild not null in btree popBack()", nextChild.isNull());
 
@@ -218,6 +225,8 @@ namespace mongo {
 		nextChild = kn.prevChildBucket;
 
         n--;
+        emptySize += sizeof(_KeyNode);
+        _unalloc(keysize);
     }
 
     /* add a key.  must be > all existing.  be careful to set next ptr right. */

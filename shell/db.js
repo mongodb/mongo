@@ -249,6 +249,8 @@ DB.prototype.help = function() {
     print("\tdb.removeUser(username)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
     print("\tdb.getReplicationInfo()");
+    print("\tdb.printReplicationInfo()");
+    print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.getProfilingLevel()");
     print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
     print("\tdb.cloneDatabase(fromhost)");
@@ -521,16 +523,14 @@ DB.prototype.killOP = DB.prototype.killOp;
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() { 
-    if( "local" != this )
-	return { errmsg : "this command only works for database local" };
+    var db = this.getSisterDB("local");
 
     var result = { };
-    var db = this;
     var ol = db.system.namespaces.findOne({name:"local.oplog.$main"});
     if( ol && ol.options ) {
 	result.logSizeMB = ol.options.size / 1000 / 1000;
     } else {
-	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection";
+	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection (not --master?)";
 	return result;
     }
 
@@ -551,7 +551,7 @@ DB.prototype.getReplicationInfo = function() {
 	    tfirst = tfirst / 4294967296; // low 32 bits are ordinal #s within a second
 	    tlast = tlast / 4294967296;
 	    result.timeDiff = tlast - tfirst;
-	    result.timeDiffHours = result.timeDiff / 3600;
+	    result.timeDiffHours = Math.round(result.timeDiff / 36)/100;
 	    result.tFirst = (new Date(tfirst*1000)).toString();
 	    result.tLast  = (new Date(tlast*1000)).toString();
 	    result.now = Date();
@@ -562,6 +562,36 @@ DB.prototype.getReplicationInfo = function() {
     }
 
     return result;
+}
+DB.prototype.printReplicationInfo = function() {
+    var result = this.getReplicationInfo();
+    if( result.errmsg ) { 
+	print(tojson(result));
+	return;
+    }
+    print("configured oplog size:   " + result.logSizeMB + "MB");
+    print("log length start to end: " + result.timeDiff + "secs (" + result.timeDiffHours + "hrs)");
+    print("oplog first event time:  " + result.tFirst);
+    print("oplog last event time:   " + result.tLast);
+    print("now:                     " + result.now);
+}
+
+DB.prototype.printSlaveReplicationInfo = function() {
+  function g(x) {
+    print("source:   " + x.host);
+    var st = new Date(x.syncedTo/4294967296*1000);
+    var now = new Date();
+    print("syncedTo: " + st.toString() );
+    var ago = (now-st)/1000;
+    var hrs = Math.round(ago/36)/100;
+    print("          = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+  }
+  var L = this.getSisterDB("local");
+  if( L.sources.count() == 0 ) { 
+    print("local.sources is empty; is this db a --slave?");
+    return;
+  }
+  L.sources.find().forEach(g);
 }
 
 DB.prototype.serverBuildInfo = function(){
