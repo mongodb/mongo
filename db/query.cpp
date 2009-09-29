@@ -112,9 +112,7 @@ namespace mongo {
                 if done here, as there are pointers into those objects in 
                 NamespaceDetails.
                 */
-                if( strstr(ns, ".system.users") )
-                    ;
-                else {
+                if( ! legalClientSystemNS( ns , true ) ){
                     uasserted("cannot delete from system namespace");
                     return -1;
                 }
@@ -752,7 +750,7 @@ namespace mongo {
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
-            uassert("cannot update system collection", strstr(ns, ".system.users"));
+            uassert("cannot update system collection", legalClientSystemNS( ns , true ) );
         }
         
         QueryPlanSet qps( ns, pattern, BSONObj() );

@@ -1302,7 +1302,7 @@ assert( !eloc.isNull() );
                 // later:check for dba-type permissions here if have that at some point separate
                 if ( strstr(ns, ".system.indexes" ) )
                     wouldAddIndex = true;
-                else if ( strstr(ns, ".system.users") )
+                else if ( legalClientSystemNS( ns , true ) )
                     ;
                 else if ( !god ) {
                     out() << "ERROR: attempt to insert in system namespace " << ns << endl;

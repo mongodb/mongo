@@ -3,10 +3,13 @@
 #include "stdafx.h"
 #include "engine.h"
 #include "../util/file.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
+
+    long long Scope::_lastVersion = 1;
     
-    Scope::Scope(){
+    Scope::Scope() : _localDBName("") , _loadedVersion(0){
     }
 
     Scope::~Scope(){
@@ -88,6 +91,37 @@ namespace mongo {
         
         return exec( data , filename , printResult , reportError , assertOnError, timeoutMs );
     }
+
+    void Scope::storedFuncMod(){
+        _lastVersion++;
+    }
+
+    void Scope::loadStored( bool ignoreNotConnected ){
+        if ( _localDBName.size() == 0 ){
+            if ( ignoreNotConnected )
+                return;
+            uassert( "need to have locallyConnected already" , _localDBName.size() );
+        }
+        if ( _loadedVersion == _lastVersion )
+            return;
+        
+        _loadedVersion = _lastVersion;
+
+        static DBClientBase * db = createDirectClient();
+        
+        auto_ptr<DBClientCursor> c = db->query( _localDBName + ".system.js" , Query() );
+        while ( c->more() ){
+            BSONObj o = c->next();
+
+            BSONElement n = o["_id"];
+            BSONElement v = o["value"];
+            
+            uassert( "name has to be a string" , n.type() == String );
+            uassert( "value has to be set" , v.type() != EOO );
+            
+            setElement( n.valuestr() , v );
+        }
+    }
     
     typedef map< string , list<Scope*> > PoolToScopes;
 
@@ -157,7 +191,9 @@ namespace mongo {
 
     class PooledScope : public Scope {
     public:
-        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ){};
+        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ){
+            _real->loadStored( true );
+        };
         virtual ~PooledScope(){
             ScopeCache * sc = scopeCache.get();
             if ( sc ){
@@ -202,6 +238,9 @@ namespace mongo {
             return _real->type( field );
         }
 
+        void setElement( const char *field , const BSONElement& val ){
+            _real->setElement( field , val );
+        }
         void setNumber( const char *field , double val ){
             _real->setNumber( field , val );
         }

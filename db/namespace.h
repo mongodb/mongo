@@ -126,6 +126,13 @@ namespace mongo {
         char buf[MaxNsLen];
     };
 
+    /**
+       @return true if a client can modify this namespace
+       things like *.system.users
+     */
+    bool legalClientSystemNS( const string& ns , bool write );
+
+
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
     */

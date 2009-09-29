@@ -36,6 +36,7 @@ namespace mongo {
 
         void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
+        virtual void setElement( const char *field , const BSONElement& e ) = 0;
         virtual void setNumber( const char *field , double val ) = 0;
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;
@@ -67,6 +68,19 @@ namespace mongo {
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
 
         virtual void gc() = 0;
+
+        void loadStored( bool ignoreNotConnected = false );
+        
+        /**
+         if any changes are made to .system.js, call this
+         right now its just global - slightly inefficient, but a lot simpler
+        */
+        static void storedFuncMod();
+        
+    protected:
+        string _localDBName;
+        long long _loadedVersion;
+        static long long _lastVersion;
     };
     
     class ScriptEngine : boost::noncopyable {

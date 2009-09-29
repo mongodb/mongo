@@ -1008,7 +1008,7 @@ namespace mongo {
             smlock;
             uassert( "already setup for external db" , ! _externalSetup );
             if ( _localConnect ){
-                uassert( "connected to different db" , _dbName == dbName );
+                uassert( "connected to different db" , _localDBName == dbName );
                 return;
             }
             
@@ -1018,7 +1018,8 @@ namespace mongo {
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
             
             _localConnect = true;
-            _dbName = dbName;
+            _localDBName = dbName;
+            loadStored();
         }
 
         // ----- getters ------
@@ -1081,6 +1082,12 @@ namespace mongo {
         }
 
         // ----- setters ------
+
+        void setElement( const char *field , const BSONElement& val ){
+            smlock;
+            jsval v = _convertor->toval( val );
+            assert( JS_SetProperty( _context , _global , field , &v ) );
+        }
 
         void setNumber( const char *field , double val ){
             smlock;
@@ -1301,7 +1308,6 @@ namespace mongo {
 
         bool _externalSetup;
         bool _localConnect;
-        string _dbName;
         
         set<string> _initFieldNames;
         
