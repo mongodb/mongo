@@ -782,6 +782,61 @@ namespace mongo {
         }
     } cmdDeleteIndexes;
     
+    class CmdReIndex : public Command {
+    public:
+        virtual bool logTheOp() {
+            return true;
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "re-index a collection";
+        }
+        CmdReIndex() : Command("reIndex") { }
+        bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            static DBDirectClient db;
+            
+            BSONElement e = jsobj.findElement(name.c_str());
+            string toDeleteNs = database->name + '.' + e.valuestr();
+            NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
+            log() << "CMD: reIndex " << toDeleteNs << endl;
+            
+            if ( ! d ){
+                errmsg = "ns not found";
+                return false;
+            }
+            
+            list<BSONObj> all;
+            auto_ptr<DBClientCursor> i = db.getIndexes( toDeleteNs );
+            BSONObjBuilder b;
+            while ( i->more() ){
+                BSONObj o = i->next().getOwned();
+                b.append( BSONObjBuilder::numStr( all.size() ) , o );
+                all.push_back( o );
+            }
+            
+            
+            bool ok = deleteIndexes( d, toDeleteNs.c_str(), "*" , errmsg, result, true );
+            if ( ! ok ){
+                errmsg = "deleteIndexes failed";
+                return false;
+            }
+            
+            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ){
+                BSONObj o = *i;
+                db.insert( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
+            }
+            
+            result.append( "ok" , 1 );
+            result.append( "nIndexes" , (int)all.size() );
+            result.appendArray( "indexes" , b.obj() );
+            return true;
+        }
+    } cmdReIndex;
+    
+
+
     class CmdListDatabases : public Command {
     public:
         virtual bool logTheOp() {
