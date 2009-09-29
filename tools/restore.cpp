@@ -31,7 +31,7 @@ namespace po = boost::program_options;
 
 class Restore : public Tool {
 public:
-    Restore() : Tool( "restore" , "" ){
+    Restore() : Tool( "restore" , "" , "" ){
         add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
@@ -50,12 +50,16 @@ public:
          *
          * In that case we better be given either a root directory that
          * contains only .bson files or a single .bson file  (a db).
+         *
+         * In the case where a collection name is specified we better be
+         * given either a root directory that contains only a single
+         * .bson file, or a single .bson file itself (a collection).
          */
-        drillDown(root, _db != "");
+        drillDown(root, _db != "", _coll != "");
         return EXIT_CLEAN;
     }
 
-    void drillDown( path root, bool use_db = false ) {
+    void drillDown( path root, bool use_db = false, bool use_coll = false ) {
         log(2) << "drillDown: " << root.string() << endl;
 
         if ( is_directory( root ) ) {
@@ -63,11 +67,10 @@ public:
             directory_iterator i(root);
             while ( i != end ) {
                 path p = *i;
+                i++;
 
                 if (use_db) {
-                    if (is_directory(p) ||
-                        !(endsWith(p.string().c_str(), ".bson") ||
-                          endsWith(p.string().c_str(), ".bin" ))) {
+                    if (is_directory(p)) {
                         cerr << "ERROR: root directory must be a dump of a single database" << endl;
                         cerr << "       when specifying a db name with --db" << endl;
                         printHelp(cout);
@@ -75,8 +78,16 @@ public:
                     }
                 }
 
-                drillDown(p, use_db);
-                i++;
+                if (use_coll) {
+                    if (is_directory(p) || i != end) {
+                        cerr << "ERROR: root directory must be a dump of a single collection" << endl;
+                        cerr << "       when specifying a collection name with --collection" << endl;
+                        printHelp(cout);
+                        return;
+                    }
+                }
+
+                drillDown(p, use_db, use_coll);
             }
             return;
         }
@@ -100,7 +111,9 @@ public:
                 ns += dir.substr( dir.find_last_of( "/" ) + 1 );
         }
 
-        {
+        if (use_coll) {
+            ns += "." + _coll;
+        } else {
             string l = root.leaf();
             l = l.substr( 0 , l.find_last_of( "." ) );
             ns += "." + l;
