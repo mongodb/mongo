@@ -282,7 +282,35 @@ namespace mongo {
     }
 
     bool shouldRepairDatabases = 0;
-
+    
+    bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
+        static DBDirectClient db;
+        
+        if ( h->version == 4 && h->versionMinor == 4 ){
+            assert( VERSION == 4 );
+            assert( VERSION_MINOR == 5 );
+            
+            list<string> colls = db.getCollectionNames( dbName );
+            for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++){
+                string c = *i;
+                log() << "\t upgrading collection:" << c << endl;
+                BSONObj out;
+                bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
+                if ( ! ok ){
+                    errmsg = "reindex failed";
+                    log() << "\t\t reindex failed: " << out << endl;
+                    return false;
+                }
+            }
+            
+            h->versionMinor = 5;
+            return true;
+        }
+        
+        // do this in the general case
+        return repairDatabase( dbName.c_str(), errmsg );
+    }
+    
     void repairDatabases() {
 
         dblock lk;
@@ -300,12 +328,12 @@ namespace mongo {
                       << "new version: " << VERSION << "." << VERSION_MINOR << endl;
                 if ( shouldRepairDatabases ){
                     // QUESTION: Repair even if file format is higher version than code?
-                    log() << "\t starting repair" << endl;
+                    log() << "\t starting upgrade" << endl;
                     string errmsg;
-                    assert( repairDatabase( dbName.c_str(), errmsg ) );
+                    assert( doDBUpgrade( dbName , errmsg , h ) );
                 }
                 else {
-                    log() << "\t Not repairing, exiting!" << endl;
+                    log() << "\t Not upgrading, exiting!" << endl;
                     log() << "\t run --upgrade to upgrade dbs, then start again" << endl;
                     log() << "****" << endl;
                     dbexit( EXIT_NEED_UPGRADE );
