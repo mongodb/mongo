@@ -129,6 +129,7 @@ namespace mongo {
         void setNotPacked();
         void setPacked();
         int _alloc(int bytes);
+        void _unalloc(int bytes);
         void truncateTo(int N, const BSONObj &order);
         void markUnused(int keypos);
 

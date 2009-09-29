@@ -48,12 +48,12 @@ namespace mongo {
                 return 0;
             
             LastError * le = new LastError();
-            _ids[id] = make_pair( time(0) , le );
+            _ids[id] = make_pair( (int) time(0) , le );
             return le;
         }
         
         LastErrorStatus & status = i->second;
-        status.first = time(0);
+        status.first = (int) time(0);
         return status.second;
     }
 
@@ -84,7 +84,7 @@ namespace mongo {
         }
         
         LastErrorStatus & status = _ids[id];
-        status.first = time(0);
+        status.first = (int) time(0);
         status.second = le;
     }
     
