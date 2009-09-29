@@ -255,7 +255,9 @@ namespace mongo {
                     _tlmr.reset( mrtl );
 
                     BSONObj q;
-                
+                    if ( cmdObj["query"].type() == Object )
+                        q = cmdObj["query"].embeddedObjectUserCheck();
+
                     auto_ptr<DBClientCursor> cursor = db.query( ns , q );
                     while ( cursor->more() ){
                         BSONObj o = cursor->next(); 
