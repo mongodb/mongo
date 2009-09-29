@@ -183,7 +183,7 @@ namespace mongo {
 
     private:
         PoolToScopes _pools;
-        mutex _mutex;
+        boost::mutex _mutex;
         int _magic;
     };
 
