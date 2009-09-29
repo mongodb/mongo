@@ -37,8 +37,18 @@ assert.eq( 3 , z.keySet().length , "C" );
 assert.eq( 2 , z.a , "D" );
 assert.eq( 3 , z.b , "E" );
 assert.eq( 3 , z.c , "F" );
-
 x.drop();
+
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
+assert.eq( 2 , res.numObjects , "B" );
+x = db[res.result];
+z = {};
+x.find().forEach( function(a){ z[a.key] = a.value.count; } );
+assert.eq( 1 , z.a , "C1" );
+assert.eq( 1 , z.b , "C2" );
+assert.eq( 2 , z.c , "C3" );
+x.drop();
+
 
 
 for ( i=5; i<1000; i++ ){
