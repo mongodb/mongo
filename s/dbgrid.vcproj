@@ -480,7 +480,7 @@
 						>
 						<Tool
 							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"
+							UsePrecompiledHeader="2"
 						/>
 					</FileConfiguration>
 				</File>

@@ -603,7 +603,6 @@ namespace JSTests {
 
             ASSERT( s->exec( "var b = 6;" , "b" , false , true , false ) );
             ASSERT_EQUALS( 6 , s->getNumber("b" ) );
-            cout << "WTF: " << s->getNumber("b" ) << endl;
             delete s;
         }
     };
