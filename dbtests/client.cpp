@@ -1,5 +1,6 @@
 // client.cpp
 
+#include "stdafx.h"
 #include "../client/dbclient.h"
 #include "dbtests.h"
 

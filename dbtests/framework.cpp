@@ -16,9 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "stdafx.h"
 #include <boost/program_options.hpp>
-
-#include "../stdafx.h"
 #include "framework.h"
 #include "../util/file_allocator.h"
 

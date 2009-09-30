@@ -17,6 +17,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stdafx.h"
 #include "../db/query.h"
 
 #include "../db/db.h"
