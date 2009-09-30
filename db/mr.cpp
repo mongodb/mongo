@@ -235,6 +235,8 @@ namespace mongo {
                 s->localConnect( database->name.c_str() );
             
                 string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() );
+                if ( cmdObj["out"].type() == String )
+                    resultColl = database->name + "." + cmdObj["out"].valuestr();
                 string resultCollShort = resultColl.substr( database->name.size() + 1 );
                 log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
                 db.dropCollection( resultColl );
