@@ -25,7 +25,16 @@ namespace mongo {
 
     namespace mr {
 
-        typedef multimap<BSONObj,BSONObj,BSONObjCmp> BBMM;
+        typedef pair<BSONObj,BSONObj> Data;
+        typedef list< Data > InMemory;
+        
+        class MyCmp {
+        public:
+            MyCmp(){}
+            bool operator()( const Data &l, const Data &r ) const {
+                return l.first.woCompare( r.first ) < 0;
+            }
+        };
     
         BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
             uassert( "need values" , values.size() );
@@ -66,7 +75,7 @@ namespace mongo {
         public:
             MRTL( DBDirectClient * db , string coll , Scope * s , ScriptingFunction reduce ) : 
                 _db( db ) , _coll( coll ) , _scope( s ) , _reduce( reduce ) , _size(0){
-                _temp = new multimap<BSONObj,BSONObj,BSONObjCmp>();
+                _temp = new InMemory();
             }
             ~MRTL(){
                 delete _temp;
@@ -76,12 +85,14 @@ namespace mongo {
                 BSONObj prevKey;
                 list<BSONObj> all;
                 
-                BBMM * old = _temp;
-                BBMM * n = new BBMM();
+                _temp->sort( MyCmp() );
+
+                InMemory * old = _temp;
+                InMemory * n = new InMemory();
                 _temp = n;
                 _size = 0;
                 
-                for ( multimap<BSONObj,BSONObj,BSONObjCmp>::iterator i=old->begin(); i!=old->end(); i++ ){
+                for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
                     BSONObj key = i->first;
                     BSONObj value = i->second;
                     
@@ -96,7 +107,6 @@ namespace mongo {
                     }
                     else if ( all.size() > 1 ){
                         BSONObj res = reduceValues( all , _scope , _reduce );
-                        assert( n->find( prevKey ) == n->end() );
                         insert( prevKey , res );
                         all.clear();
                     }
@@ -116,7 +126,7 @@ namespace mongo {
             }
         
             void dump(){
-                for ( BBMM::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
+                for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                     BSONObj key = i->first;
                     BSONObj value = i->second;
                     BSONObjBuilder b;
@@ -130,12 +140,12 @@ namespace mongo {
             }
             
             void insert( const BSONObj& key , const BSONObj& value ){
-                _temp->insert( pair<BSONObj,BSONObj>( key , value ) );
+                _temp->push_back( pair<BSONObj,BSONObj>( key , value ) );
                 _size += key.objsize() + value.objsize() + 32;
             }
 
             void checkSize(){
-                if ( _size < 1024 * 15 )
+                if ( _size < 1024 * 10 )
                     return;
 
                 long before = _size;
@@ -155,7 +165,7 @@ namespace mongo {
             Scope * _scope;
             ScriptingFunction _reduce;
         
-            multimap<BSONObj,BSONObj,BSONObjCmp> * _temp;
+            InMemory * _temp;
             
             long _size;
         };
