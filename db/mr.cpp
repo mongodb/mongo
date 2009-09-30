@@ -233,11 +233,14 @@ namespace mongo {
             
                 auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
                 s->localConnect( database->name.c_str() );
-            
+                
                 string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() );
+                string finalOutput = resultColl;
                 if ( cmdObj["out"].type() == String )
-                    resultColl = database->name + "." + cmdObj["out"].valuestr();
+                    finalOutput = database->name + "." + cmdObj["out"].valuestr();
+                
                 string resultCollShort = resultColl.substr( database->name.size() + 1 );
+                string finalOutputShort = finalOutput.substr( database->name.size() + 1 );
                 log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
                 db.dropCollection( resultColl );
                 db.ensureIndex( resultColl , BSON( "key" << 1 ) );
@@ -245,6 +248,8 @@ namespace mongo {
                 int num = 0;
             
                 try {
+                    dbtemprelease temprlease;
+
                     s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"];" , "tempcoll1" );
                     if ( s->type( "emit" ) == 6 ){
                         s->injectNative( "emit" , fast_emit );
@@ -309,8 +314,16 @@ namespace mongo {
                     db.dropCollection( resultColl );
                     throw;
                 }
-            
-                result.append( "result" , resultCollShort );
+                
+                
+                if ( finalOutput != resultColl ){
+                    // need to do this with the full dblock, that's why its after the try/catch
+                    db.dropCollection( finalOutput );
+                    BSONObj info;
+                    uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << resultColl << "to" << finalOutput ) , info ) );
+                }
+
+                result.append( "result" , finalOutputShort );
                 result.append( "numObjects" , num );
                 result.append( "timeMillis" , t.millis() );
             
