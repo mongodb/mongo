@@ -67,7 +67,9 @@ namespace mongo {
         Result * Result::cur = 0;
 
         Result * Suite::run(){
+            log(1) << "\t about to setupTests" << endl;
             setupTests();
+            log(1) << "\t done setupTests" << endl;
 
             Result * r = new Result( _name );
             Result::cur = r;
@@ -79,7 +81,7 @@ namespace mongo {
 
                 bool passes = false;
                 
-                log(1) << "\t" << tc->getName() << endl;
+                log(1) << "\t going to run test: " << tc->getName() << endl;
                 
                 stringstream err;
                 err << tc->getName() << "\t";
@@ -107,7 +109,9 @@ namespace mongo {
                     r->_messages.push_back( err.str() );
                 }
             }
-
+	    
+	    log(1) << "\t DONE running tests" << endl;
+	    
             return r;
         }
 
@@ -132,6 +136,7 @@ namespace mongo {
                  "directory will be overwritten if it already exists")
                 ("debug", "run tests with verbose output")
                 ("list,l", "list available test suites")
+                ("verbose,v", "verbose")
                 ("seed", po::value<unsigned long long>(&seed), "random number seed")
                 ;
 
@@ -165,7 +170,7 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
-            if (params.count("debug")) {
+            if (params.count("debug") || params.count("verbose") ) {
                 logLevel = 1;
             }
 
