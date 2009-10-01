@@ -116,14 +116,21 @@ namespace mongo {
             const char * data = s.c_str();
             int size = s.size();
             
-            char buf[4];
-            buf[3] = 0;
+            char buf[3];
             for ( int i=0; i<size; i+=4){
                 const char * start = data + i;
                 buf[0] = ( ( alphabet.decode[start[0]] << 2 ) & 0xFC ) | ( ( alphabet.decode[start[1]] >> 4 ) & 0x3 );
                 buf[1] = ( ( alphabet.decode[start[1]] << 4 ) & 0xF0 ) | ( ( alphabet.decode[start[2]] >> 2 ) & 0xF );
                 buf[2] = ( ( alphabet.decode[start[2]] << 6 ) & 0xC0 ) | ( ( alphabet.decode[start[3]] & 0x3F ) );
-                ss << buf;
+                
+                int len = 3;
+                if ( start[3] == '=' ){
+                    len = 2;
+                    if ( start[2] == '=' ){
+                        len = 1;
+                    }
+                }
+                ss.write( buf , len );
             }
         }
         

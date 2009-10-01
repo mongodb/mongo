@@ -344,12 +344,10 @@ namespace JsonTests {
         private:
             static void assertEquals( const BSONObj &expected, const BSONObj &actual ) {
                 if ( expected.woCompare( actual ) ) {
-                    out() << "Expected: " << expected.jsonString() << " size: " << expected.objsize()
-                          << ", got: " << actual.jsonString() << " size: " << actual.objsize() << " compared: " << expected.woCompare( actual ) 
-                          << " string match:" << ( expected.jsonString() == actual.jsonString() )
-                          << endl;
-                    expected.dump();
-                    actual.dump();
+                    out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
+                    out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
+                    out() << expected.hexDump() << endl;
+                    out() << actual.hexDump() << endl;
                 }
                 ASSERT( !expected.woCompare( actual ) );
             }
