@@ -288,7 +288,6 @@ namespace mongo {
 
         void assert_fail( const char * exp , const char * file , unsigned line ){
             Result::cur->_asserts++;
-            Result::cur->_fails++;
             
             MyAssertionException * e = new MyAssertionException();
             e->ss << "ASSERT FAILED! " << file << ":" << line << endl;
