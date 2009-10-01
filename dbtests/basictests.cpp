@@ -20,6 +20,7 @@
 #include "stdafx.h"
 
 #include "dbtests.h"
+#include "../util/base64.h"
 
 namespace BasicTests {
 
@@ -47,6 +48,18 @@ namespace BasicTests {
         }
     };
     
+    class Base64Tests {
+    public:
+        void run(){
+            base64::testAlphabet();
+            ASSERT_EQUALS( "ZWxp" , base64::encode( "eli" , 3 ) );
+            ASSERT_EQUALS( "ZWxpb3Rz" , base64::encode( "eliots" , 6 ) );
+
+            ASSERT_EQUALS( "ZQ==" , base64::encode( "e" , 1 ) );
+            ASSERT_EQUALS( "ZWw=" , base64::encode( "el" , 2 ) );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "basic" ){
@@ -54,6 +67,7 @@ namespace BasicTests {
         
         void setupTests(){
             add< Rarely >();
+            add< Base64Tests >();
         }
     } myall;
     
