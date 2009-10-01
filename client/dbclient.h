@@ -522,6 +522,8 @@ namespace mongo {
          */
         list<string> getCollectionNames( const string& db );
 
+        bool exists( const string& ns );
+
         virtual string toString() = 0;
 
         /** @return the database name portion of an ns string */
