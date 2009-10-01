@@ -320,7 +320,6 @@ namespace mongo {
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
-        //if( database->profile )
         ss << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -332,13 +331,15 @@ namespace mongo {
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
         bool upsert = flags & 1;
+        bool multi = flags & 2;
         {
             string s = query.toString();
+            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
             ss << " query: " << s;
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
-        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss);
-        recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
+        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss, multi);
+        recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 ); // for getlasterror
     }
 
     void receivedDelete(Message& m, stringstream &ss) {

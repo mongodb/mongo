@@ -429,6 +429,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\base64.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\commands.cpp"
 					>
 				</File>
