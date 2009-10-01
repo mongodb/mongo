@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "json.h"
 #include "../util/builder.h"
+#include "../util/base64.h"
 
 using namespace boost::spirit;
 
@@ -328,30 +329,13 @@ namespace mongo {
         }
         ObjectBuilder &b;
     };
-
-// NOTE The boost base64 library code was originally written for use only by the
-// boost::archive package, however a google search reveals that these base64
-// routines are used in a lot of non-boost code as well.  The library can't
-// handle '=' padding bytes, so here I replace them with 'A' (the value for 0
-// in base64's 6bit encoding) and then drop the garbage zeroes produced by
-// boost's conversion.
+    
     struct binDataBinary {
-        typedef
-        boost::archive::iterators::transform_width
-        < boost::archive::iterators::binary_from_base64
-        < string::const_iterator >, 8, 6
-        > binary_t;
         binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
             massert( "Badly formatted bindata", ( end - start ) % 4 == 0 );
-            string base64( start, end );
-            int len = base64.length();
-            int pad = 0;
-            for (; len - pad > 0 && base64[ len - 1 - pad ] == '='; ++pad )
-                base64[ len - 1 - pad ] = 'A';
-            massert( "Badly formatted bindata", pad < 3 );
-            b.binData = string( binary_t( base64.begin() ), binary_t( base64.end() ) );
-            b.binData.resize( b.binData.length() - pad );
+            string encoded( start, end );
+            b.binData = base64::decode( encoded );
         }
         ObjectBuilder &b;
     };

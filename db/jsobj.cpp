@@ -22,6 +22,7 @@
 #include "jsobj.h"
 #include "nonce.h"
 #include "../util/goodies.h"
+#include "../util/base64.h"
 #include <limits>
 #include "../util/unittest.h"
 #include "json.h"
@@ -185,11 +186,6 @@ namespace mongo {
         return ret.str();
     }
 
-    typedef boost::archive::iterators::base64_from_binary
-    < boost::archive::iterators::transform_width
-    < string::const_iterator, 6, 8 >
-    > base64_t;
-
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
         stringstream s;
         if ( includeFieldNames )
@@ -277,12 +273,7 @@ namespace mongo {
             BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
             s << "{ \"$binary\" : \"";
             char *start = ( char * )( value() ) + sizeof( int ) + 1;
-            string temp(start, len);
-            string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
-            s << base64;
-            int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
-            for ( int i = 0; i < padding; ++i )
-                s << '=';
+            base64::encode( s , start , len );
             s << "\", \"$type\" : \"" << hex;
             s.width( 2 );
             s.fill( '0' );
