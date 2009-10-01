@@ -240,7 +240,13 @@ namespace mongo {
 
                 string ns = database->name + '.' + cmdObj.firstElement().valuestr();
                 log(1) << "mr ns: " << ns << endl;
-            
+                
+                if ( ! db.exists( ns ) ){
+                    errmsg = "ns doesn't exist";
+                    return false;
+                }
+                
+
                 auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
                 s->localConnect( database->name.c_str() );
                 
@@ -337,7 +343,7 @@ namespace mongo {
                 result.append( "numObjects" , num );
                 result.append( "timeMillis" , t.millis() );
             
-                return false;
+                return true;
             }
 
         private:
