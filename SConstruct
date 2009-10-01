@@ -580,6 +580,11 @@ def getSysInfo():
     else:
         return " ".join( os.uname() )
 
+def add_exe(target):
+    if windows:
+        return target + ".exe"
+    return target
+
 def setupBuildInfoFile( outFile ):
     version = getGitVersion()
     sysInfo = getSysInfo()
@@ -962,7 +967,7 @@ def testSetup( env , target , source ):
 if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
     ensureDir( "/tmp/unittest/" );
 
-addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
+addSmoketest( "smoke", [ add_exe( "test" ) ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ]
@@ -1006,21 +1011,16 @@ def runShellTest( env, target, source ):
         Exit( 1 )
     return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
 
-def add_exe(target):
-    if windows:
-        return target + ".exe"
-    return target
-
 # These tests require the mongo shell
 if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
-    addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
+    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
-    addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
 
 mongodForTests = None
 mongodForTestsPort = "27017"

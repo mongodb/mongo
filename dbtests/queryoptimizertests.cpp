@@ -728,7 +728,7 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSONObj() ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
                 // missing ns
-                ASSERT_EQUALS( -1, runCount( "missingNS", BSONObj(), err ) );
+                ASSERT_EQUALS( -1, runCount( "unittests.missingNS", BSONObj(), err ) );
                 // impossible match
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 << LT << -1 ) ), err ) );
             }
@@ -738,7 +738,7 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 Message m;
-                assembleRequest( "missingNS", BSONObj(), 0, 0, 0, 0, m );
+                assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );
                 stringstream ss;
                 ASSERT_EQUALS( 0, runQuery( m, ss )->nReturned );
             }

@@ -94,7 +94,7 @@ namespace mongo {
                     delete( ae );
                 }
                 catch ( std::exception& e ){
-                    err << " exception " << " : " << e.what();
+                    err << " exception: " << e.what();
                 }
                 catch ( int x ){
                     err << " caught int : " << x << endl;
@@ -106,7 +106,7 @@ namespace mongo {
                 if ( ! passes ){
                     r->_fails++;
                     r->_messages.push_back( err.str() );
-                }
+                }	
             }
 	    
 	    log(1) << "\t DONE running tests" << endl;
