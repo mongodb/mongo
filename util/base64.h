@@ -20,8 +20,15 @@
 
 namespace mongo {
     namespace base64 {
+
         void encode( stringstream& ss , void * data , int size );
         string encode( const char * data , int size );
+        string encode( const string& s );
+        
+        void decode( stringstream& ss , const string& s );
+        string decode( const string& s );
+        
+
         void testAlphabet();
     }
 }

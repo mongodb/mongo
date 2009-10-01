@@ -21,18 +21,38 @@
 
 namespace mongo {
     namespace base64 {
+        
+        class Alphabet {
+        public:
+            Alphabet(){
+                encode = 
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    "abcdefghijklmnopqrstuvwxyz"
+                    "0123456789"
+                    "+/";
+                
+                decode = (char*)malloc(257);
+                memset( decode , 0 , 256 );
+                for ( int i=0; i<64; i++ ){
+                    decode[ encode[i] ] = i;
+                }
 
-        const char * alphabet = 
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "abcdefghijklmnopqrstuvwxyz"
-            "0123456789"
-            "+/";
+                test();
+            }
+            ~Alphabet(){
+                delete( decode );
+            }
 
-        void testAlphabet(){
-            assert( strlen( alphabet ) == 64 );
-            for ( int i=0; i<26; i++ )
-                assert( alphabet[i] == toupper( alphabet[i+26] ) );
-        }
+            void test(){
+                assert( strlen( encode ) == 64 );
+                for ( int i=0; i<26; i++ )
+                    assert( encode[i] == toupper( encode[i+26] ) );
+            }
+
+
+            const char * encode;
+            char * decode;
+        } alphabet;
         
         
         void encode( stringstream& ss , const char * data , int size ){
@@ -41,28 +61,28 @@ namespace mongo {
                 const char * start = data + i;
                 
                 // byte 0
-                ss << alphabet[start[0]>>2];
+                ss << alphabet.encode[start[0]>>2];
                 
                 // byte 1
                 char temp = ( start[0] & 0x3 ) << 4;
                 if ( left == 1 ){
-                    ss << alphabet[temp];
+                    ss << alphabet.encode[temp];
                     break;
                 }
                 temp |= start[1] >> 4;
-                ss << alphabet[temp];
+                ss << alphabet.encode[temp];
 
                 // byte 2
                 temp = ( start[1] & 0xF ) << 2;
                 if ( left == 2 ){
-                    ss << alphabet[temp];
+                    ss << alphabet.encode[temp];
                     break;
                 }
                 temp |= start[2] >> 6;
-                ss << alphabet[temp];
+                ss << alphabet.encode[temp];
 
                 // byte 3
-                ss << alphabet[start[2] & 0x3f];
+                ss << alphabet.encode[start[2] & 0x3f];
             }
 
             int mod = size % 3;
@@ -78,6 +98,35 @@ namespace mongo {
         string encode( const char * data , int size ){
             stringstream ss;
             encode( ss , data ,size );
+            return ss.str();
+        }
+        
+        string encode( const string& s ){
+            return encode( s.c_str() , s.size() );
+        }
+
+
+        void decode( stringstream& ss , const string& s ){
+            uassert( "invalid base64" , s.size() % 4 == 0 );
+            const char * data = s.c_str();
+            int size = s.size();
+            
+            char buf[4];
+            buf[3] = 0;
+            for ( int i=0; i<size; i+=4){
+                memset( buf , 0 , 4 );
+                const char * start = data + i;
+                buf[0] = ( alphabet.decode[start[0]] << 2 ) | ( alphabet.decode[start[1]] >> 4 );
+                buf[1] = ( alphabet.decode[start[1]] << 4 ) | ( alphabet.decode[start[2]] >> 2 );
+                buf[2] = ( alphabet.decode[start[2]] << 6 ) | ( alphabet.decode[start[3]]  );
+
+                ss << buf;
+            }
+        }
+        
+        string decode( const string& s ){
+            stringstream ss;
+            decode( ss , s );
             return ss.str();
         }
 
