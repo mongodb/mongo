@@ -55,6 +55,29 @@ namespace BasicTests {
             ASSERT_EQUALS( s , base64::decode( base64::encode( s ) ) );
         }
         
+        void roundTrip( const char * data , int len ){
+            string s = base64::encode( data , len );
+            string out = base64::decode( s );
+            ASSERT_EQUALS( out.size() , len );
+            bool broke = false;
+            for ( int i=0; i<len; i++ ){
+                if ( data[i] != out[i] )
+                    broke = true;
+            }
+            if ( ! broke )
+                return;
+
+            cout << s << endl;
+            for ( int i=0; i<len; i++ )
+                cout << hex << ( data[i] & 0xFF ) << dec << " ";
+            cout << endl;
+            for ( int i=0; i<len; i++ )
+                cout << hex << ( out[i] & 0xFF ) << dec << " ";
+            cout << endl;
+            
+            ASSERT(0);
+        }
+        
         void run(){
 
             ASSERT_EQUALS( "ZWxp" , base64::encode( "eli" , 3 ) );
@@ -71,6 +94,19 @@ namespace BasicTests {
             roundTrip( "eliot" );
             roundTrip( "eliots" );
             roundTrip( "eliotsz" );
+            
+            char z[] = { 0x1 , 0x2 , 0x3 , 0x4 };
+            roundTrip( z , 4 );
+            
+            char y[] = {
+                0x01, 0x10, 0x83, 0x10, 0x51, 0x87, 0x20, 0x92, 0x8B, 0x30,
+                0xD3, 0x8F, 0x41, 0x14, 0x93, 0x51, 0x55, 0x97, 0x61, 0x96,
+                0x9B, 0x71, 0xD7, 0x9F, 0x82, 0x18, 0xA3, 0x92, 0x59, 0xA7,
+                0xA2, 0x9A, 0xAB, 0xB2, 0xDB, 0xAF, 0xC3, 0x1C, 0xB3, 0xD3,
+                0x5D, 0xB7, 0xE3, 0x9E, 0xBB, 0xF3, 0xDF, 0xBF
+            };
+            roundTrip( y , 4 );
+            roundTrip( y , 40 );
         }
     };
     

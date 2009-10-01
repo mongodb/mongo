@@ -21,7 +21,7 @@
 namespace mongo {
     namespace base64 {
 
-        void encode( stringstream& ss , void * data , int size );
+        void encode( stringstream& ss , const char * data , int size );
         string encode( const char * data , int size );
         string encode( const string& s );
         

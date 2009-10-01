@@ -49,8 +49,13 @@ namespace mongo {
                     assert( encode[i] == toupper( encode[i+26] ) );
             }
 
-
+            char e( int x ){
+                return encode[x&0x3f];
+            }
+            
+        private:
             const char * encode;
+        public:
             char * decode;
         } alphabet;
         
@@ -61,28 +66,28 @@ namespace mongo {
                 const char * start = data + i;
                 
                 // byte 0
-                ss << alphabet.encode[start[0]>>2];
+                ss << alphabet.e(start[0]>>2);
                 
                 // byte 1
-                char temp = ( start[0] & 0x3 ) << 4;
+                char temp = ( start[0] << 4 );
                 if ( left == 1 ){
-                    ss << alphabet.encode[temp];
+                    ss << alphabet.e(temp);
                     break;
                 }
-                temp |= start[1] >> 4;
-                ss << alphabet.encode[temp];
+                temp |= ( ( start[1] >> 4 ) & 0xF );
+                ss << alphabet.e(temp);
 
                 // byte 2
                 temp = ( start[1] & 0xF ) << 2;
                 if ( left == 2 ){
-                    ss << alphabet.encode[temp];
+                    ss << alphabet.e(temp);
                     break;
                 }
-                temp |= start[2] >> 6;
-                ss << alphabet.encode[temp];
+                temp |= ( ( start[2] >> 6 ) & 0x3 );
+                ss << alphabet.e(temp);
 
                 // byte 3
-                ss << alphabet.encode[start[2] & 0x3f];
+                ss << alphabet.e(start[2] & 0x3f);
             }
 
             int mod = size % 3;
@@ -114,12 +119,10 @@ namespace mongo {
             char buf[4];
             buf[3] = 0;
             for ( int i=0; i<size; i+=4){
-                memset( buf , 0 , 4 );
                 const char * start = data + i;
-                buf[0] = ( alphabet.decode[start[0]] << 2 ) | ( alphabet.decode[start[1]] >> 4 );
-                buf[1] = ( alphabet.decode[start[1]] << 4 ) | ( alphabet.decode[start[2]] >> 2 );
-                buf[2] = ( alphabet.decode[start[2]] << 6 ) | ( alphabet.decode[start[3]]  );
-
+                buf[0] = ( ( alphabet.decode[start[0]] << 2 ) & 0xFC ) | ( ( alphabet.decode[start[1]] >> 4 ) & 0x3 );
+                buf[1] = ( ( alphabet.decode[start[1]] << 4 ) & 0xF0 ) | ( ( alphabet.decode[start[2]] >> 2 ) & 0xF );
+                buf[2] = ( ( alphabet.decode[start[2]] << 6 ) & 0xC0 ) | ( ( alphabet.decode[start[3]] & 0x3F ) );
                 ss << buf;
             }
         }
