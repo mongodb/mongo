@@ -237,24 +237,24 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-if ( typeof( DBRef ) != "undefined" ){
-    DBRef.prototype.fetch = function(){
+if ( typeof( DBPointer ) != "undefined" ){
+    DBPointer.prototype.fetch = function(){
         assert( this.ns , "need a ns" );
         assert( this.id , "need an id" );
         
         return db[ this.ns ].findOne( { _id : this.id } );
     }
     
-    DBRef.prototype.tojson = function(){
+    DBPointer.prototype.tojson = function(){
         return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
     }
     
-    DBRef.prototype.toString = function(){
-        return "DBRef " + this.ns + ":" + this.id;
+    DBPointer.prototype.toString = function(){
+        return "DBPointer " + this.ns + ":" + this.id;
     }
 }
 else {
-    print( "warning: no DBRef" );
+    print( "warning: no DBPointer" );
 }
 
 if ( typeof( BinData ) != "undefined" ){

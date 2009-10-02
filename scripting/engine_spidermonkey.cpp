@@ -526,7 +526,7 @@ namespace mongo {
             }
 
             case DBRef: {
-                JSObject * o = JS_NewObject( _context , &dbref_class , 0 , 0 );
+                JSObject * o = JS_NewObject( _context , &dbpointer_class , 0 , 0 );
                 setProperty( o , "ns" , toval( e.dbrefNS() ) );
 
                 JSObject * oid = JS_NewObject( _context , &object_id_class , 0 , 0 );
