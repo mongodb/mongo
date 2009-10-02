@@ -257,6 +257,26 @@ else {
     print( "warning: no DBPointer" );
 }
 
+if ( typeof( DBRef ) != "undefined" ){
+    DBRef.prototype.fetch = function(){
+        assert( this.$ref , "need a ns" );
+        assert( this.$id , "need an id" );
+        
+        return db[ this.$ref ].findOne( { _id : this.$id } );
+    }
+    
+    DBRef.prototype.tojson = function(){
+        return "{ '$ref' : \"" + this.ns + "\" , '$id' : \"" + this.id + "\" } ";
+    }
+    
+    DBRef.prototype.toString = function(){
+        return this.tojson();
+    }
+}
+else {
+    print( "warning: no DBRef" );
+}
+
 if ( typeof( BinData ) != "undefined" ){
     BinData.prototype.tojson = function(){
         return "BinData type: " + this.type + " len: " + this.len;

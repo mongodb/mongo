@@ -415,6 +415,14 @@ namespace mongo {
         }
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
+            static string ref = "$ref";
+            if ( ref == obj->firstElement().fieldName() ){
+                JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
+                assert( o );
+                setProperty( o , "$ref" , toval( obj->firstElement() ) );
+                setProperty( o , "$id" , toval( (*obj)["$id"] ) );
+                return o;
+            }
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
             assert( o );
             assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );

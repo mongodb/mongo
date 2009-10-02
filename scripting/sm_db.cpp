@@ -513,6 +513,33 @@ namespace mongo {
         { 0 }
     };
 
+
+    JSBool dbref_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        Convertor c( cx );
+                
+        if ( argc == 2 ){
+            assert( JS_SetProperty( cx , obj , "$ref" , &(argv[0]) ) );
+            assert( JS_SetProperty( cx , obj , "$id" , &(argv[1]) ) );
+            return JS_TRUE;
+        }
+        else {
+            JS_ReportError( cx , "DBRef needs 2 arguments" );
+            return JS_FALSE;            
+        }
+    }
+ 
+    JSClass dbref_class = {
+        "DBRef" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+
+    JSFunctionSpec dbref_functions[] = {
+        { 0 }
+    };
+
+
     // BinData
 
 
@@ -671,6 +698,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 0 , 0 , dbref_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
