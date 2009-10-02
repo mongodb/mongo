@@ -458,6 +458,27 @@ namespace mongo {
         bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
 
+        /** Run a map/reduce job on the server. 
+
+            See http://www.mongodb.org/display/DOCS/MapReduce
+
+            ns        namespace (db+collection name) of input data
+            jsmapf    javascript map function code 
+            jsreducef javascript reduce function code. 
+            query     optional query filter for the input
+            output    optional permanent output collection name.  if not specified server will 
+                      generate a temporary collection and return its name.
+
+            returns a result object which contains: 
+            { result : <collection_name>,
+              numObjects : <number_of_objects_scanned>,
+              timeMillis : <job_time>,
+              ok : <1_if_ok>,
+              [, err : <errmsg_if_error>]
+            }
+        */
+        BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
+
         /** Run javascript code on the database server.
            dbname    database context in which the code runs. The javascript variable 'db' will be assigned
                      to this database when the function is invoked.

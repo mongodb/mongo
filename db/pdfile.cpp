@@ -77,20 +77,6 @@ namespace mongo {
 
     BSONObj::BSONObj(const Record *r) {
         init(r->data, false);
-        /*
-        	_objdata = r->data;
-        	_objsize = *((int*) _objdata);
-        	if( _objsize > r->netLength() ) {
-        		out() << "About to assert fail _objsize <= r->netLength()" << endl;
-        		out() << " _objsize: " << _objsize << endl;
-        		out() << " netLength(): " << r->netLength() << endl;
-        		out() << " extentOfs: " << r->extentOfs << endl;
-        		out() << " nextOfs: " << r->nextOfs << endl;
-        		out() << " prevOfs: " << r->prevOfs << endl;
-        		assert( _objsize <= r->netLength() );
-        	}
-        	iFree = false;
-        */
     }
 
     /*---------------------------------------------------------------------*/
