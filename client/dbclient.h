@@ -470,12 +470,16 @@ namespace mongo {
                       generate a temporary collection and return its name.
 
             returns a result object which contains: 
-            { result : <collection_name>,
-              numObjects : <number_of_objects_scanned>,
-              timeMillis : <job_time>,
-              ok : <1_if_ok>,
-              [, err : <errmsg_if_error>]
-            }
+             { result : <collection_name>,
+               numObjects : <number_of_objects_scanned>,
+               timeMillis : <job_time>,
+               ok : <1_if_ok>,
+               [, err : <errmsg_if_error>]
+             }
+
+             For example one might call: 
+               result.getField("ok").trueValue() 
+             on the result to check if ok.
         */
         BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
 
