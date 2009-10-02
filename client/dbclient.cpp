@@ -328,6 +328,15 @@ namespace mongo {
         return names;
     }
 
+    bool DBClientWithCommands::exists( const string& ns ){
+        list<string> names;
+        
+        string db = nsGetDB( ns ) + ".system.namespaces";
+        BSONObj q = BSON( "name" << ns );
+        return count( db.c_str() , q );
+    }
+
+
     void testSort() { 
         DBClientConnection c;
         string err;

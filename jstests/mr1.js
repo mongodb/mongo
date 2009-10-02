@@ -25,6 +25,7 @@ r = function( key , values ){
 };
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+assert( res.ok , "not ok" );
 assert.eq( 4 , res.numObjects , "A" );
 x = db[res.result];
 
@@ -82,3 +83,10 @@ print( Date.timeFunc(
     function(){
         db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
     } , 10 ) );    
+
+
+
+// test doesn't exist
+res = db.runCommand( { mapreduce : "lasjdlasjdlasjdjasldjalsdj12e" , map : m , reduce : r } );
+assert( ! res.ok , "should be not ok" );
+
