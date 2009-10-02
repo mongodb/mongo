@@ -282,6 +282,20 @@ namespace mongo {
         return false;
     }
 
+    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, const string& outputcolname) { 
+        BSONObjBuilder b;
+        b.append("mapreduce", nsGetCollection(ns));
+        b.appendCode("map", jsmapf.c_str());
+        b.appendCode("reduce", jsreducef.c_str());
+        if( !query.isEmpty() )
+            b.append("query", query);
+        if( !outputcolname.empty() )
+            b.append("out", outputcolname);
+        BSONObj info;
+        runCommand(nsGetDB(ns), b.done(), info);
+        return info;
+    }
+
     bool DBClientWithCommands::eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
         BSONObjBuilder b;
         b.appendCode("$eval", jscode.c_str());
