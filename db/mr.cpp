@@ -48,9 +48,9 @@ namespace mongo {
             for ( list<BSONObj>::iterator i=values.begin(); i!=values.end(); i++){
                 BSONObj o = *i;
                 if ( n == 0 ){
-                    reduceArgs.append( o["key"] );
+                    reduceArgs.append( o["_id"] );
                     BSONObjBuilder temp;
-                    temp.append( o["key"] );
+                    temp.append( o["_id"] );
                     key = temp.obj();
                 }
                 valueBuilder.appendAs( o["value"] , BSONObjBuilder::numStr( n++ ).c_str() );
@@ -65,7 +65,7 @@ namespace mongo {
                 return BSONObj();
             }
             BSONObjBuilder b;
-            b.append( key["key"] );
+            b.append( key["_id"] );
             s->append( b , "value" , "return" );
             return b.obj();
         }
@@ -180,7 +180,7 @@ namespace mongo {
             {
                 assert( i.more() );
                 BSONObjBuilder b;
-                b.appendAs( i.next() , "key" );
+                b.appendAs( i.next() , "_id" );
                 key = b.obj();
             }
 
@@ -224,7 +224,7 @@ namespace mongo {
                 if ( values.size() == 0 )
                     return;
                 
-                BSONObj key = values.begin()->extractFields( BSON( "key" << 1 ) );
+                BSONObj key = values.begin()->extractFields( BSON( "_id" << 1 ) );
                 
                 if ( values.size() == 1 ){
                     assert( db.count( resultColl , key  ) == 1 );
@@ -259,7 +259,6 @@ namespace mongo {
                 string finalOutputShort = finalOutput.substr( database->name.size() + 1 );
                 log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
                 db.dropCollection( resultColl );
-                db.ensureIndex( resultColl , BSON( "key" << 1 ) );
             
                 int num = 0;
             
@@ -305,9 +304,9 @@ namespace mongo {
 
                     BSONObj prev;
                     list<BSONObj> all;
-                    BSONObj sortKey = BSON( "key" << 1 );
+                    BSONObj sortKey = BSON( "_id" << 1 );
                 
-                    cursor = db.query( resultColl, Query().sort( BSON( "key" << 1 ) ) );
+                    cursor = db.query( resultColl, Query().sort( sortKey ) );
                     while ( cursor->more() ){
                         BSONObj o = cursor->next().getOwned();
 
