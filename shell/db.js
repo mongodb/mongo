@@ -259,7 +259,8 @@ DB.prototype.help = function() {
     print("\tdb.dropDatabase()");
     print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");
-    print("\tdb.getLastError()");
+    print("\tdb.getLastError() - just returns the err msg string");
+    print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getPrevError()");
     print("\tdb.resetError()");
     print("\tdb.getCollectionNames()");
@@ -456,6 +457,12 @@ DB.prototype.getLastError = function(){
     if ( ! res.ok )
         throw "getlasterror failed: " + tojson( res );
     return res.err;
+}
+DB.prototype.getLastErrorObj = function(){
+    var res = this.runCommand( { getlasterror : 1 } );
+    if ( ! res.ok )
+        throw "getlasterror failed: " + tojson( res );
+    return res;
 }
 
 /* Return the last error which has occurred, even if not the very last error.
