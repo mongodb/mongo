@@ -23,7 +23,7 @@ __wt_prime(u_int32_t n)
 	 * power-of-two up to 2^18, then mid-points between each power-of-two
 	 * to a maximum of 2^30.
 	 */
-	static struct {
+	static const struct {
 		u_int32_t value;
 		u_int32_t prime;
 	} t[] = {

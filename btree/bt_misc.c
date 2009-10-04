@@ -16,7 +16,7 @@
 int
 __wt_bt_build_verify(void)
 {
-	static struct {
+	static const struct {
 		u_int s, c;
 		char *name;
 	} list[] = {
