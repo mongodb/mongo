@@ -74,6 +74,10 @@ namespace mongo {
     public:
         NamespaceString( const char * ns ) { init(ns); }
         NamespaceString( const string& ns ) { init(ns.c_str()); }
+
+        bool isSystem() { 
+            return strncmp(coll.c_str(), "system.", 7) == 0;
+        }
     };
 
 	/* This helper class is used to make the HashMap below in NamespaceDetails */

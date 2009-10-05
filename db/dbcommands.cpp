@@ -420,6 +420,10 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
+                if( p && nsdetails(database->profileName.c_str()) == 0 ) { 
+                    errmsg = "create a (capped) system.profile collection before enabling profiling";
+                    return false;
+                }
                 ok = true;
                 database->profile = p;
             }

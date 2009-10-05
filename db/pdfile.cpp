@@ -557,7 +557,15 @@ assert( !eloc.isNull() );
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
         uassert( (string)"ns not found: " + nsToDrop , d );
 
-        uassert( "can't drop system ns", strstr(nsToDrop.c_str(), ".system.") == 0 );
+        NamespaceString s(nsToDrop);
+        assert( s.db == database->name );
+        if( s.isSystem() ) {
+            if( s.coll == "system.profile" ) 
+                uassert( "turn off profiling before dropping system.profile collection", database->profile == 0 );
+            else
+                uasserted( "can't drop system ns" );
+        }
+
         {
             // remove from the system catalog
             BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
@@ -609,7 +617,7 @@ assert( !eloc.isNull() );
             }
             assert( d->nIndexes == 0 );
         }
-        log(1) << "\t deleteIndexes dones" << endl;
+        log(1) << "\t deleteIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         dropNS(name);        
