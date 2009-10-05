@@ -406,6 +406,7 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
 
         acquirePathLock();
+        remove_all( dbpath + "/_tmp/" );
 
         theFileAllocator().start();
 
