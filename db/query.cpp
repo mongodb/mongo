@@ -904,7 +904,7 @@ namespace mongo {
             if ( ClientCursor::erase(ids[i]) )
                 k++;
         }
-        log() << "killCursors: found " << k << " of " << n << '\n';
+        log( k == n ) << "killcursors: found " << k << " of " << n << '\n';
     }
 
     BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
