@@ -1635,6 +1635,11 @@ namespace mongo {
                     sz = fivePct;
             }
         }
+
+        log() << "******" << endl;
+        log() << "creating oplog  size : " << (int)( sz / ( 1024 * 1024 ) ) << "mb" << endl;
+        log() << "******" << endl;
+
         b.append("size", sz);
         b.appendBool("capped", 1);
         b.appendBool("autoIndexId", false);
