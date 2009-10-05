@@ -882,6 +882,15 @@ namespace mongo {
 
 #undef out
 
+    void exitCleanly() {
+        goingAway = true;
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( EXIT_KILL );        
+        }
+    }
+
 #if !defined(_WIN32)
 
 } // namespace mongo
@@ -922,11 +931,7 @@ namespace mongo {
         int x;
         sigwait( &asyncSignals, &x );
         log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
-        {
-            dblock lk;
-            log() << "now exiting" << endl;
-            dbexit( EXIT_KILL );
-        }
+        exitCleanly();
     }
 
     void setupSignals() {
@@ -946,11 +951,7 @@ namespace mongo {
 #else
 void ctrlCTerminate() {
     log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
-    {
-        dblock lk;
-        log() << "now exiting" << endl;
-        dbexit( EXIT_KILL );
-    }
+    exitCleanly();
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
 {

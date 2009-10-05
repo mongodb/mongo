@@ -289,6 +289,7 @@ assert( !eloc.isNull() );
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+        massert( "shutdown in progress", !goingAway );
         massert( "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
         massert( "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
