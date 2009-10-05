@@ -628,7 +628,13 @@ assert( !eloc.isNull() );
         b.append("ns", parentNS().c_str());
         BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
 
-        btreeStore->drop(ns.c_str());
+        /* important to catch exception here so we can finish cleanup below. */
+        try { 
+            btreeStore->drop(ns.c_str());
+        }
+        catch(DBException& ) { 
+            log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
+        }
         head.setInvalid();
         info.setInvalid();
 
