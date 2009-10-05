@@ -224,6 +224,19 @@ Array.tojson = function( a , sepLines ){
     return s;
 }
 
+Array.fetchRefs = function( arr , coll ){
+    var n = [];
+    for ( var i=0; i<arr.length; i ++){
+        var z = arr[i];
+        if ( coll && coll != z.getCollection() )
+            continue;
+        n.push( z.fetch() );
+    }
+    
+    return n;
+}
+
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
@@ -248,6 +261,10 @@ if ( typeof( DBPointer ) != "undefined" ){
     DBPointer.prototype.tojson = function(){
         return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
     }
+
+    DBPointer.prototype.getCollection = function(){
+        return this.ns;
+    }
     
     DBPointer.prototype.toString = function(){
         return "DBPointer " + this.ns + ":" + this.id;
@@ -266,7 +283,11 @@ if ( typeof( DBRef ) != "undefined" ){
     }
     
     DBRef.prototype.tojson = function(){
-        return "{ '$ref' : \"" + this.ns + "\" , '$id' : \"" + this.id + "\" } ";
+        return "{ '$ref' : \"" + this.$ref + "\" , '$id' : \"" + this.$id + "\" } ";
+    }
+
+    DBRef.prototype.getCollection = function(){
+        return this.$ref;
     }
     
     DBRef.prototype.toString = function(){
