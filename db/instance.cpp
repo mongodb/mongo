@@ -687,19 +687,23 @@ namespace mongo {
                 close( *i );
         }
 #endif
-                
+
+        log() << "\t shutdown: going to flush oplog..." << endl;
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );
 
         /* must do this before unmapping mem or you may get a seg fault */
+        log() << "\t shutdown: going to close sockets..." << endl;
         closeAllSockets();
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
+        log() << "\t shutdown: waiting for fs..." << endl;
         theFileAllocator().waitUntilFinished();
         
+        log() << "\t shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
@@ -709,6 +713,7 @@ namespace mongo {
         
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){
+            log() << "\t shutdown: removing fs lock..." << endl;
             assert( ftruncate( lockFile , 0 ) == 0 );
             flock( lockFile, LOCK_UN );
         }

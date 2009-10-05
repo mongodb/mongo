@@ -40,8 +40,11 @@ namespace mongo {
             return;
         }
         ++closingAllFiles;
-        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+        ProgressMeter pm( mmfiles.size() , 2 , 1 );
+        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             (*i)->close();
+            pm.hit();
+        }
         message << "  closeAllFiles() finished" << endl;
         --closingAllFiles;
     }
