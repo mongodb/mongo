@@ -153,6 +153,7 @@ namespace mongo {
         Timer t;
         database = 0;
 
+        int logThreshold = 100;
         int ms;
         bool log = logLevel >= 1;
         currentOp.op = curOp = m.data->operation();
@@ -244,7 +245,7 @@ namespace mongo {
             else if ( m.data->operation() == dbKillCursors ) {
                 OPREAD;
                 try {
-                    log = true;
+                    logThreshold = 10;
                     ss << "killcursors ";
                     receivedKillCursors(m);
                 }
@@ -262,7 +263,7 @@ namespace mongo {
         ms = t.millis();
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
-        if ( log || ms > 100 ) {
+        if ( log || ms > logThreshold ) {
             ss << ' ' << t.millis() << "ms";
             out() << ss.str().c_str() << endl;
         }
