@@ -951,9 +951,14 @@ namespace mongo {
     }
 
     QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
-        BufBuilder b(32768);
-
         ClientCursor *cc = ClientCursor::find(cursorid);
+        
+        int bufSize = 512;
+        if ( cc ){
+            bufSize += sizeof( QueryResult );
+            bufSize += ( ntoreturn ? 4 : 1 ) * 1024 * 1024;
+        }
+        BufBuilder b( bufSize );
 
         b.skip(sizeof(QueryResult));
 
