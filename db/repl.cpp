@@ -1620,6 +1620,13 @@ namespace mongo {
 
     void createOplog() {
         dblock lk;
+
+        const char * ns = "local.oplog.$main";
+        setClientTempNs(ns);
+        
+        if ( nsdetails( ns ) )
+            return;
+        
         /* create an oplog collection, if it doesn't yet exist. */
         BSONObjBuilder b;
         double sz;
@@ -1643,10 +1650,10 @@ namespace mongo {
         b.append("size", sz);
         b.appendBool("capped", 1);
         b.appendBool("autoIndexId", false);
-        setClientTempNs("local.oplog.$main");
+
         string err;
         BSONObj o = b.done();
-        userCreateNS("local.oplog.$main", o, err, false);
+        userCreateNS(ns, o, err, false);
         logOp( "n", "dummy", BSONObj() );
         database = 0;
     }
