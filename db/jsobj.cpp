@@ -1474,7 +1474,7 @@ namespace mongo {
         case String: append( field.c_str() , BSONObj() ); break;
         case Code:
         case CodeWScope:
-            appendMinForType( field , Timestamp ); break;
+            appendCodeWScope( field.c_str() , "ZZZ" , BSONObj() ); break;
         case Timestamp:
             appendTimestamp( field.c_str() , numeric_limits<unsigned long long>::max() ); break;
         default:
