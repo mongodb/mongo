@@ -421,8 +421,13 @@ namespace mongo {
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
                 if( p && nsdetails(database->profileName.c_str()) == 0 ) {
-                    errmsg = "create a (capped) system.profile collection before enabling profiling";
-                    return false;
+                    BSONObjBuilder spec;
+                    spec.appendBool( "capped", true );
+                    spec.append( "size", 131072.0 );
+
+                    if ( !userCreateNS( database->profileName.c_str(), spec.done(), errmsg, true ) ) {
+                        return false;
+                    }
                 }
                 ok = true;
                 database->profile = p;
