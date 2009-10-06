@@ -109,6 +109,7 @@ namespace mongo {
     // strategy object implementing direction of traversal.
     class AdvanceStrategy {
     public:
+        virtual ~AdvanceStrategy() { }
         virtual DiskLoc next( const DiskLoc &prev ) const = 0;
     };
 
