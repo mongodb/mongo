@@ -98,6 +98,7 @@ namespace mongo {
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObj obj = currentOp.info();
         replyToQuery(0, m, dbresponse, obj);
+
     }
     
     void killOp( Message &m, DbResponse &dbresponse ) {

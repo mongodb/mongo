@@ -74,6 +74,7 @@ namespace mongo {
                 e->assertOk();
                 el = e->xnext;
                 ne++;
+                checkForInterrupt();
             }
             ss << "  # extents:" << ne << '\n';
         } catch (...) {
@@ -162,6 +163,7 @@ namespace mongo {
                         delSize += d->lengthWithHeaders;
                         loc = d->nextDeleted;
                         k++;
+                        checkForInterrupt();
                     }
                 } catch (...) {
                     ss <<"    ?exception in deleted chain for bucket " << i << endl;

@@ -33,7 +33,10 @@ namespace mongo {
 
     inline void checkForInterrupt() {
         if( killCurrentOp ) { 
-            killCurrentOp = 0;
+            if( !goingAway ) {
+                // if we are shutting down, we leave this on so potentially we can stop multiple operations
+                killCurrentOp = 0;
+            }
             uasserted("interrupted");
         }
     }
