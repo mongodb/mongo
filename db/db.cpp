@@ -884,6 +884,7 @@ namespace mongo {
 
     void exitCleanly() {
         goingAway = true;
+        killCurrentOp = 1;
         {
             dblock lk;
             log() << "now exiting" << endl;

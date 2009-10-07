@@ -27,7 +27,7 @@
     try {                                                           \
         a;                                                          \
         mongo::regression::assert_fail( #a , __FILE__ , __LINE__ ); \
-    } catch ( b& x ){                                               \
+    } catch ( b& ){                                               \
         mongo::regression::assert_pass();                           \
     }
 

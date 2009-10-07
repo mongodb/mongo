@@ -990,6 +990,19 @@ namespace JsobjTests {
             }
         };
     }
+
+    class CompatBSON {
+    public:
+        void run(){
+            ASSERT_EQUALS( fromjson( "{ 'x' : true }" ).objsize() , 9 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : null }" ).objsize() , 8 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : 5.2 }" ).objsize() , 16 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : 'eliot' }" ).objsize() , 18 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : 5.2 , 'y' : 'truth' , 'z' : 1.1 }" ).objsize() , 40 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : 5.2 , 'y' : { 'a' : 'eliot' , b : true } , 'z' : null }" ).objsize() , 44 );
+            ASSERT_EQUALS( fromjson( "{ 'x' : 5.2 , 'y' : [ 'a' , 'eliot' , 'b' , true ] , 'z' : null }" ).objsize() , 62 );
+        }
+    };
         
     class All : public Suite {
     public:
@@ -1066,6 +1079,7 @@ namespace JsobjTests {
             add< external_sort::Big1 >();
             add< external_sort::Big2 >();
             add< external_sort::D1 >();
+            add< CompatBSON >();
         }
     } myall;
 

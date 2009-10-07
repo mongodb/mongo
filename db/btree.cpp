@@ -75,6 +75,7 @@ namespace mongo {
     }
 
     int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order) {
+        checkForInterrupt();
         assertValid(order, true);
 //	if( bt_fv==0 )
 //		return;
