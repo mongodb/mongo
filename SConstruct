@@ -761,8 +761,12 @@ def concatjs(target, source, env):
     for s in source:
         f = open( str(s) , 'r' )
         for l in f:
-            fullSource += l
-
+            l = l.split("//")[0].strip()
+            if len ( l ) == 0:
+                continue
+            
+            fullSource += l + "\n"
+    
     out = open( outFile , 'w' )
     out.write( fullSource )
 

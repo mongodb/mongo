@@ -18,6 +18,7 @@
 
 #include "../client/dbclient.h"
 #include "../util/processinfo.h"
+#include "../util/md5.hpp"
 #include "utils.h"
 
 namespace mongo {
@@ -460,6 +461,19 @@ namespace mongo {
         MongoProgramScope::~MongoProgramScope() {}
         void KillMongoProgramInstances() {}        
 #endif
+
+        BSONObj jsmd5( const BSONObj &a ){
+            uassert( "js md5 needs a string" , a.firstElement().type() == String );
+            const char * s = a.firstElement().valuestrsafe();
+            
+            md5digest d;
+            md5_state_t st;
+            md5_init(&st);
+            md5_append( &st , (const md5_byte_t*)s , strlen( s ) );
+            md5_finish(&st, d);
+            
+            return BSON( "" << digestToString( d ) );
+        }
         
         void installShellUtils( Scope& scope ){
             scope.injectNative( "listFiles" , listFiles );
@@ -467,6 +481,7 @@ namespace mongo {
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "version" , JSVersion );
+            scope.injectNative( "hex_md5" , jsmd5 );
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
