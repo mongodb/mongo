@@ -605,6 +605,10 @@ DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
 }
 
+DB.prototype.serverStatus = function(){
+    return this._adminCommand( "serverStatus" );
+}
+
 DB.prototype.version = function(){
     return this.serverBuildInfo().version;
 }

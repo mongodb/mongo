@@ -6,7 +6,7 @@ var files = listFiles("jstests");
 var dummyDb = db.getSisterDB( "dummyDBdummydummy" );
 
 dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
-prev = dummyDb.runCommand( "meminfo" );
+prev = dummyDb.serverStatus();
 
 print( "START : " + tojson( prev ) );
 
@@ -26,9 +26,14 @@ files.forEach(
         print("                " + Date.timeFunc( function() { load(x.name); }, 1) + "ms");
         
         assert( dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" ).ok == 1 , "closeAllDatabases failed" );
-        var now = dummyDb.runCommand( "meminfo" );
-        if ( now.virtual > prev.virtual )
-            print( "    LEAK : " + prev.virtual + " -->> " + now.virtual );
+        var now = dummyDb.serverStatus();
+        var leaked = now.mem.virtual - prev.mem.virtual;
+        if ( leaked > 0 ){
+            print( "    LEAK : " + prev.mem.virtual + " -->> " + now.mem.virtual  );
+            printjson( now );
+            if ( leaked > 20 )
+                throw -1;
+        }
         prev = now;
     }
 );
@@ -36,4 +41,4 @@ files.forEach(
 
 
 dummyDb.getSisterDB( "admin" ).runCommand( "closeAllDatabases" );
-print( "END   : " + tojson( dummyDb.runCommand( "meminfo" ) ) );
+print( "END   : " + tojson( dummyDb.serverStatus() ) );
