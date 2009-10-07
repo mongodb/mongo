@@ -24,9 +24,12 @@
 namespace mongo {
 
     namespace mr {
-
+        
         typedef pair<BSONObj,BSONObj> Data;
-        typedef list< Data > InMemory;
+        //typedef list< Data > InMemory;
+        typedef map< BSONObj,list<BSONObj>,BSONObjCmp > InMemory;
+        typedef map< BSONObj,int,BSONObjCmp > KeyNums;
+
         
         class MyCmp {
         public:
@@ -83,10 +86,7 @@ namespace mongo {
             
             void reduceInMemory(){
                 BSONObj prevKey;
-                list<BSONObj> all;
                 
-                _temp->sort( MyCmp() );
-
                 InMemory * old = _temp;
                 InMemory * n = new InMemory();
                 _temp = n;
@@ -94,32 +94,15 @@ namespace mongo {
                 
                 for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
                     BSONObj key = i->first;
-                    BSONObj value = i->second;
-                    
-                    if ( key.woCompare( prevKey ) == 0 ){
-                        all.push_back( value );
-                        continue;
-                    }
+                    list<BSONObj>& all = i->second;
                     
                     if ( all.size() == 1 ){
-                        insert( prevKey , *(all.begin()) );
-                        all.clear();
+                        insert( key , *(all.begin()) );
                     }
                     else if ( all.size() > 1 ){
                         BSONObj res = reduceValues( all , _scope , _reduce );
-                        insert( prevKey , res );
-                        all.clear();
+                        insert( key , res );
                     }
-                    prevKey = key.getOwned();
-                    all.push_back( value );
-                }
-
-                if ( all.size() == 1 ){
-                    insert( prevKey , *(all.begin()) );
-                }
-                else if ( all.size() > 1 ){
-                    BSONObj res = reduceValues( all , _scope , _reduce );
-                    insert( prevKey , res );
                 }
                 
                 delete( old );
@@ -128,7 +111,13 @@ namespace mongo {
             void dump(){
                 for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                     BSONObj key = i->first;
-                    BSONObj value = i->second;
+                    list<BSONObj>& all = i->second;
+                    if ( all.size() < 1 )
+                        continue;
+                    assert( all.size() == 1 );
+                    
+                    BSONObj value = *(all.begin());
+
                     BSONObjBuilder b;
                     b.appendElements( value );
                 
@@ -140,10 +129,11 @@ namespace mongo {
             }
             
             void insert( const BSONObj& key , const BSONObj& value ){
-                _temp->push_back( pair<BSONObj,BSONObj>( key , value ) );
+                list<BSONObj>& all = (*_temp)[key];
+                all.push_back( value );
                 _size += key.objsize() + value.objsize() + 32;
             }
-
+            
             void checkSize(){
                 if ( _size < 1024 * 10 )
                     return;
@@ -154,11 +144,24 @@ namespace mongo {
 
                 if ( _size < 1024 * 15 )
                     return;
-
+                
                 dump();
                 log(1) << "  mr: dumping to db" << endl;
             }
             
+            int getNum( const BSONObj& key ){
+                KeyNums::iterator i = _nums.find( key );
+                if ( i != _nums.end() )
+                    return i->second;
+                int n = _nums.size() + 1;
+                _nums[key] = n;
+                return n;
+            }
+
+            void resetNum(){
+                _nums.clear();
+            }
+
         private:
             DBDirectClient * _db;
             string _coll;
@@ -168,6 +171,8 @@ namespace mongo {
             InMemory * _temp;
             
             long _size;
+
+            map<BSONObj,int,BSONObjCmp> _nums;
         };
 
         boost::thread_specific_ptr<MRTL> _tlmr;
@@ -195,6 +200,15 @@ namespace mongo {
             _tlmr->insert( key , value );
             return BSON( "x" << 1 );
         }
+
+        BSONObj get_num( const BSONObj& args ){
+            return BSON( "" << _tlmr->getNum( args ) );
+        }
+        
+        BSONObj reset_num( const BSONObj& args ){
+            _tlmr->resetNum();
+            return BSONObj();
+        }
     
         class MapReduceCommand : public Command {
         public:
@@ -217,7 +231,7 @@ namespace mongo {
                     return;
 
                 BSONObj res = reduceValues( values , s , reduce );
-                db.insert( resultColl , res );
+                db.update( resultColl , res.extractFields( BSON( "_id" << 1 ) ) , res , true );
             }
 
             void finalReduce( const string& resultColl , list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
@@ -264,22 +278,31 @@ namespace mongo {
             
                 try {
                     dbtemprelease temprlease;
-
+                    
                     s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"];" , "tempcoll1" );
-                    if ( s->type( "emit" ) == 6 ){
-                        s->injectNative( "emit" , fast_emit );
-                    }
+                    s->execSetup( "MR.init()" );
 
+                    s->injectNative( "get_num" , get_num );
+                    s->injectNative( "reset_num" , reset_num );
+                    
                     ScriptingFunction mapFunction = s->createFunction( cmdObj["map"].ascode().c_str() );
                     ScriptingFunction reduceFunction = s->createFunction( cmdObj["reduce"].ascode().c_str() );
-                
+                    s->execSetup( (string)"$reduce = " + cmdObj["reduce"].ascode() );
+                    
                     MRTL * mrtl = new MRTL( &db , resultColl , s.get() , reduceFunction );
                     _tlmr.reset( mrtl );
 
-                    BSONObj q;
-                    if ( cmdObj["query"].type() == Object )
-                        q = cmdObj["query"].embeddedObjectUserCheck();
+                    Query q;
+                    BSONObj filter;
+                    if ( cmdObj["query"].type() == Object ){
+                        filter = cmdObj["query"].embeddedObjectUserCheck();
+                        q = filter;
+                    }
+                    
+                    if ( cmdObj["sort"].type() == Object )
+                        q.sort( cmdObj["sort"].embeddedObjectUserCheck() );
 
+                    ProgressMeter pm( db.count( ns , filter ) );
                     auto_ptr<DBClientCursor> cursor = db.query( ns , q );
                     while ( cursor->more() ){
                         BSONObj o = cursor->next(); 
@@ -290,18 +313,24 @@ namespace mongo {
                     
                         num++;
                         if ( num % 100 == 0 ){
-                            mrtl->checkSize();
+                            s->exec( "MR.check();" , "reduce-i" , false , true , true );
+                            //mrtl->checkSize();
                         }
+                        pm.hit();
                     }
 
                     
                     result.append( "timeMillis.emit" , t.millis() );
-
+                    
                     // final reduce
                 
                     mrtl->reduceInMemory();
                     mrtl->dump();
-
+                    
+                    s->exec( "MR.doReduce(true)" , "reduce" , false , true , true );
+                    s->execSetup( "MR.cleanup()" );
+                    _tlmr.reset( 0 );
+                    /*
                     BSONObj prev;
                     list<BSONObj> all;
                     BSONObj sortKey = BSON( "_id" << 1 );
@@ -321,8 +350,9 @@ namespace mongo {
                         prev = o;
                         all.push_back( o );
                     }
-
+                    
                     finalReduce( resultColl , all , s.get() , reduceFunction );
+                    */
                 }
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
