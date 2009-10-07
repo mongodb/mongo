@@ -22,11 +22,11 @@ namespace mongo {
 
     class MemoryMappedFile {
     public:
-        static void closeAllFiles( stringstream &message );
+
         MemoryMappedFile();
         ~MemoryMappedFile(); /* closes the file if open */
         void close();
-
+        
         // Throws exception if file doesn't exist.
         void* map( const char *filename );
 
@@ -46,7 +46,10 @@ namespace mongo {
         }
         
         static void updateLength( const char *filename, long &length );
-
+        
+        static long long totalMappedLength();
+        static void closeAllFiles( stringstream &message );
+        
     private:
         void created();
         

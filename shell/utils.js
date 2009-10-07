@@ -445,8 +445,6 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function(){
-    if ( typeof( db ) != "undefined" )
-        print( "server version: " + db.version() );
     print( "HELP" );
     print( "\t" + "show dbs                     show database names");
     print( "\t" + "show collections             show collections in current database");

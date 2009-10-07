@@ -409,7 +409,7 @@ DBCollection.prototype.storageSize = function(){
     return this.stats().storageSize;
 }
 
-DBCollection.prototype.totalIndexSize = function(){
+DBCollection.prototype.totalIndexSize = function( verbose ){
     var total = 0;
     var mydb = this._db;
     var shortName = this._shortName;
@@ -417,8 +417,10 @@ DBCollection.prototype.totalIndexSize = function(){
         function( spec ){
             var coll = mydb.getCollection( shortName + ".$" + spec.name );
             var mysize = coll.dataSize();
-            //print( coll + "\t" + mysize + "\t" + tojson( coll.validate() ) );
             total += coll.dataSize();
+            if ( verbose ) {
+                print( coll + "\t" + mysize );
+            }
         }
     );
     return total;
