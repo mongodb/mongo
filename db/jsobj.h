@@ -943,6 +943,8 @@ namespace mongo {
         
         /** true unless corrupt */
         bool valid() const;
+        
+        string md5() const;
 
         enum MatchType {
             Equality = 0,

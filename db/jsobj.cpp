@@ -23,6 +23,7 @@
 #include "nonce.h"
 #include "../util/goodies.h"
 #include "../util/base64.h"
+#include "../util/md5.hpp"
 #include <limits>
 #include "../util/unittest.h"
 #include "json.h"
@@ -676,6 +677,15 @@ namespace mongo {
         }
         s << " }";
         return s.str();
+    }
+
+    string BSONObj::md5() const {
+        md5digest d;
+        md5_state_t st;
+        md5_init(&st);
+        md5_append( &st , (const md5_byte_t*)_objdata , objsize() );
+        md5_finish(&st, d);
+        return digestToString( d );
     }
 
     string BSONObj::jsonString( JsonStringFormat format ) const {
