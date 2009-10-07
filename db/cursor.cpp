@@ -19,6 +19,7 @@
 
 namespace mongo {
 
+    /* these will be used outside of mutexes - really functors - thus the const */
     class Forward : public AdvanceStrategy {
         virtual DiskLoc next( const DiskLoc &prev ) const {
             return prev.rec()->getNext( prev );
@@ -31,10 +32,10 @@ namespace mongo {
         }
     } _reverse;
 
-    AdvanceStrategy *forward() {
+    const AdvanceStrategy *forward() {
         return &_forward;
     }
-    AdvanceStrategy *reverse() {
+    const AdvanceStrategy *reverse() {
         return &_reverse;
     }
 

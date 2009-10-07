@@ -495,7 +495,7 @@ namespace mongo {
         Message & container;
     };
     
-    /* a call from java/js to the database locally.
+    /* a call from jscript to the database locally.
 
          m - inbound message
          out - outbound message, if there is any, will be set here.
@@ -505,7 +505,7 @@ namespace mongo {
 
        note we should already be in the mutex lock from connThread() at this point.
     */
-    void jniCallback(Message& m, Message& out)
+    void jniCallbackDeprecated(Message& m, Message& out)
     {
 		/* we should be in the same thread as the original request, so authInfo should be available. */
 		AuthenticationInfo *ai = authInfo.get();
@@ -714,7 +714,8 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){
             log() << "\t shutdown: removing fs lock..." << endl;
-            assert( ftruncate( lockFile , 0 ) == 0 );
+            if( ftruncate( lockFile , 0 ) ) 
+                log() << "\t couldn't remove fs lock errno=" << errno << endl;
             flock( lockFile, LOCK_UN );
         }
 #endif

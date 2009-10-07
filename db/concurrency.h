@@ -1,6 +1,12 @@
 /* concurrency.h
 
    mongod concurrency rules & notes will be placed here.
+
+   Mutex heirarchy
+     
+     leaf: 
+       Logstream::mutex
+
 */
 
 #pragma once

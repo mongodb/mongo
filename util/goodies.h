@@ -325,7 +325,7 @@ namespace mongo {
     public:
         ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 )
             : _total( total ) , _secondsBetween( secondsBetween ) , _checkInterval( checkInterval ) ,
-              _done(0) , _hits(0) , _lastTime( time(0) ){
+              _done(0) , _hits(0) , _lastTime( (int) time(0) ){
         }
         
         void hit( int n = 1 ){
@@ -334,7 +334,7 @@ namespace mongo {
             if ( _hits % _checkInterval )
                 return;
             
-            int t = time(0);
+            int t = (int) time(0);
             if ( t - _lastTime < _secondsBetween )
                 return;
             
