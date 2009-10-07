@@ -400,7 +400,7 @@ namespace mongo {
             return repairDatabase( ns, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
         }
     } cmdRepairDatabase;
-
+    
     /* set db profiling level
        todo: how do we handle profiling information put in the db with replication?
              sensibly or not?
@@ -438,61 +438,52 @@ namespace mongo {
         }
     } cmdProfile;
 
-    /*
-       > db.$cmd.findOne({timeinfo:1})
-       {
-        "totalTime" : 1.33875E8 ,
-        "lockTime" : 765625.0 ,
-        "ratio" : 0.005718954248366013 ,
-        "ok" : 1.0
-       }
-    */
-    class CmdTimeInfo : public Command {
+    class CmdServerStatus : public Command {
     public:
         virtual bool slaveOk() {
             return true;
         }
-        CmdTimeInfo() : Command("timeinfo") {
+        CmdServerStatus() : Command("serverStatus") {
             started = time(0);
         }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            unsigned long long last, start, timeLocked;
-            dbMutexInfo.timingInfo(start, timeLocked);
-            last = curTimeMicros64();
-            double tt = (double) last-start;
-            double tl = (double) timeLocked;
-            result.append("totalTime", tt);
-            result.append("lockTime", tl);
-            result.append("ratio", tl/tt);
-            result.append("uptime",(double) (time(0)-started));
-            return true;
-        }
-        time_t started;
-    } cmdTimeInfo;
 
-    class CmdMemInfo : public Command {
-    public:
-        virtual bool slaveOk() {
-            return true;
-        }
-        CmdMemInfo() : Command("meminfo") {
-            started = time(0);
-        }
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             result.append("uptime",(double) (time(0)-started));
+            
+            {
+                BSONObjBuilder t;
 
-            ProcessInfo p;
-            if ( ! p.supported() ){
-                errmsg = "ProcessInfo not supported on this platform";
-                return false;
+                unsigned long long last, start, timeLocked;
+                dbMutexInfo.timingInfo(start, timeLocked);
+                last = curTimeMicros64();
+                double tt = (double) last-start;
+                double tl = (double) timeLocked;
+                t.append("totalTime", tt);
+                t.append("lockTime", tl);
+                t.append("ratio", tl/tt);
+                
+                result.append( "globalLock" , t.obj() );
+            }
+            
+            {
+                ProcessInfo p;
+                if ( p.supported() ){
+                    BSONObjBuilder t;
+                    t.append( "resident" , p.getResidentSize() );
+                    t.append( "virtual" , p.getVirtualMemorySize() );
+                    t.append( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                    result.append( "mem" , t.obj() );
+                }
+                else {
+                    result.append( "mem" , "not support on this platform" );
+                }
+                    
             }
 
-            result << "resident" << p.getResidentSize();
-            result << "virtual" << p.getVirtualMemorySize();
             return true;
         }
         time_t started;
-    } cmdMemInfo;
+    } cmdServerStatus;
 
     /* just to check if the db has asserted */
     class CmdAssertInfo : public Command {
