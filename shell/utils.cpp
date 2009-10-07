@@ -78,12 +78,18 @@ namespace mongo {
             int num =0;
             while ( i != end ){
                 path p = *i;
-                
                 BSONObjBuilder b;
                 b << "name" << p.string();
                 b.appendBool( "isDirectory", is_directory( p ) );
-                if ( ! is_directory( p ) )
-                    b.append( "size" , (double)file_size( p ) );
+                if ( ! is_directory( p ) ){
+                    try { 
+                        b.append( "size" , (double)file_size( p ) );
+                    }
+                    catch ( ... ){
+                        i++;
+                        continue;
+                    }
+                }
 
                 stringstream ss;
                 ss << num;
