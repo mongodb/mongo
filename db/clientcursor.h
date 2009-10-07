@@ -38,65 +38,12 @@ namespace mongo {
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     typedef map<CursorId, ClientCursor*> CCById;
-    extern CCById clientCursorsById;
 
     extern BSONObj id_obj;
 
-    // utility class for de duping ids
-    class IdSet_Deprecated {
-    public:
-        IdSet_Deprecated() : mySize_(), inMem_( true ) {}
-        ~IdSet_Deprecated() {
-            size_ -= mySize_;
-        }
-        bool get( const BSONObj &id ) const {
-            if ( inMem_ )
-                return mem_.count( id );
-            else
-                return db_.get( id );
-        }
-        void put( const BSONObj &id ) {
-            if ( inMem_ ) {
-                if ( mem_.insert( id.getOwned() ).second ) {
-                    int sizeInc = id.objsize() + sizeof( BSONObj );
-                    mySize_ += sizeInc;
-                    size_ += sizeInc;
-                }
-            } else {
-                db_.set( id, true );
-            }
-        }
-        void mayUpgradeStorage( const string &name ) {
-            if ( size_ > maxSize_ || mySize_ > maxSizePerSet() ) {
-                if ( !inMem_ )
-                    return;
-                log() << "upgrading id set to collection backed storage, cursorid: " << name << endl;
-                inMem_ = false;
-                db_.reset( "local.temp.clientcursor." + name, id_obj );
-                for( BSONObjSetDefaultOrder::const_iterator i = mem_.begin(); i != mem_.end(); ++i )
-                    db_.set( *i, true );
-                mem_.clear();
-                size_ -= mySize_;
-                mySize_ = 0;
-            }
-        }
-        bool inMem() const { return inMem_; }
-        long long mySize() { return mySize_; }
-        static long long aggregateSize() { return size_; }
-        
-        static long long maxSize_;
-    private:
-        string name_;
-        BSONObjSetDefaultOrder mem_;
-        DbSet db_;
-        long long mySize_;
-        static long long size_;
-        long long maxSizePerSet() const { return maxSize_ / 2; }
-        
-        bool inMem_;
-    };
-    
     class ClientCursor {
+        friend class CmdCursorInfo;
+        static CCById clientCursorsById;
         DiskLoc _lastLoc; // use getter and setter not this.
         unsigned _idleAgeMillis; // how long has the cursor been around, relative to server idle time
         bool _liveForever; // if true, never time out cursor
@@ -110,7 +57,6 @@ namespace mongo {
         string ns;
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
-//        auto_ptr<IdSet> ids_;
         int pos; /* # objects into the cursor so far */
         DiskLoc lastLoc() const {
             return _lastLoc;

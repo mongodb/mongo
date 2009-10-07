@@ -31,13 +31,10 @@
 
 namespace mongo {
 
-    CCById clientCursorsById;
+    CCById ClientCursor::clientCursorsById;
 
     /* ------------------------------------------- */
 
-    long long IdSet_Deprecated::size_ = 0;
-    long long IdSet_Deprecated::maxSize_ = 200 * 1024 * 1024;
-    
     typedef multimap<DiskLoc, ClientCursor*> ByLoc;
     ByLoc byLoc;
     unsigned byLocSize() {
@@ -203,7 +200,7 @@ namespace mongo {
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             result.append("byLocation_size", unsigned( byLoc.size() ) );
-            result.append("clientCursors_size", unsigned( clientCursorsById.size() ) );
+            result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );
             return true;
         }
     } cmdCursorInfo;

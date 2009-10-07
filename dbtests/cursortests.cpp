@@ -26,8 +26,9 @@
 
 namespace CursorTests {
     
-    typedef IdSet_Deprecated IdSet;
+//    typedef IdSet_Deprecated IdSet;
 
+/*
     namespace IdSetTests {
         
         class BasicSize {
@@ -106,7 +107,7 @@ namespace CursorTests {
         };
 
     } // namespace IdSetTests
-
+*/
     namespace BtreeCursorTests {
 
         class MultiRange {
@@ -200,8 +201,8 @@ namespace CursorTests {
         All() : Suite( "cursor" ){}
         
         void setupTests(){
-            add< IdSetTests::BasicSize >();
-            add< IdSetTests::Upgrade >();
+//            add< IdSetTests::BasicSize >();
+  //          add< IdSetTests::Upgrade >();
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();

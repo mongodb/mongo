@@ -1225,7 +1225,7 @@ assert( !eloc.isNull() );
         }
     }
 
-    extern BSONObj id_obj;
+    extern BSONObj id_obj; // { _id : ObjectId("000000000000000000000000") }
 
     void ensureHaveIdIndex(const char *ns) {
         NamespaceDetails *d = nsdetails(ns);
