@@ -38,12 +38,14 @@ namespace mongo {
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     typedef map<CursorId, ClientCursor*> CCById;
+    typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
     class ClientCursor {
         friend class CmdCursorInfo;
         static CCById clientCursorsById;
+        static CCByLoc byLoc;
         DiskLoc _lastLoc; // use getter and setter not this.
         unsigned _idleAgeMillis; // how long has the cursor been around, relative to server idle time
         bool _liveForever; // if true, never time out cursor
@@ -120,6 +122,12 @@ namespace mongo {
         void liveForever(){
             _liveForever = true;
         }
+
+        static unsigned byLocSize();        // just for diagnostics
+        static void idleTimeReport(unsigned millis);
+
+        static void aboutToDeleteBucket(const DiskLoc& b);
+        static void aboutToDelete(const DiskLoc& dl);
     };
     
 } // namespace mongo

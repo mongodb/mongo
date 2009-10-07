@@ -32,13 +32,13 @@
 namespace mongo {
 
     CCById ClientCursor::clientCursorsById;
+    CCByLoc ClientCursor::byLoc;
 
-    /* ------------------------------------------- */
-
-    typedef multimap<DiskLoc, ClientCursor*> ByLoc;
-    ByLoc byLoc;
-    unsigned byLocSize() {
+    inline unsigned ClientCursor::byLocSize() { 
         return byLoc.size();
+    }
+    unsigned byLocSize() {
+        return ClientCursor::byLocSize();
     }
 
     void ClientCursor::setLastLoc(DiskLoc L) {
@@ -46,7 +46,7 @@ namespace mongo {
             return;
 
         if ( !_lastLoc.isNull() ) {
-            ByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
+            CCByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
             if ( i != byLoc.end() )
                 byLoc.erase(i);
         }
@@ -59,8 +59,8 @@ namespace mongo {
     /* ------------------------------------------- */
 
     /* must call this when a btree node is updated */
-//void removedKey(const DiskLoc& btreeLoc, int keyPos) {
-//}
+    //void removedKey(const DiskLoc& btreeLoc, int keyPos) {
+    //}
 
     /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
              works fine as the prefix will end with '.'.  however, when used with drop and
@@ -72,7 +72,7 @@ namespace mongo {
 
         int len = strlen(nsPrefix);
         assert( len > 0 && strchr(nsPrefix, '.') );
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
             ClientCursor *cc = i->second;
             if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
                 toDelete.push_back(i->second);
@@ -83,10 +83,10 @@ namespace mongo {
     }
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
-    void idleTimeReport(unsigned millis) {
+    inline void ClientCursor::idleTimeReport(unsigned millis) {
         requireInWriteLock();
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
-            ByLoc::iterator j = i;
+        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
+            CCByLoc::iterator j = i;
             i++;
             if( j->second->shouldTimeout( millis ) ){
                 log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
@@ -95,22 +95,26 @@ namespace mongo {
             }
         }
     }
+    void idleTimeReport(unsigned millis) { ClientCursor::idleTimeReport(millis); }
 
     /* must call when a btree bucket going away.
        note this is potentially slow
     */
-    void aboutToDeleteBucket(const DiskLoc& b) {
+    inline void ClientCursor::aboutToDeleteBucket(const DiskLoc& b) {
         RARELY if ( byLoc.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
         }
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
+        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
             i->second->c->aboutToDeleteBucket(b);
+    }
+    void aboutToDeleteBucket(const DiskLoc& b) {
+        ClientCursor::aboutToDeleteBucket(b); 
     }
 
     /* must call this on a delete so we clean up the cursors. */
-    void aboutToDelete(const DiskLoc& dl) {
-        ByLoc::iterator j = byLoc.lower_bound(dl);
-        ByLoc::iterator stop = byLoc.upper_bound(dl);
+    inline void ClientCursor::aboutToDelete(const DiskLoc& dl) {
+        CCByLoc::iterator j = byLoc.lower_bound(dl);
+        CCByLoc::iterator stop = byLoc.upper_bound(dl);
         if ( j == stop )
             return;
 
@@ -148,6 +152,7 @@ namespace mongo {
             }
         }
     }
+    void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDeleteBucket(dl); }
 
     ClientCursor::~ClientCursor() {
         assert( pos != -2 );
@@ -199,7 +204,7 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            result.append("byLocation_size", unsigned( byLoc.size() ) );
+            result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
             result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );
             return true;
         }
