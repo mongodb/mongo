@@ -108,8 +108,11 @@ namespace mongo {
                     r->_messages.push_back( err.str() );
                 }	
             }
-	    
-	    log(1) << "\t DONE running tests" << endl;
+            
+            if ( r->_fails )
+                r->_rc = 17;
+
+            log(1) << "\t DONE running tests" << endl;
 	    
             return r;
         }
@@ -263,12 +266,12 @@ namespace mongo {
                 cout << r->toString();
                 if ( abs( r->rc() ) > abs( rc ) )
                     rc = r->rc();
-
+                
                 tests += r->_tests;
                 fails += r->_fails;
                 asserts += r->_asserts;
             }
-
+            
             cout << "TOTALS  tests:" << tests << " fails: " << fails << " asserts calls: " << asserts << endl;
 
             return rc;
