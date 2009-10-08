@@ -324,30 +324,8 @@ namespace mongo {
             log() << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
         }
 
-        void MyAsserts::ae( double a , double b ){
+        void MyAsserts::_gotAssert(){
             Result::cur->_asserts++;
-            if ( a == b )
-                return;
-
-            printLocation();
-
-            MyAssertionException * e = getBase();
-            e->ss << a << " != " << b << endl;
-            log() << e->ss.str() << endl;
-            throw e;
-        }
-
-        void MyAsserts::ae( string a , string b ){
-            Result::cur->_asserts++;
-            if ( a == b )
-                return;
-            
-            printLocation();
-
-            MyAssertionException * e = getBase();
-            e->ss << a << " != " << b << endl;
-            log() << e->ss.str() << endl;
-            throw e;
         }
 
     }
