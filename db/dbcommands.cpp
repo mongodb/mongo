@@ -1330,10 +1330,12 @@ namespace mongo {
                     "}" );
                 s->invoke( g , BSONObj() , 0 , true );
             }
-
+            
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
             result.append( "keys" , (int)(map.size()) );
+            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->gc();
 
             return true;
         }
