@@ -63,8 +63,6 @@ namespace mongo {
     unsigned q = 0;
     extern bool cpu;
 
-    void idleTimeReport(unsigned millis);
-
     void statsThread() {
         unsigned long long timeLastPass = 0;
         while ( 1 ) {
@@ -89,7 +87,7 @@ namespace mongo {
                         if ( cpu )
                             log() << "cpu: " << s << endl;
                         lockStats[q] = s;
-                        idleTimeReport( (unsigned) ((dt - dlocked)/1000) );
+                        ClientCursor::idleTimeReport( (unsigned) ((dt - dlocked)/1000) );
                     }
                 }
                 timeLastPass = now;
@@ -98,8 +96,6 @@ namespace mongo {
             sleepsecs(4);
         }
     }
-
-    unsigned byLocSize();
 
     bool _bold;
     string bold(bool x) {
@@ -120,7 +116,7 @@ namespace mongo {
                 ss << "curclient: " << database->name;
                 ss << '\n';
             }
-            ss << bold(byLocSize()>10000) << "Cursors byLoc.size(): " << byLocSize() << bold() << '\n';
+            ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
             ss << "\n<b>replication</b>\n";
             ss << "master: " << master << '\n';
             ss << "slave:  " << slave << '\n';

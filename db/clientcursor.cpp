@@ -34,7 +34,7 @@ namespace mongo {
     CCById ClientCursor::clientCursorsById;
     CCByLoc ClientCursor::byLoc;
 
-    inline unsigned ClientCursor::byLocSize() { 
+    unsigned ClientCursor::byLocSize() { 
         return byLoc.size();
     }
 
@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
-    inline void ClientCursor::idleTimeReport(unsigned millis) {
+    void ClientCursor::idleTimeReport(unsigned millis) {
         requireInWriteLock();
         for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
             CCByLoc::iterator j = i;
