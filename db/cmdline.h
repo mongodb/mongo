@@ -17,24 +17,27 @@
 #pragma once
 
 namespace mongo {
-
+    
     /* command line options        
     */
     /* concurrency: OK/READ */
     struct CmdLine { 
         int port;              // --port
+
         string source;         // --source
         string only;           // --only
+
         bool quiet;            // --quiet
-        
-        bool notablescan;     // --notablescan
-        
+        bool notablescan;      // --notablescan
+        bool prealloc;         // --noprealloc
+        bool smallfiles;       // --smallfiles
+
         enum { 
             DefaultDBPort = 27017
         };
 
         CmdLine() : 
-            port(27017), quiet(false), notablescan(false)
+            port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false)
         { } 
 
     };

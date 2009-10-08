@@ -530,6 +530,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nohttpinterface", "disable http interface")
         ("noscripting", "disable scripting engine")
         ("noprealloc", "disable data file preallocation")
+        ("smallfiles", "use a smaller default file size")
         ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
@@ -721,7 +722,10 @@ int main(int argc, char* argv[], char *envp[] )
             useJNI = false;
         }
         if (params.count("noprealloc")) {
-            prealloc = false;
+            cmdLine.prealloc = false;
+        }
+        if (params.count("smallfiles")) {
+            cmdLine.smallfiles = true;
         }
         if (params.count("oplog")) {
             int x = params["oplog"].as<int>();

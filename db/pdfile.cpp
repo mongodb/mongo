@@ -53,7 +53,6 @@ namespace mongo {
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
-    bool prealloc = true;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
@@ -213,7 +212,11 @@ namespace mongo {
             size = 1024 * 512 * mult;
             log() << "Warning : using small files for _hudsonSmall" << endl;
         }
-
+        else if ( cmdLine.smallfiles ){
+            size = size >> 2;
+        }
+        
+        
         return size;
     }
 
@@ -248,11 +251,11 @@ namespace mongo {
         if ( size > maxSize() )
             size = maxSize();
 
-        assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
+        assert( ( size >= 64*1024*1024 ) || cmdLine.smallfiles || ( strstr( filename, "_hudsonSmall" ) ) );
         assert( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
-            if ( prealloc ) {
+            if ( cmdLine.prealloc ) {
                 theFileAllocator().requestAllocation( filename, size );
             }
             return;
