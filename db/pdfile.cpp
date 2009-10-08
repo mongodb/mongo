@@ -550,8 +550,6 @@ assert( !eloc.isNull() );
         }
     }
 
-    void aboutToDelete(const DiskLoc& dl);
-
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
@@ -845,7 +843,7 @@ assert( !eloc.isNull() );
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        aboutToDelete(dl);
+        ClientCursor::aboutToDelete(dl);
 
         unindexRecord(d, todelete, dl, noWarn);
 

@@ -37,9 +37,6 @@ namespace mongo {
     inline unsigned ClientCursor::byLocSize() { 
         return byLoc.size();
     }
-    unsigned byLocSize() {
-        return ClientCursor::byLocSize();
-    }
 
     void ClientCursor::setLastLoc(DiskLoc L) {
         if ( L == _lastLoc )
@@ -95,24 +92,20 @@ namespace mongo {
             }
         }
     }
-    void idleTimeReport(unsigned millis) { ClientCursor::idleTimeReport(millis); }
 
     /* must call when a btree bucket going away.
        note this is potentially slow
     */
-    inline void ClientCursor::aboutToDeleteBucket(const DiskLoc& b) {
+    void ClientCursor::aboutToDeleteBucket(const DiskLoc& b) {
         RARELY if ( byLoc.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
         }
         for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
             i->second->c->aboutToDeleteBucket(b);
     }
-    void aboutToDeleteBucket(const DiskLoc& b) {
-        ClientCursor::aboutToDeleteBucket(b); 
-    }
 
     /* must call this on a delete so we clean up the cursors. */
-    inline void ClientCursor::aboutToDelete(const DiskLoc& dl) {
+    void ClientCursor::aboutToDelete(const DiskLoc& dl) {
         CCByLoc::iterator j = byLoc.lower_bound(dl);
         CCByLoc::iterator stop = byLoc.upper_bound(dl);
         if ( j == stop )
@@ -152,7 +145,6 @@ namespace mongo {
             }
         }
     }
-    void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDeleteBucket(dl); }
 
     ClientCursor::~ClientCursor() {
         assert( pos != -2 );
