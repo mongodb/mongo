@@ -689,11 +689,24 @@ namespace mongo {
             } else {
                 // terminal array element to expand, so generate all keys
                 BSONObjIterator i( arrElt.embeddedObject() );
-                while( i.more() ) {
+                if ( i.more() ){
+                    while( i.more() ) {
+                        BSONObjBuilder b;
+                        for( unsigned j = 0; j < fixed.size(); ++j ) {
+                            if ( j == arrIdx )
+                                b.appendAs( i.next(), "" );
+                            else
+                                b.appendAs( fixed[ j ], "" );
+                        }
+                        keys.insert( b.obj() );
+                    }
+                }
+                else if ( fixed.size() > 1 ){
+                    // x : [] - need to insert undefined
                     BSONObjBuilder b;
                     for( unsigned j = 0; j < fixed.size(); ++j ) {
                         if ( j == arrIdx )
-                            b.appendAs( i.next(), "" );
+                            b.appendUndefined( "" );
                         else
                             b.appendAs( fixed[ j ], "" );
                     }
