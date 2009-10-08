@@ -45,6 +45,7 @@ public:
 
     int run(){
         string filename = getParam( "file" );
+        long long fileSize = -1;
 
         istream * in = &cin;
 
@@ -52,6 +53,7 @@ public:
 
         if ( filename.size() > 0 && filename != "-" ){
             in = &file;
+            fileSize = file_size( filename );
         }
 
         string ns;
@@ -78,29 +80,35 @@ public:
 
         time_t start = time(0);
 
+        ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
         char line[ (1024 * 1024 * 4) + 128];
         while ( *in ){
             in->getline( line , BUF_SIZE );
-
-            int len = strlen( line );
-            if ( ! len )
-                break;
             
+            char * buf = line;
+            while( isspace( buf[0] ) ) buf++;
+
+            int len = strlen( buf );
+            if ( ! len )
+                continue;
+            
+            if ( in->rdstate() == ios_base::eofbit )
+                break;
             assert( in->rdstate() == 0 );
 
             try {
-                BSONObj o = fromjson( line );
+                BSONObj o = fromjson( buf );
                 conn().insert( ns.c_str() , o );
             }
             catch ( MsgAssertionException& ma ){
                 cout << "exception:" << ma.toString() << endl;
-                cout << line << endl;
+                cout << buf << endl;
             }
 
-            if ( ++num % 10000 == 0 ){
-                cout << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
-
+            num++;
+            if ( pm.hit( len + 1 ) ){
+                cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }
         }
 
