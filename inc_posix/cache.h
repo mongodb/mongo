@@ -146,8 +146,6 @@ struct __idb {
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
-	DBT	  key, data;		/* Returned key/data pairs */
-
 	/* Database servers. */
 #define	WT_SRVR_FOREACH(idb, srvr, i)					\
 	for ((i) = 0, (srvr) = (idb)->srvrq;				\

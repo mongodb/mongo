@@ -80,7 +80,6 @@ Db.verify
 #############################################
 Dbt
 	DBT_ALLOC			# Allocate application-owned DBT memory
-	DBT_APPMEM			# Application-supplied DBT memory
 
 wt_cache
 	READONLY			# Cache is readonly (multi-threaded)

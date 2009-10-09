@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_dbt_copyout(DB *, DBT *, DBT *, u_int8_t *, u_int32_t);
+static int __wt_bt_dbt_copyout(WT_TOC *, DBT *, DBT *, u_int8_t *, u_int32_t);
 
 /*
  * __wt_bt_dbt_return --
@@ -21,14 +21,12 @@ __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return)
 {
 	DB *db;
-	IDB *idb;
 	DBT local_key, local_data;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	int (*callback)(DB *, DBT *, DBT *);
 
 	db = toc->db;
-	idb = db->idb;
 
 	/*
 	 * If the data DBT has been configured for a callback return, we don't
@@ -55,7 +53,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			WT_RET(__wt_bt_ovfl_to_indx(toc, page, ip));
 		if (callback == NULL) {
 			WT_RET(__wt_bt_dbt_copyout(
-			    db, key, &idb->key, ip->data, ip->size));
+			    toc, key, &toc->key, ip->data, ip->size));
 		} else {
 			key->data = ip->data;
 			key->size = ip->size;
@@ -72,8 +70,8 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			goto overflow;
 
 		if (callback == NULL) {
-			WT_RET(__wt_bt_dbt_copyout(db, data,
-			    &idb->data, WT_ITEM_BYTE(item),
+			WT_RET(__wt_bt_dbt_copyout(toc, data,
+			    &toc->data, WT_ITEM_BYTE(item),
 			    (u_int32_t)WT_ITEM_LEN(item)));
 		} else {
 			data->data = WT_ITEM_BYTE(item);
@@ -85,8 +83,8 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			goto overflow;
 
 		if (callback == NULL) {
-			WT_RET(__wt_bt_dbt_copyout(db, data,
-			    &idb->data, ip->data, ip->size));
+			WT_RET(__wt_bt_dbt_copyout(toc, data,
+			    &toc->data, ip->data, ip->size));
 		} else {
 			data->data = ip->data;
 			data->size = ip->size;
@@ -96,23 +94,14 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	}
 
 	if (0) {
-overflow:	/*
-		 * Handle overflow data items.
-		 *
-		 * The overflow copy routines always attempt to resize the
-		 * buffer if necessary, which isn't correct in the case of
-		 * user-memory.  Check before calling them.
-		 */
+overflow:	/* Handle overflow data items. */
 		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
-		if (F_ISSET(data, WT_DBT_ALLOC | WT_DBT_APPMEM)) {
-			if (F_ISSET(data, WT_DBT_APPMEM) &&
-			    data->data_len < ovfl->len)
-				return (WT_TOOSMALL);
+		if (F_ISSET(data, WT_DBT_ALLOC))
 			WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, data));
-		} else {
-			WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, &idb->data));
-			data->data = idb->data.data;
-			data->size = idb->data.size;
+		else {
+			WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, &toc->data));
+			data->data = toc->data.data;
+			data->size = toc->data.size;
 		}
 	}
 
@@ -128,17 +117,15 @@ overflow:	/*
  */
 static int
 __wt_bt_dbt_copyout(
-    DB *db, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
+    WT_TOC *toc, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
 {
 	ENV *env;
 
-	env = db->env;
+	env = toc->env;
 
 	/*
-	 * By default, we use memory in the DB handle to return keys; if
-	 * the DB handle is being used by multiple threads, however, we
-	 * can't do that, we have to use memory in the DBT itself.  Look
-	 * for the appropriate flags.
+	 * We use memory in the TOC handle to return keys -- it's a per-thread
+	 * structure, so there's no chance of a race.
 	 */
 	if (F_ISSET(dbt, WT_DBT_ALLOC)) {
 		if (dbt->data_len < size) {
@@ -146,9 +133,6 @@ __wt_bt_dbt_copyout(
 			    env, dbt->data_len, size, &dbt->data));
 			dbt->data_len = size;
 		}
-	} else if (F_ISSET(dbt, WT_DBT_APPMEM)) {
-		if (dbt->data_len < size)
-			return (WT_TOOSMALL);
 	} else {
 		if (local_dbt->data_len < size) {
 			WT_RET(__wt_realloc(

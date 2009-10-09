@@ -154,8 +154,6 @@ __wt_idb_destroy(WT_TOC *toc, int refresh)
 
 	/* Free allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->dbname);
-	WT_FREE_AND_CLEAR(env, idb->key.data);
-	WT_FREE_AND_CLEAR(env, idb->data.data);
 
 	/* If we're truly done, discard the actual memory. */
 	if (!refresh) {
@@ -189,8 +187,6 @@ __wt_idb_config_default(WT_TOC *toc)
 
 	idb = toc->db->idb;
 
-	WT_CLEAR(idb->key);
-	WT_CLEAR(idb->data);
 	WT_RET(__wt_cache_create(toc, &idb->cache));
 
 	/*

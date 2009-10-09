@@ -163,6 +163,8 @@ struct __wt_toc {
 	u_int64_t root_record_cnt;	/* Server's record count */
 	int	  root_isleaf;		/* Server's root page type */
 
+	DBT	  key, data;		/* Returned key/data pairs */
+
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC handle api section: BEGIN
@@ -418,8 +420,7 @@ char	*wt_version(int *, int *, int *);
  */
 #define	WT_ALLOCATED					0x00000001
 #define	WT_CREATE					0x00000001
-#define	WT_DBT_ALLOC					0x00000002
-#define	WT_DBT_APPMEM					0x00000001
+#define	WT_DBT_ALLOC					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MODIFIED					0x00000002
@@ -446,7 +447,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000000
 #define	WT_APIMASK_DB_VERIFY				0x00000000
-#define	WT_APIMASK_DBT					0x00000003
+#define	WT_APIMASK_DBT					0x00000001
 #define	WT_APIMASK_ENV					0x00000000
 #define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DB_CREATE			0x00000000
