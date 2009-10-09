@@ -448,6 +448,14 @@ namespace mongo {
     }
     void initAndListen(int listenPort, const char *appserverLoc = null) {
         try { _initAndListen(listenPort, appserverLoc); }
+        catch ( std::exception &e ) {
+            problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
+        }
+        catch ( int& n ){
+            problem() << "exception in initAndListen int: " << n << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
+        }
         catch(...) {
             log() << " exception in initAndListen, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
