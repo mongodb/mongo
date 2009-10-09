@@ -9,10 +9,14 @@ namespace mongo {
 
     long long Scope::_lastVersion = 1;
     
+    int Scope::_numScopes = 0;
+
     Scope::Scope() : _localDBName("") , _loadedVersion(0){
+        _numScopes++;
     }
 
     Scope::~Scope(){
+        _numScopes--;
     }
 
     ScriptEngine::ScriptEngine(){
@@ -121,6 +125,15 @@ namespace mongo {
             
             setElement( n.valuestr() , v );
         }
+    }
+
+    ScriptingFunction Scope::createFunction( const char * code ){
+        map<string,ScriptingFunction>::iterator i = _cachedFunctions.find( code );
+        if ( i != _cachedFunctions.end() )
+            return i->second;
+        ScriptingFunction f = _createFunction( code );
+        _cachedFunctions[code] = f;
+        return f;
     }
     
     typedef map< string , list<Scope*> > PoolToScopes;
@@ -258,6 +271,10 @@ namespace mongo {
         }
         
         ScriptingFunction createFunction( const char * code ){
+            return _real->createFunction( code );
+        }
+
+        ScriptingFunction _createFunction( const char * code ){
             return _real->createFunction( code );
         }
 

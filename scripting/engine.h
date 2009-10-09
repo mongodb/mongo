@@ -43,8 +43,8 @@ namespace mongo {
         virtual void setBoolean( const char *field , bool val ) = 0;
         virtual void setThis( const BSONObj * obj ) = 0;
                     
-        virtual ScriptingFunction createFunction( const char * code ) = 0;
-
+        virtual ScriptingFunction createFunction( const char * code );
+        
         /**
          * @return 0 on success
          */
@@ -77,10 +77,20 @@ namespace mongo {
         */
         static void storedFuncMod();
         
+        static int getNumScopes(){
+            return _numScopes;
+        }
+        
     protected:
+
+        virtual ScriptingFunction _createFunction( const char * code ) = 0;
+
         string _localDBName;
         long long _loadedVersion;
         static long long _lastVersion;
+        map<string,ScriptingFunction> _cachedFunctions;
+
+        static int _numScopes;
     };
     
     class ScriptEngine : boost::noncopyable {
