@@ -14,7 +14,7 @@
  *	Close an Env handle.
  */
 int
-__wt_env_close(WT_STOC *stoc)
+__wt_env_close(WT_TOC *toc)
 {
 	wt_args_env_close_unpack;
 	int ret;

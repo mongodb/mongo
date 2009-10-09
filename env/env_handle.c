@@ -70,6 +70,14 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	WT_ENV_FCHK_NOTFATAL(
 	    env, "Env.destroy", flags, WT_APIMASK_ENV_DESTROY, ret);
 
+	/* Complain if DB handles weren't closed. */
+	if (TAILQ_FIRST(&ienv->dbqh) != NULL) {
+		__wt_env_errx(env,
+		    "This Env handle has open Db handles attached to it");
+		if (ret == 0)
+			ret = WT_ERROR;
+	}
+
 	/*
 	 * !!!
 	 * For part of this function we don't have valid ENV/IENV structures
@@ -80,17 +88,6 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 	 * Discard the underlying IENV structure.
 	 */
 	WT_TRET(__wt_ienv_destroy(env, 0));
-
-	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, ienv->stats);
-
-	/* Complain if DB handles weren't closed. */
-	if (TAILQ_FIRST(&ienv->dbqh) != NULL) {
-		__wt_env_errx(env,
-		    "This Env handle has open Db handles attached to it");
-		if (ret == 0)
-			ret = WT_ERROR;
-	}
 
 	/* Free the Env structure. */
 	memset(env, OVERWRITE_BYTE, sizeof(env));
@@ -126,6 +123,9 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	if (ienv == NULL)
 		return (0);
 
+	/* Free allocated memory. */
+	__wt_free(env, ienv->stats);
+
 	/* If we're truly done, discard the actual memory. */
 	if (!refresh) {
 		__wt_free(NULL, ienv);
@@ -155,20 +155,11 @@ static int
 __wt_ienv_config_default(ENV *env)
 {
 	IENV *ienv;
-	WT_STOC *stoc;
-	u_int i;
 
 	ienv = env->ienv;
 
 	/* Initialize the global mutex. */
 	WT_RET(__wt_mtx_init(&ienv->mtx));
-
-	/* Initial list of server slots. */
-#define	WT_SERVERQ_SIZE	64
-	ienv->sq_entries = WT_SERVERQ_SIZE;
-	WT_RET(__wt_calloc(NULL, WT_SERVERQ_SIZE, sizeof(WT_STOC), &ienv->sq));
-	WT_STOC_FOREACH(ienv, stoc, i)
-		WT_RET(__wt_stat_alloc_stoc_stats(NULL, &stoc->stats));
 
 	/* Database queue. */
 	TAILQ_INIT(&ienv->dbqh);
