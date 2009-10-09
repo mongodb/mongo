@@ -226,7 +226,6 @@ namespace mongo {
             assert(p);
             string to_name = todb + p;
 
-            //if( !options.isEmpty() )
             {
                 string err;
                 const char *toname = to_name.c_str();
