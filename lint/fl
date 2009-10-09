@@ -39,7 +39,7 @@ while :
 done
 
 # List of source files.
-l="../btree/*.c ../connect/*.c ../db/*.c ../env/*.c ../os_posix/*.c
+l="../btree/*.c ../db/*.c ../engine/*.c ../env/*.c ../os_posix/*.c
    ../support/*.c"
 
 # Don't lint all of them.
