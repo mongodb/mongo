@@ -1349,6 +1349,10 @@ namespace mongo {
             BSONObj q;
             if ( p["cond"].type() == Object )
                 q = p["cond"].embeddedObject();
+            else if ( p["condition"].type() == Object )
+                q = p["condition"].embeddedObject();
+            else if ( p["q"].type() == Object )
+                q = p["q"].embeddedObject();
 
             string ns = dbname;
             ns = ns.substr( 0 , ns.size() - 4 );

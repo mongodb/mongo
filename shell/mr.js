@@ -40,7 +40,7 @@ MR.doReduce = function( useDB ){
         }
 
         var r = $reduce( data.key , data.values );
-        if ( r.length && r[0] ){ 
+        if ( r && r.length && r[0] ){ 
             data.values = r; 
         }
         else{ 
