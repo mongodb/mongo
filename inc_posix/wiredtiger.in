@@ -57,6 +57,7 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
+struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
@@ -82,23 +83,85 @@ struct __dbt {
 };
 
 /*******************************************
- * API thread-of-control information
+ * Application thread-of-control information
  *******************************************/
 struct __wt_toc {
 	WT_MTX  *block;			/* Thread's blocking mutex */
 
 	/*
-	 * Payload: when the WT_TOC crosses the API layer, it gets loaded with
-	 * the following information used by underlying functions to figure out
-	 * what to do.
+	 * Each thread-of-control has a reserved slot in each server's WT_TOC
+	 * array, which is how a thread-of-control schedules itself.   The
+	 * value is assigned when the WT_TOC is created.  Since these values
+	 * are unique across all WT_TOCs, it can also be used as an ID field.
 	 */
-	int	 op;			/* Operation code */
-	ENV	*env;			/* Operation environment */
-	DB	*db;			/* Operation database */
-	void	*argp;			/* Operation parameters */
-	int      ret;			/* Operation return code */
+	u_int	srvr_slot;
 
-	u_int	 id;			/* Server ID (array offset) */
+	/*
+	 * Enclosing environment, set when the WT_TOC is created (which
+	 * implies that threads-of-control are confined to an environment).
+	 */
+	ENV	*env;			/* Operation environment */
+
+	/*
+	 * Payload: when a WT_TOC crosses the API layer, it gets loaded with
+	 * the following information used by underlying functions to figure
+	 * out what to do.
+	 */
+	DB	*db;			/* Operation database */
+	int	 op;			/* Operation code */
+	void	*argp;			/* Operation parameters */
+	int      ret;			/* Operation return status */
+
+	/*
+	 * Cache of database pages.   Normally, each server "owns" its cache
+	 * pages, and no locking is required since the server is the only
+	 * thread of control to access those pages.   An exception is the
+	 * primary server: (1) if the application is single-threaded, the
+	 * primary WT_TOC owns all the pages, (2) if the application has
+	 * multiple server threads, the primary WT_TOC owns the pinned pages
+	 * that are accessed by per-database server threads, without locking
+	 * and without coordination.   To handle these two architectures, we
+	 * don't put pages in the primary WT_TOC, instead, we maintain the
+	 * pages in the IDB structure.   That solves the problem in (1) where
+	 * we can't tell the pages in different databases apart (there's just
+	 * an addr/offset pair in the WT_PAGE, no file ID), and the problem
+	 * in (2) where multiple threads of control are walking the list of
+	 * pages because we only read those pages when the database is first
+	 * opened.
+	 *
+	 * When a thread-of-control is scheduled for an operation, the cache
+	 * pointer is set to reference the "true" cache.  Note that in some
+	 * operations (ENV operations, for example), there may be no cache
+	 * at all.
+	 */
+#define	WT_TOC_SET_CACHE(toc, srvr) do {				\
+	if ((srvr) != NULL && (srvr)->cache != NULL)			\
+		(toc)->cache = (srvr)->cache;				\
+	else if ((toc)->db != NULL)					\
+		(toc)->cache = (toc)->db->idb->cache;			\
+	else								\
+		(toc)->cache = NULL;					\
+	} while (0)
+
+	WT_CACHE *cache;
+
+	/*
+	 * Threads-of-control run (1) without any server, (2) in the primary
+	 * server, or (3) in a secondary server.   In cases 1 and 2, the op
+	 * may be rescheduled for a secondary server, in which case the server
+	 * ID and a Btree root page and isleaf information is set.   When we
+	 * are returning control to the application, clear any information we
+	 * have set so future calls don't get re-directed to the wrong server.
+	 */
+#define	WT_TOC_CLEAR_SRVR(toc) do {					\
+	(toc)->srvr = WT_SRVR_PRIMARY;					\
+	(toc)->root_addr = WT_ADDR_INVALID;				\
+	} while (0)
+
+	int	  srvr;			/* Requested server */
+	u_int32_t root_addr;		/* Server's root page */
+	u_int64_t root_record_cnt;	/* Server's record count */
+	int	  root_isleaf;		/* Server's root page type */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -110,6 +173,7 @@ struct __wt_toc {
 	 * WT_TOC handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
+
 	 u_int32_t flags;
 };
 
@@ -175,6 +239,12 @@ struct __db {
 
 	int (*get_recno)(
 	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
+
+	int (*get_recno_stoc)(
+	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
+
+	int (*get_stoc)(
+	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
 
 	int (*open)(
 	    DB *, WT_TOC *, const char *, mode_t , u_int32_t );
@@ -354,12 +424,15 @@ char	*wt_version(int *, int *, int *);
 #define	WT_DUPLICATES					0x00000002
 #define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
-#define	WT_RUNNING					0x00000001
+#define	WT_READONLY					0x00000001
+#define	WT_RESCHEDULE					0x00000001
+#define	WT_RUNNING					0x00000002
 #define	WT_SINGLE_THREADED				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
 #define	WT_UNFORMATTED					0x00000001
-#define	WT_VERB_FILEOPS					0x00000002
-#define	WT_VERB_FILEOPS_ALL				0x00000001
+#define	WT_VERB_FILEOPS					0x00000004
+#define	WT_VERB_FILEOPS_ALL				0x00000002
+#define	WT_VERB_SERVERS					0x00000001
 
 #define	WT_APIMASK_DB					0x00000000
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000003
@@ -384,11 +457,12 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_STOP				0x00000000
 #define	WT_APIMASK_ENV_TOC_CREATE			0x00000000
-#define	WT_APIMASK_ENV_VERBOSE				0x00000003
+#define	WT_APIMASK_ENV_VERBOSE				0x00000007
 #define	WT_APIMASK_IDB					0x00000001
 #define	WT_APIMASK_IENV					0x00000001
-#define	WT_APIMASK_TOC					0x00000001
+#define	WT_APIMASK_TOC					0x00000003
 #define	WT_APIMASK_TOC_DESTROY				0x00000000
+#define	WT_APIMASK_WT_CACHE				0x00000001
 #define	WT_APIMASK_WT_CACHE_IN				0x00000001
 #define	WT_APIMASK_WT_CACHE_OUT				0x00000003
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000
@@ -396,6 +470,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_OPEN				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003
+#define	WT_APIMASK_WT_RETURN				0x00000001
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api.py.

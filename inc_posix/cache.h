@@ -46,7 +46,7 @@ struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
-struct __wt_stoc;		typedef struct __wt_stoc WT_STOC;
+struct __wt_srvr;		typedef struct __wt_srvr WT_SRVR;
 struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 
 /*******************************************
@@ -62,6 +62,35 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 #include "connect.h"
 #include "connect_auto.h"
 #include "stat.h"
+
+/*******************************************
+ * Cache object.
+ *******************************************/
+struct __wt_cache {
+#define	WT_CACHE_DEFAULT_SIZE		(20)	/* 20MB */
+	u_int64_t cache_max;			/* Cache bytes maximum */
+	u_int64_t cache_bytes;			/* Cache bytes allocated */
+
+	/*
+	 * Each in-memory page is threaded on two queues: a hash queue
+	 * based on its file and page number, and an LRU list.
+	 */
+	u_int32_t hashsize;
+#define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
+	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
+	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
+
+	u_int32_t flags;
+};
+
+/*******************************************
+ * Cursor handle information that doesn't persist.
+ *******************************************/
+struct __idbc {
+	DBC *dbc;			/* Public object */
+
+	u_int32_t flags;
+};
 
 /*******************************************
  * Database handle information that doesn't persist.
@@ -84,17 +113,18 @@ struct __idb {
 
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	WT_STATS *stats;		/* Handle statistics */
-	WT_STATS *dstats;		/* Database statistics */
+	/* Database servers. */
+#define	WT_SRVR_FOREACH(idb, srvr, i)					\
+	for ((i) = 0, (srvr) = (idb)->srvrq;				\
+	    (i) < (idb)->srvrq_entries; ++(i), ++(srvr))
+#define	WT_SRVR_SRVRQ_SIZE	64
+	WT_SRVR *srvrq;			/* Server thread queue */
+	u_int srvrq_entries;		/* Total server entries */
 
-	u_int32_t flags;
-};
+	WT_CACHE *cache;		/* Primary server's database cache */
 
-/*******************************************
- * Cursor handle information that doesn't persist.
- *******************************************/
-struct __idbc {
-	DBC *dbc;			/* Public object */
+	WT_STATS *stats;		/* Database handle statistics */
+	WT_STATS *dstats;		/* Database file statistics */
 
 	u_int32_t flags;
 };
@@ -107,18 +137,15 @@ struct __ienv {
 
 	WT_MTX mtx;			/* Global mutex */
 
-	WT_STOC *sq;			/* Server thread queue */
-	u_int sq_next_id;		/* Next server ID (array offset) */
-	u_int sq_entries;		/* Total server entries */
-
-					/* Linked list of databases */
+					/* Locked: list of databases */
 	TAILQ_HEAD(__wt_db_qh, __idb) dbqh;
+	u_int next_file_id;		/* Locked: serial file ID */
 
-	WT_STATS *stats;		/* Handle statistics */
+	u_int next_toc_srvr_slot;	/* Locked: next server TOC array slot */
 
-	u_int toc_next_id;		/* Next TOC ID (array offset) */
+	WT_SRVR psrvr;			/* Primary server */
 
-	u_int file_id;			/* Serial file ID */
+	WT_STATS *stats;		/* Environment handle statistics */
 
 	char *sep;			/* Display separator line */
 	char err_buf[32];		/* Last-ditch error buffer */

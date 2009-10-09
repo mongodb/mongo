@@ -77,7 +77,9 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_ALLOC		    4
 #define	WT_STAT_DB_CACHE_HIT		    5
 #define	WT_STAT_DB_CACHE_MISS		    6
-#define	WT_STAT_IDB_STATS_TOTAL		    7
+#define	WT_STAT_DB_READ_BY_KEY		    7
+#define	WT_STAT_DB_READ_BY_RECNO	    8
+#define	WT_STAT_IDB_STATS_TOTAL		    9
 
 /*
  * Statistics entries for IENV_STATS
@@ -90,22 +92,32 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_MISS		    5
 #define	WT_STAT_CACHE_WRITE		    6
 #define	WT_STAT_CACHE_WRITE_EVICT	    7
-#define	WT_STAT_IENV_STATS_TOTAL	    8
+#define	WT_STAT_DATABASE_OPEN		    8
+#define	WT_STAT_MEMALLOC		    9
+#define	WT_STAT_MEMFREE			   10
+#define	WT_STAT_TOTAL_OPS		   11
+#define	WT_STAT_TOTAL_READ_IO		   12
+#define	WT_STAT_TOTAL_WRITE_IO		   13
+#define	WT_STAT_IENV_STATS_TOTAL	   14
 
 /*
- * Statistics entries for STOC_STATS
+ * Statistics entries for SRVR_STATS
  */
-#define	WT_STAT_STOC_ARRAY		    0
-#define	WT_STAT_STOC_OPS		    1
-#define	WT_STAT_STOC_SLEEP		    2
-#define	WT_STAT_STOC_YIELD		    3
-#define	WT_STAT_STOC_STATS_TOTAL	    4
+#define	WT_STAT_SRVR_ARRAY		    0
+#define	WT_STAT_SRVR_OPS		    1
+#define	WT_STAT_SRVR_SLEEP		    2
+#define	WT_STAT_SRVR_YIELD		    3
+#define	WT_STAT_SRVR_STATS_TOTAL	    4
 
 /* Statistics section: END */
 
 #else
-#define	WT_STAT_INCR(handle, def, str)
+
 #define	WT_STAT_DECR(handle, def, str)
+#define	WT_STAT_INCR(handle, def, str)
+#define	WT_STAT_INCRV(stats, def, str, value)
+#define	WT_STAT_SET(stats, def, str, value)
+
 #endif
 
 #if defined(__cplusplus)

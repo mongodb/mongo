@@ -13,11 +13,17 @@ extern "C" {
 
 /* Basic constants. */
 #define	WT_FRAGMENT	(512)
-#define	WT_MEGABYTE	(1024 * 1024)			/* MB */
+#define	WT_MEGABYTE	(1048576)
 
 /* Align a number to a specified power-of-2. */
 #define	WT_ALIGN(n, v)							\
 	(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
+
+/*
+ * Convert a pointer to an unsigned long so we can print it without compiler
+ * complaint.
+ */
+#define	WT_ADDR_TO_ULONG(addr)	((u_long)(uintptr_t)(addr))
 
 /*
  * Flag checking for API functions.

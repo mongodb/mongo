@@ -59,6 +59,8 @@ typedef	struct __wt_indx {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
+	int32_t srvr_id;		/* Server that owns the subtree */
+
 	/*
 	 * Associated on-page data item.
 	 *
@@ -108,6 +110,7 @@ struct __wt_page {
 	 * aid so we detect immediately if a code change leaks a page.
 	 */
 	u_int8_t ref;			/* Reference count */
+	u_int8_t notused[3];		/* Spare bytes */
 
 	TAILQ_ENTRY(__wt_page) q;	/* LRU queue */
 	TAILQ_ENTRY(__wt_page) hq;	/* Hash queue */
