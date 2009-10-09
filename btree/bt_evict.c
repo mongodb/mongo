@@ -363,6 +363,12 @@ __wt_cache_clean(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	WT_PAGE_HDR *hdr;
 	u_int64_t bytes_free, bytes_need_free;
 
+	/*
+	 * !!!
+	 * Not currently used, will be needed when we start enforcing cache
+	 * memory constraints.
+	 */
+
 	*pagep = NULL;
 
 	env = toc->env;
