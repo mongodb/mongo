@@ -6,6 +6,16 @@
 # Optional configuration.
 AC_DEFUN([AM_OPTIONS], [
 
+AC_MSG_CHECKING(if --enable-debug option specified)
+AC_ARG_ENABLE(debug,
+	[AC_HELP_STRING([--enable-debug],
+	    [Configure for debug symbols.])], r=set, r=notset)
+case "$r" in
+set)	db_cv_enable_debug=yes;;
+notset)	db_cv_enable_debug=no;;
+esac
+AC_MSG_RESULT($db_cv_enable_debug)
+
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,
@@ -29,6 +39,18 @@ set)	AC_DEFINE(HAVE_DIAGNOSTIC_MEMORY)
 notset)	db_cv_enable_diagnostic_memory=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_diagnostic_memory)
+
+AH_TEMPLATE(HAVE_SMALLBUILD, [Define to 1 for a small build.])
+AC_MSG_CHECKING(if --enable-smallbuild option specified)
+AC_ARG_ENABLE(smallbuild,
+	[AC_HELP_STRING([--enable-smallbuild],
+	    [Configure for a small build.])], r=set, r=notset)
+case "$r" in
+set)	AC_DEFINE(HAVE_SMALLBUILD)
+	db_cv_enable_smallbuild=yes;;
+notset)	db_cv_enable_smallbuild=no;;
+esac
+AC_MSG_RESULT($db_cv_enable_smallbuild)
 
 AH_TEMPLATE(HAVE_STATISTICS, [Define to 1 for statistics support.])
 AC_MSG_CHECKING(if --disable-statistics option specified)
