@@ -282,6 +282,7 @@ namespace mongo {
     }
 
     bool shouldRepairDatabases = 0;
+    bool forceRepair = 1;
     
     bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
         static DBDirectClient db;
@@ -321,7 +322,7 @@ namespace mongo {
             assert( !setClientTempNs( dbName.c_str() ) );
             MongoDataFile *p = database->getFile( 0 );
             MDFHeader *h = p->getHeader();
-            if ( !h->currentVersion() ) {
+            if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
@@ -545,6 +546,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
+        ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
 #if defined(_WIN32)
         ("install", "install mongodb service")
@@ -748,6 +750,10 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
             return 0;
+        }
+        if (params.count("repair")) {
+            shouldRepairDatabases = 1;
+            forceRepair = 1;
         }
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
