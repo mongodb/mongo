@@ -112,7 +112,7 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._serverNames = [];
 
     for ( var i=0; i<numServers; i++){
-        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" } );
+        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" , smallfiles : "" } );
         conn.name = "localhost:" + ( 30000 + i );
 
         this._connections.push( conn );

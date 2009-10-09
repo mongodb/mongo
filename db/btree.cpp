@@ -21,6 +21,7 @@
 #include "pdfile.h"
 #include "../util/unittest.h"
 #include "json.h"
+#include "clientcursor.h"
 
 namespace mongo {
 
@@ -433,9 +434,8 @@ namespace mongo {
         return false;
     }
 
-    void aboutToDeleteBucket(const DiskLoc&);
     void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
-        aboutToDeleteBucket(thisLoc);
+        ClientCursor::informAboutToDeleteBucket(thisLoc);
         assert( !isHead() );
 
         BtreeBucket *p = parent.btreemod();

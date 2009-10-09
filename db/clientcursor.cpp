@@ -35,12 +35,9 @@ namespace mongo {
     CCByLoc ClientCursor::byLoc;
     boost::recursive_mutex ClientCursor::ccmutex;
 
-    inline unsigned ClientCursor::byLocSize() { 
+    unsigned ClientCursor::byLocSize() { 
         recursive_boostlock lock(ccmutex);
         return byLoc.size();
-    }
-    unsigned byLocSize() {
-        return ClientCursor::byLocSize();
     }
 
     void ClientCursor::setLastLoc_inlock(DiskLoc L) {
@@ -90,7 +87,7 @@ namespace mongo {
     }
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
-    inline void ClientCursor::idleTimeReport(unsigned millis) {
+    void ClientCursor::idleTimeReport(unsigned millis) {
         recursive_boostlock lock(ccmutex);
         for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
             CCByLoc::iterator j = i;
@@ -102,7 +99,6 @@ namespace mongo {
             }
         }
     }
-    void idleTimeReport(unsigned millis) { ClientCursor::idleTimeReport(millis); }
 
     /* must call when a btree bucket going away.
        note this is potentially slow
@@ -120,7 +116,7 @@ namespace mongo {
     }
 
     /* must call this on a delete so we clean up the cursors. */
-    inline void ClientCursor::aboutToDelete(const DiskLoc& dl) {
+    void ClientCursor::aboutToDelete(const DiskLoc& dl) {
         recursive_boostlock lock(ccmutex);
 
         CCByLoc::iterator j = byLoc.lower_bound(dl);
@@ -161,7 +157,7 @@ namespace mongo {
             }
         }
     }
-    void aboutToDelete(const DiskLoc& dl) { ClientCursor::informAboutToDeleteBucket(dl); }
+    void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDelete(dl); }
 
     ClientCursor::~ClientCursor() {
         assert( pos != -2 );

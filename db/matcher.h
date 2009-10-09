@@ -132,7 +132,7 @@ namespace mongo {
         */
         bool matches(const BSONObj& j, bool *deep = 0);
         
-        bool keyMatch() const { return !all && !haveSize; }
+        bool keyMatch() const { return !all && !haveSize && !hasArray; }
     private:
         void addBasic(const BSONElement &e, int c) {
             // TODO May want to selectively ignore these element types based on op type.
@@ -151,6 +151,7 @@ namespace mongo {
 //        int n;                           // # of basicmatcher items
         bool haveSize;
         bool all;
+        bool hasArray;
 
         RegexMatcher regexs[4];
         int nRegex;

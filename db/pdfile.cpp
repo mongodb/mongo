@@ -53,7 +53,6 @@ namespace mongo {
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
-    bool prealloc = true;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
@@ -101,7 +100,7 @@ namespace mongo {
         log(1) << "create collection " << ns << ' ' << j << '\n';
 
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
-                 and then go back and set to ok : 1 after we are done.
+           and then go back and set to ok : 1 after we are done.
         */
         if( strstr(ns, ".$freelist") == 0 )
             addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
@@ -168,8 +167,8 @@ namespace mongo {
         return true;
     }
 
-// { ..., capped: true, size: ..., max: ... }
-// returns true if successful
+    // { ..., capped: true, size: ..., max: ... }
+    // returns true if successful
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) {
         const char *coll = strchr( ns, '.' ) + 1;
         massert( "invalid ns", coll && *coll );
@@ -213,7 +212,11 @@ namespace mongo {
             size = 1024 * 512 * mult;
             log() << "Warning : using small files for _hudsonSmall" << endl;
         }
-
+        else if ( cmdLine.smallfiles ){
+            size = size >> 2;
+        }
+        
+        
         return size;
     }
 
@@ -248,13 +251,13 @@ namespace mongo {
         if ( size > maxSize() )
             size = maxSize();
 
-        assert( ( size >= 64*1024*1024 ) || ( strstr( filename, "_hudsonSmall" ) ) );
+        assert( ( size >= 64*1024*1024 ) || cmdLine.smallfiles || ( strstr( filename, "_hudsonSmall" ) ) );
         assert( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
-	  if ( prealloc ) {
-            theFileAllocator().requestAllocation( filename, size );
-	  }
+            if ( cmdLine.prealloc ) {
+                theFileAllocator().requestAllocation( filename, size );
+            }
             return;
         }
         
@@ -271,11 +274,11 @@ namespace mongo {
         NamespaceIndex *ni = nsindex(ns);
         NamespaceDetails *details = ni->details(ns);
         if ( details ) {
-assert( !details->lastExtent.isNull() );
+            assert( !details->lastExtent.isNull() );
             assert( !details->firstExtent.isNull() );
             e->xprev = details->lastExtent;
             details->lastExtent.ext()->xnext = eloc;
-assert( !eloc.isNull() );
+            assert( !eloc.isNull() );
             details->lastExtent = eloc;
         }
         else {
@@ -314,7 +317,7 @@ assert( !eloc.isNull() );
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
         DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
-        << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
+                  << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
         return e;
     }
 
@@ -429,49 +432,49 @@ assert( !eloc.isNull() );
     }
 
     /*
-    Record* Extent::newRecord(int len) {
-    	if( firstEmptyRegion.isNull() )
-    		return 0;
+      Record* Extent::newRecord(int len) {
+      if( firstEmptyRegion.isNull() )
+      return 0;
 
-    	assert(len > 0);
-    	int newRecSize = len + Record::HeaderSize;
-    	DiskLoc newRecordLoc = firstEmptyRegion;
-    	Record *r = getRecord(newRecordLoc);
-    	int left = r->netLength() - len;
-    	if( left < 0 ) {
-    	//
-    		firstEmptyRegion.Null();
-    		return 0;
-    	}
+      assert(len > 0);
+      int newRecSize = len + Record::HeaderSize;
+      DiskLoc newRecordLoc = firstEmptyRegion;
+      Record *r = getRecord(newRecordLoc);
+      int left = r->netLength() - len;
+      if( left < 0 ) {
+      //
+      firstEmptyRegion.Null();
+      return 0;
+      }
 
-    	DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
-    	r->lengthWithHeaders = newRecSize;
-    	r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
-    	if( !lastRecord.isNull() ) {
-    		assert(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
-    		getRecord(lastRecord)->next.set(newRecordLoc); // until now
-    		r->prev.set(lastRecord);
-    	}
-    	else {
-    		r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
-    		assert( firstRecord.isNull() );
-    		firstRecord = newRecordLoc;
-    	}
-    	lastRecord = newRecordLoc;
+      DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
+      r->lengthWithHeaders = newRecSize;
+      r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
+      if( !lastRecord.isNull() ) {
+      assert(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
+      getRecord(lastRecord)->next.set(newRecordLoc); // until now
+      r->prev.set(lastRecord);
+      }
+      else {
+      r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
+      assert( firstRecord.isNull() );
+      firstRecord = newRecordLoc;
+      }
+      lastRecord = newRecordLoc;
 
-    	if( left < Record::HeaderSize + 32 ) {
-    		firstEmptyRegion.Null();
-    	}
-    	else {
-    		firstEmptyRegion.inc(newRecSize);
-    		Record *empty = getRecord(firstEmptyRegion);
-    		empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
-    		empty->prev.Null();
-    		empty->lengthWithHeaders = left;
-    	}
+      if( left < Record::HeaderSize + 32 ) {
+      firstEmptyRegion.Null();
+      }
+      else {
+      firstEmptyRegion.inc(newRecSize);
+      Record *empty = getRecord(firstEmptyRegion);
+      empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
+      empty->prev.Null();
+      empty->lengthWithHeaders = left;
+      }
 
-    	return r;
-    }
+      return r;
+      }
     */
 
     /*---------------------------------------------------------------------*/
@@ -510,7 +513,7 @@ assert( !eloc.isNull() );
                 return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
             while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
                 /* todo: if extent is empty, free it for reuse elsewhere.
-                    that is a bit complicated have to clean up the freelists.
+                   that is a bit complicated have to clean up the freelists.
                 */
                 RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
                 // find a nonempty extent
@@ -549,8 +552,6 @@ assert( !eloc.isNull() );
             return auto_ptr< Cursor >( new ReverseCappedCursor( d, startLoc ) );
         }
     }
-
-    void aboutToDelete(const DiskLoc& dl);
 
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
@@ -654,80 +655,93 @@ assert( !eloc.isNull() );
         wassert( n == 1 );
     }
 
-  void getKeys( vector< const char * > fieldNames, vector< BSONElement > fixed, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-    BSONObjBuilder b;
-    b.appendNull( "" );
-    BSONElement nullElt = b.done().firstElement();
-    BSONElement arrElt;
-    unsigned arrIdx = ~0;
-    for( unsigned i = 0; i < fieldNames.size(); ++i ) {
-      if ( *fieldNames[ i ] == '\0' )
-	continue;
-      BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
-      if ( e.eoo() )
-	e = nullElt; // no matching field
-      if ( e.type() != Array )
-	fieldNames[ i ] = ""; // no matching field or non-array match
-      if ( *fieldNames[ i ] == '\0' )
-	fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
-      if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
-	arrIdx = i;
-	arrElt = e;
-      }
-      // enforce single array path here
-      uassert( "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
+    void getKeys( vector< const char * > fieldNames, vector< BSONElement > fixed, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+        BSONObjBuilder b;
+        b.appendNull( "" );
+        BSONElement nullElt = b.done().firstElement();
+        BSONElement arrElt;
+        unsigned arrIdx = ~0;
+        for( unsigned i = 0; i < fieldNames.size(); ++i ) {
+            if ( *fieldNames[ i ] == '\0' )
+                continue;
+            BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
+            if ( e.eoo() )
+                e = nullElt; // no matching field
+            if ( e.type() != Array )
+                fieldNames[ i ] = ""; // no matching field or non-array match
+            if ( *fieldNames[ i ] == '\0' )
+                fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
+            if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
+                arrIdx = i;
+                arrElt = e;
+            }
+            // enforce single array path here
+            uassert( "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
+        }
+        bool allFound = true; // have we found elements for all field names in the key spec?
+        for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
+            if ( **i != '\0' )
+                allFound = false;
+        if ( allFound ) {
+            if ( arrElt.eoo() ) {
+                // no terminal array element to expand
+                BSONObjBuilder b;
+                for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
+                    b.appendAs( *i, "" );
+                keys.insert( b.obj() );
+            } else {
+                // terminal array element to expand, so generate all keys
+                BSONObjIterator i( arrElt.embeddedObject() );
+                if ( i.more() ){
+                    while( i.more() ) {
+                        BSONObjBuilder b;
+                        for( unsigned j = 0; j < fixed.size(); ++j ) {
+                            if ( j == arrIdx )
+                                b.appendAs( i.next(), "" );
+                            else
+                                b.appendAs( fixed[ j ], "" );
+                        }
+                        keys.insert( b.obj() );
+                    }
+                }
+                else if ( fixed.size() > 1 ){
+                    // x : [] - need to insert undefined
+                    BSONObjBuilder b;
+                    for( unsigned j = 0; j < fixed.size(); ++j ) {
+                        if ( j == arrIdx )
+                            b.appendUndefined( "" );
+                        else
+                            b.appendAs( fixed[ j ], "" );
+                    }
+                    keys.insert( b.obj() );
+                }
+            }
+        } else {
+            // nonterminal array element to expand, so recurse
+            assert( !arrElt.eoo() );
+            BSONObjIterator i( arrElt.embeddedObject() );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.type() == Object )
+                    getKeys( fieldNames, fixed, e.embeddedObject(), keys );
+            }
+        }
     }
-    bool allFound = true; // have we found elements for all field names in the key spec?
-    for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
-      if ( **i != '\0' )
-	allFound = false;
-    if ( allFound ) {
-      if ( arrElt.eoo() ) {
-	// no terminal array element to expand
-	BSONObjBuilder b;
-	for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
-	  b.appendAs( *i, "" );
-	keys.insert( b.obj() );
-      } else {
-	// terminal array element to expand, so generate all keys
-	BSONObjIterator i( arrElt.embeddedObject() );
-	while( i.more() ) {
-	  BSONObjBuilder b;
-	  for( unsigned j = 0; j < fixed.size(); ++j ) {
-	    if ( j == arrIdx )
-	      b.appendAs( i.next(), "" );
-	    else
-	      b.appendAs( fixed[ j ], "" );
-	  }
-	  keys.insert( b.obj() );
-	}
-      }
-    } else {
-      // nonterminal array element to expand, so recurse
-      assert( !arrElt.eoo() );
-      BSONObjIterator i( arrElt.embeddedObject() );
-      while( i.more() ) {
-	BSONElement e = i.next();
-	if ( e.type() == Object )
-	  getKeys( fieldNames, fixed, e.embeddedObject(), keys );
-      }
-    }
-  }
 
-  void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-    BSONObjIterator i( keyPattern );
-    vector< const char * > fieldNames;
-    vector< BSONElement > fixed;
-    BSONObjBuilder nullKey;
-    while( i.more() ) {
-      fieldNames.push_back( i.next().fieldName() );
-      fixed.push_back( BSONElement() );
-      nullKey.appendNull( "" );
+    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+        BSONObjIterator i( keyPattern );
+        vector< const char * > fieldNames;
+        vector< BSONElement > fixed;
+        BSONObjBuilder nullKey;
+        while( i.more() ) {
+            fieldNames.push_back( i.next().fieldName() );
+            fixed.push_back( BSONElement() );
+            nullKey.appendNull( "" );
+        }
+        getKeys( fieldNames, fixed, obj, keys );
+        if ( keys.empty() )
+            keys.insert( nullKey.obj() );
     }
-    getKeys( fieldNames, fixed, obj, keys );
-    if ( keys.empty() )
-      keys.insert( nullKey.obj() );
-  }
 
     /* Pull out the relevant key objects from obj, so we
        can index them.  Note that the set is multiple elements
@@ -736,12 +750,12 @@ assert( !eloc.isNull() );
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
         BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
-	if ( keyPattern.objsize() == 0 ) {
-	  out() << keyPattern.toString() << endl;
-	  out() << info.obj().toString() << endl;
-	  assert(false);
-	}
-	mongo::getKeysFromObject( keyPattern, obj, keys );
+        if ( keyPattern.objsize() == 0 ) {
+            out() << keyPattern.toString() << endl;
+            out() << info.obj().toString() << endl;
+            assert(false);
+        }
+        mongo::getKeysFromObject( keyPattern, obj, keys );
     }
 
     int nUnindexes = 0;
@@ -751,7 +765,7 @@ assert( !eloc.isNull() );
         id.getKeysFromObject(obj, keys);
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
-//		out() << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
+            //		out() << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
             if ( otherTraceLevel >= 5 ) {
                 out() << "_unindexRecord() " << obj.toString();
                 out() << "\n  unindex:" << j.toString() << endl;
@@ -820,9 +834,9 @@ assert( !eloc.isNull() );
             d->nrecords--;
             d->datasize -= todelete->netLength();
             /* temp: if in system.indexes, don't reuse, and zero out: we want to be
-                     careful until validated more, as IndexDetails has pointers
-                     to this disk location.  so an incorrectly done remove would cause
-                     a lot of problems.
+               careful until validated more, as IndexDetails has pointers
+               to this disk location.  so an incorrectly done remove would cause
+               a lot of problems.
             */
             if ( strstr(ns, ".system.indexes") ) {
                 memset(todelete, 0, todelete->lengthWithHeaders);
@@ -845,7 +859,7 @@ assert( !eloc.isNull() );
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        aboutToDelete(dl);
+        ClientCursor::aboutToDelete(dl);
 
         unindexRecord(d, todelete, dl, noWarn);
 
@@ -906,11 +920,11 @@ assert( !eloc.isNull() );
     }
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
-    */
+     */
     void DataFileMgr::update(
-        const char *ns,
-        Record *toupdate, const DiskLoc& dl,
-        const char *_buf, int _len, stringstream& ss)
+                             const char *ns,
+                             Record *toupdate, const DiskLoc& dl,
+                             const char *_buf, int _len, stringstream& ss)
     {
         dassert( toupdate == dl.rec() );
 
@@ -925,7 +939,7 @@ assert( !eloc.isNull() );
             /* add back the old _id value if the update removes it.  Note this implementation is slow 
                (copies entire object multiple times), but this shouldn't happen often, so going for simple
                code, not speed.
-               */
+            */
             BSONObjBuilder b;
             BSONElement e;
             assert( objOld.getObjectID(e) );
@@ -974,8 +988,8 @@ assert( !eloc.isNull() );
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
                         idx.head.btree()->bt_insert(
-                            idx.head,
-                            dl, *changes[x].added[i], idxKey, /*dupsAllowed*/true, idx);
+                                                    idx.head,
+                                                    dl, *changes[x].added[i], idxKey, /*dupsAllowed*/true, idx);
                     }
                     catch (AssertionException&) {
                         ss << " exception update index ";
@@ -1004,7 +1018,7 @@ assert( !eloc.isNull() );
 
     int deb=0;
 
-   /* add keys to indexes for a new record */
+    /* add keys to indexes for a new record */
     inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->indexes[idxNo];
         BSONObjSetDefaultOrder keys;
@@ -1018,7 +1032,7 @@ assert( !eloc.isNull() );
             assert( !newRecordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, newRecordLoc,
-                                         *i, order, dupsAllowed, idx);
+                                            *i, order, dupsAllowed, idx);
             }
             catch (AssertionException& ) {
                 if( !dupsAllowed ) {
@@ -1056,9 +1070,9 @@ assert( !eloc.isNull() );
     }
 
     /* _ TODO dropDups 
-    */
+     */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-//        testSorting();
+        //        testSorting();
         Timer t;
 
         log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
@@ -1084,7 +1098,7 @@ assert( !eloc.isNull() );
             for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
                 if( ++k == 2 )
                     d->setIndexIsMultikey(idxNo);
-//cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
+                //cout<<"SORTER ADD " << i->toString() << ' ' << loc.toString() << endl;
                 sorter.add(*i, loc);
                 nkeys++;
             }
@@ -1096,21 +1110,21 @@ assert( !eloc.isNull() );
 
         log(1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << (double)t.millis() / 1000 << " secs" << endl;
 
-/*        if( 0 && idxNo == 1 ) { 
-            // TEMP!
+        /*        if( 0 && idxNo == 1 ) { 
+        // TEMP!
 
-            auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            while( i->more() ) { 
-                BSONObjExternalSorter::Data d = i->next();
-                cout << d.second.toString() << endl;
-                cout << d.first.objsize() << endl;
-                cout<<"SORTER next:" << d.first.toString() << endl;
-            }
-
-            cout << "stop here" << endl;
-            cout << "stop here" << endl;
+        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+        while( i->more() ) { 
+        BSONObjExternalSorter::Data d = i->next();
+        cout << d.second.toString() << endl;
+        cout << d.first.objsize() << endl;
+        cout<<"SORTER next:" << d.first.toString() << endl;
         }
-*/
+
+        cout << "stop here" << endl;
+        cout << "stop here" << endl;
+        }
+        */
         list<DiskLoc> dupsToDrop;
 
         /* build index --- */ 
@@ -1121,7 +1135,7 @@ assert( !eloc.isNull() );
             while( i->more() ) { 
                 BSONObjExternalSorter::Data d = i->next();
 
-//                cout<<"TEMP SORTER next " << d.first.toString() << endl;
+                //                cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }
@@ -1129,13 +1143,13 @@ assert( !eloc.isNull() );
                     if( !dupsAllowed ) { 
                         if( dropDups ) { 
                             /* we could queue these on disk, but normally there are very few dups, so instead we 
-                            keep in ram and have a limit.
+                               keep in ram and have a limit.
                             */
                             dupsToDrop.push_back(d.second);
                             uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                         }
-                    else
-                        throw;
+                        else
+                            throw;
                     }
                 }
             }
@@ -1291,7 +1305,7 @@ assert( !eloc.isNull() );
     }
 
     /* note: if god==true, you may pass in obuf of NULL and then popular the returned DiskLoc 
-             after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
+       after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
@@ -1320,7 +1334,7 @@ assert( !eloc.isNull() );
         if ( d == 0 ) {
             addNewNamespaceToCatalog(ns);
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
-                     also if this is an addIndex, those checks should happen before this!
+               also if this is an addIndex, those checks should happen before this!
             */
             // This creates first file in the database.
             database->newestFile()->allocExtent(ns, initialExtentSize(len));
@@ -1350,7 +1364,7 @@ assert( !eloc.isNull() );
             }
             if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
                 out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
-                     tabletoidxns << "\n  ourns:" << ns;
+                    tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
                 string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
                 uasserted(s);
@@ -1564,7 +1578,7 @@ assert( !eloc.isNull() );
     }
 
     void pdfileInit() {
-//	namespaceIndex.init(dbpath);
+        //	namespaceIndex.init(dbpath);
         theDataFileMgr.init(dbpath);
     }
 
@@ -1587,7 +1601,7 @@ namespace mongo {
 
     typedef boost::filesystem::path Path;
 
-// back up original database files to 'temp' dir
+    // back up original database files to 'temp' dir
     void _renameForBackup( const char *database, const Path &reservedPath ) {
         class Renamer : public FileOp {
         public:
@@ -1607,7 +1621,7 @@ namespace mongo {
         _applyOpToDataFiles( database, renamer, true );
     }
 
-// move temp files to standard data dir
+    // move temp files to standard data dir
     void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
         class : public FileOp {
             virtual bool apply( const Path &p ) {
@@ -1623,7 +1637,7 @@ namespace mongo {
         _applyOpToDataFiles( database, renamer, true, reservedPathString );
     }
 
-// generate a directory name for storing temp data files
+    // generate a directory name for storing temp data files
     Path uniqueReservedPath( const char *prefix ) {
         Path dbPath = Path( dbpath );
         Path reservedPath;
@@ -1694,7 +1708,7 @@ namespace mongo {
         if ( freeSize > -1 && freeSize < totalSize ) {
             stringstream ss;
             ss << "Cannot repair database " << dbName << " having size: " << totalSize
-            << " (bytes) because free disk space is: " << freeSize << " (bytes)";
+               << " (bytes) because free disk space is: " << freeSize << " (bytes)";
             errmsg = ss.str();
             problem() << errmsg << endl;
             return false;
@@ -1708,7 +1722,7 @@ namespace mongo {
         assert( setClient( dbName, reservedPathString.c_str() ) );
 
         bool res = cloneFrom(localhost.c_str(), errmsg, dbName, 
-            /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
+                             /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
         closeClient( dbName, reservedPathString.c_str() );
 
         if ( !res ) {

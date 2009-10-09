@@ -137,15 +137,18 @@ namespace mongo {
             return _idleAgeMillis;
         }
 
+        static void idleTimeReport(unsigned millis);
+
         void liveForever() {
             _liveForever = true;
         }
 
         static unsigned byLocSize();        // just for diagnostics
-        static void idleTimeReport(unsigned millis);
+//        static void idleTimeReport(unsigned millis);
 
         static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);
     };
+
     
 } // namespace mongo

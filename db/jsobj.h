@@ -40,6 +40,7 @@
 namespace mongo {
 
     class BSONObj;
+    class BSONElement;
     class Record;
     class BSONObjBuilder;
     class BSONObjBuilderValueStream;
@@ -180,6 +181,9 @@ namespace mongo {
         /** Javascript JSON compatible */
         JS
     };
+
+    /* l and r MUST have same type when called: check that first. */
+    int compareElementValues(const BSONElement& l, const BSONElement& r);
 
 #pragma pack()
 
@@ -587,6 +591,13 @@ namespace mongo {
             start += 4 + *reinterpret_cast< const int* >( start );
             return *reinterpret_cast< const OID* >( start );
         }
+
+        bool operator<( const BSONElement& other ) const {
+            int x = (int)canonicalType() - (int)other.canonicalType();
+            if ( x < 0 ) return true;
+            else if ( x > 0 ) return false;
+            return compareElementValues(*this,other) < 0;
+        }
         
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
@@ -614,8 +625,6 @@ namespace mongo {
         mutable int totalSize; /* caches the computed size */
     };
     
-    /* l and r MUST have same type when called: check that first. */
-    int compareElementValues(const BSONElement& l, const BSONElement& r);
     int getGtLtOp(const BSONElement& e);
 
     /* compare values with type check. 

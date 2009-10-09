@@ -328,19 +328,22 @@ namespace mongo {
               _done(0) , _hits(0) , _lastTime( (int) time(0) ){
         }
         
-        void hit( int n = 1 ){
+        bool hit( int n = 1 ){
             _done += n;
             _hits++;
             if ( _hits % _checkInterval )
-                return;
+                return false;
             
             int t = (int) time(0);
             if ( t - _lastTime < _secondsBetween )
-                return;
+                return false;
             
-            int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-            cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
+            if ( _total > 0 ){
+                int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
+                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
+            }
             _lastTime = t;
+            return true;
         }
 
         long long done(){

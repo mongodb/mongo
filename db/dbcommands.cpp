@@ -1330,10 +1330,12 @@ namespace mongo {
                     "}" );
                 s->invoke( g , BSONObj() , 0 , true );
             }
-
+            
             result.appendArray( "retval" , s->getObject( "$arr" ) );
             result.append( "count" , keynum - 1 );
             result.append( "keys" , (int)(map.size()) );
+            s->exec( "$arr = [];" , "reduce setup 2" , false , true , true , 100 );
+            s->gc();
 
             return true;
         }
@@ -1347,6 +1349,10 @@ namespace mongo {
             BSONObj q;
             if ( p["cond"].type() == Object )
                 q = p["cond"].embeddedObject();
+            else if ( p["condition"].type() == Object )
+                q = p["condition"].embeddedObject();
+            else if ( p["q"].type() == Object )
+                q = p["q"].embeddedObject();
 
             string ns = dbname;
             ns = ns.substr( 0 , ns.size() - 4 );
