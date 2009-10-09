@@ -36,8 +36,6 @@ public:
     ImportJSON() : Tool( "importjson" ){
         add_options()
             ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
-            ("idbefore", "create id index before importing " )
-            ("id", "create id index after importing (recommended) " )
             ("drop", "drop collection first " )
             ;
         addPositionArg( "file" , 1 );
@@ -70,10 +68,6 @@ public:
         if ( hasParam( "drop" ) ){
             cout << "dropping: " << ns << endl;
             conn().dropCollection( ns.c_str() );
-        }
-
-        if ( hasParam( "idbefore" ) ){
-            conn().ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
 
         int num = 0;
@@ -110,10 +104,6 @@ public:
             if ( pm.hit( len + 1 ) ){
                 cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }
-        }
-
-        if ( hasParam( "id" ) ){
-            conn().ensureIndex( ns.c_str() , BSON( "_id" << 1 ) );
         }
 
         return 0;
