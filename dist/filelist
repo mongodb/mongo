@@ -18,8 +18,6 @@ btree/btree_ret.c
 btree/btree_stat.c
 btree/btree_sync.c
 btree/btree_vrfy.c
-connect/engine.c
-connect/toc.c
 db/db_close.c
 db/db_err.c
 db/db_getset.c
@@ -27,6 +25,8 @@ db/db_handle.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
+engine/engine.c
+engine/toc.c
 env/env_cache.c
 env/env_close.c
 env/env_err.c

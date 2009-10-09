@@ -96,16 +96,6 @@ __wt_bt_verify_int(WT_TOC *toc, FILE *fp);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
 int
-__wt_env_start(ENV *env, u_int32_t flags);
-int
-__wt_env_stop(ENV *env, u_int32_t flags);
-void *
-__wt_workq(void *arg);
-int
-__wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp);
-int
-__wt_toc_sched(WT_TOC *toc);
-int
 __wt_db_close(WT_TOC *toc);
 void
 __wt_db_err(DB *db, int error, const char *fmt, ...);
@@ -131,6 +121,16 @@ int
 __wt_db_stat_clear(WT_TOC *toc);
 int
 __wt_db_sync(WT_TOC *toc);
+int
+__wt_env_start(ENV *env, u_int32_t flags);
+int
+__wt_env_stop(ENV *env, u_int32_t flags);
+void *
+__wt_workq(void *arg);
+int
+__wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp);
+int
+__wt_toc_sched(WT_TOC *toc);
 int
 __wt_cache_create(WT_TOC *toc, WT_CACHE **cache_addr);
 int

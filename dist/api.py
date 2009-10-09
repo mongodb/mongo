@@ -147,10 +147,10 @@ def func_getset(handle, method, flags, args, f):
 			    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n')
 	f.write('\treturn (0);\n}\n\n')
 
-# func_connect_hdr --
-#	Generate #defines and structures for the connection API.
+# func_api_hdr --
+#	Generate #defines and structures for the API.
 op_cnt = 1
-def func_connect_hdr(handle, method, flags, args, f):
+def func_api_hdr(handle, method, flags, args, f):
 	global op_cnt
 	uv = handle.upper() + '_' + method.upper()
 	lv = 'wt_args_' + handle + '_' + method
@@ -183,9 +183,9 @@ def func_connect_hdr(handle, method, flags, args, f):
 		sep = ';\\\n'
 	f.write('\n')
 
-# func_connect_api --
-#	Generate the actual API connection code.
-def func_connect_api(handle, method, flags, args, f):
+# func_api --
+#	Generate the actual API code.
+def func_api(handle, method, flags, args, f):
 	if flags.count('methodV'):
 		rettype = 'void'
 	else:
@@ -210,9 +210,9 @@ def func_connect_api(handle, method, flags, args, f):
 	    handle.upper() + '_' + method.upper() + ');\n')
 	f.write('}\n\n')
 
-# func_connect_switch --
-#	Generate the switch for the API connection code.
-def func_connect_switch(handle, method, flags, args, f):
+# func_api_switch --
+#	Generate the switch for the API code.
+def func_api_switch(handle, method, flags, args, f):
 	f.write('\tcase WT_OP_' + handle.upper() + '_' + method.upper() + ':\n')
 	f.write('\t\t')
 	if not flags.count('methodV'):
@@ -226,7 +226,7 @@ def func_connect_switch(handle, method, flags, args, f):
 func_input()
 
 #####################################################################
-# Update connect.h with ENV, DB, WT_TOC handle information.
+# Update api.h with ENV, DB, WT_TOC handle information.
 #####################################################################
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
@@ -246,14 +246,14 @@ tfile.write('\ttoc->db = db;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
 tfile.write('\treturn (__wt_toc_sched(toc))\n')
 
-# Write the connect structures.
+# Write the API structures.
 for i in sorted(\
     filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
-	func_connect_hdr(\
+	func_api_hdr(\
 	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 
 tfile.close()
-compare_srcfile(tmp_file, '../inc_posix/connect_auto.h')
+compare_srcfile(tmp_file, '../inc_posix/api.h')
 
 #####################################################################
 # Update api.c.
@@ -262,10 +262,10 @@ tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
-#  Write the API connection functions.
+#  Write the API functions.
 for i in sorted(
     filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
-	func_connect_api(\
+	func_api(\
 	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 
 # Write the Env/Db getter/setter functions.
@@ -300,13 +300,13 @@ for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
 	func_method_lockout('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('}\n\n')
 
-# Write the API connection switch.
+# Write the API switch.
 tfile.write('void\n__wt_api_switch(WT_TOC *toc)\n{\n')
 tfile.write('\tint ret;\n\n')
 tfile.write('\tswitch (toc->op) {\n')
 for i in sorted(
     filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
-	func_connect_switch(\
+	func_api_switch(\
 	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
 tfile.write('\tdefault:\n')
 tfile.write('\t\tret = WT_ERROR;\n')
