@@ -14,13 +14,8 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort(ENV *env)
+__wt_abort()
 {
-	/*lint -esym(715,env)
-	 *
-	 * env isn't referenced, but this layer always takes an env
-	 * argument.
-	 */
 	abort();
 	/* NOTREACHED */
 }

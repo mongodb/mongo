@@ -14,30 +14,29 @@
  *	Close a DB handle.
  */
 int
-__wt_db_close(WT_STOC *stoc)
+__wt_db_close(WT_TOC *toc)
 {
 	wt_args_db_close_unpack;
 	IDB *idb;
 	IENV *ienv;
 	int ret;
 
-	ienv = stoc->env->ienv;
+	ienv = toc->env->ienv;
 	idb = db->idb;
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
-	/* Close the underlying Btree. */
-	WT_TRET(__wt_bt_close(stoc));
-
-	/* Discard the cache. */
-	WT_TRET(__wt_cache_close(stoc));
-
 	/* Remove from the environment's list. */
+	WT_RET(__wt_lock(&ienv->mtx));
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
+	WT_RET(__wt_unlock(&ienv->mtx));
+
+	/* Close the underlying Btree. */
+	WT_TRET(__wt_bt_close(toc));
 
 	/* Re-cycle the underlying IDB structure. */
-	WT_TRET(__wt_idb_destroy(db, 1));
+	WT_TRET(__wt_idb_destroy(toc, 1));
 
 	/*
 	 * Reset the methods that are permitted.

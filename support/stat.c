@@ -10,19 +10,18 @@ __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 	WT_RET(__wt_calloc(env,
 	    WT_STAT_FH_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_READ_IO].desc = "count of read I/Os";
-	stats[WT_STAT_WRITE_IO].desc = "count of write I/Os";
+	stats[WT_STAT_READ_IO].desc = "read I/Os";
+	stats[WT_STAT_WRITE_IO].desc = "write I/Os";
 
 	*statsp = stats;
 	return (0);
 }
 
-int
+void
 __wt_stat_clear_fh_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_READ_IO].v = 0;
 	stats[WT_STAT_WRITE_IO].v = 0;
-	return (0);
 }
 
 int
@@ -58,7 +57,7 @@ __wt_stat_alloc_idb_dstats(ENV *env, WT_STATS **statsp)
 	return (0);
 }
 
-int
+void
 __wt_stat_clear_idb_dstats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
@@ -81,7 +80,6 @@ __wt_stat_clear_idb_dstats(WT_STATS *stats)
 	stats[WT_STAT_PAGE_LEAF].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
 	stats[WT_STAT_TREE_LEVEL].v = 0;
-	return (0);
 }
 
 int
@@ -103,12 +101,15 @@ __wt_stat_alloc_idb_stats(ENV *env, WT_STATS **statsp)
 	    "cache hit: reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
+	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
+	stats[WT_STAT_DB_READ_BY_RECNO].desc =
+	    "database read-by-recno operations";
 
 	*statsp = stats;
 	return (0);
 }
 
-int
+void
 __wt_stat_clear_idb_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
@@ -118,7 +119,8 @@ __wt_stat_clear_idb_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
-	return (0);
+	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
+	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
 }
 
 int
@@ -139,12 +141,18 @@ __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_CACHE_WRITE].desc = "writes from the cache";
 	stats[WT_STAT_CACHE_WRITE_EVICT].desc =
 	    "dirty pages evicted from the cache";
+	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
+	stats[WT_STAT_MEMALLOC].desc = "memory allocations";
+	stats[WT_STAT_MEMFREE].desc = "memory frees";
+	stats[WT_STAT_TOTAL_OPS].desc = "total operations";
+	stats[WT_STAT_TOTAL_READ_IO].desc = "total read I/Os";
+	stats[WT_STAT_TOTAL_WRITE_IO].desc = "total write I/Os";
 
 	*statsp = stats;
 	return (0);
 }
 
-int
+void
 __wt_stat_clear_ienv_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
@@ -155,32 +163,36 @@ __wt_stat_clear_ienv_stats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_WRITE].v = 0;
 	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
-	return (0);
+	stats[WT_STAT_DATABASE_OPEN].v = 0;
+	stats[WT_STAT_MEMALLOC].v = 0;
+	stats[WT_STAT_MEMFREE].v = 0;
+	stats[WT_STAT_TOTAL_OPS].v = 0;
+	stats[WT_STAT_TOTAL_READ_IO].v = 0;
+	stats[WT_STAT_TOTAL_WRITE_IO].v = 0;
 }
 
 int
-__wt_stat_alloc_stoc_stats(ENV *env, WT_STATS **statsp)
+__wt_stat_alloc_srvr_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
 	WT_RET(__wt_calloc(env,
-	    WT_STAT_STOC_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
+	    WT_STAT_SRVR_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
-	stats[WT_STAT_STOC_ARRAY].desc = "server thread array passes";
-	stats[WT_STAT_STOC_OPS].desc = "server thread operations";
-	stats[WT_STAT_STOC_SLEEP].desc = "server thread sleeps";
-	stats[WT_STAT_STOC_YIELD].desc = "server thread yields";
+	stats[WT_STAT_SRVR_ARRAY].desc = "server thread array passes";
+	stats[WT_STAT_SRVR_OPS].desc = "server thread operations";
+	stats[WT_STAT_SRVR_SLEEP].desc = "server thread sleeps";
+	stats[WT_STAT_SRVR_YIELD].desc = "server thread yields";
 
 	*statsp = stats;
 	return (0);
 }
 
-int
-__wt_stat_clear_stoc_stats(WT_STATS *stats)
+void
+__wt_stat_clear_srvr_stats(WT_STATS *stats)
 {
-	stats[WT_STAT_STOC_ARRAY].v = 0;
-	stats[WT_STAT_STOC_OPS].v = 0;
-	stats[WT_STAT_STOC_SLEEP].v = 0;
-	stats[WT_STAT_STOC_YIELD].v = 0;
-	return (0);
+	stats[WT_STAT_SRVR_ARRAY].v = 0;
+	stats[WT_STAT_SRVR_OPS].v = 0;
+	stats[WT_STAT_SRVR_SLEEP].v = 0;
+	stats[WT_STAT_SRVR_YIELD].v = 0;
 }

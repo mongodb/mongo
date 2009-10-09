@@ -14,15 +14,10 @@
  *	Create a new thread of control.
  */
 int
-__wt_thread_create(
-    ENV *env, pthread_t *tidret, void *(*func)(void *), void *arg)
+__wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
 {
 	/* Spawn a new thread of control. */
-	if (pthread_create(tidret, NULL, func, arg) != 0) {
-		__wt_env_err(env, errno, "thread creation");
-		return (WT_ERROR);
-	}
-	return (0);
+	return (pthread_create(tidret, NULL, func, arg) == 0 ? 0 : WT_ERROR);
 }
 
 /*

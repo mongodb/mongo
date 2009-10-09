@@ -14,15 +14,17 @@
  *	Open a file handle.
  */
 int
-__wt_open(ENV *env,
+__wt_open(WT_TOC *toc,
     const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
 {
+	ENV *env;
 	IDB *idb;
 	IENV *ienv;
 	WT_FH *fh;
 	int f, fd, ret;
 
 	fh = NULL;
+	env = toc->env;
 	ienv = env->ienv;
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
@@ -75,7 +77,7 @@ __wt_open(ENV *env,
 	*fhp = fh;
 
 	/* Set the file's size. */
-	WT_ERR(__wt_filesize(env, fh, &fh->file_size));
+	WT_ERR(__wt_filesize(toc, fh, &fh->file_size));
 
 	return (0);
 
@@ -93,9 +95,14 @@ err:	if (fh != NULL) {
  *	Close a file handle.
  */
 int
-__wt_close(ENV *env, WT_FH *fh)
+__wt_close(WT_TOC *toc, WT_FH *fh)
 {
-	WT_ASSERT(env, fh->refcnt > 0);
+	ENV *env;
+
+	env = toc->env;
+
+	if (fh == NULL || fh->refcnt == 0)
+		return (0);
 	if (--fh->refcnt == 0) {
 		__wt_free(env, fh->name);
 		__wt_free(env, fh->stats);

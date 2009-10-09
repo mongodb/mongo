@@ -14,9 +14,14 @@
  *	Read a file handle.
  */
 int
-__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
+__wt_read(WT_TOC *toc, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, READ_IO, "count of read I/Os");
+	ENV *env;
+
+	env = toc->env;
+
+	WT_STAT_INCR(fh->stats, READ_IO, "read I/Os");
+	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO, "total read I/Os");
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,
@@ -35,9 +40,14 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
  *	Write a file handle.
  */
 int
-__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
+__wt_write(WT_TOC *toc, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, WRITE_IO, "count of write I/Os");
+	ENV *env;
+
+	env = toc->env;
+
+	WT_STAT_INCR(fh->stats, WRITE_IO, "write I/Os");
+	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO, "total write I/Os");
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
 		__wt_env_errx(env,

@@ -88,7 +88,7 @@ __wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
 	__wt_env_errx(env,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
 
-	__wt_abort(env);
+	__wt_abort();
 	/* NOTREACHED */
 }
 #endif

@@ -10,15 +10,15 @@
 #include "wt_internal.h"
 
 static int __wt_db_config_default(DB *);
-static int __wt_db_destroy_int(WT_STOC *, u_int32_t);
-static int __wt_idb_config_default(DB *);
+static int __wt_db_destroy_int(WT_TOC *, u_int32_t);
+static int __wt_idb_config_default(WT_TOC *);
 
 /*
  * wt_db_create --
  *	DB constructor.
  */
 int
-__wt_env_db_create(WT_STOC *stoc)
+__wt_env_db_create(WT_TOC *toc)
 {
 	wt_args_env_db_create_unpack;
 	DB *db;
@@ -37,7 +37,7 @@ __wt_env_db_create(WT_STOC *stoc)
 	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
 
 	/* Connect everything together. */
-	stoc->db = stoc->toc->db = db;
+	toc->db = db;
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
@@ -45,15 +45,17 @@ __wt_env_db_create(WT_STOC *stoc)
 
 	/* Configure the DB and the IDB. */
 	WT_ERR(__wt_db_config_default(db));
-	WT_ERR(__wt_idb_config_default(db));
+	WT_ERR(__wt_idb_config_default(toc));
 
 	/* Insert the database on the environment's list. */
+	WT_ERR(__wt_lock(&ienv->mtx));
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
+	WT_ERR(__wt_unlock(&ienv->mtx));
 
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_destroy_int(stoc, 0);
+err:	(void)__wt_db_destroy_int(toc, 0);
 	return (ret);
 }
 
@@ -62,11 +64,11 @@ err:	(void)__wt_db_destroy_int(stoc, 0);
  *	Db.destroy method (DB destructor).
  */
 int
-__wt_db_destroy(WT_STOC *stoc)
+__wt_db_destroy(WT_TOC *toc)
 {
 	wt_args_db_destroy_unpack;
 
-	return (__wt_db_destroy_int(stoc, flags));
+	return (__wt_db_destroy_int(toc, flags));
 }
 
 /*
@@ -74,15 +76,15 @@ __wt_db_destroy(WT_STOC *stoc)
  *	Db.destroy method (DB destructor), internal version.
  */
 static int
-__wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
+__wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
 	IDB *idb;
 	int ret;
 
-	db = stoc->db;
-	env = stoc->env;
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
 	ret = 0;
 
@@ -90,7 +92,7 @@ __wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
 	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
 
 	/* Discard the underlying IDB structure. */
-	WT_TRET(__wt_idb_destroy(db, 0));
+	WT_TRET(__wt_idb_destroy(toc, 0));
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->stats);
@@ -101,7 +103,7 @@ __wt_db_destroy_int(WT_STOC *stoc, u_int32_t flags)
 	__wt_free(env, db);
 
 	/* The TOC can't even find it. */
-	stoc->toc->db = NULL;
+	toc->db = NULL;
 
 	return (ret);
 }
@@ -134,22 +136,26 @@ __wt_db_config_default(DB *db)
  *	Destroy the DB's underlying IDB structure.
  */
 int
-__wt_idb_destroy(DB *db, int refresh)
+__wt_idb_destroy(WT_TOC *toc, int refresh)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
+	int ret;
 
-	env = db->env;
+	env = toc->env;
+	db = toc->db;
 	idb = db->idb;
+	ret = 0;
 
 	/* Check that there's something to destroy. */
 	if (idb == NULL)
 		return (0);
 
 	/* Free allocated memory. */
+	WT_FREE_AND_CLEAR(env, idb->dbname);
 	WT_FREE_AND_CLEAR(env, idb->key.data);
 	WT_FREE_AND_CLEAR(env, idb->data.data);
-	WT_FREE_AND_CLEAR(env, idb->dbname);
 
 	/* If we're truly done, discard the actual memory. */
 	if (!refresh) {
@@ -167,9 +173,9 @@ __wt_idb_destroy(DB *db, int refresh)
 	 * by DB configuration, we'd lose that configuration here.
 	 */
 	memset(idb, 0, sizeof(idb));
-	WT_RET(__wt_idb_config_default(db));
+	WT_TRET(__wt_idb_config_default(toc));
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -177,14 +183,21 @@ __wt_idb_destroy(DB *db, int refresh)
  *	Set default configuration for a just-created IDB handle.
  */
 static int
-__wt_idb_config_default(DB *db)
+__wt_idb_config_default(WT_TOC *toc)
 {
 	IDB *idb;
 
-	idb = db->idb;
+	idb = toc->db->idb;
 
 	WT_CLEAR(idb->key);
 	WT_CLEAR(idb->data);
+	WT_RET(__wt_cache_create(toc, &idb->cache));
+
+	/*
+	 * BUG!!!
+	 * Why set this here?
+	 */
+	toc->cache = idb->cache;
 
 	return (0);
 }
