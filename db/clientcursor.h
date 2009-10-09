@@ -37,7 +37,11 @@ namespace mongo {
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
+
+    /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
+    */
     typedef map<CursorId, ClientCursor*> CCById;
+
     typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
