@@ -22,6 +22,7 @@ int nodesize = 0;				/* Node page size */
 int runs = 0;					/* Runs: default forever */
 int singlethread = 0;				/* Single-threaded */
 int stats = 0;					/* Show statistics */
+int verbose = 0;				/* Verbose debugging */
 
 const char *progname;
 
@@ -47,7 +48,7 @@ main(int argc, char *argv[])
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
 	defkeys = defleafsize = defnodesize = defthread = 1;
-	while ((ch = getopt(argc, argv, "c:dk:l:mn:R:r:Ss")) != EOF)
+	while ((ch = getopt(argc, argv, "c:dk:l:mn:R:r:Ssv")) != EOF)
 		switch (ch) {
 		case 'c':
 			cachesize = atoi(optarg);
@@ -82,6 +83,9 @@ main(int argc, char *argv[])
 		case 's':
 			defthread = 0;
 			singlethread = 1;
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		case '?':
 		default:
@@ -161,7 +165,10 @@ load()
 	DB *db;
 	FILE *fp;
 
-	__wt_simple_setup(progname, singlethread, &toc, &db);
+	__wt_simple_setup(progname, 1, &toc, &db);
+	if (verbose)
+		assert(
+		    db->env->set_verbose(db->env, toc, WT_VERB_SERVERS) == 0);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(
@@ -193,7 +200,7 @@ load()
 
 	if (stats) {
 		(void)printf("\nLoad statistics:\n");
-		assert(db->stat_print(db, toc, stdout, 0) == 0);
+		assert(toc->env->stat_print(toc->env, toc, stdout, 0) == 0);
 	}
 
 	__wt_simple_teardown(progname, toc, db);
@@ -215,6 +222,9 @@ read_check()
 	memset(&data, 0, sizeof(data));
 
 	__wt_simple_setup(progname, singlethread, &toc, &db);
+	if (verbose)
+		assert(
+		    db->env->set_verbose(db->env, toc, WT_VERB_SERVERS) == 0);
 
 	db->set_errpfx(db, toc, progname);
 	assert(db->env->set_cachesize(db->env, toc, (u_int32_t)cachesize) == 0);
@@ -289,7 +299,7 @@ read_check()
 
 	if (stats) {
 		(void)printf("\nVerify statistics:\n");
-		assert(db->stat_print(db, toc, stdout, 0) == 0);
+		assert(toc->env->stat_print(toc->env, toc, stdout, 0) == 0);
 	}
 
 	__wt_simple_teardown(progname, toc, db);
@@ -360,7 +370,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: get [-dmSs] [-c cachesize] [-k keys] [-l leafsize] "
+	    "usage: get [-dmSsv] [-c cachesize] [-k keys] [-l leafsize] "
 	    "[-n nodesize] [-R rand] [-r runs]\n");
 	exit(1);
 }
