@@ -85,12 +85,11 @@ for d in sorted(stats.iteritems()):
 	f.write('}\n')
 	f.write('\n')
 
-	f.write('int\n')
+	f.write('void\n')
 	f.write('__wt_stat_clear_' + d[0] + '(WT_STATS *stats)\n')
 	f.write('{\n')
 	for l in sorted(d[1]):
 		f.write('\tstats[WT_STAT_' + l[0] + '].v = 0;\n');
-	f.write('\treturn (0);\n')
 	f.write('}\n')
 f.close()
 compare_srcfile(tmp_file, '../support/stat.c')

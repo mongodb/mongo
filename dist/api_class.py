@@ -169,6 +169,13 @@ db.errx
 	fmt	const char *@S, ...
 
 db.get
+	method,local,open
+	key	DBT *@S
+	pkey	DBT *@S
+	data	DBT *@S
+	flags	u_int32_t @S
+
+db.get_stoc
 	method,open
 	key	DBT *@S
 	pkey	DBT *@S
@@ -176,6 +183,14 @@ db.get
 	flags	u_int32_t @S
 
 db.get_recno
+	method,local,open
+	recno	u_int64_t @S
+	key	DBT *@S
+	pkey	DBT *@S
+	data	DBT *@S
+	flags	u_int32_t @S
+
+db.get_recno_stoc
 	method,open
 	recno	u_int64_t @S
 	key	DBT *@S

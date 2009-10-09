@@ -1,27 +1,28 @@
 # $Id$
 #
 # This file lists all of the API interface flags used by the WiredTiger
-# library, and is processed to ensure flag #defines never collide.
+# library, and is processed to ensure flag #defines never collide
 #
 # The format:
 #	Method/Function/API
 #	<tab>	Flag
 
 #############################################
-# Threads-of-control.
+# Threads-of-control
 #############################################
 Toc
+	SINGLE_THREADED			# Single threaded
 	RUNNING				# Thread being served
 
 Toc.destroy
 
 #############################################
-# Environments.
+# Environments
 #############################################
 Env					# Public handle
 
 IEnv					# Private handle
-	SINGLE_THREADED
+	SINGLE_THREADED			# Single threaded
 
 wt_env_create
 Env.close
@@ -38,11 +39,12 @@ Env.stop
 Env.toc_create
 
 Env.verbose
-	VERB_FILEOPS			# Verbose, major file operations
-	VERB_FILEOPS_ALL		# Verbose, all file operations
+	VERB_FILEOPS			# Verbose: major file operations
+	VERB_FILEOPS_ALL		# Verbose: all file operations
+	VERB_SERVERS			# Verbose: server execution
 
 #############################################
-# Databases.
+# Databases
 #############################################
 Db					# Public handle
 
@@ -80,6 +82,9 @@ Dbt
 	DBT_ALLOC			# Allocate application-owned DBT memory
 	DBT_APPMEM			# Application-supplied DBT memory
 
+wt_cache
+	READONLY			# Cache is readonly (multi-threaded)
+
 wt_indx
 	ALLOCATED			# Index key in allocated memory
 
@@ -91,11 +96,17 @@ wt_page
 # Internal functions
 #############################################
 wt_cache_in
-	UNFORMATTED			# Page may not be a valid database page.
+	UNFORMATTED			# Page may not be a valid database page
 
 wt_cache_out
-	UNFORMATTED			# Page may not be a valid database page.
+	UNFORMATTED			# Page may not be a valid database page
 	MODIFIED			# Page is modified
 
 wt_open
 	CREATE				# Create the file
+
+#############################################
+# Internal returns
+#############################################
+wt_return
+	RESCHEDULE			# Reschedule job for another server
