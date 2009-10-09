@@ -9,33 +9,71 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_search(WT_STOC *, DBT *, WT_PAGE **, WT_INDX **);
-static int __wt_bt_search_recno(WT_STOC *, u_int64_t, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search_recno(WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
+
+/*
+ * __wt_db_get_stoc --
+ *	Db.get method when scheduled by a server thread.
+ */
+int
+__wt_db_get_stoc(WT_TOC *toc)
+{
+	wt_args_db_get_stoc_unpack;
+
+	return (__wt_db_get_worker(db, toc, key, pkey, data, flags));
+}
 
 /*
  * __wt_db_get --
- *	Db.get method.
+ *	Db.get method when called directly from a user thread.
  */
 int
-__wt_db_get(WT_STOC *stoc)
+__wt_db_get(
+    DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
-	wt_args_db_get_unpack;
-	ENV *env;
 	IDB *idb;
-	WT_PAGE *page;
+	int ret;
+
+	/*
+	 * The initial search in a database is always done using the
+	 * the IDB cache.
+	 */
+	toc->db = db;
+	idb = db->idb;
+	toc->cache = idb->cache;
+	WT_STAT_INCR(idb->stats,
+	    DB_READ_BY_KEY, "database read-by-key operations");
+
+	if ((ret = __wt_db_get_worker(
+	    db, toc, key, pkey, data, flags)) == WT_RESCHEDULE)
+		ret = db->get_stoc(db, toc, key, pkey, data, flags);
+
+	return (ret);
+}
+
+/*
+ * __wt_db_get_worker --
+ *	Db.get method that does the real work.
+ */
+int
+__wt_db_get_worker(
+    DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+{
+	IDB *idb;
 	WT_INDX *indx;
+	WT_PAGE *page;
 	u_int32_t type;
 	int ret;
 
-	env = stoc->env;
 	idb = db->idb;
 
-	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
+	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
 
 	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
 	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search(stoc, key, &page, &indx));
+	WT_RET(__wt_bt_search(toc, key, &page, &indx));
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -48,57 +86,11 @@ __wt_db_get(WT_STOC *stoc)
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(stoc, key, data, page, indx, 0);
+		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 0);
 
 	/* Discard any page other than the root page, which remains pinned. */
 	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(stoc, page, 0));
-
-	return (ret);
-
-}
-
-/*
- * __wt_db_get_recno --
- *	Db.get_recno method.
- */
-int
-__wt_db_get_recno(WT_STOC *stoc)
-{
-	wt_args_db_get_recno_unpack;
-	ENV *env;
-	IDB *idb;
-	WT_PAGE *page;
-	WT_INDX *indx;
-	u_int32_t type;
-	int ret;
-
-	env = stoc->env;
-	idb = db->idb;
-
-	WT_ASSERT(env, pkey == NULL);			/* NOT YET */
-
-	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
-
-	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search_recno(stoc, recno, &page, &indx));
-
-	/*
-	 * The Db.get_recno method can only return single key/data pairs.
-	 * If that's not what we found, we're done.
-	 */
-	type = WT_ITEM_TYPE(indx->ditem);
-	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
-		__wt_db_errx(db,
-		    "the Db.get_recno method cannot return keys with duplicate "
-		    "data items; use the Db.cursor method instead");
-		ret = WT_ERROR;
-	} else
-		ret = __wt_bt_dbt_return(stoc, key, data, page, indx, 1);
-
-	/* Discard any page other than the root page, which remains pinned. */
-	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(stoc, page, 0));
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 	return (ret);
 }
@@ -108,7 +100,7 @@ __wt_db_get_recno(WT_STOC *stoc)
  *	Search the tree for a specific key.
  */
 static int
-__wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
+__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	DB *db;
 	IDB *idb;
@@ -117,20 +109,33 @@ __wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	u_int32_t addr, base, indx, limit;
 	int cmp, isleaf, next_isleaf, put_page, ret;
 
-	db = stoc->db;
+	db = toc->db;
 	idb = db->idb;
 
-	/* Check for an empty tree. */
-	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
-		return (WT_NOTFOUND);
+	/*
+	 * Check for a rescheduled operation, where the root for this server
+	 * was set by a previous search; check for an empty tree, as well.
+	 *
+	 * If the operation is being rescheduled to a different server, get
+	 * the page; otherwise, we can use the always-pinned root page for
+	 * the database.
+	 */
+	if ((addr = toc->root_addr) == WT_ADDR_INVALID) {
+		if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+			return (WT_NOTFOUND);
+		page = idb->root_page;
+		isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
+		put_page = 0;
+	} else {
+		isleaf = toc->root_isleaf;
+		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
+		put_page = 1;
+	}
 
 	/* Search the tree. */
-	page = idb->root_page;
-	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
-	for (put_page = 0;; put_page = 1) {
+	for (;; put_page = 1) {
 		/*
-		 * Do a binary search of the page -- this loop needs to be
-		 * tight.
+		 * Do a binary search of the page -- this loop must be tight.
 		 */
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
@@ -142,7 +147,7 @@ __wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 			 */
 			ip = page->indx + indx;
 			if (ip->data == NULL)
-				WT_ERR(__wt_bt_ovfl_to_indx(stoc, page, ip));
+				WT_ERR(__wt_bt_ovfl_to_indx(toc, page, ip));
 
 			/*
 			 * If we're about to compare an application key with
@@ -197,7 +202,15 @@ __wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET(__wt_bt_page_out(stoc, page, 0));
+			WT_RET(__wt_bt_page_out(toc, page, 0));
+
+		/* Check if we're switching servers. */
+		if (ip->srvr_id != 0) {
+			toc->srvr = ip->srvr_id;
+			toc->root_addr = addr;
+			toc->root_isleaf = next_isleaf;
+			return (WT_RESCHEDULE);
+		}
 
 		/*
 		 * Failed to match on a leaf page -- we're done, return the
@@ -208,13 +221,106 @@ __wt_bt_search(WT_STOC *stoc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
 	}
 	/* NOTREACHED */
 
 	/* Discard any page we've read other than the root page. */
 err:	if (put_page)
-		(void)__wt_bt_page_out(stoc, page, 0);
+		(void)__wt_bt_page_out(toc, page, 0);
+	return (ret);
+}
+
+/*
+ * __wt_db_get_stoc --
+ *	Db.get method when scheduled by a server thread.
+ */
+int
+__wt_db_get_recno_stoc(WT_TOC *toc)
+{
+	wt_args_db_get_recno_stoc_unpack;
+
+	return (__wt_db_get_recno_worker(
+	    db, toc, recno, key, pkey, data, flags));
+}
+
+/*
+ * __wt_db_get_recno --
+ *	Db.get_recno method when called directly from a user thread.
+ */
+int
+__wt_db_get_recno(DB *db, WT_TOC *toc,
+    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+{
+	IDB *idb;
+	int ret;
+
+	/*
+	 * The initial search in a database is always done using the
+	 * the IDB cache.
+	 */
+	toc->db = db;
+	idb = db->idb;
+	toc->cache = idb->cache;
+	WT_STAT_INCR(idb->stats,
+	    DB_READ_BY_RECNO, "database read-by-recno operations");
+
+	/* Check for a record past the end of the database. */
+	if (idb->root_page->records < recno)
+		return (WT_ERROR);
+
+	/*
+	 * The initial search in a database is always done using the
+	 * master server and the IDB cache.
+	 */
+	if ((ret = __wt_db_get_recno_worker(
+	    db, toc, recno, key, pkey, data, flags)) == WT_RESCHEDULE)
+		ret = db->get_recno_stoc(
+		    db, toc, recno, key, pkey, data, flags);
+
+	return (ret);
+}
+
+/*
+ * __wt_db_get_recno_worker --
+ *	Db.get_recno method that does the real work.
+ */
+int
+__wt_db_get_recno_worker(DB *db, WT_TOC *toc,
+    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+{
+	IDB *idb;
+	WT_PAGE *page;
+	WT_INDX *indx;
+	u_int32_t type;
+	int ret;
+
+	idb = db->idb;
+
+	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
+
+	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
+
+	/* Search the primary btree for the key. */
+	WT_RET(__wt_bt_search_recno(toc, recno, &page, &indx));
+
+	/*
+	 * The Db.get_recno method can only return single key/data pairs.
+	 * If that's not what we found, we're done.
+	 */
+	type = WT_ITEM_TYPE(indx->ditem);
+	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
+		__wt_db_errx(db,
+		    "the Db.get_recno method cannot return keys with duplicate "
+		    "data items; use the Db.cursor method instead");
+		ret = WT_ERROR;
+	} else
+		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 1);
+
+	/* Discard any page other than the root page, which remains pinned. */
+	if (page != idb->root_page)
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
+
 	return (ret);
 }
 
@@ -224,41 +330,53 @@ err:	if (put_page)
  */
 static int
 __wt_bt_search_recno(
-    WT_STOC *stoc, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
+    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
 {
 	IDB *idb;
 	WT_INDX *ip;
 	WT_PAGE *page;
-	u_int64_t total;
+	u_int64_t record_cnt;
 	u_int32_t addr, i;
 	int isleaf, next_isleaf, put_page;
 
-	idb = stoc->db->idb;
+	idb = toc->db->idb;
 
-	/* Check for an empty tree. */
-	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
-		return (WT_NOTFOUND);
+	/*
+	 * Check for a rescheduled operation, where the root for this server
+	 * was set by a previous search; check for an empty tree, as well.
+	 *
+	 * If the operation is being rescheduled to a different server, get
+	 * the page; otherwise, we can use the always-pinned root page for
+	 * the database.
+	 */
+	if ((addr = toc->root_addr) == WT_ADDR_INVALID) {
+		if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+			return (WT_NOTFOUND);
+		page = idb->root_page;
+		record_cnt = 0;
+		isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
+		put_page = 0;
+	} else {
+		record_cnt = toc->root_record_cnt;
+		isleaf = toc->root_isleaf;
+		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
+		put_page = 1;
+	}
 
 	/* Search the tree. */
-	page = idb->root_page;
-	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
-	for (total = 0, put_page = 0;; put_page = 1) {
-		/* Check for a record past the end of the database. */
-		if (total == 0 && page->records < recno)
-			break;
-
+	for (;; put_page = 1) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
-			*indxp = page->indx + ((recno - total) - 1);
+			*indxp = page->indx + ((recno - record_cnt) - 1);
 			return (0);
 		}
 
 		/* Walk the page, counting records. */
 		WT_INDX_FOREACH(page, ip, i) {
-			if (total + WT_INDX_OFFP_RECORDS(ip) >= recno)
+			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
 				break;
-			total += WT_INDX_OFFP_RECORDS(ip);
+			record_cnt += WT_INDX_OFFP_RECORDS(ip);
 		}
 
 		/* ip references the subtree containing the record. */
@@ -268,16 +386,20 @@ __wt_bt_search_recno(
 
 		/* We're done with the page. */
 		if (put_page)
-			WT_RET(__wt_bt_page_out(stoc, page, 0));
+			WT_RET(__wt_bt_page_out(toc, page, 0));
+
+		/* Check if we're switching servers. */
+		if (ip->srvr_id != 0) {
+			toc->srvr = ip->srvr_id;
+			toc->root_addr = addr;
+			toc->root_record_cnt = record_cnt;
+			toc->root_isleaf = next_isleaf;
+			return (WT_RESCHEDULE);
+		}
 
 		isleaf = next_isleaf;
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
 	}
-
-	/* Discard any page we've read other than the root page. */
-	if (put_page)
-		(void)__wt_bt_page_out(stoc, page, 0);
-	return (WT_NOTFOUND);
 }

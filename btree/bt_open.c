@@ -9,6 +9,7 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_server_start(WT_TOC *, WT_PAGE *);
 static int __wt_bt_vrfy_sizes(DB *);
 
 /*
@@ -16,20 +17,23 @@ static int __wt_bt_vrfy_sizes(DB *);
  *	Open a Btree.
  */
 int
-__wt_bt_open(WT_STOC *stoc)
+__wt_bt_open(WT_TOC *toc)
 {
 	DB *db;
 	IDB *idb;
+	IENV *ienv;
 	int isleaf;
 
-	db = stoc->db;
+	db = toc->db;
 	idb = db->idb;
+	ienv = toc->env->ienv;
 
 	/* Check page size configuration. */
 	WT_RET(__wt_bt_vrfy_sizes(db));
 
-	/* Open the underlying database file. */
-	WT_RET(__wt_cache_open(stoc));
+	/* Open the fle. */
+	WT_RET(__wt_open(toc, idb->dbname, idb->mode,
+	    F_ISSET(idb, WT_CREATE) ? WT_CREATE : 0, &idb->fh));
 
 	/* If the file is empty, we're done. */
 	if (idb->fh->file_size == 0) {
@@ -43,7 +47,7 @@ __wt_bt_open(WT_STOC *stoc)
 	 * there had better be a description record.)  Then, read in the root
 	 * page.
 	 */
-	WT_RET(__wt_bt_desc_read(stoc));
+	WT_RET(__wt_bt_desc_read(toc));
 
 	/*
 	 * The isleaf value tells us how big a page to read.  If the tree has
@@ -51,7 +55,127 @@ __wt_bt_open(WT_STOC *stoc)
 	 */
 	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
 	WT_RET(
-	    __wt_bt_page_in(stoc, idb->root_addr, isleaf, 1, &idb->root_page));
+	    __wt_bt_page_in(toc, idb->root_addr, isleaf, 1, &idb->root_page));
+
+	/*
+	 * If we're not configured for single threaded behavior and the root
+	 * page isn't a leaf page, fork server threads to serve the database
+	 * pages.
+	 */
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED) && !isleaf)
+		WT_RET(__wt_bt_server_start(toc, idb->root_page));
+
+	return (0);
+}
+
+u_int __wt_sthread_count = 10;
+
+/*
+ * __wt_bt_server_start --
+ *	Fork off server threads for the second-level subtrees.
+ */
+static int
+__wt_bt_server_start(WT_TOC *toc, WT_PAGE *page)
+{
+	ENV *env;
+	IDB *idb;
+	WT_INDX *ip;
+	WT_SRVR *srvr;
+	u_int32_t addr, cnt, first_addr, i, n, per_server;
+	int isleaf, srvr_id;
+
+	env = toc->env;
+	idb = toc->db->idb;
+
+	/* We start 10 servers for now; this needs to be tuneable. */
+	idb->srvrq_entries = __wt_sthread_count;
+	WT_RET(__wt_calloc(
+	    NULL, idb->srvrq_entries, sizeof(WT_SRVR), &idb->srvrq));
+	for (srvr_id = 0; srvr_id < (int)idb->srvrq_entries; ++srvr_id) {
+		srvr = idb->srvrq + srvr_id;
+		srvr->id = srvr_id + 1;
+		srvr->env = env;
+		WT_RET(__wt_cache_create(toc, &srvr->cache));
+		WT_RET(__wt_stat_alloc_srvr_stats(env, &srvr->stats));
+		WT_RET(__wt_thread_create(&srvr->tid, __wt_workq, srvr));
+	}
+
+	/*
+	 * We're willing to pin up to 100 pages; this needs to be tuneable.
+	 *
+	 * If the tree is only two levels, or has more than 100 pages in
+	 * the 2nd level, pin just the root page and walk the root page,
+	 * allocating a server to each group of items.  If the tree has at
+	 * least 3 levels and less than 100 pages in the 2nd level, pin
+	 * the entire 2nd level: walk the 2nd level, allocating a server to
+	 * each group of items.
+	 *
+	 * !!!
+	 * This is a rough, first-cut -- change this to pin 100 pages (or
+	 * some tuneable number of pages) all the time.  It's possible to
+	 * pin some subset of the 2nd level of the tree, it doesn't have
+	 * to be a pin of an entire level, regardless.
+	 */
+	__wt_bt_first_offp(page, &addr, &isleaf);
+
+	if (isleaf || page->indx_count > 100) {
+		srvr_id = 1;	
+		n = 0;
+		per_server = page->indx_count / idb->srvrq_entries;
+
+		if (FLD_ISSET(env->verbose, WT_VERB_SERVERS))
+			__wt_env_errx(env,
+			    "database %s: pinning level #1 (%lu root entries, "
+			    "%lu per server)", idb->dbname,
+			    (u_long)page->indx_count, (u_long)per_server);
+
+		WT_INDX_FOREACH(page, ip, i) {
+			if (srvr_id <
+			    (int)idb->srvrq_entries && ++n > per_server) {
+				n = 0;
+				++srvr_id;
+			}
+			ip->srvr_id = srvr_id;
+		}
+	} else {
+		/* Walk the 2nd level of the tree, counting up items. */
+		for (cnt = 0, first_addr = addr;
+		    addr != WT_ADDR_INVALID; addr = page->hdr->nextaddr) {
+			WT_RET(__wt_bt_page_in(toc, addr, 0, 1, &page));
+			cnt += page->indx_count;
+		}
+
+		/* Walk the 2nd level of the tree, assign items to servers. */
+		srvr_id = 1;	
+		n = 0;
+		per_server = cnt / idb->srvrq_entries;
+
+		if (FLD_ISSET(env->verbose, WT_VERB_SERVERS))
+			__wt_env_errx(env,
+			    "database %s: pinning level #2 (%lu root entries, "
+			    "%lu per server)", idb->dbname,
+			    (u_long)page->indx_count, (u_long)per_server);
+
+		for (addr = first_addr;
+		    addr != WT_ADDR_INVALID; addr = page->hdr->nextaddr) {
+			WT_RET(__wt_bt_page_in(toc, addr, 0, 1, &page));
+
+			WT_INDX_FOREACH(page, ip, i) {
+				if (srvr_id < (int)idb->srvrq_entries &&
+				    ++n > per_server) {
+					n = 0;
+					++srvr_id;
+				}
+				ip->srvr_id = srvr_id;
+			}
+		}
+	}
+
+	/*
+	 * The DB cache is never unpinned, don't even look at it if there's
+	 * a question of discarding memory.
+	 */
+	F_SET(toc->cache, WT_READONLY);
 
 	return (0);
 }

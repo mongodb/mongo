@@ -9,35 +9,38 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_level(WT_STOC *, u_int32_t, int);
-static int __wt_bt_stat_page(WT_STOC *, WT_PAGE *);
+static int __wt_bt_stat_level(WT_TOC *, u_int32_t, int);
+static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
 
 /*
  * __wt_bt_stat --
  *	Return Btree statistics.
  */
 int
-__wt_bt_stat(WT_STOC *stoc)
+__wt_bt_stat(WT_TOC *toc)
 {
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	int ret;
 
-	db = stoc->db;
+	fprintf(stderr, "stat not supported with multiple caches\n");
+	return (0);
+
+	db = toc->db;
 	idb = db->idb;
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL, "number of levels in the Btree");
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
-		WT_RET(__wt_bt_page_in(stoc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
-		ret = __wt_bt_stat_page(stoc, page);
-		WT_TRET(__wt_bt_page_out(stoc, page, 0));
+		WT_RET(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
+		ret = __wt_bt_stat_page(toc, page);
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 		return (ret);
 	}
 
-	return (__wt_bt_stat_level(stoc, idb->root_addr, 0));
+	return (__wt_bt_stat_level(toc, idb->root_addr, 0));
 }
 
 /*
@@ -45,7 +48,7 @@ __wt_bt_stat(WT_STOC *stoc)
  *	Stat a level of a tree.
  */
 static int
-__wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
+__wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 {
 	DB *db;
 	IDB *idb;
@@ -54,16 +57,16 @@ __wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
 	u_int32_t addr_arg;
 	int first, isleaf_arg, ret;
 
-	db = stoc->db;
+	db = toc->db;
 	idb = db->idb;
 	ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		WT_RET(__wt_bt_page_in(stoc, addr, isleaf, 0, &page));
+		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
 
-		ret = __wt_bt_stat_page(stoc, page);
+		ret = __wt_bt_stat_page(toc, page);
 
 		/*
 		 * If we're walking an internal page, we'll want to descend
@@ -80,14 +83,14 @@ __wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
 				    page, &addr_arg, &isleaf_arg);
 		}
 
-		WT_TRET(__wt_bt_page_out(stoc, page, 0));
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 		if (ret != 0)
 			return (ret);
 	}
 
 	if (addr_arg != WT_ADDR_INVALID) {
 		WT_STAT_INCR(idb->dstats, TREE_LEVEL, NULL);
-		ret = __wt_bt_stat_level(stoc, addr_arg, isleaf_arg);
+		ret = __wt_bt_stat_level(toc, addr_arg, isleaf_arg);
 	}
 
 	return (ret);
@@ -98,7 +101,7 @@ __wt_bt_stat_level(WT_STOC *stoc, u_int32_t addr, int isleaf)
  *	Stat a single Btree page.
  */
 static int
-__wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
+__wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	IDB *idb;
@@ -106,7 +109,7 @@ __wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr, i;
 
-	db = stoc->db;
+	db = toc->db;
 	idb = db->idb;
 	hdr = page->hdr;
 	addr = page->addr;
@@ -184,7 +187,7 @@ __wt_bt_stat_page(WT_STOC *stoc, WT_PAGE *page)
 		case WT_ITEM_OFFP_LEAF:
 			if (hdr->type != WT_PAGE_LEAF)
 				break;
-			WT_RET(__wt_bt_stat_level(stoc,
+			WT_RET(__wt_bt_stat_level(toc,
 			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
 			    WT_ITEM_TYPE(item) ==
 			    WT_ITEM_OFFP_LEAF ? 1 : 0));

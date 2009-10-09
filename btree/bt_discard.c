@@ -18,16 +18,16 @@ static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
  *	Allocate a new btree page from the cache.
  */
 int
-__wt_bt_page_alloc(WT_STOC *stoc, int isleaf, WT_PAGE **pagep)
+__wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 {
 	DB *db;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 
-	db = stoc->db;
+	db = toc->db;
 
 	WT_RET((__wt_cache_alloc(
-	    stoc, isleaf ? db->leafsize : db->intlsize, &page)));
+	    toc, isleaf ? db->leafsize : db->intlsize, &page)));
 
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
@@ -53,20 +53,18 @@ __wt_bt_page_alloc(WT_STOC *stoc, int isleaf, WT_PAGE **pagep)
  */
 int
 __wt_bt_page_in(
-    WT_STOC *stoc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
+    WT_TOC *toc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
 {
 	DB *db;
-	ENV *env;
 	WT_PAGE *page;
 
-	db = stoc->db;
-	env = stoc->env;
+	db = toc->db;
 
-	WT_RET((__wt_cache_in(stoc, WT_ADDR_TO_OFF(db, addr),
+	WT_RET((__wt_cache_in(toc, WT_ADDR_TO_OFF(db, addr),
 	    isleaf ? db->leafsize : db->intlsize, 0, &page)));
 
 	/* Verify the page. */
-	WT_ASSERT(env, __wt_bt_verify_page(stoc, page, NULL, NULL) == 0);
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL, NULL) == 0);
 
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
@@ -81,16 +79,12 @@ __wt_bt_page_in(
  *	Write a btree page to the cache.
  */
 int
-__wt_bt_page_out(WT_STOC *stoc, WT_PAGE *page, u_int32_t flags)
+__wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
-	ENV *env;
-
-	env = stoc->env;
-
 	/* Verify the page. */
-	WT_ASSERT(env, __wt_bt_verify_page(stoc, page, NULL, NULL) == 0);
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL, NULL) == 0);
 
-	return (__wt_cache_out(stoc, page, flags));
+	return (__wt_cache_out(toc, page, flags));
 }
 
 /*
