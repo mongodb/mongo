@@ -840,7 +840,7 @@ env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
 
 env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
-env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
+env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
