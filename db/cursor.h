@@ -43,6 +43,9 @@ namespace mongo {
 
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
+
+       WARNING concurrency: the vfunctions below are called back from within a 
+       ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
     */
     class Cursor {
     public:
