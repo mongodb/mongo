@@ -2,11 +2,13 @@
 
    mongod concurrency rules & notes will be placed here.
 
-   Mutex heirarchy
-     
-     leaf: 
-       Logstream::mutex
+   Mutex heirarchy (1 = "leaf")
+     name                   level
+     Logstream::mutex       1
+     ClientCursor::ccmutex  2
+     dblock                 3
 
+     End func name with _inlock to indicate "caller must lock before calling".
 */
 
 #pragma once

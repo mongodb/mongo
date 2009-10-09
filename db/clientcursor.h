@@ -37,33 +37,48 @@ namespace mongo {
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
+
+    /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
+    */
     typedef map<CursorId, ClientCursor*> CCById;
+
     typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
     class ClientCursor {
         friend class CmdCursorInfo;
+        DiskLoc _lastLoc;                        // use getter and setter not this (important)
+        unsigned _idleAgeMillis;                 // how long has the cursor been around, relative to server idle time
+        bool _liveForever;                       // if true, never time out cursor
+
         static CCById clientCursorsById;
         static CCByLoc byLoc;
-        DiskLoc _lastLoc; // use getter and setter not this.
-        unsigned _idleAgeMillis; // how long has the cursor been around, relative to server idle time
-        bool _liveForever; // if true, never time out cursor
-        static CursorId allocCursorId();
+        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
+
+        static CursorId allocCursorId_inlock();
+
     public:
-        ClientCursor() : _idleAgeMillis(0), _liveForever(false), cursorid( allocCursorId() ), pos(0) {
-            clientCursorsById.insert( make_pair(cursorid, this) );
-        }
-        ~ClientCursor();
-        const CursorId cursorid;
+        /*const*/ CursorId cursorid;
         string ns;
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
-        int pos; /* # objects into the cursor so far */
+        int pos;                                 // # objects into the cursor so far 
+
+        ClientCursor() : _idleAgeMillis(0), _liveForever(false), pos(0) {
+            recursive_boostlock lock(ccmutex);
+            cursorid = allocCursorId_inlock();
+            clientCursorsById.insert( make_pair(cursorid, this) );
+        }
+        ~ClientCursor();
+
         DiskLoc lastLoc() const {
             return _lastLoc;
         }
-        void setLastLoc(DiskLoc);
+    private:
+        void setLastLoc_inlock(DiskLoc);
+    public:
+
         auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
@@ -72,16 +87,8 @@ namespace mongo {
         */
         static void invalidate(const char *nsPrefix);
 
-        static bool erase(CursorId id) {
-            ClientCursor *cc = find(id);
-            if ( cc ) {
-                delete cc;
-                return true;
-            }
-            return false;
-        }
-
-        static ClientCursor* find(CursorId id, bool warn = true) {
+    private:
+        static ClientCursor* find_inlock(CursorId id, bool warn = true) {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {
                 if ( warn )
@@ -89,6 +96,21 @@ namespace mongo {
                 return 0;
             }
             return it->second;
+        }
+    public:
+        static ClientCursor* find(CursorId id, bool warn = true) { 
+            recursive_boostlock lock(ccmutex);
+            return find_inlock(id, warn);
+        }
+
+        static bool erase(CursorId id) {
+            recursive_boostlock lock(ccmutex);
+            ClientCursor *cc = find_inlock(id);
+            if ( cc ) {
+                delete cc;
+                return true;
+            }
+            return false;
         }
 
         /* call when cursor's location changes so that we can update the
@@ -100,7 +122,7 @@ namespace mongo {
         void cleanupByLocation(DiskLoc loc);
         
         void mayUpgradeStorage() {
-/*            if ( !ids_.get() )
+            /* if ( !ids_.get() )
                 return;
             stringstream ss;
             ss << ns << "." << cursorid;
@@ -119,15 +141,18 @@ namespace mongo {
             return _idleAgeMillis;
         }
 
-        void liveForever(){
+        static void idleTimeReport(unsigned millis);
+
+        void liveForever() {
             _liveForever = true;
         }
 
         static unsigned byLocSize();        // just for diagnostics
-        static void idleTimeReport(unsigned millis);
+//        static void idleTimeReport(unsigned millis);
 
-        static void aboutToDeleteBucket(const DiskLoc& b);
+        static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);
     };
+
     
 } // namespace mongo
