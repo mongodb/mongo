@@ -1136,7 +1136,7 @@ namespace mongo {
 
         // ---- functions -----
 
-        ScriptingFunction createFunction( const char * code ){
+        ScriptingFunction _createFunction( const char * code ){
             smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
