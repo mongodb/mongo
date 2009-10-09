@@ -16,6 +16,6 @@ t.o: ${LIB}
 
 
 clean:
-	rm -f get
+	rm -f get t
 	rm -f a.* *.o *.core
-	rm -f DUMP memory.out
+	rm -f DUMP flexlint.out memory.out
