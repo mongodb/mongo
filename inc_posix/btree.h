@@ -106,8 +106,8 @@ struct __wt_page {
 	u_int32_t bytes;		/* Page size */
 
 	/*
-	 * We don't require a page reference count; leave it as a debugging
-	 * aid so we detect immediately if a code change leaks a page.
+	 * The reference count is used to ensure that pages in use don't get
+	 * pushed out of memory.
 	 */
 	u_int8_t ref;			/* Reference count */
 	u_int8_t notused[3];		/* Spare bytes */
