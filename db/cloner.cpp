@@ -231,14 +231,6 @@ namespace mongo {
                 string err;
                 const char *toname = to_name.c_str();
                 userCreateNS(toname, options, err, logForRepl);
-
-                /* chunks are big enough that we should create the _id index up front, that should
-                   be faster. perhaps we should do that for everything?  Not doing that yet -- not sure
-                   how we want to handle _id-less collections, and we might not want to create the index
-                   there.
-                   */
-                if ( strstr(toname, "._chunks") )
-                    ensureHaveIdIndex(toname);
             }
             log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
