@@ -12,7 +12,7 @@
 static int __wt_env_toc_destroy(WT_TOC *, u_int32_t);
 
 /*
- * wt_toc_create --
+ * wt_env_toc_create --
  *	WT_TOC constructor.
  */
 int
@@ -33,19 +33,25 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 	WT_ERR(__wt_mtx_init(toc->block));
 	WT_ERR(__wt_lock(toc->block));
 
-	/* Get a server slot ID. */
+	/* Allocate a new WT_TOC slot. */
 	WT_ERR(__wt_lock(&ienv->mtx));
-	toc->id = ienv->toc_next_id++;
+	toc->srvr_slot = ienv->next_toc_srvr_slot++;
 	WT_ERR(__wt_unlock(&ienv->mtx));
-	if (toc->id >= WT_SERVER_QSIZE) {
-		__wt_env_errx(env, "wt_env_toc_create: too many threads");
+	if (toc->srvr_slot >= WT_SRVR_TOCQ_SIZE) {
+		__wt_env_errx(env, "WtToc->create: too many threads");
 		ret = WT_ERROR;
 		goto err;
 	}
 
+	/* WT_TOCs are enclosed by an environment. */
+	toc->env = env;
+
+	WT_TOC_CLEAR_SRVR(toc);
+
+	toc->destroy = __wt_env_toc_destroy;
+
 	if (F_ISSET(ienv, WT_SINGLE_THREADED))
 		F_SET(toc, WT_SINGLE_THREADED);
-	toc->destroy = __wt_env_toc_destroy;
 
 	*tocp = toc;
 	return (0);
@@ -55,7 +61,7 @@ err:	(void)__wt_env_toc_destroy(toc, 0);
 }
 
 /*
- * __wt_toc_destroy --
+ * __wt_env_toc_destroy --
  *	toc.destroy method (WT_TOC destructor).
  */
 static int
@@ -80,40 +86,51 @@ __wt_env_toc_destroy(WT_TOC *toc, u_int32_t flags)
 }
 
 /*
- * __wt_env_toc_sched --
+ * __wt_toc_sched --
  *	Schedule an operation.
  */
 int
-__wt_env_toc_sched(WT_TOC *toc, int stoc_id)
+__wt_toc_sched(WT_TOC *toc)
 {
-	WT_STOC *stoc;
+	ENV *env;
+	WT_SRVR *srvr;
 
-	/* Get a reference to the server that's going to do the work. */
-	stoc = &toc->env->ienv->sq[stoc_id];
+	env = toc->env;
 
 	/*
-	 * Threads of control may re-enter the API or the engine may simply be
-	 * single-threaded.  Rather than duplicate the API routines, allow
-	 * calls through the standard API layer, continuing using the current
-	 * server.
-	 *
-	 * Otherwise, schedule the call and wait for it to complete.
+	 * Threads of control may re-enter the API.  Rather than re-implement
+	 * the API, the WT_RUNNING flag will be set, which means we continue
+	 * what we're doing, using the current thread of control, whatever that
+	 * may be.
 	 */
-	if (F_ISSET(toc, WT_RUNNING | WT_SINGLE_THREADED)) {
-		/*
-		 * !!!
-		 * I don't think there's any way we can come through here
-		 * with different ENV/DB handles than on the original call;
-		 * if that's possible, we'd have to pop/restore the ENV/DB
-		 * handle values.
-		 */
-		stoc->toc = toc;
-		stoc->env = toc->env;
-		stoc->db = toc->db;
-		__wt_api_switch(stoc);
-	} else {
-		stoc->ops[toc->id] = toc;
-		(void)__wt_lock(toc->block);
+	if (F_ISSET(toc, WT_RUNNING)) {
+		__wt_api_switch(toc);
+		return (toc->ret);
 	}
+
+	WT_STAT_INCR(env->ienv->stats, TOTAL_OPS, "total operations");
+
+	/*
+	 * The whole engine may be single-threaded, in which case we use the
+	 * primary server without further consideration.
+	 */
+	if (F_ISSET(toc, WT_SINGLE_THREADED)) {
+		srvr = &env->ienv->psrvr;
+		WT_TOC_SET_CACHE(toc, srvr);
+		__wt_api_switch(toc);
+	} else {
+		/* Select a server. */
+		srvr = WT_SRVR_SELECT(toc);
+
+		/* Queue the operation. */
+		srvr->ops[toc->srvr_slot] = toc;
+
+		/* Wait for the operation to complete. */
+		(void)__wt_lock(toc->block);
+
+		/* Reset the WT_TOC's server information. */
+		WT_TOC_CLEAR_SRVR(toc);
+	}
+
 	return (toc->ret);
 }

@@ -16,12 +16,15 @@
 int
 __wt_env_start(ENV *env, u_int32_t flags)
 {
+	WT_SRVR *srvr;
 	IENV *ienv;
-	WT_STOC *stoc;
 
 	ienv = env->ienv;
 
 	WT_ENV_FCHK(NULL, "Env.start", flags, WT_APIMASK_ENV_START);
+
+	if (LF_ISSET(WT_SINGLE_THREADED))
+		F_SET(ienv, WT_SINGLE_THREADED);
 
 	/*
 	 * No matter what we're doing, we end up here before we do any real
@@ -29,18 +32,15 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	 */
 	WT_RET(__wt_build_verify());
 
-	/* Create the primary thread-of-control structure. */
-	stoc = ienv->sq  + ienv->sq_next_id;
-	stoc->id = ++ienv->sq_next_id;
-	stoc->running = 1;
+	/* Initialize the primary thread-of-control structure. */
+	srvr = &ienv->psrvr;
+	srvr->id = WT_SRVR_PRIMARY;
+	srvr->env = env;
+	WT_RET(__wt_stat_alloc_srvr_stats(env, &srvr->stats));
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED))
+		WT_RET(__wt_thread_create(&srvr->tid, __wt_workq, srvr));
 
-	/* If we're single-threaded, we're done. */
-	if (LF_ISSET(WT_SINGLE_THREADED)) {
-		F_SET(ienv, WT_SINGLE_THREADED);
-		return (0);
-	}
-
-	return (__wt_thread_create(env, &stoc->tid, __wt_workq, stoc));
+	return (0);
 }
 
 /*
@@ -50,36 +50,42 @@ __wt_env_start(ENV *env, u_int32_t flags)
 int
 __wt_env_stop(ENV *env, u_int32_t flags)
 {
-	IENV *ienv;
 	IDB *idb;
-	WT_STOC *stoc;
-	u_int i;
+	IENV *ienv;
+	WT_SRVR *srvr;
+	WT_TOC *toc;
+	int ret;
 
 	ienv = env->ienv;
+	ret = 0;
 
 	WT_ENV_FCHK(NULL, "Env.stop", flags, WT_APIMASK_ENV_STOP);
 
 	/*
-	 * We don't close open databases -- we need a TOC to do that, and we
-	 * don't have one.   Complain and kill any running threads.
+	 * Close any open databases -- we need a WT_TOC to call into the
+	 * DB handle functions, create one as necessary.
 	 */
-	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		__wt_env_errx(env,
-		    "Env.stop: database %s left open", idb->dbname);
+	toc = NULL;
+	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
+		if (toc == NULL)
+			WT_RET(env->toc_create(env, 0, &toc));
+		WT_TRET(idb->db->close(idb->db, toc, 0));
+	}
 
-	/* If we're single-threaded, we're done. */
-	if (F_ISSET(ienv, WT_SINGLE_THREADED))
-		return (0);
+	if (toc != NULL)
+		WT_TRET(toc->destroy(toc, 0));
 
-	/* Flag all running threads to quit, and wait for them to exit. */
-	WT_STOC_FOREACH(ienv, stoc, i)
-		if (stoc->running) {
-			stoc->running = 0;
-			WT_FLUSH_MEMORY;
-			__wt_thread_join(stoc->tid);
-		}
+	/* Close down the primary server. */
+	srvr = &ienv->psrvr;
+	srvr->running = 0;
+	WT_FLUSH_MEMORY;
 
-	return (0);
+	__wt_free(env, srvr->stats);
+
+	if (!F_ISSET(ienv, WT_SINGLE_THREADED))
+		__wt_thread_join(srvr->tid);
+
+	return (ret);
 }
 
 /*
@@ -89,40 +95,63 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 void *
 __wt_workq(void *arg)
 {
-	WT_STOC *stoc;
+	ENV *env;
+	WT_SRVR *srvr, *tsrvr;
 	WT_TOC **q, **eq, *toc;
 	int not_found;
 
-	stoc = arg;
+	srvr = arg;
+	env = srvr->env;
+	srvr->running = 1;
+
+	if (FLD_ISSET(env->verbose, WT_VERB_SERVERS))
+		__wt_env_errx(env, "server %d starting", srvr->id);
 
 	/* Walk the queue, executing work. */
 	not_found = 1;
-	q = stoc->ops;
-	eq = q + sizeof(stoc->ops) / sizeof(stoc->ops[0]);
+	q = srvr->ops;
+	eq = q + sizeof(srvr->ops) / sizeof(srvr->ops[0]);
 	do {
 		if (*q != NULL) {			/* Operation. */
 			WT_STAT_INCR(
-			    stoc->stats, STOC_OPS, "server thread operations");
+			    srvr->stats, SRVR_OPS, "server thread operations");
 
-			toc = *q;
 			not_found = 0;
 
-			/* Initialize the WT_STOC handles and run the job. */
-			stoc->toc = toc;
-			stoc->env = toc->env;
-			stoc->db = toc->db;
+			/*
+			 * Save and clear the WT_TOC. (Clear it now, as soon as
+			 * we wake the thread that scheduled this job, it can
+			 * schedule a new job, and we need to get ahead of that
+			 * memory write.)
+			 */
+			toc = *q;
+			*q = NULL;
+
+			/* The operation uses this server's cache; set it. */
+			WT_TOC_SET_CACHE(toc, srvr);
+
+			/* Perform the operation. */
 			F_SET(toc, WT_RUNNING);
-			__wt_api_switch(stoc);
+			__wt_api_switch(toc);
 			F_CLR(toc, WT_RUNNING);
 
-			/* Clear the slot and wake the application thread. */
-			*q = NULL;
-			(void)__wt_unlock(toc->block);
+			/*
+			 * If the toc is being switched to a different server,
+			 * add it to that server's queue.   Else, we're done
+			 * with this operation, wake the thread.
+			 */
+			if (toc->ret == WT_RESCHEDULE) {
+				tsrvr = WT_SRVR_SELECT(toc);
+				tsrvr->ops[toc->srvr_slot] = toc;
+				WT_FLUSH_MEMORY;
+			} else
+				(void)__wt_unlock(toc->block);
+
 		}
 
 		if (++q == eq) {
-			WT_STAT_INCR(stoc->stats,
-			    STOC_ARRAY, "server thread array passes");
+			WT_STAT_INCR(srvr->stats,
+			    SRVR_ARRAY, "server thread array passes");
 			/*
 			 * If we didn't find work, yield the processor.
 			 * If we don't find work in enough loops, sleep, where
@@ -132,17 +161,21 @@ __wt_workq(void *arg)
 				if (not_found > 10) {
 					if (not_found > 80)
 						not_found = 80;
-					WT_STAT_INCR(stoc->stats,
-					    STOC_SLEEP, "server thread sleeps");
-					__wt_sleep(0, not_found * 25000);
+					WT_STAT_INCR(srvr->stats,
+					    SRVR_SLEEP, "server thread sleeps");
+					__wt_yield();
+					//__wt_sleep(0, not_found * 25000);
 				} else {
 					__wt_yield();
-					WT_STAT_INCR(stoc->stats,
-					    STOC_YIELD, "server thread yields");
+					WT_STAT_INCR(srvr->stats,
+					    SRVR_YIELD, "server thread yields");
 				}
-			q = stoc->ops;
+			q = srvr->ops;
 		}
-	} while (stoc->running == 1);
+	} while (srvr->running == 1);
+
+	if (FLD_ISSET(env->verbose, WT_VERB_SERVERS))
+		__wt_env_errx(env, "server %d exiting", srvr->id);
 
 	return (NULL);
 }
