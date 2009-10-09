@@ -246,6 +246,7 @@ namespace mongo {
             case Bool:
                 return 40;
             case Date:
+            case Timestamp:
                 return 45;
             case RegEx:
                 return 50;
@@ -255,8 +256,6 @@ namespace mongo {
                 return 60;
             case CodeWScope:
                 return 65;
-            case Timestamp:
-                return 70;
             default:
                 assert(0);
                 return -1;

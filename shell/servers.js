@@ -230,6 +230,7 @@ MongodRunner.prototype.start = function( reuseData ) {
     }
     args.push( "--nohttpinterface" );
     args.push( "--noprealloc" );
+    args.push( "--smallfiles" );
     args.push( "--bind_ip" );
     args.push( "127.0.0.1" );
     if ( this.extraArgs_ ) {

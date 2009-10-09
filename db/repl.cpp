@@ -469,7 +469,7 @@ namespace mongo {
         uassert( "only source='main' allowed for now with replication", sourceName() == "main" );
         BSONElement e = o.getField("syncedTo");
         if ( !e.eoo() ) {
-            uassert( "bad sources 'syncedTo' field value", e.type() == Date );
+            uassert( "bad sources 'syncedTo' field value", e.type() == Date || e.type() == Timestamp );
             OpTime tmp( e.date() );
             syncedTo = tmp;
         }
@@ -507,9 +507,9 @@ namespace mongo {
         if ( !only.empty() )
             b.append("only", only);
         if ( !syncedTo.isNull() )
-            b.appendDate("syncedTo", syncedTo.asDate());
+            b.appendTimestamp("syncedTo", syncedTo.asDate());
 
-        b.appendDate("localLogTs", lastSavedLocalTs_.asDate());
+        b.appendTimestamp("localLogTs", lastSavedLocalTs_.asDate());
         
         BSONObjBuilder dbsNextPassBuilder;
         int n = 0;
@@ -983,7 +983,7 @@ namespace mongo {
         BSONObj last = conn->findOne( _ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
             BSONElement ts = last.findElement( "ts" );
-            massert( "non Date ts found", ts.type() == Date );
+            massert( "non Date ts found", ts.type() == Date || ts.type() == Timestamp );
             syncedTo = OpTime( ts.date() );
         }        
     }
@@ -1151,7 +1151,7 @@ namespace mongo {
         int n = 0;
         BSONObj op = c->next();
         BSONElement ts = op.findElement("ts");
-        if ( ts.type() != Date ) {
+        if ( ts.type() != Date && ts.type() != Timestamp ) {
             string err = op.getStringField("$err");
             if ( !err.empty() ) {
                 problem() << "repl: $err reading remote oplog: " + err << '\n';
@@ -1243,7 +1243,7 @@ namespace mongo {
 
                 BSONObj op = c->next();
                 ts = op.findElement("ts");
-                assert( ts.type() == Date );
+                assert( ts.type() == Date || ts.type() == Timestamp );
                 OpTime last = nextOpTime;
                 OpTime tmp( ts.date() );
                 nextOpTime = tmp;
@@ -1412,7 +1412,7 @@ namespace mongo {
         */
 
         BSONObjBuilder b;
-        b.appendDate("ts", ts.asDate());
+        b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
         if ( bb )
