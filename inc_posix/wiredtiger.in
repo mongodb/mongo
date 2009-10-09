@@ -165,6 +165,8 @@ struct __wt_toc {
 
 	DBT	  key, data;		/* Returned key/data pairs */
 
+	 u_int32_t flags;
+
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC handle api section: BEGIN
@@ -175,17 +177,19 @@ struct __wt_toc {
 	 * WT_TOC handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
-
-	 u_int32_t flags;
 };
 
 /*******************************************
  * Database handle
  *******************************************/
 struct __db {
-	IDB *idb;			/* Private object */
-	ENV *env;			/* Enclosing environment */
-	IENV *ienv;			/* Private environment object */
+	ENV	*env;			/* Enclosing environment */
+	IENV	*ienv;			/* Private environment object */
+	IDB	*idb;			/* Private object */
+
+	void	*app_private;		/* Application-private information */
+
+	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -306,8 +310,6 @@ struct __db {
 	 * Db handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
-
-	u_int32_t flags;
 };
 
 /*******************************************
@@ -323,7 +325,11 @@ struct __dbc {
  * Database environment handle
  *******************************************/
 struct __env {
-	IENV *ienv;			/* Private object */
+	IENV	*ienv;			/* Private object */
+
+	void	*app_private;		/* Application-private information */
+
+	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -400,8 +406,6 @@ struct __env {
 	 * Env handle api section: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
-
-	u_int32_t flags;
 };
 
 /*******************************************
