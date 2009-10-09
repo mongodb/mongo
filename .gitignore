@@ -57,7 +57,7 @@ mongorestore
 mongofiles
 mongoexport
 
-mongoimportjson
+mongoimport
 mongosniff
 mongobridge
 

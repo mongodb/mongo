@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
+#include <pcrecpp.h>
 
 #include "util/file_allocator.h"
 
@@ -154,6 +155,24 @@ mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
     if ( _paired && slaveIfPaired )
         return ((DBClientPaired*)_conn)->slaveConn();
     return *_conn;
+}
+
+void mongo::Tool::needFields(){
+    uassert( "you need to specify fields" , hasParam( "fields" ) );
+
+    BSONObjBuilder b;
+    
+    string fields_arg = getParam("fields");
+    pcrecpp::StringPiece input(fields_arg);
+
+    string f;
+    pcrecpp::RE re("([\\w\\.]+),?" );
+    while ( re.Consume( &input, &f ) ){
+        _fields.push_back( f );
+        b.append( f.c_str() , 1 );
+    }
+    
+    _fieldsObj = b.obj();
 }
 
 void mongo::Tool::auth( string dbname ){

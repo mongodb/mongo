@@ -61,7 +61,7 @@ namespace mongo {
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
         void auth( string db = "" );
-
+        
         string _name;
 
         string _db;
@@ -70,7 +70,11 @@ namespace mongo {
         string _username;
         string _password;
 
+        void needFields();
+        vector<string> _fields;
+        BSONObj _fieldsObj;
 
+        
     private:
         string _host;
         mongo::DBClientBase * _conn;
