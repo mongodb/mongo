@@ -512,6 +512,12 @@ DB.prototype.killOp = function(){
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
+DB.tsToSeconds = function(x){
+    if ( x.t && x.i )
+        return x.t / 1000;
+    return x / 4294967296; // low 32 bits are ordinal #s within a second
+}
+
 /** 
   Get a replication log information summary.
   <p>
@@ -554,9 +560,10 @@ DB.prototype.getReplicationInfo = function() {
     {
 	var tfirst = first.ts;
 	var tlast = last.ts;
+        
 	if( tfirst && tlast ) { 
-	    tfirst = tfirst / 4294967296; // low 32 bits are ordinal #s within a second
-	    tlast = tlast / 4294967296;
+	    tfirst = DB.tsToSeconds( tfirst ); 
+	    tlast = DB.tsToSeconds( tlast );
 	    result.timeDiff = tlast - tfirst;
 	    result.timeDiffHours = Math.round(result.timeDiff / 36)/100;
 	    result.tFirst = (new Date(tfirst*1000)).toString();
@@ -584,21 +591,21 @@ DB.prototype.printReplicationInfo = function() {
 }
 
 DB.prototype.printSlaveReplicationInfo = function() {
-  function g(x) {
-    print("source:   " + x.host);
-    var st = new Date(x.syncedTo/4294967296*1000);
-    var now = new Date();
-    print("syncedTo: " + st.toString() );
-    var ago = (now-st)/1000;
-    var hrs = Math.round(ago/36)/100;
-    print("          = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
-  }
-  var L = this.getSisterDB("local");
-  if( L.sources.count() == 0 ) { 
-    print("local.sources is empty; is this db a --slave?");
-    return;
-  }
-  L.sources.find().forEach(g);
+    function g(x) {
+        print("source:   " + x.host);
+        var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
+        var now = new Date();
+        print("syncedTo: " + st.toString() );
+        var ago = (now-st)/1000;
+        var hrs = Math.round(ago/36)/100;
+        print("          = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+    }
+    var L = this.getSisterDB("local");
+    if( L.sources.count() == 0 ) { 
+        print("local.sources is empty; is this db a --slave?");
+        return;
+    }
+    L.sources.find().forEach(g);
 }
 
 DB.prototype.serverBuildInfo = function(){
