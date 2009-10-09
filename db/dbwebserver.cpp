@@ -290,7 +290,7 @@ namespace mongo {
             ss << "</pre></body></html>";
             responseMsg = ss.str();
 
-            // we want to return context from before the authentication was performed
+            // we want to return SavedContext from before the authentication was performed
             if ( ! allowed( rq , headers, from ) ){
                 responseCode = 401;
                 responseMsg = "not allowed\n";
@@ -457,8 +457,7 @@ namespace mongo {
 
     void webServerThread() {
         boost::thread thr(statsThread);
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
+        Connection::initThread();
         DbWebServer mini;
         int p = cmdLine.port + 1000;
         if ( mini.init(bind_ip, p) ) {

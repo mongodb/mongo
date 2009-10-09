@@ -83,7 +83,7 @@ namespace mongo {
         Code=13,
         /** a programming language (e.g., Python) symbol */
         Symbol=14,
-        /** javascript code that can execute on the database server, with context */
+        /** javascript code that can execute on the database server, with SavedContext */
         CodeWScope=15,
         /** 32 bit signed integer */
         NumberInt = 16,
@@ -457,7 +457,7 @@ namespace mongo {
         const char * codeWScopeCode() const {
             return value() + 8;
         }
-        /** Get the scope context of a CodeWScope data element. */
+        /** Get the scope SavedContext of a CodeWScope data element. */
         const char * codeWScopeScopeData() const {
             // TODO fix
             return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;

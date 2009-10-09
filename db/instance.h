@@ -23,6 +23,7 @@
 #include "curop.h"
 #include "security.h"
 #include "cmdline.h"
+#include "connection.h"
 
 namespace mongo {
 
@@ -126,28 +127,30 @@ namespace mongo {
                 return true;   
             }
         };
-        class Context {
+        /* TODO: this looks bad that auth is set to always.  is that really always safe? */
+        class SavedContext {
         public:
-            Context() {
+            SavedContext() {
                 dblock lk;
                 if ( database )
-                    oldName_ = database->name;
-                backup_.reset( authInfo.release() );
-                // careful, don't want to free this.
-                authInfo.reset( &always );
+                    oldName = database->name;
+                Connection *c = currentConnection.get();
+                oldAuth = c->ai;
+                // careful, don't want to free this:
+                c->ai = &always;
             }
-            ~Context() {
-                authInfo.release();
-                authInfo.reset( backup_.release() );
-                if ( !oldName_.empty() ) {
+            ~SavedContext() {
+                Connection *c = currentConnection.get();
+                c->ai = oldAuth;
+                if ( !oldName.empty() ) {
                     dblock lk;
-                    setClientTempNs( oldName_.c_str() );
+                    setClientTempNs( oldName.c_str() );
                 }
             }
         private:
             static AlwaysAuthorized always;
-            boost::thread_specific_ptr< AuthenticationInfo > backup_;
-            string oldName_;
+            AuthenticationInfo *oldAuth;
+            string oldName;
         };
     };
 

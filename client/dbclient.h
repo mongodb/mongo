@@ -122,7 +122,7 @@ namespace mongo {
             @param jscode The javascript function to evaluate against each potential object 
                    match.  The function must return true for matched objects.  Use the this 
                    variable to inspect the current object.
-            @param scope Context for the javascript object.  List in a BSON object any 
+            @param scope SavedContext for the javascript object.  List in a BSON object any 
                    variables you would like defined when the jscode executes.  One can think 
                    of these as "bind variables".
 
@@ -484,7 +484,7 @@ namespace mongo {
         BSONObj mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query = BSONObj(), const string& output = "");
 
         /** Run javascript code on the database server.
-           dbname    database context in which the code runs. The javascript variable 'db' will be assigned
+           dbname    database SavedContext in which the code runs. The javascript variable 'db' will be assigned
                      to this database when the function is invoked.
            jscode    source code for a javascript function.
            info      the command object which contains any information on the invocation result including

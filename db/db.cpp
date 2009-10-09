@@ -147,8 +147,7 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "lasterror.h"
-#include "security.h"
+#include "connection.h"
 
 namespace mongo {
 
@@ -170,8 +169,9 @@ namespace mongo {
     */
     void connThread()
     {
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
+        Connection::initThread();
+
+        /* todo: move to Connection object */
         LastError *le = new LastError();
         lastError.reset(le);
 
@@ -180,7 +180,7 @@ namespace mongo {
 
         try {
 
-            ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            currentConnection.get()->ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -411,6 +411,8 @@ namespace mongo {
         theFileAllocator().start();
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
+
+        Connection::initThread();
 
         clearTmpCollections();
 

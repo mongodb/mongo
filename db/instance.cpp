@@ -103,8 +103,8 @@ namespace mongo {
     
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        AuthenticationInfo *ai = authInfo.get();
-        if( ai == 0 || !ai->isAuthorized("admin") ) { 
+        AuthenticationInfo *ai = currentConnection.get()->ai;
+        if( !ai->isAuthorized("admin") ) { 
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         else if( !dbMutexInfo.isLocked() ) 
@@ -206,7 +206,7 @@ namespace mongo {
             char cl[256];
             nsToClient(ns, cl);
             strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
-            AuthenticationInfo *ai = authInfo.get();
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
@@ -445,7 +445,7 @@ namespace mongo {
         ss << " ntoreturn:" << ntoreturn;
         QueryResult* msgdata;
         try {
-            AuthenticationInfo *ai = authInfo.get();
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid);
         }
@@ -509,8 +509,7 @@ namespace mongo {
     void jniCallbackDeprecated(Message& m, Message& out)
     {
 		/* we should be in the same thread as the original request, so authInfo should be available. */
-		AuthenticationInfo *ai = authInfo.get();
-		massert("no authInfo in eval", ai);
+        AuthenticationInfo *ai = currentConnection.get()->ai;
         
         Database *clientOld = database;
 
@@ -616,7 +615,7 @@ namespace mongo {
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
-        Context c;
+        SavedContext c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -625,12 +624,12 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend ) {
-        Context c;
+        SavedContext c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }
 
-    DBDirectClient::AlwaysAuthorized DBDirectClient::Context::always;
+    DBDirectClient::AlwaysAuthorized DBDirectClient::SavedContext::always;
 
     DBClientBase * createDirectClient(){
         return new DBDirectClient();

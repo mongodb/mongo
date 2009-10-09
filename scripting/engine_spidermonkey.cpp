@@ -1292,7 +1292,7 @@ namespace mongo {
             JS_GC( _context );
         }
 
-        JSContext *context() const { return _context; }
+        JSContext *SavedContext() const { return _context; }
         
     private:
 

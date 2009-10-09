@@ -350,18 +350,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\js\js\Debug\js.lib"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath="..\..\js\js\Release\js.lib"
 				>
 				<FileConfiguration
@@ -374,6 +362,18 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug Recstore|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\js\js\Debug\js.lib"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -1375,6 +1375,10 @@
 			</File>
 			<File
 				RelativePath=".\concurrency.h"
+				>
+			</File>
+			<File
+				RelativePath=".\connection.h"
 				>
 			</File>
 			<File

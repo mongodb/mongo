@@ -18,10 +18,11 @@
 
 #include "stdafx.h"
 #include "security.h"
+#include "connection.h"
 
 namespace mongo {
 
-    boost::thread_specific_ptr<AuthenticationInfo> authInfo;
+    boost::thread_specific_ptr<Connection> currentConnection;
 
     bool noauth = true;
 

@@ -269,8 +269,8 @@ namespace mongo {
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
 			   one is not authenticated for admin db to be safe.
 			*/
-			AuthenticationInfo *ai = authInfo.get();
-			bool authed = ai == 0 || ai->isAuthorized("admin");
+            AuthenticationInfo *ai = currentConnection.get()->ai;
+			bool authed = ai->isAuthorized("admin");
 
             if ( replAllDead ) {
                 result.append("ismaster", 0.0);
@@ -1263,8 +1263,8 @@ namespace mongo {
 	BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
 	bool replAuthenticate(DBClientConnection *conn) {
-		AuthenticationInfo *ai = authInfo.get();
-		if( ai && !ai->isAuthorized("admin") ) { 
+        AuthenticationInfo *ai = currentConnection.get()->ai;
+		if( !ai->isAuthorized("admin") ) { 
 			log() << "replauthenticate: requires admin permissions, failing\n";
 			return false;
 		}
@@ -1584,9 +1584,8 @@ namespace mongo {
         {
             dblock lk;
 
-			AuthenticationInfo *ai = new AuthenticationInfo();
-			ai->authorize("admin");
-			authInfo.reset(ai);
+            Connection::initThread();
+			currentConnection.get()->ai->authorize("admin");
         
             BSONObj obj;
             if ( Helpers::getSingleton("local.pair.startup", obj) ) {

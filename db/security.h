@@ -72,5 +72,4 @@ namespace mongo {
         }
     };
 
-    extern boost::thread_specific_ptr<AuthenticationInfo> authInfo;
 } // namespace mongo

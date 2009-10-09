@@ -87,7 +87,7 @@ namespace mongo {
     };
     
     /* fetch a single object from collection ns that matches query 
-       set your db context first
+       set your db SavedContext first
     */
     bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
         QueryPlanSet s( ns, query, BSONObj(), 0, !requireIndex );

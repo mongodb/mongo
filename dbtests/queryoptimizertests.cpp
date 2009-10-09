@@ -585,8 +585,7 @@ namespace QueryOptimizerTests {
                 setClient( ns() );
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
-                AuthenticationInfo *ai = new AuthenticationInfo();
-                authInfo.reset( ai );
+                currentConnection.reset( new Connection() );
             }
             ~Base() {
                 if ( !nsd() )
