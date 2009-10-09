@@ -203,6 +203,7 @@ namespace mongo {
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
 
+            Connection::initThread();
             acquirePathLock();
 
             srand( seed );
