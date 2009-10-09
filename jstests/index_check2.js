@@ -24,9 +24,9 @@ assert.eq( 120 , t.find( q1 ).itcount() , "q1 a");
 assert.eq( 120 , t.find( q2 ).itcount() , "q2 a" );
 assert.eq( 60 , t.find( q3 ).itcount() , "q3 a");
 
-assert.eq( "BtreeCursor tags_1" , t.find( q1 ).explain().cursor );
-assert.eq( "BtreeCursor tags_1" , t.find( q2 ).explain().cursor );
-assert.eq( "BtreeCursor tags_1" , t.find( q3 ).explain().cursor );
+assert.eq( "BtreeCursor tags_1" , t.find( q1 ).explain().cursor , "e1" );
+assert.eq( "BtreeCursor tags_1" , t.find( q2 ).explain().cursor , "e2" );
+assert.eq( "BtreeCursor tags_1" , t.find( q3 ).explain().cursor , "e3" );
 
 scanned1 = t.find(q1).explain().nscanned;
 scanned2 = t.find(q2).explain().nscanned;

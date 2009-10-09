@@ -32,6 +32,11 @@ namespace mongo {
     };
 
     struct FieldInterval {
+        FieldInterval(){}
+        FieldInterval( const BSONElement& e ){
+            lower_.bound_ = upper_.bound_ = e;
+            lower_.inclusive_ = upper_.inclusive_ = true;
+        }
         FieldBound lower_;
         FieldBound upper_;
         bool valid() const {

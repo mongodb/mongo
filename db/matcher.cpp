@@ -93,7 +93,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), nRegex(0){
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), nRegex(0){
 
         BSONObjIterator i(jsobj);
         while ( i.moreWithEOO() ) {
@@ -252,6 +252,10 @@ namespace mongo {
                 }
                 if ( ok )
                     continue;
+            }
+
+            if ( e.type() == Array ){
+                hasArray = true;
             }
             
             // normal, simple case e.g. { a : "foo" }
