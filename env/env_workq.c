@@ -97,7 +97,8 @@ __wt_workq(void *arg)
 {
 	ENV *env;
 	WT_SRVR *srvr, *tsrvr;
-	WT_TOC **q, **eq, *toc;
+	WT_TOC_CACHELINE *q, *eq;
+	WT_TOC *toc;
 	int not_found;
 
 	srvr = arg;
@@ -112,7 +113,7 @@ __wt_workq(void *arg)
 	q = srvr->ops;
 	eq = q + sizeof(srvr->ops) / sizeof(srvr->ops[0]);
 	do {
-		if (*q != NULL) {			/* Operation. */
+		if (q->toc != NULL) {			/* Operation. */
 			WT_STAT_INCR(
 			    srvr->stats, SRVR_OPS, "server thread operations");
 
@@ -124,8 +125,8 @@ __wt_workq(void *arg)
 			 * schedule a new job, and we need to get ahead of that
 			 * memory write.)
 			 */
-			toc = *q;
-			*q = NULL;
+			toc = q->toc;
+			q->toc = NULL;
 
 			/* The operation uses this server's cache; set it. */
 			WT_TOC_SET_CACHE(toc, srvr);
@@ -142,7 +143,7 @@ __wt_workq(void *arg)
 			 */
 			if (toc->ret == WT_RESCHEDULE) {
 				tsrvr = WT_SRVR_SELECT(toc);
-				tsrvr->ops[toc->srvr_slot] = toc;
+				tsrvr->ops[toc->srvr_slot].toc = toc;
 				WT_FLUSH_MEMORY;
 			} else
 				(void)__wt_unlock(toc->block);

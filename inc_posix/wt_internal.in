@@ -85,6 +85,22 @@ struct __wt_cache {
 /*******************************************
  * Server thread-of-control information
  *******************************************/
+ /*
+  * The primary shared object is an array of WT_TOC references.   We pad it
+  * to a cache-line to avoid collisions.
+  *
+  * !!!
+  * I've left this code in because it doesn't cost anything but a K or two of
+  * memory, but I've never seen a platform/test where it made a difference in
+  * the performance.  We use 64B as the default line size, that's the biggest
+  * D-cache line size I've seen.
+  */
+#define	WT_CACHELINE_SIZE	64
+typedef struct {
+	WT_TOC *toc;				/* Operation */
+	u_int8_t unused[WT_CACHELINE_SIZE - sizeof(void *)];
+} WT_TOC_CACHELINE;
+
 struct __wt_srvr {
 	pthread_t tid;			/* System thread ID */
 
@@ -108,8 +124,8 @@ struct __wt_srvr {
 
 	WT_CACHE *cache;		/* Database page cache */
 
-#define	WT_SRVR_TOCQ_SIZE	 40	/* Queued operations max */
-	WT_TOC *ops[WT_SRVR_TOCQ_SIZE];	/* Queued operations */
+#define	WT_SRVR_TOCQ_SIZE	 40	/* Queued operations */
+	WT_TOC_CACHELINE ops[WT_SRVR_TOCQ_SIZE];
 
 	WT_STATS *stats;		/* Server statistics */
 };

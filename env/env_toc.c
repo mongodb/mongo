@@ -128,7 +128,7 @@ __wt_toc_sched(WT_TOC *toc)
 		srvr = WT_SRVR_SELECT(toc);
 
 		/* Queue the operation. */
-		srvr->ops[toc->srvr_slot] = toc;
+		srvr->ops[toc->srvr_slot].toc = toc;
 
 		/* Wait for the operation to complete. */
 		(void)__wt_lock(toc->block);
