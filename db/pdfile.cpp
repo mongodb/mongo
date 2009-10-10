@@ -1304,8 +1304,8 @@ namespace mongo {
         return loc;
     }
 
-    /* note: if god==true, you may pass in obuf of NULL and then popular the returned DiskLoc 
-       after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
+    /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc 
+             after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
