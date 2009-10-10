@@ -282,7 +282,7 @@ namespace mongo {
     }
 
     bool shouldRepairDatabases = 0;
-    bool forceRepair = 1;
+    bool forceRepair = 0;
     
     bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
         static DBDirectClient db;
