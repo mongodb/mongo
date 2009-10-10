@@ -36,14 +36,15 @@ namespace mongo {
 
         void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
+        virtual void setElement( const char *field , const BSONElement& e ) = 0;
         virtual void setNumber( const char *field , double val ) = 0;
         virtual void setString( const char *field , const char * val ) = 0;
         virtual void setObject( const char *field , const BSONObj& obj , bool readOnly=true ) = 0;
         virtual void setBoolean( const char *field , bool val ) = 0;
         virtual void setThis( const BSONObj * obj ) = 0;
                     
-        virtual ScriptingFunction createFunction( const char * code ) = 0;
-
+        virtual ScriptingFunction createFunction( const char * code );
+        
         /**
          * @return 0 on success
          */
@@ -55,7 +56,7 @@ namespace mongo {
         
         int invoke( const char* code , const BSONObj& args, int timeoutMs = 0 );
         void invokeSafe( const char* code , const BSONObj& args, int timeoutMs = 0 ){
-            assert( invoke( code , args , timeoutMs ) == 0 );
+	    uassert( "invoke failed" , invoke( code , args , timeoutMs ) == 0 );
         }
 
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;
@@ -67,6 +68,29 @@ namespace mongo {
         virtual void injectNative( const char *field, NativeFunction func ) = 0;
 
         virtual void gc() = 0;
+
+        void loadStored( bool ignoreNotConnected = false );
+        
+        /**
+         if any changes are made to .system.js, call this
+         right now its just global - slightly inefficient, but a lot simpler
+        */
+        static void storedFuncMod();
+        
+        static int getNumScopes(){
+            return _numScopes;
+        }
+        
+    protected:
+
+        virtual ScriptingFunction _createFunction( const char * code ) = 0;
+
+        string _localDBName;
+        long long _loadedVersion;
+        static long long _lastVersion;
+        map<string,ScriptingFunction> _cachedFunctions;
+
+        static int _numScopes;
     };
     
     class ScriptEngine : boost::noncopyable {

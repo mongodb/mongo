@@ -22,6 +22,8 @@
 #include "jsobj.h"
 #include "nonce.h"
 #include "../util/goodies.h"
+#include "../util/base64.h"
+#include "../util/md5.hpp"
 #include <limits>
 #include "../util/unittest.h"
 #include "json.h"
@@ -185,11 +187,6 @@ namespace mongo {
         return ret.str();
     }
 
-    typedef boost::archive::iterators::base64_from_binary
-    < boost::archive::iterators::transform_width
-    < string::const_iterator, 6, 8 >
-    > base64_t;
-
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
         stringstream s;
         if ( includeFieldNames )
@@ -277,12 +274,7 @@ namespace mongo {
             BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
             s << "{ \"$binary\" : \"";
             char *start = ( char * )( value() ) + sizeof( int ) + 1;
-            string temp(start, len);
-            string base64 = string( base64_t( temp.begin() ), base64_t( temp.end() ) );
-            s << base64;
-            int padding = ( 4 - ( base64.length() % 4 ) ) % 4;
-            for ( int i = 0; i < padding; ++i )
-                s << '=';
+            base64::encode( s , start , len );
             s << "\", \"$type\" : \"" << hex;
             s.width( 2 );
             s.fill( '0' );
@@ -685,6 +677,15 @@ namespace mongo {
         }
         s << " }";
         return s.str();
+    }
+
+    string BSONObj::md5() const {
+        md5digest d;
+        md5_state_t st;
+        md5_init(&st);
+        md5_append( &st , (const md5_byte_t*)_objdata , objsize() );
+        md5_finish(&st, d);
+        return digestToString( d );
     }
 
     string BSONObj::jsonString( JsonStringFormat format ) const {
@@ -1483,7 +1484,7 @@ namespace mongo {
         case String: append( field.c_str() , BSONObj() ); break;
         case Code:
         case CodeWScope:
-            appendMinForType( field , Timestamp ); break;
+            appendCodeWScope( field.c_str() , "ZZZ" , BSONObj() ); break;
         case Timestamp:
             appendTimestamp( field.c_str() , numeric_limits<unsigned long long>::max() ); break;
         default:

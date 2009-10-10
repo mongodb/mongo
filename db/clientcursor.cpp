@@ -31,25 +31,21 @@
 
 namespace mongo {
 
-    CCById clientCursorsById;
+    CCById ClientCursor::clientCursorsById;
+    CCByLoc ClientCursor::byLoc;
+    boost::recursive_mutex ClientCursor::ccmutex;
 
-    /* ------------------------------------------- */
-
-    long long IdSet_Deprecated::size_ = 0;
-    long long IdSet_Deprecated::maxSize_ = 200 * 1024 * 1024;
-    
-    typedef multimap<DiskLoc, ClientCursor*> ByLoc;
-    ByLoc byLoc;
-    unsigned byLocSize() {
+    unsigned ClientCursor::byLocSize() { 
+        recursive_boostlock lock(ccmutex);
         return byLoc.size();
     }
 
-    void ClientCursor::setLastLoc(DiskLoc L) {
+    void ClientCursor::setLastLoc_inlock(DiskLoc L) {
         if ( L == _lastLoc )
             return;
 
         if ( !_lastLoc.isNull() ) {
-            ByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
+            CCByLoc::iterator i = kv_find(byLoc, _lastLoc, this);
             if ( i != byLoc.end() )
                 byLoc.erase(i);
         }
@@ -62,8 +58,8 @@ namespace mongo {
     /* ------------------------------------------- */
 
     /* must call this when a btree node is updated */
-//void removedKey(const DiskLoc& btreeLoc, int keyPos) {
-//}
+    //void removedKey(const DiskLoc& btreeLoc, int keyPos) {
+    //}
 
     /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
              works fine as the prefix will end with '.'.  however, when used with drop and
@@ -75,21 +71,26 @@ namespace mongo {
 
         int len = strlen(nsPrefix);
         assert( len > 0 && strchr(nsPrefix, '.') );
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
-            ClientCursor *cc = i->second;
-            if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
-                toDelete.push_back(i->second);
-        }
 
-        for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
-            delete (*i);
+        {
+            recursive_boostlock lock(ccmutex);
+
+            for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); ++i ) {
+                ClientCursor *cc = i->second;
+                if ( strncmp(nsPrefix, cc->ns.c_str(), len) == 0 )
+                    toDelete.push_back(i->second);
+            }
+
+            for ( vector<ClientCursor*>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
+                delete (*i);
+        }
     }
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
-    void idleTimeReport(unsigned millis) {
-        requireInWriteLock();
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
-            ByLoc::iterator j = i;
+    void ClientCursor::idleTimeReport(unsigned millis) {
+        recursive_boostlock lock(ccmutex);
+        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end();  ) {
+            CCByLoc::iterator j = i;
             i++;
             if( j->second->shouldTimeout( millis ) ){
                 log(1) << "killing old cursor " << j->second->cursorid << ' ' << j->second->ns 
@@ -102,22 +103,27 @@ namespace mongo {
     /* must call when a btree bucket going away.
        note this is potentially slow
     */
-    void aboutToDeleteBucket(const DiskLoc& b) {
+    inline void ClientCursor::informAboutToDeleteBucket(const DiskLoc& b) {
+        recursive_boostlock lock(ccmutex);
         RARELY if ( byLoc.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
         }
-        for ( ByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
+        for ( CCByLoc::iterator i = byLoc.begin(); i != byLoc.end(); i++ )
             i->second->c->aboutToDeleteBucket(b);
+    }
+    void aboutToDeleteBucket(const DiskLoc& b) {
+        ClientCursor::informAboutToDeleteBucket(b); 
     }
 
     /* must call this on a delete so we clean up the cursors. */
-    void aboutToDelete(const DiskLoc& dl) {
-        ByLoc::iterator j = byLoc.lower_bound(dl);
-        ByLoc::iterator stop = byLoc.upper_bound(dl);
+    void ClientCursor::aboutToDelete(const DiskLoc& dl) {
+        recursive_boostlock lock(ccmutex);
+
+        CCByLoc::iterator j = byLoc.lower_bound(dl);
+        CCByLoc::iterator stop = byLoc.upper_bound(dl);
         if ( j == stop )
             return;
 
-        requireInWriteLock();
         vector<ClientCursor*> toAdvance;
 
         while ( 1 ) {
@@ -151,14 +157,20 @@ namespace mongo {
             }
         }
     }
+    void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDelete(dl); }
 
     ClientCursor::~ClientCursor() {
         assert( pos != -2 );
-        setLastLoc( DiskLoc() ); // removes us from bylocation multimap
-        clientCursorsById.erase(cursorid);
-        // defensive:
-        (CursorId&) cursorid = -1;
-        pos = -2;
+
+        {
+            recursive_boostlock lock(ccmutex);
+            setLastLoc_inlock( DiskLoc() ); // removes us from bylocation multimap
+            clientCursorsById.erase(cursorid);
+
+            // defensive:
+            (CursorId&) cursorid = -1;
+            pos = -2;
+        }
     }
 
     /* call when cursor's location changes so that we can update the
@@ -173,18 +185,21 @@ namespace mongo {
             //log() << "info: lastloc==curloc " << ns << '\n';
             return;
         }
-        setLastLoc(cl);
-        c->noteLocation();
+        {
+            recursive_boostlock lock(ccmutex);
+            setLastLoc_inlock(cl);
+            c->noteLocation();
+        }
     }
 
     int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
-    long long ClientCursor::allocCursorId() {
+    long long ClientCursor::allocCursorId_inlock() {
         long long x;
         int ctm = (int) curTimeMillis();
         while ( 1 ) {
             x = (((long long)rand()) << 32);
             x = x | ctm | 0x80000000; // OR to make sure not zero
-            if ( ctm != ctmLast || ClientCursor::find(x, false) == 0 )
+            if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
         ctmLast = ctm;
@@ -202,8 +217,9 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            result.append("byLocation_size", unsigned( byLoc.size() ) );
-            result.append("clientCursors_size", unsigned( clientCursorsById.size() ) );
+            recursive_boostlock lock(ClientCursor::ccmutex);
+            result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
+            result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );
             return true;
         }
     } cmdCursorInfo;

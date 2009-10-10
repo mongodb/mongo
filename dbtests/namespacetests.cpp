@@ -18,6 +18,7 @@
  */
 
 // Where IndexDetails defined.
+#include "stdafx.h"
 #include "../db/namespace.h"
 
 #include "../db/db.h"
@@ -505,6 +506,63 @@ namespace NamespaceTests {
                 return aDotB();
             }
         };
+        
+        class EmptyArray : Base {
+        public:
+            void run(){
+                create();
+
+                BSONObjSetDefaultOrder keys;
+                id().getKeysFromObject( fromjson( "{a:[1,2]}" ), keys );
+                checkSize(2, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:[1]}" ), keys );
+                checkSize(1, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:null}" ), keys );
+                checkSize(1, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:[]}" ), keys );
+                checkSize(1, keys );
+                keys.clear();
+            }
+        };
+
+        class MultiEmptyArray : Base {
+        public:
+            void run(){
+                create();
+
+                BSONObjSetDefaultOrder keys;
+                id().getKeysFromObject( fromjson( "{a:1,b:[1,2]}" ), keys );
+                checkSize(2, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:1,b:[1]}" ), keys );
+                checkSize(1, keys );
+                keys.clear();
+
+                id().getKeysFromObject( fromjson( "{a:1,b:null}" ), keys );
+                cout << "YO : " << *(keys.begin()) << endl;
+                checkSize(1, keys );
+                keys.clear();
+                
+                id().getKeysFromObject( fromjson( "{a:1,b:[]}" ), keys );
+                checkSize(1, keys );
+                cout << "YO : " << *(keys.begin()) << endl;
+                ASSERT_EQUALS( NumberDouble , keys.begin()->firstElement().type() );
+                keys.clear();
+            }
+
+        protected:
+            BSONObj key() const {
+                return aAndB();
+            }
+        };
+
 
     } // namespace IndexDetailsTests
 
@@ -719,6 +777,8 @@ namespace NamespaceTests {
             add< IndexDetailsTests::ParallelArraysComplex >();
             add< IndexDetailsTests::AlternateMissing >();
             add< IndexDetailsTests::MultiComplex >();
+            add< IndexDetailsTests::EmptyArray >();
+            add< IndexDetailsTests::MultiEmptyArray >();
             add< IndexDetailsTests::MissingField >();
             add< IndexDetailsTests::SubobjectMissing >();
             add< IndexDetailsTests::CompoundMissing >();

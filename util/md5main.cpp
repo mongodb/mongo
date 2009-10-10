@@ -40,6 +40,7 @@
   2002-04-13 lpd Splits off main program into a separate file, md5main.c.
  */
 
+#include "stdafx.h"
 #include "md5.h"
 #include <math.h>
 #include <stdio.h>

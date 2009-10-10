@@ -37,9 +37,11 @@ namespace mongo {
         rootpath << dbpath;
         if ( dbpath[dbpath.size()-1] != '/' )
             rootpath << "/";
-        rootpath << "esort." << time(0) << "." << rand() << "/";
+        rootpath << "_tmp/esort." << time(0) << "." << rand() << "/";
         _root = rootpath.str();
         
+        log(1) << "external sort root: " << _root.string() << endl;
+
         create_directories( _root );
         _compares = 0;
     }

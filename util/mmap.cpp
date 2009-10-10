@@ -40,10 +40,22 @@ namespace mongo {
             return;
         }
         ++closingAllFiles;
-        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+        ProgressMeter pm( mmfiles.size() , 2 , 1 );
+        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             (*i)->close();
-        message << "  closeAllFiles() finished" << endl;
+            pm.hit();
+        }
+        message << "    closeAllFiles() finished" << endl;
         --closingAllFiles;
+    }
+
+    long long MemoryMappedFile::totalMappedLength(){
+        unsigned long long total = 0;
+        
+        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+            total += (*i)->length();
+
+        return total;
     }
 
     void MemoryMappedFile::updateLength( const char *filename, long &length ) {

@@ -224,6 +224,19 @@ Array.tojson = function( a , sepLines ){
     return s;
 }
 
+Array.fetchRefs = function( arr , coll ){
+    var n = [];
+    for ( var i=0; i<arr.length; i ++){
+        var z = arr[i];
+        if ( coll && coll != z.getCollection() )
+            continue;
+        n.push( z.fetch() );
+    }
+    
+    return n;
+}
+
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
@@ -237,20 +250,48 @@ ObjectId.prototype.tojson = function(){
 
 ObjectId.prototype.isObjectId = true;
 
-if ( typeof( DBRef ) != "undefined" ){
-    DBRef.prototype.fetch = function(){
+if ( typeof( DBPointer ) != "undefined" ){
+    DBPointer.prototype.fetch = function(){
         assert( this.ns , "need a ns" );
         assert( this.id , "need an id" );
         
         return db[ this.ns ].findOne( { _id : this.id } );
     }
     
-    DBRef.prototype.tojson = function(){
+    DBPointer.prototype.tojson = function(){
         return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
+    }
+
+    DBPointer.prototype.getCollection = function(){
+        return this.ns;
+    }
+    
+    DBPointer.prototype.toString = function(){
+        return "DBPointer " + this.ns + ":" + this.id;
+    }
+}
+else {
+    print( "warning: no DBPointer" );
+}
+
+if ( typeof( DBRef ) != "undefined" ){
+    DBRef.prototype.fetch = function(){
+        assert( this.$ref , "need a ns" );
+        assert( this.$id , "need an id" );
+        
+        return db[ this.$ref ].findOne( { _id : this.$id } );
+    }
+    
+    DBRef.prototype.tojson = function(){
+        return "{ '$ref' : \"" + this.$ref + "\" , '$id' : \"" + this.$id + "\" } ";
+    }
+
+    DBRef.prototype.getCollection = function(){
+        return this.$ref;
     }
     
     DBRef.prototype.toString = function(){
-        return "DBRef " + this.ns + ":" + this.id;
+        return this.tojson();
     }
 }
 else {
@@ -404,8 +445,6 @@ shellHelper = function( command , rest , shouldPrint ){
 }
 
 help = shellHelper.help = function(){
-    if ( typeof( db ) != "undefined" )
-        print( "server version: " + db.version() );
     print( "HELP" );
     print( "\t" + "show dbs                     show database names");
     print( "\t" + "show collections             show collections in current database");

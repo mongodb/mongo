@@ -21,6 +21,7 @@
 #include "db.h"
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
+#include "../scripting/engine.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -692,5 +693,18 @@ namespace mongo {
 			deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
 		}
 	}
+
+    bool legalClientSystemNS( const string& ns , bool write ){
+        if ( ns.find( ".system.users" ) != string::npos )
+            return true;
+
+        if ( ns.find( ".system.js" ) != string::npos ){
+            if ( write )
+                Scope::storedFuncMod();
+            return true;
+        }
+        
+        return false;
+    }
 	
 } // namespace mongo

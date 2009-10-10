@@ -127,25 +127,25 @@ namespace mongo {
 #undef assert
 #endif
 
-#define assert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
     /* "user assert".  if asserts, user did something wrong, not our code */
 //#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
-#define uassert(msg,_Expression) (void)( (!!(_Expression)) || (uasserted(msg), 0) )
+#define uassert(msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msg), 0) )
 
-#define xassert(_Expression) (void)( (!!(_Expression)) || (asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define xassert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #define yassert 1
 
     /* warning only - keeps going */
-#define wassert(_Expression) (void)( (!!(_Expression)) || (wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
 
     /* display a message, no context, and throw assertionexception
 
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define massert(msg,_Expression) (void)( (!!(_Expression)) || (msgasserted(msg), 0) )
+#define massert(msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msg), 0) )
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.

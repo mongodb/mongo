@@ -38,7 +38,7 @@ public:
         cout << "\t" << coll << " to " << outputFile.string() << endl;
         
         ofstream out;
-        out.open( outputFile.string().c_str() );
+        out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
         uassert( "couldn't open file" , out.good() );
 
         ProgressMeter m( conn( true ).count( coll.c_str() ) );

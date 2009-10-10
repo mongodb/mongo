@@ -17,6 +17,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stdafx.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
 
@@ -343,8 +344,10 @@ namespace JsonTests {
         private:
             static void assertEquals( const BSONObj &expected, const BSONObj &actual ) {
                 if ( expected.woCompare( actual ) ) {
-                    out() << "Expected: " << expected.toString()
-                    << ", got: " << actual.toString();
+                    out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
+                    out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
+                    out() << expected.hexDump() << endl;
+                    out() << actual.hexDump() << endl;
                 }
                 ASSERT( !expected.woCompare( actual ) );
             }

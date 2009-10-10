@@ -39,7 +39,11 @@ namespace mongo {
         sayDbContext();
         raiseError(msg && *msg ? msg : "assertion failure");
         lastAssert[0].set(msg, getDbContext().c_str(), file, line);
-        throw AssertionException();
+        stringstream temp;
+        temp << "assertion " << file << ":" << line;
+        AssertionException e;
+        e.msg = temp.str();
+        throw e;
     }
 
     void uassert_nothrow(const char *msg) {

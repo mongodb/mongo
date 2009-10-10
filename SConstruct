@@ -101,6 +101,13 @@ AddOption('--usesm',
           action="store",
           help="use spider monkey for javascript" )
 
+AddOption('--usev8',
+          dest='usev8',
+          type="string",
+          nargs=0,
+          action="store",
+          help="use v8 for javascript" )
+
 AddOption('--usejvm',
           dest='usejvm',
           type="string",
@@ -213,6 +220,7 @@ noshell = not GetOption( "noshell" ) is None
 nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
+usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
@@ -244,7 +252,7 @@ if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
     Exit(1)
 
-if ( not ( usesm or usejvm ) ):
+if ( not ( usesm or usejvm or usev8 ) ):
     usesm = True
 
 if GetOption( "extrapath" ) is not None:
@@ -256,7 +264,8 @@ if GetOption( "extrapath" ) is not None:
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" ]
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
+                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
@@ -282,6 +291,9 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 
 if usesm:
     commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    nojni = True
+elif usev8:
+    commonFiles += [ Glob( "scripting/*v8*.cpp" ) ]
     nojni = True
 elif not nojni:
     commonFiles += [ "scripting/engine_java.cpp" ]
@@ -546,6 +558,10 @@ if nix:
         #Depends( "stdafx.o" , "stdafx.h.gch" )
         #SideEffect( "dummyGCHSideEffect" , "stdafx.h.gch" )
 
+if usev8:
+    env.Append( CPPPATH=["../v8/include/"] )
+    env.Append( LIBPATH=["../v8/"] )
+
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -578,6 +594,11 @@ def getSysInfo():
         return "windows " + str( sys.getwindowsversion() )
     else:
         return " ".join( os.uname() )
+
+def add_exe(target):
+    if windows:
+        return target + ".exe"
+    return target
 
 def setupBuildInfoFile( outFile ):
     version = getGitVersion()
@@ -716,6 +737,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 print( "no spider monkey headers!" )
                 Exit(1)
 
+    if usev8:
+        myCheckLib( "v8" , True )
+
     if shell:
         haveReadLine = False
         if darwin:
@@ -755,8 +779,12 @@ def concatjs(target, source, env):
     for s in source:
         f = open( str(s) , 'r' )
         for l in f:
-            fullSource += l
-
+            l = l.split("//")[0].strip()
+            if len ( l ) == 0:
+                continue
+            
+            fullSource += l + "\n"
+    
     out = open( outFile , 'w' )
     out.write( fullSource )
 
@@ -830,7 +858,7 @@ env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
 env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
 
 env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
-env.Program( "mongoimportjson" , allToolFiles + [ "tools/importJSON.cpp" ] )
+env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
 
 env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
 
@@ -961,7 +989,7 @@ def testSetup( env , target , source ):
 if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
     ensureDir( "/tmp/unittest/" );
 
-addSmoketest( "smoke", [ "test" ] , [ test[ 0 ].abspath ] )
+addSmoketest( "smoke", [ add_exe( "test" ) ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
 
 clientExec = [ x[0].abspath for x in clientTests ]
@@ -1005,21 +1033,16 @@ def runShellTest( env, target, source ):
         Exit( 1 )
     return subprocess.call( [ mongo[0].abspath, "--port", mongodForTestsPort ] + spec )
 
-def add_exe(target):
-    if windows:
-        return target + ".exe"
-    return target
-
 # These tests require the mongo shell
 if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
-    addSmoketest( "smokeDisk", [ "mongo", "mongod" ], [ jsDirTestSpec( "disk" ) ] )
+    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
-    addSmoketest( "smokeTool", [ "mongo" ], [ jsDirTestSpec( "tool" ) ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
 
 mongodForTests = None
 mongodForTestsPort = "27017"

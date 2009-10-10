@@ -6,54 +6,74 @@
 using namespace v8;
 
 namespace mongo {
+
+    class V8ScriptEngine;
     
     class V8Scope : public Scope {
     public:
-        virtual void reset() {}
-        virtual void init( BSONObj * data ) {}
+        
+        V8Scope( V8ScriptEngine * engine );
+        ~V8Scope();
+        
+        virtual void reset(){}
+        virtual void init( BSONObj * data ){ assert(0); }
 
-        virtual void localConnect( const char * dbName ) {}
+        virtual void localConnect( const char * dbName ){ assert(0); }
+        virtual void externalSetup(){ assert(0); };
         
-        virtual double getNumber( const char *field ) { assert( false ); return 0; }
-        virtual string getString( const char *field ) { assert( false ); return ""; }
-        virtual bool getBoolean( const char *field ) { assert( false ); return false; }
-        virtual BSONObj getObject( const char *field ) { assert( false ); return BSONObj(); }
+        virtual double getNumber( const char *field );
+        virtual string getString( const char *field );
+        virtual bool getBoolean( const char *field );
+        virtual BSONObj getObject( const char *field ){ assert( false ); return BSONObj(); }
         
-        virtual int type( const char *field ) { assert( false ); return 0; }
+        virtual int type( const char *field ){ assert( false ); return 0; }
+
+        virtual void setNumber( const char *field , double val );
+        virtual void setString( const char *field , const char * val );
+        virtual void setBoolean( const char *field , bool val );
+        virtual void setElement( const char *field , const BSONElement& e ){ assert( 0 );} 
+        virtual void setObject( const char *field , const BSONObj& obj , bool readOnly){ assert(0); }
+        virtual void setThis( const BSONObj * obj ){ assert(0); }
         
-        virtual void setNumber( const char *field , double val ) { assert(0); }
-        virtual void setString( const char *field , const char * val ) { assert(0); }
-        virtual void setObject( const char *field , const BSONObj& obj , bool readOnly) { assert(0); }
-        virtual void setBoolean( const char *field , bool val ) { assert(0); }
-        virtual void setThis( const BSONObj * obj ) { assert(0); }
+        virtual ScriptingFunction _createFunction( const char * code ){ assert( false ); return 0; }
+        virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false ){ assert(0); return 0;}
+        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){ assert(0); return 0; }
+        virtual string getError(){ assert( false ); return ""; }
         
-        virtual ScriptingFunction createFunction( const char * code ) { assert( false ); return 0; }
-        virtual int invoke( ScriptingFunction func , const BSONObj& args ) { assert( false ); return 0; }
-        virtual string getError() { assert( false ); return ""; }
-        
-        virtual void injectNative( const char *field, NativeFunction func ) {
+        virtual void injectNative( const char *field, NativeFunction func ){
             Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
             f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
-            global_->Set( v8::String::New( field ), f );
+            _global->Set( v8::String::New( field ), f->GetFunction() );
         }
 
-        void setGlobal( const Handle< v8::ObjectTemplate > &global ) {
-            global_ = global;
-        }
-        
+        void gc(){ assert(0); }
+
     private:
+
         static Handle< Value > nativeCallback( const Arguments &args );
-        Handle< v8::ObjectTemplate > global_;
+
+        HandleScope _handleScope;
+        Handle<Context> _context;
+        Context::Scope _scope;
+        Handle<v8::Object> _global;
     };
     
     class V8ScriptEngine : public ScriptEngine {
     public:
-        V8ScriptEngine() {}
-        virtual ~V8ScriptEngine() {}
+        V8ScriptEngine();
+        virtual ~V8ScriptEngine();
         
-        virtual Scope * createScope() { return new V8Scope(); }
+        virtual Scope * createScope(){ return new V8Scope( this ); }
         
-        virtual void runTest() {}
+        virtual void runTest(){}
+
+        bool utf8Ok() const { return true; }
+
+    private:
+        HandleScope _handleScope;
+        Handle<ObjectTemplate> _globalTemplate;
+
+        friend class V8Scope;
     };
     
     

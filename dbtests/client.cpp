@@ -1,5 +1,6 @@
 // client.cpp
 
+#include "stdafx.h"
 #include "../client/dbclient.h"
 #include "dbtests.h"
 
@@ -62,6 +63,26 @@ namespace ClientTests {
 
     };
 
+    class ReIndex2 : public Base {
+    public:
+        ReIndex2() : Base( "reindex2" ){}
+        void run(){
+            
+            db.insert( ns() , BSON( "x" << 2 ) );
+            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            
+            db.ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            
+            BSONObj out;
+            ASSERT( db.runCommand( "test" , BSON( "reIndex" << "reindex2" ) , out ) );
+            ASSERT_EQUALS( 2 , out["nIndexes"].number() );
+            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+        }
+
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "client" ){
@@ -70,7 +91,8 @@ namespace ClientTests {
         void setupTests(){
             add<DropIndex>();
             add<ReIndex>();
+            add<ReIndex2>();
         }
-
+        
     } all;
 }

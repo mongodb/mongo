@@ -40,6 +40,7 @@
 namespace mongo {
 
     class BSONObj;
+    class BSONElement;
     class Record;
     class BSONObjBuilder;
     class BSONObjBuilderValueStream;
@@ -82,7 +83,7 @@ namespace mongo {
         Code=13,
         /** a programming language (e.g., Python) symbol */
         Symbol=14,
-        /** javascript code that can execute on the database server, with context */
+        /** javascript code that can execute on the database server, with SavedContext */
         CodeWScope=15,
         /** 32 bit signed integer */
         NumberInt = 16,
@@ -181,6 +182,9 @@ namespace mongo {
         JS
     };
 
+    /* l and r MUST have same type when called: check that first. */
+    int compareElementValues(const BSONElement& l, const BSONElement& r);
+
 #pragma pack()
 
     /* internals
@@ -242,6 +246,7 @@ namespace mongo {
             case Bool:
                 return 40;
             case Date:
+            case Timestamp:
                 return 45;
             case RegEx:
                 return 50;
@@ -251,8 +256,6 @@ namespace mongo {
                 return 60;
             case CodeWScope:
                 return 65;
-            case Timestamp:
-                return 70;
             default:
                 assert(0);
                 return -1;
@@ -454,7 +457,7 @@ namespace mongo {
         const char * codeWScopeCode() const {
             return value() + 8;
         }
-        /** Get the scope context of a CodeWScope data element. */
+        /** Get the scope SavedContext of a CodeWScope data element. */
         const char * codeWScopeScopeData() const {
             // TODO fix
             return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
@@ -587,6 +590,13 @@ namespace mongo {
             start += 4 + *reinterpret_cast< const int* >( start );
             return *reinterpret_cast< const OID* >( start );
         }
+
+        bool operator<( const BSONElement& other ) const {
+            int x = (int)canonicalType() - (int)other.canonicalType();
+            if ( x < 0 ) return true;
+            else if ( x > 0 ) return false;
+            return compareElementValues(*this,other) < 0;
+        }
         
     protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
@@ -614,8 +624,6 @@ namespace mongo {
         mutable int totalSize; /* caches the computed size */
     };
     
-    /* l and r MUST have same type when called: check that first. */
-    int compareElementValues(const BSONElement& l, const BSONElement& r);
     int getGtLtOp(const BSONElement& e);
 
     /* compare values with type check. 
@@ -852,11 +860,11 @@ namespace mongo {
             return objsize() <= 5;
         }
 
-        void dump() {
+        void dump() const {
             out() << hex;
             const char *p = objdata();
             for ( int i = 0; i < objsize(); i++ ) {
-                out() << i << '\t' << (unsigned) *p;
+                out() << i << '\t' << ( 0xff & ( (unsigned) *p ) );
                 if ( *p >= 'A' && *p <= 'z' )
                     out() << '\t' << *p;
                 out() << endl;
@@ -943,6 +951,8 @@ namespace mongo {
         
         /** true unless corrupt */
         bool valid() const;
+        
+        string md5() const;
 
         enum MatchType {
             Equality = 0,
@@ -1091,6 +1101,10 @@ namespace mongo {
             b.append((char) Object);
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
+        }
+
+        void append(const string& fieldName , BSONObj subObj) {
+            append( fieldName.c_str() , subObj );
         }
 
         /** add header for a new subobject and return bufbuilder for writing to

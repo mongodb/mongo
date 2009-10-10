@@ -321,4 +321,49 @@ namespace mongo {
         boost::thread_specific_ptr<int> _val;
     };
 
+    class ProgressMeter {
+    public:
+        ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 )
+            : _total( total ) , _secondsBetween( secondsBetween ) , _checkInterval( checkInterval ) ,
+              _done(0) , _hits(0) , _lastTime( (int) time(0) ){
+        }
+        
+        bool hit( int n = 1 ){
+            _done += n;
+            _hits++;
+            if ( _hits % _checkInterval )
+                return false;
+            
+            int t = (int) time(0);
+            if ( t - _lastTime < _secondsBetween )
+                return false;
+            
+            if ( _total > 0 ){
+                int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
+                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
+            }
+            _lastTime = t;
+            return true;
+        }
+
+        long long done(){
+            return _done;
+        }
+        
+        long long hits(){
+            return _hits;
+        }
+
+    private:
+        
+        long long _total;
+        int _secondsBetween;
+        int _checkInterval;
+
+        long long _done;
+        long long _hits;
+        int _lastTime;
+    };
+
+
 } // namespace mongo

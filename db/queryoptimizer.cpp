@@ -162,11 +162,13 @@ namespace mongo {
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc ) const {
         if ( !fbs_.matchPossible() ){
-            checkTableScanAllowed( fbs_.ns() );
+            if ( fbs_.nNontrivialRanges() )
+                checkTableScanAllowed( fbs_.ns() );
             return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
         }
         if ( !index_ ){
-            checkTableScanAllowed( fbs_.ns() );
+            if ( fbs_.nNontrivialRanges() )
+                checkTableScanAllowed( fbs_.ns() );
             return findTableScan( fbs_.ns(), order_, startLoc );
         }
 

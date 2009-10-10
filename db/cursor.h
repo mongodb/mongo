@@ -33,13 +33,19 @@ namespace mongo {
 
     inline void checkForInterrupt() {
         if( killCurrentOp ) { 
-            killCurrentOp = 0;
+            if( !goingAway ) {
+                // if we are shutting down, we leave this on so potentially we can stop multiple operations
+                killCurrentOp = 0;
+            }
             uasserted("interrupted");
         }
     }
 
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
+
+       WARNING concurrency: the vfunctions below are called back from within a 
+       ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
     */
     class Cursor {
     public:
@@ -99,15 +105,6 @@ namespace mongo {
                          force a data file conversion. 7Jul09
         */
         virtual bool getsetdup(bool deep, DiskLoc loc) = 0;
-/*
-        set<DiskLoc> dups;
-        bool getsetdup(DiskLoc loc) {
-            if ( dups.count(loc) > 0 )
-                return true;
-            dups.insert(loc);
-            return false;
-        }
-*/
 
         virtual BSONObj prettyStartKey() const { return BSONObj(); }
         virtual BSONObj prettyEndKey() const { return BSONObj(); }
@@ -118,18 +115,18 @@ namespace mongo {
     // strategy object implementing direction of traversal.
     class AdvanceStrategy {
     public:
-        virtual ~AdvanceStrategy() {}
+        virtual ~AdvanceStrategy() { }
         virtual DiskLoc next( const DiskLoc &prev ) const = 0;
     };
 
-    AdvanceStrategy *forward();
-    AdvanceStrategy *reverse();
+    const AdvanceStrategy *forward();
+    const AdvanceStrategy *reverse();
 
     /* table-scan style cursor */
     class BasicCursor : public Cursor {
     protected:
         DiskLoc curr, last;
-        AdvanceStrategy *s;
+        const AdvanceStrategy *s;
 
     private:
         bool tailable_;
@@ -171,10 +168,10 @@ namespace mongo {
             return ok();
         }
 
-        BasicCursor(DiskLoc dl, AdvanceStrategy *_s = forward()) : curr(dl), s( _s ) {
+        BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ) {
             init();
         }
-        BasicCursor(AdvanceStrategy *_s = forward()) : s( _s ) {
+        BasicCursor(const AdvanceStrategy *_s = forward()) : s( _s ) {
             init();
         }
         virtual string toString() {

@@ -415,6 +415,14 @@ namespace mongo {
         }
 
         JSObject * toJSObject( const BSONObj * obj , bool readOnly=false ){
+            static string ref = "$ref";
+            if ( ref == obj->firstElement().fieldName() ){
+                JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
+                assert( o );
+                setProperty( o , "$ref" , toval( obj->firstElement() ) );
+                setProperty( o , "$id" , toval( (*obj)["$id"] ) );
+                return o;
+            }
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
             assert( o );
             assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
@@ -526,7 +534,7 @@ namespace mongo {
             }
 
             case DBRef: {
-                JSObject * o = JS_NewObject( _context , &dbref_class , 0 , 0 );
+                JSObject * o = JS_NewObject( _context , &dbpointer_class , 0 , 0 );
                 setProperty( o , "ns" , toval( e.dbrefNS() ) );
 
                 JSObject * oid = JS_NewObject( _context , &object_id_class , 0 , 0 );
@@ -1008,7 +1016,7 @@ namespace mongo {
             smlock;
             uassert( "already setup for external db" , ! _externalSetup );
             if ( _localConnect ){
-                uassert( "connected to different db" , _dbName == dbName );
+                uassert( "connected to different db" , _localDBName == dbName );
                 return;
             }
             
@@ -1018,7 +1026,8 @@ namespace mongo {
             exec( ((string)"db = _mongo.getDB( \"" + dbName + "\" ); ").c_str() );
             
             _localConnect = true;
-            _dbName = dbName;
+            _localDBName = dbName;
+            loadStored();
         }
 
         // ----- getters ------
@@ -1082,6 +1091,12 @@ namespace mongo {
 
         // ----- setters ------
 
+        void setElement( const char *field , const BSONElement& val ){
+            smlock;
+            jsval v = _convertor->toval( val );
+            assert( JS_SetProperty( _context , _global , field , &v ) );
+        }
+
         void setNumber( const char *field , double val ){
             smlock;
             jsval v = _convertor->toval( val );
@@ -1121,7 +1136,7 @@ namespace mongo {
 
         // ---- functions -----
 
-        ScriptingFunction createFunction( const char * code ){
+        ScriptingFunction _createFunction( const char * code ){
             smlock;
             precall();
             return (ScriptingFunction)_convertor->compileFunction( code );
@@ -1277,7 +1292,7 @@ namespace mongo {
             JS_GC( _context );
         }
 
-        JSContext *context() const { return _context; }
+        JSContext *SavedContext() const { return _context; }
         
     private:
 
@@ -1301,7 +1316,6 @@ namespace mongo {
 
         bool _externalSetup;
         bool _localConnect;
-        string _dbName;
         
         set<string> _initFieldNames;
         

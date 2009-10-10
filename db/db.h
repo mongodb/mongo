@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    void jniCallback(Message& m, Message& out);
+//    void jniCallback(Message& m, Message& out);
 
     /* Note the limit here is rather arbitrary and is simply a standard. generally the code works
        with any object that fits in ram.

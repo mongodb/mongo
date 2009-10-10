@@ -98,12 +98,13 @@ namespace mongo {
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObj obj = currentOp.info();
         replyToQuery(0, m, dbresponse, obj);
+
     }
     
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        AuthenticationInfo *ai = authInfo.get();
-        if( ai == 0 || !ai->isAuthorized("admin") ) { 
+        AuthenticationInfo *ai = currentConnection.get()->ai;
+        if( !ai->isAuthorized("admin") ) { 
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         else if( !dbMutexInfo.isLocked() ) 
@@ -153,6 +154,7 @@ namespace mongo {
         Timer t;
         database = 0;
 
+        int logThreshold = 100;
         int ms;
         bool log = logLevel >= 1;
         currentOp.op = curOp = m.data->operation();
@@ -204,7 +206,7 @@ namespace mongo {
             char cl[256];
             nsToClient(ns, cl);
             strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
-            AuthenticationInfo *ai = authInfo.get();
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
@@ -244,7 +246,7 @@ namespace mongo {
             else if ( m.data->operation() == dbKillCursors ) {
                 OPREAD;
                 try {
-                    log = true;
+                    logThreshold = 10;
                     ss << "killcursors ";
                     receivedKillCursors(m);
                 }
@@ -262,7 +264,7 @@ namespace mongo {
         ms = t.millis();
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
-        if ( log || ms > 100 ) {
+        if ( log || ms > logThreshold ) {
             ss << ' ' << t.millis() << "ms";
             out() << ss.str().c_str() << endl;
         }
@@ -320,7 +322,6 @@ namespace mongo {
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
         Top::setWrite();
-        //if( database->profile )
         ss << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -332,13 +333,15 @@ namespace mongo {
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
         bool upsert = flags & 1;
+        bool multi = flags & 2;
         {
             string s = query.toString();
+            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
             ss << " query: " << s;
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
-        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss);
-        recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 );
+        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss, multi);
+        recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 ); // for getlasterror
     }
 
     void receivedDelete(Message& m, stringstream &ss) {
@@ -442,7 +445,7 @@ namespace mongo {
         ss << " ntoreturn:" << ntoreturn;
         QueryResult* msgdata;
         try {
-            AuthenticationInfo *ai = authInfo.get();
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid);
         }
@@ -493,7 +496,7 @@ namespace mongo {
         Message & container;
     };
     
-    /* a call from java/js to the database locally.
+    /* a call from jscript to the database locally.
 
          m - inbound message
          out - outbound message, if there is any, will be set here.
@@ -503,11 +506,10 @@ namespace mongo {
 
        note we should already be in the mutex lock from connThread() at this point.
     */
-    void jniCallback(Message& m, Message& out)
+    void jniCallbackDeprecated(Message& m, Message& out)
     {
 		/* we should be in the same thread as the original request, so authInfo should be available. */
-		AuthenticationInfo *ai = authInfo.get();
-		massert("no authInfo in eval", ai);
+        AuthenticationInfo *ai = currentConnection.get()->ai;
         
         Database *clientOld = database;
 
@@ -613,7 +615,7 @@ namespace mongo {
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
-        Context c;
+        SavedContext c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -622,12 +624,12 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend ) {
-        Context c;
+        SavedContext c;
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }
 
-    DBDirectClient::AlwaysAuthorized DBDirectClient::Context::always;
+    DBDirectClient::AlwaysAuthorized DBDirectClient::SavedContext::always;
 
     DBClientBase * createDirectClient(){
         return new DBDirectClient();
@@ -685,19 +687,23 @@ namespace mongo {
                 close( *i );
         }
 #endif
-                
+
+        log() << "\t shutdown: going to flush oplog..." << endl;
         stringstream ss2;
         flushOpLog( ss2 );
         rawOut( ss2.str() );
 
         /* must do this before unmapping mem or you may get a seg fault */
+        log() << "\t shutdown: going to close sockets..." << endl;
         closeAllSockets();
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
+        log() << "\t shutdown: waiting for fs..." << endl;
         theFileAllocator().waitUntilFinished();
         
+        log() << "\t shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         rawOut( ss3.str() );
@@ -707,7 +713,9 @@ namespace mongo {
         
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){
-            assert( ftruncate( lockFile , 0 ) == 0 );
+            log() << "\t shutdown: removing fs lock..." << endl;
+            if( ftruncate( lockFile , 0 ) ) 
+                log() << "\t couldn't remove fs lock errno=" << errno << endl;
             flock( lockFile, LOCK_UN );
         }
 #endif

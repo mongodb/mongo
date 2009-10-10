@@ -31,12 +31,25 @@ namespace mongo {
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() )
                 vals.insert( i.next() );
-            for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i ) {
-                FieldInterval equalityInterval;
-                equalityInterval.lower_.bound_ = equalityInterval.upper_.bound_ = *i;
-                equalityInterval.lower_.inclusive_ = equalityInterval.upper_.inclusive_ = true;
-                intervals_.push_back( equalityInterval );
+
+            for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i )
+                intervals_.push_back( FieldInterval(*i) );
+
+            return;
+        }
+        
+        if ( e.type() == Array && e.getGtLtOp() == BSONObj::Equality ){
+            
+            intervals_.push_back( FieldInterval(e) );
+            
+            const BSONElement& temp = e.embeddedObject().firstElement();
+            if ( ! temp.eoo() ){
+                if ( temp < e )
+                    intervals_.insert( intervals_.begin() , temp );
+                else
+                    intervals_.push_back( FieldInterval(temp) );
             }
+            
             return;
         }
 

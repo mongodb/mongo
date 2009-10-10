@@ -12,6 +12,7 @@
 #include "dbhelpers.h"
 #include "commands.h"
 #include "jsobj.h"
+#include "connection.h"
 
 namespace mongo {
 
@@ -60,8 +61,7 @@ namespace mongo {
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // database->name is the one we are logging out...
-            AuthenticationInfo *ai = authInfo.get();
-            assert( ai ); 
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             ai->logout(database->name.c_str());
             return true;
         }
@@ -142,8 +142,7 @@ namespace mongo {
                 return false;
             }
 
-            AuthenticationInfo *ai = authInfo.get();
-            assert( ai );
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             ai->authorize(database->name.c_str());
             return true;
         }

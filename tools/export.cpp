@@ -26,7 +26,6 @@
 #include <iostream>
 
 #include <boost/program_options.hpp>
-#include <pcrecpp.h>
 
 using namespace mongo;
 
@@ -42,20 +41,31 @@ public:
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
             ;
     }
-
+    
     int run(){
         string ns;
         const bool csv = hasParam( "csv" );
         ostream *outPtr = &cout;
         string outfile = getParam( "out" );
-        if ( hasParam( "out" ) )
-            outPtr = new ofstream( outfile.c_str() );
+        auto_ptr<ofstream> fileStream;
+        if ( hasParam( "out" ) ){
+            size_t idx = outfile.rfind( "/" );
+            if ( idx != string::npos ){
+                string dir = outfile.substr( 0 , idx + 1 );
+                create_directories( dir );
+            }
+            ofstream * s = new ofstream( outfile.c_str() , ios_base::out | ios_base::binary );
+            fileStream.reset( s );
+            outPtr = s;
+            if ( ! s->good() ){
+                cerr << "couldn't open [" << outfile << "]" << endl;
+                return -1;
+            }
+        }
         ostream &out = *outPtr;
 
         BSONObj * fieldsToReturn = 0;
         BSONObj realFieldsToReturn;
-
-        vector<string> fields;
 
         try {
             ns = getNS();
@@ -67,24 +77,12 @@ public:
         auth();
 
         if ( hasParam( "fields" ) ){
-
-            BSONObjBuilder b;
-
-            string fields_arg = getParam("fields");
-            pcrecpp::StringPiece input(fields_arg);
-
-            string f;
-            pcrecpp::RE re("([\\w\\.]+),?" );
-            while ( re.Consume( &input, &f ) ){
-                fields.push_back( f );
-                b.append( f.c_str() , 1 );
-            }
-
-            realFieldsToReturn = b.obj();
-            fieldsToReturn = &realFieldsToReturn;
+            needFields();
+            fieldsToReturn = &_fieldsObj;
         }
 
-        if ( csv && fields.size() == 0 ){
+
+        if ( csv && _fields.size() == 0 ){
             cerr << "csv mode requires a field list" << endl;
             return -1;
         }
@@ -93,19 +91,21 @@ public:
         auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , ((Query)(getParam( "query" , "" ))).snapshot() , 0 , 0 , fieldsToReturn , Option_SlaveOk | Option_NoCursorTimeout );
 
         if ( csv ){
-            for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
-                if ( i != fields.begin() )
+            for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ){
+                if ( i != _fields.begin() )
                     out << ",";
                 out << *i;
             }
             out << endl;
         }
-
+        
+        long long num = 0;
         while ( cursor->more() ) {
+            num++;
             BSONObj obj = cursor->next();
             if ( csv ){
-                for ( vector<string>::iterator i=fields.begin(); i != fields.end(); i++ ){
-                    if ( i != fields.begin() )
+                for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ){
+                    if ( i != _fields.begin() )
                         out << ",";
                     const BSONElement & e = obj.getFieldDotted(i->c_str());
                     if ( ! e.eoo() ){
@@ -119,6 +119,8 @@ public:
             }
         }
 
+        
+        cout << "exported " << num << " records" << endl;
 
         return 0;
     }

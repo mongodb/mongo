@@ -9,7 +9,7 @@ db.otherthings.save(other);
 
 db.things.save( { name : "abc" } );
 x = db.things.findOne();
-x.o = new DBRef( "otherthings" , other._id );
+x.o = new DBPointer( "otherthings" , other._id );
 db.things.save(x);
 
 assert( db.things.findOne().o.fetch().n == 1, "dbref broken 2" );

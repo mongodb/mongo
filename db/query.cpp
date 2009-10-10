@@ -112,9 +112,7 @@ namespace mongo {
                 if done here, as there are pointers into those objects in 
                 NamespaceDetails.
                 */
-                if( strstr(ns, ".system.users") )
-                    ;
-                else {
+                if( ! legalClientSystemNS( ns , true ) ){
                     uasserted("cannot delete from system namespace");
                     return -1;
                 }
@@ -752,7 +750,8 @@ namespace mongo {
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
-            uassert("cannot update system collection", strstr(ns, ".system.users"));
+            /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
+            uassert("cannot update system collection", legalClientSystemNS( ns , true ) );
         }
         
         QueryPlanSet qps( ns, pattern, BSONObj() );
@@ -864,9 +863,13 @@ namespace mongo {
     int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
         return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
     }
-        
-    bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss) {
+     
+    /* multi means multiple updates. this is not implemented yet, but stubbing out for future work */   
+    /* todo - clean up these crazy __updateobjects return codes! */
+    bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool multi) {
+        uassert("multi not coded yet", !multi);
         int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
+        /* todo: why is there a logOp here when __updateObjects also does a bunch of logOps? */
         if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )
             logOp("u", ns, updateobj, &pattern, &upsert);
         return ( rc == 1 || rc == 2 || rc == 5 );
@@ -901,7 +904,7 @@ namespace mongo {
             if ( ClientCursor::erase(ids[i]) )
                 k++;
         }
-        log() << "killCursors: found " << k << " of " << n << '\n';
+        log( k == n ) << "killcursors: found " << k << " of " << n << '\n';
     }
 
     BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
@@ -948,9 +951,14 @@ namespace mongo {
     }
 
     QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
-        BufBuilder b(32768);
-
         ClientCursor *cc = ClientCursor::find(cursorid);
+        
+        int bufSize = 512;
+        if ( cc ){
+            bufSize += sizeof( QueryResult );
+            bufSize += ( ntoreturn ? 4 : 1 ) * 1024 * 1024;
+        }
+        BufBuilder b( bufSize );
 
         b.skip(sizeof(QueryResult));
 
@@ -1396,7 +1404,7 @@ namespace mongo {
         }
         else {
             
-            AuthenticationInfo *ai = authInfo.get();
+            AuthenticationInfo *ai = currentConnection.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 

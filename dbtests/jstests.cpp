@@ -17,6 +17,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stdafx.h"
 #include "../db/instance.h"
 
 #include "../stdafx.h"
@@ -45,26 +46,25 @@ namespace JSTests {
     class BasicScope {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
-            
-            s->setNumber( "x" , 5 );
-            assert( 5 == s->getNumber( "x" ) );
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->createScope() );
 
+            s->setNumber( "x" , 5 );
+            ASSERT( 5 == s->getNumber( "x" ) );
+            
             s->setNumber( "x" , 1.67 );
-            assert( 1.67 == s->getNumber( "x" ) );
+            ASSERT( 1.67 == s->getNumber( "x" ) );
 
             s->setString( "s" , "eliot was here" );
-            assert( "eliot was here" == s->getString( "s" ) );
+            ASSERT( "eliot was here" == s->getString( "s" ) );
             
             s->setBoolean( "b" , true );
-            assert( s->getBoolean( "b" ) );
+            ASSERT( s->getBoolean( "b" ) );
 
             if ( 0 ){
                 s->setBoolean( "b" , false );
-                assert( ! s->getBoolean( "b" ) );
+                ASSERT( ! s->getBoolean( "b" ) );
             }
-
-            delete s;
         }
     };
 
@@ -73,10 +73,10 @@ namespace JSTests {
         void run(){
             Scope * s = globalScriptEngine->createScope();
 
-            assert( ! s->getBoolean( "x" ) );
+            ASSERT( ! s->getBoolean( "x" ) );
             
             s->setString( "z" , "" );
-            assert( ! s->getBoolean( "z" ) );
+            ASSERT( ! s->getBoolean( "z" ) );
             
             
             delete s ;
@@ -89,21 +89,21 @@ namespace JSTests {
             Scope * s = globalScriptEngine->createScope();
 
             s->invoke( "x=5;" , BSONObj() );
-            assert( 5 == s->getNumber( "x" ) );
+            ASSERT( 5 == s->getNumber( "x" ) );
             
             s->invoke( "return 17;" , BSONObj() );
-            assert( 17 == s->getNumber( "return" ) );
+            ASSERT( 17 == s->getNumber( "return" ) );
             
             s->invoke( "function(){ return 17; }" , BSONObj() );
-            assert( 17 == s->getNumber( "return" ) );
+            ASSERT( 17 == s->getNumber( "return" ) );
             
             s->setNumber( "x" , 1.76 );
             s->invoke( "return x == 1.76; " , BSONObj() );
-            assert( s->getBoolean( "return" ) );
+            ASSERT( s->getBoolean( "return" ) );
 
             s->setNumber( "x" , 1.76 );
             s->invoke( "return x == 1.79; " , BSONObj() );
-            assert( ! s->getBoolean( "return" ) );
+            ASSERT( ! s->getBoolean( "return" ) );
 
             delete s;
         }
@@ -306,7 +306,7 @@ namespace JSTests {
 
             s->setObject( "z" , b.obj() );
             
-            assert( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , BSONObj() ) == 0 );
+            ASSERT( s->invoke( "y = { a : z.a , b : z.b , c : z.c , d: z.d }" , BSONObj() ) == 0 );
 
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( Timestamp , out["a"].type() );
@@ -539,7 +539,7 @@ namespace JSTests {
                 client.insert( _b , b.obj() );
             }
             
-            assert( client.eval( "unittest" , "x = db.dbref.b.findOne(); assert.eq( 17 , x.c.fetch().a , 'ref working' );" ) );
+            ASSERT( client.eval( "unittest" , "x = db.dbref.b.findOne(); assert.eq( 17 , x.c.fetch().a , 'ref working' );" ) );
         }
         
         void reset(){
@@ -597,12 +597,11 @@ namespace JSTests {
         void run(){
             Scope * s = globalScriptEngine->createScope();
             
-            assert( s->exec( "a = 5;" , "a" , false , true , false ) );
+            ASSERT( s->exec( "a = 5;" , "a" , false , true , false ) );
             ASSERT_EQUALS( 5 , s->getNumber("a" ) );
 
-            assert( s->exec( "var b = 6;" , "b" , false , true , false ) );
+            ASSERT( s->exec( "var b = 6;" , "b" , false , true , false ) );
             ASSERT_EQUALS( 6 , s->getNumber("b" ) );
-            cout << "WTF: " << s->getNumber("b" ) << endl;
             delete s;
         }
     };

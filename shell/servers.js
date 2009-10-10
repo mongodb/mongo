@@ -112,7 +112,7 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._serverNames = [];
 
     for ( var i=0; i<numServers; i++){
-        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" } );
+        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" , smallfiles : "" } );
         conn.name = "localhost:" + ( 30000 + i );
 
         this._connections.push( conn );
@@ -230,6 +230,7 @@ MongodRunner.prototype.start = function( reuseData ) {
     }
     args.push( "--nohttpinterface" );
     args.push( "--noprealloc" );
+    args.push( "--smallfiles" );
     args.push( "--bind_ip" );
     args.push( "127.0.0.1" );
     if ( this.extraArgs_ ) {
@@ -386,4 +387,53 @@ ReplPair.prototype.toString = function() {
     ret += " right: " + this.right_;
     ret += " " + this._annotatedNode( this.rightC_ );
     return ret;
+}
+
+
+ToolTest = function( name ){
+    this.name = name;
+    this.port = allocatePorts(1)[0];
+    this.baseName = "jstests_tool_" + name;
+    this.root = "/data/db/" + this.baseName;
+    this.dbpath = this.root + "/";
+    this.ext = this.root + "_external/";
+    this.extFile = this.root + "_external/a";
+    resetDbpath( this.dbpath );
+}
+
+ToolTest.prototype.startDB = function( coll ){
+    assert( ! this.m , "db already running" );
+ 
+    this.m = startMongoProgram( "mongod" , "--port", this.port , "--dbpath" , this.dbpath , "--nohttpinterface", "--noprealloc" , "--smallfiles" , "--bind_ip", "127.0.0.1" );
+    this.db = this.m.getDB( this.baseName );
+    if ( coll )
+        return this.db.getCollection( coll );
+    return this.db;
+}
+
+ToolTest.prototype.stop = function(){
+    if ( ! this.m )
+        return;
+    stopMongod( this.port );
+    this.m = null;
+    this.db = null;
+}
+
+ToolTest.prototype.runTool = function(){
+    var a = [ "mongo" + arguments[0] ];
+
+    var hasdbpath = false;
+    
+    for ( var i=1; i<arguments.length; i++ ){
+        a.push( arguments[i] );
+        if ( arguments[i] == "--dbpath" )
+            hasdbpath = true;
+    }
+
+    if ( ! hasdbpath ){
+        a.push( "--host" );
+        a.push( "127.0.0.1:" + this.port );
+    }
+
+    runMongoProgram.apply( null , a );
 }

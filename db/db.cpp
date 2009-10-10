@@ -147,8 +147,7 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "lasterror.h"
-#include "security.h"
+#include "connection.h"
 
 namespace mongo {
 
@@ -170,8 +169,9 @@ namespace mongo {
     */
     void connThread()
     {
-        AuthenticationInfo *ai = new AuthenticationInfo();
-        authInfo.reset(ai);
+        Connection::initThread();
+
+        /* todo: move to Connection object */
         LastError *le = new LastError();
         lastError.reset(le);
 
@@ -180,7 +180,7 @@ namespace mongo {
 
         try {
 
-            ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            currentConnection.get()->ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -282,7 +282,36 @@ namespace mongo {
     }
 
     bool shouldRepairDatabases = 0;
-
+    bool forceRepair = 0;
+    
+    bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
+        static DBDirectClient db;
+        
+        if ( h->version == 4 && h->versionMinor == 4 ){
+            assert( VERSION == 4 );
+            assert( VERSION_MINOR == 5 );
+            
+            list<string> colls = db.getCollectionNames( dbName );
+            for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++){
+                string c = *i;
+                log() << "\t upgrading collection:" << c << endl;
+                BSONObj out;
+                bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
+                if ( ! ok ){
+                    errmsg = "reindex failed";
+                    log() << "\t\t reindex failed: " << out << endl;
+                    return false;
+                }
+            }
+            
+            h->versionMinor = 5;
+            return true;
+        }
+        
+        // do this in the general case
+        return repairDatabase( dbName.c_str(), errmsg );
+    }
+    
     void repairDatabases() {
 
         dblock lk;
@@ -293,19 +322,19 @@ namespace mongo {
             assert( !setClientTempNs( dbName.c_str() ) );
             MongoDataFile *p = database->getFile( 0 );
             MDFHeader *h = p->getHeader();
-            if ( !h->currentVersion() ) {
+            if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
                       << "new version: " << VERSION << "." << VERSION_MINOR << endl;
                 if ( shouldRepairDatabases ){
                     // QUESTION: Repair even if file format is higher version than code?
-                    log() << "\t starting repair" << endl;
+                    log() << "\t starting upgrade" << endl;
                     string errmsg;
-                    assert( repairDatabase( dbName.c_str(), errmsg ) );
+                    assert( doDBUpgrade( dbName , errmsg , h ) );
                 }
                 else {
-                    log() << "\t Not repairing, exiting!" << endl;
+                    log() << "\t Not upgrading, exiting!" << endl;
                     log() << "\t run --upgrade to upgrade dbs, then start again" << endl;
                     log() << "****" << endl;
                     dbexit( EXIT_NEED_UPGRADE );
@@ -378,10 +407,13 @@ namespace mongo {
         massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
 
         acquirePathLock();
+        remove_all( dbpath + "/_tmp/" );
 
         theFileAllocator().start();
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
+
+        Connection::initThread();
 
         clearTmpCollections();
 
@@ -419,6 +451,14 @@ namespace mongo {
     }
     void initAndListen(int listenPort, const char *appserverLoc = null) {
         try { _initAndListen(listenPort, appserverLoc); }
+        catch ( std::exception &e ) {
+            problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
+        }
+        catch ( int& n ){
+            problem() << "exception in initAndListen int: " << n << ", terminating" << endl;
+            dbexit( EXIT_UNCAUGHT );
+        }
         catch(...) {
             log() << " exception in initAndListen, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
@@ -501,10 +541,12 @@ int main(int argc, char* argv[], char *envp[] )
         ("nohttpinterface", "disable http interface")
         ("noscripting", "disable scripting engine")
         ("noprealloc", "disable data file preallocation")
+        ("smallfiles", "use a smaller default file size")
         ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
         ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
+        ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
 #if defined(_WIN32)
         ("install", "install mongodb service")
@@ -692,7 +734,10 @@ int main(int argc, char* argv[], char *envp[] )
             useJNI = false;
         }
         if (params.count("noprealloc")) {
-            prealloc = false;
+            cmdLine.prealloc = false;
+        }
+        if (params.count("smallfiles")) {
+            cmdLine.smallfiles = true;
         }
         if (params.count("oplog")) {
             int x = params["oplog"].as<int>();
@@ -705,6 +750,10 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
             return 0;
+        }
+        if (params.count("repair")) {
+            shouldRepairDatabases = 1;
+            forceRepair = 1;
         }
         if (params.count("upgrade")) {
             shouldRepairDatabases = 1;
@@ -853,6 +902,16 @@ namespace mongo {
 
 #undef out
 
+    void exitCleanly() {
+        goingAway = true;
+        killCurrentOp = 1;
+        {
+            dblock lk;
+            log() << "now exiting" << endl;
+            dbexit( EXIT_KILL );        
+        }
+    }
+
 #if !defined(_WIN32)
 
 } // namespace mongo
@@ -893,11 +952,7 @@ namespace mongo {
         int x;
         sigwait( &asyncSignals, &x );
         log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
-        {
-            dblock lk;
-            log() << "now exiting" << endl;
-            dbexit( EXIT_KILL );
-        }
+        exitCleanly();
     }
 
     void setupSignals() {
@@ -917,11 +972,7 @@ namespace mongo {
 #else
 void ctrlCTerminate() {
     log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
-    {
-        dblock lk;
-        log() << "now exiting" << endl;
-        dbexit( EXIT_KILL );
-    }
+    exitCleanly();
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
 {

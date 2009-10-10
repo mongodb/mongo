@@ -29,8 +29,9 @@ DBCollection.prototype.getName = function(){
 DBCollection.prototype.help = function(){
     print("DBCollection help");
     print("\tdb.foo.getDB() get DB object associated with collection");
-    print("\tdb.foo.findOne(...)");
-    print("\tdb.foo.find( [{..}] , [{...}]) - first parameters is an optional filter, 2nd paramter is optional and what fields to return.  db.foo.find( { x : 1 } , { name : 1 , x : 1 } )");
+    print("\tdb.foo.findOne([query])");
+    print("\tdb.foo.find( [query] , [fields]) - first parameter is an optional query filter. second parameter is optional set of fields to return.");
+    print("\t                                   e.g. db.foo.find( { x : 77 } , { name : 1 , x : 1 } )");
     print("\tdb.foo.find(...).sort(...)");
     print("\tdb.foo.find(...).limit(n)");
     print("\tdb.foo.find(...).skip(n)");
@@ -51,7 +52,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.dataSize()");
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
     print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
-    print("\tdb.foo.totalSize() - storage allocated for all data and indexe data");
+    print("\tdb.foo.totalSize() - storage allocated for all data and indexes");
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -408,7 +409,7 @@ DBCollection.prototype.storageSize = function(){
     return this.stats().storageSize;
 }
 
-DBCollection.prototype.totalIndexSize = function(){
+DBCollection.prototype.totalIndexSize = function( verbose ){
     var total = 0;
     var mydb = this._db;
     var shortName = this._shortName;
@@ -416,8 +417,10 @@ DBCollection.prototype.totalIndexSize = function(){
         function( spec ){
             var coll = mydb.getCollection( shortName + ".$" + spec.name );
             var mysize = coll.dataSize();
-            //print( coll + "\t" + mysize + "\t" + tojson( coll.validate() ) );
             total += coll.dataSize();
+            if ( verbose ) {
+                print( coll + "\t" + mysize );
+            }
         }
     );
     return total;

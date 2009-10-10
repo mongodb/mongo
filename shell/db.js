@@ -249,6 +249,8 @@ DB.prototype.help = function() {
     print("\tdb.removeUser(username)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
     print("\tdb.getReplicationInfo()");
+    print("\tdb.printReplicationInfo()");
+    print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.getProfilingLevel()");
     print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
     print("\tdb.cloneDatabase(fromhost)");
@@ -257,7 +259,8 @@ DB.prototype.help = function() {
     print("\tdb.dropDatabase()");
     print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");
-    print("\tdb.getLastError()");
+    print("\tdb.getLastError() - just returns the err msg string");
+    print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getPrevError()");
     print("\tdb.resetError()");
     print("\tdb.getCollectionNames()");
@@ -455,6 +458,12 @@ DB.prototype.getLastError = function(){
         throw "getlasterror failed: " + tojson( res );
     return res.err;
 }
+DB.prototype.getLastErrorObj = function(){
+    var res = this.runCommand( { getlasterror : 1 } );
+    if ( ! res.ok )
+        throw "getlasterror failed: " + tojson( res );
+    return res;
+}
 
 /* Return the last error which has occurred, even if not the very last error.
 
@@ -503,6 +512,12 @@ DB.prototype.killOp = function(){
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
+DB.tsToSeconds = function(x){
+    if ( x.t && x.i )
+        return x.t / 1000;
+    return x / 4294967296; // low 32 bits are ordinal #s within a second
+}
+
 /** 
   Get a replication log information summary.
   <p>
@@ -521,16 +536,14 @@ DB.prototype.killOP = DB.prototype.killOp;
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() { 
-    if( "local" != this )
-	return { errmsg : "this command only works for database local" };
+    var db = this.getSisterDB("local");
 
     var result = { };
-    var db = this;
     var ol = db.system.namespaces.findOne({name:"local.oplog.$main"});
     if( ol && ol.options ) {
 	result.logSizeMB = ol.options.size / 1000 / 1000;
     } else {
-	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection";
+	result.errmsg  = "local.oplog.$main, or its options, not found in system.namespaces collection (not --master?)";
 	return result;
     }
 
@@ -547,11 +560,12 @@ DB.prototype.getReplicationInfo = function() {
     {
 	var tfirst = first.ts;
 	var tlast = last.ts;
+        
 	if( tfirst && tlast ) { 
-	    tfirst = tfirst / 4294967296; // low 32 bits are ordinal #s within a second
-	    tlast = tlast / 4294967296;
+	    tfirst = DB.tsToSeconds( tfirst ); 
+	    tlast = DB.tsToSeconds( tlast );
 	    result.timeDiff = tlast - tfirst;
-	    result.timeDiffHours = result.timeDiff / 3600;
+	    result.timeDiffHours = Math.round(result.timeDiff / 36)/100;
 	    result.tFirst = (new Date(tfirst*1000)).toString();
 	    result.tLast  = (new Date(tlast*1000)).toString();
 	    result.now = Date();
@@ -563,9 +577,43 @@ DB.prototype.getReplicationInfo = function() {
 
     return result;
 }
+DB.prototype.printReplicationInfo = function() {
+    var result = this.getReplicationInfo();
+    if( result.errmsg ) { 
+	print(tojson(result));
+	return;
+    }
+    print("configured oplog size:   " + result.logSizeMB + "MB");
+    print("log length start to end: " + result.timeDiff + "secs (" + result.timeDiffHours + "hrs)");
+    print("oplog first event time:  " + result.tFirst);
+    print("oplog last event time:   " + result.tLast);
+    print("now:                     " + result.now);
+}
+
+DB.prototype.printSlaveReplicationInfo = function() {
+    function g(x) {
+        print("source:   " + x.host);
+        var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
+        var now = new Date();
+        print("syncedTo: " + st.toString() );
+        var ago = (now-st)/1000;
+        var hrs = Math.round(ago/36)/100;
+        print("          = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+    }
+    var L = this.getSisterDB("local");
+    if( L.sources.count() == 0 ) { 
+        print("local.sources is empty; is this db a --slave?");
+        return;
+    }
+    L.sources.find().forEach(g);
+}
 
 DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
+}
+
+DB.prototype.serverStatus = function(){
+    return this._adminCommand( "serverStatus" );
 }
 
 DB.prototype.version = function(){

@@ -42,7 +42,7 @@ namespace mongo {
         static void ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name);
 
         /* fetch a single object from collection ns that matches query.
-           set your db context first.
+           set your db SavedContext first.
 
            @param requireIndex if true, complain if no index for the query.  a way to guard against
            writing a slow query.

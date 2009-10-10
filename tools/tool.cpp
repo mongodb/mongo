@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
+#include <pcrecpp.h>
 
 #include "util/file_allocator.h"
 
@@ -12,26 +13,6 @@ using namespace std;
 using namespace mongo;
 
 namespace po = boost::program_options;
-
-mongo::ProgressMeter::ProgressMeter( long long total , int secondsBetween )
-    : _total( total ) , _secondsBetween( secondsBetween ) , _done(0) , _hits(0) , _lastTime( time(0) ){
-
-}
-
-void mongo::ProgressMeter::hit( int n ){
-    _done += n;
-    _hits++;
-    if ( _hits % 100 )
-        return;
-    
-    int t = time(0);
-    if ( t - _lastTime < _secondsBetween )
-        return;
-
-    int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-    cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
-    _lastTime = t;
-}
 
 mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
     _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
@@ -141,6 +122,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         cerr << "connected to: " << _host << endl;
     }
     else {
+        Connection::initThread();
         _conn = new DBDirectClient();
         _host = "DIRECT";
         static string myDbpath = getParam( "dbpath" );
@@ -174,6 +156,24 @@ mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
     if ( _paired && slaveIfPaired )
         return ((DBClientPaired*)_conn)->slaveConn();
     return *_conn;
+}
+
+void mongo::Tool::needFields(){
+    uassert( "you need to specify fields" , hasParam( "fields" ) );
+
+    BSONObjBuilder b;
+    
+    string fields_arg = getParam("fields");
+    pcrecpp::StringPiece input(fields_arg);
+
+    string f;
+    pcrecpp::RE re("([\\w\\.]+),?" );
+    while ( re.Consume( &input, &f ) ){
+        _fields.push_back( f );
+        b.append( f.c_str() , 1 );
+    }
+    
+    _fieldsObj = b.obj();
 }
 
 void mongo::Tool::auth( string dbname ){

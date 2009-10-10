@@ -61,7 +61,7 @@ namespace mongo {
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
         void auth( string db = "" );
-
+        
         string _name;
 
         string _db;
@@ -70,7 +70,11 @@ namespace mongo {
         string _username;
         string _password;
 
+        void needFields();
+        vector<string> _fields;
+        BSONObj _fieldsObj;
 
+        
     private:
         string _host;
         mongo::DBClientBase * _conn;
@@ -84,27 +88,4 @@ namespace mongo {
 
     };
 
-    class ProgressMeter {
-    public:
-        ProgressMeter( long long total , int secondsBetween = 3 );
-        
-        void hit( int n = 1 );
-
-        long long done(){
-            return _done;
-        }
-        
-        long long hits(){
-            return _hits;
-        }
-
-    private:
-        
-        long long _total;
-        int _secondsBetween;
-
-        long long _done;
-        long long _hits;
-        int _lastTime;
-    };
 }

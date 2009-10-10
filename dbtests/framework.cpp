@@ -16,9 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "stdafx.h"
 #include <boost/program_options.hpp>
-
-#include "../stdafx.h"
 #include "framework.h"
 #include "../util/file_allocator.h"
 
@@ -67,7 +66,9 @@ namespace mongo {
         Result * Result::cur = 0;
 
         Result * Suite::run(){
+            log(1) << "\t about to setupTests" << endl;
             setupTests();
+            log(1) << "\t done setupTests" << endl;
 
             Result * r = new Result( _name );
             Result::cur = r;
@@ -79,7 +80,7 @@ namespace mongo {
 
                 bool passes = false;
                 
-                log(1) << "\t" << tc->getName() << endl;
+                log(1) << "\t going to run test: " << tc->getName() << endl;
                 
                 stringstream err;
                 err << tc->getName() << "\t";
@@ -93,7 +94,7 @@ namespace mongo {
                     delete( ae );
                 }
                 catch ( std::exception& e ){
-                    err << " exception " << " : " << e.what();
+                    err << " exception: " << e.what();
                 }
                 catch ( int x ){
                     err << " caught int : " << x << endl;
@@ -105,9 +106,14 @@ namespace mongo {
                 if ( ! passes ){
                     r->_fails++;
                     r->_messages.push_back( err.str() );
-                }
+                }	
             }
+            
+            if ( r->_fails )
+                r->_rc = 17;
 
+            log(1) << "\t DONE running tests" << endl;
+	    
             return r;
         }
 
@@ -132,6 +138,7 @@ namespace mongo {
                  "directory will be overwritten if it already exists")
                 ("debug", "run tests with verbose output")
                 ("list,l", "list available test suites")
+                ("verbose,v", "verbose")
                 ("seed", po::value<unsigned long long>(&seed), "random number seed")
                 ;
 
@@ -165,7 +172,7 @@ namespace mongo {
                 return EXIT_CLEAN;
             }
 
-            if (params.count("debug")) {
+            if (params.count("debug") || params.count("verbose") ) {
                 logLevel = 1;
             }
 
@@ -196,6 +203,7 @@ namespace mongo {
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
 
+            Connection::initThread();
             acquirePathLock();
 
             srand( seed );
@@ -259,12 +267,12 @@ namespace mongo {
                 cout << r->toString();
                 if ( abs( r->rc() ) > abs( rc ) )
                     rc = r->rc();
-
+                
                 tests += r->_tests;
                 fails += r->_fails;
                 asserts += r->_asserts;
             }
-
+            
             cout << "TOTALS  tests:" << tests << " fails: " << fails << " asserts calls: " << asserts << endl;
 
             return rc;
@@ -284,12 +292,10 @@ namespace mongo {
 
         void assert_fail( const char * exp , const char * file , unsigned line ){
             Result::cur->_asserts++;
-            Result::cur->_fails++;
             
-            stringstream ss;
-            ss << "ASSERT FAILED! " << file << ":" << line << endl;
-            log() << ss.str() << endl;
-            Result::cur->_messages.push_back( ss.str() );
+            MyAssertionException * e = new MyAssertionException();
+            e->ss << "ASSERT FAILED! " << file << ":" << line << endl;
+            throw e;
         }
 
         void fail( const char * exp , const char * file , unsigned line ){
@@ -322,30 +328,8 @@ namespace mongo {
             log() << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
         }
 
-        void MyAsserts::ae( double a , double b ){
+        void MyAsserts::_gotAssert(){
             Result::cur->_asserts++;
-            if ( a == b )
-                return;
-
-            printLocation();
-
-            MyAssertionException * e = getBase();
-            e->ss << a << " != " << b << endl;
-            log() << e->ss.str() << endl;
-            throw e;
-        }
-
-        void MyAsserts::ae( string a , string b ){
-            Result::cur->_asserts++;
-            if ( a == b )
-                return;
-            
-            printLocation();
-
-            MyAssertionException * e = getBase();
-            e->ss << a << " != " << b << endl;
-            log() << e->ss.str() << endl;
-            throw e;
         }
 
     }

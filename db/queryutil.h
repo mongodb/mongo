@@ -32,6 +32,11 @@ namespace mongo {
     };
 
     struct FieldInterval {
+        FieldInterval(){}
+        FieldInterval( const BSONElement& e ){
+            lower_.bound_ = upper_.bound_ = e;
+            lower_.inclusive_ = upper_.inclusive_ = true;
+        }
         FieldBound lower_;
         FieldBound upper_;
         bool valid() const {
@@ -59,8 +64,9 @@ namespace mongo {
         }
         bool nontrivial() const {
             return
-                minKey.firstElement().woCompare( min(), false ) != 0 ||
-                maxKey.firstElement().woCompare( max(), false ) != 0;
+                ! empty() && 
+                ( minKey.firstElement().woCompare( min(), false ) != 0 ||
+                  maxKey.firstElement().woCompare( max(), false ) != 0 );
         }
         bool empty() const { return intervals_.empty(); }
 		const vector< FieldInterval > &intervals() const { return intervals_; }

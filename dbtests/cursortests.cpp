@@ -17,6 +17,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "stdafx.h"
 #include "../db/clientcursor.h"
 #include "../db/instance.h"
 #include "../db/btree.h"
@@ -25,8 +26,9 @@
 
 namespace CursorTests {
     
-    typedef IdSet_Deprecated IdSet;
+//    typedef IdSet_Deprecated IdSet;
 
+/*
     namespace IdSetTests {
         
         class BasicSize {
@@ -105,7 +107,7 @@ namespace CursorTests {
         };
 
     } // namespace IdSetTests
-
+*/
     namespace BtreeCursorTests {
 
         class MultiRange {
@@ -199,8 +201,8 @@ namespace CursorTests {
         All() : Suite( "cursor" ){}
         
         void setupTests(){
-            add< IdSetTests::BasicSize >();
-            add< IdSetTests::Upgrade >();
+//            add< IdSetTests::BasicSize >();
+  //          add< IdSetTests::Upgrade >();
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();

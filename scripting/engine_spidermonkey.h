@@ -73,6 +73,7 @@ namespace mongo {
     extern JSClass bson_ro_class;
 
     extern JSClass object_id_class;
+    extern JSClass dbpointer_class;
     extern JSClass dbref_class;
     extern JSClass bindata_class;
     extern JSClass timestamp_class;

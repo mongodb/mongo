@@ -27,7 +27,7 @@
     try {                                                           \
         a;                                                          \
         mongo::regression::assert_fail( #a , __FILE__ , __LINE__ ); \
-    } catch ( b& x ){                                               \
+    } catch ( b& ){                                               \
         mongo::regression::assert_pass();                           \
     }
 
@@ -151,13 +151,26 @@ namespace mongo {
                 : _aexp( aexp ) , _bexp( bexp ) , _file( file ) , _line( line ){
 
             }
-
-            void ae( double a , double b );
-            void ae( string a , string b );
+            
+            template<typename A,typename B>
+            void ae( A a , B b ){
+                _gotAssert();
+                if ( a == b )
+                    return;
+                
+                printLocation();
+                    
+                MyAssertionException * e = getBase();
+                e->ss << a << " != " << b << endl;
+                log() << e->ss.str() << endl;
+                throw e;
+            }
             
             void printLocation();
-
+            
         private:
+            
+            void _gotAssert();
             
             MyAssertionException * getBase();
             

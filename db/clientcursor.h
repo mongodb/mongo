@@ -37,85 +37,48 @@ namespace mongo {
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
+
+    /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
+    */
     typedef map<CursorId, ClientCursor*> CCById;
-    extern CCById clientCursorsById;
+
+    typedef multimap<DiskLoc, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
-    // utility class for de duping ids
-    class IdSet_Deprecated {
-    public:
-        IdSet_Deprecated() : mySize_(), inMem_( true ) {}
-        ~IdSet_Deprecated() {
-            size_ -= mySize_;
-        }
-        bool get( const BSONObj &id ) const {
-            if ( inMem_ )
-                return mem_.count( id );
-            else
-                return db_.get( id );
-        }
-        void put( const BSONObj &id ) {
-            if ( inMem_ ) {
-                if ( mem_.insert( id.getOwned() ).second ) {
-                    int sizeInc = id.objsize() + sizeof( BSONObj );
-                    mySize_ += sizeInc;
-                    size_ += sizeInc;
-                }
-            } else {
-                db_.set( id, true );
-            }
-        }
-        void mayUpgradeStorage( const string &name ) {
-            if ( size_ > maxSize_ || mySize_ > maxSizePerSet() ) {
-                if ( !inMem_ )
-                    return;
-                log() << "upgrading id set to collection backed storage, cursorid: " << name << endl;
-                inMem_ = false;
-                db_.reset( "local.temp.clientcursor." + name, id_obj );
-                for( BSONObjSetDefaultOrder::const_iterator i = mem_.begin(); i != mem_.end(); ++i )
-                    db_.set( *i, true );
-                mem_.clear();
-                size_ -= mySize_;
-                mySize_ = 0;
-            }
-        }
-        bool inMem() const { return inMem_; }
-        long long mySize() { return mySize_; }
-        static long long aggregateSize() { return size_; }
-        
-        static long long maxSize_;
-    private:
-        string name_;
-        BSONObjSetDefaultOrder mem_;
-        DbSet db_;
-        long long mySize_;
-        static long long size_;
-        long long maxSizePerSet() const { return maxSize_ / 2; }
-        
-        bool inMem_;
-    };
-    
     class ClientCursor {
-        DiskLoc _lastLoc; // use getter and setter not this.
-        unsigned _idleAgeMillis; // how long has the cursor been around, relative to server idle time
-        bool _liveForever; // if true, never time out cursor
-        static CursorId allocCursorId();
+        friend class CmdCursorInfo;
+        DiskLoc _lastLoc;                        // use getter and setter not this (important)
+        unsigned _idleAgeMillis;                 // how long has the cursor been around, relative to server idle time
+        bool _liveForever;                       // if true, never time out cursor
+
+        static CCById clientCursorsById;
+        static CCByLoc byLoc;
+        static boost::recursive_mutex ccmutex;   // must use this for all statics above!
+
+        static CursorId allocCursorId_inlock();
+
     public:
-        ClientCursor() : _idleAgeMillis(0), _liveForever(false), cursorid( allocCursorId() ), pos(0) {
-            clientCursorsById.insert( make_pair(cursorid, this) );
-        }
-        ~ClientCursor();
-        const CursorId cursorid;
+        /*const*/ CursorId cursorid;
         string ns;
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
-//        auto_ptr<IdSet> ids_;
-        int pos; /* # objects into the cursor so far */
+        int pos;                                 // # objects into the cursor so far 
+
+        ClientCursor() : _idleAgeMillis(0), _liveForever(false), pos(0) {
+            recursive_boostlock lock(ccmutex);
+            cursorid = allocCursorId_inlock();
+            clientCursorsById.insert( make_pair(cursorid, this) );
+        }
+        ~ClientCursor();
+
         DiskLoc lastLoc() const {
             return _lastLoc;
         }
-        void setLastLoc(DiskLoc);
+    private:
+        void setLastLoc_inlock(DiskLoc);
+    public:
+
         auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
@@ -124,16 +87,8 @@ namespace mongo {
         */
         static void invalidate(const char *nsPrefix);
 
-        static bool erase(CursorId id) {
-            ClientCursor *cc = find(id);
-            if ( cc ) {
-                delete cc;
-                return true;
-            }
-            return false;
-        }
-
-        static ClientCursor* find(CursorId id, bool warn = true) {
+    private:
+        static ClientCursor* find_inlock(CursorId id, bool warn = true) {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {
                 if ( warn )
@@ -141,6 +96,21 @@ namespace mongo {
                 return 0;
             }
             return it->second;
+        }
+    public:
+        static ClientCursor* find(CursorId id, bool warn = true) { 
+            recursive_boostlock lock(ccmutex);
+            return find_inlock(id, warn);
+        }
+
+        static bool erase(CursorId id) {
+            recursive_boostlock lock(ccmutex);
+            ClientCursor *cc = find_inlock(id);
+            if ( cc ) {
+                delete cc;
+                return true;
+            }
+            return false;
         }
 
         /* call when cursor's location changes so that we can update the
@@ -152,7 +122,7 @@ namespace mongo {
         void cleanupByLocation(DiskLoc loc);
         
         void mayUpgradeStorage() {
-/*            if ( !ids_.get() )
+            /* if ( !ids_.get() )
                 return;
             stringstream ss;
             ss << ns << "." << cursorid;
@@ -171,9 +141,18 @@ namespace mongo {
             return _idleAgeMillis;
         }
 
-        void liveForever(){
+        static void idleTimeReport(unsigned millis);
+
+        void liveForever() {
             _liveForever = true;
         }
+
+        static unsigned byLocSize();        // just for diagnostics
+//        static void idleTimeReport(unsigned millis);
+
+        static void informAboutToDeleteBucket(const DiskLoc& b);
+        static void aboutToDelete(const DiskLoc& dl);
     };
+
     
 } // namespace mongo
