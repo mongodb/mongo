@@ -46,11 +46,12 @@ namespace JSTests {
     class BasicScope {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
-            
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->createScope() );
+
             s->setNumber( "x" , 5 );
             ASSERT( 5 == s->getNumber( "x" ) );
-
+            
             s->setNumber( "x" , 1.67 );
             ASSERT( 1.67 == s->getNumber( "x" ) );
 
@@ -64,8 +65,6 @@ namespace JSTests {
                 s->setBoolean( "b" , false );
                 ASSERT( ! s->getBoolean( "b" ) );
             }
-
-            delete s;
         }
     };
 

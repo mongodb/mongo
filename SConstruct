@@ -101,6 +101,13 @@ AddOption('--usesm',
           action="store",
           help="use spider monkey for javascript" )
 
+AddOption('--usev8',
+          dest='usev8',
+          type="string",
+          nargs=0,
+          action="store",
+          help="use v8 for javascript" )
+
 AddOption('--usejvm',
           dest='usejvm',
           type="string",
@@ -213,6 +220,7 @@ noshell = not GetOption( "noshell" ) is None
 nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
+usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
@@ -244,7 +252,7 @@ if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
     Exit(1)
 
-if ( not ( usesm or usejvm ) ):
+if ( not ( usesm or usejvm or usev8 ) ):
     usesm = True
 
 if GetOption( "extrapath" ) is not None:
@@ -283,6 +291,9 @@ serverOnlyFiles = Split( "db/query.cpp db/introspect.cpp db/btree.cpp db/clientc
 
 if usesm:
     commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    nojni = True
+elif usev8:
+    commonFiles += [ Glob( "scripting/*v8*.cpp" ) ]
     nojni = True
 elif not nojni:
     commonFiles += [ "scripting/engine_java.cpp" ]
@@ -547,6 +558,10 @@ if nix:
         #Depends( "stdafx.o" , "stdafx.h.gch" )
         #SideEffect( "dummyGCHSideEffect" , "stdafx.h.gch" )
 
+if usev8:
+    env.Append( CPPPATH=["../v8/include/"] )
+    env.Append( LIBPATH=["../v8/"] )
+
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -721,6 +736,9 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             else:
                 print( "no spider monkey headers!" )
                 Exit(1)
+
+    if usev8:
+        myCheckLib( "v8" , True )
 
     if shell:
         haveReadLine = False
