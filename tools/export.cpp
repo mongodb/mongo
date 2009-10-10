@@ -47,8 +47,21 @@ public:
         const bool csv = hasParam( "csv" );
         ostream *outPtr = &cout;
         string outfile = getParam( "out" );
-        if ( hasParam( "out" ) )
-            outPtr = new ofstream( outfile.c_str() );
+        auto_ptr<ofstream> fileStream;
+        if ( hasParam( "out" ) ){
+            size_t idx = outfile.rfind( "/" );
+            if ( idx != string::npos ){
+                string dir = outfile.substr( 0 , idx + 1 );
+                create_directories( dir );
+            }
+            ofstream * s = new ofstream( outfile.c_str() , ios_base::out | ios_base::binary );
+            fileStream.reset( s );
+            outPtr = s;
+            if ( ! s->good() ){
+                cerr << "couldn't open [" << outfile << "]" << endl;
+                return -1;
+            }
+        }
         ostream &out = *outPtr;
 
         BSONObj * fieldsToReturn = 0;
@@ -85,8 +98,10 @@ public:
             }
             out << endl;
         }
-
+        
+        long long num = 0;
         while ( cursor->more() ) {
+            num++;
             BSONObj obj = cursor->next();
             if ( csv ){
                 for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ){
@@ -104,6 +119,8 @@ public:
             }
         }
 
+        
+        cout << "exported " << num << " records" << endl;
 
         return 0;
     }
