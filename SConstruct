@@ -1237,7 +1237,7 @@ installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
 
 installBinary( env , "mongoexport" )
-installBinary( env , "mongoimportjson" )
+installBinary( env , "mongoimport" )
 
 installBinary( env , "mongofiles" )
 
