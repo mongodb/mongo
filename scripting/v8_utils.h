@@ -21,7 +21,9 @@ namespace mongo {
     
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o );
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::TryCatch> * try_catch );
+
     std::string toSTLString( const v8::Handle<v8::Value> & o );
+    std::string toSTLString( const v8::TryCatch * try_catch );
 
 }
 

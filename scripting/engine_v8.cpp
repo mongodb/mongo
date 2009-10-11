@@ -12,7 +12,6 @@ namespace mongo {
         
         _globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
         _globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
-        
     }
 
     V8ScriptEngine::~V8ScriptEngine(){
@@ -31,7 +30,7 @@ namespace mongo {
           _context( Context::New( 0 , engine->_globalTemplate ) ) ,
           _scope( _context ) ,
           _global( _context->Global() ){
-        
+        _this = v8::Object::New();
     }
 
     V8Scope::~V8Scope(){
@@ -82,6 +81,78 @@ namespace mongo {
         return _global->Get( v8::String::New( field ) )->ToBoolean()->Value();
     }
 
+    ScriptingFunction V8Scope::_createFunction( const char * raw ){
+        
+        string code = raw;
+        if ( code.find( "function" ) == string::npos ){
+            code = "function(){ " + code + "}";
+        }
+        
+        int num = _funcs.size() + 1;
+
+        string fn;
+        {
+            stringstream ss;
+            ss << "_funcs" << num;
+            fn = ss.str();
+        }
+        
+        code = fn + " = " + code;
+
+        TryCatch try_catch;
+        Handle<Script> script = v8::Script::Compile( v8::String::New( code.c_str() ) , 
+                                                     v8::String::New( fn.c_str() ) );
+        if ( script.IsEmpty() ){
+            _error = (string)"compile error: " + toSTLString( &try_catch );
+            log() << _error << endl;
+            return 0;
+        }
+        
+        Local<Value> result = script->Run();
+        if ( result.IsEmpty() ){
+            _error = (string)"compile error: " + toSTLString( &try_catch );
+            log() << _error << endl;
+            return 0;
+        }        
+        
+        Handle<Value> f = _global->Get( v8::String::New( fn.c_str() ) );
+        cout << "HERE : " << f << endl;
+        uassert( "not a func" , f->IsFunction() );
+        _funcs.push_back( f );
+        return num;
+    }
+    
+    int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
+        Handle<Value> funcValue = _funcs[func-1];
+        
+        TryCatch try_catch;        
+        int nargs = argsObject.nFields();
+        auto_ptr< Handle<Value> > args;
+        if ( nargs ){
+            args.reset( new Handle<Value>[nargs] );
+            BSONObjIterator it( argsObject );
+            for ( int i=0; i<nargs; i++ ){
+                BSONElement next = it.next();
+                args.get()[i] = mongoToV8Element( next );
+            }
+        }
+        Local<Value> result = ((v8::Function*)(*funcValue))->Call( _this , nargs , args.get() );
+                
+        if ( result.IsEmpty() ){
+            stringstream ss;
+            ss << "error in invoke: " << toSTLString( &try_catch );
+            _error = ss.str();
+            log() << _error << endl;
+            return 1;
+        }
+
+        if ( ! ignoreReturn ){
+            _global->Set( v8::String::New( "return" ) , result );
+        }
+
+        return 0;
+    }
+
     bool V8Scope::exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
 
         if ( timeoutMs ){
@@ -99,10 +170,10 @@ namespace mongo {
                                                      v8::String::New( name.c_str() ) );
         if (script.IsEmpty()) {
             stringstream ss;
-            ss << "compile error: " << &try_catch;
+            ss << "compile error: " << toSTLString( &try_catch );
             _error = ss.str();
             if (reportError)
-                ReportException(&try_catch);
+                log() << _error << endl;
             if ( assertOnError )
                 uassert( _error , 0 );
             return false;
@@ -114,7 +185,7 @@ namespace mongo {
             ss << "exec error: " << &try_catch;
             _error = ss.str();
             if ( reportError )
-                ReportException(&try_catch);
+                log() << _error << endl;
             if ( assertOnError )
                 uassert( _error , 0 );
             return false;

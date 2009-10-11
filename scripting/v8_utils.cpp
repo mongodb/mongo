@@ -36,6 +36,45 @@ namespace mongo {
         return s;
     }
 
+    std::string toSTLString( const v8::TryCatch * try_catch ){
+        
+        stringstream ss;
+        
+        while ( try_catch ){
+            
+            v8::String::Utf8Value exception(try_catch->Exception());
+            Handle<v8::Message> message = try_catch->Message();
+            
+            if (message.IsEmpty()) {
+                ss << *exception << endl;
+            } 
+            else {
+                
+                v8::String::Utf8Value filename(message->GetScriptResourceName());
+                int linenum = message->GetLineNumber();
+                ss << *filename << ":" << linenum << " " << *exception << endl;
+                
+                v8::String::Utf8Value sourceline(message->GetSourceLine());
+                ss << *sourceline << endl;
+                
+                int start = message->GetStartColumn();
+                for (int i = 0; i < start; i++)
+                    ss << " ";
+                
+                int end = message->GetEndColumn();
+                for (int i = start; i < end; i++)
+                    ss << "^";
+                
+                ss << endl;
+            }    
+            
+            try_catch = try_catch->next_;
+        }
+        
+        return ss.str();
+    }
+
+
     std::ostream& operator<<( std::ostream &s, const Handle<v8::Value> & o ){
         v8::String::Utf8Value str(o);    
         s << *str;
