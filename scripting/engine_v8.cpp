@@ -5,8 +5,13 @@
 
 namespace mongo {
 
+    // --- engine ---
+
     V8ScriptEngine::V8ScriptEngine()
         : _handleScope() , _globalTemplate( ObjectTemplate::New() ) {
+        
+        _globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
+        _globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
         
     }
 
@@ -19,6 +24,8 @@ namespace mongo {
         }
     }
 
+    // --- scope ---
+    
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
         : _handleScope(),
           _context( Context::New( 0 , engine->_globalTemplate ) ) ,
@@ -73,6 +80,55 @@ namespace mongo {
 
     bool V8Scope::getBoolean( const char *field ){ 
         return _global->Get( v8::String::New( field ) )->ToBoolean()->Value();
+    }
+
+    bool V8Scope::exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
+
+        if ( timeoutMs ){
+            static bool t = 1;
+            if ( t ){
+                log() << "timeoutMs not support for v8 yet" << endl;
+                t = 0;
+            }
+        }
+        
+        HandleScope handle_scope;
+        TryCatch try_catch;
+    
+        Handle<Script> script = v8::Script::Compile( v8::String::New( code.c_str() ) , 
+                                                     v8::String::New( name.c_str() ) );
+        if (script.IsEmpty()) {
+            stringstream ss;
+            ss << "compile error: " << &try_catch;
+            _error = ss.str();
+            if (reportError)
+                ReportException(&try_catch);
+            if ( assertOnError )
+                uassert( _error , 0 );
+            return false;
+        } 
+    
+        Handle<v8::Value> result = script->Run();
+        if ( result.IsEmpty() ){
+            stringstream ss;
+            ss << "exec error: " << &try_catch;
+            _error = ss.str();
+            if ( reportError )
+                ReportException(&try_catch);
+            if ( assertOnError )
+                uassert( _error , 0 );
+            return false;
+        } 
+        
+        if ( printResult ){
+            cout << toSTLString( result ) << endl;
+        }
+        
+        return true;
+    }
+
+    void V8Scope::_startCall(){
+        _error = "";
     }
     
 } // namespace mongo

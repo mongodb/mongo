@@ -37,8 +37,8 @@ namespace mongo {
         
         virtual ScriptingFunction _createFunction( const char * code ){ assert( false ); return 0; }
         virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false ){ assert(0); return 0;}
-        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){ assert(0); return 0; }
-        virtual string getError(){ assert( false ); return ""; }
+        virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
+        virtual string getError(){ return _error; }
         
         virtual void injectNative( const char *field, NativeFunction func ){
             Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
@@ -49,13 +49,16 @@ namespace mongo {
         void gc(){ assert(0); }
 
     private:
-
+        void _startCall();
+        
         static Handle< Value > nativeCallback( const Arguments &args );
 
         HandleScope _handleScope;
         Handle<Context> _context;
         Context::Scope _scope;
         Handle<v8::Object> _global;
+
+        string _error;
     };
     
     class V8ScriptEngine : public ScriptEngine {

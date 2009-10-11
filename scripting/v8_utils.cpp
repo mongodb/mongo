@@ -81,56 +81,8 @@ namespace mongo {
         return v8::String::New(v8::V8::GetVersion());
     }
 
-    bool ExecuteString(Handle<v8::String> source, Handle<v8::Value> name,
-                       bool print_result, bool report_exceptions ){
-    
-        HandleScope handle_scope;
-        v8::TryCatch try_catch;
-    
-        Handle<v8::Script> script = v8::Script::Compile(source, name);
-        if (script.IsEmpty()) {
-            if (report_exceptions)
-                ReportException(&try_catch);
-            return false;
-        } 
-    
-        Handle<v8::Value> result = script->Run();
-        if ( result.IsEmpty() ){
-            if (report_exceptions)
-                ReportException(&try_catch);
-            return false;
-        } 
-    
-        if ( print_result ){
-        
-            Local<Context> current = Context::GetCurrent();
-            Local<Object> global = current->Global();
-        
-            Local<Value> shellPrint = global->Get( String::New( "shellPrint" ) );
-
-            if ( shellPrint->IsFunction() ){
-                v8::Function * f = (v8::Function*)(*shellPrint);
-                Handle<v8::Value> argv[1];
-                argv[0] = result;
-                f->Call( global , 1 , argv );
-            }
-            else if ( ! result->IsUndefined() ){
-                cout << result << endl;
-            }
-        }
-    
-        return true;
-    }
-
     void ReportException(v8::TryCatch* try_catch) {
         cout << try_catch << endl;
-    }
-
-    extern v8::Handle< v8::Context > baseContext_;
-    
-    void installShellUtils( Handle<v8::ObjectTemplate>& global ){
-        global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
-        global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
     }
 
 }
