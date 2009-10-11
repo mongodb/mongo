@@ -104,6 +104,9 @@ namespace JSTests {
             s->setNumber( "x" , 1.76 );
             s->invoke( "return x == 1.79; " , BSONObj() );
             ASSERT( ! s->getBoolean( "return" ) );
+            
+            s->invoke( "function( z ){ return 5 + z; }" , BSON( "" << 11 ) );
+            ASSERT_EQUALS( 16 , s->getNumber( "return" ) );
 
             delete s;
         }
