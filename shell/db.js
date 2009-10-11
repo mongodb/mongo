@@ -271,10 +271,11 @@ DB.prototype.help = function() {
 }
 
 DB.prototype.printCollectionStats = function(){
+    var mydb = this;
     this.getCollectionNames().forEach(
         function(z){
             print( z );
-            printjson( db[z].stats() );
+            printjson( mydb.getCollection(z).stats() );
             print( "---" );
         }
     );
