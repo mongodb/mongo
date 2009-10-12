@@ -129,6 +129,9 @@ namespace JSTests {
             s->invoke( "return this.z;" , BSONObj() );
             ASSERT_EQUALS( "sara" , s->getString( "return" ) );
 
+            s->invoke( "return this.z == 'sara';" , BSONObj() );
+            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+
             s->invoke( "this.z == 'sara';" , BSONObj() );
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
 
@@ -151,6 +154,12 @@ namespace JSTests {
             ASSERT_EQUALS( true , s->getBoolean( "return" ) );
             
             s->invoke( "function z(){ return this.x == 18; }" , BSONObj() );
+            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+
+            s->invoke( "function (){ this.x == 17; }" , BSONObj() );
+            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            
+            s->invoke( "function z(){ this.x == 18; }" , BSONObj() );
             ASSERT_EQUALS( false , s->getBoolean( "return" ) );
 
             s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , BSONObj() );
