@@ -20,6 +20,16 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{2CABB3B8-C9A6-478D-9463-0B37799ED708}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
+	ProjectSection(SolutionItems) = preProject
+		..\tools\bridge.cpp = ..\tools\bridge.cpp
+		..\tools\dump.cpp = ..\tools\dump.cpp
+		..\tools\export.cpp = ..\tools\export.cpp
+		..\tools\files.cpp = ..\tools\files.cpp
+		..\tools\import.cpp = ..\tools\import.cpp
+		..\tools\restore.cpp = ..\tools\restore.cpp
+		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
+		..\tools\tool.cpp = ..\tools\tool.cpp
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\s\dbgrid.vcproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
 EndProject
