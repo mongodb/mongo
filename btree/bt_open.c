@@ -119,7 +119,7 @@ __wt_bt_server_start(WT_TOC *toc, WT_PAGE *page)
 	__wt_bt_first_offp(page, &addr, &isleaf);
 
 	if (isleaf || page->indx_count > 100) {
-		srvr_id = 1;	
+		srvr_id = 1;
 		n = 0;
 		per_server = page->indx_count / idb->srvrq_entries;
 
@@ -146,7 +146,7 @@ __wt_bt_server_start(WT_TOC *toc, WT_PAGE *page)
 		}
 
 		/* Walk the 2nd level of the tree, assign items to servers. */
-		srvr_id = 1;	
+		srvr_id = 1;
 		n = 0;
 		per_server = cnt / idb->srvrq_entries;
 
@@ -207,7 +207,7 @@ __wt_bt_vrfy_sizes(DB *db)
 	 * If the values haven't been set, set the defaults.
 	 *
 	 * Default to a small fragment size, so overflow items don't consume
-	 * a lot of space.  
+	 * a lot of space.
 	 */
 	if (db->allocsize == 0)
 		db->allocsize = 512;

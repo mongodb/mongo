@@ -522,12 +522,12 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_ITEM_LEN_SET(&data_item, sizeof(WT_ITEM_OFFP));
 	WT_ITEM_TYPE_SET(&data_item,
 	    root_addr == page->addr ? WT_ITEM_OFFP_LEAF : WT_ITEM_OFFP_INTL);
-	WT_64_CAST(offpage_item.records) = dup_count, 
+	WT_64_CAST(offpage_item.records) = dup_count,
 	offpage_item.addr = root_addr;
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
 	memcpy(p + sizeof(data_item), &offpage_item, sizeof(offpage_item));
-	__wt_set_ff_and_sa_from_addr(db, leaf_page, 
+	__wt_set_ff_and_sa_from_addr(db, leaf_page,
 	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP)));
 
 	return (ret);
@@ -735,7 +735,7 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 
 	/* Create the OFFP reference. */
 	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
-	WT_ITEM_TYPE_SET(&item, 
+	WT_ITEM_TYPE_SET(&item,
 	    page->hdr->type == WT_PAGE_INT ||
 	    page->hdr->type == WT_PAGE_DUP_INT ?
 	    WT_ITEM_OFFP_INTL : WT_ITEM_OFFP_LEAF);

@@ -26,7 +26,7 @@ __wt_bt_build_verify(void)
 		{ sizeof(WT_ITEM_OFFP), WT_ITEM_OFFP_SIZE, "WT_ITEM_OFFP" },
 		{ sizeof(WT_ITEM_OVFL), WT_ITEM_OVFL_SIZE, "WT_ITEM_OVFL" }
 	}, *lp;
-		
+
 	/*
 	 * The compiler had better not have padded our structures -- make
 	 * sure the page header structure is exactly what we expect.

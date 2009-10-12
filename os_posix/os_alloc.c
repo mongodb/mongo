@@ -14,7 +14,7 @@
 The memory debugger included in the WiredTiger sources tracks allocations and
 frees, but doesn't do any kind of overrun detection.
 
-1. Build the WiredTiger library with the --enable-diagnostic_memory 
+1. Build the WiredTiger library with the --enable-diagnostic_memory
    configuration option.
 2. Run your test program.
 3. A file will have been created named "memory.out".

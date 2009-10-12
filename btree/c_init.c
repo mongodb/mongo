@@ -85,7 +85,7 @@ __wt_cache_destroy(WT_TOC *toc, WT_CACHE **cache_addr)
 	/* Discard allocated memory. */
 	WT_FREE_AND_CLEAR(env, cache->hqh);
 	WT_FREE_AND_CLEAR(env, *cache_addr);
-		
+
 	return (ret);
 }
 
