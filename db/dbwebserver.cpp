@@ -457,7 +457,7 @@ namespace mongo {
 
     void webServerThread() {
         boost::thread thr(statsThread);
-        Connection::initThread();
+        Client::initThread();
         DbWebServer mini;
         int p = cmdLine.port + 1000;
         if ( mini.init(bind_ip, p) ) {

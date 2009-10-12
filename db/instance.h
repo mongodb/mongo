@@ -23,7 +23,7 @@
 #include "curop.h"
 #include "security.h"
 #include "cmdline.h"
-#include "connection.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -134,13 +134,13 @@ namespace mongo {
                 dblock lk;
                 if ( database )
                     oldName = database->name;
-                Connection *c = currentConnection.get();
+                Client *c = currentClient.get();
                 oldAuth = c->ai;
                 // careful, don't want to free this:
                 c->ai = &always;
             }
             ~SavedContext() {
-                Connection *c = currentConnection.get();
+                Client *c = currentClient.get();
                 c->ai = oldAuth;
                 if ( !oldName.empty() ) {
                     dblock lk;

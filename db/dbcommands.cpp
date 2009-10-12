@@ -218,7 +218,7 @@ namespace mongo {
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( noauth ) {
                 // if running without auth, you must be on localhost
-                AuthenticationInfo *ai = currentConnection.get()->ai;
+                AuthenticationInfo *ai = currentClient.get()->ai;
                 if( !ai->isLocalHost ) {
                     log() << "ignoring shutdown cmd from client, not from localhost and running without auth" << endl;
                     errmsg = "unauthorized [2]";
@@ -1488,7 +1488,7 @@ namespace mongo {
             valid = true;
             string errmsg;
             Command *c = i->second;
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
 
             bool admin = c->adminOnly();
@@ -1523,7 +1523,7 @@ namespace mongo {
                 anObjBuilder.append("errmsg", errmsg);
         }
         else if ( e.type() == String ) {
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
             /* { count: "collectionname"[, query: <query>] } */

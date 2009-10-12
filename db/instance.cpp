@@ -103,7 +103,7 @@ namespace mongo {
     
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        AuthenticationInfo *ai = currentConnection.get()->ai;
+        AuthenticationInfo *ai = currentClient.get()->ai;
         if( !ai->isAuthorized("admin") ) { 
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
@@ -206,7 +206,7 @@ namespace mongo {
             char cl[256];
             nsToClient(ns, cl);
             strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
@@ -445,7 +445,7 @@ namespace mongo {
         ss << " ntoreturn:" << ntoreturn;
         QueryResult* msgdata;
         try {
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid);
         }
@@ -509,7 +509,7 @@ namespace mongo {
     void jniCallbackDeprecated(Message& m, Message& out)
     {
 		/* we should be in the same thread as the original request, so authInfo should be available. */
-        AuthenticationInfo *ai = currentConnection.get()->ai;
+        AuthenticationInfo *ai = currentClient.get()->ai;
         
         Database *clientOld = database;
 

@@ -571,7 +571,7 @@ namespace JsonTests {
         class EscapedUnicodeToUtf8 : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                char u[ 7 ];
+                unsigned char u[ 7 ];
                 u[ 0 ] = 0xe0 | 0x0a;
                 u[ 1 ] = 0x80;
                 u[ 2 ] = 0x80;
@@ -579,9 +579,9 @@ namespace JsonTests {
                 u[ 4 ] = 0x80;
                 u[ 5 ] = 0x80;
                 u[ 6 ] = 0;
-                b.append( "a", u );
+                b.append( "a", (char *) u );
                 BSONObj built = b.obj();
-                ASSERT_EQUALS( string( u ), built.firstElement().valuestr() );
+                ASSERT_EQUALS( string( (char *) u ), built.firstElement().valuestr() );
                 return built;
             }
             virtual string json() const {
@@ -592,7 +592,7 @@ namespace JsonTests {
         class Utf8AllOnes : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                char u[ 8 ];
+                unsigned char u[ 8 ];
                 u[ 0 ] = 0x01;
 
                 u[ 1 ] = 0x7f;
@@ -606,7 +606,7 @@ namespace JsonTests {
 
                 u[ 7 ] = 0;
 
-                b.append( "a", u );
+                b.append( "a", (char *) u );
                 return b.obj();
             }
             virtual string json() const {
@@ -617,7 +617,7 @@ namespace JsonTests {
         class Utf8FirstByteOnes : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                char u[ 6 ];
+                unsigned char u[ 6 ];
                 u[ 0 ] = 0xdc;
                 u[ 1 ] = 0x80;
 
@@ -627,7 +627,7 @@ namespace JsonTests {
 
                 u[ 5 ] = 0;
 
-                b.append( "a", u );
+                b.append( "a", (char *) u );
                 return b.obj();
             }
             virtual string json() const {
@@ -744,7 +744,7 @@ namespace JsonTests {
 
         class BinDataAllChars : public Base {
             virtual BSONObj bson() const {
-                char z[] = {
+                unsigned char z[] = {
                     0x00, 0x10, 0x83, 0x10, 0x51, 0x87, 0x20, 0x92, 0x8B, 0x30,
                     0xD3, 0x8F, 0x41, 0x14, 0x93, 0x51, 0x55, 0x97, 0x61, 0x96,
                     0x9B, 0x71, 0xD7, 0x9F, 0x82, 0x18, 0xA3, 0x92, 0x59, 0xA7,

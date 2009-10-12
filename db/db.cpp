@@ -147,7 +147,7 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "connection.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -169,9 +169,9 @@ namespace mongo {
     */
     void connThread()
     {
-        Connection::initThread();
+        Client::initThread();
 
-        /* todo: move to Connection object */
+        /* todo: move to Client object */
         LastError *le = new LastError();
         lastError.reset(le);
 
@@ -180,7 +180,7 @@ namespace mongo {
 
         try {
 
-            currentConnection.get()->ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            currentClient.get()->ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -413,7 +413,7 @@ namespace mongo {
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
-        Connection::initThread();
+        Client::initThread();
 
         clearTmpCollections();
 

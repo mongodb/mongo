@@ -55,7 +55,8 @@ namespace BasicTests {
             ASSERT_EQUALS( s , base64::decode( base64::encode( s ) ) );
         }
         
-        void roundTrip( const char * data , int len ){
+        void roundTrip( const unsigned char * _data , int len ){
+            const char *data = (const char *) _data;
             string s = base64::encode( data , len );
             string out = base64::decode( s );
             ASSERT_EQUALS( out.size() , len );
@@ -95,10 +96,10 @@ namespace BasicTests {
             roundTrip( "eliots" );
             roundTrip( "eliotsz" );
             
-            char z[] = { 0x1 , 0x2 , 0x3 , 0x4 };
+            unsigned char z[] = { 0x1 , 0x2 , 0x3 , 0x4 };
             roundTrip( z , 4 );
             
-            char y[] = {
+            unsigned char y[] = {
                 0x01, 0x10, 0x83, 0x10, 0x51, 0x87, 0x20, 0x92, 0x8B, 0x30,
                 0xD3, 0x8F, 0x41, 0x14, 0x93, 0x51, 0x55, 0x97, 0x61, 0x96,
                 0x9B, 0x71, 0xD7, 0x9F, 0x82, 0x18, 0xA3, 0x92, 0x59, 0xA7,

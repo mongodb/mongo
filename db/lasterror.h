@@ -63,15 +63,12 @@ namespace mongo {
         
     };
 
-    typedef pair<int,LastError*> LastErrorStatus ;
-    typedef map<int,LastErrorStatus> LastErrorIDMap;
-
-    class LastErrorHolder {
+    extern class LastErrorHolder {
     public:
-        
         LastErrorHolder() : _id( 0 ){}
 
         LastError * get( bool create = false );
+
         void reset( LastError * le );
         
         /**
@@ -83,17 +80,21 @@ namespace mongo {
         void remove( int id );
         void release();
         
-        void startRequest( Message& m , LastError * connectionOwned = 0 );
+        /** when db receives a message/request, call this */
+        void startRequest( Message& m , LastError * connectionOwned );
+        void startRequest( Message& m );
     private:
-        
         ThreadLocalInt _id;
         boost::thread_specific_ptr<LastError> _tl;
         
-        LastErrorIDMap _ids;        
-    };
+        struct Status {
+            time_t time;
+            LastError *lerr;
+        };
+        static boost::mutex _idsmutex;
+        map<int,Status> _ids;        
+    } lastError;
     
-    extern LastErrorHolder lastError;
-
     inline void raiseError(const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {

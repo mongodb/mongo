@@ -4,7 +4,7 @@
 
 #include "namespace.h"
 #include "security.h"
-#include "connection.h"
+#include "client.h"
 
 namespace mongo { 
 
@@ -38,7 +38,7 @@ namespace mongo {
         }
 
         BSONObj info() { 
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             if( !ai->isAuthorized("admin") ) { 
                 BSONObjBuilder b;
                 b.append("err", "unauthorized");

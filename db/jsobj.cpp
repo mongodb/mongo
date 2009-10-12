@@ -1440,7 +1440,7 @@ namespace mongo {
         case Array:
             appendArray( field.c_str() , BSONObj() ); return;
         case BinData:
-            appendBinData( field.c_str() , 0 , Function , 0 ); return;
+            appendBinData( field.c_str() , 0 , Function , (const char *) 0 ); return;
         case Undefined:
             appendUndefined( field.c_str() ); return;
         case RegEx: appendRegex( field.c_str() , "" ); return;
