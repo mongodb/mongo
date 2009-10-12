@@ -97,6 +97,16 @@ namespace mongo {
             break;
         }
         case BSONObj::opMOD: {
+            {
+                BSONObjBuilder b;
+                b.appendMinForType( "" , NumberDouble );
+                lower = addObj( b.obj() ).firstElement();
+            }
+            {
+                BSONObjBuilder b;
+                b.appendMaxForType( "" , NumberDouble );
+                upper = addObj( b.obj() ).firstElement();
+            }            
             break;
         }
         case BSONObj::opTYPE: {
