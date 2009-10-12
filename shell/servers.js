@@ -138,7 +138,7 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
 
     this._serverNames.forEach(
         function(z){
-            admin.runCommand( { addshard : z } );
+            admin.runCommand( { addshard : z , allowLocal : true } );
         }
     );
 }

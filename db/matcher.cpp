@@ -156,108 +156,78 @@ namespace mongo {
             if ( e.type() == Object ) {
                 // e.g., fe == { $gt : 3 }
                 BSONObjIterator j(e.embeddedObject());
-                bool ok = false;
-                while ( j.moreWithEOO() ) {
+                bool isOperator = false;
+                while ( j.more() ) {
                     BSONElement fe = j.next();
-                    if ( fe.eoo() )
-                        break;
-                    // BSONElement fe = e.embeddedObject().firstElement();
                     const char *fn = fe.fieldName();
-                    /* TODO: use getGtLtOp() here.  this code repeats ourself */
+                    
                     if ( fn[0] == '$' && fn[1] ) {
-                        if ( fn[2] == 't' ) {
-                            int op = BSONObj::Equality;
-                            if ( fn[1] == 'g' ) {
-                                if ( fn[3] == 0 ) op = BSONObj::GT;
-                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = BSONObj::GTE;
-                                else
-                                    uassert("invalid $operator", false);
+                        int op = fe.getGtLtOp( -1 );
+
+                        if ( op == -1 ){
+                            if ( fn[1] == 'r' && fn[2] == 'e' && fn[3] == 'f' && fn[4] == 0 ){
+                                break; // { $ref : xxx } - treat as normal object
                             }
-                            else if ( fn[1] == 'l' ) {
-                                if ( fn[3] == 0 ) op = BSONObj::LT;
-                                else if ( fn[3] == 'e' && fn[4] == 0 ) op = BSONObj::LTE;
-                                else
-                                    uassert("invalid $operator", false);
-                            }
-                            else
-                                uassert("invalid $operator", false);
-                            if ( op ) {
-                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                                builders_.push_back( b );
-                                b->appendAs(fe, e.fieldName());
-                                addBasic(b->done().firstElement(), op);
-                                ok = true;
-                            }
+                            uassert( (string)"invalid operator: " + fn , op != -1 );
                         }
-                        else if ( fn[2] == 'e' ) {
-                            if ( fn[1] == 'n' && fn[3] == 0 ) {
-                                // $ne
-                                shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                                builders_.push_back( b );
-                                b->appendAs(fe, e.fieldName());
-                                addBasic(b->done().firstElement(), BSONObj::NE);
-                                ok = true;
-                            }
-                            else if ( fn[1] == 'r' && fn[3] == 'f' && fn[4] == 0 ){
-                                // { $ref : xxx } - treat as normal object
-                                ok = false;
-                                break;
-                            }
-                            else
-                                uassert("invalid $operator", false);
+
+                        isOperator = true;
+                        
+                        switch ( op ){
+                        case BSONObj::GT:
+                        case BSONObj::GTE:
+                        case BSONObj::LT:
+                        case BSONObj::LTE:{
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            builders_.push_back( b );
+                            b->appendAs(fe, e.fieldName());
+                            addBasic(b->done().firstElement(), op);
+                            isOperator = true;
+                            break;
                         }
-                        else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 && fe.type() == Array ) {
-                            // $in
-                            basics.push_back( BasicMatcher( e , BSONObj::opIN , fe.embeddedObject() ) );
-                            ok = true;
+                        case BSONObj::NE:{
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            builders_.push_back( b );
+                            b->appendAs(fe, e.fieldName());
+                            addBasic(b->done().firstElement(), BSONObj::NE);
+                            break;
                         }
-                        else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 && fe.type() == Array ) {
-                            // $mod
-                            basics.push_back( BasicMatcher( e , BSONObj::opMOD ) );
-                            ok = true;
-                        }
-                        else if ( fn[1] == 'n' && fn[2] == 'i' && fn[3] == 'n' && fn[4] == 0 && fe.type() == Array ) {
-                            // $nin
-                            basics.push_back( BasicMatcher( e , BSONObj::NIN , fe.embeddedObject() ) );
-                            ok = true;
-                        }
-                        else if ( fn[1] == 'a' && fn[2] == 'l' && fn[3] == 'l' && fn[4] == 0 && fe.type() == Array ) {
-                            // $all
-                            basics.push_back( BasicMatcher( e , BSONObj::opALL , fe.embeddedObject() ) );
-                            ok = true;
+                        case BSONObj::opALL:
                             all = true;
-                        }
-                        else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0 && fe.isNumber() ) {
-                            // $size
+                        case BSONObj::opIN:
+                        case BSONObj::NIN:
+                            basics.push_back( BasicMatcher( e , op , fe.embeddedObject() ) );
+                            break;
+                        case BSONObj::opMOD:
+                        case BSONObj::opTYPE:
+                            basics.push_back( BasicMatcher( e , op ) );
+                            break;
+                        case BSONObj::opSIZE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::opSIZE);    
                             haveSize = true;
-                            ok = true;
+                            break;
                         }
-                        else if ( fn[1] == 'e' && fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' && fn[7] == 0 && fe.isBoolean() ) {
-                            // $exists
+                        case BSONObj::opEXISTS:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::opEXISTS);
-                            ok = true;
+                            break;
                         }
-                        else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 && fe.isNumber() ) {
-                            // $type
-                            basics.push_back( BasicMatcher( e , BSONObj::opTYPE ) );
-                            ok = true;
+                        default:
+                            uassert( (string)"BUG - can't operator for: " + fn , 0 );
                         }
-                        else
-                            uassert( (string)"invalid $operator: " + fn , false);
+                        
                     }
                     else {
-                        ok = false;
+                        isOperator = false;
                         break;
                     }
                 }
-                if ( ok )
+                if ( isOperator )
                     continue;
             }
 

@@ -471,11 +471,25 @@ namespace mongo {
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ScopedDbConnection conn( configServer.getPrimary() );
-
+                
+                
+                string host = cmdObj["addshard"].valuestrsafe();
+                
+                if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
+                     host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
+                    if ( cmdObj["allowLocal"].type() != Bool || 
+                         ! cmdObj["allowLocal"].boolean() ){
+                        errmsg = 
+                            "can't use localhost as a shard since all shards need to communicate.  "
+                            "allowLocal to override for testing";
+                        return false;
+                    }
+                }
+                
                 BSONObj shard;
                 {
                     BSONObjBuilder b;
-                    b.append( "host" , cmdObj["addshard"].valuestrsafe() );
+                    b.append( "host" , host );
                     if ( cmdObj["maxSize"].isNumber() )
                         b.append( cmdObj["maxSize"] );
                     shard = b.obj();
@@ -490,18 +504,20 @@ namespace mongo {
                 }
 
                 try {
-                    ScopedDbConnection newShardConn( shard["host"].valuestrsafe() );
+                    ScopedDbConnection newShardConn( host );
                     newShardConn->getLastError();
                     newShardConn.done();
                 }
                 catch ( DBException& e ){
                     errmsg = "couldn't connect to new shard";
-                    result.append( "host" , shard["host"].valuestrsafe() );
+                    result.append( "host" , host );
                     result.append( "exception" , e.what() );
                     result.append( "ok" , 0 );
                     conn.done();
                     return false;
                 }
+                
+                
 
                 conn->insert( "config.shards" , shard );
                 result.append( "ok", 1 );
