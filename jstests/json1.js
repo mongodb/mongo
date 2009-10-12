@@ -16,5 +16,5 @@ x = {"x" : [{"x" : [1,2,[]], "4" : "ok", "y" : [[]]}, {"foo" : "bar"}], "y" : nu
 assert.eq(tojson(x), '{\n\t"x" : [\n\t\t{\n\t\t\t"x" : [\n\t\t\t\t1,\n\t\t\t\t2,\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t],\n\t\t\t"4" : "ok",\n\t\t\t"y" : [\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t]\n\t\t},\n\t\t{\n\t\t\t"foo" : "bar"\n\t\t}\n\t],\n\t"y" : null\n}');
 
 // special types
-x = {"x" : ObjectId("4ad35a73d2e34eb4fc43579a"), 'y' : new Date("10/12/1998"),  'z' : /xd?/ig};
-assert.eq(tojson(x), '{\n\t"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),\n\t"y" : "Mon Oct 12 1998 00:00:00 GMT-0400 (EDT)",\n\t"z" : /xd?/gi\n}');
+x = {"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),  'z' : /xd?/ig};
+assert.eq(tojson(x), '{\n\t"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),\n\t"z" : /xd?/gi\n}');
