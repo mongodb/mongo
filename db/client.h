@@ -1,4 +1,4 @@
-// connection.h 
+// client.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,8 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Connection represents a connection to the database (the server-side) and corresponds 
-   to an open socket from a client.
+/* Client represents a connection to the database (the server-side) and corresponds 
+   to an open socket (or logical connection if pooling on sockets) from a client.
 
    todo: switch to asio...this will fit nicely with that.
 */
@@ -31,21 +31,21 @@ namespace mongo {
 
     /* TODO: _ i bet these are not cleaned up on thread exit?  if so fix */
 
-    class Connection { 
+    class Client { 
     public:
         AuthenticationInfo *ai;
 
-        Connection() { ai = new AuthenticationInfo(); }
-        ~Connection() { delete ai; }
+        Client() { ai = new AuthenticationInfo(); }
+        ~Client() { delete ai; }
 
         static void initThread();
     };
 
-    extern boost::thread_specific_ptr<Connection> currentConnection;
+    extern boost::thread_specific_ptr<Client> currentClient;
 
-    inline void Connection::initThread() {
-        assert( currentConnection.get() == 0 );
-        currentConnection.reset( new Connection() );
+    inline void Client::initThread() {
+        assert( currentClient.get() == 0 );
+        currentClient.reset( new Client() );
     }
 
 };

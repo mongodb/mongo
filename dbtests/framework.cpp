@@ -203,10 +203,10 @@ namespace mongo {
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
 
-            Connection::initThread();
+            Client::initThread();
             acquirePathLock();
 
-            srand( seed );
+            srand( (unsigned) seed );
             printGitVersion();
             printSysInfo();
             out() << "random seed: " << seed << endl;

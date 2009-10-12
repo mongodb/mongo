@@ -1297,6 +1297,9 @@ namespace mongo {
             b.append( (char) type );
             b.append( (void *) data, len );
         }
+        void appendBinData( const char *fieldName, int len, BinDataType type, const unsigned char *data ) {
+            appendBinData(fieldName, len, type, (const char *) data);
+        }
         
         /**
            @param len the length of data

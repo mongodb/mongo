@@ -1404,7 +1404,7 @@ namespace mongo {
         }
         else {
             
-            AuthenticationInfo *ai = currentConnection.get()->ai;
+            AuthenticationInfo *ai = currentClient.get()->ai;
             uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 

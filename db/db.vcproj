@@ -1362,6 +1362,10 @@
 			Name="db"
 			>
 			<File
+				RelativePath=".\client.h"
+				>
+			</File>
+			<File
 				RelativePath=".\clientcursor.h"
 				>
 			</File>
@@ -1375,10 +1379,6 @@
 			</File>
 			<File
 				RelativePath=".\concurrency.h"
-				>
-			</File>
-			<File
-				RelativePath=".\connection.h"
 				>
 			</File>
 			<File

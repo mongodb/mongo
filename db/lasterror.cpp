@@ -13,7 +13,8 @@ namespace mongo {
 
     LastError LastError::noError;
     LastErrorHolder lastError;
-    
+    boost::mutex LastErrorHolder::_idsmutex;
+
     void LastError::appendSelf( BSONObjBuilder &b ) {
         if ( !valid ) {
             b.appendNull( "err" );
@@ -42,27 +43,31 @@ namespace mongo {
         if ( id == 0 )
             return _tl.get();
         
-        LastErrorIDMap::iterator i = _ids.find( id );
+        map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() ){
             if ( ! create )
                 return 0;
             
             LastError * le = new LastError();
-            _ids[id] = make_pair( (int) time(0) , le );
+            Status s;
+            s.time = time(0);
+            s.lerr = le;
+            _ids[id] = s;
             return le;
         }
         
-        LastErrorStatus & status = i->second;
-        status.first = (int) time(0);
-        return status.second;
+        Status &status = i->second;
+        status.time = time(0);
+        return status.lerr;
     }
 
     void LastErrorHolder::remove( int id ){
-        LastErrorIDMap::iterator i = _ids.find( id );
+        boostlock lock(_idsmutex);
+        map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() )
             return;
         
-        delete i->second.second;
+        delete i->second.lerr;
         _ids.erase( i );
     }
 
@@ -83,23 +88,25 @@ namespace mongo {
             return;
         }
         
-        LastErrorStatus & status = _ids[id];
-        status.first = (int) time(0);
-        status.second = le;
+        Status & status = _ids[id];
+        status.time = time(0);
+        status.lerr = le;
     }
     
-    void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ){
-        if ( connectionOwned && ! connectionOwned->overridenById ){
-            connectionOwned->nPrev++;
-            return;
-        }
-        
+    void LastErrorHolder::startRequest( Message& m ) {
         int id = m.data->id & 0xFFFF0000;
         setID( id );
         LastError * le = get( true);
         le->nPrev++;
     }
 
+    void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {
+        if ( !connectionOwned->overridenById ) {
+            connectionOwned->nPrev++;
+            return;
+        }
+        startRequest(m);
+    }
 
     struct LastErrorHolderTest : public UnitTest {
     public:
