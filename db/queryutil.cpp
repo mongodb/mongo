@@ -99,6 +99,21 @@ namespace mongo {
         case BSONObj::opMOD: {
             break;
         }
+        case BSONObj::opTYPE: {
+            BSONType t = (BSONType)e.numberInt();
+            {
+                BSONObjBuilder b;
+                b.appendMinForType( "" , t );
+                lower = addObj( b.obj() ).firstElement();
+            }
+            {
+                BSONObjBuilder b;
+                b.appendMaxForType( "" , t );
+                upper = addObj( b.obj() ).firstElement();
+            }
+            
+            break;
+        }
         default:
             break;
         }

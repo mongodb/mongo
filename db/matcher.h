@@ -65,6 +65,9 @@ namespace mongo {
                 
                 uassert( "mod can't be 0" , mod );
             }
+            else if ( _op == BSONObj::opTYPE ){
+                type = (BSONType)(_e.embeddedObject().firstElement().numberInt());
+            }
         }
 
         
@@ -85,6 +88,7 @@ namespace mongo {
 
         int mod;
         int modm;
+        BSONType type;
     };
 
 // SQL where clause equivalent
