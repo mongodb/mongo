@@ -69,6 +69,19 @@ namespace mongo {
         _global->Set( v8::String::New( field ) , v8::Boolean::New( val ) );
     }
 
+    void V8Scope::setElement( const char *field , const BSONElement& e ){ 
+        _global->Set( v8::String::New( field ) , mongoToV8Element( e ) );
+    }
+
+    void V8Scope::setObject( const char *field , const BSONObj& obj , bool readOnly){
+        // TODO: ignoring readOnly
+        _global->Set( v8::String::New( field ) , mongoToV8( obj ) );
+    }
+
+    void V8Scope::setThis( const BSONObj * obj ){
+        _this = mongoToV8( *obj );
+    }
+
     double V8Scope::getNumber( const char *field ){ 
         return _global->Get( v8::String::New( field ) )->ToNumber()->Value();
     }
@@ -116,7 +129,6 @@ namespace mongo {
         }        
         
         Handle<Value> f = _global->Get( v8::String::New( fn.c_str() ) );
-        cout << "HERE : " << f << endl;
         uassert( "not a func" , f->IsFunction() );
         _funcs.push_back( f );
         return num;

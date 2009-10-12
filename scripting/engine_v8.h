@@ -32,9 +32,9 @@ namespace mongo {
         virtual void setNumber( const char *field , double val );
         virtual void setString( const char *field , const char * val );
         virtual void setBoolean( const char *field , bool val );
-        virtual void setElement( const char *field , const BSONElement& e ){ assert( 0 );} 
-        virtual void setObject( const char *field , const BSONObj& obj , bool readOnly){ assert(0); }
-        virtual void setThis( const BSONObj * obj ){ assert(0); }
+        virtual void setElement( const char *field , const BSONElement& e );
+        virtual void setObject( const char *field , const BSONObj& obj , bool readOnly);
+        virtual void setThis( const BSONObj * obj );
         
         virtual ScriptingFunction _createFunction( const char * code );
         virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false );
