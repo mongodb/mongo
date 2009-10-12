@@ -14,3 +14,4 @@ python stat.py				# Build statistics support
 sh ./s_prototypes			# Build prototypes include file
 sh ./s_readme				# Build README file
 sh ./s_tags				# Build tags files
+sh ./s_whitespace			# Strip trailing whitespace from source
