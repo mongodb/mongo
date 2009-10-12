@@ -209,18 +209,24 @@ Array.shuffle = function( arr ){
 }
 
 
-Array.tojson = function( a , sepLines ){
-    var s = "[";
-    if ( sepLines ) s += "\n";
+Array.tojson = function( a , indent ){
+    if (!indent) 
+        indent = "";
+
+    var s = "[\n";
+    indent += "\t";
     for ( var i=0; i<a.length; i++){
-        if ( i > 0 ){
-            s += ",";
-            if ( sepLines ) s += "\n";
+        s += indent + tojson( a[i], indent );
+        if ( i < a.length - 1 ){
+            s += ",\n";
         }
-        s += tojson( a[i] );
     }
-    s += "]";
-    if ( sepLines ) s += "\n";
+    if ( a.length == 0 ) {
+        s += indent;
+    }
+
+    indent = indent.substring(1);
+    s += "\n"+indent+"]";
     return s;
 }
 
@@ -245,7 +251,7 @@ ObjectId.prototype.toString = function(){
 }
 
 ObjectId.prototype.tojson = function(){
-    return " ObjectId( \"" + this.str + "\") ";
+    return "ObjectId(\"" + this.str + "\")";
 }
 
 ObjectId.prototype.isObjectId = true;
@@ -258,8 +264,8 @@ if ( typeof( DBPointer ) != "undefined" ){
         return db[ this.ns ].findOne( { _id : this.id } );
     }
     
-    DBPointer.prototype.tojson = function(){
-        return "{ 'ns' : \"" + this.ns + "\" , 'id' : \"" + this.id + "\" } ";
+    DBPointer.prototype.tojson = function(indent){
+        return tojson({"ns" : this.ns, "id" : this.id}, indent);
     }
 
     DBPointer.prototype.getCollection = function(){
@@ -282,8 +288,8 @@ if ( typeof( DBRef ) != "undefined" ){
         return db[ this.$ref ].findOne( { _id : this.$id } );
     }
     
-    DBRef.prototype.tojson = function(){
-        return "{ '$ref' : \"" + this.$ref + "\" , '$id' : \"" + this.$id + "\" } ";
+    DBRef.prototype.tojson = function(indent){
+        return tojson({"$ref" : this.$ref, "$id" : this.$id}, indent);
     }
 
     DBRef.prototype.getCollection = function(){
@@ -307,13 +313,16 @@ else {
     print( "warning: no BinData" );
 }
 
-tojson = function( x ){
+tojson = function( x, indent ){
     if ( x == null )
         return "null";
     
     if ( x == undefined )
-        return "";
+        return "undefined";
     
+    if (!indent) 
+        indent = "";
+
     switch ( typeof x ){
         
     case "string": {
@@ -333,7 +342,7 @@ tojson = function( x ){
         return "" + x;
             
     case "object":
-        return tojsonObject( x );
+        return tojsonObject( x, indent );
         
     case "function":
         return x.toString();
@@ -345,36 +354,54 @@ tojson = function( x ){
     
 }
 
-tojsonObject = function( x ){
+tojsonObject = function( x, indent ){
     assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
+
+    if (!indent) 
+        indent = "";
     
-    if ( typeof( x.tojson ) == "function" && x.tojson != tojson )
-        return x.tojson();
+    if ( typeof( x.tojson ) == "function" && x.tojson != tojson ) {
+        return x.tojson(indent);
+    }
     
-    if ( typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson )
-        return x.constructor.tojson( x );
+    if ( typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
+        return x.constructor.tojson( x, indent );
+    }
 
     if ( x.toString() == "[object MaxKey]" )
         return "{ $maxKey : 1 }";
     if ( x.toString() == "[object MinKey]" )
         return "{ $minKey : 1 }";
     
-    var s = "{";
+    var s = "{\n";
+
+    // push one level of indent
+    indent += "\t";
     
-    var first = true;
+    var total = 0;
+    for ( var k in x ) total++;
+    if ( total == 0 ) {
+        s += indent + "\n";
+    }
+
+    var num = 1;
     for ( var k in x ){
 
         var val = x[k];
         if ( val == DB.prototype || val == DBCollection.prototype )
             continue;
 
-        if ( first ) first = false;
-        else s += " , ";
-        
-        s += "\"" + k + "\" : " + tojson( val );
+        s += indent + "\"" + k + "\" : " + tojson( val, indent );
+        if (num != total) {
+            s += ",";
+            num++;
+        }
+        s += "\n";
     }
 
-    return s + "}";
+    // pop one level of indent
+    indent = indent.substring(1);
+    return s + indent + "}";
 }
 
 shellPrint = function( x ){
