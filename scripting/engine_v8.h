@@ -22,10 +22,11 @@ namespace mongo {
         virtual void localConnect( const char * dbName ){ assert(0); }
         virtual void externalSetup(){ assert(0); };
         
+        v8::Handle<v8::Value> get( const char * field );
         virtual double getNumber( const char *field );
         virtual string getString( const char *field );
         virtual bool getBoolean( const char *field );
-        virtual BSONObj getObject( const char *field ){ assert( false ); return BSONObj(); }
+        virtual BSONObj getObject( const char *field );
         
         virtual int type( const char *field ){ assert( false ); return 0; }
 

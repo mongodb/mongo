@@ -82,16 +82,28 @@ namespace mongo {
         _this = mongoToV8( *obj );
     }
 
+    v8::Handle<v8::Value> V8Scope::get( const char * field ){
+        return _global->Get( v8::String::New( field ) );
+    }
+
     double V8Scope::getNumber( const char *field ){ 
-        return _global->Get( v8::String::New( field ) )->ToNumber()->Value();
+        return get( field )->ToNumber()->Value();
     }
 
     string V8Scope::getString( const char *field ){ 
-        return toSTLString( _global->Get( v8::String::New( field ) ) );
+        return toSTLString( get( field ) );
     }
 
     bool V8Scope::getBoolean( const char *field ){ 
-        return _global->Get( v8::String::New( field ) )->ToBoolean()->Value();
+        return get( field )->ToBoolean()->Value();
+    }
+
+    BSONObj V8Scope::getObject( const char * field ){
+        Handle<Value> v = get( field );
+        if ( v->IsNull() || v->IsUndefined() )
+            return BSONObj();
+        uassert( "not an object" , v->IsObject() );
+        return v8ToMongo( v->ToObject() );
     }
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
