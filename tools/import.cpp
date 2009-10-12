@@ -155,6 +155,8 @@ public:
             return -1;
         }
         
+        log(1) << "ns: " << ns << endl;
+        
         auth();
 
         if ( hasParam( "drop" ) ){
@@ -194,15 +196,17 @@ public:
         
         time_t start = time(0);
 
+        log(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
         char line[ (1024 * 1024 * 4) + 128];
         while ( *in ){
             in->getline( line , BUF_SIZE );
-            
+            log(1) << "got line:" << line << endl;
+
             char * buf = line;
             while( isspace( buf[0] ) ) buf++;
-
+            
             int len = strlen( buf );
             if ( ! len )
                 continue;
