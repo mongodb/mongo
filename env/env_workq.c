@@ -99,7 +99,7 @@ __wt_workq(void *arg)
 	WT_SRVR *srvr, *tsrvr;
 	WT_TOC_CACHELINE *q, *eq;
 	WT_TOC *toc;
-	int not_found;
+	int notfound;
 
 	srvr = arg;
 	env = srvr->env;
@@ -109,7 +109,7 @@ __wt_workq(void *arg)
 		__wt_env_errx(env, "server %d starting", srvr->id);
 
 	/* Walk the queue, executing work. */
-	not_found = 1;
+	notfound = 1;
 	q = srvr->ops;
 	eq = q + sizeof(srvr->ops) / sizeof(srvr->ops[0]);
 	do {
@@ -117,7 +117,7 @@ __wt_workq(void *arg)
 			WT_STAT_INCR(
 			    srvr->stats, SRVR_OPS, "server thread operations");
 
-			not_found = 0;
+			notfound = 0;
 
 			/*
 			 * Save and clear the WT_TOC. (Clear it now, as soon as
@@ -147,7 +147,6 @@ __wt_workq(void *arg)
 				WT_FLUSH_MEMORY;
 			} else
 				(void)__wt_unlock(toc->block);
-
 		}
 
 		if (++q == eq) {
@@ -158,18 +157,15 @@ __wt_workq(void *arg)
 			 * If we don't find work in enough loops, sleep, where
 			 * we gradually increase the sleep to 2 seconds.
 			 */
-			if (not_found++)
-				if (not_found > 10) {
-					if (not_found > 80)
-						not_found = 80;
+			if (notfound++)
+				if (notfound >= 100000) {
 					WT_STAT_INCR(srvr->stats,
 					    SRVR_SLEEP, "server thread sleeps");
-					__wt_yield();
-					//__wt_sleep(0, not_found * 25000);
+					__wt_sleep(0, notfound);
 				} else {
-					__wt_yield();
 					WT_STAT_INCR(srvr->stats,
 					    SRVR_YIELD, "server thread yields");
+					__wt_yield();
 				}
 			q = srvr->ops;
 		}
