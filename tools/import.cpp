@@ -119,9 +119,9 @@ class Import : public Tool {
     
 public:
     Import() : Tool( "import" ){
+        addFieldOptions();
         add_options()
             ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
-            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f name,age" )
             ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
             ("drop", "drop collection first " )
             ;
@@ -183,10 +183,6 @@ public:
         }
         
         if ( _type == CSV || _type == TSV ){
-            if ( ! hasParam( "fields" ) ){
-                cerr << "need to speicfy fields for csv and tsv" << endl;
-                return -1;
-            }
             needFields();
         }
 

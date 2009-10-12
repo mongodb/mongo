@@ -158,22 +158,57 @@ mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
     return *_conn;
 }
 
+void mongo::Tool::addFieldOptions(){
+    add_options()
+        ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f name,age" )
+        ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
+        ;
+}
+
 void mongo::Tool::needFields(){
-    uassert( "you need to specify fields" , hasParam( "fields" ) );
 
-    BSONObjBuilder b;
-    
-    string fields_arg = getParam("fields");
-    pcrecpp::StringPiece input(fields_arg);
-
-    string f;
-    pcrecpp::RE re("([\\w\\.]+),?" );
-    while ( re.Consume( &input, &f ) ){
-        _fields.push_back( f );
-        b.append( f.c_str() , 1 );
+    if ( hasParam( "fields" ) ){
+        BSONObjBuilder b;
+        
+        string fields_arg = getParam("fields");
+        pcrecpp::StringPiece input(fields_arg);
+        
+        string f;
+        pcrecpp::RE re("([\\w\\.]+),?" );
+        while ( re.Consume( &input, &f ) ){
+            _fields.push_back( f );
+            b.append( f.c_str() , 1 );
+        }
+        
+        _fieldsObj = b.obj();
+        return;
     }
-    
-    _fieldsObj = b.obj();
+
+    if ( hasParam( "fieldFile" ) ){
+        string fn = getParam( "fieldFile" );
+        if ( ! exists( fn ) )
+            throw UserException( ((string)"file: " + fn ) + " doesn't exist" );
+
+        const int BUF_SIZE = 1024;
+        char line[ 1024 + 128];
+        ifstream file( fn.c_str() );
+
+        BSONObjBuilder b;
+        while ( file.rdstate() == ios_base::goodbit ){
+            file.getline( line , BUF_SIZE );
+            const char * cur = line;
+            while ( isspace( cur[0] ) ) cur++;
+            if ( strlen( cur ) == 0 )
+                continue;
+
+            _fields.push_back( cur );
+            b.append( cur , 1 );
+        }
+        _fieldsObj = b.obj();
+        return;
+    }
+
+    throw UserException( "you need to specify fields" );
 }
 
 void mongo::Tool::auth( string dbname ){
