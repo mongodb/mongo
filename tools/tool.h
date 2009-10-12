@@ -70,7 +70,9 @@ namespace mongo {
         string _username;
         string _password;
 
+        void addFieldOptions();
         void needFields();
+        
         vector<string> _fields;
         BSONObj _fieldsObj;
 
