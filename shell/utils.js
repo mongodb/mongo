@@ -313,7 +313,7 @@ else {
     print( "warning: no BinData" );
 }
 
-tojson = function( x, indent ){
+tojson = function( x, indent , nolint ){
     if ( x == null )
         return "null";
     
@@ -342,7 +342,7 @@ tojson = function( x, indent ){
         return "" + x;
             
     case "object":
-        return tojsonObject( x, indent );
+        return tojsonObject( x, indent , nolint );
         
     case "function":
         return x.toString();
@@ -354,18 +354,21 @@ tojson = function( x, indent ){
     
 }
 
-tojsonObject = function( x, indent ){
+tojsonObject = function( x, indent , nolint ){
+    var lineEnding = nolint ? " " : "\n";
+    var tabSpace = nolint ? " " : "\t";
+    
     assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
 
     if (!indent) 
         indent = "";
     
     if ( typeof( x.tojson ) == "function" && x.tojson != tojson ) {
-        return x.tojson(indent);
+        return x.tojson(indent,nolint);
     }
     
     if ( typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
-        return x.constructor.tojson( x, indent );
+        return x.constructor.tojson( x, indent , nolint );
     }
 
     if ( x.toString() == "[object MaxKey]" )
@@ -373,15 +376,15 @@ tojsonObject = function( x, indent ){
     if ( x.toString() == "[object MinKey]" )
         return "{ $minKey : 1 }";
     
-    var s = "{\n";
+    var s = "{" + lineEnding;
 
     // push one level of indent
-    indent += "\t";
+    indent += tabSpace;
     
     var total = 0;
     for ( var k in x ) total++;
     if ( total == 0 ) {
-        s += indent + "\n";
+        s += indent + tabSpace;
     }
 
     var num = 1;
@@ -391,12 +394,12 @@ tojsonObject = function( x, indent ){
         if ( val == DB.prototype || val == DBCollection.prototype )
             continue;
 
-        s += indent + "\"" + k + "\" : " + tojson( val, indent );
+        s += indent + "\"" + k + "\" : " + tojson( val, indent , nolint );
         if (num != total) {
             s += ",";
             num++;
         }
-        s += "\n";
+        s += lineEnding;
     }
 
     // pop one level of indent
