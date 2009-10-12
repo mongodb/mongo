@@ -132,7 +132,7 @@ for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
 
-doParallel( "z = db.runCommand( {startCloneCollection:\"jstests_clonecollection.a\", from:\"localhost:" + ports[ 0 ] + "\" } ); print( \"clone_clone_clone_commandResult:::::\" + tojson( z ) + \":::::\" );" );
+doParallel( "z = db.runCommand( {startCloneCollection:\"jstests_clonecollection.a\", from:\"localhost:" + ports[ 0 ] + "\" } ); print( \"clone_clone_clone_commandResult:::::\" + tojson( z , '' , true ) + \":::::\" );" );
 
 sleep( 200 );
 f.a.save( { i: -1 } );
@@ -140,7 +140,8 @@ f.a.save( { i: -1 } );
 waitParallel();
 // even after parallel shell finished, must wait for finishToken line to appear in log
 assert.soon( function() {
-            ret = rawMongoProgramOutput().match( /clone_clone_clone_commandResult:::::(.*):::::/gm );
+            raw = rawMongoProgramOutput().replace( /[\r\n]/gm , " " )
+            ret = raw.match( /clone_clone_clone_commandResult:::::(.*):::::/ );
             if ( ret == null ) {
                 return false;
             }
