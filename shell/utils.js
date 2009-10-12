@@ -384,7 +384,7 @@ tojsonObject = function( x, indent , nolint ){
     var total = 0;
     for ( var k in x ) total++;
     if ( total == 0 ) {
-        s += indent + tabSpace;
+        s += indent + lineEnding;
     }
 
     var num = 1;
