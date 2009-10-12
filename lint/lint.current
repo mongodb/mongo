@@ -34,16 +34,26 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_cmp.c (C)
 
 --- Module:   ../btree/btree_debug.c (C)
+                                                          _
+				__wt_bt_dump_dbt((DBT *)ip, fp);
+../btree/btree_debug.c  190  Info 740: Unusual pointer cast (incompatible
+    indirect types)
+                                                                _
+		    (u_long)offp->addr, WT_64_CAST(offp->records));
+../btree/btree_debug.c  267  Info 740: Unusual pointer cast (incompatible
+    indirect types)
+
+    --- Wrap-up for Module: ../btree/btree_debug.c
+
+Warning 528: Symbol '__wt_bt_dump_addr(struct __wt_toc *, unsigned int, char *,
+    struct __sFILE *)' (line 73, file ../btree/btree_debug.c) not referenced
+../btree/btree_debug.c  73  Info 830: Location cited in prior message
 
 --- Module:   ../btree/btree_desc.c (C)
 
 --- Module:   ../btree/btree_dump.c (C)
 
 --- Module:   ../btree/btree_get.c (C)
-_
-}
-../btree/btree_get.c  96  Info 715: Symbol 'pkey' (line 61) not referenced
-../btree/btree_get.c  61  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
 ../btree/btree_get.c  166  Info 740: Unusual pointer cast (incompatible
@@ -58,10 +68,6 @@ _
 ../btree/btree_get.c  186  Info 771: Symbol 'ip' (line 107) conceivably not
     initialized
 ../btree/btree_get.c  107  Info 830: Location cited in prior message
-_
-}
-../btree/btree_get.c  325  Info 715: Symbol 'pkey' (line 290) not referenced
-../btree/btree_get.c  290  Info 830: Location cited in prior message
                                                                 _
 #... 4_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
@@ -249,8 +255,11 @@ _
     --- Wrap-up for Module: ../env/env_cache.c
 
 Warning 528: Symbol '__wt_cache_clean(struct __wt_toc *, unsigned int, struct
-    __wt_page **)' (line 348, file ../env/env_cache.c) not referenced
-../env/env_cache.c  348  Info 830: Location cited in prior message
+    __wt_page **)' (line 358, file ../env/env_cache.c) not referenced
+../env/env_cache.c  358  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_cache_dump(struct __wt_cache *, char *, struct
+    __sFILE *)' (line 486, file ../env/env_cache.c) not referenced
+../env/env_cache.c  486  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_close.c (C)
 
