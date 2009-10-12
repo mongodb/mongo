@@ -37,6 +37,7 @@ class Import : public Tool {
     Type _type;
 
     const char * _sep;
+    bool _ignoreBlanks;
 
     bool _appendNumber( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( data.size() == 0 )
@@ -81,6 +82,9 @@ class Import : public Tool {
         if ( _appendNumber( b , fieldName , data ) )
             return;
         
+        if ( _ignoreBlanks && data.size() == 0 )
+            return;
+
         // TODO: other types?
         b.append( fieldName.c_str() , data );
     }
@@ -121,14 +125,16 @@ public:
     Import() : Tool( "import" ){
         addFieldOptions();
         add_options()
+            ("ignoreBlanks","if given, empty fields in csv and tsv will be ignored")
             ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
             ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
             ("drop", "drop collection first " )
             ;
         addPositionArg( "file" , 1 );
         _type = JSON;
+        _ignoreBlanks = false;
     }
-
+    
     int run(){
         string filename = getParam( "file" );
         long long fileSize = -1;
@@ -162,6 +168,10 @@ public:
         if ( hasParam( "drop" ) ){
             cout << "dropping: " << ns << endl;
             conn().dropCollection( ns.c_str() );
+        }
+
+        if ( hasParam( "ignoreBlanks" ) ){
+            _ignoreBlanks = true;
         }
 
         if ( hasParam( "type" ) ){
