@@ -25,9 +25,10 @@ def foundxulrunner( env , options ):
 
     incroot = "/usr/include/" + best + "/"
     libroot = "/usr/lib"
-    if options["linux64"]:
+    if options["linux64"] and os.path.exists("/usr/lib64"):
         libroot += "64";
     libroot += "/" + best
+
     
     if not os.path.exists( libroot ):
         print( "warning: found xulrunner include but not lib for: " + best )
