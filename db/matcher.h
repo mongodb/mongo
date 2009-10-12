@@ -69,7 +69,7 @@ namespace mongo {
                 type = (BSONType)(_e.embeddedObject().firstElement().numberInt());
             }
         }
-
+        
         
         BasicMatcher( BSONElement _e , int _op , const BSONObj& array ) : toMatch( _e ) , compareOp( _op ){
             
@@ -85,7 +85,8 @@ namespace mongo {
         BSONElement toMatch;
         int compareOp;
         shared_ptr< set<BSONElement,element_lt> > myset;
-
+        
+        // these are for specific operators
         int mod;
         int modm;
         BSONType type;

@@ -400,7 +400,7 @@ namespace mongo {
         return totalSize;
     }
 
-    int BSONElement::getGtLtOp() const {
+    int BSONElement::getGtLtOp( int def ) const {
         const char *fn = fieldName();
         if ( fn[0] == '$' && fn[1] ) {
             if ( fn[2] == 't' ) {
@@ -429,8 +429,10 @@ namespace mongo {
                 return BSONObj::opALL;
             else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0 )
                 return BSONObj::opSIZE;
+            else if ( fn[1] == 'e' && fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' && fn[7] == 0 )
+                return BSONObj::opEXISTS;
         }
-        return BSONObj::Equality;
+        return def;
     }
 
     /* wo = "well ordered" */
