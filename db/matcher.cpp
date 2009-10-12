@@ -228,6 +228,7 @@ namespace mongo {
                             all = true;
                         }
                         else if ( fn[1] == 's' && fn[2] == 'i' && fn[3] == 'z' && fn[4] == 'e' && fn[5] == 0 && fe.isNumber() ) {
+                            // $size
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
@@ -236,10 +237,16 @@ namespace mongo {
                             ok = true;
                         }
                         else if ( fn[1] == 'e' && fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' && fn[7] == 0 && fe.isBoolean() ) {
+                            // $exists
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             builders_.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::opEXISTS);
+                            ok = true;
+                        }
+                        else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 && fe.isNumber() ) {
+                            // $type
+                            basics.push_back( BasicMatcher( e , BSONObj::opTYPE ) );
                             ok = true;
                         }
                         else
@@ -295,6 +302,10 @@ namespace mongo {
                 return false;
             
             return l.numberLong() % bm.mod == bm.modm;
+        }
+        
+        if ( op == BSONObj::opTYPE ){
+            return bm.type == l.type();
         }
 
         /* check LT, GTE, ... */
