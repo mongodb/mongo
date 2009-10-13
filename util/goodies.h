@@ -301,24 +301,34 @@ namespace mongo {
     typedef void *HANDLE;
 #endif
     
-    class ThreadLocalInt {
+    /* thread local "value" rather than a pointer
+       good for things which have copy constructors (and the copy constructor is fast enough)
+       e.g. 
+         ThreadLocalValue<int> myint;
+    */
+    template<class T>
+    class ThreadLocalValue {
     public:
-        ThreadLocalInt( int def = 0 ) : _def( def ){}
+        ThreadLocalValue( T def = 0 ) : _default( def ) { }
 
-        int get(){
-            int * val = _val.get();
+        int get() {
+            T * val = _val.get();
             if ( val )
                 return *val;
-            return _def;
+            return _default;
         }
-        void reset( int i ){
-            int * val = new int[1];
-            *val = i;
-            _val.reset( val );
+        void set( const T& i ) {
+            T *v = _val.get();
+            if( v ) { 
+                *v = i;
+                return;
+            }
+            v = new T(i);
+            _val.reset( v );
         }
     private:
-        int _def;
-        boost::thread_specific_ptr<int> _val;
+        T _default;
+        boost::thread_specific_ptr<T> _val;
     };
 
     class ProgressMeter {

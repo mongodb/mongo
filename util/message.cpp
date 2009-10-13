@@ -423,7 +423,7 @@ again:
 
     MSGID NextMsgId;
     bool usingClientIds = 0;
-    ThreadLocalInt clientId;
+    ThreadLocalValue<int> clientId;
 
     struct MsgStart {
         MsgStart() {
@@ -452,7 +452,7 @@ again:
         usingClientIds = true;
         id = id & 0xFFFF0000;
         massert( "invalid id" , id );
-        clientId.reset( id );
+        clientId.set( id );
     }
     
     int getClientId(){

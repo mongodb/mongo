@@ -325,7 +325,7 @@ namespace JsobjTests {
                 }
                 BSONObj invalid() const {
                     BSONObj ret = valid();
-                    set( ret, ret.objsize() - 1, 0xff );
+                    set( ret, ret.objsize() - 1, (char) 0xff );
                     // (first byte of size)--
                     set( ret, 0, get( ret, 0 ) - 1 );
                     // re-read size for BSONObj::details

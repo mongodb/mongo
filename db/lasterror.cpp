@@ -31,7 +31,7 @@ namespace mongo {
     }
 
     void LastErrorHolder::setID( int id ){
-        _id.reset( id );
+        _id.set( id );
     }
     
     int LastErrorHolder::getID(){
@@ -112,7 +112,7 @@ namespace mongo {
     public:
         
         void test( int i ){
-            _tl.reset( i );
+            _tl.set( i );
             assert( _tl.get() == i );
         }
         
@@ -143,7 +143,7 @@ namespace mongo {
             holder.remove( 1 );
         }
         
-        ThreadLocalInt _tl;
+        ThreadLocalValue<int> _tl;
     } lastErrorHolderTest;
 
 } // namespace mongo

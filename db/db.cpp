@@ -602,7 +602,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
     }
 
-    DEV out() << "warning: DEV mode enabled\n";
+    DEV out() << "DEV is defined (using _DEBUG), which is slower...\n";
 
     UnitTest::runTests();
 

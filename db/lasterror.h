@@ -84,7 +84,7 @@ namespace mongo {
         void startRequest( Message& m , LastError * connectionOwned );
         void startRequest( Message& m );
     private:
-        ThreadLocalInt _id;
+        ThreadLocalValue<int> _id;
         boost::thread_specific_ptr<LastError> _tl;
         
         struct Status {
