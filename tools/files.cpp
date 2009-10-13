@@ -111,7 +111,10 @@ public:
 
             string out = getParam("local", f.getFilename());
             f.write( out );
-            cout << "done write to: " << out << endl;
+
+            if (out != "-")
+                cout << "done write to: " << out << endl;
+
             return 0;
         }
 
