@@ -213,7 +213,7 @@ DBQuery.prototype.shellPrint = function(){
     try {
         var n = 0;
         while ( this.hasNext() && n < 20 ){
-            var s = tojson( this.next() );
+            var s = tojson( this.next() , "" , true );
             print( s );
             n++;
         }
