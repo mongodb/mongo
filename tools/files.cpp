@@ -36,6 +36,7 @@ public:
     Files() : Tool( "files" ){
         add_options()
             ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
+            ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
             ;
         add_hidden_options()
             ( "command" , po::value<string>() , "command (list|search|put|get)" )
@@ -119,7 +120,10 @@ public:
         }
 
         if ( cmd == "put" ){
-            cout << "file object: " << g.storeFile(getParam("local", filename), filename) << endl;
+            const string& infile = getParam("local", filename);
+            const string& type = getParam("type", "");
+
+            cout << "file object: " << g.storeFile(infile, filename, type) << endl;
             cout << "done!";
             return 0;
         }

@@ -43,7 +43,7 @@ namespace mongo {
 
     }
 
-    BSONObj GridFS::storeFile( const string& fileName , const string& remoteName ){
+    BSONObj GridFS::storeFile( const string& fileName , const string& remoteName , const string& contentType){
         uassert( "file doesn't exist" , fileName == "-" || boost::filesystem::exists( fileName ) );
 
         FILE* fd;
@@ -87,17 +87,22 @@ namespace mongo {
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
             throw UserException( "filemd5 failed" );
 
-        BSONObj fileObject =
-            BSON( "_id" << id
-               << "filename" << (remoteName.empty() ? fileName : remoteName)
-               << "length" << (unsigned) length
-               << "chunkSize" << DEFAULT_CHUNK_SIZE
-               << "md5" << res["md5"]
-            );
+        BSONObjBuilder file;
+        file << "_id" << id
+             << "filename" << (remoteName.empty() ? fileName : remoteName)
+             << "length" << (unsigned) length
+             << "chunkSize" << DEFAULT_CHUNK_SIZE
+             << "uploadDate" << DATENOW
+             << "md5" << res["md5"]
+             ;
 
-        _client.insert(_filesNS.c_str(), fileObject );
+        if (!contentType.empty())
+            file << "contentType" << contentType;
 
-        return fileObject;
+        BSONObj ret = file.obj();
+        _client.insert(_filesNS.c_str(), ret);
+
+        return ret;
     }
 
     void GridFS::removeFile( const string& fileName ){

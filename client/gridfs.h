@@ -57,9 +57,11 @@ namespace mongo {
          * @param fileName local filename relative to process
          * @param remoteName optional filename to use for file stored in GridFS
          *                   (default is to use fileName parameter)
+         * @param contentType optional MIME type for this object.
+         *                    (default is to omit)
          * @return the file object
          */
-        BSONObj storeFile( const string& fileName , const string& remoteName="" );
+        BSONObj storeFile( const string& fileName , const string& remoteName="" , const string& contentType="");
 
         /**
          * removes file referenced by fileName from the db
