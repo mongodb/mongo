@@ -738,7 +738,10 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 Exit(1)
 
     if usev8:
-        myCheckLib( "v8" , True )
+        if debugBuild:
+            myCheckLib( [ "v8_g" , "v8" ] , True )
+        else:
+            myCheckLib( "v8" , True )
 
     if shell:
         haveReadLine = False

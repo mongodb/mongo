@@ -35,18 +35,36 @@ namespace mongo {
 
     void installDBTypes( Handle<ObjectTemplate>& global ){
         v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
-        global->Set(v8::String::New("DB") , db );
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
-
+        global->Set(v8::String::New("DB") , db );
+        
         v8::Local<v8::FunctionTemplate> dbCollection = FunctionTemplate::New( collectionInit );
-        global->Set(v8::String::New("DBCollection") , dbCollection );
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+        global->Set(v8::String::New("DBCollection") , dbCollection );
+
 
         v8::Local<v8::FunctionTemplate> dbQuery = FunctionTemplate::New( dbQueryInit );
-        global->Set(v8::String::New("DBQuery") , dbQuery );
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
-        
+        global->Set(v8::String::New("DBQuery") , dbQuery );
+
         global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit ) );
+    }
+
+    void installDBTypes( Handle<v8::Object>& global ){
+        v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
+        db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+        global->Set(v8::String::New("DB") , db->GetFunction() );
+        
+        v8::Local<v8::FunctionTemplate> dbCollection = FunctionTemplate::New( collectionInit );
+        dbCollection->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
+        global->Set(v8::String::New("DBCollection") , dbCollection->GetFunction() );
+
+
+        v8::Local<v8::FunctionTemplate> dbQuery = FunctionTemplate::New( dbQueryInit );
+        dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
+        global->Set(v8::String::New("DBQuery") , dbQuery->GetFunction() );
+
+        global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit )->GetFunction() );
     }
 
 
@@ -139,11 +157,7 @@ namespace mongo {
             auto_ptr<mongo::DBClientCursor> cursor;
             int nToReturn = (int)(args[3]->ToNumber()->Value());
             int nToSkip = (int)(args[4]->ToNumber()->Value());
-            {
-                v8::Unlocker u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
-            }
-        
+            cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
             Local<v8::Object> c = cons->NewInstance();
@@ -247,11 +261,7 @@ namespace mongo {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return v8::Undefined();
-        BSONObj o;
-        {
-            v8::Unlocker u;
-            o = cursor->next();
-        }
+        BSONObj o = cursor->next();
         return mongoToV8( o );
     }
 
@@ -259,12 +269,7 @@ namespace mongo {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return Boolean::New( false );
-        bool more;
-        {
-            v8::Unlocker u;
-            more = cursor->more();
-        }
-        return Boolean::New( more );
+        return Boolean::New( cursor->more() );
     }
 
 

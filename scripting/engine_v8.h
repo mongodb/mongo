@@ -16,7 +16,7 @@ namespace mongo {
         V8Scope( V8ScriptEngine * engine );
         ~V8Scope();
         
-        virtual void reset()
+        virtual void reset();
         virtual void init( BSONObj * data );
 
         virtual void localConnect( const char * dbName );
@@ -83,11 +83,11 @@ namespace mongo {
         bool utf8Ok() const { return true; }
 
     private:
-        HandleScope _handleScope;
-        Handle<ObjectTemplate> _globalTemplate;
+        //HandleScope _handleScope;
+        //Handle<ObjectTemplate> _globalTemplate;
         
-        Handle<FunctionTemplate> _externalTemplate;
-        Handle<FunctionTemplate> _localTemplate;
+        //Handle<FunctionTemplate> _externalTemplate;
+        //Handle<FunctionTemplate> _localTemplate;
         friend class V8Scope;
     };
     

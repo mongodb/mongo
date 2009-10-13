@@ -9,16 +9,17 @@ namespace mongo {
     // --- engine ---
 
     V8ScriptEngine::V8ScriptEngine()
-        : _handleScope() , _globalTemplate( ObjectTemplate::New() ) {
+    //        : _handleScope() , _globalTemplate( ObjectTemplate::New() ) 
+{
         
-        _globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
-        _globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
+        //_globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
+        //_globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
 
-        _externalTemplate = getMongoFunctionTemplate( false );
-        _localTemplate = getMongoFunctionTemplate( true );
-        installDBTypes( _globalTemplate );
+        //_externalTemplate = getMongoFunctionTemplate( false );
+        //_localTemplate = getMongoFunctionTemplate( true );
+        //installDBTypes( _globalTemplate );
     }
-
+    
     V8ScriptEngine::~V8ScriptEngine(){
     }
 
@@ -33,11 +34,19 @@ namespace mongo {
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
         : _engine( engine ) , 
           _handleScope(),
-          _context( Context::New( 0 , engine->_globalTemplate ) ) ,
+          //_context( Context::New( 0 , engine->_globalTemplate ) ) ,
+          _context( Context::New() ) ,
           _scope( _context ) ,
           _global( _context->Global() ) ,
           _connectState( NOT ){
         _this = v8::Object::New();
+
+        _global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print)->GetFunction() );
+        _global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version)->GetFunction() );
+
+        //_externalTemplate = getMongoFunctionTemplate( false );
+        //_localTemplate = getMongoFunctionTemplate( true );
+        installDBTypes( _global );
     }
 
     V8Scope::~V8Scope(){
@@ -290,7 +299,11 @@ namespace mongo {
             throw UserException( "localConnect called with a different name previously" );
         }
 
-        uassert( "local connect not supported yet" , 0 );
+        //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
+        _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( true )->GetFunction() );
+        exec( jsconcatcode , "localConnect 1" , false , true , true , 0 );
+        exec( "_mongo = new Mongo();" , "local connect 2" , false , true , true , 0 );
+        exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
     }
     
@@ -300,7 +313,7 @@ namespace mongo {
         if ( _connectState == LOCAL )
             throw UserException( "localConnect already called, can't call externalSetup" );
         
-        _global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
+        _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( false )->GetFunction() );
         exec( jsconcatcode , "shell setup" , false , true , true , 0 );
         _connectState = EXTERNAL;
     }
@@ -308,12 +321,12 @@ namespace mongo {
     // ----- internal -----
 
     void V8Scope::reset(){
-        _error = "";
-        _context->Enter();
+        _startCall();
     }
 
     void V8Scope::_startCall(){
         _error = "";
+        _context->Enter();
     }
     
 } // namespace mongo

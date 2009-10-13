@@ -600,6 +600,12 @@ Map.prototype.values = function(){
     return all;
 }
 
+if ( typeof( gc ) == "undefined" ){
+    gc = function(){
+    }
+}
+   
+
 Math.sigFig = function( x , N ){
     if ( ! N ){
         N = 3;

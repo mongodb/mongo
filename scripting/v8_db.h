@@ -13,6 +13,7 @@ namespace mongo {
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local );
     void installDBTypes( v8::Handle<v8::ObjectTemplate>& global );
+    void installDBTypes( v8::Handle<v8::Object>& global );
     
     // the actual globals
     
