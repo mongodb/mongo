@@ -47,6 +47,8 @@ namespace mongo {
         return b;
     }
 
+    DateNowLabeler DATENOW;
+
     string BSONElement::toString( bool includeFieldName ) const {
         stringstream s;
         if ( includeFieldName && type() != EOO )

@@ -36,6 +36,7 @@ db/makefile.local
 config.log
 settings.py
 buildinfo.cpp
+tags
 
 #temp dirs
 dump
@@ -45,7 +46,7 @@ docs
 32bit
 scratch
 
-# binaryies
+# binaries
 mongo
 mongod
 mongogrid

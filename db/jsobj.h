@@ -1007,11 +1007,17 @@ namespace mongo {
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
 
     /* Utility class to auto assign object IDs.
-       Example: 
-         cout << BSON( GENOID << z << 3 ); // { _id : ..., z : 3 }
+       Example:
+         cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
     extern struct IDLabeler { } GENOID;
     BSONObjBuilder& operator<<(BSONObjBuilder& b, IDLabeler& id);
+
+    /* Utility class to add a Date element with the current time
+       Example: 
+         cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
+    */
+    extern struct DateNowLabeler { } DATENOW;
 
     // Utility class to implement GT, GTE, etc as described above.
     class Labeler {
@@ -1052,6 +1058,8 @@ namespace mongo {
         
         template<class T> 
         BSONObjBuilder& operator<<( T value );
+
+        BSONObjBuilder& operator<<(DateNowLabeler& id);
         
         Labeler operator<<( const Labeler::Label &l );
 
@@ -1635,6 +1643,12 @@ namespace mongo {
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) { 
         _builder->appendAs( e , _fieldName );
+        _fieldName = 0;
+        return *_builder;
+    }
+
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(DateNowLabeler& id){
+        _builder->appendDate(_fieldName, jsTime());
         _fieldName = 0;
         return *_builder;
     }

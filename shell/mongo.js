@@ -11,7 +11,6 @@ if ( ! Mongo.prototype ){
     throw "Mongo.prototype not defined";
 }
 
-
 if ( ! Mongo.prototype.find )
     Mongo.prototype.find = function( ns , query , fields , limit , skip ){ throw "find not implemented"; }
 if ( ! Mongo.prototype.insert )
