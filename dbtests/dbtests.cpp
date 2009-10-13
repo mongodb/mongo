@@ -24,3 +24,4 @@
 int main( int argc, char** argv ) {
     return Suite::run(argc, argv, "/tmp/unittest");
 }
+

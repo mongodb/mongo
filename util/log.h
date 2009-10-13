@@ -20,8 +20,6 @@
 
 namespace mongo {
 
-    extern const char *curNs;
-
     // Utility interface for stringifying object only when val() called.
     class LazyString {
     public:
@@ -165,13 +163,11 @@ namespace mongo {
             return *this;
         }
 
-        Logstream& prolog(bool withNs = false) {
+        Logstream& prolog() {
             char now[64];
             time_t_to_String(time(0), now);
             now[20] = 0;
             ss << now;
-            if ( withNs && /*database && */curNs )
-                ss << curNs << ' ';
             return *this;
         }
 
@@ -188,12 +184,6 @@ namespace mongo {
 
     extern int logLevel;
 
-    inline Nullstream& problem( int level = 0 ) {
-        if ( level > logLevel )
-            return nullstream;
-        return Logstream::get().prolog(true);
-    }
-    
     inline Nullstream& out( int level = 0 ) {
         if ( level > logLevel )
             return nullstream;
@@ -223,6 +213,17 @@ namespace mongo {
     /* TODOCONCURRENCY */
     inline ostream& stdcout() {
         return cout;
+    }
+
+    /* default impl returns "" -- mongod overrides */
+    extern const char * (*getcurns)();
+
+    inline Nullstream& problem( int level = 0 ) {
+        if ( level > logLevel )
+            return nullstream;
+        Logstream& l = Logstream::get().prolog();
+        l << ' ' << getcurns() << ' ';
+        return l;
     }
 
 } // namespace mongo

@@ -77,11 +77,11 @@ namespace mongo {
     public:
         DBContext(const char *ns) {
             old = database;
-            setClientTempNs(ns);
+            setClient(ns);
         }
         DBContext(string ns) {
             old = database;
-            setClientTempNs(ns.c_str());
+            setClient(ns.c_str());
         }
         ~DBContext() {
             database = old;

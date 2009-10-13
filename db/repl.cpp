@@ -734,7 +734,7 @@ namespace mongo {
     string ReplSource::resyncDrop( const char *db, const char *requester ) {
         log() << "resync: dropping database " << db << endl;
         string dummyns = string( db ) + ".";
-        setClientTempNs(dummyns.c_str());        
+        setClient(dummyns.c_str());        
         assert( database->name == db );
         dropDatabase(dummyns.c_str());
         return dummyns;
@@ -743,7 +743,7 @@ namespace mongo {
     /* grab initial copy of a database from the master */
     bool ReplSource::resync(string db) {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
-        setClientTempNs( dummyNs.c_str() );
+        setClient( dummyNs.c_str() );
         {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
@@ -865,7 +865,7 @@ namespace mongo {
         
         bool justCreated;
         try {
-            justCreated = setClientTempNs(ns);
+            justCreated = setClient(ns);
         } catch ( AssertionException& ) {
             problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
             addDbNextPass.erase(clientName);
@@ -900,7 +900,7 @@ namespace mongo {
                     log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
                 }
                 save();
-                setClientTempNs( ns );
+                setClient( ns );
                 nClonedThisPass++;
                 resync(database->name);
                 addDbNextPass.erase(clientName);
@@ -1210,6 +1210,11 @@ namespace mongo {
         {
 			time_t saveLast = time(0);
             while ( 1 ) {
+                /* TODO: WHY is c->more() called twice here?  Once in this block it's clearly false?
+                         Also: isn't it bad to call more() without a temprelease?  seems like we need 
+                         another helper haveMoreWithoutRequesting(), and then if that is false, we temp 
+                         release and try more().
+                */
                 if ( !c->more() ) {
                     dblock lk;
                     OpTime nextLastSaved = nextLastSavedLocalTs();
@@ -1229,14 +1234,14 @@ namespace mongo {
                     break;
                 }
 
-				OCCASIONALLY if( n > 100000 || time(0) - saveLast > 60 ) { 
+                OCCASIONALLY if( n > 100000 || time(0) - saveLast > 60 ) { 
 					// periodically note our progress, in case we are doing a lot of work and crash
 					dblock lk;
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
 					save();
-                    log() << "repl:   applied " << n << " operations" << endl;
-                    log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
+                    log() << "repl:   checkpoint applied " << n << " operations" << endl;
+                    log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
 					saveLast = time(0);
 					n = 0;
 				}
@@ -1426,7 +1431,7 @@ namespace mongo {
         Record *r;
         if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
             if ( localOplogMainDetails == 0 ) {
-                setClientTempNs("local.");
+                setClient("local.");
                 localOplogClient = database;
                 localOplogMainDetails = nsdetails(logNS);
             }
@@ -1621,7 +1626,7 @@ namespace mongo {
         dblock lk;
 
         const char * ns = "local.oplog.$main";
-        setClientTempNs(ns);
+        setClient(ns);
         
         if ( nsdetails( ns ) )
             return;

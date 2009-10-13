@@ -32,6 +32,9 @@ namespace mongo {
 
     thread_specific_ptr<Logstream> Logstream::tsp;
 
+    const char *default_getcurns() { return ""; }
+    const char * (*getcurns)() = default_getcurns;
+
     int logLevel = 0;
     boost::mutex &Logstream::mutex = *( new boost::mutex );
 
@@ -142,5 +145,5 @@ namespace mongo {
         ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;
         return ss.str();
     }
-    
+        
 } // namespace mongo

@@ -24,6 +24,15 @@ namespace mongo {
 
     boost::thread_specific_ptr<Client> currentClient;
 
+    Client::Client() : _ns(""), _nsstr("") { 
+        ai = new AuthenticationInfo(); 
+    }
+
+    Client::~Client() { 
+cout << "TEMP" << endl;
+        delete ai; 
+    }
+
     bool noauth = true;
 
 	int AuthenticationInfo::warned;

@@ -35,7 +35,7 @@ namespace mongo {
         DBInfo(const char *db) {
             dbold = database;
             ns = string("local.dbinfo.") + db;
-            setClientTempNs(ns.c_str());
+            setClient(ns.c_str());
         }
 
         BSONObj getDbInfoObj() {

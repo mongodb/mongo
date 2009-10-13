@@ -49,7 +49,6 @@ namespace mongo {
     DataFileMgr theDataFileMgr;
     map<string,Database*> databases;
     Database *database;
-    const char *curNs = "";
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
@@ -67,8 +66,7 @@ namespace mongo {
         stringstream ss;
         if ( database ) {
             ss << database->name << ' ';
-            if ( curNs )
-                ss << curNs << ' ';
+            ss << cc().ns() << ' ';
         }
         ss<< "op:" << curOp << ' ' << callDepth;
         return ss.str();
@@ -1732,7 +1730,7 @@ namespace mongo {
             return false;
         }
 
-        assert( !setClientTempNs( dbName ) );
+        assert( !setClient( dbName ) );
         closeClient( dbName );
 
         if ( backupOriginalFiles )

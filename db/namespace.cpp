@@ -576,7 +576,7 @@ namespace mongo {
         stringstream spec;
         // 128MB
         spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true,autoIndexId:false}";
-        setClientTempNs( logNS_.c_str() );
+        setClient( logNS_.c_str() );
         string err;
         massert( "Could not create log ns", userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false ) );
         NamespaceDetails *d = nsdetails( logNS_.c_str() );
@@ -599,7 +599,7 @@ namespace mongo {
     void NamespaceDetailsTransient::dropLog() {
         if ( !logValid_ )
             return;
-        setClientTempNs( logNS_.c_str() );
+        setClient( logNS_.c_str() );
         dropNS( logNS_ );
     }
 

@@ -23,8 +23,9 @@
 #include "../util/goodies.h"
 #include "../util/unittest.h"
 #include "storage.h"
-
 #include "../scripting/engine.h"
+#include "db.h"
+#include "client.h"
 
 namespace mongo {
     
@@ -107,8 +108,7 @@ namespace mongo {
                 where = new Where();
                 uassert( "$where query, but no script engine", globalScriptEngine );
 
-                assert( curNs );
-                where->scope = globalScriptEngine->getPooledScope( curNs );
+                where->scope = globalScriptEngine->getPooledScope( cc().ns() );
                 where->scope->localConnect( database->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {

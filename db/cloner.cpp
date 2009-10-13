@@ -665,7 +665,7 @@ namespace mongo {
                 theDataFileMgr.insert( targetIndexes.c_str(), n );
             }
 
-            setClientTempNs( source.c_str() );
+            setClient( source.c_str() );
             dropCollection( source, errmsg, result );
             return true;
         }

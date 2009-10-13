@@ -46,7 +46,7 @@ namespace mongo {
         }
         *q = 0;
         if (q-database>=MaxClientLen) {
-            problem() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
+            log() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
             dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
@@ -89,7 +89,7 @@ namespace mongo {
         }
         Namespace& operator=(const char *ns) {
             uassert("ns name too long, max size is 128", strlen(ns) < MaxNsLen);
-            memset(buf, 0, MaxNsLen); /* this is just to keep stuff clean in the files for easy dumping and reading */
+            //memset(buf, 0, MaxNsLen); /* this is just to keep stuff clean in the files for easy dumping and reading */
             strcpy_s(buf, MaxNsLen, ns);
             return *this;
         }
@@ -113,7 +113,6 @@ namespace mongo {
             }
             return (x & 0x7fffffff) | 0x8000000; // must be > 0
         }
-
 
         /**
            ( foo.bar ).getSisterNS( "blah" ) == foo.blah

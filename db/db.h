@@ -22,6 +22,7 @@
 #include "boost/version.hpp"
 #include "concurrency.h"
 #include "pdfile.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -43,28 +44,32 @@ namespace mongo {
     // tempish...move to TLS or pass all the way down as a parm
     extern map<string,Database*> databases;
     extern Database *database;
-    extern const char *curNs;
     extern bool master;
 
-    inline string getKey( const char *ns, const string& path ) {
+    /* sometimes we deal with databases with the same name in different directories - thus this */
+    inline string makeDbKeyStr( const char *ns, const string& path ) {
         char cl[256];
         nsToClient(ns, cl);
         return string( cl ) + ":" + path;
     }
 
-    /* returns true if the database ("database") did not exist, and it was created on this call */
+    /* returns true if the database ("database") did not exist, and it was created on this call 
+       path - datafiles directory, if not the default, so we can differentiate between db's of the same
+              name in different places (for example temp ones on repair).
+    */
     inline bool setClient(const char *ns, const string& path=dbpath) {
         /* we must be in critical section at this point as these are global
            variables.
         */
         requireInWriteLock();
 
-        log( 5 ) << "setClient: " << ns << endl;
+        if( logLevel > 5 )
+            log() << "setClient: " << ns << endl;
 
         Top::clientStart( ns );
 
-        curNs = ns;
-        string key = getKey( ns, path );
+        cc().setns(ns);
+        string key = makeDbKeyStr( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
         if ( it != databases.end() ) {
             database = it->second;
@@ -97,18 +102,8 @@ namespace mongo {
 
     /* remove database from the databases map */
     inline void eraseDatabase( const char *ns, const string& path=dbpath ) {
-        string key = getKey( ns, path );
+        string key = makeDbKeyStr( ns, path );
         databases.erase( key );
-    }
-
-    /* We normally keep around a curNs ptr -- if this ns is temporary,
-       use this instead so we don't have a bad ptr.  we could have made a copy,
-       but trying to be fast as we call setClient this for every single operation.
-    */
-    inline bool setClientTempNs(const char *ns) {
-        bool jc = setClient(ns);
-        curNs = "";
-        return jc;
     }
 
     inline bool clientIsEmpty() {

@@ -25,23 +25,40 @@
 #pragma once
 
 #include "lasterror.h"
-#include "security.h"
 
 namespace mongo { 
 
-    /* TODO: _ i bet these are not cleaned up on thread exit?  if so fix */
+    class AuthenticationInfo;
 
+    /* TODO: _ i bet these are not cleaned up on thread exit?  if so fix */
     class Client { 
+        Namespace _ns;
+        NamespaceString _nsstr;
     public:
         AuthenticationInfo *ai;
 
-        Client() { ai = new AuthenticationInfo(); }
-        ~Client() { delete ai; }
+        const char *ns() { return _ns.buf; }
 
+        void setns(const char *ns) { 
+            _ns = ns;
+            _nsstr = ns;
+        }
+
+        Client();
+        ~Client();
+
+        /* each thread which does db operations has a Client object in TLS.  
+           call this when your thread starts. 
+        */
         static void initThread();
     };
 
+    /* defined in security.cpp */
     extern boost::thread_specific_ptr<Client> currentClient;
+
+    inline Client& cc() { 
+        return *currentClient.get();
+    }
 
     inline void Client::initThread() {
         assert( currentClient.get() == 0 );
@@ -49,3 +66,4 @@ namespace mongo {
     }
 
 };
+

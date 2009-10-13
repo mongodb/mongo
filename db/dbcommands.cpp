@@ -866,7 +866,7 @@ namespace mongo {
                 b.append( "name", i->c_str() );
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
-                setClientTempNs( i->c_str() );
+                setClient( i->c_str() );
                 b.appendBool( "empty", clientIsEmpty() );
                 totalSize += size;
                 dbInfos.push_back( b.obj() );
@@ -883,7 +883,7 @@ namespace mongo {
 
                 BSONObjBuilder b;
                 b << "name" << name << "sizeOnDisk" << double( 1 );
-                setClientTempNs( name.c_str() );
+                setClient( name.c_str() );
                 b.appendBool( "empty", clientIsEmpty() );
 
                 dbInfos.push_back( b.obj() );
@@ -908,7 +908,7 @@ namespace mongo {
                 dbs.insert( name );
             }
             for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-                setClientTempNs( i->c_str() );
+                setClient( i->c_str() );
                 closeClient( i->c_str() );
             }
 
@@ -1149,7 +1149,7 @@ namespace mongo {
 
             string fromNs = string( realDbName ) + "." + from;
             string toNs = string( realDbName ) + "." + to;
-            massert( "source collection " + fromNs + " does not exist", !setClientTempNs( fromNs.c_str() ) );
+            massert( "source collection " + fromNs + " does not exist", !setClient( fromNs.c_str() ) );
             NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
             massert( "source collection " + fromNs + " does not exist", nsd );
             long long excessSize = nsd->datasize - size * 2;
@@ -1173,7 +1173,7 @@ namespace mongo {
             }
 
             DBDirectClient client;
-            setClientTempNs( toNs.c_str() );
+            setClient( toNs.c_str() );
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", double( size ) );

@@ -144,7 +144,7 @@ namespace mongo {
                 c->ai = oldAuth;
                 if ( !oldName.empty() ) {
                     dblock lk;
-                    setClientTempNs( oldName.c_str() );
+                    setClient( oldName.c_str() );
                 }
             }
         private:

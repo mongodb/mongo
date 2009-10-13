@@ -72,6 +72,11 @@ namespace mongo {
     void pairWith(const char *remoteEnd, const char *arb);
     void setRecCacheSize(unsigned MB);
 
+    const char *ourgetns() { 
+        Client *c = currentClient.get();
+        return c ? c->ns() : "";
+    }
+
     struct MyStartupTests {
         MyStartupTests() {
             assert( sizeof(OID) == 12 );
@@ -319,7 +324,7 @@ namespace mongo {
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
-            assert( !setClientTempNs( dbName.c_str() ) );
+            assert( !setClient( dbName.c_str() ) );
             MongoDataFile *p = database->getFile( 0 );
             MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() || forceRepair ) {
@@ -507,6 +512,8 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    getcurns = ourgetns;
+
     po::options_description general_options("General options");
     po::options_description replication_options("Replication options");
     po::options_description visible_options("Allowed options");
