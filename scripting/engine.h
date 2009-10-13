@@ -56,7 +56,9 @@ namespace mongo {
         
         int invoke( const char* code , const BSONObj& args, int timeoutMs = 0 );
         void invokeSafe( const char* code , const BSONObj& args, int timeoutMs = 0 ){
-	    uassert( "invoke failed" , invoke( code , args , timeoutMs ) == 0 );
+            if ( invoke( code , args , timeoutMs ) == 0 )
+                return;
+            throw UserException( (string)"invoke failed: " + getError() );
         }
 
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;

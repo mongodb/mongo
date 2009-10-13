@@ -16,10 +16,12 @@ namespace mongo {
     
     // the actual globals
     
-    mongo::DBClientConnection * getConnection( const v8::Arguments& args );
+    mongo::DBClientBase * getConnection( const v8::Arguments& args );
 
     // Mongo members
-    v8::Handle<v8::Value> mongoInit(const v8::Arguments& args);
+    v8::Handle<v8::Value> mongoConsLocal(const v8::Arguments& args);
+    v8::Handle<v8::Value> mongoConsExternal(const v8::Arguments& args);
+    
     v8::Handle<v8::Value> mongoFind(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoInsert(const v8::Arguments& args);
     v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args);

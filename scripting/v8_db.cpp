@@ -16,8 +16,7 @@ namespace mongo {
 #define DDD(x)
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local ){
-        uassert( "local not supported" , ! local );
-        v8::Local<v8::FunctionTemplate> mongo = FunctionTemplate::New( mongoInit );
+        v8::Local<v8::FunctionTemplate> mongo = FunctionTemplate::New( local ? mongoConsLocal : mongoConsExternal );
         
         v8::Local<v8::Template> proto = mongo->PrototypeTemplate();
 
@@ -51,7 +50,7 @@ namespace mongo {
     }
 
 
-    Handle<Value> mongoInit(const Arguments& args){
+    Handle<Value> mongoConsExternal(const Arguments& args){
 
         char host[255];
     
@@ -63,10 +62,11 @@ namespace mongo {
             strcpy( host , "127.0.0.1" );
         }
 
-        DBClientConnection * conn = new DBClientConnection( true );
+        DBClientConnection * cc = new DBClientConnection( true );
+        DBClientBase * conn = cc;
 
         string errmsg;
-        if ( ! conn->connect( host , errmsg ) ){
+        if ( ! cc->connect( host , errmsg ) ){
             return v8::ThrowException( v8::String::New( "couldn't connect" ) );
         }
 
@@ -74,6 +74,20 @@ namespace mongo {
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
     
+        return v8::Undefined();
+    }
+
+    Handle<Value> mongoConsLocal(const Arguments& args){
+        
+        if ( args.Length() > 0 )
+            return v8::ThrowException( v8::String::New( "local Mongo constructor takes no args" ) );
+
+        DBClientBase * conn = createDirectClient();
+
+        // NOTE I don't believe the conn object will ever be freed.
+        args.This()->Set( CONN_STRING , External::New( conn ) );
+        args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
+        
         return v8::Undefined();
     }
 
@@ -86,9 +100,9 @@ namespace mongo {
 #define GETNS char ns[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns ); 
 #endif
 
-    DBClientConnection * getConnection( const Arguments& args ){
+    DBClientBase * getConnection( const Arguments& args ){
         Local<External> c = External::Cast( *(args.This()->Get( CONN_STRING )) );
-        DBClientConnection * conn = (DBClientConnection*)(c->Value());
+        DBClientBase * conn = (DBClientBase*)(c->Value());
         assert( conn );
         return conn;
     }
@@ -103,10 +117,9 @@ namespace mongo {
        4 - skip
     */
     Handle<Value> mongoFind(const Arguments& args){
-        cerr << "in mongoFind" << endl;
         jsassert( args.Length() == 5 , "find needs 5 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
-        DBClientConnection * conn = getConnection( args );
+        DBClientBase * conn = getConnection( args );
         GETNS;
 
         BSONObj q = v8ToMongo( args[1]->ToObject() );
@@ -148,7 +161,7 @@ namespace mongo {
         jsassert( args.Length() == 2 , "insert needs 2 args" );
         jsassert( args[1]->IsObject() , "have to insert an object" );
     
-        DBClientConnection * conn = getConnection( args );
+        DBClientBase * conn = getConnection( args );
         GETNS;
     
         v8::Handle<v8::Object> in = args[1]->ToObject();
@@ -175,7 +188,7 @@ namespace mongo {
         jsassert( args.Length() == 2 , "remove needs 2 args" );
         jsassert( args[1]->IsObject() , "have to remove an object template" );
 
-        DBClientConnection * conn = getConnection( args );
+        DBClientBase * conn = getConnection( args );
         GETNS;
     
         v8::Handle<v8::Object> in = args[1]->ToObject();
@@ -197,7 +210,7 @@ namespace mongo {
         jsassert( args[1]->IsObject() , "1st param to update has to be an object" );
         jsassert( args[2]->IsObject() , "2nd param to update has to be an object" );
 
-        DBClientConnection * conn = getConnection( args );
+        DBClientBase * conn = getConnection( args );
         GETNS;
     
         v8::Handle<v8::Object> q = args[1]->ToObject();

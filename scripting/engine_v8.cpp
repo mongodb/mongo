@@ -15,7 +15,7 @@ namespace mongo {
         _globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
 
         _externalTemplate = getMongoFunctionTemplate( false );
-        //_localTemplate = getMongoFunctionTemplate( true );
+        _localTemplate = getMongoFunctionTemplate( true );
         installDBTypes( _globalTemplate );
     }
 
@@ -306,6 +306,11 @@ namespace mongo {
     }
 
     // ----- internal -----
+
+    void V8Scope::reset(){
+        _error = "";
+        _context->Enter();
+    }
 
     void V8Scope::_startCall(){
         _error = "";

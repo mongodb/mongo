@@ -16,7 +16,7 @@ namespace mongo {
         V8Scope( V8ScriptEngine * engine );
         ~V8Scope();
         
-        virtual void reset(){}
+        virtual void reset()
         virtual void init( BSONObj * data );
 
         virtual void localConnect( const char * dbName );
