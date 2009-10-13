@@ -2,6 +2,7 @@
 
 #include "v8_wrapper.h"
 #include "v8_utils.h"
+#include "v8_db.h"
 
 namespace mongo {
 
@@ -12,6 +13,10 @@ namespace mongo {
         
         _globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
         _globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
+
+        _externalTemplate = getMongoFunctionTemplate( false );
+        //_localTemplate = getMongoFunctionTemplate( true );
+        installDBTypes( _globalTemplate );
     }
 
     V8ScriptEngine::~V8ScriptEngine(){
@@ -26,7 +31,8 @@ namespace mongo {
     // --- scope ---
     
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
-        : _handleScope(),
+        : _engine( engine ) , 
+          _handleScope(),
           _context( Context::New( 0 , engine->_globalTemplate ) ) ,
           _scope( _context ) ,
           _global( _context->Global() ) ,
@@ -256,9 +262,7 @@ namespace mongo {
     
         Handle<v8::Value> result = script->Run();
         if ( result.IsEmpty() ){
-            stringstream ss;
-            ss << "exec error: " << &try_catch;
-            _error = ss.str();
+            _error = (string)"exec error: " + toSTLString( &try_catch );
             if ( reportError )
                 log() << _error << endl;
             if ( assertOnError )
@@ -266,7 +270,9 @@ namespace mongo {
             return false;
         } 
         
-        if ( printResult ){
+        _global->Set( v8::String::New( "__lastres__" ) , result );
+
+        if ( printResult && ! result->IsUndefined() ){
             cout << toSTLString( result ) << endl;
         }
         
@@ -293,9 +299,9 @@ namespace mongo {
             return;
         if ( _connectState == LOCAL )
             throw UserException( "localConnect already called, can't call externalSetup" );
-
         
-        uassert( "externalSetup not supported yet" , 0 );
+        _global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
+        exec( jsconcatcode , "shell setup" , false , true , true , 0 );
         _connectState = EXTERNAL;
     }
 

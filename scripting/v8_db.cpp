@@ -15,12 +15,26 @@ namespace mongo {
 
 #define DDD(x)
 
-    void installMongoGlobals( Handle<ObjectTemplate>& global ){
-        global->Set(v8::String::New("mongoInject"), FunctionTemplate::New(mongoInject));
-
+    v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local ){
+        uassert( "local not supported" , ! local );
         v8::Local<v8::FunctionTemplate> mongo = FunctionTemplate::New( mongoInit );
-        global->Set(v8::String::New("Mongo") , mongo );
-    
+        
+        v8::Local<v8::Template> proto = mongo->PrototypeTemplate();
+
+        proto->Set( v8::String::New( "find" ) , FunctionTemplate::New( mongoFind ) );
+        proto->Set( v8::String::New( "insert" ) , FunctionTemplate::New( mongoInsert ) );
+        proto->Set( v8::String::New( "remove" ) , FunctionTemplate::New( mongoRemove ) );
+        proto->Set( v8::String::New( "update" ) , FunctionTemplate::New( mongoUpdate ) );
+
+        Local<FunctionTemplate> ic = FunctionTemplate::New( internalCursorCons );
+        ic->PrototypeTemplate()->Set( v8::String::New("next") , FunctionTemplate::New( internalCursorNext ) );
+        ic->PrototypeTemplate()->Set( v8::String::New("hasNext") , FunctionTemplate::New( internalCursorHasNext ) );
+        proto->Set( v8::String::New( "internalCursor" ) , ic );
+
+        return mongo;
+    }
+
+    void installDBTypes( Handle<ObjectTemplate>& global ){
         v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
         global->Set(v8::String::New("DB") , db );
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
@@ -32,30 +46,10 @@ namespace mongo {
         v8::Local<v8::FunctionTemplate> dbQuery = FunctionTemplate::New( dbQueryInit );
         global->Set(v8::String::New("DBQuery") , dbQuery );
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler( dbQueryIndexAccess );
-    
-        v8::Local<v8::FunctionTemplate> objectId = FunctionTemplate::New( objectIdInit );
-        global->Set(v8::String::New("ObjectId") , objectId );
+        
+        global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit ) );
     }
 
-    Handle<Value> mongoInject(const Arguments& args){
-        jsassert( args.Length() == 1 , "mongoInject takes exactly 1 argument" );
-        jsassert( args[0]->IsObject() , "mongoInject needs to be passed a prototype" );
-
-        Local<v8::Object> o = args[0]->ToObject();
-    
-        o->Set( v8::String::New( "init" ) , FunctionTemplate::New( mongoInit )->GetFunction() );
-        o->Set( v8::String::New( "find" ) , FunctionTemplate::New( mongoFind )->GetFunction() );
-        o->Set( v8::String::New( "insert" ) , FunctionTemplate::New( mongoInsert )->GetFunction() );
-        o->Set( v8::String::New( "remove" ) , FunctionTemplate::New( mongoRemove )->GetFunction() );
-        o->Set( v8::String::New( "update" ) , FunctionTemplate::New( mongoUpdate )->GetFunction() );
-    
-        Local<FunctionTemplate> t = FunctionTemplate::New( internalCursorCons );
-        t->PrototypeTemplate()->Set( v8::String::New("next") , FunctionTemplate::New( internalCursorNext ) );
-        t->PrototypeTemplate()->Set( v8::String::New("hasNext") , FunctionTemplate::New( internalCursorHasNext ) );
-        o->Set( v8::String::New( "internalCursor" ) , t->GetFunction() );
-    
-        return v8::Undefined();
-    }
 
     Handle<Value> mongoInit(const Arguments& args){
 
@@ -109,6 +103,7 @@ namespace mongo {
        4 - skip
     */
     Handle<Value> mongoFind(const Arguments& args){
+        cerr << "in mongoFind" << endl;
         jsassert( args.Length() == 5 , "find needs 5 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
         DBClientConnection * conn = getConnection( args );
@@ -137,6 +132,7 @@ namespace mongo {
             }
         
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
+            assert( cons );
             Local<v8::Object> c = cons->NewInstance();
         
             // NOTE I don't believe the cursor object will ever be freed.

@@ -54,6 +54,8 @@ namespace mongo {
         void _startCall();
         
         static Handle< Value > nativeCallback( const Arguments &args );
+        
+        V8ScriptEngine * _engine;
 
         HandleScope _handleScope;
         Handle<Context> _context;
@@ -83,7 +85,9 @@ namespace mongo {
     private:
         HandleScope _handleScope;
         Handle<ObjectTemplate> _globalTemplate;
-
+        
+        Handle<FunctionTemplate> _externalTemplate;
+        Handle<FunctionTemplate> _localTemplate;
         friend class V8Scope;
     };
     

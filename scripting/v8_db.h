@@ -10,10 +10,11 @@
 #include "../client/dbclient.h"
 
 namespace mongo {
-    void installMongoGlobals( v8::Handle<v8::ObjectTemplate>& global );
+
+    v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local );
+    void installDBTypes( v8::Handle<v8::ObjectTemplate>& global );
     
     // the actual globals
-    v8::Handle<v8::Value> mongoInject(const v8::Arguments& args);
     
     mongo::DBClientConnection * getConnection( const v8::Arguments& args );
 
