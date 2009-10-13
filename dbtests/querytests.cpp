@@ -639,7 +639,113 @@ namespace QueryTests {
             ASSERT_EQUALS( 2U, client().count( ns, BSON( "foo.bar" << "spam" ) ) );
         }
     };
-    
+
+    class DifferentNumbers : public ClientBase {
+    public:
+        ~DifferentNumbers(){
+            client().dropCollection( "unittests.querytests.DifferentNumbers" );
+        }
+        void t( const char * ns ){
+            auto_ptr< DBClientCursor > cursor = client().query( ns, Query().sort( "7" ) );
+            while ( cursor->more() ){
+                BSONObj o = cursor->next();
+                cout << " foo " << o << endl;
+            }
+
+        }
+        void run() {
+            const char *ns = "unittests.querytests.DifferentNumbers";
+            { BSONObjBuilder b; b.append( "7" , (int)4 ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , (long long)2 ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.appendNull( "7" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , "b" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.appendNull( "8" ); client().insert( ns , b.obj() ); }
+            { BSONObjBuilder b; b.append( "7" , (double)3.7 ); client().insert( ns , b.obj() ); }
+
+            t(ns);
+            client().ensureIndex( ns , BSON( "7" << 1 ) );
+            t(ns);
+        }
+    };
+
+    class SymbolStringSame : public ClientBase {
+    public:
+        ~SymbolStringSame(){
+            client().dropCollection( ns() );
+        }
+        const char * ns(){
+            return "unittests.querytests.symbolstringsame";
+        }
+        void run(){
+            { BSONObjBuilder b; b.appendSymbol( "x" , "eliot" ); b.append( "z" , 17 ); client().insert( ns() , b.obj() ); }
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSONObj() )["z"].number() );
+            {
+                BSONObjBuilder b;
+                b.appendSymbol( "x" , "eliot" );
+                ASSERT_EQUALS( 17 , client().findOne( ns() , b.obj() )["z"].number() );
+            }
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
+            client().ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_EQUALS( 17 , client().findOne( ns() , BSON( "x" << "eliot" ) )["z"].number() );
+        }
+    };
+
+    class TailableCappedRaceCondition : public ClientBase {
+    public:
+
+        TailableCappedRaceCondition(){
+            client().dropCollection( ns() );
+            _n = 0;
+        }
+        ~TailableCappedRaceCondition(){
+            client().dropCollection( ns() );
+        }
+
+        int count(){
+            return client().count( ns() );
+        }
+        
+        void run(){
+            string err;
+            ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
+            for ( int i=0; i<100; i++ ){
+                insertNext();
+                ASSERT( count() < 40 );
+            }
+            
+            int a = count();
+            
+            auto_ptr< DBClientCursor > c = client().query( ns() , QUERY( "i" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_CursorTailable );
+            int n=0;
+            while ( c->more() ){
+                BSONObj z = c->next();
+                n++;
+            }
+            
+            ASSERT_EQUALS( a , n );
+
+            insertNext();
+            ASSERT( c->more() );
+
+            for ( int i=0; i<50; i++ ){
+                insertNext();
+            }
+
+            while ( c->more() ){ c->next(); }
+            ASSERT( c->isDead() );
+        }
+        
+        const char * ns(){
+            return "unittests.querytests.tailablecappedrace";
+        }
+        
+        void insertNext(){
+            insert( ns() , BSON( "i" << _n++ ) );
+        }
+
+        int _n;
+    };
+
     class All : public Suite {
     public:
         All() {
@@ -674,6 +780,9 @@ namespace QueryTests {
             add< DirectLocking >();
             add< FastCountIn >();
             add< EmbeddedArray >();
+            add< DifferentNumbers >();
+            add< SymbolStringSame >();
+            add< TailableCappedRaceCondition >();
         }
     };
     
