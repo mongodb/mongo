@@ -29,7 +29,6 @@ namespace mongo {
     }
 
     Client::~Client() { 
-cout << "TEMP" << endl;
         delete ai; 
     }
 
