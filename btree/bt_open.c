@@ -77,6 +77,7 @@ u_int __wt_sthread_count = 10;
 static int
 __wt_bt_server_start(WT_TOC *toc, WT_PAGE *page)
 {
+	extern u_int __wt_cthread_count;
 	ENV *env;
 	IDB *idb;
 	WT_INDX *ip;
@@ -95,6 +96,8 @@ __wt_bt_server_start(WT_TOC *toc, WT_PAGE *page)
 		srvr = idb->srvrq + srvr_id;
 		srvr->id = srvr_id + 1;
 		srvr->env = env;
+		WT_RET(__wt_calloc(env,
+		    __wt_cthread_count, sizeof(WT_TOC_CACHELINE), &srvr->ops));
 		WT_RET(__wt_cache_create(toc, &srvr->cache));
 		WT_RET(__wt_stat_alloc_srvr_stats(env, &srvr->stats));
 		WT_RET(__wt_thread_create(&srvr->tid, __wt_workq, srvr));

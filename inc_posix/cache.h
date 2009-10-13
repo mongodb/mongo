@@ -122,10 +122,9 @@ struct __wt_srvr {
 	 */
 	ENV	*env;			/* Server environment */
 
-	WT_CACHE *cache;		/* Database page cache */
+	WT_TOC_CACHELINE *ops;		/* Job queue */
 
-#define	WT_SRVR_TOCQ_SIZE	 40	/* Queued operations */
-	WT_TOC_CACHELINE ops[WT_SRVR_TOCQ_SIZE];
+	WT_CACHE *cache;		/* Database page cache */
 
 	WT_STATS *stats;		/* Server statistics */
 };

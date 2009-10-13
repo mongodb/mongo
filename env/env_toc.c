@@ -11,6 +11,8 @@
 
 static int __wt_env_toc_destroy(WT_TOC *, u_int32_t);
 
+u_int __wt_cthread_count = 10;
+
 /*
  * wt_env_toc_create --
  *	WT_TOC constructor.
@@ -37,8 +39,10 @@ __wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp)
 	WT_ERR(__wt_lock(&ienv->mtx));
 	toc->srvr_slot = ienv->next_toc_srvr_slot++;
 	WT_ERR(__wt_unlock(&ienv->mtx));
-	if (toc->srvr_slot >= WT_SRVR_TOCQ_SIZE) {
-		__wt_env_errx(env, "WtToc->create: too many threads");
+	if (toc->srvr_slot > __wt_cthread_count) {
+		__wt_env_errx(env,
+		    "Env->toc_create: too many threads: maximum %u",
+		    __wt_cthread_count);
 		ret = WT_ERROR;
 		goto err;
 	}
@@ -123,19 +127,25 @@ __wt_toc_sched(WT_TOC *toc)
 		srvr = &env->ienv->psrvr;
 		WT_TOC_SET_CACHE(toc, srvr);
 		__wt_api_switch(toc);
-	} else {
+		return (toc->ret);
+	}
+
+	/* Otherwise, select a server and run, until the operation finishes. */
+	do {
 		/* Select a server. */
 		srvr = WT_SRVR_SELECT(toc);
 
 		/* Queue the operation. */
 		srvr->ops[toc->srvr_slot].toc = toc;
+		WT_FLUSH_MEMORY;
 
 		/* Wait for the operation to complete. */
-		(void)__wt_lock(toc->block);
+		while (srvr->ops[toc->srvr_slot].toc != NULL)
+			__wt_yield();
+	} while (toc->ret == WT_RESCHEDULE);
 
-		/* Reset the WT_TOC's server information. */
-		WT_TOC_CLEAR_SRVR(toc);
-	}
+	/* Reset the WT_TOC's server information. */
+	WT_TOC_CLEAR_SRVR(toc);
 
 	return (toc->ret);
 }

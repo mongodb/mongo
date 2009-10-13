@@ -65,6 +65,7 @@ __wt_bt_server_stop(WT_TOC *toc)
 		srvr->running = 0;
 		WT_FLUSH_MEMORY;
 
+		__wt_free(env, srvr->ops);
 		WT_TRET(__wt_cache_destroy(toc, &srvr->cache));
 		__wt_free(env, srvr->stats);
 

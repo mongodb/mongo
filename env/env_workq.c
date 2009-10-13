@@ -16,6 +16,7 @@
 int
 __wt_env_start(ENV *env, u_int32_t flags)
 {
+	extern u_int __wt_cthread_count;
 	WT_SRVR *srvr;
 	IENV *ienv;
 
@@ -36,6 +37,8 @@ __wt_env_start(ENV *env, u_int32_t flags)
 	srvr = &ienv->psrvr;
 	srvr->id = WT_SRVR_PRIMARY;
 	srvr->env = env;
+	WT_RET(__wt_calloc(env,
+	    __wt_cthread_count, sizeof(WT_TOC_CACHELINE), &srvr->ops));
 	WT_RET(__wt_stat_alloc_srvr_stats(env, &srvr->stats));
 	if (!F_ISSET(ienv, WT_SINGLE_THREADED))
 		WT_RET(__wt_thread_create(&srvr->tid, __wt_workq, srvr));
@@ -80,6 +83,7 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 	srvr->running = 0;
 	WT_FLUSH_MEMORY;
 
+	__wt_free(env, srvr->ops);
 	__wt_free(env, srvr->stats);
 
 	if (!F_ISSET(ienv, WT_SINGLE_THREADED))
@@ -95,8 +99,9 @@ __wt_env_stop(ENV *env, u_int32_t flags)
 void *
 __wt_workq(void *arg)
 {
+	extern u_int __wt_cthread_count;
 	ENV *env;
-	WT_SRVR *srvr, *tsrvr;
+	WT_SRVR *srvr;
 	WT_TOC_CACHELINE *q, *eq;
 	WT_TOC *toc;
 	int notfound;
@@ -111,7 +116,7 @@ __wt_workq(void *arg)
 	/* Walk the queue, executing work. */
 	notfound = 1;
 	q = srvr->ops;
-	eq = q + sizeof(srvr->ops) / sizeof(srvr->ops[0]);
+	eq = q + __wt_cthread_count;
 	do {
 		if (q->toc != NULL) {			/* Operation. */
 			WT_STAT_INCR(
@@ -126,7 +131,6 @@ __wt_workq(void *arg)
 			 * memory write.)
 			 */
 			toc = q->toc;
-			q->toc = NULL;
 
 			/* The operation uses this server's cache; set it. */
 			WT_TOC_SET_CACHE(toc, srvr);
@@ -136,32 +140,24 @@ __wt_workq(void *arg)
 			__wt_api_switch(toc);
 			F_CLR(toc, WT_RUNNING);
 
-			/*
-			 * If the toc is being switched to a different server,
-			 * add it to that server's queue.   Else, we're done
-			 * with this operation, wake the thread.
-			 */
-			if (toc->ret == WT_RESCHEDULE) {
-				tsrvr = WT_SRVR_SELECT(toc);
-				tsrvr->ops[toc->srvr_slot].toc = toc;
-				WT_FLUSH_MEMORY;
-			} else
-				(void)__wt_unlock(toc->block);
+			/* Unblock the client thread. */
+			q->toc = NULL;
+			WT_FLUSH_MEMORY;
 		}
 
 		if (++q == eq) {
 			WT_STAT_INCR(srvr->stats,
 			    SRVR_ARRAY, "server thread array passes");
 			/*
-			 * If we didn't find work, yield the processor.
-			 * If we don't find work in enough loops, sleep, where
-			 * we gradually increase the sleep to 2 seconds.
+			 * If we didn't find work, yield the processor.  If we
+			 * don't find work for awhile, sleep.
 			 */
 			if (notfound++)
 				if (notfound >= 100000) {
 					WT_STAT_INCR(srvr->stats,
 					    SRVR_SLEEP, "server thread sleeps");
 					__wt_sleep(0, notfound);
+					notfound = 100000;
 				} else {
 					WT_STAT_INCR(srvr->stats,
 					    SRVR_YIELD, "server thread yields");
