@@ -17,10 +17,10 @@ namespace mongo {
         ~V8Scope();
         
         virtual void reset(){}
-        virtual void init( BSONObj * data ){ assert(0); }
+        virtual void init( BSONObj * data );
 
-        virtual void localConnect( const char * dbName ){ assert(0); }
-        virtual void externalSetup(){ assert(0); };
+        virtual void localConnect( const char * dbName );
+        virtual void externalSetup();
         
         v8::Handle<v8::Value> get( const char * field );
         virtual double getNumber( const char *field );
@@ -28,7 +28,7 @@ namespace mongo {
         virtual bool getBoolean( const char *field );
         virtual BSONObj getObject( const char *field );
         
-        virtual int type( const char *field ){ assert( false ); return 0; }
+        virtual int type( const char *field );
 
         virtual void setNumber( const char *field , double val );
         virtual void setString( const char *field , const char * val );
@@ -48,7 +48,7 @@ namespace mongo {
             _global->Set( v8::String::New( field ), f->GetFunction() );
         }
 
-        void gc(){ assert(0); }
+        void gc(){} // no-op in v8
 
     private:
         void _startCall();
@@ -63,6 +63,10 @@ namespace mongo {
         string _error;
         vector< v8::Handle<Value> > _funcs;
         v8::Handle<v8::Object> _this;
+
+        enum ConnectState { NOT , LOCAL , EXTERNAL };
+        ConnectState _connectState;
+        string _localDBName;
     };
     
     class V8ScriptEngine : public ScriptEngine {

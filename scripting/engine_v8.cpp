@@ -29,7 +29,8 @@ namespace mongo {
         : _handleScope(),
           _context( Context::New( 0 , engine->_globalTemplate ) ) ,
           _scope( _context ) ,
-          _global( _context->Global() ){
+          _global( _context->Global() ) ,
+          _connectState( NOT ){
         _this = v8::Object::New();
     }
 
@@ -57,6 +58,19 @@ namespace mongo {
         return mongoToV8Element( ret.firstElement() );
     }
 
+    // ---- global stuff ----
+
+    void V8Scope::init( BSONObj * data ){
+        if ( ! data )
+            return;
+        
+        BSONObjIterator i( *data );
+        while ( i.more() ){
+            BSONElement e = i.next();
+            setElement( e.fieldName() , e );
+        }
+    }
+    
     void V8Scope::setNumber( const char * field , double val ){
         _global->Set( v8::String::New( field ) , v8::Number::New( val ) );
     }
@@ -78,8 +92,34 @@ namespace mongo {
         _global->Set( v8::String::New( field ) , mongoToV8( obj ) );
     }
 
-    void V8Scope::setThis( const BSONObj * obj ){
-        _this = mongoToV8( *obj );
+    int V8Scope::type( const char *field ){
+        Handle<Value> v = get( field );
+        if ( v->IsNull() )
+            return jstNULL;
+        if ( v->IsUndefined() )
+            return Undefined;
+        if ( v->IsString() )
+            return String;
+        if ( v->IsFunction() )
+            return Code;
+        if ( v->IsArray() )
+            return Array;
+        if ( v->IsObject() )
+            return Object;
+        if ( v->IsBoolean() )
+            return Bool;
+        if ( v->IsInt32() )
+            return NumberInt;
+        if ( v->IsNumber() )
+            return NumberDouble;
+        if ( v->IsExternal() ){
+            uassert( "can't handle external yet" , 0 );
+            return -1;
+        }
+        if ( v->IsDate() )
+            return Date;
+
+        throw UserException( (string)"don't know what this is: " + field );
     }
 
     v8::Handle<v8::Value> V8Scope::get( const char * field ){
@@ -97,7 +137,7 @@ namespace mongo {
     bool V8Scope::getBoolean( const char *field ){ 
         return get( field )->ToBoolean()->Value();
     }
-
+    
     BSONObj V8Scope::getObject( const char * field ){
         Handle<Value> v = get( field );
         if ( v->IsNull() || v->IsUndefined() )
@@ -105,6 +145,8 @@ namespace mongo {
         uassert( "not an object" , v->IsObject() );
         return v8ToMongo( v->ToObject() );
     }
+    
+    // --- functions -----
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
         
@@ -149,6 +191,10 @@ namespace mongo {
         uassert( "not a func" , f->IsFunction() );
         _funcs.push_back( f );
         return num;
+    }
+
+    void V8Scope::setThis( const BSONObj * obj ){
+        _this = mongoToV8( *obj );
     }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
@@ -226,6 +272,34 @@ namespace mongo {
         
         return true;
     }
+
+    // ----- db access -----
+
+    void V8Scope::localConnect( const char * dbName ){
+        if ( _connectState == EXTERNAL )
+            throw UserException( "externalSetup already called, can't call externalSetup" );
+        if ( _connectState ==  LOCAL ){
+            if ( _localDBName == dbName )
+                return;
+            throw UserException( "localConnect called with a different name previously" );
+        }
+
+        uassert( "local connect not supported yet" , 0 );
+        _connectState = LOCAL;
+    }
+    
+    void V8Scope::externalSetup(){
+        if ( _connectState == EXTERNAL )
+            return;
+        if ( _connectState == LOCAL )
+            throw UserException( "localConnect already called, can't call externalSetup" );
+
+        
+        uassert( "externalSetup not supported yet" , 0 );
+        _connectState = EXTERNAL;
+    }
+
+    // ----- internal -----
 
     void V8Scope::_startCall(){
         _error = "";
