@@ -692,6 +692,62 @@ namespace QueryTests {
         }
     };
 
+    class TailableCappedRaceCondition : public ClientBase {
+    public:
+
+        TailableCappedRaceCondition(){
+            client().dropCollection( ns() );
+            _n = 0;
+        }
+        ~TailableCappedRaceCondition(){
+            client().dropCollection( ns() );
+        }
+
+        int count(){
+            return client().count( ns() );
+        }
+        
+        void run(){
+            string err;
+            ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
+            for ( int i=0; i<100; i++ ){
+                insertNext();
+                ASSERT( count() < 40 );
+            }
+            
+            int a = count();
+            
+            auto_ptr< DBClientCursor > c = client().query( ns() , QUERY( "i" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_CursorTailable );
+            int n=0;
+            while ( c->more() ){
+                BSONObj z = c->next();
+                n++;
+            }
+            
+            ASSERT_EQUALS( a , n );
+
+            insertNext();
+            ASSERT( c->more() );
+
+            for ( int i=0; i<50; i++ ){
+                insertNext();
+            }
+
+            while ( c->more() ){ c->next(); }
+            ASSERT( c->isDead() );
+        }
+        
+        const char * ns(){
+            return "unittests.querytests.tailablecappedrace";
+        }
+        
+        void insertNext(){
+            insert( ns() , BSON( "i" << _n++ ) );
+        }
+
+        int _n;
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -731,6 +787,7 @@ namespace QueryTests {
             add< EmbeddedArray >();
             add< DifferentNumbers >();
             add< SymbolStringSame >();
+            add< TailableCappedRaceCondition >();
         }
     } myall;
 

@@ -140,6 +140,11 @@ namespace mongo {
                 i != toAdvance.end(); ++i )
         {
             Cursor *c = (*i)->c.get();
+            if ( c->capped() ){
+                delete *i;
+                continue;
+            }
+            
             c->checkLocation();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
