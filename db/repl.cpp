@@ -1220,10 +1220,9 @@ namespace mongo {
                     OpTime nextLastSaved = nextLastSavedLocalTs();
                     {
                         dbtemprelease t;
-                        assert( !c->more() ); // [dm] if this asserts i don't understand this code. 13oct09
-                        /*if ( c->more() ) {
+                        if ( c->more() ) {
                             continue;
-                        } else*/ {
+                        } else {
                             setLastSavedLocalTs( nextLastSaved );
                         }
                     }
