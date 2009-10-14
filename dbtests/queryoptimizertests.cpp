@@ -585,7 +585,6 @@ namespace QueryOptimizerTests {
                 setClient( ns() );
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
-                currentClient.reset( new Client() );
             }
             ~Base() {
                 if ( !nsd() )
