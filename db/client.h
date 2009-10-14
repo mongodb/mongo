@@ -30,7 +30,6 @@ namespace mongo {
 
     class AuthenticationInfo;
 
-    /* TODO: _ i bet these are not cleaned up on thread exit?  if so fix */
     class Client { 
         Namespace _ns;
         NamespaceString _nsstr;
