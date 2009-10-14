@@ -202,7 +202,8 @@ namespace mongo {
 
             string dbpathString = p.native_directory_string();
             dbpath = dbpathString.c_str();
-
+            
+            cmdLine.prealloc = false;
             Client::initThread();
             acquirePathLock();
 
