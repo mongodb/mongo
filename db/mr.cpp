@@ -219,10 +219,13 @@ namespace mongo {
                 help << "see http://www.mongodb.org/display/DOCS/MapReduce";
             }
         
-            string tempCollectionName( string coll ){
+            string tempCollectionName( string coll , bool tmp ){
                 static int inc = 1;
                 stringstream ss;
-                ss << cc().database()->name << ".mr." << coll << "." << time(0) << "." << inc++;
+                ss << cc().database()->name << ".";
+                if ( tmp )
+                    ss << "tmp.";
+                ss << "mr." << coll << "_" << time(0) << "_" << inc++;
                 return ss.str();
             }
 
@@ -264,8 +267,9 @@ namespace mongo {
                 auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
                 s->localConnect( cc().database()->name.c_str() );
                 
-                string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() );
-                if ( cmdObj["keeptemp"].trueValue() == false )
+                bool istemp = ! cmdObj["keeptemp"].trueValue();
+                string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() , istemp );
+                if ( istemp )
                     currentClient->addTempCollection( resultColl );
                 string finalOutput = resultColl;
                 if ( cmdObj["out"].type() == String )
@@ -276,8 +280,8 @@ namespace mongo {
                 log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
                 db.dropCollection( resultColl );
             
-                int num = 0;
-            
+                long long num = 0;
+                long long numEmits = 0;
                 try {
                     dbtemprelease temprlease;
                     
@@ -330,6 +334,7 @@ namespace mongo {
                     mrtl->dump();
                     
                     s->exec( "MR.doReduce(true)" , "reduce" , false , true , true );
+                    numEmits = s->getNumber( "$numEmits" );
                     s->execSetup( "MR.cleanup()" );
                     _tlmr.reset( 0 );
                     /*
@@ -371,8 +376,14 @@ namespace mongo {
                 }
 
                 result.append( "result" , finalOutputShort );
-                result.append( "numObjects" , num );
                 result.append( "timeMillis" , t.millis() );
+                {
+                    BSONObjBuilder temp;
+                    temp.append( "input" , num );
+                    temp.append( "emit" , numEmits );
+                    temp.append( "output" , (long long)(db.count( finalOutput )) );
+                    result.append( "counts" , temp.obj() );
+                }
             
                 return true;
             }

@@ -32,7 +32,7 @@ r = function( key , values ){
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
 if ( ks == "_id" ) assert( res.ok , "not ok" );
-assert.eq( 4 , res.numObjects , "A" );
+assert.eq( 4 , res.counts.input , "A" );
 x = db[res.result];
 
 assert.eq( 3 , x.find().count() , "B" );
@@ -47,7 +47,7 @@ assert.eq( 3 , z.c , "F" );
 x.drop();
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
-assert.eq( 2 , res.numObjects , "B" );
+assert.eq( 2 , res.counts.input , "B" );
 x = db[res.result];
 z = {};
 x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );
@@ -57,7 +57,8 @@ assert.eq( 2 , z.c , "C3" );
 x.drop();
 
 res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
-assert.eq( 2 , res.numObjects , "B2" );
+printjson( res );
+assert.eq( 2 , res.counts.input , "B2" );
 assert.eq( "foo" , res.result , "B2-c" );
 x = db[res.result];
 z = {};
@@ -75,7 +76,7 @@ for ( i=5; i<1000; i++ ){
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
 printjson( res );
-assert.eq( 999 , res.numObjects , "Z1" );
+assert.eq( 999 , res.counts.input , "Z1" );
 x = db[res.result];
 x.find().forEach( printjson )
 assert.eq( 4 , x.find().count() , "Z2" );
