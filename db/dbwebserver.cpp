@@ -64,6 +64,7 @@ namespace mongo {
     extern bool cpu;
 
     void statsThread() {
+        Client::initThread();
         unsigned long long timeLastPass = 0;
         while ( 1 ) {
             {

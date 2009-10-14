@@ -225,7 +225,8 @@ public:
 
 inline void dbunlocking() { 
     theRecCache.ejectOld();
-    cc().top.clientStop();
+    Client *c = currentClient.get();
+    c->top.clientStop();
 }
 
 } /*namespace*/
