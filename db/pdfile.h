@@ -399,6 +399,7 @@ namespace mongo {
 
     inline NamespaceIndex* nsindex(const char *ns) {
         Database *database = cc().database();
+        assert( database );
         DEV {
             char buf[256];
             nsToClient(ns, buf);
