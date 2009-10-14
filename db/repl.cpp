@@ -1407,6 +1407,8 @@ namespace mongo {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
+        DEV assertInWriteLock();
+
         DBContext context;
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --

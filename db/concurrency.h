@@ -92,7 +92,7 @@ namespace mongo {
         }
     };
 
-    inline void requireInWriteLock() { 
+    inline void assertInWriteLock() { 
         assert( dbMutexInfo.isLocked() );
     }
 

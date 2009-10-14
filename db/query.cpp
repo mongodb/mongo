@@ -43,7 +43,7 @@ namespace mongo {
     const int MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
     //ns->query->DiskLoc
-    LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
+//    LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
     extern bool useCursors;
     extern bool useHints;

@@ -1,4 +1,7 @@
-// dbwebserver.cpp
+/* dbwebserver.cpp
+
+   This is the administrative web page displayed on port 28017.
+*/
 
 /**
 *    Copyright (C) 2008 10gen Inc.

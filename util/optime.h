@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "../db/concurrency.h"
+
 namespace mongo {
     
     /* Operation sequence #.  A combination of current second plus an ordinal value.
@@ -44,6 +46,7 @@ namespace mongo {
         }
         static OpTime now() {
             unsigned t = (unsigned) time(0);
+            DEV assertInWriteLock();
             if ( last.secs == t ) {
                 last.i++;
                 return last;

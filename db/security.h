@@ -45,11 +45,11 @@ namespace mongo {
         virtual ~AuthenticationInfo() {
         }
         void logout(const char *dbname) { 
-			requireInWriteLock();
+			assertInWriteLock();
 			m.erase(dbname); 
 		}
         void authorize(const char *dbname) { 
-			requireInWriteLock();
+			assertInWriteLock();
             m[dbname].level = 2;
         }
         virtual bool isAuthorized(const char *dbname) { 

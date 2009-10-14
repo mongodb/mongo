@@ -60,7 +60,7 @@ namespace mongo {
         /* we must be in critical section at this point as these are global
            variables.
         */
-        requireInWriteLock();
+        assertInWriteLock();
 
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
