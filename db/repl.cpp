@@ -1210,14 +1210,10 @@ namespace mongo {
         {
 			time_t saveLast = time(0);
             while ( 1 ) {
-                /* TODO: WHY is c->more() called twice here?  Once in this block it's clearly false?
-                         Also: isn't it bad to call more() without a temprelease?  seems like we need 
-                         another helper haveMoreWithoutRequesting(), and then if that is false, we temp 
-                         release and try more().
-                */
+                /* todo this code is ugly and confusing fix */
                 if ( !c->more() ) {
                     dblock lk;
-                    OpTime nextLastSaved = nextLastSavedLocalTs();
+                    OpTime nextLastSaved = nextLastSavedLocalTs(); // this may make c->more() become true
                     {
                         dbtemprelease t;
                         if ( c->more() ) {
