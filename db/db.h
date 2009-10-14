@@ -65,7 +65,7 @@ namespace mongo {
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
-        Top::clientStart( ns );
+        cc().top.clientStart( ns );
 
         string key = makeDbKeyStr( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
@@ -112,12 +112,13 @@ namespace mongo {
         string clientname;
         string clientpath;
         dbtemprelease() {
-            Database *database = cc().database();
+            Client& client = cc();
+            Database *database = client.database();
             if ( database ) {
                 clientname = database->name;
                 clientpath = database->path;
             }
-            Top::clientStop();
+            client.top.clientStop();
             dbMutexInfo.leaving();
 #if BOOST_VERSION >= 103500
             dbMutex.unlock();

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "lasterror.h"
+#include "../util/top.h"
 
 namespace mongo { 
 
@@ -38,6 +39,7 @@ namespace mongo {
         list<string> _tempCollections;
     public:
         AuthenticationInfo *ai;
+        Top top;
 
         Database* database() { return _database; }
         const char *ns() { return _ns.buf; }

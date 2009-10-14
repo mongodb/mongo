@@ -17,34 +17,61 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
 
-// Records per namespace utilization of the mongod process.
-// No two functions of this class may be called concurrently.
+/* Records per namespace utilization of the mongod process.
+   No two functions of this class may be called concurrently.
+*/
 class Top {
-public:
     typedef boost::posix_time::ptime T;
     typedef boost::posix_time::time_duration D;
-    static void clientStart( const char *client ) {
+public:
+    Top() : read_(false), write_(false) { }
+
+    /* these are used to record activity: */
+
+    void clientStart( const char *client ) {
         clientStop();
         currentStart_ = currentTime();
         current_ = client;
     }
-    static void setRead() { read_ = true; }
-    static void setWrite() { write_ = true; }
-    static void clientStop() {
+
+    /* indicate current request is a read operation. */
+    void setRead() { read_ = true; }
+
+    void setWrite() { write_ = true; }
+
+    void clientStop() {
         if ( currentStart_ == T() )
             return;
         D d = currentTime() - currentStart_;
-        recordUsage( current_, d );
+
+        {
+            boostlock L(topMutex);
+            recordUsage( current_, d );
+        }
+
         currentStart_ = T();
         read_ = false;
         write_ = false;
     }
-    struct Usage { string ns; D time; double pct; int reads; int writes; int calls; };
+
+    /* these are used to fetch the stats: */
+
+    struct Usage { 
+        string ns; 
+        D time; 
+        double pct; 
+        int reads, writes, calls; 
+    };
+
     static void usage( vector< Usage > &res ) {
+        boostlock L(topMutex);
+
         // Populate parent namespaces
         UsageMap snapshot;
         UsageMap totalUsage;
@@ -79,7 +106,10 @@ public:
             res.push_back( u );
         }
     }
+
     static void completeSnapshot() {
+        boostlock L(topMutex);
+
         if ( &snapshot_ == &snapshotA_ ) {
             snapshot_ = snapshotB_;
             nextSnapshot_ = snapshotA_;
@@ -91,7 +121,9 @@ public:
         snapshotStart_ = currentTime();
         nextSnapshot_.clear();
     }
+
 private:
+    static boost::mutex topMutex;
     static bool trivialNs( const char *ns ) {
         const char *ret = strrchr( ns, '.' );
         return ret && ret[ 1 ] == '\0';
@@ -100,11 +132,11 @@ private:
     static T currentTime() {
         return boost::posix_time::microsec_clock::universal_time();
     }
-    static void recordUsage( const string &client, D duration ) {
+    void recordUsage( const string &client, D duration ) {
         recordUsageForMap( totalUsage_, client, duration );
         recordUsageForMap( nextSnapshot_, client, duration );
     }
-    static void recordUsageForMap( UsageMap &map, const string &client, D duration ) {
+    void recordUsageForMap( UsageMap &map, const string &client, D duration ) {
         map[ client ].get< 0 >() += duration;
         if ( read_ && !write_ )
             map[ client ].get< 1 >()++;
@@ -116,7 +148,7 @@ private:
         for( UsageMap::const_iterator i = from.begin(); i != from.end(); ++i ) {
             string current = i->first;
             size_t dot = current.rfind( "." );
-            if ( dot == string::npos || dot != current_.length() - 1 ) {
+            if ( dot == string::npos || dot != current.length() - 1 ) {
                 inc( to[ current ], i->second );
             }
             while( dot != string::npos ) {
@@ -133,8 +165,8 @@ private:
         to.get<3>() += from.get<3>();
     }
     struct more { bool operator()( const D &a, const D &b ) { return a > b; } };
-    static string current_;
-    static T currentStart_;
+    string current_;
+    T currentStart_;
     static T snapshotStart_;
     static D snapshotDuration_;
     static UsageMap totalUsage_;
@@ -142,8 +174,8 @@ private:
     static UsageMap snapshotB_;
     static UsageMap &snapshot_;
     static UsageMap &nextSnapshot_;
-    static bool read_;
-    static bool write_;
+    bool read_;
+    bool write_;
 };
 
 } // namespace mongo

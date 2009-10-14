@@ -323,7 +323,7 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
-        Top::setWrite();
+        cc().top.setWrite();
         ss << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -352,7 +352,7 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
-        Top::setWrite();
+        cc().top.setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -386,7 +386,7 @@ namespace mongo {
             }
 
             setClient( q.ns );
-            Top::setRead();
+            cc().top.setRead();
             strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
             msgdata = runQuery(m, ss ).release();
         }
@@ -441,7 +441,7 @@ namespace mongo {
         const char *ns = d.getns();
         ss << ns;
         setClient(ns);
-        Top::setRead();
+        cc().top.setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         ss << " cid:" << cursorid;
@@ -471,7 +471,7 @@ namespace mongo {
 		assert(*ns);
         uassert( "not master", isMasterNs( ns ) );
 		setClient(ns);
-        Top::setWrite();
+        cc().top.setWrite();
 		ss << ns;
 		
         while ( d.moreJSObjs() ) {

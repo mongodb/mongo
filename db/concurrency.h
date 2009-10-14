@@ -68,9 +68,7 @@ namespace mongo {
                 lock( dbMutex, dbMutexInfo ) {
         }
         ~dblock() { 
-            /* todo: this should be inlined */
             dbunlocking();
-            Top::clientStop();
         }
     };
 
