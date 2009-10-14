@@ -112,10 +112,12 @@ namespace mongo {
     */
     class OID {
         union {
-            long long a;
-            unsigned char data[8];
+            struct{
+                long long a;
+                unsigned b;
+            };
+            unsigned char data[12];
         };
-        unsigned b;
     public:
 		/** initialize to 'null' */
 		void clear() { a = 0; b = 0; }
