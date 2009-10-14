@@ -45,6 +45,7 @@ namespace mongo {
             for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
                 string ns = *i;
                 dblock l;
+                setClient( ns.c_str() );
                 if ( ! nsdetails( ns.c_str() ) )
                     continue;
                 try {
