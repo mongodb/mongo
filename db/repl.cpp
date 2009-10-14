@@ -548,7 +548,7 @@ namespace mongo {
         setClient("local.sources");
         int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
         assert( u == 1 || u == 4 );
-        database = 0;
+        cc().clearns();
 
         if ( replacing ) {
             /* if we were in "replace" mode, we now have synced up with the replacement,
@@ -670,7 +670,7 @@ namespace mongo {
             addSourceToList(v, tmp, c->current(), old);
             c->advance();
         }
-        database = 0;
+        cc().clearns();
 
         if ( !gotPairWith && replPair ) {
             /* add the --pairwith server */
@@ -735,7 +735,7 @@ namespace mongo {
         log() << "resync: dropping database " << db << endl;
         string dummyns = string( db ) + ".";
         setClient(dummyns.c_str());        
-        assert( database->name == db );
+        assert( cc().database()->name == db );
         dropDatabase(dummyns.c_str());
         return dummyns;
     }
@@ -748,7 +748,7 @@ namespace mongo {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, database->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
+            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
             if ( !ok ) {
                 problem() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
                 throw SyncException();
@@ -881,7 +881,7 @@ namespace mongo {
 	// this is a bit hacky -- the semantics of replication/commands aren't well specified
 	if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
 	  applyOperation( op );
-	  database = 0;
+      cc().clearns();
 	  return;
 	}
         
@@ -902,7 +902,7 @@ namespace mongo {
                 save();
                 setClient( ns );
                 nClonedThisPass++;
-                resync(database->name);
+                resync(cc().database()->name);
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
             }
@@ -926,7 +926,7 @@ namespace mongo {
             }
             addDbNextPass.erase( clientName );
         }
-        database = 0;
+        cc().clearns();
     }
 
     BSONObj ReplSource::idForOp( const BSONObj &op, bool &mod ) {
@@ -1407,7 +1407,8 @@ namespace mongo {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
-        Database *oldClient = database;
+        DBContext context;
+
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
         */
@@ -1428,10 +1429,10 @@ namespace mongo {
         if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
             if ( localOplogMainDetails == 0 ) {
                 setClient("local.");
-                localOplogClient = database;
+                localOplogClient = cc().database();
                 localOplogMainDetails = nsdetails(logNS);
             }
-            database = localOplogClient;
+            cc().setns("", localOplogClient); // database = localOplogClient;
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         } else {
             setClient( logNS );
@@ -1454,8 +1455,6 @@ namespace mongo {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
-
-        database = oldClient;
     }
 
     /* --------------------------------------------------------------*/
@@ -1655,7 +1654,7 @@ namespace mongo {
         BSONObj o = b.done();
         userCreateNS(ns, o, err, false);
         logOp( "n", "dummy", BSONObj() );
-        database = 0;
+        cc().clearns();
     }
     
     void startReplication() {

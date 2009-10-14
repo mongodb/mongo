@@ -61,8 +61,9 @@ namespace mongo {
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // database->name is the one we are logging out...
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            ai->logout(database->name.c_str());
+            Client& client = cc();
+            AuthenticationInfo *ai = client.ai;
+            ai->logout(client.database()->name.c_str());
             return true;
         }
     } cmdLogout;
@@ -85,7 +86,9 @@ namespace mongo {
             string received_nonce = cmdObj.getStringField("nonce");
             
             if( user.empty() || key.empty() || received_nonce.empty() ) { 
-                log() << "field missing/wrong type in received authenticate command " << database->name << '\n';                log() << "field missing/wrong type in received authenticate command " << database->name << '\n';
+                log() << "field missing/wrong type in received authenticate command " 
+                    << cc().database()->name
+                    << '\n';               
                 errmsg = "auth fails";
                 sleepmillis(10);
                 return false;
@@ -98,7 +101,7 @@ namespace mongo {
                 digestBuilder << hex << *ln;
                 
                 if( ln == 0 || digestBuilder.str() != received_nonce ) {
-                    log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << database->name << '\n';                log() << "field missing/wr " << database->name << '\n';
+                    log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << cc().database()->name << '\n';
                     errmsg = "auth fails";
                     sleepmillis(30);
                     return false;
@@ -106,7 +109,7 @@ namespace mongo {
             }
 
             static BSONObj userPattern = fromjson("{\"user\":1}");
-            string systemUsers = database->name + ".system.users";
+            string systemUsers = cc().database()->name + ".system.users";
             OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
 
             BSONObj userObj;
@@ -143,7 +146,7 @@ namespace mongo {
             }
 
             AuthenticationInfo *ai = currentClient.get()->ai;
-            ai->authorize(database->name.c_str());
+            ai->authorize(cc().database()->name.c_str());
             return true;
         }
     } cmdAuthenticate;

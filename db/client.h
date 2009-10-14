@@ -29,20 +29,25 @@
 namespace mongo { 
 
     class AuthenticationInfo;
+    class Database;
 
     class Client { 
+        Database* _database;
         Namespace _ns;
-        NamespaceString _nsstr;
+        //NamespaceString _nsstr;
         list<string> _tempCollections;
     public:
         AuthenticationInfo *ai;
 
+        Database* database() { return _database; }
         const char *ns() { return _ns.buf; }
 
-        void setns(const char *ns) { 
+        void setns(const char *ns, Database *db) { 
+            _database = db;
             _ns = ns;
-            _nsstr = ns;
+            //_nsstr = ns;
         }
+        void clearns() { setns("", 0); }
 
         Client();
         ~Client();

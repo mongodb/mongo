@@ -40,7 +40,7 @@ namespace mongo {
             return;
         }
 
-        string system_indexes = database->name + ".system.indexes";
+        string system_indexes = cc().database()->name + ".system.indexes";
 
         BSONObjBuilder b;
         b.append("name", name);

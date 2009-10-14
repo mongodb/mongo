@@ -109,7 +109,7 @@ namespace mongo {
                 uassert( "$where query, but no script engine", globalScriptEngine );
 
                 where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-                where->scope->localConnect( database->name.c_str() );
+                where->scope->localConnect( cc().database()->name.c_str() );
 
                 if ( e.type() == CodeWScope ) {
                     where->setFunc( e.codeWScopeCode() );

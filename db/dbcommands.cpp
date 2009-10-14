@@ -416,23 +416,23 @@ namespace mongo {
         CmdProfile() : Command("profile") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.findElement(name);
-            result.append("was", (double) database->profile);
+            result.append("was", (double) cc().database()->profile);
             int p = (int) e.number();
             bool ok = false;
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                if( p && nsdetails(database->profileName.c_str()) == 0 ) {
+                if( p && nsdetails(cc().database()->profileName.c_str()) == 0 ) {
                     BSONObjBuilder spec;
                     spec.appendBool( "capped", true );
                     spec.append( "size", 131072.0 );
 
-                    if ( !userCreateNS( database->profileName.c_str(), spec.done(), errmsg, true ) ) {
+                    if ( !userCreateNS( cc().database()->profileName.c_str(), spec.done(), errmsg, true ) ) {
                         return false;
                     }
                 }
                 ok = true;
-                database->profile = p;
+                cc().database()->profile = p;
             }
             return ok;
         }
@@ -640,7 +640,7 @@ namespace mongo {
             return false;
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string nsToDrop = database->name + '.' + cmdObj.findElement(name).valuestr();
+            string nsToDrop = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop.c_str());
             if ( !cmdLine.quiet )
                 log() << "CMD: drop " << nsToDrop << endl;
@@ -702,7 +702,7 @@ namespace mongo {
             return false;
         }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
             string err;
             long long n = runCount(ns.c_str(), cmdObj, err);
             long long nn = n;
@@ -739,7 +739,7 @@ namespace mongo {
             help << "create a collection";
         }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
             string err;
             bool ok = userCreateNS(ns.c_str(), cmdObj, err, true);
             if ( !ok && !err.empty() )
@@ -763,7 +763,7 @@ namespace mongo {
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             /* note: temp implementation.  space not reclaimed! */
             BSONElement e = jsobj.findElement(name.c_str());
-            string toDeleteNs = database->name + '.' + e.valuestr();
+            string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             if ( !cmdLine.quiet )
                 log() << "CMD: deleteIndexes " << toDeleteNs << endl;
@@ -800,7 +800,7 @@ namespace mongo {
             static DBDirectClient db;
 
             BSONElement e = jsobj.findElement(name.c_str());
-            string toDeleteNs = database->name + '.' + e.valuestr();
+            string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             log() << "CMD: reIndex " << toDeleteNs << endl;
 
@@ -1410,7 +1410,7 @@ namespace mongo {
         bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             static DBDirectClient db;
 
-            string ns = database->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
             string key = cmdObj["key"].valuestrsafe();
 
             BSONObj keyPattern = BSON( key << 1 );
@@ -1489,7 +1489,7 @@ namespace mongo {
             string errmsg;
             Command *c = i->second;
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(database->name.c_str()) || !c->requiresAuth());
+            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
 
             bool admin = c->adminOnly();
             if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
@@ -1524,7 +1524,7 @@ namespace mongo {
         }
         else if ( e.type() == String ) {
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
+            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
 
             /* { count: "collectionname"[, query: <query>] } */
             string us(ns, p-ns);

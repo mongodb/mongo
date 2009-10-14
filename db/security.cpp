@@ -25,7 +25,7 @@ namespace mongo {
 
     boost::thread_specific_ptr<Client> currentClient;
 
-    Client::Client() : _ns(""), _nsstr("") { 
+    Client::Client() : _database(0), _ns("")/*, _nsstr("")*/ { 
         ai = new AuthenticationInfo(); 
     }
 

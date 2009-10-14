@@ -115,6 +115,7 @@ namespace mongo {
 			return true;
 
         if ( !client ) {
+            Database *database = cc().database();
             assert( database );
             client = database->name.c_str();
         }

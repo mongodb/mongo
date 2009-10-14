@@ -108,7 +108,7 @@ namespace mongo {
         }
         out() << endl;
 
-        database = 0;
+        cc().clearns();
     }
 
     MessagingPort *grab = 0;
@@ -326,7 +326,7 @@ namespace mongo {
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
             assert( !setClient( dbName.c_str() ) );
-            MongoDataFile *p = database->getFile( 0 );
+            MongoDataFile *p = cc().database()->getFile( 0 );
             MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;

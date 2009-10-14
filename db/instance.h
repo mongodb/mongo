@@ -132,9 +132,9 @@ namespace mongo {
         public:
             SavedContext() {
                 dblock lk;
-                if ( database )
-                    oldName = database->name;
                 Client *c = currentClient.get();
+                if ( c->database() )
+                    oldName = c->database()->name;
                 oldAuth = c->ai;
                 // careful, don't want to free this:
                 c->ai = &always;

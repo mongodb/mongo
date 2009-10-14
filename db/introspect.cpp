@@ -34,7 +34,7 @@ namespace mongo {
         b.append("info", str);
         b.append("millis", (double) millis);
         BSONObj p = b.done();
-        theDataFileMgr.insert(database->profileName.c_str(),
+        theDataFileMgr.insert(cc().database()->profileName.c_str(),
                               p.objdata(), p.objsize(), true);
     }
 

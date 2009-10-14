@@ -74,7 +74,7 @@ inline static string unescape(const char *ns) {
 }
 
 string RecCache::directory() { 
-    return database->path;
+    return cc().database()->path;
 }
 
 /* filename format is 

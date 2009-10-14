@@ -18,10 +18,10 @@
  */
 
 #include "stdafx.h"
+#include "../db/db.h"
 #include "../db/clientcursor.h"
 #include "../db/instance.h"
 #include "../db/btree.h"
-
 #include "dbtests.h"
 
 namespace CursorTests {

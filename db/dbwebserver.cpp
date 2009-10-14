@@ -112,8 +112,8 @@ namespace mongo {
         void doLockedStuff(stringstream& ss) {
             ss << "currentOp: " << currentOp.infoNoauth() << "\n";
             ss << "# databases: " << databases.size() << '\n';
-            if ( database ) {
-                ss << "curclient: " << database->name;
+            if ( cc().database() ) {
+                ss << "curclient: " << cc().database()->name;
                 ss << '\n';
             }
             ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';

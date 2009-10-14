@@ -68,7 +68,7 @@ namespace mongo {
         
         if ( e.type() == CodeWScope )
             s->init( e.codeWScopeScopeData() );
-        s->localConnect( database->name.c_str() );
+        s->localConnect( cc().database()->name.c_str() );
 
         BSONObj args;
         {

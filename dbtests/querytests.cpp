@@ -608,7 +608,7 @@ namespace QueryTests {
             dblock lk;
             setClient( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
-            ASSERT_EQUALS( "unittests", database->name );
+            ASSERT_EQUALS( "unittests", cc().database()->name );
         }
         const char *ns;
     };
@@ -704,7 +704,7 @@ namespace QueryTests {
         }
 
         int count(){
-            return client().count( ns() );
+            return (int) client().count( ns() );
         }
         
         void run(){

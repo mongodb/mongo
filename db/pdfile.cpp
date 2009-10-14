@@ -48,7 +48,6 @@ namespace mongo {
 
     DataFileMgr theDataFileMgr;
     map<string,Database*> databases;
-    Database *database;
     int MAGIC = 0x1000;
     int curOp = -2;
     int callDepth = 0;
@@ -64,6 +63,7 @@ namespace mongo {
 
     string getDbContext() {
         stringstream ss;
+        Database *database = cc().database();
         if ( database ) {
             ss << database->name << ' ';
             ss << cc().ns() << ' ';
@@ -128,6 +128,7 @@ namespace mongo {
         // each of size 'size'.
         e = j.findElement( "$nExtents" );
         int nExtents = int( e.number() );
+        Database *database = cc().database();
         if ( nExtents > 0 ) {
             assert( size <= 0x7fffffff );
             for ( int i = 0; i < nExtents; ++i ) {
@@ -231,6 +232,7 @@ namespace mongo {
                    something reasonable.
                 */
                 string s = "db disk space quota exceeded ";
+                Database *database = cc().database();
                 if ( database )
                     s += database->name;
                 uasserted(s);
@@ -303,7 +305,7 @@ namespace mongo {
                 out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
-            return database->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
+            return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
         header->unused.setOfs( fileNo, offset + ExtentSize );
@@ -320,7 +322,7 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::allocExtent(const char *ns, int approxSize, bool capped) { 
-        string s = database->name + ".$freelist";
+        string s = cc().database()->name + ".$freelist";
         NamespaceDetails *f = nsdetails(s.c_str());
         if( f ) {
             int low, high;
@@ -557,10 +559,10 @@ namespace mongo {
         uassert( (string)"ns not found: " + nsToDrop , d );
 
         NamespaceString s(nsToDrop);
-        assert( s.db == database->name );
+        assert( s.db == cc().database()->name );
         if( s.isSystem() ) {
             if( s.coll == "system.profile" ) 
-                uassert( "turn off profiling before dropping system.profile collection", database->profile == 0 );
+                uassert( "turn off profiling before dropping system.profile collection", cc().database()->profile == 0 );
             else
                 uasserted( "can't drop system ns" );
         }
@@ -568,14 +570,14 @@ namespace mongo {
         {
             // remove from the system catalog
             BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
-            string system_namespaces = database->name + ".system.namespaces";
+            string system_namespaces = cc().database()->name + ".system.namespaces";
             /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, false, true);
 			// no check of return code as this ns won't exist for some of the new storage engines
         }
 
         // free extents
         if( !d->firstExtent.isNull() ) {
-            string s = database->name + ".$freelist";
+            string s = cc().database()->name + ".$freelist";
             NamespaceDetails *freeExtents = nsdetails(s.c_str());
             if( freeExtents == 0 ) { 
                 string err;
@@ -600,7 +602,7 @@ namespace mongo {
         }
 
         // remove from the catalog hashtable
-        database->namespaceIndex.kill(nsToDrop.c_str());
+        cc().database()->namespaceIndex.kill(nsToDrop.c_str());
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
@@ -648,7 +650,7 @@ namespace mongo {
 
         // clean up in system.indexes.  we do this last on purpose.  note we have 
         // to make the cond object before the drop() above though.
-        string system_indexes = database->name + ".system.indexes";
+        string system_indexes = cc().database()->name + ".system.indexes";
         int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
         wassert( n == 1 );
     }
@@ -957,7 +959,7 @@ namespace mongo {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert("E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
-            if ( database->profile )
+            if ( cc().database()->profile )
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
             insert(ns, objNew.objdata(), objNew.objsize(), false);
@@ -994,7 +996,7 @@ namespace mongo {
                         out() << " caught assertion update index " << idx.indexNamespace() << '\n';
                         problem() << " caught assertion update index " << idx.indexNamespace() << endl;
                     }
-                    if ( database->profile )
+                    if ( cc().database()->profile )
                         ss << '\n' << changes[x].added.size() << " key updates ";
                 }
 
@@ -1250,7 +1252,7 @@ namespace mongo {
             if ( d->indexes[ i ].isIdIndex() )
                 return;
         
-        string system_indexes = database->name + ".system.indexes";
+        string system_indexes = cc().database()->name + ".system.indexes";
 
         BSONObjBuilder b;
         b.append("name", "_id_");
@@ -1335,7 +1337,7 @@ namespace mongo {
                also if this is an addIndex, those checks should happen before this!
             */
             // This creates first file in the database.
-            database->newestFile()->allocExtent(ns, initialExtentSize(len));
+            cc().database()->newestFile()->allocExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);
@@ -1350,7 +1352,7 @@ namespace mongo {
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
 
-            if ( database->name != nsToClient(tabletoidxns.c_str()) ) {
+            if ( cc().database()->name != nsToClient(tabletoidxns.c_str()) ) {
                 uassert("bad table to index name on add index attempt", false);
                 return DiskLoc();
             }
@@ -1435,13 +1437,13 @@ namespace mongo {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
                 log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
-                database->newestFile()->allocExtent(ns, followupExtentSize(lenWHdr, d->lastExtentSize));
+                cc().database()->newestFile()->allocExtent(ns, followupExtentSize(lenWHdr, d->lastExtentSize));
                 loc = d->alloc(ns, lenWHdr, extentLoc);
                 if ( loc.isNull() ){
                     log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
                     for ( int zzz=0; zzz<10 && lenWHdr > d->lastExtentSize; zzz++ ){
                         log() << "try #" << zzz << endl;
-                        database->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
+                        cc().database()->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
                         loc = d->alloc(ns, lenWHdr, extentLoc);
                         if ( ! loc.isNull() )
                             break;
@@ -1591,7 +1593,7 @@ namespace mongo {
         char cl[256];
         nsToClient(ns, cl);
         log(1) << "dropDatabase " << cl << endl;
-        assert( database->name == cl );
+        assert( cc().database()->name == cl );
 
         closeClient( cl );
         _deleteDataFiles(cl);
@@ -1699,7 +1701,7 @@ namespace mongo {
         char dbName[256];
         nsToClient(ns, dbName);
         problem() << "repairDatabase " << dbName << endl;
-        assert( database->name == dbName );
+        assert( cc().database()->name == dbName );
 
         boost::intmax_t totalSize = dbSize( dbName );
         boost::intmax_t freeSize = freeSpace();

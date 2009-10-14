@@ -18,7 +18,11 @@
 
 #pragma once
 
+#include "dbhelpers.h"
+
 namespace mongo {
+
+    class DBContext;
 
     /* this is an "accessor" class to data held in local.dbinfo.<dbname>
 
@@ -27,15 +31,15 @@ namespace mongo {
     */
     class DBInfo {
         string ns;
-        Database *dbold;
+        DBContext *context;
     public:
         ~DBInfo() {
-            database = dbold;
+            delete context;
         }
-        DBInfo(const char *db) {
-            dbold = database;
+        DBInfo(const char *db)
+        {
             ns = string("local.dbinfo.") + db;
-            setClient(ns.c_str());
+            context = new DBContext(ns);
         }
 
         BSONObj getDbInfoObj() {

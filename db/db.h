@@ -43,7 +43,6 @@ namespace mongo {
 
     // tempish...move to TLS or pass all the way down as a parm
     extern map<string,Database*> databases;
-    extern Database *database;
     extern bool master;
 
     /* sometimes we deal with databases with the same name in different directories - thus this */
@@ -68,11 +67,10 @@ namespace mongo {
 
         Top::clientStart( ns );
 
-        cc().setns(ns);
         string key = makeDbKeyStr( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
         if ( it != databases.end() ) {
-            database = it->second;
+            cc().setns(ns, it->second);
             return false;
         }
 
@@ -88,10 +86,10 @@ namespace mongo {
         char cl[256];
         nsToClient(ns, cl);
         bool justCreated;
-        Database *c = new Database(cl, justCreated, path);
-        databases[key] = c;
-        database = c;
-        database->finishInit();
+        Database *newdb = new Database(cl, justCreated, path);
+        databases[key] = newdb;
+        newdb->finishInit();
+        cc().setns(ns, newdb);
 
         return justCreated;
     }
@@ -107,13 +105,14 @@ namespace mongo {
     }
 
     inline bool clientIsEmpty() {
-        return !database->namespaceIndex.allocated();
+        return !cc().database()->namespaceIndex.allocated();
     }
 
     struct dbtemprelease {
         string clientname;
         string clientpath;
         dbtemprelease() {
+            Database *database = cc().database();
             if ( database ) {
                 clientname = database->name;
                 clientpath = database->path;
@@ -134,7 +133,7 @@ namespace mongo {
 #endif
             dbMutexInfo.entered();
             if ( clientname.empty() )
-                database = 0;
+                cc().setns("", 0);
             else
                 setClient(clientname.c_str(), clientpath.c_str());
         }

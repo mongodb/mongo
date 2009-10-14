@@ -17,11 +17,14 @@
 */
 
 #include "stdafx.h"
+#include "db.h"
 #include "btree.h"
 #include "pdfile.h"
 #include "../util/unittest.h"
 #include "json.h"
 #include "clientcursor.h"
+#include "client.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 

@@ -30,6 +30,7 @@
 #include "storage.h"
 #include "jsobjmanipulator.h"
 #include "namespace.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -397,6 +398,7 @@ namespace mongo {
     boost::intmax_t dbSize( const char *database );
 
     inline NamespaceIndex* nsindex(const char *ns) {
+        Database *database = cc().database();
         DEV {
             char buf[256];
             nsToClient(ns, buf);
@@ -418,17 +420,17 @@ namespace mongo {
 
     inline MongoDataFile& DiskLoc::pdf() const {
         assert( fileNo != -1 );
-        return *database->getFile(fileNo);
+        return *cc().database()->getFile(fileNo);
     }
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
         assert( dl.a() != -1 );
-        return database->getFile(dl.a())->getExtent(dl);
+        return cc().database()->getFile(dl.a())->getExtent(dl);
     }
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
         assert( dl.a() != -1 );
-        return database->getFile(dl.a())->recordAt(dl);
+        return cc().database()->getFile(dl.a())->recordAt(dl);
     }
     
     void ensureHaveIdIndex(const char *ns);

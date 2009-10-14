@@ -746,7 +746,7 @@ namespace mongo {
     };
     
     int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
-        int profile = database->profile;
+        int profile = cc().database()->profile;
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
@@ -1405,7 +1405,7 @@ namespace mongo {
         else {
             
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
+            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
@@ -1552,6 +1552,7 @@ namespace mongo {
         }
         
         int duration = t.millis();
+        Database *database = cc().database();
         if ( (database && database->profile) || duration >= 100 ) {
             ss << " nscanned:" << nscanned << ' ';
             if ( ntoskip )

@@ -147,6 +147,4 @@ namespace mongo {
 
     };
 
-    extern Database *database;
-
 } // namespace mongo

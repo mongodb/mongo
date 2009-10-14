@@ -152,7 +152,7 @@ namespace mongo {
         ss << buf;
 
         Timer t;
-        database = 0;
+        cc().clearns();
 
         int logThreshold = 100;
         int ms;
@@ -268,6 +268,7 @@ namespace mongo {
             ss << ' ' << t.millis() << "ms";
             out() << ss.str().c_str() << endl;
         }
+        Database *database = cc().database();
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= 100 ) {
                 // profile it
@@ -296,6 +297,7 @@ namespace mongo {
        path - db directory
     */
     void closeClient( const char *cl, const string& path ) {
+        Database *database = cc().database();
         assert( database );
         assert( database->name == cl );
         if ( string("local") != cl ) {
@@ -312,7 +314,7 @@ namespace mongo {
 
         eraseDatabase( cl, path );
         delete database; // closes files
-        database = 0;
+        cc().clearns();
     }
 
     void receivedUpdate(Message& m, stringstream& ss) {
@@ -421,6 +423,7 @@ namespace mongo {
         resp->setData(msgdata, true); // transport will free
         dbresponse.response = resp;
         dbresponse.responseTo = responseTo;
+        Database *database = cc().database();
         if ( database ) {
             if ( database->profile )
                 ss << " bytes:" << resp->data->dataLen();
@@ -446,7 +449,7 @@ namespace mongo {
         QueryResult* msgdata;
         try {
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(database->name.c_str()));
+            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid);
         }
         catch ( AssertionException& e ) {
@@ -511,7 +514,7 @@ namespace mongo {
 		/* we should be in the same thread as the original request, so authInfo should be available. */
         AuthenticationInfo *ai = currentClient.get()->ai;
         
-        Database *clientOld = database;
+        Database *clientOld = cc().database();
 
         JniMessagingPort jmp(out);
         callDepth++;
@@ -582,6 +585,7 @@ namespace mongo {
                     ss << ' ' << t.millis() << "ms";
                     mongo::out() << ss.str().c_str() << endl;
                 }
+                Database *database = cc().database();
                 if ( database && database->profile >= 1 ) {
                     if ( database->profile >= 2 || ms >= 100 ) {
                         // profile it
@@ -598,9 +602,10 @@ namespace mongo {
         curOp = curOpOld;
         callDepth--;
 
-        if ( database != clientOld ) {
+        if ( cc().database() != clientOld ) {
+            assert(false);/*
             database = clientOld;
-            wassert(false);
+            wassert(false);*/
         }
     }
 

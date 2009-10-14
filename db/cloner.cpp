@@ -67,7 +67,7 @@ namespace mongo {
                 uassert("bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
                 uassert("bad ns field for index during dbcopy [2]", p);
-                string newname = database->name + p;
+                string newname = cc().database()->name + p;
                 b.append("ns", newname);
             }
             else
@@ -139,13 +139,13 @@ namespace mongo {
 
 		massert( "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
 
-        string todb = database->name;
+        string todb = cc().database()->name;
         stringstream a,b;
         a << "localhost:" << cmdLine.port;
         b << "127.0.0.1:" << cmdLine.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
-            if ( fromdb == todb && database->path == dbpath ) {
+            if ( fromdb == todb && cc().database()->path == dbpath ) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";
@@ -384,7 +384,7 @@ namespace mongo {
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
                were to clone it would get a different point-in-time and not match.
                */
-            return cloneFrom(from.c_str(), errmsg, database->name, 
+            return cloneFrom(from.c_str(), errmsg, cc().database()->name, 
                              /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true);
         }
     } cmdclone;
@@ -561,7 +561,7 @@ namespace mongo {
             }
             setClient(todb.c_str());
             bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
-            database = 0;
+            cc().clearns();
             return res;
         }
     } cmdcopydb;
