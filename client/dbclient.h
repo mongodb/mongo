@@ -580,7 +580,7 @@ namespace mongo {
          ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          query:         query to perform on the collection.  this is a BSONObj (binary JSON)
          You may format as
-           { query: { ... }, order: { ... } }
+           { query: { ... }, orderby: { ... } }
          to specify a sort order.
          nToReturn:     n to return.  0 = unlimited
          nToSkip:       start with the nth item
