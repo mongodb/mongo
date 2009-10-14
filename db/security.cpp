@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 #include "security.h"
+#include "instance.h"
 #include "client.h"
 
 namespace mongo {
@@ -30,8 +31,36 @@ namespace mongo {
 
     Client::~Client() { 
         delete ai; 
+        ai = 0;
+        if ( _tempCollections.size() ){
+            cerr << "ERROR: Client::shutdown not called!" << endl;
+        }
     }
 
+    bool Client::shutdown(){
+        bool didAnything = false;
+        
+        if ( _tempCollections.size() ){
+            didAnything = true;
+            for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
+                string ns = *i;
+                if ( ! nsdetails( ns.c_str() ) )
+                    continue;
+                try {
+                    string err;
+                    BSONObjBuilder b;
+                    dropCollection( ns , err , b );
+                }
+                catch ( ... ){
+                    log() << "error dropping temp collection: " << ns << endl;
+                }
+            }
+            _tempCollections.clear();
+        }
+        
+        return didAnything;
+    }
+    
     bool noauth = true;
 
 	int AuthenticationInfo::warned;

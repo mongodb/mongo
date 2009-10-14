@@ -239,6 +239,7 @@ namespace mongo {
 
         // any thread cleanup can happen here
 
+        currentClient->shutdown();
         globalScriptEngine->threadDone();
     }
 

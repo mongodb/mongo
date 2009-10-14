@@ -265,6 +265,8 @@ namespace mongo {
                 s->localConnect( database->name.c_str() );
                 
                 string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() );
+                if ( cmdObj["keeptemp"].trueValue() == false )
+                    currentClient->addTempCollection( resultColl );
                 string finalOutput = resultColl;
                 if ( cmdObj["out"].type() == String )
                     finalOutput = database->name + "." + cmdObj["out"].valuestr();

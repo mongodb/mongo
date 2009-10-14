@@ -40,8 +40,12 @@ namespace mongo {
 
     void dropDatabase(const char *ns);
     bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
+
+    /* low level - only drops this ns */
     void dropNS(const string& dropNs);
-    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); // also deletes indexes and cursors
+    
+    /* deletes this ns, indexes and cursors */
+    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); 
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
     void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys );

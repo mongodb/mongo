@@ -131,3 +131,6 @@ if ( true ){
     x.drop();
 }
 
+
+res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+assert( res.ok , "should be ok" );

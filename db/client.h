@@ -34,6 +34,7 @@ namespace mongo {
     class Client { 
         Namespace _ns;
         NamespaceString _nsstr;
+        list<string> _tempCollections;
     public:
         AuthenticationInfo *ai;
 
@@ -47,12 +48,22 @@ namespace mongo {
         Client();
         ~Client();
 
+        void addTempCollection( const string& ns ){
+            _tempCollections.push_back( ns );
+        }
+
         /* each thread which does db operations has a Client object in TLS.  
            call this when your thread starts. 
         */
         static void initThread();
-    };
 
+        /* 
+           this has to be called as the client goes away, but before thread termination
+           @return true if anything was done
+         */
+        bool shutdown();
+    };
+    
     /* defined in security.cpp */
     extern boost::thread_specific_ptr<Client> currentClient;
 
