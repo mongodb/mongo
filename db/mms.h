@@ -7,6 +7,10 @@
 
 namespace mongo {
 
+
+    /** Mongo Monitoring Service
+        if enabled, this runs in the background ands pings mss
+     */
     class MMS : public BackgroundJob {
     public:
 
