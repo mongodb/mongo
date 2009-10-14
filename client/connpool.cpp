@@ -41,7 +41,7 @@ namespace mongo {
                 log(2) << "creating new connection for pool to:" << host << endl;
                 if ( !cc->connect(host.c_str(), errmsg) ) {
                     delete cc;
-                    uassert( (string)"dbconnectionpool: connect failed" + host , false);
+                    uassert( (string)"dbconnectionpool: connect failed " + host , false);
                     return 0;
                 }
                 c = cc;
