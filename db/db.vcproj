@@ -1563,6 +1563,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\mr.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\namespace.cpp"
 					>
 				</File>

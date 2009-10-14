@@ -15,7 +15,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "db.h"
 #include "instance.h"
 #include "commands.h"
@@ -222,7 +222,7 @@ namespace mongo {
             string tempCollectionName( string coll ){
                 static int inc = 1;
                 stringstream ss;
-                ss << database->name << ".mr." << coll << "." << time(0) << "." << inc++;
+                ss << cc().database()->name << ".mr." << coll << "." << time(0) << "." << inc++;
                 return ss.str();
             }
 
@@ -252,7 +252,7 @@ namespace mongo {
             bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
 
-                string ns = database->name + '.' + cmdObj.firstElement().valuestr();
+                string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
                 log(1) << "mr ns: " << ns << endl;
                 
                 if ( ! db.exists( ns ) ){
@@ -262,17 +262,17 @@ namespace mongo {
                 
 
                 auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
-                s->localConnect( database->name.c_str() );
+                s->localConnect( cc().database()->name.c_str() );
                 
                 string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() );
                 if ( cmdObj["keeptemp"].trueValue() == false )
                     currentClient->addTempCollection( resultColl );
                 string finalOutput = resultColl;
                 if ( cmdObj["out"].type() == String )
-                    finalOutput = database->name + "." + cmdObj["out"].valuestr();
+                    finalOutput = cc().database()->name + "." + cmdObj["out"].valuestr();
                 
-                string resultCollShort = resultColl.substr( database->name.size() + 1 );
-                string finalOutputShort = finalOutput.substr( database->name.size() + 1 );
+                string resultCollShort = resultColl.substr( cc().database()->name.size() + 1 );
+                string finalOutputShort = finalOutput.substr( cc().database()->name.size() + 1 );
                 log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
                 db.dropCollection( resultColl );
             
