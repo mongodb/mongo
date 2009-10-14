@@ -6,6 +6,7 @@ MR.init = function(){
     $max = 0;
     $arr = [];
     emit = MR.emit;
+    $numEmits = 0;
     gc(); // this is just so that keep memory size sane
 }
 
@@ -15,6 +16,7 @@ MR.cleanup = function(){
 }
 
 MR.emit = function(k,v){
+    $numEmits++;
     var num = get_num( k );
     var data = $arr[num];
     if ( ! data ){
