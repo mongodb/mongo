@@ -56,6 +56,7 @@ public:
         out << "           which listed filenames must contain." << endl;
         out << "  put - add a file with filename 'gridfs filename'" << endl;
         out << "  get - get a file with filename 'gridfs filename'" << endl;
+        out << "  delete - delete all files with filename 'gridfs filename'" << endl;
     }
 
     void display( GridFS * grid , BSONObj obj ){
@@ -124,6 +125,12 @@ public:
             const string& type = getParam("type", "");
 
             cout << "file object: " << g.storeFile(infile, filename, type) << endl;
+            cout << "done!";
+            return 0;
+        }
+
+        if ( cmd == "delete" ){
+            g.removeFile(filename);
             cout << "done!";
             return 0;
         }
