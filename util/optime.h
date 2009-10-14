@@ -46,7 +46,7 @@ namespace mongo {
         }
         static OpTime now() {
             unsigned t = (unsigned) time(0);
-            DEV assertInWriteLock();
+//            DEV assertInWriteLock();
             if ( last.secs == t ) {
                 last.i++;
                 return last;
