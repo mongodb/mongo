@@ -123,6 +123,7 @@ namespace mongo {
     };
 
     GridFile GridFS::findFile( BSONObj query ){
+        query = BSON("query" << query << "orderby" << BSON("uploadDate" << -1));
         return GridFile( this , _client.findOne( _filesNS.c_str() , query ) );
     }
 
