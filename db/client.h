@@ -32,7 +32,7 @@ namespace mongo {
     class AuthenticationInfo;
     class Database;
 
-    class Client { 
+    class Client : boost::noncopyable { 
         Database* _database;
         Namespace _ns;
         //NamespaceString _nsstr;
