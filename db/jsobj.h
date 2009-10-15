@@ -1202,7 +1202,7 @@ namespace mongo {
             @param dt a C-style 32 bit date value, that is
                       the number of seconds since January 1, 1970, 00:00:00 GMT
         */
-        void append(const char *fieldName, time_t dt) {
+        void appendTimeT(const char *fieldName, time_t dt) {
             b.append((char) Date);
             b.append(fieldName);
             b.append(static_cast<unsigned long long>(dt) * 1000);

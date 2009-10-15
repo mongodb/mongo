@@ -729,9 +729,11 @@ namespace JsobjTests {
         void run() {
             unsigned long long before = jsTime();
             time_t now = time(NULL);
-            BSONObj o = BSON("now" << now);
             unsigned long long after = jsTime();
 
+            BSONObjBuilder b;
+            b.appendTimeT("now", now);
+            BSONObj o = b.obj();
 
             ASSERT( o.valid() );
 
