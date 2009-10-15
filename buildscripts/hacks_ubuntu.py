@@ -41,4 +41,6 @@ def foundxulrunner( env , options ):
                            incroot + "unstable/" ] )
     
     env.Append( CPPDEFINES=[ "XULRUNNER" , "OLDJS" ] )
+    if best.find( "1.9.0" ) >= 0:
+        env.Append( CPPDEFINES=[ "XULRUNNER190" ] )
     return True

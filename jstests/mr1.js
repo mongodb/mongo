@@ -10,7 +10,7 @@ t.save( { x : 4 , tags : [ "b" , "c" ] } );
 emit = printjson;
 
 function d( x ){
-    //printjson( x );
+    printjson( x );
 }
 
 ks = "_id";
@@ -26,12 +26,27 @@ m = function(){
     );
 };
 
+m2 = function(){
+    for ( var i=0; i<this.tags.length; i++ ){
+        emit( this.tags[i] , 1 );
+    }
+};
+
+
 r = function( key , values ){
     var total = 0;
     for ( var i=0; i<values.length; i++ ){
         total += values[i].count;
     }
     return { count : total };
+};
+
+r2 = function( key , values ){
+    var total = 0;
+    for ( var i=0; i<values.length; i++ ){
+        total += values[i];
+    }
+    return total;
 };
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
@@ -61,6 +76,18 @@ assert.eq( 1 , z.a , "C1" );
 assert.eq( 1 , z.b , "C2" );
 assert.eq( 2 , z.c , "C3" );
 x.drop();
+
+res = db.runCommand( { mapreduce : "mr1" , map : m2 , reduce : r2 , query : { x : { "$gt" : 2 } } } );
+d( res );
+assert.eq( 2 , res.counts.input , "B" );
+x = db[res.result];
+z = {};
+x.find().forEach( function(a){ z[a[ks]] = a.value; } );
+assert.eq( 1 , z.a , "C1z" );
+assert.eq( 1 , z.b , "C2z" );
+assert.eq( 2 , z.c , "C3z" );
+x.drop();
+
 
 res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
 d( res );
@@ -141,6 +168,10 @@ if ( true ){
         }
     }
     x.drop();
+
+    res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m2 , reduce : r2 } );
+    d(res);
+    print( "t3: " + res.timeMillis + " (~3500 on 2.8ghz)" );
 }
 
 

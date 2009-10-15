@@ -19,8 +19,8 @@ namespace mongo {
             sprintf( name , "/proc/%d/stat"  , pid );
   
             FILE * f = fopen( name , "r");
-
-            fscanf(f,
+            
+            int found = fscanf(f,
                    "%d %s %c "
                    "%d %d %d %d %d "
                    "%lu %lu %lu %lu %lu "
@@ -61,7 +61,9 @@ namespace mongo {
                      &_rtprio, &_sched  
                    */
                    );
-
+            if ( found == 0 ){
+                cerr << "system error: reading proc info" << endl;
+            }
             fclose( f );
         }
         
