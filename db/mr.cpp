@@ -254,6 +254,8 @@ namespace mongo {
         
             bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
+                
+                bool verboseOutput = cmdObj["verbose"].trueValue();
 
                 string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
                 log(1) << "mr ns: " << ns << endl;
@@ -281,7 +283,9 @@ namespace mongo {
                 db.dropCollection( resultColl );
             
                 long long num = 0;
-                long long numEmits = 0;
+                long long inReduce = 0;
+                BSONObjBuilder countsBuilder;
+                BSONObjBuilder timingBuilder;
                 try {
                     dbtemprelease temprlease;
                     
@@ -310,31 +314,51 @@ namespace mongo {
 
                     ProgressMeter pm( db.count( ns , filter ) );
                     auto_ptr<DBClientCursor> cursor = db.query( ns , q );
+                    long long mapTime;
+                    Timer mt;
                     while ( cursor->more() ){
                         BSONObj o = cursor->next(); 
-                        s->setThis( &o );
                     
+                        if ( verboseOutput ) mt.reset();
+                        
+                        s->setThis( &o );
                         if ( s->invoke( mapFunction , BSONObj() , 0 , true ) )
                             throw UserException( (string)"map invoke failed: " + s->getError() );
+                        
+                        if ( verboseOutput ) mapTime += mt.micros();
                     
                         num++;
                         if ( num % 100 == 0 ){
+                            Timer t;
                             s->exec( "MR.check();" , "reduce-i" , false , true , true );
+                            inReduce += t.micros();
                             //mrtl->checkSize();
                         }
                         pm.hit();
                     }
-
                     
-                    result.append( "timeMillis.emit" , t.millis() );
+                    
+                    countsBuilder.append( "input" , num );
+                    countsBuilder.append( "emit" , s->getNumber( "$numEmits" ) );
+                    
+                    timingBuilder.append( "mapTime" , mapTime / 1000 );
+                    timingBuilder.append( "emitLoop" , t.millis() );
                     
                     // final reduce
-                
+                    
                     mrtl->reduceInMemory();
                     mrtl->dump();
-                    
-                    s->exec( "MR.doReduce(true)" , "reduce" , false , true , true );
-                    numEmits = s->getNumber( "$numEmits" );
+                                     
+                    {
+                        Timer t;
+                        s->exec( "MR.doReduce(true)" , "reduce" , false , true , true );
+                        inReduce += t.micros();
+                        timingBuilder.append( "reduce" , inReduce / 1000 );
+                    }
+                    if ( verboseOutput ){
+                        countsBuilder.append( "reduces" , s->getNumber( "$numReduces" ) );
+                        countsBuilder.append( "reducesToDB" , s->getNumber( "$numReducesToDB" ) );
+                    }
                     s->execSetup( "MR.cleanup()" );
                     _tlmr.reset( 0 );
                     /*
@@ -375,16 +399,14 @@ namespace mongo {
                     uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << resultColl << "to" << finalOutput ) , info ) );
                 }
 
+                timingBuilder.append( "total" , t.millis() );
+                
                 result.append( "result" , finalOutputShort );
                 result.append( "timeMillis" , t.millis() );
-                {
-                    BSONObjBuilder temp;
-                    temp.append( "input" , num );
-                    temp.append( "emit" , numEmits );
-                    temp.append( "output" , (long long)(db.count( finalOutput )) );
-                    result.append( "counts" , temp.obj() );
-                }
-            
+                countsBuilder.append( "output" , (long long)(db.count( finalOutput )) );
+                if ( verboseOutput ) result.append( "timing" , timingBuilder.obj() );
+                result.append( "counts" , countsBuilder.obj() );
+                
                 return true;
             }
 
