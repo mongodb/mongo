@@ -63,10 +63,13 @@ namespace mongo {
 
     string getDbContext() {
         stringstream ss;
-        Database *database = cc().database();
-        if ( database ) {
-            ss << database->name << ' ';
-            ss << cc().ns() << ' ';
+        Client * c = currentClient.get();
+        if ( c ){
+            Database *database = c->database();
+            if ( database ) {
+                ss << database->name << ' ';
+                ss << cc().ns() << ' ';
+            }
         }
         ss<< "op:" << curOp << ' ' << callDepth;
         return ss.str();
