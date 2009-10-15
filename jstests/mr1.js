@@ -9,6 +9,10 @@ t.save( { x : 4 , tags : [ "b" , "c" ] } );
 
 emit = printjson;
 
+function d( x ){
+    //printjson( x );
+}
+
 ks = "_id";
 if ( db.version() == "1.1.1" )
     ks = "key";
@@ -31,15 +35,16 @@ r = function( key , values ){
 };
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
+d( res );
 if ( ks == "_id" ) assert( res.ok , "not ok" );
 assert.eq( 4 , res.counts.input , "A" );
 x = db[res.result];
 
 assert.eq( 3 , x.find().count() , "B" );
-x.find().forEach( printjson );
+x.find().forEach( d );
 z = {};
 x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );
-printjson( z );
+d( z );
 assert.eq( 3 , z.keySet().length , "C" );
 assert.eq( 2 , z.a , "D" );
 assert.eq( 3 , z.b , "E" );
@@ -47,6 +52,7 @@ assert.eq( 3 , z.c , "F" );
 x.drop();
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
+d( res );
 assert.eq( 2 , res.counts.input , "B" );
 x = db[res.result];
 z = {};
@@ -57,7 +63,7 @@ assert.eq( 2 , z.c , "C3" );
 x.drop();
 
 res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
-printjson( res );
+d( res );
 assert.eq( 2 , res.counts.input , "B2" );
 assert.eq( "foo" , res.result , "B2-c" );
 x = db[res.result];
@@ -75,10 +81,10 @@ for ( i=5; i<1000; i++ ){
 }
 
 res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
-printjson( res );
+d( res );
 assert.eq( 999 , res.counts.input , "Z1" );
 x = db[res.result];
-x.find().forEach( printjson )
+x.find().forEach( d )
 assert.eq( 4 , x.find().count() , "Z2" );
 assert.eq( "a,b,c,d" , x.distinct( ks ) , "Z3" );
 
@@ -94,12 +100,16 @@ assert.eq( 3 , getk( "c" ).value.count , "ZC" );
 assert.eq( 995 , getk( "d" ).value.count , "ZD" );
 x.drop();
 
-print( Date.timeFunc( 
+if ( true ){
+    printjson( db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , verbose : true } ) );
+}
+
+print( "t1: " + Date.timeFunc( 
     function(){
         var out = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
         if ( ks == "_id" ) assert( out.ok , "XXX" );
         db[out.result].drop();
-    } , 10 ) );    
+    } , 10 ) + " (~500 on 2.8ghz)" );    
 
 
 
@@ -120,7 +130,8 @@ if ( true ){
     }
     
     res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r } );
-    printjson( res );
+    d( res );
+    print( "t2: " + res.timeMillis + " (~3500 on 2.8ghz)" );
     x = db[res.result];
     z = {};
     x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );

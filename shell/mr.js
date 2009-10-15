@@ -7,6 +7,8 @@ MR.init = function(){
     $arr = [];
     emit = MR.emit;
     $numEmits = 0;
+    $numReduces = 0;
+    $numReducesToDB = 0;
     gc(); // this is just so that keep memory size sane
 }
 
@@ -28,6 +30,9 @@ MR.emit = function(k,v){
 }
 
 MR.doReduce = function( useDB ){
+    $numReduces++;
+    if ( useDB )
+        $numReducesToDB++;
     $max = 0;
     for ( var i=0; i<$arr.length; i++){
         var data = $arr[i];
