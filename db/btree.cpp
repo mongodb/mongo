@@ -20,7 +20,6 @@
 #include "db.h"
 #include "btree.h"
 #include "pdfile.h"
-#include "../util/unittest.h"
 #include "json.h"
 #include "clientcursor.h"
 #include "client.h"
@@ -38,8 +37,8 @@ namespace mongo {
     const int KeyMax = BucketSize / 10;
 
     extern int otherTraceLevel;
-    int split_debug = 0;
-    int insert_debug = 0;
+    const int split_debug = 0;
+    const int insert_debug = 0;
 
     /* BucketBasics --------------------------------------------------- */
 
@@ -79,6 +78,12 @@ namespace mongo {
     }
 
     int BucketBasics::fullValidate(const DiskLoc& thisLoc, const BSONObj &order) {
+        {
+            bool f = false;
+            assert( f = true );
+            massert("assert is misdefined", f);
+        }
+
         checkForInterrupt();
         assertValid(order, true);
 //	if( bt_fv==0 )

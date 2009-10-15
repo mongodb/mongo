@@ -18,9 +18,9 @@
  */
 
 #include "stdafx.h"
-#include "../db/btree.h"
 
 #include "../db/db.h"
+#include "../db/btree.h"
 
 #include "dbtests.h"
 
@@ -29,6 +29,12 @@ namespace BtreeTests {
     class Base {
     public:
         Base() {
+            {
+                bool f = false;
+                assert( f = true );
+                massert("assert is misdefined", f);
+            }
+
             setClient( ns() );
             BSONObjBuilder builder;
             builder.append( "ns", ns() );

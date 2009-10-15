@@ -18,6 +18,10 @@
 
 #include "stdafx.h"
 #include <boost/program_options.hpp>
+
+#undef assert
+#define assert xassert
+
 #include "framework.h"
 #include "../util/file_allocator.h"
 

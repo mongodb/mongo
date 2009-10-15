@@ -30,6 +30,8 @@
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
 #include <boost/static_assert.hpp>
+#undef assert
+#define assert xassert
 
 // make sure our assumptions are valid
 BOOST_STATIC_ASSERT( sizeof(int) == 4 );

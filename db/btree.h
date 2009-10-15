@@ -108,9 +108,9 @@ namespace mongo {
          */
         bool _pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild);
         void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild){
-            assert( _pushBack( recordLoc , key , order , prevChild ) );
+            bool ok = _pushBack( recordLoc , key , order , prevChild );
+            assert(ok);
         }
-        //void pushBack(const DiskLoc& recordLoc, BSONObj& key, const BSONObj &order, DiskLoc prevChild, DiskLoc nextChild);
         void popBack(DiskLoc& recLoc, BSONObj& key);
         void _delKeyAtPos(int keypos); // low level version that doesn't deal with child ptrs.
 
