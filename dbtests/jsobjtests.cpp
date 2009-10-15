@@ -724,6 +724,26 @@ namespace JsobjTests {
         }
     };
 
+    class TimeTBuilder {
+    public:
+        void run() {
+            unsigned long long before = jsTime();
+            time_t now = time(NULL);
+            unsigned long long after = jsTime();
+
+            BSONObjBuilder b;
+            b.appendTimeT("now", now);
+            BSONObj o = b.obj();
+
+            ASSERT( o.valid() );
+
+            BSONElement e = o["now"];
+            ASSERT( e.type() == Date );
+            ASSERT( e.date()/1000 >= before/1000 );
+            ASSERT( e.date()/1000 <= after/1000 );
+        }
+    };
+
     class MinMaxElementTest {
     public:
 
@@ -1095,6 +1115,7 @@ namespace JsobjTests {
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
             add< DateNowBuilder >();
+            add< TimeTBuilder >();
             add< MinMaxElementTest >();
             add< ComparatorTest >();
             add< ExtractFieldsTest >();

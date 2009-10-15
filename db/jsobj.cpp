@@ -35,6 +35,7 @@
 BOOST_STATIC_ASSERT( sizeof(int) == 4 );
 BOOST_STATIC_ASSERT( sizeof(long long) == 8 );
 BOOST_STATIC_ASSERT( sizeof(double) == 8 );
+BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 

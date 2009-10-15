@@ -59,7 +59,7 @@ namespace BasicTests {
             const char *data = (const char *) _data;
             string s = base64::encode( data , len );
             string out = base64::decode( s );
-            ASSERT_EQUALS( out.size() , len );
+            ASSERT_EQUALS( out.size() , static_cast<size_t>(len) );
             bool broke = false;
             for ( int i=0; i<len; i++ ){
                 if ( data[i] != out[i] )

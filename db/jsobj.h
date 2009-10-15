@@ -112,10 +112,12 @@ namespace mongo {
     */
     class OID {
         union {
-            long long a;
-            unsigned char data[8];
+            struct{
+                long long a;
+                unsigned b;
+            };
+            unsigned char data[12];
         };
-        unsigned b;
     public:
 		/** initialize to 'null' */
 		void clear() { a = 0; b = 0; }
@@ -1195,6 +1197,15 @@ namespace mongo {
         }
         void append( const char *fieldName, OID oid ) {
             appendOID( fieldName, &oid );
+        }
+        /** Append a time_t date.
+            @param dt a C-style 32 bit date value, that is
+                      the number of seconds since January 1, 1970, 00:00:00 GMT
+        */
+        void appendTimeT(const char *fieldName, time_t dt) {
+            b.append((char) Date);
+            b.append(fieldName);
+            b.append(static_cast<unsigned long long>(dt) * 1000);
         }
         /** Append a date.  
             @param dt a Java-style 64 bit date value, that is 
