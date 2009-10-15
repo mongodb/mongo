@@ -509,9 +509,10 @@ namespace mongo {
 
        note we should already be in the mutex lock from connThread() at this point.
     */
+    /*
     void jniCallbackDeprecated(Message& m, Message& out)
     {
-		/* we should be in the same thread as the original request, so authInfo should be available. */
+		//
         AuthenticationInfo *ai = currentClient.get()->ai;
         
         Database *clientOld = cc().database();
@@ -589,7 +590,7 @@ namespace mongo {
                 if ( database && database->profile >= 1 ) {
                     if ( database->profile >= 2 || ms >= 100 ) {
                         // profile it
-                        profile(ss.str().c_str()+20/*skip ts*/, ms);
+                        profile(ss.str().c_str()+20, ms);
                     }
                 }
             }
@@ -603,11 +604,10 @@ namespace mongo {
         callDepth--;
 
         if ( cc().database() != clientOld ) {
-            assert(false);/*
-            database = clientOld;
-            wassert(false);*/
+            assert(false);
         }
     }
+    */
 
     void getDatabaseNames( vector< string > &names ) {
         boost::filesystem::path path( dbpath );
