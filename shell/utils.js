@@ -343,7 +343,7 @@ tojson = function( x, indent , nolint ){
             
     case "object":{
         var s = tojsonObject( x, indent , nolint );
-        if ( s.length < 70 && ( indent == null || indent.length == 0 ) ){
+        if ( ( nolint == null || nolint == true ) && s.length < 70 && ( indent == null || indent.length == 0 ) ){
             s = s.replace( /[\s\r\n ]+/gm , " " );
         }
         return s;
