@@ -24,9 +24,7 @@ namespace mongo {
         mongo::BSONObj sub;
     
         for ( BSONObjIterator i(m); i.more(); ) {
-            BSONElement f = i.next();
-            if ( f.eoo() )
-                break;
+            const BSONElement& f = i.next();
         
             Local<Value> v;
         
@@ -128,9 +126,8 @@ namespace mongo {
     }
 
     Handle<v8::Value> mongoToV8Element( const BSONElement &f ) {
-        assert( !f.eoo() );
         switch ( f.type() ){
-            
+
         case mongo::Code:
             cout << "warning, code saved in database just turned into string right now" << endl;
         case mongo::String: 
@@ -156,7 +153,8 @@ namespace mongo {
             
         case mongo::Bool:
             return v8::Boolean::New( f.boolean() );
-            
+
+        case mongo::EOO:            
         case mongo::jstNULL:
             return v8::Null();
             

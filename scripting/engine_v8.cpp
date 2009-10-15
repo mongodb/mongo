@@ -55,16 +55,17 @@ namespace mongo {
 
     Handle< Value > V8Scope::nativeCallback( const Arguments &args ) {
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_native_function" ) ) );
-        NativeFunction function = ( NativeFunction )( f->Value() );
+        NativeFunction function = (NativeFunction)(f->Value());
         BSONObjBuilder b;
         for( int i = 0; i < args.Length(); ++i ) {
             stringstream ss;
             ss << i;
             v8ToMongoElement( b, v8::String::New( "foo" ), ss.str(), args[ i ] );
         }
+        BSONObj nativeArgs = b.obj();
         BSONObj ret;
         try {
-            ret = function( b.done() );
+            ret = function( nativeArgs );
         } catch( const std::exception &e ) {
             return v8::ThrowException(v8::String::New(e.what()));
         } catch( ... ) {
@@ -209,7 +210,10 @@ namespace mongo {
     }
 
     void V8Scope::setThis( const BSONObj * obj ){
-        _this = mongoToV8( *obj );
+        if ( obj )
+            _this = mongoToV8( *obj );
+        else
+            _this = v8::Object::New();
     }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
@@ -305,6 +309,7 @@ namespace mongo {
         exec( "_mongo = new Mongo();" , "local connect 2" , false , true , true , 0 );
         exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
+        _localDBName = dbName;
     }
     
     void V8Scope::externalSetup(){
