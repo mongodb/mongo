@@ -25,13 +25,13 @@ namespace mongo {
         class Alphabet {
         public:
             Alphabet(){
-                encode = 
+                encode = (unsigned char*)
                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                     "abcdefghijklmnopqrstuvwxyz"
                     "0123456789"
                     "+/";
                 
-                decode = (char*)malloc(257);
+                decode = (unsigned char*)malloc(257);
                 memset( decode , 0 , 256 );
                 for ( int i=0; i<64; i++ ){
                     decode[ encode[i] ] = i;
@@ -44,7 +44,7 @@ namespace mongo {
             }
 
             void test(){
-                assert( strlen( encode ) == 64 );
+                assert( strlen( (char*)encode ) == 64 );
                 for ( int i=0; i<26; i++ )
                     assert( encode[i] == toupper( encode[i+26] ) );
             }
@@ -54,22 +54,22 @@ namespace mongo {
             }
             
         private:
-            const char * encode;
+            const unsigned char * encode;
         public:
-            char * decode;
+            unsigned char * decode;
         } alphabet;
         
         
         void encode( stringstream& ss , const char * data , int size ){
             for ( int i=0; i<size; i+=3 ){
                 int left = size - i;
-                const char * start = data + i;
+                const unsigned char * start = (const unsigned char*)data + i;
                 
                 // byte 0
                 ss << alphabet.e(start[0]>>2);
                 
                 // byte 1
-                char temp = ( start[0] << 4 );
+                unsigned char temp = ( start[0] << 4 );
                 if ( left == 1 ){
                     ss << alphabet.e(temp);
                     break;
@@ -113,12 +113,12 @@ namespace mongo {
 
         void decode( stringstream& ss , const string& s ){
             uassert( "invalid base64" , s.size() % 4 == 0 );
-            const char * data = s.c_str();
+            const unsigned char * data = (const unsigned char*)s.c_str();
             int size = s.size();
             
-            char buf[3];
+            unsigned char buf[3];
             for ( int i=0; i<size; i+=4){
-                const char * start = data + i;
+                const unsigned char * start = data + i;
                 buf[0] = ( ( alphabet.decode[start[0]] << 2 ) & 0xFC ) | ( ( alphabet.decode[start[1]] >> 4 ) & 0x3 );
                 buf[1] = ( ( alphabet.decode[start[1]] << 4 ) & 0xF0 ) | ( ( alphabet.decode[start[2]] >> 2 ) & 0xF );
                 buf[2] = ( ( alphabet.decode[start[2]] << 6 ) & 0xC0 ) | ( ( alphabet.decode[start[3]] & 0x3F ) );
@@ -130,7 +130,7 @@ namespace mongo {
                         len = 1;
                     }
                 }
-                ss.write( buf , len );
+                ss.write( (const char*)buf , len );
             }
         }
         
