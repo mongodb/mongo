@@ -314,7 +314,7 @@ namespace mongo {
 
                     ProgressMeter pm( db.count( ns , filter ) );
                     auto_ptr<DBClientCursor> cursor = db.query( ns , q );
-                    long long mapTime;
+                    long long mapTime = 0;
                     Timer mt;
                     while ( cursor->more() ){
                         BSONObj o = cursor->next(); 
