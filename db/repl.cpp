@@ -789,7 +789,10 @@ namespace mongo {
                     else {
                         BSONObjBuilder b;
 						b.append(_id);
-                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow
+                        
+                        /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
+                        RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
+
                         _updateObjects(ns, o, b.done(), true, ss);
                     }
                 }
