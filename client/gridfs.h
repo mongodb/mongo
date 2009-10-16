@@ -64,6 +64,17 @@ namespace mongo {
         BSONObj storeFile( const string& fileName , const string& remoteName="" , const string& contentType="");
 
         /**
+         * puts the file represented by data into the db
+         * @param data pointer to buffer to store in GridFS
+         * @param length length of buffer
+         * @param remoteName optional filename to use for file stored in GridFS
+         *                   (default is to use fileName parameter)
+         * @param contentType optional MIME type for this object.
+         *                    (default is to omit)
+         * @return the file object
+         */
+        BSONObj storeFile( const char* data , size_t length , const string& remoteName , const string& contentType);
+        /**
          * removes file referenced by fileName from the db
          * @param fileName filename (in GridFS) of the file to remove
          * @return the file object
@@ -96,6 +107,9 @@ namespace mongo {
         string _prefix;
         string _filesNS;
         string _chunksNS;
+
+        // insert fileobject. All chunks must be in DB.
+        BSONObj insertFile(const string& name, const OID& id, unsigned length, const string& contentType);
 
         friend class GridFile;
     };

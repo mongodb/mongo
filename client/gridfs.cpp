@@ -2,6 +2,7 @@
 
 #include "../stdafx.h"
 #include <fcntl.h>
+#include <utility>
 
 #include "gridfs.h"
 
@@ -43,6 +44,28 @@ namespace mongo {
 
     }
 
+    BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType){
+        massert("large files not yet implemented", length <= 0xffffffff);
+        char const * const end = data + length;
+
+        OID id;
+        id.init();
+        BSONObj idObj = BSON("_id" << id);
+
+        int chunkNumber = 0;
+        while (data < end){
+            int chunkLen = MIN(DEFAULT_CHUNK_SIZE, end-data);
+            Chunk c(idObj, chunkNumber, data, chunkLen);
+            _client.insert( _chunksNS.c_str() , c._data );
+
+            chunkNumber++;
+            data += chunkLen;
+        }
+
+        return insertFile(remoteName, id, length, contentType);
+    }
+
+
     BSONObj GridFS::storeFile( const string& fileName , const string& remoteName , const string& contentType){
         uassert( "file doesn't exist" , fileName == "-" || boost::filesystem::exists( fileName ) );
 
@@ -83,13 +106,18 @@ namespace mongo {
         
         massert("large files not yet implemented", length <= 0xffffffff);
 
+        return insertFile((remoteName.empty() ? fileName : remoteName), id, length, contentType);
+    }
+
+    BSONObj GridFS::insertFile(const string& name, const OID& id, unsigned length, const string& contentType){
+
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
             throw UserException( "filemd5 failed" );
 
         BSONObjBuilder file;
         file << "_id" << id
-             << "filename" << (remoteName.empty() ? fileName : remoteName)
+             << "filename" << name
              << "length" << (unsigned) length
              << "chunkSize" << DEFAULT_CHUNK_SIZE
              << "uploadDate" << DATENOW
