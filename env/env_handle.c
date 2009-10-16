@@ -78,6 +78,18 @@ __wt_env_destroy(ENV *env, u_int32_t flags)
 			ret = WT_ERROR;
 	}
 
+	/* Complain if files weren't closed. */
+	if (TAILQ_FIRST(&ienv->fhqh) != NULL) {
+		__wt_env_errx(env,
+		    "This Env handle has open file handles attached to it");
+		/*
+		 * BUG
+		 * We need a TOC handle here, and then we call __wt_close.
+		 */
+		if (ret == 0)
+			ret = WT_ERROR;
+	}
+
 	/*
 	 * !!!
 	 * For part of this function we don't have valid ENV/IENV structures
@@ -161,8 +173,8 @@ __wt_ienv_config_default(ENV *env)
 	/* Initialize the global mutex. */
 	WT_RET(__wt_mtx_init(&ienv->mtx));
 
-	/* Database queue. */
-	TAILQ_INIT(&ienv->dbqh);
+	TAILQ_INIT(&ienv->dbqh);		/* Database list */
+	TAILQ_INIT(&ienv->fhqh);		/* File list */
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_ienv_stats(env, &ienv->stats));
