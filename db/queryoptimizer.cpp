@@ -34,7 +34,10 @@ namespace mongo {
              strstr( ns , "local." ) )
             return;
         
-        uassert( "table scans not allowed" , ! cmdLine.notablescan );
+        if ( ! nsdetails( ns ) )
+            return;
+
+        uassert( (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
     }
     
     double elementDirection( const BSONElement &e ) {
