@@ -237,36 +237,36 @@ DB.prototype.repairDatabase = function() {
 
 DB.prototype.help = function() {
     print("DB methods:");
-    print("\tdb.auth(username, password)");
-    print("\tdb.getMongo() get the server connection object");
-	print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
-    print("\tdb.getSisterDB(name) get the db at the same server as this onew");
-    print("\tdb.getName()");
-    print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
-    print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
-    print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.addUser(username, password)");
-    print("\tdb.removeUser(username)");
-    print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-    print("\tdb.getReplicationInfo()");
-    print("\tdb.printReplicationInfo()");
-    print("\tdb.printSlaveReplicationInfo()");
-    print("\tdb.getProfilingLevel()");
-    print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
+    print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
+    print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
-    print("\tdb.shutdownServer()");
+    print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
+    print("\tdb.currentOp() displays the current operation in the db" );
     print("\tdb.dropDatabase()");
-    print("\tdb.repairDatabase()");
     print("\tdb.eval(func, args) run code server-side");
+    print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
+    print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
+    print("\tdb.getMongo() get the server connection object");
+	print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
+    print("\tdb.getName()");
     print("\tdb.getPrevError()");
-    print("\tdb.resetError()");
-    print("\tdb.getCollectionNames()");
-    print("\tdb.currentOp() displays the current operation in the db" );
+    print("\tdb.getProfilingLevel()");
+    print("\tdb.getReplicationInfo()");
+    print("\tdb.getSisterDB(name) get the db at the same server as this onew");
     print("\tdb.killOp() kills the current operation in the db" );
     print("\tdb.printCollectionStats()" );
+    print("\tdb.printReplicationInfo()");
+    print("\tdb.printSlaveReplicationInfo()");
+    print("\tdb.removeUser(username)");
+    print("\tdb.repairDatabase()");
+    print("\tdb.resetError()");
+    print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
+    print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
+    print("\tdb.shutdownServer()");
     print("\tdb.version() current version of the server" );
 }
 

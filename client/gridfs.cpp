@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "gridfs.h"
+#include <boost/smart_ptr.hpp>
 
 #if defined(_WIN32)
 #include <io.h>
@@ -83,8 +84,8 @@ namespace mongo {
         int chunkNumber = 0;
         gridfs_offset length = 0;
         while (!feof(fd)){
-            char buf[DEFAULT_CHUNK_SIZE];
-            char* bufPos = buf;
+            boost::scoped_array<char>buf (new char[DEFAULT_CHUNK_SIZE]);
+            char* bufPos = buf.get();
             unsigned int chunkLen = 0; // how much in the chunk now
             while(chunkLen != DEFAULT_CHUNK_SIZE && !feof(fd)){
                 int readLen = fread(bufPos, 1, DEFAULT_CHUNK_SIZE - chunkLen, fd);
@@ -94,7 +95,7 @@ namespace mongo {
                 assert(chunkLen <= DEFAULT_CHUNK_SIZE);
             }
 
-            Chunk c(idObj, chunkNumber, buf, chunkLen);
+            Chunk c(idObj, chunkNumber, buf.get(), chunkLen);
             _client.insert( _chunksNS.c_str() , c._data );
 
             length += chunkLen;
