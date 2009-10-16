@@ -150,6 +150,13 @@ AddOption( "--extrapath",
            action="store",
            help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
 
+AddOption( "--extralib",
+           dest="extralib",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of libraries  (--extralib js_static,readline" )
+
 AddOption( "--cxx",
            dest="cxx",
            type="string",
@@ -261,6 +268,10 @@ if GetOption( "extrapath" ) is not None:
         env.Append( LIBPATH=[ x + "/lib" ] )
     release = True
 
+if GetOption( "extralib" ) is not None:
+    for x in GetOption( "extralib" ).split( "," ):
+        env.Append( LIBS=[ x ] )
+
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
@@ -362,8 +373,9 @@ if "darwin" == os.sys.platform:
     if not nojni:
         env.Append( FRAMEWORKS=["JavaVM"] )
 
-    if os.path.exists( "/usr/bin/g++-4.2" ):
-        env["CXX"] = "g++-4.2"
+    if env["CXX"] is None:
+        if os.path.exists( "/usr/bin/g++-4.2" ):
+            env["CXX"] = "g++-4.2"
 
     nix = True
 
@@ -697,7 +709,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                     release or not shell)
 
     # this will add it iff it exists and works
-    myCheckLib( "boost_system" + boostCompiler + "-mt" + boostVersion )
+    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
+                  "boost_system" + boostCompiler + boostVersion ] )
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
@@ -725,7 +738,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     if usesm:
 
-        myCheckLib( [ "mozjs" , "js" ] , True )
+        myCheckLib( [ "mozjs" , "js", "js_static" ] , True )
         mozHeader = "js"
         if bigLibString(myenv).find( "mozjs" ) >= 0:
             mozHeader = "mozjs"
