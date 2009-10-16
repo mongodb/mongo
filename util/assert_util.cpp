@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "assert_util.h"
 #include "assert.h"
+#include "file.h"
 
 namespace mongo {
 
@@ -81,6 +82,50 @@ namespace mongo {
             ss << file << ' ' << line << '\n';
         return ss.str();
     }	
+
+    
+    class LoggingManager {
+    public:
+        LoggingManager()
+            : _enabled(0) , _file(0) {
+        }
+        
+        void start( const string& lp , bool append ){
+            uassert( "LoggingManager already started" , ! _enabled );
+            _path = lp;
+            _append = append;
+            _enabled = 1;
+            rotate();
+        }
+        
+        void rotate(){
+            if ( _file ){
+                assert(0);
+            }
+        
+            _file = fopen( _path.c_str() , _append ? "a" : "w" );
+            assert( _file );
+            int fd = fileno( _file );
+            assert( fd );
+            
+            assert( dup2( fd , 1 ) > 0 );
+            assert( dup2( fd , 2 ) > 0 );
+        }
+        
+    private:
+        
+        bool _enabled;
+        string _path;
+        bool _append;
+        
+        FILE * _file;
+        
+    } loggingManager;
+
+    void initLogging( const string& lp , bool append ){
+        cout << "all output going to: " << lp << endl;
+        loggingManager.start( lp , append );
+    }
 
 }
 

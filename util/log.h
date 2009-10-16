@@ -226,4 +226,10 @@ namespace mongo {
         return l;
     }
 
+    /**
+       log to a file rather than stdout
+       defined in assert_util.cpp 
+     */
+    void initLogging( const string& logpath , bool append );
+
 } // namespace mongo

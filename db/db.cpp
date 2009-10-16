@@ -534,9 +534,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("quiet", "quieter output")
-#ifndef _WIN32
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
         ("logappend" , "appnd to logpath instead of over-writing" )
+#ifndef _WIN32
         ("fork" , "fork server process" )
 #endif
         ("cpu", "periodically show cpu and iowait utilization")
@@ -718,18 +718,12 @@ int main(int argc, char* argv[], char *envp[] )
             setsid();
             setupSignals();
         }
+#endif
         if (params.count("logpath")) {
             string lp = params["logpath"].as<string>();
             uassert( "logpath has to be non-zero" , lp.size() );
-            cout << "all output going to: " << lp << endl;
-            int fd = open( lp.c_str() ,
-                           O_CREAT | O_WRONLY | ( params.count("logappend" ) ? O_APPEND : O_TRUNC ) ,
-                           S_IRUSR | S_IWUSR );
-            assert( fd );
-            assert( dup2( fd , STDOUT_FILENO ) > 0 );
-            assert( dup2( fd , STDERR_FILENO ) > 0 );
+            initLogging( lp , params.count( "logappend" ) );
         }
-#endif
         if (params.count("nocursors")) {
             useCursors = false;
         }
