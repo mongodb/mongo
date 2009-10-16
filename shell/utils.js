@@ -125,9 +125,13 @@ assert.gt = function( a , b , msg ){
     doassert( a + " is not greater than " + b + " : " + msg );
 }
 
-Object.extend = function( dst , src ){
+Object.extend = function( dst , src , deep ){
     for ( var k in src ){
-        dst[k] = src[k];
+        var v = src[k];
+        if ( deep && typeof(v) == "object" ){
+            v = Object.extend( typeof ( v.length ) == "number" ? [] : {} , v , true );
+        }
+        dst[k] = v;
     }
     return dst;
 }

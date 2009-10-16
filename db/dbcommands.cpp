@@ -1278,7 +1278,7 @@ namespace mongo {
                 "  if ( $arr[n] == null ){ "
                 "    next = {}; "
                 "    Object.extend( next , $key ); "
-                "    Object.extend( next , $initial ); "
+                "    Object.extend( next , $initial , true ); "
                 "    $arr[n] = next; "
                 "    next = null; "
                 "  } "
