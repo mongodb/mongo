@@ -12,7 +12,7 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
     initialized
 ../btree/btree_bulk.c  29  Info 830: Location cited in prior message
                                        _
-	WT_64_CAST(offpage_item.records) = dup_count, 
+	WT_64_CAST(offpage_item.records) = dup_count,
 ../btree/btree_bulk.c  525  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                _
@@ -239,16 +239,21 @@ _
 --- Module:   ../engine/engine.c (C)
         _
 	WT_FLUSH_MEMORY;
-../engine/engine.c  81  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../engine/engine.c  81  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  84  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../engine/engine.c  84  Warning 522: Expected void type, assignment, increment
     or decrement
-                                _
-				WT_FLUSH_MEMORY;
-../engine/engine.c  146  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../engine/engine.c  146  Warning 522: Expected void type, assignment, increment
+                        _
+			WT_FLUSH_MEMORY;
+../engine/engine.c  145  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../engine/engine.c  145  Warning 522: Expected void type, assignment, increment
     or decrement
 
 --- Module:   ../engine/toc.c (C)
+                _
+		WT_FLUSH_MEMORY;
+../engine/toc.c  140  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
+../engine/toc.c  140  Warning 522: Expected void type, assignment, increment or
+    decrement
 
 --- Module:   ../env/env_cache.c (C)
 
