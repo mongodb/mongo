@@ -20,49 +20,10 @@
 #include "security.h"
 #include "instance.h"
 #include "client.h"
+#include "curop.h"
 
 namespace mongo {
 
-    boost::thread_specific_ptr<Client> currentClient;
-
-    Client::Client() : _database(0), _ns("")/*, _nsstr("")*/ { 
-        ai = new AuthenticationInfo(); 
-    }
-
-    Client::~Client() { 
-        delete ai; 
-        ai = 0;
-        if ( _tempCollections.size() ){
-            cout << "ERROR: Client::shutdown not called!" << endl;
-        }
-    }
-
-    bool Client::shutdown(){
-        bool didAnything = false;
-        
-        if ( _tempCollections.size() ){
-            didAnything = true;
-            for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
-                string ns = *i;
-                dblock l;
-                setClient( ns.c_str() );
-                if ( ! nsdetails( ns.c_str() ) )
-                    continue;
-                try {
-                    string err;
-                    BSONObjBuilder b;
-                    dropCollection( ns , err , b );
-                }
-                catch ( ... ){
-                    log() << "error dropping temp collection: " << ns << endl;
-                }
-            }
-            _tempCollections.clear();
-        }
-        
-        return didAnything;
-    }
-    
     bool noauth = true;
 
 	int AuthenticationInfo::warned;

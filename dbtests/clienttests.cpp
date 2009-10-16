@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include "../client/dbclient.h"
 #include "dbtests.h"
-
+ 
 namespace ClientTests {
     
     class Base {

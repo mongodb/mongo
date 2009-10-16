@@ -1589,8 +1589,8 @@ namespace mongo {
         {
             dblock lk;
 
-            Client::initThread();
-			currentClient.get()->ai->authorize("admin");
+            Client::initThread("replslave");
+	    currentClient.get()->ai->authorize("admin");
         
             BSONObj obj;
             if ( Helpers::getSingleton("local.pair.startup", obj) ) {

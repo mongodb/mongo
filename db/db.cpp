@@ -53,7 +53,7 @@ namespace mongo {
 
     extern string bind_ip;
     extern char *appsrvPath;
-    extern int curOp;
+//    extern int curOp;
     extern bool autoresync;
     extern int opLogging;
     extern long long oplogSize;
@@ -173,7 +173,7 @@ namespace mongo {
     */
     void connThread()
     {
-        Client::initThread();
+        Client::initThread("conn");
 
         /* todo: move to Client object */
         LastError *le = new LastError();
@@ -419,7 +419,7 @@ namespace mongo {
 
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
-        Client::initThread();
+        Client::initThread("initandlisten");
 
         clearTmpCollections();
 
@@ -436,7 +436,6 @@ namespace mongo {
             RecCache::tempStore.init(indexpath.str().c_str(), BucketSize);
         }
 #endif
-
 
         if ( useJNI ) {
             ScriptEngine::setup();
@@ -936,9 +935,11 @@ namespace mongo {
         ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
         rawOut( ossSig.str() );
 
+        /*
         ostringstream ossOp;
         ossOp << "Last op: " << currentOp.infoNoauth() << endl;
         rawOut( ossOp.str() );
+        */
 
         ostringstream oss;
         oss << "Backtrace:" << endl;

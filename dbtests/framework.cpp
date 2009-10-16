@@ -208,7 +208,7 @@ namespace mongo {
             dbpath = dbpathString.c_str();
             
             cmdLine.prealloc = false;
-            Client::initThread();
+            Client::initThread("testsuite");
             acquirePathLock();
 
             srand( (unsigned) seed );

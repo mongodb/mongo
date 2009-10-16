@@ -31,16 +31,25 @@ namespace mongo {
 
     class AuthenticationInfo;
     class Database;
+    struct CurOp;
 
     class Client : boost::noncopyable { 
-        Database* _database;
+    public:
+        static boost::mutex clientsMutex;
+        static set<Client*> clients; // always be in clientsMutex when manipulating this
+    private:
+        CurOp *_op;
+        Database *_database;
         Namespace _ns;
         //NamespaceString _nsstr;
+        bool _shutdown;
         list<string> _tempCollections;
+        const char *_desc;
     public:
         AuthenticationInfo *ai;
         Top top;
 
+        CurOp* curop() { return _op; }
         Database* database() { return _database; }
         const char *ns() { return _ns.buf; }
 
@@ -51,7 +60,7 @@ namespace mongo {
         }
         void clearns() { setns("", 0); }
 
-        Client();
+        Client(const char *desc);
         ~Client();
 
         void addTempCollection( const string& ns ){
@@ -61,7 +70,7 @@ namespace mongo {
         /* each thread which does db operations has a Client object in TLS.  
            call this when your thread starts. 
         */
-        static void initThread();
+        static void initThread(const char *desc);
 
         /* 
            this has to be called as the client goes away, but before thread termination
@@ -77,10 +86,9 @@ namespace mongo {
         return *currentClient.get();
     }
 
-    inline void Client::initThread() {
+    inline void Client::initThread(const char *desc) {
         assert( currentClient.get() == 0 );
-        currentClient.reset( new Client() );
+        currentClient.reset( new Client(desc) );
     }
 
 };
-

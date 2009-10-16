@@ -8,7 +8,7 @@
 
 namespace mongo { 
 
-    extern struct CurOp {
+    struct CurOp {
         void reset(time_t now, const sockaddr_in &_client) { 
             active = true;
             opNum++;
@@ -29,6 +29,7 @@ namespace mongo {
         struct sockaddr_in client;
 
         CurOp() { 
+            active = false;
             opNum = 0; 
             // These addresses should never be written to again.  The zeroes are
             // placed here as a precaution because currentOp may be accessed
@@ -73,6 +74,6 @@ namespace mongo {
             b.append("client", clientStr.str());
             return b.obj();
         }
-    } currentOp;
+    };
 
 }

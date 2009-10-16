@@ -45,7 +45,7 @@ namespace mongo {
 
     SlaveTypes slave = NotSlave;
     bool master = false; // true means keep an op log
-    extern int curOp;
+//    extern int curOp;
     bool autoresync = false;
     
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
@@ -90,12 +90,29 @@ namespace mongo {
     
     int lockFile = 0;
 
-    CurOp currentOp;
-
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
-        BSONObj obj = currentOp.info();
-        replyToQuery(0, m, dbresponse, obj);
+        BSONObjBuilder b;
 
+        AuthenticationInfo *ai = cc().ai;
+        if( !ai->isAuthorized("admin") ) { 
+            BSONObjBuilder b;
+            b.append("err", "unauthorized");
+        }
+        else {
+            vector<BSONObj> vals;
+            {
+                boostlock bl(Client::clientsMutex);
+                for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
+                    Client *c = *i;
+                    CurOp& co = *(c->curop());
+                    if( co.active )
+                        vals.push_back( co.infoNoauth() );
+                }
+            }
+            b.append("inprog", vals);
+        }
+
+        replyToQuery(0, m, dbresponse, b.obj());
     }
     
     void killOp( Message &m, DbResponse &dbresponse ) {
@@ -142,6 +159,7 @@ namespace mongo {
         stringstream ss;
         char buf[64];
         time_t now = time(0);
+        CurOp& currentOp = *cc().curop();
         currentOp.reset(now, client);
 
         time_t_to_String(now, buf);
@@ -149,12 +167,13 @@ namespace mongo {
         ss << buf;
 
         Timer t;
-        cc().clearns();
+        Client& c = cc();
+        c.clearns();
 
         int logThreshold = 100;
         int ms;
         bool log = logLevel >= 1;
-        currentOp.op = curOp = m.data->operation();
+        c.curop()->op = m.data->operation();
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -320,7 +339,8 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
-        cc().top.setWrite();
+        Client& client = cc();
+        client.top.setWrite();
         ss << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -337,6 +357,7 @@ namespace mongo {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
             ss << " query: " << s;
+            CurOp& currentOp = *client.curop();
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
         bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss, multi);
@@ -349,7 +370,8 @@ namespace mongo {
         assert(*ns);
         uassert( "not master", isMasterNs( ns ) );
         setClient(ns);
-        cc().top.setWrite();
+        Client& client = cc();
+        client.top.setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -357,6 +379,7 @@ namespace mongo {
         {
             string s = pattern.toString();
             ss << " query: " << s;
+            CurOp& currentOp = *client.curop();
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
@@ -383,8 +406,9 @@ namespace mongo {
             }
 
             setClient( q.ns );
-            cc().top.setRead();
-            strncpy(currentOp.ns, q.ns, Namespace::MaxNsLen);
+            Client& client = cc();
+            client.top.setRead();
+            strncpy(client.curop()->ns, q.ns, Namespace::MaxNsLen);
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {

@@ -68,7 +68,7 @@ namespace mongo {
     unsigned q = 0;
 
     void statsThread() {
-        Client::initThread();
+        Client::initThread("stats");
         unsigned long long timeLastPass = 0;
         while ( 1 ) {
             {
@@ -115,7 +115,6 @@ namespace mongo {
     public:
         // caller locks
         void doLockedStuff(stringstream& ss) {
-            ss << "currentOp: " << currentOp.infoNoauth() << "\n";
             ss << "# databases: " << databases.size() << '\n';
             if ( cc().database() ) {
                 ss << "curclient: " << cc().database()->name;
@@ -175,7 +174,15 @@ namespace mongo {
             }
 
             ss << "\nreplInfo:  " << replInfo << '\n';
-            ss << "currentOp (unlocked): " << currentOp.infoNoauth() << "\n";
+
+            {
+                boostlock bl(Client::clientsMutex);
+                for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
+                    Client *c = *i;
+                    CurOp& co = *(c->curop());
+                    ss << "currentOp (unlocked): " << co.infoNoauth() << "\n";
+                }
+            }
         }
         
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
@@ -462,7 +469,7 @@ namespace mongo {
 
     void webServerThread() {
         boost::thread thr(statsThread);
-        Client::initThread();
+        Client::initThread("websvr");
         DbWebServer mini;
         int p = cmdLine.port + 1000;
         if ( mini.init(bind_ip, p) ) {
@@ -473,6 +480,7 @@ namespace mongo {
         else { 
             log() << "warning: web admin interface failed to initialize on port " << p << endl;
         }
+        cc().shutdown();
     }
 
 } // namespace mongo

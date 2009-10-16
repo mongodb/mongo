@@ -122,7 +122,7 @@ int mongo::Tool::main( int argc , char ** argv ){
         cerr << "connected to: " << _host << endl;
     }
     else {
-        Client::initThread();
+        Client::initThread("tools");
         _conn = new DBDirectClient();
         _host = "DIRECT";
         static string myDbpath = getParam( "dbpath" );
