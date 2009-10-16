@@ -105,6 +105,10 @@ namespace mongo {
             }
 
             if ( _file ){
+#ifdef _WIN32
+                cout << "log rotationd doesn't work on windows" << endl;
+                return;
+#else
                 struct tm t;
                 localtime_r( &_opened , &t );
                 
@@ -113,7 +117,7 @@ namespace mongo {
                    << "_" << t.tm_hour << "-" << t.tm_min << "-" << t.tm_sec;
                 string s = ss.str();
                 rename( _path.c_str() , s.c_str() );
-                
+#endif
             }
         
             _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
