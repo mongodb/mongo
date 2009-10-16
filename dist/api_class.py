@@ -5,7 +5,25 @@
 #
 # $Id$
 #
-# Auto-generate getter/setter code and handle method initialization.
+# Auto-generate everything we can:
+#	flag values
+#	getter/setter code
+#	manual page headers
+#	structure method fields
+#
+# There are 3 primary handles: DB, ENV, and WT_TOC.  The DB and ENV handles are
+# similar to Berkeley DB handles: DB is a single table/database, and ENV is a
+# database/environment.   WiredTiger adds the WT_TOC handle, which identifies
+# a single thread of control running in a single environment.  WiredTiger calls
+# take a WT_TOC argument because the WT_TOC IDs the calling thread and caller's
+# environment.
+#
+# Because the WT_TOC handle always references a single ENV, and to make the
+# application "handler passing" problem simpler, we moved all the Berkeley DB
+# methods into the WT_TOC structure (because otherwise we'd have ENV methods
+# taking both ENV and WT_TOC arguments, or ENV methods that didn't take ENV
+# arguments).   We could have left DB methods on the DB handle, but it seemed
+# simpler to give the application fewer handles to pass around internally.
 #
 # The initial line of each entry in the api file:
 #
@@ -40,9 +58,12 @@
 # the name goes in different places in the declaration, and sometimes we want
 # the name, and sometimes we don't.
 
-###################################################
-# Env standard method declarations
-###################################################
+env.open
+	method
+	home	const char *@S
+	mode	mode_t @S
+	flags	u_int32_t @S
+
 env.close
 	method
 	flags	u_int32_t @S
@@ -64,12 +85,6 @@ env.err
 env.errx
 	methodV,local,notoc
 	fmt	const char *@S, ...
-
-env.open
-	method
-	home	const char *@S
-	mode	mode_t @S
-	flags	u_int32_t @S
 
 env.start
 	method,local,notoc

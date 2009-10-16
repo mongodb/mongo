@@ -2,7 +2,7 @@
 #
 # $Id$
 
-t=/tmp/__t
+t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 . RELEASE

@@ -4,11 +4,11 @@
 
 # Build tags file.
 #
+t=__a.c
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
 # Test to see what flags this ctags binary supports.
 # Use the -d, -t and -w flags to ctags if available.
-t=/tmp/__a.c
-trap 'rm -f $t dist.pyc; exit 0' 0 1 2 3 13 15
-
 flags=""
 echo "f() { int a; }" > $t
 for i in -d -t -w; do
@@ -19,7 +19,7 @@ done
 
 echo "Building tags..."
 rm -f tags
-ctags $flags ../inc_*/*.in ../*/*.[ch] > $t 2>/dev/null
+ctags $flags ../inc_*/*.in ../*/*.[ch] 2>/dev/null
 chmod 444 tags
 
 # Link to the tags file from standard build and source directories.
