@@ -31,13 +31,18 @@ namespace mongo {
         bool notablescan;      // --notablescan
         bool prealloc;         // --noprealloc
         bool smallfiles;       // --smallfiles
+        
+        bool quota;            // --quota
+        bool cpu;              // --cpu show cpu time periodically
+
 
         enum { 
             DefaultDBPort = 27017
         };
 
         CmdLine() : 
-            port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false)
+            port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            quota(false), cpu(false)
         { } 
 
     };

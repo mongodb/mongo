@@ -42,7 +42,6 @@
 
 namespace mongo {
 
-    extern bool quota, cpu;
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */
@@ -686,7 +685,7 @@ int main(int argc, char* argv[], char *envp[] )
             }
         }
         if (params.count("cpu")) {
-            cpu = true;
+            cmdLine.cpu = true;
         }
         if (params.count("noauth")) {
             noauth = true;
@@ -695,7 +694,7 @@ int main(int argc, char* argv[], char *envp[] )
             noauth = false;
         }
         if (params.count("quota")) {
-            quota = true;
+            cmdLine.quota = true;
         }
         if (params.count("objcheck")) {
             objcheck = true;

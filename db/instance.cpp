@@ -43,7 +43,6 @@ namespace mongo {
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
-    bool quota = false;
     SlaveTypes slave = NotSlave;
     bool master = false; // true means keep an op log
     extern int curOp;
@@ -82,8 +81,6 @@ namespace mongo {
     }
 
     int ctr = 0;
-    bool quiet = false;
-    bool cpu = false; // --cpu show cpu time periodically
 
     /* 0 = ok
        1 = kill current operation and reset this to 0

@@ -66,7 +66,6 @@ namespace mongo {
     const int NStats = 32;
     string lockStats[NStats];
     unsigned q = 0;
-    extern bool cpu;
 
     void statsThread() {
         Client::initThread();
@@ -90,7 +89,7 @@ namespace mongo {
                         if ( dt )
                             ss << (dlocked*100)/dt << '%';
                         string s = ss.str();
-                        if ( cpu )
+                        if ( cmdLine.cpu )
                             log() << "cpu: " << s << endl;
                         lockStats[q] = s;
                         ClientCursor::idleTimeReport( (unsigned) ((dt - dlocked)/1000) );
