@@ -88,3 +88,6 @@ build-stamp
 configure-stamp
 debian/mongodb
 debian/mongodb.*
+
+#osx
+.DS_Store
