@@ -28,31 +28,31 @@ DBCollection.prototype.getName = function(){
 
 DBCollection.prototype.help = function(){
     print("DBCollection help");
-    print("\tdb.foo.getDB() get DB object associated with collection");
-    print("\tdb.foo.findOne([query])");
+    print("\tdb.foo.count()");
+    print("\tdb.foo.dataSize()");
+    print("\tdb.foo.drop() drop the collection");
+    print("\tdb.foo.dropIndex(name)");
+    print("\tdb.foo.dropIndexes()");
+    print("\tdb.foo.ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
     print("\tdb.foo.find( [query] , [fields]) - first parameter is an optional query filter. second parameter is optional set of fields to return.");
     print("\t                                   e.g. db.foo.find( { x : 77 } , { name : 1 , x : 1 } )");
-    print("\tdb.foo.find(...).sort(...)");
+    print("\tdb.foo.find(...).count()");
     print("\tdb.foo.find(...).limit(n)");
     print("\tdb.foo.find(...).skip(n)");
-    print("\tdb.foo.find(...).count()");
-    print("\tdb.foo.count()");
-    print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
-    print("\tdb.foo.save(obj)");
-    print("\tdb.foo.update(query, object[, upsert_bool])");
-    print("\tdb.foo.remove(query)" );
-    print("\tdb.foo.ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
-    print("\tdb.foo.dropIndexes()");
-    print("\tdb.foo.dropIndex(name)");
+    print("\tdb.foo.find(...).sort(...)");
+    print("\tdb.foo.findOne([query])");
+    print("\tdb.foo.getDB() get DB object associated with collection");
     print("\tdb.foo.getIndexes()");
-    print("\tdb.foo.drop() drop the collection");
+    print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
+    print("\tdb.foo.remove(query)" );
     print("\tdb.foo.renameCollection( newName ) renames the collection");
-    print("\tdb.foo.validate() - SLOW");
+    print("\tdb.foo.save(obj)");
     print("\tdb.foo.stats()");
-    print("\tdb.foo.dataSize()");
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
     print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
     print("\tdb.foo.totalSize() - storage allocated for all data and indexes");
+    print("\tdb.foo.update(query, object[, upsert_bool])");
+    print("\tdb.foo.validate() - SLOW");
 }
 
 DBCollection.prototype.getFullName = function(){
