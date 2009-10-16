@@ -31,15 +31,19 @@ __wt_open(WT_TOC *toc,
 		__wt_env_errx(env, "fileops: %s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
+	WT_RET(__wt_lock(&ienv->mtx));
 	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 		if ((fh = idb->fh) == NULL)
 			continue;
 		if (strcmp(name, idb->dbname) == 0) {
 			++fh->refcnt;
 			*fhp = fh;
-			return (0);
+			break;
 		}
 	}
+	WT_RET(__wt_unlock(&ienv->mtx));
+	if (fh != NULL)
+		return (0);
 
 	f = O_RDWR;
 #ifdef O_BINARY
@@ -79,6 +83,11 @@ __wt_open(WT_TOC *toc,
 	/* Set the file's size. */
 	WT_ERR(__wt_filesize(toc, fh, &fh->file_size));
 
+	/* Link onto the environment's list of files. */
+	WT_ERR(__wt_lock(&ienv->mtx));
+	TAILQ_INSERT_TAIL(&ienv->fhqh, fh, q);
+	WT_ERR(__wt_unlock(&ienv->mtx));
+
 	return (0);
 
 err:	if (fh != NULL) {
@@ -98,15 +107,28 @@ int
 __wt_close(WT_TOC *toc, WT_FH *fh)
 {
 	ENV *env;
+	IENV *ienv;
+	int ret;
 
 	env = toc->env;
+	ienv = env->ienv;
+	ret = 0;
 
-	if (fh == NULL || fh->refcnt == 0)
+	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0)
 		return (0);
-	if (--fh->refcnt == 0) {
-		__wt_free(env, fh->name);
-		__wt_free(env, fh->stats);
-		__wt_free(env, fh);
+
+	/* Remove from the list and discard the memory. */
+	WT_RET(__wt_lock(&ienv->mtx));
+	TAILQ_REMOVE(&ienv->fhqh, fh, q);
+	WT_RET(__wt_unlock(&ienv->mtx));
+
+	if (close(fh->fd) != 0) {
+		__wt_env_err(env, errno, "%s", fh->name);
+		ret = WT_ERROR;
 	}
-	return (0);
+
+	__wt_free(env, fh->name);
+	__wt_free(env, fh->stats);
+	__wt_free(env, fh);
+	return (ret);
 }

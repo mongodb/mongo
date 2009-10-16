@@ -185,8 +185,10 @@ struct __ienv {
 
 	WT_MTX mtx;			/* Global mutex */
 
-					/* Locked: list of databases */
-	TAILQ_HEAD(__wt_db_qh, __idb) dbqh;
+	TAILQ_HEAD(
+	    __wt_db_qh, __idb) dbqh;	/* Locked: database list */
+	TAILQ_HEAD(
+	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: serial file ID */
 
 	u_int next_toc_srvr_slot;	/* Locked: next server TOC array slot */
