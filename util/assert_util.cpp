@@ -103,13 +103,7 @@ namespace mongo {
                 assert(0);
             }
         
-            _file = fopen( _path.c_str() , _append ? "a" : "w" );
-            assert( _file );
-            int fd = fileno( _file );
-            assert( fd );
-            
-            assert( dup2( fd , 1 ) > 0 );
-            assert( dup2( fd , 2 ) > 0 );
+            _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
         }
         
     private:
