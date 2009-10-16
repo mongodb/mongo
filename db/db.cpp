@@ -706,12 +706,12 @@ int main(int argc, char* argv[], char *envp[] )
 #ifndef _WIN32
         if (params.count("fork")) {
             if ( ! params.count( "logpath" ) ){
-                cerr << "--fork has to be used with --logpath" << endl;
+                cout << "--fork has to be used with --logpath" << endl;
                 return -1;
             }
             pid_t c = fork();
             if ( c ){
-                cerr << "forked process: " << c << endl;
+                cout << "forked process: " << c << endl;
                 ::exit(0);
             }
             setsid();

@@ -63,8 +63,8 @@ namespace mongo {
 
         off_t filelen = lseek(fd, 0, SEEK_END);
         if ( filelen != length ){
-            cerr << "wanted length: " << length << " filelen: " << filelen << endl;
-            cerr << sizeof(size_t) << endl;
+            cout << "wanted length: " << length << " filelen: " << filelen << endl;
+            cout << sizeof(size_t) << endl;
             massert( "file size allocation failed", filelen == length );
         }
         lseek( fd, 0, SEEK_SET );

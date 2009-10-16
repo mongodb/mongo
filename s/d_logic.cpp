@@ -377,7 +377,7 @@ namespace mongo {
             }
             
             // wait until cursors are clean
-            cerr << "WARNING: deleting data before ensuring no more cursors TODO" << endl;
+            cout << "WARNING: deleting data before ensuring no more cursors TODO" << endl;
             
             dbtemprelease unlock;
 

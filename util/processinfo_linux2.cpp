@@ -62,7 +62,7 @@ namespace mongo {
                    */
                    );
             if ( found == 0 ){
-                cerr << "system error: reading proc info" << endl;
+                cout << "system error: reading proc info" << endl;
             }
             fclose( f );
         }

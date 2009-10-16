@@ -32,7 +32,7 @@ namespace mongo {
 
 #ifdef JNI_DEBUG
 #undef JNI_DEBUG
-#define JNI_DEBUG(x) cerr << x << endl
+#define JNI_DEBUG(x) cout << x << endl
 #else
 #undef JNI_DEBUG
 #define JNI_DEBUG(x)
@@ -276,7 +276,7 @@ namespace mongo {
     JavaJSImpl::~JavaJSImpl() {
         if ( _jvm ) {
             _jvm->DestroyJavaVM();
-            cerr << "Destroying JVM" << endl;
+            cout << "Destroying JVM" << endl;
         }
     }
 

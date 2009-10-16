@@ -33,7 +33,7 @@ namespace mongo {
         delete ai; 
         ai = 0;
         if ( _tempCollections.size() ){
-            cerr << "ERROR: Client::shutdown not called!" << endl;
+            cout << "ERROR: Client::shutdown not called!" << endl;
         }
     }
 

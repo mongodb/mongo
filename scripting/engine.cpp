@@ -71,14 +71,14 @@ namespace mongo {
         path p( filename );
 
         if ( ! exists( p ) ){
-            cerr << "file [" << filename << "] doesn't exist" << endl;
+            cout << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
                 assert( 0 );
             return false;
         }
 
         if ( is_directory( p ) ){
-            cerr << "can't read directory [" << filename << "]" << endl;
+            cout << "can't read directory [" << filename << "]" << endl;
             if ( assertOnError )
                 assert( 0 );
             return false;

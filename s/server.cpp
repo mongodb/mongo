@@ -181,7 +181,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     printSysInfo();
 
     if ( ! configServer.init( configdbs , infer ) ){
-        cerr << "couldn't connectd to config db" << endl;
+        cout << "couldn't connectd to config db" << endl;
         return 7;
     }
     
@@ -189,7 +189,7 @@ int main(int argc, char* argv[], char *envp[] ) {
     
     int configError = configServer.checkConfigVersion();
     if ( configError ){
-        cerr << "config server error: " << configError << endl;
+        cout << "config server error: " << configError << endl;
         return configError;
     }
 

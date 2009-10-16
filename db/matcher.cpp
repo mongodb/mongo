@@ -595,7 +595,7 @@ namespace mongo {
 
             pcre_config( PCRE_CONFIG_UNICODE_PROPERTIES , &ret );
             if ( ! ret )
-                cerr << "warning: some regex utf8 things will not work.  pcre build doesn't have --enable-unicode-properties" << endl;
+                cout << "warning: some regex utf8 things will not work.  pcre build doesn't have --enable-unicode-properties" << endl;
             
         }
     } rxtest;

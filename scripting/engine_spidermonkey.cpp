@@ -372,7 +372,7 @@ namespace mongo {
             JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
             delete paramArray;
             if ( ! func ){
-                cerr << "compile failed for: " << raw << endl;
+                cout << "compile failed for: " << raw << endl;
                 return 0;
             }
             gcName = "cf normal";
@@ -405,7 +405,7 @@ namespace mongo {
             free( dst );
 
             if ( ! res ){
-                cerr << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
+                cout << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
                     cout << "\t why: " << toString( v ) << endl;

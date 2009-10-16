@@ -43,7 +43,7 @@ namespace mongo {
                 return;
 
             if ( ! _inHeader.valid() ){
-                cerr << "  got invalid header from: " << _socket.remote_endpoint() << " closing connected" << endl;
+                cout << "  got invalid header from: " << _socket.remote_endpoint() << " closing connected" << endl;
                 return;
             }
             
@@ -137,7 +137,7 @@ namespace mongo {
         void handleAccept( shared_ptr<MessageServerSession> session , 
                            const boost::system::error_code& error ){
             if ( error ){
-                cerr << "handleAccept error!" << endl;
+                cout << "handleAccept error!" << endl;
                 return;
             }
             session->start();
