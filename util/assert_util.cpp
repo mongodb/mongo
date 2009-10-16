@@ -99,11 +99,25 @@ namespace mongo {
         }
         
         void rotate(){
+            if ( ! _enabled ){
+                cout << "LoggingManager not enabled" << endl;
+                return;
+            }
+
             if ( _file ){
-                assert(0);
+                struct tm t;
+                localtime_r( &_opened , &t );
+                
+                stringstream ss;
+                ss << _path << "." << ( 1900 + t.tm_year ) << "-" << t.tm_mon << "-" << t.tm_mday 
+                   << "_" << t.tm_hour << "-" << t.tm_min << "-" << t.tm_sec;
+                string s = ss.str();
+                rename( _path.c_str() , s.c_str() );
+                
             }
         
             _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
+            _opened = time(0);
         }
         
     private:
@@ -113,6 +127,7 @@ namespace mongo {
         bool _append;
         
         FILE * _file;
+        time_t _opened;
         
     } loggingManager;
 
@@ -121,5 +136,8 @@ namespace mongo {
         loggingManager.start( lp , append );
     }
 
+    void rotateLogs( int signal ){
+        loggingManager.rotate();
+    }
 }
 

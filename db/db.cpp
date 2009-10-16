@@ -963,7 +963,8 @@ namespace mongo {
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
         assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
-
+        assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
+        
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
