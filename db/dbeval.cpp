@@ -29,6 +29,7 @@
 #include "json.h"
 #include "repl.h"
 #include "commands.h"
+#include "cmdline.h"
 
 #include "../scripting/engine.h"
 
@@ -85,7 +86,7 @@ namespace mongo {
         int res;
         {
             Timer t;
-            res = s->invoke(f,args, 10 * 60 * 1000);
+            res = s->invoke(f,args, cmdLine.quota ? 10 * 60 * 1000 : 0 );
             int m = t.millis();
             if ( m > 100 ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
