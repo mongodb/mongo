@@ -23,7 +23,7 @@ def func_method_single(handle, method, config, rettype, func, args, f):
 	if not config.count('notoc'):
 		f.write(', WT_TOC *')
 	for l in args:
-		f.write(', ' + l.split('\t')[1].replace('@S', ''))
+		f.write(', ' + l.split('/')[1].replace('@S', ''))
 	f.write('))\n\t    __wt_' + handle + '_' + func + ';\n')
 
 # func_method_std --
@@ -78,7 +78,7 @@ def func_decl(handle, method, config, args, f):
 	if config.count('getset') and method.count('set_'):
 		for l in args:
 			f.write('\t' + l.split\
-			    ('\t')[1].replace('@S', l.split('\t')[0]) + ';\n')
+			    ('/')[1].replace('@S', l.split('/')[0]) + ';\n')
 
 	# Output the method variables.
 	if config.count('methodV'):
@@ -90,7 +90,7 @@ def func_decl(handle, method, config, args, f):
 	if not config.count('notoc'):
 		f.write(', WT_TOC *')
 	for l in args:
-		f.write(', ' + l.split('\t')[1].replace('@S', ''))
+		f.write(', ' + l.split('/')[1].replace('@S', ''))
 	f.write(');\n')
 
 # func_getset --
@@ -118,12 +118,12 @@ def func_getset(handle, method, config, args, f):
 
 	if config.count('getset') and method.count('get_'):
 		for l in args:
-			f.write('\t*(' + l.split('\t')[0] + ')' +\
-			    ' = ' + handle + '->' + l.split('\t')[0] + ';\n')
+			f.write('\t*(' + l.split('/')[0] + ')' +\
+			    ' = ' + handle + '->' + l.split('/')[0] + ';\n')
 	else:
 		for l in args:
 			f.write('\t' + handle + '->' +\
-			    l.split('\t')[0] + ' = ' + l.split('\t')[0] + ';\n')
+			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 	f.write('\treturn (0);\n}\n\n')
 
 # func_api_hdr --
@@ -139,14 +139,14 @@ def func_api_hdr(handle, method, args, f):
 	f.write('typedef struct {\n')
 	for l in args:
 		f.write('\t' +\
-		    l.split('\t')[1].replace('@S', l.split('\t')[0]) + ';\n')
+		    l.split('/')[1].replace('@S', l.split('/')[0]) + ';\n')
 	f.write('} ' + lv + ';\n')
 
 	f.write('#define\t' + lv + '_pack\\\n')
 	sep = ''
 	for l in args:
 		f.write(sep + '\t' +\
-		    'args.' + l.split('\t')[0] + ' = ' + l.split('\t')[0])
+		    'args.' + l.split('/')[0] + ' = ' + l.split('/')[0])
 		sep = ';\\\n'
 	f.write('\n')
 
@@ -156,9 +156,9 @@ def func_api_hdr(handle, method, args, f):
 	sep = ''
 	for l in args:
 		f.write(sep + '\t' +\
-		    l.split('\t')[1].replace('@S', l.split('\t')[0]) +\
+		    l.split('/')[1].replace('@S', l.split('/')[0]) +\
 		    ' =\\\n\t    ((' +\
-		    lv + ' *)(toc->argp))->' + l.split('\t')[0])
+		    lv + ' *)(toc->argp))->' + l.split('/')[0])
 		sep = ';\\\n'
 	f.write('\n')
 
@@ -176,7 +176,7 @@ def func_api(handle, method, config, args, f):
 		s += ',\n\tWT_TOC *toc'
 	for l in args:
 		s += ',\n\t' +\
-		    l.split('\t')[1].replace('@S', l.split('\t')[0])
+		    l.split('/')[1].replace('@S', l.split('/')[0])
 	s += ')'
 	f.write(s + ';\n')
 	f.write(s + '\n{\n')
