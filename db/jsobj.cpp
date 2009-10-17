@@ -654,9 +654,42 @@ namespace mongo {
     int getGtLtOp(const BSONElement& e) {
         if ( e.type() != Object )
             return BSONObj::Equality;
-
+        
         BSONElement fe = e.embeddedObject().firstElement();
         return fe.getGtLtOp();
+    }
+
+    FieldCompareResult compareDottedFieldNames( const string& l , const string& r ){
+        size_t lstart = 0;
+        size_t rstart = 0;
+        while ( 1 ){
+            if ( lstart >= l.size() ){
+                if ( rstart >= r.size() )
+                    return SAME;
+                return RIGHT_SUBFIELD;
+            }
+            if ( rstart >= r.size() )
+                return LEFT_SUBFIELD;
+
+            size_t a = l.find( '.' , lstart );
+            size_t b = r.find( '.' , rstart );
+            
+            size_t lend = a == string::npos ? l.size() : a;
+            size_t rend = b == string::npos ? r.size() : b;
+
+            const string& c = l.substr( lstart , lend - lstart );
+            const string& d = r.substr( rstart , rend - rstart );
+
+            int x = c.compare( d );
+
+            if ( x < 0 )
+                return LEFT_BEFORE;
+            if ( x > 0 )
+                return RIGHT_BEFORE;
+
+            lstart = lend + 1;
+            rstart = rend + 1;
+        }
     }
 
     /* BSONObj ------------------------------------------------------------*/

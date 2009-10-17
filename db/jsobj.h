@@ -993,6 +993,16 @@ namespace mongo {
 
     typedef set< BSONObj, BSONObjCmpDefaultOrder > BSONObjSetDefaultOrder;
 
+    enum FieldCompareResult {
+        LEFT_SUBFIELD = -2,
+        LEFT_BEFORE = -1,
+        SAME = 0,
+        RIGHT_BEFORE = 1 ,
+        RIGHT_SUBFIELD = 2
+    };
+
+    FieldCompareResult compareDottedFieldNames( const string& l , const string& r );
+
 /** Use BSON macro to build a BSONObj from a stream 
 
     e.g., 

@@ -1048,7 +1048,24 @@ namespace JsobjTests {
             
         }
     };
+    
+    class CompareDottedFieldNamesTest {
+    public:
+        void t( FieldCompareResult res , const string& l , const string& r ){
+            ASSERT_EQUALS( res , compareDottedFieldNames( l , r ) );
+            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l ) );
+        }
         
+        void run(){
+            t( SAME , "x" , "x" );
+            t( SAME , "x.a" , "x.a" );
+            t( LEFT_BEFORE , "a" , "b" );
+            t( RIGHT_BEFORE , "b" , "a" );
+
+            t( LEFT_SUBFIELD , "a.x" , "a" );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1127,8 +1144,9 @@ namespace JsobjTests {
             add< external_sort::Big2 >();
             add< external_sort::D1 >();
             add< CompatBSON >();
+            add< CompareDottedFieldNamesTest >();
         }
     } myall;
-
+    
 } // namespace JsobjTests
 

@@ -297,17 +297,18 @@ namespace mongo {
             sort( mods_.begin(), mods_.end() );
         }
         static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
-        int compare( const vector< Mod >::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
+        FieldCompareResult compare( const vector< Mod >::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
             bool mDone = ( m == mods_.end() );
             bool pDone = ( p == pEnd );
             if ( mDone && pDone )
-                return 0;
+                return SAME;
             // If one iterator is done we want to read from the other one, so say the other one is lower.
             if ( mDone )
-                return 1;
+                return RIGHT_BEFORE;
             if ( pDone )
-                return -1;
-            return strcmp( m->fieldName, p->first.c_str() );
+                return LEFT_BEFORE;
+
+            return compareDottedFieldNames( m->fieldName, p->first.c_str() );
         }
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
@@ -620,7 +621,8 @@ namespace mongo {
                 }
                 ++m;
                 ++p;
-            } else if ( cmp < 0 ) {
+            } 
+            else if ( cmp < 0 ) {
                 // $ modifier applied to missing field -- create field from scratch
                 if ( m->op == Mod::PUSH ) {
                     BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
@@ -634,7 +636,8 @@ namespace mongo {
                     b2.appendAs( m->elt, m->fieldName );
                 }
                 ++m;
-            } else if ( cmp > 0 ) {
+            } 
+            else if ( cmp > 0 ) {
                 // No $ modifier
                 if ( mayAddEmbedded( existing, p->first ) )
                     b2.appendAs( p->second, p->first ); 
