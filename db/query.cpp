@@ -174,14 +174,17 @@ namespace mongo {
     class EmbeddedBuilder {
     public:
         EmbeddedBuilder( BSONObjBuilder *b ) {
-            builders_.push_back( make_pair( "", b ) );
+            _builders.push_back( make_pair( "", b ) );
         }
         // It is assumed that the calls to prepareContext will be made with the 'name'
         // parameter in lex ascending order.
         void prepareContext( string &name ) {
-            int i = 1, n = builders_.size();
-            while( i < n && name.substr( 0, builders_[ i ].first.length() ) == builders_[ i ].first ) {
-                name = name.substr( builders_[ i ].first.length() + 1 );
+            int i = 1, n = _builders.size();
+            while( i < n && 
+                   name.substr( 0, _builders[ i ].first.length() ) == _builders[ i ].first && 
+                   ( name[ _builders[i].first.length() ] == '.' || name[ _builders[i].first.length() ] == 0 )
+                   ){
+                name = name.substr( _builders[ i ].first.length() + 1 );
                 ++i;
             }
             for( int j = n - 1; j >= i; --j ) {
@@ -205,9 +208,10 @@ namespace mongo {
             return back()->subarrayStart( name.c_str() );
         }
         void done() {
-            while( !builderStorage_.empty() )
+            while( ! _builderStorage.empty() )
                 popBuilder();
         }
+
         static string splitDot( string & str ) {
             size_t pos = str.find( '.' );
             if ( pos == string::npos )
@@ -216,20 +220,24 @@ namespace mongo {
             str = str.substr( pos + 1 );
             return ret;
         }
+
     private:
         void addBuilder( const string &name ) {
             shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name.c_str() ) ) );
-            builders_.push_back( make_pair( name, newBuilder.get() ) );
-            builderStorage_.push_back( newBuilder );
+            _builders.push_back( make_pair( name, newBuilder.get() ) );
+            _builderStorage.push_back( newBuilder );
         }
         void popBuilder() {
             back()->done();
-            builders_.pop_back();
-            builderStorage_.pop_back();
+            _builders.pop_back();
+            _builderStorage.pop_back();
         }
-        BSONObjBuilder *back() { return builders_.back().second; }
-        vector< pair< string, BSONObjBuilder * > > builders_;
-        vector< shared_ptr< BSONObjBuilder > > builderStorage_;
+
+        BSONObjBuilder *back() { return _builders.back().second; }
+        
+        vector< pair< string, BSONObjBuilder * > > _builders;
+        vector< shared_ptr< BSONObjBuilder > > _builderStorage;
+
     };
     
     /* Used for modifiers such as $inc, $set, ... */
@@ -521,7 +529,17 @@ namespace mongo {
         vector< Mod >::iterator m = mods_.begin();
         map< string, BSONElement >::iterator p = existing.begin();
         while( m != mods_.end() || p != existing.end() ) {
-            int cmp = compare( m, p, existing.end() );
+
+            if ( m == mods_.end() ){
+                // no more mods, just regular elements
+                assert( p != existing.end() );
+                if ( mayAddEmbedded( existing, p->first ) )
+                    b2.appendAs( p->second, p->first ); 
+                p++;
+                continue;
+            }
+
+            FieldCompareResult cmp = compare( m, p, existing.end() );
             if ( cmp <= 0 )
                 uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
                          " or is referenced in another $set clause",
