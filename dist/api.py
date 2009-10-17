@@ -9,39 +9,18 @@
 # functions, and other API initialization.
 
 import os, string, sys
-from collections import defaultdict
-from dist import compare_srcfile
+from dist import api_load, compare_srcfile
 
 # Temporary file.
 tmp_file = '__tmp'
 
-# api is a dictionary of lists, with the handle + method name as the key.  The
-# list's first element is the flags, subsequent list elements are argument/type
-# pairs for getter/setter methods, and method prototypes for all other methods.
-api = defaultdict(list)
-
-# func_input --
-#	Read/parse the api file into the api dictionary.
-def func_input():
-	for line in open('api', 'r').readlines():
-		# Skip comments and empty lines.
-		if line[:1] == '#' or line[:1] == '\n':
-			continue
-
-		# Lines beginning with a tab are additional information for the
-		# current method, all other lines are new methods.
-		if line[:1] == '\t':
-			api[method].append(line.strip())
-		else:
-			method = line.strip()
-
 # func_method_single --
 #	Set methods to reference a single underlying function (usually an
 #	error function).
-def func_method_single(handle, method, flags, rettype, func, args, f):
+def func_method_single(handle, method, config, rettype, func, args, f):
 	f.write('\t' + handle + '->' + method +\
 	    ' = (' + rettype + ' (*)\n\t    (' + handle.upper() + ' *')
-	if not flags.count('notoc'):
+	if not config.count('notoc'):
 		f.write(', WT_TOC *')
 	for l in args:
 		f.write(', ' + l.split('\t')[1].replace('@S', ''))
@@ -49,8 +28,8 @@ def func_method_single(handle, method, flags, rettype, func, args, f):
 
 # func_method_std --
 #	Set methods to reference their underlying function.
-def func_method_std(handle, method, flags, f):
-	if flags.count('local'):
+def func_method_std(handle, method, config, f):
+	if config.count('local'):
 		f.write('\t' + handle + '->' +\
 		    method + ' = __wt_' + handle + '_' + method + ';\n')
 	else:
@@ -59,56 +38,56 @@ def func_method_std(handle, method, flags, f):
 
 # func_method_init --
 #	Set methods to their initial state.
-def func_method_init(handle, method, flags, args, f):
+def func_method_init(handle, method, config, args, f):
 	# If the open keyword is set, lock out the function until open.
-	if flags.count('open'):
+	if config.count('open'):
 		func_method_single(\
-		    handle, method, flags, 'int', 'lockout_open', args, f)
+		    handle, method, config, 'int', 'lockout_open', args, f)
 		return
 
-	func_method_std(handle, method, flags, f)
+	func_method_std(handle, method, config, f)
 
 # func_method_open --
 #	Set methods to reference their normal underlying function (after
 #	the open method is called).
-def func_method_open(handle, method, flags, args, f):
+def func_method_open(handle, method, config, args, f):
 	# If the open keyword is set, we need to reset the method.
-	if flags.count('open'):
-		func_method_std(handle, method, flags, f)
+	if config.count('open'):
+		func_method_std(handle, method, config, f)
 
 # func_method_lockout --
 #	Set methods (other than destroy) to a single underlying error function.
-def func_method_lockout(handle, method, flags, args, f):
+def func_method_lockout(handle, method, config, args, f):
 	# Skip the destroy method, it's the only legal method.
 	if method.count('destroy'):
 		return
 
-	if flags.count('methodV'):
+	if config.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
 	func_method_single(\
-	    handle, method, flags, rettype, 'lockout_err', args, f)
+	    handle, method, config, rettype, 'lockout_err', args, f)
 
 # func_decl --
 #	Output method name and getter/setter variables for an include file.
-def func_decl(handle, method, flags, args, f):
+def func_decl(handle, method, config, args, f):
 	f.write('\n')
 
 	# Output the setter variables.
-	if flags.count('getset') and method.count('set_'):
+	if config.count('getset') and method.count('set_'):
 		for l in args:
 			f.write('\t' + l.split\
 			    ('\t')[1].replace('@S', l.split('\t')[0]) + ';\n')
 
 	# Output the method variables.
-	if flags.count('methodV'):
+	if config.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
 	f.write('\t' + rettype + \
 	    ' (*' + method + ')(\n\t    ' + handle.upper() + ' *')
-	if not flags.count('notoc'):
+	if not config.count('notoc'):
 		f.write(', WT_TOC *')
 	for l in args:
 		f.write(', ' + l.split('\t')[1].replace('@S', ''))
@@ -116,8 +95,8 @@ def func_decl(handle, method, flags, args, f):
 
 # func_getset --
 #	Generate the actual getter/setter code for the API.
-def func_getset(handle, method, flags, args, f):
-	if flags.count('methodV'):
+def func_getset(handle, method, config, args, f):
+	if config.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
@@ -131,13 +110,13 @@ def func_getset(handle, method, flags, args, f):
 	# Verify means call a standard verification routine because there are
 	# constraints or side-effects on setting the value.  The setter fails
 	# if the verification routine fails.
-	if flags.count('verify'):
+	if config.count('verify'):
 		f.write('\n\tWT_RET((__wt_' +\
 		    handle + '_' + method + '_verify(toc)));\n')
 	else:
 		f.write('\n')
 
-	if flags.count('getset') and method.count('get_'):
+	if config.count('getset') and method.count('get_'):
 		for l in args:
 			f.write('\t*(' + l.split('\t')[0] + ')' +\
 			    ' = ' + handle + '->' + l.split('\t')[0] + ';\n')
@@ -150,7 +129,7 @@ def func_getset(handle, method, flags, args, f):
 # func_api_hdr --
 #	Generate #defines and structures for the API.
 op_cnt = 1
-def func_api_hdr(handle, method, flags, args, f):
+def func_api_hdr(handle, method, args, f):
 	global op_cnt
 	uv = handle.upper() + '_' + method.upper()
 	lv = 'wt_args_' + handle + '_' + method
@@ -185,15 +164,15 @@ def func_api_hdr(handle, method, flags, args, f):
 
 # func_api --
 #	Generate the actual API code.
-def func_api(handle, method, flags, args, f):
-	if flags.count('methodV'):
+def func_api(handle, method, config, args, f):
+	if config.count('methodV'):
 		rettype = 'void'
 	else:
 		rettype = 'int'
 	
 	s = 'static ' + rettype + ' __wt_api_' +\
 	    handle + '_' + method + '(\n\t' + handle.upper() + ' *' + handle
-	if not flags.count('notoc'):
+	if not config.count('notoc'):
 		s += ',\n\tWT_TOC *toc'
 	for l in args:
 		s += ',\n\t' +\
@@ -212,10 +191,10 @@ def func_api(handle, method, flags, args, f):
 
 # func_api_switch --
 #	Generate the switch for the API code.
-def func_api_switch(handle, method, flags, args, f):
+def func_api_switch(handle, method, config, args, f):
 	f.write('\tcase WT_OP_' + handle.upper() + '_' + method.upper() + ':\n')
 	f.write('\t\t')
-	if not flags.count('methodV'):
+	if not config.count('methodV'):
 		f.write('ret = ')
 	f.write('__wt_' + handle + '_' + method + '(toc);\n')
 	f.write('\t\tbreak;\n')
@@ -223,10 +202,10 @@ def func_api_switch(handle, method, flags, args, f):
 #####################################################################
 # Read in the api.py file.
 #####################################################################
-func_input()
+arguments, config, flags = api_load()
 
 #####################################################################
-# Update api.h with ENV, DB, WT_TOC handle information.
+# Update api.h, the API header file.
 #####################################################################
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
@@ -246,68 +225,74 @@ tfile.write('\ttoc->db = db;\\\n')
 tfile.write('\ttoc->argp = &args;\\\n')
 tfile.write('\treturn (__wt_toc_sched(toc))\n')
 
-# Write the API structures.
-for i in sorted(\
-    filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
+for i in sorted(filter(
+    lambda _i: config[_i[0]].count('local') == 0, arguments.iteritems())):
 	func_api_hdr(\
-	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+	    i[0].split('.')[0], i[0].split('.')[1], i[1], tfile)
 
 tfile.close()
 compare_srcfile(tmp_file, '../inc_posix/api.h')
 
 #####################################################################
-# Update api.c.
+# Update api.c, the API source file.
 #####################################################################
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
 #  Write the API functions.
-for i in sorted(
-    filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
+for i in sorted(filter(
+    lambda _i: config[_i[0]].count('local') == 0, arguments.iteritems())):
 	func_api(\
-	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+	    i[0].split('.')[0], i[0].split('.')[1], config[i[0]], i[1], tfile)
 
 # Write the Env/Db getter/setter functions.
-for i in sorted(filter(lambda _i: _i[1][0].count('getset'), api.iteritems())):
+for i in sorted(filter(
+    lambda _i: config[_i[0]].count('getset'), arguments.iteritems())):
 	func_getset(\
-	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+	    i[0].split('.')[0], i[0].split('.')[1], config[i[0]], i[1], tfile)
 
 # Write the Env/Db method configuration functions.
 tfile.write('void\n__wt_env_config_methods(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
-	func_method_init('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('env.'), arguments.iteritems())):
+	func_method_init('env', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_env_config_methods_open(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
-	func_method_open('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('env.'), arguments.iteritems())):
+	func_method_open('env', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_env_config_methods_lockout(ENV *env)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('env.'), api.iteritems())):
-	func_method_lockout('env', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('env.'), arguments.iteritems())):
+	func_method_lockout('env', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n\n')
 
 tfile.write('void\n__wt_db_config_methods(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
-	func_method_init('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('db.'), arguments.iteritems())):
+	func_method_init('db', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n\n')
 tfile.write('void\n__wt_db_config_methods_open(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
-	func_method_open('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('db.'), arguments.iteritems())):
+	func_method_open('db', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n')
 tfile.write('void\n__wt_db_config_methods_lockout(DB *db)\n{\n')
-for i in sorted(filter(lambda _i: _i[0].count('db.'), api.iteritems())):
-	func_method_lockout('db', i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+for i in sorted(filter(
+    lambda _i: _i[0].count('db.'), arguments.iteritems())):
+	func_method_lockout('db', i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('}\n\n')
 
 # Write the API switch.
 tfile.write('void\n__wt_api_switch(WT_TOC *toc)\n{\n')
 tfile.write('\tint ret;\n\n')
 tfile.write('\tswitch (toc->op) {\n')
-for i in sorted(
-    filter(lambda _i: _i[1][0].count('local') == 0, api.iteritems())):
+for i in sorted(filter(
+    lambda _i: config[_i[0]].count('local') == 0, arguments.iteritems())):
 	func_api_switch(\
-	    i[0].split('.')[0], i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+	    i[0].split('.')[0], i[0].split('.')[1], config[i[0]], i[1], tfile)
 tfile.write('\tdefault:\n')
 tfile.write('\t\tret = WT_ERROR;\n')
 tfile.write('\t\tbreak;\n')
@@ -335,24 +320,24 @@ for line in open('../inc_posix/wiredtiger.in', 'r'):
 	if line.count('Env handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		for i in sorted(\
-		    filter(lambda _i: _i[0].count('env.'), api.iteritems())):
-			func_decl('env',
-			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+		for i in sorted(filter(
+		    lambda _i: _i[0].count('env.'), arguments.iteritems())):
+			func_decl('env', i[0].split('.')[1],
+			    config[i[0]], arguments[i[0]], tfile)
 	elif line.count('Db handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		for i in sorted(\
-		    filter(lambda _i: _i[0].count('db.'), api.iteritems())):
-			func_decl('db',
-			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+		for i in sorted(filter(
+		    lambda _i: _i[0].count('db.'), arguments.iteritems())):
+			func_decl('db', i[0].split('.')[1],
+			    config[i[0]], arguments[i[0]], tfile)
 	elif line.count('WT_TOC handle api section: BEGIN'):
 		skip = 1
 		tfile.write('\t */')
-		for i in sorted(\
-		    filter(lambda _i: _i[0].count('wt_toc.'), api.iteritems())):
-			func_decl('wt_toc',
-			    i[0].split('.')[1], i[1][0], i[1][1:], tfile)
+		for i in sorted(filter(
+		    lambda _i: _i[0].count('wt_toc.'), arguments.iteritems())):
+			func_decl('wt_toc', i[0].split('.')[1],
+			    config[i[0]], arguments[i[0]], tfile)
 
 tfile.close()
 compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
