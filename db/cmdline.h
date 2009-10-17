@@ -35,6 +35,7 @@ namespace mongo {
         bool quota;            // --quota
         bool cpu;              // --cpu show cpu time periodically
 
+        long long oplogSize;   // --oplogSize
 
         enum { 
             DefaultDBPort = 27017
@@ -42,7 +43,7 @@ namespace mongo {
 
         CmdLine() : 
             port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
-            quota(false), cpu(false)
+            quota(false), cpu(false), oplogSize(0)
         { } 
 
     };

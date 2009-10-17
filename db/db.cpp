@@ -56,7 +56,6 @@ namespace mongo {
 //    extern int curOp;
     extern bool autoresync;
     extern int opLogging;
-    extern long long oplogSize;
     extern OpLog _oplog;
     extern int lenForNewNsFiles;
 
@@ -814,8 +813,8 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("oplogSize")) {
             long x = params["oplogSize"].as<long>();
             uassert("bad --oplogSize arg", x > 0);
-            oplogSize = x * 1024 * 1024;
-            assert(oplogSize > 0);
+            cmdLine.oplogSize = x * 1024 * 1024;
+            assert(cmdLine.oplogSize > 0);
         }
         if (params.count("opIdMem")) {
             long x = params["opIdMem"].as<long>();
