@@ -280,9 +280,9 @@ struct __wt_item {
 	 * minimize our on-page footprint as well as maintain alignment of the
 	 * bytes that follow the item.   (The trade-off is this limits on-page
 	 * database items to 16MB.)   The bottom 24-bits are the length of the
-	 * trailing data, the next 4-bits are unused, and the top 4-bits are
-	 * the type.   We could use the unused 4-bits to provide more length,
-	 * but 16MB seems sufficient for on-page items.
+	 * trailing data, the next 4-bits are the type, and the top 4-bits are
+	 * unused.   We could use the unused 4-bits to provide more length, but
+	 * 16MB seems sufficient for on-page items.
 	 *
 	 * The __item_chunk field should never be directly accessed, there are
 	 * macros to extract the type and length.
