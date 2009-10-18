@@ -52,7 +52,7 @@ See also http://www.mongodb.org/display/DOCS/Building+for+Windows
 
 COMPILING
    REQUIREMENTS
-     - python 2.6 (for scons)
+     - python 2.5 (for scons - 2.6 might be needed for some regression tests)
      - scons
      - boost 1.35
      - vc++ express
