@@ -469,7 +469,7 @@ namespace mongo {
         try {
             AuthenticationInfo *ai = currentClient.get()->ai;
             uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
-            msgdata = getMore(ns, ntoreturn, cursorid);
+            msgdata = getMore(ns, ntoreturn, cursorid, ss);
         }
         catch ( AssertionException& e ) {
             ss << " exception " + e.toString();

@@ -971,7 +971,7 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid) {
+    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , stringstream& ss) {
         ClientCursor *cc = ClientCursor::find(cursorid);
         
         int bufSize = 512;
@@ -993,6 +993,7 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
+            ss << " query: " << cc->query << " ";
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
@@ -1529,6 +1530,7 @@ namespace mongo {
                     cc->liveForever();
                 cc->c = c;
                 cursorid = cc->cursorid;
+                cc->query = jsobj.getOwned();
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
                 //                cc->ids_ = dqo.ids();

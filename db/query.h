@@ -72,7 +72,7 @@
 namespace mongo {
 
     // for an existing query (ie a ClientCursor), send back additional information.
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid);
+    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , stringstream& ss);
 
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set

@@ -51,7 +51,7 @@ namespace mongo {
         DiskLoc _lastLoc;                        // use getter and setter not this (important)
         unsigned _idleAgeMillis;                 // how long has the cursor been around, relative to server idle time
         bool _liveForever;                       // if true, never time out cursor
-
+        
         static CCById clientCursorsById;
         static CCByLoc byLoc;
         static boost::recursive_mutex ccmutex;   // must use this for all statics above!
@@ -64,6 +64,7 @@ namespace mongo {
         auto_ptr<KeyValJSMatcher> matcher;
         auto_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
+        BSONObj query;
 
         ClientCursor() : _idleAgeMillis(0), _liveForever(false), pos(0) {
             recursive_boostlock lock(ccmutex);
