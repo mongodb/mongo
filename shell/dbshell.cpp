@@ -14,6 +14,9 @@ jmp_buf jbuf;
 #include "../util/unittest.h"
 #include "utils.h"
 
+using namespace std;
+using namespace boost::filesystem;
+
 extern const char * jsconcatcode;
 
 string historyFile;

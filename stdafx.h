@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    using namespace std;
+
 #define NOMINMAX
 
 #if defined(_WIN32)
@@ -85,7 +87,7 @@ namespace mongo {
 #include "string.h"
 #include "limits.h"
 
-using namespace std;
+///using namespace std;
 
 #undef yassert
 #include <boost/archive/iterators/base64_from_binary.hpp>
@@ -117,7 +119,10 @@ using namespace std;
 #undef assert
 #define assert xassert
 #define yassert 1
-using namespace boost::filesystem;
+
+namespace mongo {
+    using namespace boost::filesystem;
+}
 
 #include "util/debug_util.h"
 #include "util/goodies.h"

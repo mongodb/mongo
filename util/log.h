@@ -20,6 +20,8 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+
     // Utility interface for stringifying object only when val() called.
     class LazyString {
     public:
