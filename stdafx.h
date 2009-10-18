@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace mongo {
 
     using namespace std;
