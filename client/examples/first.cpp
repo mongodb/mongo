@@ -8,6 +8,8 @@
 
 #include "client/dbclient.h"
 
+using namespace std;
+
 void insert( mongo::DBClientConnection & conn , const char * name , int num ) {
     mongo::BSONObjBuilder obj;
     obj.append( "name" , name );
