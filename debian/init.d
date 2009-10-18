@@ -156,7 +156,7 @@ reload_server() {
     [ ! -f "$PIDFILE" ] && return 1
     pid=pidofproc $PIDFILE # This is the daemon's pid
     # Send a SIGHUP
-    kill -1 $pid
+    kill -USR1 $pid
     return $?
 }
 
