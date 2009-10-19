@@ -356,7 +356,10 @@ namespace mongo {
         }
 
         capExtent = theCapExtent()->xnext.isNull() ? firstExtent : theCapExtent()->xnext;
-        dassert( theCapExtent()->ns == ns );
+
+        /* this isn't true if a collection has been renamed...that is ok just used for diagnostics */
+        //dassert( theCapExtent()->ns == ns );
+
         theCapExtent()->assertOk();
         capFirstNewRecord = DiskLoc();
     }
@@ -371,7 +374,7 @@ namespace mongo {
                 if ( e == capExtent )
                     out() << " (capExtent)";
                 out() << '\n';
-                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->ns.buf << '\n';
+                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->nsDiagnostic.buf << '\n';
                 out() << "    fr: " << e.ext()->firstRecord.toString() <<
                      " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
             }
@@ -444,7 +447,10 @@ namespace mongo {
         DiskLoc loc;
 
         // delete records until we have room and the max # objects limit achieved.
-        dassert( theCapExtent()->ns == ns );
+
+        /* this fails on a rename -- that is ok but must keep commented out */
+        //assert( theCapExtent()->ns == ns );
+
         theCapExtent()->assertOk();
         DiskLoc firstEmptyExtent;
         while ( 1 ) {

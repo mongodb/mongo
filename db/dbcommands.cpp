@@ -61,8 +61,8 @@ namespace mongo {
         if ( d->capped )
             ss << "  capped:" << d->capped << " max:" << d->max << '\n';
 
-        ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->ns.buf << '\n';
-        ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->ns.buf << '\n';
+        ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.buf << '\n';
+        ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->nsDiagnostic.buf << '\n';
         try {
             d->firstExtent.ext()->assertOk();
             d->lastExtent.ext()->assertOk();

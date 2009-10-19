@@ -188,7 +188,12 @@ namespace mongo {
         unsigned magic;
         DiskLoc myLoc;
         DiskLoc xnext, xprev; /* next/prev extent for this namespace */
-        Namespace ns; /* which namespace this extent is for.  this is just for troubleshooting really */
+
+        /* which namespace this extent is for.  this is just for troubleshooting really 
+           and won't even be correct if the collection were renamed!
+        */
+        Namespace nsDiagnostic; 
+
         int length;   /* size of the extent, including these fields */
         DiskLoc firstRecord, lastRecord;
         char extentData[4];
@@ -200,7 +205,7 @@ namespace mongo {
 
         void dump(iostream& s) {
             s << "    loc:" << myLoc.toString() << " xnext:" << xnext.toString() << " xprev:" << xprev.toString() << '\n';
-            s << "    ns:" << ns.buf << '\n';
+            s << "    nsdiag:" << nsDiagnostic.buf << '\n';
             s << "    size:" << length << " firstRecord:" << firstRecord.toString() << " lastRecord:" << lastRecord.toString() << '\n';
         }
 

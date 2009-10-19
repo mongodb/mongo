@@ -386,11 +386,11 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     DiskLoc Extent::reuse(const char *nsname) { 
-        log(3) << "reset extent was:" << ns.buf << " now:" << nsname << '\n';
+        log(3) << "reset extent was:" << nsDiagnostic.buf << " now:" << nsname << '\n';
         massert( "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
         xprev.Null();
-        ns = nsname;
+        nsDiagnostic = nsname;
         firstRecord.Null();
         lastRecord.Null();
 
@@ -416,7 +416,7 @@ namespace mongo {
         myLoc.setOfs(_fileNo, _offset);
         xnext.Null();
         xprev.Null();
-        ns = nsname;
+        nsDiagnostic = nsname;
         length = _length;
         firstRecord.Null();
         lastRecord.Null();
