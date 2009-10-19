@@ -65,6 +65,23 @@ namespace mongo {
 
 #include "pdfile.h"
 
+namespace {
+    inline pcrecpp::RE_Options flags2options(const char* flags){
+        pcrecpp::RE_Options options;
+        options.set_utf8(true);
+        while ( flags && *flags ) {
+            if ( *flags == 'i' )
+                options.set_caseless(true);
+            else if ( *flags == 'm' )
+                options.set_multiline(true);
+            else if ( *flags == 'x' )
+                options.set_extended(true);
+            flags++;
+        }
+        return options;
+    }
+}
+
 namespace mongo {
     
     KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
@@ -128,22 +145,9 @@ namespace mongo {
                     out() << "ERROR: too many regexes in query" << endl;
                 }
                 else {
-                    pcrecpp::RE_Options options;
-                    options.set_utf8(true);
-                    const char *flags = e.regexFlags();
-                    while ( flags && *flags ) {
-                        if ( *flags == 'i' )
-                            options.set_caseless(true);
-                        else if ( *flags == 'm' )
-                            options.set_multiline(true);
-                        else if ( *flags == 'x' )
-                            options.set_extended(true);
-                        flags++;
-                    }
                     RegexMatcher& rm = regexs[nRegex];
-                    rm.re = new pcrecpp::RE(e.regex(), options);
+                    rm.re = new pcrecpp::RE(e.regex(), flags2options(e.regexFlags()));
                     rm.fieldName = e.fieldName();
-
                     nRegex++;
                 }
                 continue;
@@ -154,6 +158,10 @@ namespace mongo {
             //       or
             //            { a : { $in : [1,2,3] } }
             if ( e.type() == Object ) {
+                // support {$regex:"a|b", $options:"imx"}
+                const char* regex = NULL;
+                const char* flags = "";
+                
                 // e.g., fe == { $gt : 3 }
                 BSONObjIterator j(e.embeddedObject());
                 bool isOperator = false;
@@ -217,6 +225,14 @@ namespace mongo {
                             addBasic(b->done().firstElement(), BSONObj::opEXISTS);
                             break;
                         }
+                        case BSONObj::opREGEX:{
+                            regex = fe.valuestrsafe();
+                            break;
+                        }
+                        case BSONObj::opOPTIONS:{
+                            flags = fe.valuestrsafe();
+                            break;
+                        }
                         default:
                             uassert( (string)"BUG - can't operator for: " + fn , 0 );
                         }
@@ -225,6 +241,16 @@ namespace mongo {
                     else {
                         isOperator = false;
                         break;
+                    }
+                }
+                if (regex){
+                    if ( nRegex >= 4 ) {
+                        out() << "ERROR: too many regexes in query" << endl;
+                    } else {
+                        RegexMatcher& rm = regexs[nRegex];
+                        rm.re = new pcrecpp::RE(regex, flags2options(flags));
+                        rm.fieldName = e.fieldName();
+                        nRegex++;
                     }
                 }
                 if ( isOperator )

@@ -424,10 +424,8 @@ namespace mongo {
                     else if ( fn[3] == 'e' && fn[4] == 0 ) return BSONObj::LTE;
                 }
             }
-            else if ( fn[2] == 'e' ) {
-                if ( fn[1] == 'n' && fn[3] == 0 )
-                    return BSONObj::NE;
-            }
+            else if ( fn[1] == 'n' && fn[2] == 'e' && fn[3] == 0)
+                return BSONObj::NE;
             else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
                 return BSONObj::opMOD;
             else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 )
@@ -442,6 +440,10 @@ namespace mongo {
                 return BSONObj::opSIZE;
             else if ( fn[1] == 'e' && fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' && fn[7] == 0 )
                 return BSONObj::opEXISTS;
+            else if ( fn[1] == 'r' && fn[2] == 'e' && fn[3] == 'g' && fn[4] == 'e' && fn[5] == 'x' && fn[6] == 0 )
+                return BSONObj::opREGEX;
+            else if ( fn[1] == 'o' && fn[2] == 'p' && fn[3] == 't' && fn[4] == 'i' && fn[5] == 'o' && fn[6] == 'n' && fn[7] == 's' && fn[8] == 0 )
+                return BSONObj::opOPTIONS;
         }
         return def;
     }
