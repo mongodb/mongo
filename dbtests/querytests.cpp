@@ -99,7 +99,7 @@ namespace QueryTests {
             insert( "{\"c\":\"d\"}" );
             BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
             string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
         }
     };
 

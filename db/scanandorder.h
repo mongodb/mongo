@@ -53,8 +53,6 @@ namespace mongo {
     inline bool fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
         if ( filter ) {
             
-            const int mark = bb.len();
-            
             BSONObjBuilder b( bb );
             BSONObjIterator i( js );
             int N = filter->size();
@@ -78,9 +76,7 @@ namespace mongo {
                 }
             }
             b.done();
-            if ( ! n )
-                bb.setlen( mark );
-            return n;
+            return true;
         }
         
         bb.append((void*) js.objdata(), js.objsize());

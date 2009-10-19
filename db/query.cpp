@@ -346,9 +346,8 @@ namespace mongo {
         CountOp( const BSONObj &spec ) : spec_( spec ), count_(), bc_() {}
         virtual void init() {
             query_ = spec_.getObjectField( "query" );
-            spec_.getObjectField( "fields" ).getFieldNames( fields_ );
             c_ = qp().newCursor();
-            if ( qp().exactKeyMatch() && fields_.empty() ) {
+            if ( qp().exactKeyMatch() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
                 bc_->forgetEndKey();
@@ -383,18 +382,7 @@ namespace mongo {
                 if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
                 }
                 else if( !c_->getsetdup(deep, c_->currLoc()) ) {
-                    bool match = true;
-                    if ( !fields_.empty() ) {
-                        BSONObj js = c_->current();
-                        for( set< string >::iterator i = fields_.begin(); i != fields_.end(); ++i ) {
-                            if ( js.getFieldDotted( i->c_str() ).eoo() ) {
-                                match = false;
-                                break;
-                            }
-                        }
-                    }
-                    if ( match )
-                        ++count_;
+                    ++count_;
                 }                
             }
             c_->advance();
@@ -409,7 +397,6 @@ namespace mongo {
         long long count_;
         auto_ptr< Cursor > c_;
         BSONObj query_;
-        set< string > fields_;
         BtreeCursor *bc_;
         auto_ptr< KeyValJSMatcher > matcher_;
         BSONObj firstMatch_;
