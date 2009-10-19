@@ -424,10 +424,8 @@ namespace mongo {
                     else if ( fn[3] == 'e' && fn[4] == 0 ) return BSONObj::LTE;
                 }
             }
-            else if ( fn[2] == 'e' ) {
-                if ( fn[1] == 'n' && fn[3] == 0 )
-                    return BSONObj::NE;
-            }
+            else if ( fn[1] == 'n' && fn[2] == 'e' && fn[3] == 0)
+                return BSONObj::NE;
             else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
                 return BSONObj::opMOD;
             else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 )
