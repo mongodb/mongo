@@ -300,14 +300,18 @@ namespace mongo {
     };
 
     class ModSet {
-        vector< Mod > mods_;
+        vector< Mod > _mods;
         void sortMods() {
-            sort( mods_.begin(), mods_.end() );
+            sort( _mods.begin(), _mods.end() );
         }
+        
         static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
+        
         FieldCompareResult compare( const vector< Mod >::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
-            bool mDone = ( m == mods_.end() );
+            bool mDone = ( m == _mods.end() );
             bool pDone = ( p == pEnd );
+            assert( ! mDone );
+            assert( ! pDone );
             if ( mDone && pDone )
                 return SAME;
             // If one iterator is done we want to read from the other one, so say the other one is lower.
@@ -318,6 +322,23 @@ namespace mongo {
 
             return compareDottedFieldNames( m->fieldName, p->first.c_str() );
         }
+        
+        void appendNewFromMod( Mod& m , EmbeddedBuilder& b ){
+            if ( m.op == Mod::PUSH ) {
+                BSONObjBuilder arr( b.subarrayStartAs( m.fieldName ) );
+                arr.appendAs( m.elt, "0" );
+                arr.done();
+                m.pushStartSize = -1;
+            } 
+            else if ( m.op == Mod::PUSH_ALL ) {
+                b.appendAs( m.elt, m.fieldName );
+                m.pushStartSize = -1;
+            } 
+            else if ( m.op != Mod::PULL && m.op != Mod::PULL_ALL ) {
+                b.appendAs( m.elt, m.fieldName );
+            }
+        }
+
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
                  left.length() > 0 && left[ left.length() - 1 ] != '.';
@@ -343,7 +364,7 @@ namespace mongo {
         BSONObj createNewFromMods( const BSONObj &obj );
 
         void checkUnindexed( const set<string>& idxKeys ) const {
-            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
+            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 // check if there is an index key that is a parent of mod
                 for( const char *dot = strchr( i->fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
                     if ( idxKeys.count( string( i->fieldName, dot - i->fieldName ) ) )
@@ -360,10 +381,10 @@ namespace mongo {
             }
         }
 
-        unsigned size() const { return mods_.size(); }
+        unsigned size() const { return _mods.size(); }
         bool haveModForField( const char *fieldName ) const {
             // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
                 if ( strlen( fieldName ) == strlen( i->fieldName ) && strcmp( fieldName, i->fieldName ) == 0 )
                     return true;
             }
@@ -371,7 +392,7 @@ namespace mongo {
         }
         bool haveModForFieldOrSubfield( const char *fieldName ) const {
             // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
                 const char *dot = strchr( i->fieldName, '.' );
                 size_t len = dot ? dot - i->fieldName : strlen( i->fieldName );
                 if ( len == strlen( fieldName ) && strncmp( fieldName, i->fieldName, len ) == 0 )
@@ -381,20 +402,20 @@ namespace mongo {
         }
         const Mod *modForField( const char *fieldName ) const {
             // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
                 if ( strcmp( fieldName, i->fieldName ) == 0 )
                     return &*i;
             }
             return 0;
         }
         bool haveArrayDepMod() const {
-            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ )
+            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
                 if ( i->arrayDep() )
                     return true;
             return false;
         }
         void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
-            for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); i++ ) {
+            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 if ( i->arrayDep() ){
                     if ( i->pushStartSize == -1 )
                         b.appendNull( i->fieldName );
@@ -409,7 +430,7 @@ namespace mongo {
         bool inPlacePossible = true;
         // Perform this check first, so that we don't leave a partially modified object
         // on uassert.
-        for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+        for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( e.eoo() ) {
@@ -469,7 +490,7 @@ namespace mongo {
         if ( !inPlacePossible ) {
             return false;
         }
-        for ( vector<Mod>::const_iterator i = mods_.begin(); i != mods_.end(); ++i ) {
+        for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
@@ -526,11 +547,11 @@ namespace mongo {
         }
             
         EmbeddedBuilder b2( &b );
-        vector< Mod >::iterator m = mods_.begin();
+        vector< Mod >::iterator m = _mods.begin();
         map< string, BSONElement >::iterator p = existing.begin();
-        while( m != mods_.end() || p != existing.end() ) {
+        while( m != _mods.end() || p != existing.end() ) {
 
-            if ( m == mods_.end() ){
+            if ( m == _mods.end() ){
                 // no more mods, just regular elements
                 assert( p != existing.end() );
                 if ( mayAddEmbedded( existing, p->first ) )
@@ -538,8 +559,18 @@ namespace mongo {
                 p++;
                 continue;
             }
+            
+            if ( p == existing.end() ){
+                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
+                         " or is referenced in another $set clause",
+                         mayAddEmbedded( existing, m->fieldName ) );                
+                // $ modifier applied to missing field -- create field from scratch
+                appendNewFromMod( *m , b2 );
+                m++;
+                continue;
+            }
 
-            FieldCompareResult cmp = compare( m, p, existing.end() );
+            FieldCompareResult cmp = compareDottedFieldNames( m->fieldName , p->first );
             if ( cmp <= 0 )
                 uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
                          " or is referenced in another $set clause",
@@ -642,18 +673,8 @@ namespace mongo {
             } 
             else if ( cmp < 0 ) {
                 // $ modifier applied to missing field -- create field from scratch
-                if ( m->op == Mod::PUSH ) {
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
-                    arr.appendAs( m->elt, "0" );
-                    arr.done();
-                    m->pushStartSize = -1;
-                } else if ( m->op == Mod::PUSH_ALL ) {
-                    b2.appendAs( m->elt, m->fieldName );
-                    m->pushStartSize = -1;
-                } else if ( m->op != Mod::PULL && m->op != Mod::PULL_ALL ) {
-                    b2.appendAs( m->elt, m->fieldName );
-                }
-                ++m;
+                appendNewFromMod( *m , b2 );
+                m++;
             } 
             else if ( cmp > 0 ) {
                 // No $ modifier
@@ -695,7 +716,7 @@ namespace mongo {
                 m.fieldName = f.fieldName();
                 uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
                 uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
-                for ( vector<Mod>::iterator i = mods_.begin(); i != mods_.end(); i++ ) {
+                for ( vector<Mod>::iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                     uassert( "Field name duplication not allowed with modifiers",
                              strcmp( m.fieldName, i->fieldName ) != 0 );
                 }
@@ -716,7 +737,7 @@ namespace mongo {
                     m.nint = 0;
                     m.nlong = (long long *) f.value();
                 }
-                mods_.push_back( m );
+                _mods.push_back( m );
             }
         }
     }
