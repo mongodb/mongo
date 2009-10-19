@@ -28,6 +28,10 @@ case "$1" in
 	# create db
 	mkdir -p /var/lib/mongodb
 	chown mongodb:mongodb /var/lib/mongodb
+
+	# create logdir
+	mkdir -p /var/log/mongodb
+	chown mongodb:mongodb /var/log/mongodb
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
