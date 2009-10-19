@@ -956,6 +956,10 @@ namespace mongo {
         bool valid() const;
         
         string md5() const;
+        
+        bool operator==( const BSONObj& other ){
+            return woCompare( other ) == 0;
+        }
 
         enum MatchType {
             Equality = 0,
