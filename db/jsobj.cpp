@@ -440,6 +440,10 @@ namespace mongo {
                 return BSONObj::opSIZE;
             else if ( fn[1] == 'e' && fn[2] == 'x' && fn[3] == 'i' && fn[4] == 's' && fn[5] == 't' && fn[6] == 's' && fn[7] == 0 )
                 return BSONObj::opEXISTS;
+            else if ( fn[1] == 'r' && fn[2] == 'e' && fn[3] == 'g' && fn[4] == 'e' && fn[5] == 'x' && fn[6] == 0 )
+                return BSONObj::opREGEX;
+            else if ( fn[1] == 'o' && fn[2] == 'p' && fn[3] == 't' && fn[4] == 'i' && fn[5] == 'o' && fn[6] == 'n' && fn[7] == 's' && fn[8] == 0 )
+                return BSONObj::opOPTIONS;
         }
         return def;
     }
