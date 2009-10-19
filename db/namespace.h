@@ -94,6 +94,12 @@ namespace mongo {
             return *this;
         }
 
+        string extraName() { 
+            string s = string(buf) + "$extra";
+            massert("ns name too long", s.size() < MaxNsLen);
+            return s;
+        }
+
         void kill() {
             buf[0] = 0x7f;
         }
@@ -244,7 +250,7 @@ namespace mongo {
         /* delete this index.  does NOT clean up the system catalog
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
-        void kill();
+        void kill_idx();
 
         operator string() const {
             return info.obj().toString();
@@ -519,12 +525,12 @@ namespace mongo {
         
         void init();
 
-        void add(const char *ns, DiskLoc& loc, bool capped) {
+        void add_ns(const char *ns, DiskLoc& loc, bool capped) {
             NamespaceDetails details( loc, capped );
-			add( ns, details );
+			add_ns( ns, details );
         }
 
-		void add( const char *ns, const NamespaceDetails &details ) {
+		void add_ns( const char *ns, const NamespaceDetails &details ) {
             init();
             Namespace n(ns);
             uassert("too many namespaces/collections", ht->put(n, details));
@@ -547,19 +553,23 @@ namespace mongo {
             return d;
         }
 
-        void kill(const char *ns) {
+        void kill_ns(const char *ns) {
             if ( !ht )
                 return;
             Namespace n(ns);
             ht->kill(n);
+
+            // todo catch assert if name too long (that is ok if no extra)
+            // Namespace extra(n.extraName().c_str());
+            // ht->kill(extra);
         }
 
-        void drop(const char *ns) {
+       /* void drop_ns(const char *ns) {
             if ( !ht )
                 return;
             Namespace n(ns);
             ht->drop(n);
-        }
+        }*/
 
         bool find(const char *ns, DiskLoc& loc) {
             NamespaceDetails *l = details(ns);

@@ -583,7 +583,7 @@ namespace mongo {
                     if ( !mayDeleteIdIndex && d->indexes[i].isIdIndex() ) {
                         idIndex = &d->indexes[i];
                     } else {
-                        d->indexes[i].kill();
+                        d->indexes[i].kill_idx();
                     }
                 }
                 d->nIndexes = 0;
@@ -612,7 +612,7 @@ namespace mongo {
                     errmsg = "may not delete _id index";
                     return false;
                 }
-                d->indexes[x].kill();
+                d->indexes[x].kill_idx();
                 d->multiKeyIndexBits = removeBit(d->multiKeyIndexBits, x);
                 d->nIndexes--;
                 for ( int i = x; i < d->nIndexes; i++ )

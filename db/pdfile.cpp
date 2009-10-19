@@ -283,7 +283,7 @@ namespace mongo {
             details->lastExtent = eloc;
         }
         else {
-            ni->add(ns, eloc, capped);
+            ni->add_ns(ns, eloc, capped);
             details = ni->details(ns);
         }
 
@@ -603,7 +603,7 @@ namespace mongo {
         }
 
         // remove from the catalog hashtable
-        cc().database()->namespaceIndex.kill(nsToDrop.c_str());
+        cc().database()->namespaceIndex.kill_ns(nsToDrop.c_str());
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
@@ -628,7 +628,7 @@ namespace mongo {
     /* delete this index.  does NOT clean up the system catalog
        (system.indexes or system.namespaces) -- only NamespaceIndex.
     */
-    void IndexDetails::kill() {
+    void IndexDetails::kill_idx() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
         
         // clean up parent namespace index cache

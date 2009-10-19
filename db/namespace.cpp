@@ -648,8 +648,8 @@ namespace mongo {
 		NamespaceDetailsTransient::drop( from );
 		
 		NamespaceDetails *details = ni->details( from );
-		ni->add( to, *details );
-		ni->drop( from );
+		ni->add_ns( to, *details );
+		ni->kill_ns( from );
 		details = ni->details( to );
 		
 		BSONObj oldSpec;

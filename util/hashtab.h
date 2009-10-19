@@ -113,11 +113,11 @@ namespace mongo {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
-                nodes[i].k.kill();
+//TEMP                nodes[i].k.kill();
                 nodes[i].setUnused();
             }
         }
-
+/*
         void drop(const Key& k) {
             bool found;
             int i = _find(k, found);
@@ -125,7 +125,7 @@ namespace mongo {
                 nodes[i].setUnused();
             }
         }
-
+*/
         /** returns false if too full */
         bool put(const Key& k, const Type& value) {
             bool found;
