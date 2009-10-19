@@ -1212,7 +1212,20 @@ namespace mongo {
         {
 			time_t saveLast = time(0);
             while ( 1 ) {
-                /* todo this code is ugly and confusing fix */
+                /* from a.s.:
+                   I think the idea here is that we can establish a sync point between the local op log and the remote log with the following steps:
+
+                   1) identify most recent op in local log -- call it O
+                   2) ask "does nextOpTime reflect the tail of the remote op log?" (in other words, is more() false?) - If yes, all subsequent ops after nextOpTime in the remote log must have occurred after O.  If no, we can't establish a sync point.
+
+                   Note that we can't do step (2) followed by step (1) because if we do so ops may be added to both machines between steps (2) and (1) and we can't establish a sync point.  (In particular, between (2) and (1) an op may be added to the remote log before a different op is added to the local log.  In this case, the newest remote op will have occurred after nextOpTime but before O.)
+
+                   Now, for performance reasons we don't want to have to identify the most recent op in the local log every time we call c->more() because in performance sensitive situations more() will be true most of the time.  So we do:
+
+                   0) more()?
+                   1) find most recent op in local log
+                   2) more()?
+                */
                 if ( !c->more() ) {
                     dblock lk;
                     OpTime nextLastSaved = nextLastSavedLocalTs(); // this may make c->more() become true
