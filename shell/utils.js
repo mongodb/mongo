@@ -347,7 +347,7 @@ tojson = function( x, indent , nolint ){
             
     case "object":{
         var s = tojsonObject( x, indent , nolint );
-        if ( ( nolint == null || nolint == true ) && s.length < 70 && ( indent == null || indent.length == 0 ) ){
+        if ( ( nolint == null || nolint == true ) && s.length < 80 && ( indent == null || indent.length == 0 ) ){
             s = s.replace( /[\s\r\n ]+/gm , " " );
         }
         return s;
@@ -396,9 +396,12 @@ tojsonObject = function( x, indent , nolint ){
         s += indent + lineEnding;
     }
 
+    var keys = x;
+    if ( typeof( x._simpleKeys ) == "function" )
+        keys = x._simpleKeys();
     var num = 1;
-    for ( var k in x ){
-
+    for ( var k in keys ){
+        
         var val = x[k];
         if ( val == DB.prototype || val == DBCollection.prototype )
             continue;
