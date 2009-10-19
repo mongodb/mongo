@@ -83,3 +83,11 @@ MR.check = function(){
     return 2;
 }
 
+MR.finalize = function(){
+    tempcoll.find().forEach( 
+        function(z){
+            z.value = $finalize( z._id , z.value );
+            tempcoll.save( z );
+        }
+    );
+}

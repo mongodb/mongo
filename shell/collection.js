@@ -475,10 +475,50 @@ DBCollection.prototype.groupcmd = function( params ){
     return this._db.groupcmd( params );
 }
 
+MapReduceResult = function( db , o ){
+    Object.extend( this , o );
+    this._o = o;
+    this._keys = o.keySet();
+    this._db = db;
+    this._coll = this._db.getCollection( this.result );
+}
+
+MapReduceResult.prototype._simpleKeys = function(){
+    return this._o;
+}
+
+MapReduceResult.prototype.find = function(){
+    return DBCollection.prototype.find.apply( this._coll , arguments );
+}
+
+MapReduceResult.prototype.drop = function(){
+    this._coll.drop();
+}
+
+
+/**
+* @param optional object of optional fields;
+*/
+DBCollection.prototype.mapReduce = function( map , reduce , optional ){
+    var c = { mapreduce : this._shortName , map : map , reduce : reduce };
+    if ( optional )
+        Object.extend( c , optional );
+    return new MapReduceResult( this._db , this._db.runCommand( c ) );
+
+}
+
 DBCollection.prototype.toString = function(){
     return this.getFullName();
 }
 
+DBCollection.prototype.toString = function(){
+    return this.getFullName();
+}
+
+
+DBCollection.prototype.tojson = DBCollection.prototype.toString;
+
 DBCollection.prototype.shellPrint = DBCollection.prototype.toString;
+
 
 

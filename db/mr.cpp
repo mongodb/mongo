@@ -359,6 +359,12 @@ namespace mongo {
                         countsBuilder.append( "reduces" , s->getNumber( "$numReduces" ) );
                         countsBuilder.append( "reducesToDB" , s->getNumber( "$numReducesToDB" ) );
                     }
+                    
+                    if ( cmdObj["finalize"].type() ){
+                        s->execSetup( (string)"$finalize = " + cmdObj["finalize"].ascode() );
+                        s->execSetup( "MR.finalize()" );
+                    }
+
                     s->execSetup( "MR.cleanup()" );
                     _tlmr.reset( 0 );
                     /*
