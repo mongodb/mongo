@@ -255,19 +255,14 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
     var name = this._indexSpec( keys, options ).name;
     this._indexCache = this._indexCache || {};
     if ( this._indexCache[ name ] ){
-        return false;
+        return;
     }
 
     this.createIndex( keys , options );
-    var e = this._db.getLastError();
-    if ( e != null )
-        throw e;
-
     if ( this.getDB().getLastError() == "" ) {
 	this._indexCache[name] = true;
     }
 
-    return true;
 }
 
 DBCollection.prototype.resetIndexCache = function(){
