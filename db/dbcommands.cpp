@@ -1251,7 +1251,7 @@ namespace mongo {
                 int res = s->invoke( func , b.obj() );
                 uassert( (string)"invoke failed in $keyf: " + s->getError() , res == 0 );
                 int type = s->type("return");
-                uassert( "return of $key has to be a function" , type == Object );
+                uassert( "return of $key has to be an object" , type == Object );
                 return s->getObject( "return" );
             }
             return obj.extractFields( keyPattern , true );

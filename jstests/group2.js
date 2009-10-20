@@ -29,3 +29,10 @@ cmd["$keyf"] = function(x){ return { a : x.a }; };
 result2 = t.group( cmd );
 
 assert.eq( result , result2 );
+
+
+delete cmd.$keyf
+cmd["keyf"] = function(x){ return { a : x.a }; };
+result3 = t.group( cmd );
+
+assert.eq( result , result3 );
