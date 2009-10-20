@@ -26,13 +26,14 @@ namespace mongo {
 
         string source;         // --source
         string only;           // --only
-
+        
         bool quiet;            // --quiet
         bool notablescan;      // --notablescan
         bool prealloc;         // --noprealloc
         bool smallfiles;       // --smallfiles
         
         bool quota;            // --quota
+        int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically
 
         long long oplogSize;   // --oplogSize
@@ -43,7 +44,7 @@ namespace mongo {
 
         CmdLine() : 
             port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
-            quota(false), cpu(false), oplogSize(0)
+            quota(false), quotaFiles(8), cpu(false), oplogSize(0)
         { } 
 
     };
