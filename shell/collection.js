@@ -259,9 +259,14 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
     }
 
     this.createIndex( keys , options );
+    var e = this._db.getLastError();
+    if ( e != null )
+        throw e;
+
     if ( this.getDB().getLastError() == "" ) {
 	this._indexCache[name] = true;
     }
+
     return true;
 }
 
