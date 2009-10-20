@@ -67,6 +67,9 @@ namespace mongo {
         global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit )->GetFunction() );
     }
 
+    void destroyConnection( Persistent<Value> object, void* parameter){
+        cout << "Yo ho ho" << endl;
+    }
 
     Handle<Value> mongoConsExternal(const Arguments& args){
 
@@ -80,11 +83,13 @@ namespace mongo {
             strcpy( host , "127.0.0.1" );
         }
 
-        DBClientConnection * cc = new DBClientConnection( true );
-        DBClientBase * conn = cc;
+        DBClientConnection * conn = new DBClientConnection( true );
+
+        Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
+        self.MakeWeak( conn , destroyConnection );
 
         string errmsg;
-        if ( ! cc->connect( host , errmsg ) ){
+        if ( ! conn->connect( host , errmsg ) ){
             return v8::ThrowException( v8::String::New( "couldn't connect" ) );
         }
 
@@ -101,6 +106,9 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "local Mongo constructor takes no args" ) );
 
         DBClientBase * conn = createDirectClient();
+
+        Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
+        self.MakeWeak( conn , destroyConnection );
 
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );

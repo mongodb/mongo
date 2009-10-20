@@ -34,7 +34,6 @@ namespace mongo {
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
         : _engine( engine ) , 
           _handleScope(),
-          //_context( Context::New( 0 , engine->_globalTemplate ) ) ,
           _context( Context::New() ) ,
           _scope( _context ) ,
           _global( _context->Global() ) ,
@@ -50,7 +49,6 @@ namespace mongo {
     }
 
     V8Scope::~V8Scope(){
-        
     }
 
     Handle< Value > V8Scope::nativeCallback( const Arguments &args ) {
