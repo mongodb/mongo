@@ -795,8 +795,9 @@ namespace mongo {
     void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         if ( d->nIndexes == 0 ) return;
         BSONObj obj(todelete);
-        for ( int i = 0; i < d->nIndexes; i++ ) {
-            _unindexRecord(d->indexes[i], obj, dl, !noWarn);
+        NamespaceDetails::IndexIterator i = d->ii();
+        while( i.more() ) {
+            _unindexRecord(i.next(), obj, dl, !noWarn);
         }
     }
 
@@ -900,23 +901,26 @@ namespace mongo {
 
     inline void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
         v.resize(d.nIndexes);
-        for ( int i = 0; i < d.nIndexes; i++ ) {
-            IndexDetails& idx = d.indexes[i];
+        NamespaceDetails::IndexIterator i = d.ii();
+        while( i.more() ) {
+            int j = i.pos();
+            IndexDetails& idx = i.next();
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }
-            IndexChanges& ch = v[i];
+            IndexChanges& ch = v[j];
             idx.getKeysFromObject(oldObj, ch.oldkeys);
             idx.getKeysFromObject(newObj, ch.newkeys);
             if( ch.newkeys.size() > 1 ) 
-                d.setIndexIsMultikey(i);
+                d.setIndexIsMultikey(j);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
         }
     }
 
     inline void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d) {
-        for ( int i = 0; i < d.nIndexes; i++ ) {
-            IndexDetails& idx = d.indexes[i];
-            v[i].dupCheck(idx);
+        NamespaceDetails::IndexIterator i = d.ii();
+        while( i.more() ) {
+            int j = i.pos();
+            v[j].dupCheck(i.next());
         }
     }
 
@@ -973,7 +977,7 @@ namespace mongo {
         /* have any index keys changed? */
         if( d->nIndexes ) {
             for ( int x = 0; x < d->nIndexes; x++ ) {
-                IndexDetails& idx = d->indexes[x];
+                IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
                         idx.head.btree()->unindex(idx.head, idx, *changes[x].removed[i], dl);
@@ -1021,7 +1025,7 @@ namespace mongo {
 
     /* add keys to indexes for a new record */
     inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
-        IndexDetails& idx = d->indexes[idxNo];
+        IndexDetails& idx = d->idx(idxNo);
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
@@ -1219,7 +1223,7 @@ namespace mongo {
         /*UNIQUE*/
         for ( int i = 0; i < d->nIndexes; i++ ) {
             try { 
-                bool unique = d->indexes[i].unique();
+                bool unique = d->idx(i).unique();
                 _indexRecord(d, i, obj, newRecordLoc, /*dupsAllowed*/!unique);
             }
             catch( DBException& ) { 
@@ -1229,7 +1233,7 @@ namespace mongo {
                 */
                 for( int j = 0; j <= i; j++ ) { 
                     try {
-                        _unindexRecord(d->indexes[j], obj, newRecordLoc, false);
+                        _unindexRecord(d->idx(j), obj, newRecordLoc, false);
                     }
                     catch(...) { 
                         log(3) << "unindex fails on rollback after unique failure\n";
@@ -1249,10 +1253,14 @@ namespace mongo {
 
         d->flags |= NamespaceDetails::Flag_HaveIdIndex;
 
-        for( int i = 0; i < d->nIndexes; ++i )
-            if ( d->indexes[ i ].isIdIndex() )
-                return;
-        
+        {
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                if( i.next().isIdIndex() )
+                    return;
+            }
+        }
+
         string system_indexes = cc().database()->name + ".system.indexes";
 
         BSONObjBuilder b;
@@ -1382,16 +1390,16 @@ namespace mongo {
                 log() << "info: creating collection " << tabletoidxns << " on add index\n";
                 assert( tableToIndex );
             }
-            if ( tableToIndex->nIndexes >= MaxIndexes ) {
+            if ( tableToIndex->findIndexByName(name) >= 0 ) {
+                // index already exists.
+                return DiskLoc();
+            }
+            if ( tableToIndex->nIndexes >= NamespaceDetails::NIndexesMax ) {
                 stringstream ss;
                 ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
                 string s = ss.str();
                 log() << s << '\n';
                 uasserted(s);
-            }
-            if ( tableToIndex->findIndexByName(name) >= 0 ) {
-                //out() << "INFO: index:" << name << " already exists for:" << tabletoidxns << endl;
-                return DiskLoc();
             }
             if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
                 ensureHaveIdIndex( tabletoidxns.c_str() );
@@ -1492,9 +1500,8 @@ namespace mongo {
         
         if ( tableToIndex ) {
             int idxNo = tableToIndex->nIndexes;
-            IndexDetails& idx = tableToIndex->indexes[idxNo];
+            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str()); // clear transient info caches so they refresh; increments nIndexes
             idx.info = loc;
-            tableToIndex->addingIndex(tabletoidxns.c_str(), idx); // clear transient info caches so they refresh; increments nIndexes
             try {
                 buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {

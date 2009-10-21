@@ -749,7 +749,7 @@ namespace mongo {
                                in the query optimizer please fix this then!
                             */
                             BSONObjBuilder b;
-                            b.append("$hint", d->indexes[i].indexName());
+                            b.append("$hint", d->idx(i).indexName());
                             snapshotHint = b.obj();
                             hint = snapshotHint.firstElement();
                         }

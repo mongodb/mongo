@@ -94,6 +94,7 @@ namespace mongo {
             return *this;
         }
 
+        /* for more than 10 indexes -- see NamespaceDetails::Extra */
         string extraName() { 
             string s = string(buf) + "$extra";
             massert("ns name too long", s.size() < MaxNsLen);
@@ -151,7 +152,7 @@ namespace mongo {
 	/* Maximum # of indexes per collection.  We need to raise this limit at some point.  
 	   (Backward datafile compatibility is main issue with changing.)
 	*/
-    const int MaxIndexes = 10;
+//    const int MaxIndexes = 10;
 
 	/* Details about a particular index. There is one of these effectively for each object in 
 	   system.namespaces (although this also includes the head pointer, which is not in that 
@@ -262,7 +263,28 @@ namespace mongo {
     /* this is the "header" for a collection that has all its details.  in the .ns file.
     */
     class NamespaceDetails {
+        friend class NamespaceIndex;
+        enum { NIndexesExtra = 30,
+               NIndexesBase  = 10
+        };
+        struct Extra { 
+            // note we could use this field for more chaining later, so don't waste it:
+            unsigned long long reserved1; 
+            IndexDetails details[NIndexesExtra];
+            unsigned reserved2;
+            unsigned reserved3;
+        };
+        Extra* extra() { 
+            assert( extraOffset );
+            return (Extra *) (((char *) this) + extraOffset);
+        }
     public:
+        void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
+
+        enum { NIndexesMax = 40 };
+
+        BOOST_STATIC_ASSERT( NIndexesMax == NIndexesBase + NIndexesExtra );
+
         NamespaceDetails( const DiskLoc &loc, bool _capped ) {
             /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
             firstExtent = lastExtent = capExtent = loc;
@@ -283,6 +305,8 @@ namespace mongo {
 			dataFileVersion = 0;
 			indexFileVersion = 0;
             multiKeyIndexBits = 0;
+            reservedA = 0;
+            extraOffset = 0;
             memset(reserved, 0, sizeof(reserved));
         }
         DiskLoc firstExtent;
@@ -292,7 +316,9 @@ namespace mongo {
         long long nrecords;
         int lastExtentSize;
         int nIndexes;
-        IndexDetails indexes[MaxIndexes];
+    private:
+        IndexDetails _indexes[NIndexesBase];
+    public:
         int capped;
         int max; // max # of objects for a capped table.
         double paddingFactor; // 1.0 = no padding.
@@ -306,21 +332,60 @@ namespace mongo {
 		unsigned short dataFileVersion;
 		unsigned short indexFileVersion;
 
-        unsigned multiKeyIndexBits;
-
-        char reserved[100];
+        unsigned long long multiKeyIndexBits;
+    private:
+        unsigned long long reservedA;
+        long long extraOffset; // where the $extra info is located (bytes relative to this)
+    public:
+        char reserved[80];
 
         enum NamespaceFlags {
             Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
         };
 
+        IndexDetails& idx(int idxNo) {
+            if( idxNo < NIndexesBase ) 
+                return _indexes[idxNo];
+            return extra()->details[idxNo-NIndexesBase];
+        }
+
+        class IndexIterator { 
+            friend class NamespaceDetails;
+            int i;
+            int n;
+            NamespaceDetails *d;
+            Extra *e;
+            IndexIterator(NamespaceDetails *_d) { 
+                d = _d;
+                i = 0;
+                n = d->nIndexes;
+                if( n > NIndexesBase )
+                    e = d->extra();
+            }
+        public:
+            int pos() { return i; } // note this is the next one to come
+            bool more() { return i < n; }
+            IndexDetails& next() { 
+                int k = i;
+                i++;
+                return k < NIndexesBase ? d->_indexes[k] : 
+                    e->details[k-10];
+            }
+        };
+
+        IndexIterator ii() { 
+            return IndexIterator(this);
+        }
+
         /* hackish - find our index # in the indexes array
         */
         int idxNo(IndexDetails& idx) { 
-            for( int i = 0; i < nIndexes; i++ )
-                if( &indexes[i] == &idx ) 
-                    return i;
+            IndexIterator i = ii();
+            while( i.more() ) {
+                if( &i.next() == &idx )
+                    return i.pos()-1;
+            }
             massert("E12000 idxNo fails", false);
             return -1;
         }
@@ -329,20 +394,22 @@ namespace mongo {
              for a single document. see multikey in wiki.
            for these, we have to do some dedup object on queries.
         */
-        bool isMultikey(int i) { 
-            return (multiKeyIndexBits & (1 << i)) != 0;
+        bool isMultikey(int i) {
+            return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0;
         }
         void setIndexIsMultikey(int i) { 
-            dassert( i < 32 && i <MaxIndexes );
-            multiKeyIndexBits |= (1 << i);
+            dassert( i < NIndexesMax );
+            multiKeyIndexBits |= (((unsigned long long) 1) << i);
         }
         void clearIndexIsMultikey(int i) { 
-            dassert( i < 32 && i <MaxIndexes );
-            multiKeyIndexBits &= ~(1 << i);
+            dassert( i < NIndexesMax );
+            multiKeyIndexBits &= ~(((unsigned long long) 1) << i);
         }
 
-        /* you MUST call when adding an index.  see pdfile.cpp */
-        void addingIndex(const char *thisns, IndexDetails& details);
+        /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
+           caller must populate returned object. 
+         */
+        IndexDetails& addIndex(const char *thisns);
 
         void aboutToDeleteAnIndex() {
             flags &= ~Flag_HaveIdIndex;
@@ -368,9 +435,10 @@ namespace mongo {
 
         //returns offset in indexes[]
         int findIndexByName(const char *name) {
-            for ( int i = 0; i < nIndexes; i++ ) {
-                if ( strcmp(indexes[i].info.obj().getStringField("name"),name) == 0 )
-                    return i;
+            IndexIterator i = ii();
+            while( i.more() ) {
+                if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
+                    return i.pos()-1;
             }
             return -1;
         }
@@ -379,9 +447,10 @@ namespace mongo {
            generally id is first index, so not that expensive an operation (assuming present).
         */
         int findIdIndex() {
-            for( int i = 0; i < nIndexes; i++ ) {
-                if( indexes[i].isIdIndex() )
-                    return i;
+            IndexIterator i = ii();
+            while( i.more() ) {
+                if( i.next().isIdIndex() ) 
+                    return i.pos()-1;
             }
             return -1;
         }
@@ -514,6 +583,7 @@ namespace mongo {
     */
     class NamespaceIndex {
         friend class NamespaceCursor;
+        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
     public:
         NamespaceIndex(const string &dir, const string &database) :
         ht( 0 ),
@@ -543,6 +613,23 @@ namespace mongo {
             return ((char *) d) -  (char *) ht->nodes;
         }
 
+        /* extra space for indexes when more than 10 */
+        NamespaceDetails::Extra* allocExtra(const char *ns) { 
+            Namespace n(ns);
+            Namespace extra(n.extraName().c_str()); // throws userexception if ns name too long
+            NamespaceDetails *d = details(ns);
+            massert( "allocExtra: base ns missing?", d );
+            assert( d->extraOffset == 0 );
+            massert( "allocExtra: extra already exists", ht->get(extra) == 0 );
+            NamespaceDetails::Extra temp;
+            memset(&temp, 0, sizeof(temp));
+            uassert( "allocExtra: too many namespaces/collections", ht->put(extra, (NamespaceDetails&) temp));
+            NamespaceDetails::Extra *e = (NamespaceDetails::Extra *) ht->get(extra);
+            d->extraOffset = ((char *) e) - ((char *) d);
+            assert( d->extra() == e );
+            return e;
+        }
+
         NamespaceDetails* details(const char *ns) {
             if ( !ht )
                 return 0;
@@ -559,17 +646,12 @@ namespace mongo {
             Namespace n(ns);
             ht->kill(n);
 
-            // todo catch assert if name too long (that is ok if no extra)
-            // Namespace extra(n.extraName().c_str());
-            // ht->kill(extra);
+            try {
+                Namespace extra(n.extraName().c_str());
+                ht->kill(extra);
+            }
+            catch(DBException&) { }
         }
-
-       /* void drop_ns(const char *ns) {
-            if ( !ht )
-                return;
-            Namespace n(ns);
-            ht->drop(n);
-        }*/
 
         bool find(const char *ns, DiskLoc& loc) {
             NamespaceDetails *l = details(ns);

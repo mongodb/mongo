@@ -179,9 +179,11 @@ namespace mongo {
             int idxn = 0;
             try  {
                 ss << "  nIndexes:" << d->nIndexes << endl;
-                for ( ; idxn < d->nIndexes; idxn++ ) {
-                    ss << "    " << d->indexes[idxn].indexNamespace() << " keys:" <<
-                    d->indexes[idxn].head.btree()->fullValidate(d->indexes[idxn].head, d->indexes[idxn].keyPattern()) << endl;
+                NamespaceDetails::IndexIterator i = d->ii();
+                while( i.more() ) {
+                    IndexDetails& id = i.next();
+                    ss << "    " << id.indexNamespace() << " keys:" <<
+                        id.head.btree()->fullValidate(id.head, id.keyPattern()) << endl;
                 }
             }
             catch (...) {
@@ -549,10 +551,11 @@ namespace mongo {
         }
     } cmdoplogging;
 
-    unsigned removeBit(unsigned b, int x) {
-        unsigned tmp = b;
+    // remove bit from a bit array - actually remove its slot, not a clear
+    unsigned long long removeBit(unsigned long long b, int x) {
+        unsigned long long tmp = b;
         return
-            (tmp & ((1 << x)-1)) |
+            (tmp & ((((unsigned long long) 1) << x)-1)) |
             ((tmp >> (x+1)) << x);
     }
 
@@ -563,6 +566,9 @@ namespace mongo {
             assert( removeBit(2, 1) == 0 );
             assert( removeBit(255, 1) == 127 );
             assert( removeBit(21, 2) == 9 );
+            assert( removeBit(0x8000000000000000, 63) == 0 );
+            assert( removeBit(0x8000000000000001, 63) == 1 );
+            assert( removeBit(0x8000000000000001, 0) == 0x4000000000000000 );
         }
     } dbc_unittest;
 
@@ -580,17 +586,17 @@ namespace mongo {
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) {
                 for ( int i = 0; i < d->nIndexes; i++ ) {
-                    if ( !mayDeleteIdIndex && d->indexes[i].isIdIndex() ) {
-                        idIndex = &d->indexes[i];
+                    if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
+                        idIndex = &d->idx(i);
                     } else {
-                        d->indexes[i].kill_idx();
+                        d->idx(i).kill_idx();
                     }
                 }
                 d->nIndexes = 0;
             }
             if ( idIndex ) {
-                d->indexes[ 0 ] = *idIndex;
-                d->nIndexes = 1;
+                d->addIndex(ns) = *idIndex;
+                wassert( d->nIndexes == 1 );
             }
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
@@ -607,16 +613,16 @@ namespace mongo {
                  call, otherwise, on recreate, the old one would be reused, and its
                  IndexDetails::info ptr would be bad info.
                  */
-                IndexDetails *id = &d->indexes[x];
+                IndexDetails *id = &d->idx(x);
                 if ( !mayDeleteIdIndex && id->isIdIndex() ) {
                     errmsg = "may not delete _id index";
                     return false;
                 }
-                d->indexes[x].kill_idx();
+                id->kill_idx();
                 d->multiKeyIndexBits = removeBit(d->multiKeyIndexBits, x);
                 d->nIndexes--;
                 for ( int i = x; i < d->nIndexes; i++ )
-                    d->indexes[i] = d->indexes[i+1];
+                    d->idx(i) = d->idx(i+1);
             } else {
                 log() << "deleteIndexes: " << name << " not found" << endl;
                 errmsg = "index not found";

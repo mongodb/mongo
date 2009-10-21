@@ -67,7 +67,7 @@ namespace mongo {
         }
 
         if( idxNo >= 0 ) {
-            index_ = &d->indexes[idxNo];
+            index_ = &d->idx(idxNo);
         } else {
             // full table scan case
             if ( order_.isEmpty() || !strcmp( order_.firstElement().fieldName(), "$natural" ) )
@@ -257,8 +257,9 @@ namespace mongo {
             mayRecordPlan_ = false;
             if( hint.type() == String ) {
                 string hintstr = hint.valuestr();
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
+                NamespaceDetails::IndexIterator i = d->ii();
+                while( i.more() ) {
+                    IndexDetails& ii = i.next();
                     if ( ii.indexName() == hintstr ) {
                         addHint( ii );
                         return;
@@ -274,8 +275,9 @@ namespace mongo {
                     plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
                     return;
                 }
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
+                NamespaceDetails::IndexIterator i = d->ii();
+                while( i.more() ) {
+                    IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(hintobj) == 0 ) {
                         addHint( ii );
                         return;
@@ -305,10 +307,13 @@ namespace mongo {
                     plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
                     return;
                 }
-                for (int i = 0; i < d->nIndexes; i++ ) {
-                    IndexDetails& ii = d->indexes[i];
+
+                NamespaceDetails::IndexIterator i = d->ii();
+                while( i.more() ) {
+                    int j = i.pos();
+                    IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        plans_.push_back( PlanPtr( new QueryPlan( d, i, fbs_, order_ ) ) );
+                        plans_.push_back( PlanPtr( new QueryPlan( d, j, fbs_, order_ ) ) );
                         return;
                     }
                 }
@@ -560,8 +565,9 @@ namespace mongo {
             return 0;
         }
         if ( keyPattern.isEmpty() ) {
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                IndexDetails& ii = d->indexes[i];
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                IndexDetails& ii = i.next();
                 if ( indexWorks( ii.keyPattern(), min.isEmpty() ? max : min, ret.first, ret.second ) ) {
                     id = &ii;
                     keyPattern = ii.keyPattern();
@@ -574,8 +580,9 @@ namespace mongo {
                 errmsg = "requested keyPattern does not match specified keys";
                 return 0;
             }
-            for (int i = 0; i < d->nIndexes; i++ ) {
-                IndexDetails& ii = d->indexes[i];
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                IndexDetails& ii = i.next();
                 if( ii.keyPattern().woCompare(keyPattern) == 0 ) {
                     id = &ii;
                     break;

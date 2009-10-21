@@ -507,23 +507,40 @@ namespace mongo {
     }
 
     /* you MUST call when adding an index.  see pdfile.cpp */
-    void NamespaceDetails::addingIndex(const char *thisns, IndexDetails& details) {
+    IndexDetails& NamespaceDetails::addIndex(const char *thisns) {
         assert( nsdetails(thisns) == this );
-        assert( &details == &indexes[nIndexes] );
+
+        if( nIndexes == NIndexesBase && extraOffset == 0 ) { 
+            nsindex(thisns)->allocExtra(thisns);
+        }
+
+        IndexDetails& id = idx(nIndexes);
         nIndexes++;
         NamespaceDetailsTransient::get(thisns).addedIndex();
+        return id;
+    }
+
+    // must be called when renaming a NS to fix up extra
+    void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) { 
+        if( extraOffset ) {
+            extraOffset = 0; // so allocExtra() doesn't assert.
+            Extra *e = nsindex(thisns)->allocExtra(thisns);
+            memcpy(e, src->extra(), sizeof(Extra));
+        } 
     }
 
     /* returns index of the first index in which the field is present. -1 if not present.
        (aug08 - this method not currently used)
     */
     int NamespaceDetails::fieldIsIndexed(const char *fieldName) {
+        massert("not implemented", false);
+        /*
         for ( int i = 0; i < nIndexes; i++ ) {
             IndexDetails& idx = indexes[i];
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // e.g., { ts : -1 }
             if ( !idxKey.findElement(fieldName).eoo() )
                 return i;
-        }
+        }*/
         return -1;
     }
     
@@ -569,11 +586,9 @@ namespace mongo {
     void NamespaceDetailsTransient::computeIndexKeys() {
         allIndexKeys.clear();
         NamespaceDetails *d = nsdetails(ns.c_str());
-        for ( int i = 0; i < d->nIndexes; i++ ) {
-			// set<string> fields;
-            d->indexes[i].keyPattern().getFieldNames(allIndexKeys);
-			// allIndexKeys.insert(fields.begin(),fields.end());
-        }
+        NamespaceDetails::IndexIterator i = d->ii();
+        while( i.more() )
+            i.next().keyPattern().getFieldNames(allIndexKeys);
     }
     
     void NamespaceDetailsTransient::startLog( int logSizeMb ) {
@@ -646,11 +661,20 @@ namespace mongo {
 		// transient (including query cache) so clear these.
 		ClientCursor::invalidate( from );
 		NamespaceDetailsTransient::drop( from );
-		
+
 		NamespaceDetails *details = ni->details( from );
 		ni->add_ns( to, *details );
+        NamespaceDetails *todetails = ni->details( to );
+        try { 
+            todetails->copyingFrom(to, details); // fixes extraOffset
+        }
+        catch( DBException& ) { 
+            // could end up here if .ns is full - if so try to clean up / roll back a little
+            ni->kill_ns(to);
+            throw;
+        }
 		ni->kill_ns( from );
-		details = ni->details( to );
+		details = todetails;
 		
 		BSONObj oldSpec;
 		char database[MaxClientLen];
@@ -690,7 +714,7 @@ namespace mongo {
 			BSONObj newIndexSpec = newIndexSpecB.done();
 			DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, BSONElement(), false );
 			int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
-			IndexDetails &indexDetails = details->indexes[ indexI ];
+			IndexDetails &indexDetails = details->idx(indexI);
 			string oldIndexNs = indexDetails.indexNamespace();
 			indexDetails.info = newIndexSpecLoc;
 			string newIndexNs = indexDetails.indexNamespace();

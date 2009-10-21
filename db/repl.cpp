@@ -1659,8 +1659,8 @@ namespace mongo {
             }
         }
 
-        log() << "******" << endl;
-        log() << "creating oplog  size : " << (int)( sz / ( 1024 * 1024 ) ) << "mb" << endl;
+        log() << "******\n";
+        log() << "creating oplog  size : " << (int)( sz / ( 1024 * 1024 ) ) << "mb\n";
         log() << "******" << endl;
 
         b.append("size", sz);

@@ -324,8 +324,8 @@ namespace QueryOptimizerTests {
                 client_.ensureIndex( ns(), key, false, name.c_str() );
                 NamespaceDetails *d = nsd();
                 for( int i = 0; i < d->nIndexes; ++i ) {
-                    if ( d->indexes[ i ].indexName() == name || ( d->indexes[ i ].isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) )
-                        return &d->indexes[ i ];
+                    if ( d->idx(i).indexName() == name || ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) )
+                        return &d->idx(i);
                 }
                 assert( false );
                 return 0;
