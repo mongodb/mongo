@@ -96,8 +96,8 @@ namespace mongo {
         deleteObjects("sys.unittest.delete", j1, false);
         theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
         deleteObjects("sys.unittest.delete", j1, false);
-        updateObjects("sys.unittest.delete", j1, j1, true,ss);
-        updateObjects("sys.unittest.delete", j1, j1, false,ss);
+        updateObjects("sys.unittest.delete", j1, j1, true,false,ss,true);
+        updateObjects("sys.unittest.delete", j1, j1, false,false,ss,true);
 
         auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
         while ( c->ok() ) {

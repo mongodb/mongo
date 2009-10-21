@@ -648,8 +648,11 @@ namespace mongo {
         long long nscanned_;
         auto_ptr< KeyValJSMatcher > matcher_;
     };
+
     
-    int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
+    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi, stringstream& ss, bool logop ) {
+        uassert("multi not coded yet", !multi);
+
         int profile = cc().database()->profile;
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
@@ -711,18 +714,20 @@ namespace mongo {
                             mods.appendSizeSpecForArrayDepMods( patternBuilder );
                             pattern = patternBuilder.obj();                        
                         }
-                        logOp("u", ns, updateobj, &pattern );
-                        return 5;
                     }
+                    logOp("u", ns, updateobj, &pattern );
                 }
-                return 2;
-            } else {
+                return UpdateResult( 1 , 1 , 1 );
+            } 
+            else {
                 BSONElementManipulator::lookForTimestamps( updateobj );
                 checkNoMods( updateobj );
             }
             
             theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-            return 1;
+            if ( logop )
+                logOp("u", ns, updateobj, &pattern );
+            return UpdateResult( 1 , 0 , 1 );
         }
         
         if ( profile )
@@ -746,7 +751,7 @@ namespace mongo {
                     ss << " fastmodinsert ";
                 if ( logop )
                     logOp( "i", ns, newObj );
-                return 3;
+                return UpdateResult( 0 , 1 , 1 );
             }
             checkNoMods( updateobj );
             if ( profile )
@@ -754,27 +759,9 @@ namespace mongo {
             theDataFileMgr.insert(ns, updateobj);
             if ( logop )
                 logOp( "i", ns, updateobj );
-            return 4;
+            return UpdateResult( 0 , 0 , 1 );
         }
-        return 0;
+        return UpdateResult( 0 , 0 , 0 );
     }
     
-    /* todo:
-       _ smart requery find record immediately
-       (clean return codes up later...)
-    */
-    int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
-        return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
-    }
-     
-    /* multi means multiple updates. this is not implemented yet, but stubbing out for future work */   
-    /* todo - clean up these crazy __updateobjects return codes! */
-    bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool multi) {
-        uassert("multi not coded yet", !multi);
-        int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
-        /* todo: why is there a logOp here when __updateObjects also does a bunch of logOps? */
-        if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )
-            logOp("u", ns, updateobj, &pattern, &upsert);
-        return ( rc == 1 || rc == 2 || rc == 5 );
-    }
 }

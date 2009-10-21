@@ -49,7 +49,6 @@
 namespace mongo {
 
     extern boost::recursive_mutex &dbMutex;
-    int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logOp=false);
     void ensureHaveIdIndex(const char *ns);
 
     /* if 1 sync() is running */
@@ -545,8 +544,9 @@ namespace mongo {
 
         stringstream ss;
         setClient("local.sources");
-        int u = _updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, ss);
-        assert( u == 1 || u == 4 );
+        UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,ss,false);
+        assert( ! res.mod );
+        assert( res.num == 1 );
         cc().clearns();
 
         if ( replacing ) {
@@ -780,7 +780,7 @@ namespace mongo {
 					if( !o.getObjectID(_id) ) {
 						/* No _id.  This will be very slow. */
                         Timer t;
-                        _updateObjects(ns, o, o, true, ss);
+                        updateObjects(ns, o, o, true, false, ss, false );
                         if( t.millis() >= 2 ) {
                             RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                         }
@@ -792,13 +792,13 @@ namespace mongo {
                         /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
                         RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
 
-                        _updateObjects(ns, o, b.done(), true, ss);
+                        updateObjects(ns, o, b.done(), true, false, ss, false );
                     }
                 }
             }
             else if ( *opType == 'u' ) {
                 RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-                _updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), ss);
+                updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), false, ss, false );
             }
             else if ( *opType == 'd' ) {
                 if ( opType[1] == 0 )

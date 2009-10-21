@@ -358,8 +358,8 @@ namespace mongo {
             CurOp& currentOp = *client.curop();
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
-        bool updatedExisting = updateObjects(ns, toupdate, query, upsert, ss, multi);
-        recordUpdate( updatedExisting, ( upsert || updatedExisting ) ? 1 : 0 ); // for getlasterror
+        UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, ss, true);
+        recordUpdate( res.existing , res.num ); // for getlasterror
     }
 
     void receivedDelete(Message& m, stringstream &ss) {
