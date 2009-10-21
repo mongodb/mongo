@@ -116,7 +116,7 @@ namespace mongo {
             else if( nint )
                 *nint += n.numberInt();
             else
-                *nlong += n.numberLong();\
+                *nlong += n.numberLong();
         }
 
         void setElementToOurNumericValue(BSONElement& e) const { 
@@ -562,10 +562,8 @@ namespace mongo {
     */
     void ModSet::getMods(const BSONObj &from) {
         BSONObjIterator it(from);
-        while ( it.moreWithEOO() ) {
+        while ( it.more() ) {
             BSONElement e = it.next();
-            if ( e.eoo() )
-                break;
             const char *fn = e.fieldName();
             uassert( "Invalid modifier specified" + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
