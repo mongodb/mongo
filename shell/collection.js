@@ -151,7 +151,7 @@ DBCollection.prototype.update = function( query , obj , upsert ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
     this._validateObject( obj );
-    return this._mongo.update( this._fullName , query , obj , upsert ? true : false );
+    this._mongo.update( this._fullName , query , obj , upsert ? true : false );
 }
 
 DBCollection.prototype.save = function( obj ){
@@ -262,7 +262,6 @@ DBCollection.prototype.ensureIndex = function( keys , options ){
     if ( this.getDB().getLastError() == "" ) {
 	this._indexCache[name] = true;
     }
-
 }
 
 DBCollection.prototype.resetIndexCache = function(){
@@ -298,7 +297,7 @@ DBCollection.prototype.drop = function(){
 }
 
 DBCollection.prototype.renameCollection = function( newName ){
-    return this._db._adminCommand( { renameCollection : this._fullName , to : this._db._name + "." + newName } ).ok;
+    return this._db._adminCommand( { renameCollection : this._fullName , to : this._db._name + "." + newName } )
 }
 
 DBCollection.prototype.validate = function() {
