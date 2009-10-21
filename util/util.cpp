@@ -37,7 +37,8 @@ namespace mongo {
 
     int logLevel = 0;
     boost::mutex &Logstream::mutex = *( new boost::mutex );
-
+    int Logstream::doneSetup = Logstream::magicNumber();
+    
     bool goingAway = false;
 
     bool isPrime(int n) {

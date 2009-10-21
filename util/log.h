@@ -117,10 +117,15 @@ namespace mongo {
 
     class Logstream : public Nullstream {
         static boost::mutex &mutex;
+        static int doneSetup;
         stringstream ss;
     public:
+        static int magicNumber(){
+            return 1717;
+        }
         void flush() {
-            {
+            // this ensures things are sane
+            if ( doneSetup == 1717 ){
                 boostlock lk(mutex);
                 cout << ss.str();
                 cout.flush();
