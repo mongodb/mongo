@@ -439,19 +439,22 @@ namespace UpdateTests {
             client().ensureIndex( ns(), BSON( "a" << 1 ) );
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
+            ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , client().findOne( ns(), Query() ) );
+            ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , client().findOne( ns(), fromjson( "{'a.b':4}" ) ) ); // make sure the index works
         }
     };
 
-    class ModParentOfIndex : public SetBase {
+    class IndexModSet : public SetBase {
     public:
         void run() {
             client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
-            client().insert( ns(), fromjson( "{'_id':0}" ) );
-            client().update( ns(), Query(), fromjson( "{$set:{'a':4}}" ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:3}}" ) );
+            client().update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
+            ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , client().findOne( ns(), Query() ) );
+            ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , client().findOne( ns(), fromjson( "{'a.b':4}" ) ) ); // make sure the index works
         }
     };
+
 
     class PreserveIdWithIndex : public SetBase { // Not using $set, but base class is still useful
     public:
@@ -528,7 +531,7 @@ namespace UpdateTests {
             add< DontDropEmpty >();
             add< InsertInEmpty >();
             add< IndexParentOfMod >();
-            add< ModParentOfIndex >();
+            add< IndexModSet >();
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
             add< UpdateMissingToNull >();

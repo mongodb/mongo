@@ -218,22 +218,22 @@ namespace mongo {
         bool applyModsInPlace( const BSONObj &obj ) const;
         BSONObj createNewFromMods( const BSONObj &obj );
 
-        void checkUnindexed( const set<string>& idxKeys ) const {
+        bool isIndexed( const set<string>& idxKeys ) const {
             for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 // check if there is an index key that is a parent of mod
                 for( const char *dot = strchr( i->fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
                     if ( idxKeys.count( string( i->fieldName, dot - i->fieldName ) ) )
-                        uassert("E12010 can't $inc/$set an indexed field ", false);
+                        return true;
                 string fullName = i->fieldName;
                 // check if there is an index key equal to mod
                 if ( idxKeys.count(fullName) )
-                    uassert("E12011 can't $inc/$set an indexed field", false);
+                    return true;
                 // check if there is an index key that is a child of mod
                 set< string >::const_iterator j = idxKeys.upper_bound( fullName );
-                if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' ){
-                    uassert("E12012 can't $inc/$set an indexed field", false);                    
-                }
+                if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
+                    return true;
             }
+            return false;
         }
 
         unsigned size() const { return _mods.size(); }
@@ -698,8 +698,7 @@ namespace mongo {
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                mods.checkUnindexed( idxKeys );
-                if ( mods.applyModsInPlace( c->currLoc().obj() ) ) {
+                if ( ! mods.isIndexed( idxKeys ) && mods.applyModsInPlace( c->currLoc().obj() ) ) {
                     if ( profile )
                         ss << " fastmod ";
                 } else {
