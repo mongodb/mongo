@@ -74,7 +74,7 @@ class Import : public Tool {
             return true;
         }
         
-        b.append( fieldName , atol( data.c_str() ) );
+        b.append( fieldName , atoll( data.c_str() ) );
         return true;
     }
 
