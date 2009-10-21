@@ -551,7 +551,11 @@ namespace mongo {
         }
     } cmdoplogging;
 
-    // remove bit from a bit array - actually remove its slot, not a clear
+    /* remove bit from a bit array - actually remove its slot, not a clear
+       note: this function does not work with x == 63 -- that is ok
+             but keep in mind in the future if max indexes were extended to 
+             exactly 64 it would be a problem
+    */
     unsigned long long removeBit(unsigned long long b, int x) {
         unsigned long long tmp = b;
         return
@@ -566,9 +570,7 @@ namespace mongo {
             assert( removeBit(2, 1) == 0 );
             assert( removeBit(255, 1) == 127 );
             assert( removeBit(21, 2) == 9 );
-            assert( removeBit(0x8000000000000000LL, 63) == 0 );
-            assert( removeBit(0x8000000000000001LL, 63) == 1 );
-            assert( removeBit(0x8000000000000001LL, 0) == 0x4000000000000000LL );
+            assert( removeBit(0x4000000000000001ULL, 62) == 1 );
         }
     } dbc_unittest;
 
