@@ -566,9 +566,9 @@ namespace mongo {
             assert( removeBit(2, 1) == 0 );
             assert( removeBit(255, 1) == 127 );
             assert( removeBit(21, 2) == 9 );
-            assert( removeBit(0x8000000000000000, 63) == 0 );
-            assert( removeBit(0x8000000000000001, 63) == 1 );
-            assert( removeBit(0x8000000000000001, 0) == 0x4000000000000000 );
+            assert( removeBit(0x8000000000000000LL, 63) == 0 );
+            assert( removeBit(0x8000000000000001LL, 63) == 1 );
+            assert( removeBit(0x8000000000000001LL, 0) == 0x4000000000000000LL );
         }
     } dbc_unittest;
 
