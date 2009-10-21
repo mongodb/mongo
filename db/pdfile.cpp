@@ -226,7 +226,7 @@ namespace mongo {
                very simple temporary implementation - we will in future look up
                the quota from the grid database
             */
-            if ( cmdLine.quota && fileNo > 8 && !boost::filesystem::exists(filename) ) {
+            if ( cmdLine.quota && fileNo > cmdLine.quotaFiles && !boost::filesystem::exists(filename) ) {
                 /* todo: if we were adding / changing keys in an index did we do some
                    work previously that needs cleaning up?  Possible.  We should
                    check code like that and have it catch the exception and do

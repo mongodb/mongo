@@ -229,7 +229,8 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
             flock( lockFile, LOCK_UN );
 #endif
-
+            
+            cc().shutdown();
             dbexit( (ExitCode)ret ); // so everything shuts down cleanly
             return ret;
         }

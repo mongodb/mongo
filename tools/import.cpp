@@ -74,8 +74,13 @@ class Import : public Tool {
             return true;
         }
         
-        b.append( fieldName , atol( data.c_str() ) );
-        return true;
+        try {
+            b.append( fieldName , boost::lexical_cast<long long>( data ) );
+            return true;
+        }
+        catch(bad_lexical_cast &){
+            return false;
+        }
     }
 
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){

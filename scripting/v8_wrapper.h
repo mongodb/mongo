@@ -20,4 +20,9 @@ namespace mongo {
     v8::Function * getNamedCons( const char * name );
     v8::Function * getObjectIdCons();
 
+    v8::Handle<v8::FunctionTemplate> getObjectWrapperTemplate();
+
+    class WrapperHolder;
+    WrapperHolder * createWrapperHolder( const BSONObj * o , bool readOnly , bool iDelete );
+
 }

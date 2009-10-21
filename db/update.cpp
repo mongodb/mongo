@@ -116,7 +116,7 @@ namespace mongo {
             else if( nint )
                 *nint += n.numberInt();
             else
-                *nlong += n.numberLong();\
+                *nlong += n.numberLong();
         }
 
         void setElementToOurNumericValue(BSONElement& e) const { 
@@ -218,22 +218,22 @@ namespace mongo {
         bool applyModsInPlace( const BSONObj &obj ) const;
         BSONObj createNewFromMods( const BSONObj &obj );
 
-        void checkUnindexed( const set<string>& idxKeys ) const {
+        bool isIndexed( const set<string>& idxKeys ) const {
             for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 // check if there is an index key that is a parent of mod
                 for( const char *dot = strchr( i->fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
                     if ( idxKeys.count( string( i->fieldName, dot - i->fieldName ) ) )
-                        uassert("E12010 can't $inc/$set an indexed field ", false);
+                        return true;
                 string fullName = i->fieldName;
                 // check if there is an index key equal to mod
                 if ( idxKeys.count(fullName) )
-                    uassert("E12011 can't $inc/$set an indexed field", false);
+                    return true;
                 // check if there is an index key that is a child of mod
                 set< string >::const_iterator j = idxKeys.upper_bound( fullName );
-                if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' ){
-                    uassert("E12012 can't $inc/$set an indexed field", false);                    
-                }
+                if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
+                    return true;
             }
+            return false;
         }
 
         unsigned size() const { return _mods.size(); }
@@ -348,19 +348,28 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-            if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
-                continue;
+            
+            switch ( m.op ){
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+                break;
 
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
-            if ( m.op == Mod::INC ) {
+            case Mod::INC:
                 m.inc(e);
                 m.setElementToOurNumericValue(e);
-            } else {
+                break;
+            case Mod::SET:
                 if ( e.isNumber() && m.elt.isNumber() ) {
                     // todo: handle NumberLong:
                     m.setElementToOurNumericValue(e);
-                } else
+                } 
+                else {
                     BSONElementManipulator( e ).replaceTypeAndValue( m.elt );
+                }
+                break;
+            default:
+                uassert( "can't handle mod" , 0 );
             }
         }
         return true;
@@ -553,10 +562,8 @@ namespace mongo {
     */
     void ModSet::getMods(const BSONObj &from) {
         BSONObjIterator it(from);
-        while ( it.moreWithEOO() ) {
+        while ( it.more() ) {
             BSONElement e = it.next();
-            if ( e.eoo() )
-                break;
             const char *fn = e.fieldName();
             uassert( "Invalid modifier specified" + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
@@ -641,8 +648,11 @@ namespace mongo {
         long long nscanned_;
         auto_ptr< KeyValJSMatcher > matcher_;
     };
+
     
-    int __updateObjects(const char *ns, BSONObj updateobj, BSONObj &pattern, bool upsert, stringstream& ss, bool logop=false) {
+    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi, stringstream& ss, bool logop ) {
+        uassert("multi not coded yet", !multi);
+
         int profile = cc().database()->profile;
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
@@ -689,8 +699,7 @@ namespace mongo {
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                mods.checkUnindexed( idxKeys );
-                if ( mods.applyModsInPlace( c->currLoc().obj() ) ) {
+                if ( ! mods.isIndexed( idxKeys ) && mods.applyModsInPlace( c->currLoc().obj() ) ) {
                     if ( profile )
                         ss << " fastmod ";
                 } else {
@@ -705,18 +714,20 @@ namespace mongo {
                             mods.appendSizeSpecForArrayDepMods( patternBuilder );
                             pattern = patternBuilder.obj();                        
                         }
-                        logOp("u", ns, updateobj, &pattern );
-                        return 5;
                     }
+                    logOp("u", ns, updateobj, &pattern );
                 }
-                return 2;
-            } else {
+                return UpdateResult( 1 , 1 , 1 );
+            } 
+            else {
                 BSONElementManipulator::lookForTimestamps( updateobj );
                 checkNoMods( updateobj );
             }
             
             theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
-            return 1;
+            if ( logop )
+                logOp("u", ns, updateobj, &pattern );
+            return UpdateResult( 1 , 0 , 1 );
         }
         
         if ( profile )
@@ -740,7 +751,7 @@ namespace mongo {
                     ss << " fastmodinsert ";
                 if ( logop )
                     logOp( "i", ns, newObj );
-                return 3;
+                return UpdateResult( 0 , 1 , 1 );
             }
             checkNoMods( updateobj );
             if ( profile )
@@ -748,27 +759,9 @@ namespace mongo {
             theDataFileMgr.insert(ns, updateobj);
             if ( logop )
                 logOp( "i", ns, updateobj );
-            return 4;
+            return UpdateResult( 0 , 0 , 1 );
         }
-        return 0;
+        return UpdateResult( 0 , 0 , 0 );
     }
     
-    /* todo:
-       _ smart requery find record immediately
-       (clean return codes up later...)
-    */
-    int _updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool logop=false) {
-        return __updateObjects( ns, updateobj, pattern, upsert, ss, logop );
-    }
-     
-    /* multi means multiple updates. this is not implemented yet, but stubbing out for future work */   
-    /* todo - clean up these crazy __updateobjects return codes! */
-    bool updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, stringstream& ss, bool multi) {
-        uassert("multi not coded yet", !multi);
-        int rc = __updateObjects(ns, updateobj, pattern, upsert, ss, true);
-        /* todo: why is there a logOp here when __updateObjects also does a bunch of logOps? */
-        if ( rc != 5 && rc != 0 && rc != 4 && rc != 3 )
-            logOp("u", ns, updateobj, &pattern, &upsert);
-        return ( rc == 1 || rc == 2 || rc == 5 );
-    }
 }

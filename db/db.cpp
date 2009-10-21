@@ -96,8 +96,8 @@ namespace mongo {
         deleteObjects("sys.unittest.delete", j1, false);
         theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
         deleteObjects("sys.unittest.delete", j1, false);
-        updateObjects("sys.unittest.delete", j1, j1, true,ss);
-        updateObjects("sys.unittest.delete", j1, j1, false,ss);
+        updateObjects("sys.unittest.delete", j1, j1, true,false,ss,true);
+        updateObjects("sys.unittest.delete", j1, j1, false,false,ss,true);
 
         auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
         while ( c->ok() ) {
@@ -541,6 +541,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("auth", "run with security")
         ("objcheck", "inspect client data for validity on receipt")
         ("quota", "enable db quota management")
+        ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
         ("appsrvpath", po::value<string>(), "root directory for the babble app server")
         ("nocursors", "diagnostic/debugging option")
         ("nohints", "ignore query hints")
@@ -693,6 +694,10 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("quota")) {
             cmdLine.quota = true;
+        }
+        if (params.count("quotaFiles")) {
+            cmdLine.quota = true;
+            cmdLine.quotaFiles = params["quotaFiles"].as<int>() - 1;
         }
         if (params.count("objcheck")) {
             objcheck = true;

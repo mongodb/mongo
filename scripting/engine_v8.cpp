@@ -34,7 +34,6 @@ namespace mongo {
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
         : _engine( engine ) , 
           _handleScope(),
-          //_context( Context::New( 0 , engine->_globalTemplate ) ) ,
           _context( Context::New() ) ,
           _scope( _context ) ,
           _global( _context->Global() ) ,
@@ -46,11 +45,13 @@ namespace mongo {
 
         //_externalTemplate = getMongoFunctionTemplate( false );
         //_localTemplate = getMongoFunctionTemplate( true );
+
+        _wrapper = getObjectWrapperTemplate()->GetFunction();
+        
         installDBTypes( _global );
     }
 
     V8Scope::~V8Scope(){
-        
     }
 
     Handle< Value > V8Scope::nativeCallback( const Arguments &args ) {
@@ -210,10 +211,15 @@ namespace mongo {
     }
 
     void V8Scope::setThis( const BSONObj * obj ){
-        if ( obj )
-            _this = mongoToV8( *obj );
-        else
+        if ( ! obj ){
             _this = v8::Object::New();
+            return;
+        }
+
+        //_this = mongoToV8( *obj );
+        v8::Handle<v8::Value> argv[1];
+        argv[0] = v8::External::New( createWrapperHolder( obj , true , false ) );
+        _this = _wrapper->NewInstance( 1, argv );
     }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){

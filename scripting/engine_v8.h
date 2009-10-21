@@ -66,6 +66,8 @@ namespace mongo {
         vector< v8::Handle<Value> > _funcs;
         v8::Handle<v8::Object> _this;
 
+        v8::Handle<v8::Function> _wrapper;
+
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
         string _localDBName;

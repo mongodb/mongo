@@ -122,7 +122,7 @@ namespace mongo {
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         DBContext context(ns);
         stringstream ss;
-        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, ss);
+        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false, ss, /*logop=*/true );
     }
 
     void Helpers::emptyCollection(const char *ns) {
