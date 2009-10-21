@@ -348,19 +348,28 @@ namespace mongo {
         for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = *i;
             BSONElement e = obj.getFieldDotted(m.fieldName);
-            if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL )
-                continue;
+            
+            switch ( m.op ){
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+                break;
 
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
-            if ( m.op == Mod::INC ) {
+            case Mod::INC:
                 m.inc(e);
                 m.setElementToOurNumericValue(e);
-            } else {
+                break;
+            case Mod::SET:
                 if ( e.isNumber() && m.elt.isNumber() ) {
                     // todo: handle NumberLong:
                     m.setElementToOurNumericValue(e);
-                } else
+                } 
+                else {
                     BSONElementManipulator( e ).replaceTypeAndValue( m.elt );
+                }
+                break;
+            default:
+                uassert( "can't handle mod" , 0 );
             }
         }
         return true;
