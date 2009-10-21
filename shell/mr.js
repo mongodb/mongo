@@ -22,11 +22,11 @@ MR.emit = function(k,v){
     var num = get_num( k );
     var data = $arr[num];
     if ( ! data ){
-        data = { key : k , values : [] };
+        data = { key : k , values : new Array(1000) , count : 0 };
         $arr[num] = data;
     }
-    data.values.push( v );
-    $max = Math.max( $max , data.values.length );
+    data.values[data.count++] = v;
+    $max = Math.max( $max , data.count );
 }
 
 MR.doReduce = function( useDB ){
@@ -42,26 +42,28 @@ MR.doReduce = function( useDB ){
         if ( useDB ){
             var x = tempcoll.findOne( { _id : data.key } );
             if ( x ){
-                data.values.push( x.value );
+                data.values[data.count++] = x.value;
             }
         }
 
-        var r = $reduce( data.key , data.values );
+        var r = $reduce( data.key , data.values.slice( 0 , data.count ) );
         if ( r && r.length && r[0] ){ 
             data.values = r; 
+            data.count = r.length;
         }
         else{ 
-            data.values = [ r ]; 
+            data.values[0] = r;
+            data.count = 1;
         }
         
-        $max = Math.max( $max , data.values.length ); 
+        $max = Math.max( $max , data.count ); 
         
         if ( useDB ){
-            if ( data.values.length == 1 ){
+            if ( data.count == 1 ){
                 tempcoll.save( { _id : data.key , value : data.values[0] } );
             }
             else {
-                tempcoll.save( { _id : data.key , value : data.values } );
+                tempcoll.save( { _id : data.key , value : data.values.slice( 0 , data.count ) } );
             }
         }
     }

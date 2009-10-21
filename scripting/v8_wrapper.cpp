@@ -308,6 +308,69 @@ namespace mongo {
         return b.obj();
     }
 
+    // --- object wrapper ---
+
+    class WrapperHolder {
+    public:
+        WrapperHolder( const BSONObj * o , bool readOnly , bool iDelete )
+            : _o(o), _readOnly( readOnly ), _iDelete( iDelete ) {
+        }
+        
+        ~WrapperHolder(){
+            if ( _o && _iDelete ){
+                delete _o;
+            }
+            _o = 0;
+        }
+
+        v8::Handle<v8::Value> get( v8::Local<v8::String> name ){
+            const string& s = toSTLString( name );
+            const BSONElement& e = _o->getField( s );
+            return mongoToV8Element(e);
+        }
+
+        const BSONObj * _o;
+        bool _readOnly;
+        bool _iDelete;
+    };
+
+    WrapperHolder * createWrapperHolder( const BSONObj * o , bool readOnly , bool iDelete ){
+        return new WrapperHolder( o , readOnly , iDelete );
+    }
+
+#define WRAPPER_STRING (v8::String::New( "_wrapper" ) )
+
+    WrapperHolder * getWrapper( v8::Handle<v8::Object> o ){
+        Handle<v8::Value> t = o->GetRealNamedProperty( WRAPPER_STRING );
+        assert( t->IsExternal() );
+        Local<External> c = External::Cast( *t );
+        WrapperHolder * w = (WrapperHolder*)(c->Value());
+        assert( w );
+        return w;
+    }
+
+
+    Handle<Value> wrapperCons(const Arguments& args){
+        if ( ! ( args.Length() == 1 && args[0]->IsExternal() ) )
+            return v8::ThrowException( v8::String::New( "wrapperCons needs 1 External arg" ) );
+
+        args.This()->Set( WRAPPER_STRING , args[0] );
+        
+        return v8::Undefined();
+    }
+
+    v8::Handle<v8::Value> wrapperGetHandler( v8::Local<v8::String> name, const v8::AccessorInfo &info){
+        return getWrapper( info.This() )->get( name );
+    }
+
+    v8::Handle<v8::FunctionTemplate> getObjectWrapperTemplate(){
+        v8::Local<v8::FunctionTemplate> t = FunctionTemplate::New( wrapperCons );
+        t->InstanceTemplate()->SetNamedPropertyHandler( wrapperGetHandler );
+        return t;
+    }
+
+    // --- random utils ----
+
     v8::Function * getNamedCons( const char * name ){
         return v8::Function::Cast( *(v8::Context::GetCurrent()->Global()->Get( v8::String::New( name ) ) ) );
     }
