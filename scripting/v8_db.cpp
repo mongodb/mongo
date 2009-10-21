@@ -203,7 +203,7 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "socket error on insert" ) );
         }
     
-        return args[1];
+        return v8::Undefined();
     }
 
     v8::Handle<v8::Value> mongoRemove(const v8::Arguments& args){
