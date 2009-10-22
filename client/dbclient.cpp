@@ -560,13 +560,16 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert ) {
+    void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert , bool multi ) {
 
         BufBuilder b;
         b.append( (int)0 ); // reserverd
         b.append( ns );
 
-        b.append( (int)upsert );
+        int flags = 0;
+        if ( upsert ) flags |= Option_Upsert;
+        if ( multi ) flags |= Option_Multi;
+        b.append( flags );
 
         query.obj.appendSelfToBufBuilder( b );
         obj.appendSelfToBufBuilder( b );

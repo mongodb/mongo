@@ -520,7 +520,49 @@ namespace ReplTests {
         protected:
             BSONObj o_, q_, u_, ou_;            
         };
+        
+        class MultiInc : public Base {
+        public:
+            
+            string s() const {
+                stringstream ss;
+                auto_ptr<DBClientCursor> cc = client()->query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
+                bool first = true;
+                while ( cc->more() ){
+                    if ( first ) first = false;
+                    else ss << ",";
+                    
+                    BSONObj o = cc->next();
+                    ss << o["x"].numberInt();
+                }
+                return ss.str();
+            }
+            
+            void doIt() const {
+                client()->insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
+                client()->insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
+                
+                ASSERT_EQUALS( "1,5" , s() );
+                
+                client()->update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
+                ASSERT_EQUALS( "2,5" , s() );
+                
+                client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) );
+                ASSERT_EQUALS( "3,5" , s() );
+                
+                client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
+                check();
+            }
 
+            void check() const {
+                ASSERT_EQUALS( "4,6" , s() );
+            }
+            
+            void reset() const {
+                deleteAll( ns() );
+            }
+        };
+        
         class UpdateWithoutPreexistingId : public Base {
         public:
             UpdateWithoutPreexistingId() :
@@ -959,6 +1001,7 @@ namespace ReplTests {
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();
+            add< Idempotence::MultiInc >();
             // Don't worry about this until someone wants this functionality.
 //            add< Idempotence::UpdateWithoutPreexistingId >();
             add< Idempotence::Remove >();

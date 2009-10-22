@@ -238,6 +238,41 @@ namespace UpdateTests {
         }
     };
 
+    class MultiInc : public SetBase {
+    public:
+        
+        string s(){
+            stringstream ss;
+            auto_ptr<DBClientCursor> cc = client().query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
+            bool first = true;
+            while ( cc->more() ){
+                if ( first ) first = false;
+                else ss << ",";
+
+                BSONObj o = cc->next();
+                ss << o["x"].numberInt();
+            }
+            return ss.str();
+        }
+        
+        void run(){
+            client().insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
+            client().insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
+            
+            ASSERT_EQUALS( "1,5" , s() );
+
+            client().update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
+            ASSERT_EQUALS( "2,5" , s() );
+
+            client().update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) );
+            ASSERT_EQUALS( "3,5" , s() );
+
+            client().update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
+            ASSERT_EQUALS( "4,6" , s() );
+            
+        }
+    };
+
     class UnorderedNewSet : public SetBase {
     public:
         void run() {
@@ -508,6 +543,7 @@ namespace UpdateTests {
             add< SetMissingDotted >();
             add< SetAdjacentDotted >();
             add< IncMissing >();
+            add< MultiInc >();
             add< UnorderedNewSet >();
             add< UnorderedNewSetAdjacent >();
             add< ArrayEmbeddedSet >();

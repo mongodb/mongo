@@ -650,9 +650,7 @@ namespace mongo {
     };
 
     
-    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi, stringstream& ss, bool logop ) {
-        uassert("multi not coded yet", !multi);
-
+    UpdateResult updateObjects(const char *ns, BSONObj updateobjOrig, BSONObj patternOrig, bool upsert, bool multi, stringstream& ss, bool logop ) {
         int profile = cc().database()->profile;
         
         uassert("cannot update reserved $ collection", strchr(ns, '$') == 0 );
@@ -661,15 +659,19 @@ namespace mongo {
             uassert("cannot update system collection", legalClientSystemNS( ns , true ) );
         }
         
-        QueryPlanSet qps( ns, pattern, BSONObj() );
+        QueryPlanSet qps( ns, patternOrig, BSONObj() );
         UpdateOp original;
         shared_ptr< UpdateOp > u = qps.runOp( original );
         massert( u->exceptionMessage(), u->complete() );
         auto_ptr< Cursor > c = u->c();
-        if ( c->ok() ) {
+        int numModded = 0;
+        while ( c->ok() ) {
             Record *r = c->_current();
             BSONObj js(r);
             
+            BSONObj pattern = patternOrig;
+            BSONObj updateobj = updateobjOrig;
+
             if ( logop ) {
                 BSONObjBuilder idPattern;
                 BSONElement id;
@@ -680,6 +682,9 @@ namespace mongo {
                 if ( js.getObjectID( id ) ) {
                     idPattern.append( id );
                     pattern = idPattern.obj();
+                }
+                else {
+                    uassert( "multi-update requires all modified objects to have an _id" , ! multi );
                 }
             }
             
@@ -697,6 +702,9 @@ namespace mongo {
             const char *firstField = updateobj.firstElement().fieldName();
             
             if ( firstField[0] == '$' ) {
+                if ( multi )
+                    updateobj = updateobj.copy();
+
                 ModSet mods;
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
@@ -719,10 +727,15 @@ namespace mongo {
                     }
                     logOp("u", ns, updateobj, &pattern );
                 }
-                return UpdateResult( 1 , 1 , 1 );
+                numModded++;
+                if ( ! multi )
+                    break;
+                c->advance();
+                continue;
             } 
             
             uassert( "multi update only works with $ operators" , ! multi );
+
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
             theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
@@ -731,15 +744,19 @@ namespace mongo {
             return UpdateResult( 1 , 0 , 1 );
         }
         
+        if ( numModded )
+            return UpdateResult( 1 , 1 , numModded );
+
+        
         if ( profile )
             ss << " nscanned:" << u->nscanned();
         
         if ( upsert ) {
-            if ( updateobj.firstElement().fieldName()[0] == '$' ) {
+            if ( updateobjOrig.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
                 ModSet mods;
-                mods.getMods(updateobj);
-                BSONObj newObj = pattern.copy();
+                mods.getMods(updateobjOrig);
+                BSONObj newObj = patternOrig.copy();
                 if ( mods.applyModsInPlace( newObj ) ) {
                     //
                 } else {
@@ -755,12 +772,12 @@ namespace mongo {
                 return UpdateResult( 0 , 1 , 1 );
             }
             uassert( "multi update only works with $ operators" , ! multi );
-            checkNoMods( updateobj );
+            checkNoMods( updateobjOrig );
             if ( profile )
                 ss << " upsert ";
-            theDataFileMgr.insert(ns, updateobj);
+            theDataFileMgr.insert(ns, updateobjOrig);
             if ( logop )
-                logOp( "i", ns, updateobj );
+                logOp( "i", ns, updateobjOrig );
             return UpdateResult( 0 , 0 , 1 );
         }
         return UpdateResult( 0 , 0 , 0 );

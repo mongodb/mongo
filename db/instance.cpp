@@ -349,8 +349,8 @@ namespace mongo {
         uassert("update object too large", toupdate.objsize() <= MaxBSONObjectSize);
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
-        bool upsert = flags & 1;
-        bool multi = flags & 2;
+        bool upsert = flags & Option_Upsert;
+        bool multi = flags & Option_Multi;
         {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */

@@ -48,6 +48,11 @@ namespace mongo {
         Option_NoCursorTimeout = 1 << 4
     };
 
+    enum UpdateOptions {
+        Option_Upsert = 1 << 0,
+        Option_Multi = 1 << 1
+    };
+
     class BSONObj;
 
     /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
@@ -301,7 +306,7 @@ namespace mongo {
 
         virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
 
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 ) = 0;
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) = 0;
 
         virtual ~DBClientInterface() { }
     };
@@ -625,7 +630,7 @@ namespace mongo {
         /**
            updates objects matching query
          */
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 );
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
 
         /** Create an index if it does not already exist.
             ensureIndex calls are remembered so it is safe/fast to call this function many 
@@ -842,8 +847,8 @@ namespace mongo {
         }
 
         /** update */
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 ) {
-            return checkMaster().update(ns, query, obj, upsert);
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) {
+            return checkMaster().update(ns, query, obj, upsert,multi);
         }
         
         string toString();
