@@ -305,10 +305,9 @@ namespace mongo {
             MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() ) {
                 // QUESTION: Repair even if file format is higher version than code?
-                log() << "repairing database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                << "new version: " << VERSION << "." << VERSION_MINOR << endl;
-                string errmsg;
-                assert( repairDatabase( dbName.c_str(), errmsg ) );
+                log() << "can't migrate data version " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
+                      << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+                throw UserException( "wrong data file version" );
             } else {
                 closeClient( dbName.c_str() );
             }

@@ -422,6 +422,7 @@ namespace mongo {
             // Last, in case we're killed before getting here
             capExtent = firstExtent;
         }
+        assert( nIndexes <= 10 ); // make sure we aren't trying to use new index format with 1.0.x server
     }
 
     /* alloc with capped table handling. */
