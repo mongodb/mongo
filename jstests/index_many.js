@@ -17,6 +17,7 @@ while( x < 60 ) {
 }
 
 // print( tojson(db.getLastErrorObj()) );
+assert( db.getLastError(), "should have an error 'too many indexes'" );
 
 // 40 is the limit currently
 
