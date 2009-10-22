@@ -225,9 +225,10 @@ namespace mongo {
         string ns = c.toString( argv[0] );
 
         bool upsert = argc > 3 && c.toBoolean( argv[3] );
+        bool multi = argc > 4 && c.toBoolean( argv[4] );
 
         try {
-            conn->update( ns , c.toObject( argv[1] ) , c.toObject( argv[2] ) , upsert );
+            conn->update( ns , c.toObject( argv[1] ) , c.toObject( argv[2] ) , upsert , multi );
             return JS_TRUE;
         }
         catch ( ... ){

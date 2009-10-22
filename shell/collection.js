@@ -147,11 +147,11 @@ DBCollection.prototype.remove = function( t ){
     this._mongo.remove( this._fullName , this._massageObject( t ) );
 }
 
-DBCollection.prototype.update = function( query , obj , upsert ){
+DBCollection.prototype.update = function( query , obj , upsert , multi ){
     assert( query , "need a query" );
     assert( obj , "need an object" );
     this._validateObject( obj );
-    this._mongo.update( this._fullName , query , obj , upsert ? true : false );
+    this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
 }
 
 DBCollection.prototype.save = function( obj ){
