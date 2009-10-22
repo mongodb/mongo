@@ -6,6 +6,7 @@ t.ensureIndex( { i: 1 } );
 for( i = 0; i < 20; ++i ) {
     t.save( { i : i } );
 }
+assert.eq( 14 , t.count() );
 c = t.find().sort( { $natural: -1 } ).limit( 2 );
 c.next();
 c.next();
@@ -20,5 +21,11 @@ assert( !t.findOne( { i : 19 } ) );
 assert( !c.hasNext() );
 assert( !d.hasNext() );
 assert( t.find().sort( { i : 1 } ).hint( { i : 1 } ).toArray().length > 10 );
+
+assert.eq( 14 , t.count() );
+assert( t.findOne( { i : 38 } ) );
+t.remove( { i : 38 } );
+assert( db.getLastError().indexOf( "capped" ) >= 0 );
+assert.eq( 14 , t.count() );
 
 assert( t.validate().valid );
