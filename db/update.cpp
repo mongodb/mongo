@@ -693,7 +693,9 @@ namespace mongo {
             
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                regular ones at the moment. */
+            
             const char *firstField = updateobj.firstElement().fieldName();
+            
             if ( firstField[0] == '$' ) {
                 ModSet mods;
                 mods.getMods(updateobj);
@@ -704,7 +706,7 @@ namespace mongo {
                         ss << " fastmod ";
                 } else {
                     BSONObj newObj = mods.createNewFromMods( c->currLoc().obj() );
-                    theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);                    
+                    theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);
                 }
                 if ( logop ) {
                     if ( mods.size() ) {
@@ -719,11 +721,10 @@ namespace mongo {
                 }
                 return UpdateResult( 1 , 1 , 1 );
             } 
-            else {
-                BSONElementManipulator::lookForTimestamps( updateobj );
-                checkNoMods( updateobj );
-            }
             
+            uassert( "multi update only works with $ operators" , ! multi );
+            BSONElementManipulator::lookForTimestamps( updateobj );
+            checkNoMods( updateobj );
             theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
             if ( logop )
                 logOp("u", ns, updateobj, &pattern );
@@ -753,6 +754,7 @@ namespace mongo {
                     logOp( "i", ns, newObj );
                 return UpdateResult( 0 , 1 , 1 );
             }
+            uassert( "multi update only works with $ operators" , ! multi );
             checkNoMods( updateobj );
             if ( profile )
                 ss << " upsert ";
