@@ -1,23 +1,20 @@
-Mongo DB README
+MongoDB README
 
 DOCUMENTATION
 
-http://www.mongodb.org/display/DOCS/Home
+  http://www.mongodb.org/
 
 COMPONENTS
 
-mongod - The database process.
-mongos - Sharding controller (sharding available later in Q209).
-mongo  - The interact javascript db shell.
+  mongod - The database process.
+  mongos - Sharding controller.
+  mongo  - The database shell (uses interactive javascript).
 
 BUILDING
 
   For detail information about building, please see:
 
   http://www.mongodb.org/display/DOCS/Building
-
-
-- Then use scons to build.
 
   If you want to build everything (mongod, mongo, tools, etc):
 
@@ -31,46 +28,51 @@ BUILDING
 
      $ scons --prefix=/opt/mongo install
 
+  Please note that prebuilt binaries are available on mongodb.org and may be the easier way to get started.
+
 RUNNING
 
-Run ./mongod and command line options will display.
+  ./mongod
+
+  runs the database.  Use 
+
+  ./mongod --help
+
+  to see command line options.
 
 COMPILER VERSIONS
 
-Mongo has been tested with GCC 4.1.2 and Visual Studio 2008.  Older versions
-of GCC may not be happy.
+  Mongo has been tested with GCC 4.x and Visual Studio 2008.  Older versions
+  of GCC may not be happy.
 
 NOTES
 
-Mongo uses memory mapped files.  If built as a 32 bit executable, you will
-not be able to work with large (multi-gigabyte) databases.  However, 32 bit
-builds work fine with small development databases.
+  Mongo uses memory mapped files.  If built as a 32 bit executable, you will
+  not be able to work with large (multi-gigabyte) databases.  However, 32 bit
+  builds work fine with small development databases.
 
---- WINDOWS ---
+WINDOWS
 
-See also http://www.mongodb.org/display/DOCS/Building+for+Windows
+  See also http://www.mongodb.org/display/DOCS/Building+for+Windows
 
-COMPILING
-   REQUIREMENTS
-     - python 2.5 (for scons - 2.6 might be needed for some regression tests)
-     - scons
-     - boost 1.35
-     - vc++ express
-     - windows sdk - tested with v6.0 v6.0a
+  Build requirements:
+    - vc++ express or visual studio
+    - python 2.5 (for scons - 2.6 might be needed for some regression tests)
+    - scons
+    - boost 1.35 (or higher)
+    - windows sdk - tested with v6.0 v6.0a
 
-   scons
-   mkdir \data\
-   mkdir \data\db
-   db\db run
+  Or download a prebuilt binary for Windows at www.mongodb.org.
 
+UBUNTU
 
---- ubuntu ---
- scons libboost-dev libpcre++-dev xulrunner-1.9.1-dev
+  scons libboost-dev libpcre++-dev xulrunner-1.9.1-dev
 
---- FreeBSD ---
+FreeBSD
 
-Install the following ports:
-  - devel/boost
-  - devel/libexecinfo
-  - devel/pcre
-  - lang/spidermonkey
+  Install the following ports:
+
+    - devel/boost
+    - devel/libexecinfo
+    - devel/pcre
+    - lang/spidermonkey
