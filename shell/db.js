@@ -251,7 +251,7 @@ DB.prototype.help = function() {
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getMongo() get the server connection object");
-	print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
+    print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
     print("\tdb.getName()");
     print("\tdb.getPrevError()");
     print("\tdb.getProfilingLevel()");
