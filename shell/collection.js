@@ -491,7 +491,7 @@ MapReduceResult.prototype.find = function(){
 }
 
 MapReduceResult.prototype.drop = function(){
-    this._coll.drop();
+    return this._coll.drop();
 }
 
 
@@ -502,7 +502,10 @@ DBCollection.prototype.mapReduce = function( map , reduce , optional ){
     var c = { mapreduce : this._shortName , map : map , reduce : reduce };
     if ( optional )
         Object.extend( c , optional );
-    return new MapReduceResult( this._db , this._db.runCommand( c ) );
+    var raw = this._db.runCommand( c );
+    if ( ! raw.ok )
+        throw "map reduce failed: " + raw.errmsg;
+    return new MapReduceResult( this._db , raw );
 
 }
 
