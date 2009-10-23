@@ -134,7 +134,10 @@ namespace mongo {
                 return true;
             }
         }
-
+        
+        if ( cc().isGod() )
+            return true;
+        
         return strcmp( client, "local" ) == 0;
     }
     inline bool isMasterNs( const char *ns ) {

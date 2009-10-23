@@ -31,6 +31,7 @@ namespace mongo {
 
     class AuthenticationInfo;
     class Database;
+    class ClientGod;
     struct CurOp;
 
     class Client : boost::noncopyable { 
@@ -45,6 +46,7 @@ namespace mongo {
         bool _shutdown;
         list<string> _tempCollections;
         const char *_desc;
+        bool _god;
     public:
         AuthenticationInfo *ai;
         Top top;
@@ -77,6 +79,11 @@ namespace mongo {
            @return true if anything was done
          */
         bool shutdown();
+
+        bool isGod(){ return _god; }
+
+    private:
+        friend class ClientGod;
     };
     
     /* defined in security.cpp */
@@ -90,5 +97,16 @@ namespace mongo {
         assert( currentClient.get() == 0 );
         currentClient.reset( new Client(desc) );
     }
-
+    
+    class ClientGod {
+    public:
+        ClientGod(){
+            _prev = cc()._god;
+            cc()._god = true;
+        }
+        ~ClientGod(){
+            cc()._god = _prev;
+        }
+        bool _prev;
+    };
 };

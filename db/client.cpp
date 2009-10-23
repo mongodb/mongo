@@ -35,7 +35,8 @@ namespace mongo {
       _op(new CurOp()),
       _database(0), _ns("")/*, _nsstr("")*/ 
       ,_shutdown(false),
-      _desc(desc)
+      _desc(desc),
+      _god(0)
     { 
         ai = new AuthenticationInfo(); 
 
@@ -47,6 +48,7 @@ namespace mongo {
         delete _op;
         delete ai; 
         ai = 0;
+        _god = 0;
         if ( !_shutdown ) {
             cout << "ERROR: Client::shutdown not called!" << endl;
         }
