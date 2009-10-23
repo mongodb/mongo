@@ -254,7 +254,7 @@ namespace mongo {
         
             bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
-                ClientGod cg;
+                Client::GodScope cg;
                 bool verboseOutput = cmdObj["verbose"].trueValue();
 
                 string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
