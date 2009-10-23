@@ -347,15 +347,14 @@ namespace mongo {
         virtual void init() {
             query_ = spec_.getObjectField( "query" );
             c_ = qp().newCursor();
-            if ( qp().exactKeyMatch() ) {
+            matcher_.reset( new KeyValJSMatcher( query_, c_->indexKeyPattern() ) );
+            if ( qp().exactKeyMatch() && ! matcher_->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
                 bc_->forgetEndKey();
             }
-            else {
-                matcher_.reset( new KeyValJSMatcher( query_, c_->indexKeyPattern() ) );
-            }
         }
+
         virtual void next() {
             if ( !c_->ok() ) {
                 setComplete();

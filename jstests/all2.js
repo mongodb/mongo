@@ -48,11 +48,6 @@ t.save( { a : [ 3 , 4  ] } )
 
 state = "more no index";
 
-function check( n , q , e ){
-    assert.eq( n , t.find( q ).count() , tojson( q ) + " " + e + " count " + state );
-    assert.eq( n , t.find( q ).itcount() , tojson( q ) + " " + e + " itcount" + state );
-}
-
 check( 1 , { "a" : { $in : [ 1 ] } } , "A" );
 check( 2 , { "a" : { $in : [ 2 ] } } , "B" );
 
@@ -77,3 +72,15 @@ check( 3 , { "a" : { $in : [ 1 , 3 ] } } , "E" );
 check( 1 , { "a" : { $all : [ 1 , 2 ] } } , "F" );
 check( 1 , { "a" : { $all : [ 2 , 3 ] } } , "G" );
 check( 0 , { "a" : { $all : [ 1 , 3 ] } } , "H" );
+
+
+// more 2
+
+state = "more 2"
+
+t.drop();
+t.save( { name : [ "harry","jack","tom" ] } )
+check( 0 , { name : { $all : ["harry","john"] } } , "A" );
+t.ensureIndex( { name : 1 } );
+check( 0 , { name : { $all : ["harry","john"] } } , "B" );
+
