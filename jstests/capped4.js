@@ -24,6 +24,5 @@ assert( t.find().sort( { i : 1 } ).hint( { i : 1 } ).toArray().length > 10 );
 assert( t.findOne( { i : 38 } ) );
 t.remove( { i : 38 } );
 assert( db.getLastError().indexOf( "capped" ) >= 0 );
-assert.eq( 14 , t.count() );
 
 assert( t.validate().valid );
