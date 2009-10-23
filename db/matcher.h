@@ -173,10 +173,11 @@ namespace mongo {
         KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &j, bool *deep = 0);
         bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
+        bool needRecord(){ return _needRecord; }
     private:
-        JSMatcher keyMatcher_;
-        JSMatcher recordMatcher_;
-        bool needRecord;
+        JSMatcher _keyMatcher;
+        JSMatcher _recordMatcher;
+        bool _needRecord;
     };
     
 } // namespace mongo

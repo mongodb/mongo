@@ -84,27 +84,27 @@ namespace {
 
 namespace mongo {
     
-    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &_jsobj, const BSONObj &indexKeyPattern) :
-    keyMatcher_(_jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
-    recordMatcher_(_jsobj) {
-        needRecord = ! ( 
-                        recordMatcher_.keyMatch() && 
-                        keyMatcher_.jsobj.nFields() == recordMatcher_.jsobj.nFields()
-                         );
+    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
+        _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
+        _recordMatcher(jsobj) {
+        _needRecord = ! ( 
+                         _recordMatcher.keyMatch() && 
+                         _keyMatcher.jsobj.nFields() == _recordMatcher.jsobj.nFields()
+                          );
     }
     
     bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
-        if ( keyMatcher_.keyMatch() ) {
-            if ( !keyMatcher_.matches(key, deep) ) {
+        if ( _keyMatcher.keyMatch() ) {
+            if ( !_keyMatcher.matches(key, deep) ) {
                 return false;
             }
         }
         
-        if ( ! needRecord ){
+        if ( ! _needRecord ){
             return true;
         }
 
-        return recordMatcher_.matches(recLoc.rec(), deep);
+        return _recordMatcher.matches(recLoc.rec(), deep);
     }
     
     
