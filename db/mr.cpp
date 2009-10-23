@@ -254,7 +254,7 @@ namespace mongo {
         
             bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
-                
+                ClientGod cg;
                 bool verboseOutput = cmdObj["verbose"].trueValue();
 
                 string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
@@ -284,12 +284,13 @@ namespace mongo {
             
                 long long num = 0;
                 long long inReduce = 0;
+                long long numEmits = 0;
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 try {
                     dbtemprelease temprlease;
                     
-                    s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"];" , "tempcoll1" );
+                    s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"]; db.getMongo().setSlaveOk();" , "tempcoll1" );
                     s->execSetup( "MR.init()" );
 
                     s->injectNative( "get_num" , get_num );
@@ -339,7 +340,8 @@ namespace mongo {
                     
                     
                     countsBuilder.append( "input" , num );
-                    countsBuilder.append( "emit" , s->getNumber( "$numEmits" ) );
+                    numEmits = s->getNumber( "$numEmits" );
+                    countsBuilder.append( "emit" , numEmits );
                     
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
@@ -403,6 +405,11 @@ namespace mongo {
                     db.dropCollection( finalOutput );
                     BSONObj info;
                     uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << resultColl << "to" << finalOutput ) , info ) );
+                }
+
+                if ( db.count( finalOutput ) == 0 && numEmits > 0 ){
+                    errmsg = "there were emits but no data!";
+                    return false;
                 }
 
                 timingBuilder.append( "total" , t.millis() );
