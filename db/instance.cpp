@@ -501,8 +501,6 @@ namespace mongo {
         }
     }
 
-    extern int callDepth;
-
     class JniMessagingPort : public AbstractMessagingPort {
     public:
         JniMessagingPort(Message& _container) : container(_container) { }
