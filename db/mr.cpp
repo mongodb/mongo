@@ -340,7 +340,7 @@ namespace mongo {
                     
                     
                     countsBuilder.append( "input" , num );
-                    numEmits = s->getNumber( "$numEmits" );
+                    numEmits = (long long)(s->getNumber( "$numEmits" ));
                     countsBuilder.append( "emit" , numEmits );
                     
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
