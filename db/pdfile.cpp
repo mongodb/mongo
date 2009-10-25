@@ -48,7 +48,6 @@ namespace mongo {
     map<string,Database*> databases;
     int MAGIC = 0x1000;
 //    int curOp = -2;
-    int callDepth = 0;
 
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
@@ -69,7 +68,6 @@ namespace mongo {
                 ss << cc().ns() << ' ';
             }
         }
-        ss << callDepth;
         return ss.str();
     }
 
