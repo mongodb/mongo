@@ -26,7 +26,7 @@ namespace mongo {
 
     bool noauth = true;
 
-	int AuthenticationInfo::warned;
+	int AuthenticationInfo::warned = 0;
 
 } // namespace mongo
 
