@@ -461,6 +461,12 @@ ReplTest.prototype.getPath = function( master ){
 
 
 ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
+
+    if ( ! extra )
+        extra = {};
+
+    if ( ! extra.oplogSize )
+        extra.oplogSize = 10;
         
     var a = []
     if ( putBinaryFirst )
@@ -483,13 +489,11 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
         a.push( "127.0.0.1:" + this.ports[0] );
     }
     
-    if ( extra ){
-        for ( var k in extra ){
-            var v = extra[k];
-            a.push( "--" + k );
-            if ( v != null )
-                a.push( v );                    
-        }
+    for ( var k in extra ){
+        var v = extra[k];
+        a.push( "--" + k );
+        if ( v != null )
+            a.push( v );                    
     }
 
     return a;
