@@ -54,8 +54,6 @@ namespace mongo {
         if ( filter ) {
             BSONObjBuilder b( bb );
             BSONObjIterator i( js );
-            int N = filter->size();
-            int n=0;
             bool gotId = false;
             while ( i.more() ){
                 BSONElement e = i.next();
@@ -64,14 +62,9 @@ namespace mongo {
                 if ( strcmp( fname , "_id" ) == 0 ){
                     b.append( e );
                     gotId = true;
-                    if ( filter->matches( "_id" ) )
-                        n++;
                 }
                 else if ( filter->matches( fname ) ){
                     filter->append( b , e );
-                    n++;
-                    if ( n == N && gotId )
-                        break;
                 }
             }
             b.done();
