@@ -308,16 +308,14 @@ namespace mongo {
                            cc->ids_->put( id ); 
                            }
                            }*/
-                        bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
-                        if ( ok ) {
-                            n++;
-                            if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                 (ntoreturn==0 && b.len()>1*1024*1024) ) {
-                                c->advance();
-                                cc->pos += n;
-                                //cc->updateLocation();
-                                break;
-                            }
+                        fillQueryResultFromObj(b, cc->filter.get(), js);
+                        n++;
+                        if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+                             (ntoreturn==0 && b.len()>1*1024*1024) ) {
+                            c->advance();
+                            cc->pos += n;
+                            //cc->updateLocation();
+                            break;
                         }
                     }
                 }
@@ -550,30 +548,28 @@ namespace mongo {
                             }
                         }
                         else {
-                            bool ok = fillQueryResultFromObj(b_, filter_, js);
-                            if ( ok ) n_++;
-                            if ( ok ) {
-                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                     (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
-                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                       is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                       we don't return much, but once getmore kicks in, we start pushing significant quantities.
-                                 
-                                       The n limit (vs. size) is important when someone fetches only one small field from big
-                                       objects, which causes massive scanning server-side.
-                                    */
-                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                    if ( mayCreateCursor1 ) {
-                                        c_->advance();
-                                        if ( c_->ok() ) {
-                                            // more...so save a cursor
-                                            saveClientCursor_ = true;
-                                        }
+                            fillQueryResultFromObj(b_, filter_, js);
+                            n_++;
+                            if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                 (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                   is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                   we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                             
+                                   The n limit (vs. size) is important when someone fetches only one small field from big
+                                   objects, which causes massive scanning server-side.
+                                */
+                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                if ( mayCreateCursor1 ) {
+                                    c_->advance();
+                                    if ( c_->ok() ) {
+                                        // more...so save a cursor
+                                        saveClientCursor_ = true;
                                     }
-                                    finish();
-                                    return;
                                 }
-                            }
+                                finish();
+                                return;
+                                }
                         }
                     }
                 }

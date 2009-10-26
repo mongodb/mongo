@@ -50,9 +50,8 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline bool fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
+    inline void fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
         if ( filter ) {
-            
             BSONObjBuilder b( bb );
             BSONObjIterator i( js );
             int N = filter->size();
@@ -76,11 +75,9 @@ namespace mongo {
                 }
             }
             b.done();
-            return true;
+        } else {
+            bb.append((void*) js.objdata(), js.objsize());
         }
-        
-        bb.append((void*) js.objdata(), js.objsize());
-        return true;
     }
     
     typedef multimap<BSONObj,BSONObj,BSONObjCmp> BestMap;
@@ -140,14 +137,12 @@ namespace mongo {
                 if ( n <= startFrom )
                     continue;
                 BSONObj& o = i->second;
-                if ( fillQueryResultFromObj(b, filter, o) ) {
-                    nFilled++;
-                    if ( nFilled >= limit )
-                        goto done;
-                    uassert( "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
-                }
+                fillQueryResultFromObj(b, filter, o);
+                nFilled++;
+                if ( nFilled >= limit )
+                    break;
+                uassert( "too much data for sort() with no index", b.len() < 4000000 ); // appserver limit
             }
-done:
             nout = nFilled;
         }
 
