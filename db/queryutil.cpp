@@ -334,6 +334,10 @@ namespace mongo {
             ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
         return ret;
     }
+
+    ///////////////////
+    // FilterMatcher //
+    ///////////////////
     
     void FieldMatcher::add( const BSONObj& o ){
         BSONObjIterator i( o );
