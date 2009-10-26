@@ -628,7 +628,7 @@ namespace mongo {
         UpdateOp() : nscanned_() {}
         virtual void init() {
             BSONObj pattern = qp().query();
-            c_ = qp().newCursor();
+            c_.reset( qp().newCursor().release() );
             if ( !c_->ok() )
                 setComplete();
             else
