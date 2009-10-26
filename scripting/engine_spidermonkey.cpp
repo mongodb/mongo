@@ -465,9 +465,8 @@ namespace mongo {
                 }
 
                 int n = embed.nFields();
-                assert( n > 0 );
 
-                JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
+                JSObject * array = JS_NewArrayObject( _context , n , 0 );
                 assert( array );
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
