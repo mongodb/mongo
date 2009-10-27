@@ -143,13 +143,19 @@ int mongo::Tool::main( int argc , char ** argv ){
     if ( _params.count( "password" ) )
         _password = _params["password"].as<string>();
 
+    int ret = -1;
     try {
-        return run();
+        ret = run();
     }
     catch ( DBException& e ){
         cerr << "assertion: " << e.toString() << endl;
-        return -1;
+        ret = -1;
     }
+    
+    if ( currentClient.get() )
+        currentClient->shutdown();
+    
+    return ret;
 }
 
 mongo::DBClientBase& mongo::Tool::conn( bool slaveIfPaired ){
