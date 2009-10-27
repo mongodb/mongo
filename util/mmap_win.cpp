@@ -74,7 +74,7 @@ namespace mongo {
                  filenamew.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ,
                  NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if ( fd == INVALID_HANDLE_VALUE ) {
-            out() << "CreateFile failed " << filename << endl;
+            out() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
             return 0;
         }
 
@@ -82,7 +82,7 @@ namespace mongo {
 
         maphandle = CreateFileMapping(fd, NULL, PAGE_READWRITE, 0, length, NULL);
         if ( maphandle == NULL ) {
-            out() << "CreateFileMapping failed " << filename << endl;
+            out() << "CreateFileMapping failed " << filename << ' ' << GetLastError() << endl;
             return 0;
         }
 
@@ -92,7 +92,7 @@ namespace mongo {
             out() << GetLastError();
             out() << endl;
         }
-	len = length;
+        len = length;
         return view;
     }
 
