@@ -53,6 +53,12 @@ namespace mongo {
         case NumberDouble:
             builder.append( fieldName , getNumber( scopeName ) );
             break;
+        case NumberInt:
+            builder.append( fieldName , getNumberInt( scopeName ) );
+            break;
+        case NumberLong:
+            builder.append( fieldName , getNumberLongLong( scopeName ) );
+            break;
         case String:
             builder.append( fieldName , getString( scopeName ).c_str() );
             break;

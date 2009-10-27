@@ -41,6 +41,8 @@ namespace mongo {
         
         v8::Handle<v8::Value> get( const char * field );
         virtual double getNumber( const char *field );
+        virtual int getNumberInt( const char *field );
+        virtual long long getNumberLongLong( const char *field );
         virtual string getString( const char *field );
         virtual bool getBoolean( const char *field );
         virtual BSONObj getObject( const char *field );

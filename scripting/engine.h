@@ -43,6 +43,8 @@ namespace mongo {
         virtual void externalSetup() = 0;
         
         virtual double getNumber( const char *field ) = 0;
+        virtual int getNumberInt( const char *field ){ return (int)getNumber( field ); }
+        virtual long long getNumberLongLong( const char *field ){ return (long long)getNumber( field ); }
         virtual string getString( const char *field ) = 0;
         virtual bool getBoolean( const char *field ) = 0;
         virtual BSONObj getObject( const char *field ) = 0;

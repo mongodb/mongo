@@ -164,6 +164,14 @@ namespace mongo {
         return get( field )->ToNumber()->Value();
     }
 
+    int V8Scope::getNumberInt( const char *field ){ 
+        return get( field )->ToInt32()->Value();
+    }
+
+    long long V8Scope::getNumberLongLong( const char *field ){ 
+        return get( field )->ToInteger()->Value();
+    }
+
     string V8Scope::getString( const char *field ){ 
         return toSTLString( get( field ) );
     }
