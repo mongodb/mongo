@@ -8,7 +8,7 @@ Homepage: http://www.mongodb.org
 
 Package: mongodb
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, xulrunner-1.9-dev
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage

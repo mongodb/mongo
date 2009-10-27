@@ -1431,6 +1431,8 @@ namespace mongo {
             while ( cursor->more() ){
                 BSONObj o = cursor->next();
                 BSONObj value = o.extractFields( keyPattern );
+                if ( value.isEmpty() )
+                    continue;
                 if ( map.insert( value ).second ){
                     size += o.objsize() + 20;
                     uassert( "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );

@@ -23,5 +23,27 @@ s.adminCommand( { movechunk : "test.foo" , find : { x : 3 } , to : s.getOther( s
 
 assert.eq( "1,2,3" , db.foo.distinct( "x" ) , "distinct 4" );
 
-// -----
+// ----- delete ---
+
+assert.eq( 3 , db.foo.count() , "D1" );
+
+db.foo.remove( { x : 3 } );
+assert.eq( 2 , db.foo.count() , "D2" );
+
+db.foo.save( { x : 3 } );
+assert.eq( 3 , db.foo.count() , "D3" );
+
+db.foo.remove( { x : { $gt : 2 } } );
+assert.eq( 2 , db.foo.count() , "D4" );
+
+db.foo.remove( { x : { $gt : -1 } } );
+assert.eq( 0 , db.foo.count() , "D5" );
+
+db.foo.save( { x : 1 } );
+db.foo.save( { x : 2 } );
+db.foo.save( { x : 3 } );
+assert.eq( 3 , db.foo.count() , "D6" );
+db.foo.remove( {} );
+assert.eq( 0 , db.foo.count() , "D7" );
+
 s.stop();

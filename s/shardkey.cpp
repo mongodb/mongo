@@ -344,23 +344,6 @@ normal:
             assert(rel);
 
         return rel;
-
-/*        if( e.type() == Object ) { 
-			//			cout << "\n\nrfq\n" << v.toString() << "\n\nquery:\n" << query.toString() << endl;
-			//			sleepsecs(99);
-            massert( "gt/lt etc. support not done yet", e.embeddedObject().firstElement().fieldName()[0] != '$');
-        }*/
-
-        /* todo:
-          _ $gt/$lt
-          _ $ne 
-          _ regex
-        */
-/*
-        return
-            compare( shard->getMin() , v ) <= 0 &&
-            compare( v, shard->getMax() ) < 0;
-*/
     }
 
     /**

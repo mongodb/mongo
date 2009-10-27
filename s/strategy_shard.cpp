@@ -151,18 +151,17 @@ namespace mongo {
             
             uassert( "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
-            
-            if ( manager->hasShardKey( pattern ) ){
-                Chunk& c = manager->findChunk( pattern );
-                doWrite( dbDelete , r , c.getShard() );
+
+            vector<Chunk*> chunks;
+            manager->getChunksForQuery( chunks , pattern );
+            cout << "delete : " << pattern << " \t " << chunks.size() << " justOne: " << justOne << endl;
+            if ( chunks.size() == 1 ){
+                doWrite( dbDelete , r , chunks[0]->getShard() );
                 return;
             }
             
-            if ( ! justOne && ! pattern.hasField( "_id" ) )
+            if ( justOne && ! pattern.hasField( "_id" ) )
                 throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
-            
-            vector<Chunk*> chunks;
-            manager->getChunksForQuery( chunks , pattern );
             
             set<string> seen;
             for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){

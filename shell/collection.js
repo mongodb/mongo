@@ -30,6 +30,7 @@ DBCollection.prototype.help = function(){
     print("DBCollection help");
     print("\tdb.foo.count()");
     print("\tdb.foo.dataSize()");
+    print("\tdb.foo.distinct( key ) - eg. db.foo.distinct( 'x' )" );
     print("\tdb.foo.drop() drop the collection");
     print("\tdb.foo.dropIndex(name)");
     print("\tdb.foo.dropIndexes()");
@@ -44,6 +45,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.getDB() get DB object associated with collection");
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
+    print("\tdb.foo.mapReduce( mapFunction , reduceFunction , <optional params> )" );
     print("\tdb.foo.remove(query)" );
     print("\tdb.foo.renameCollection( newName ) renames the collection");
     print("\tdb.foo.save(obj)");
