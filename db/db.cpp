@@ -864,6 +864,11 @@ int main(int argc, char* argv[], char *envp[] )
                 return 0;
             }
 
+            if (command[0].compare("dbpath") == 0) {
+                cout << dbpath << endl;
+                return 0;
+            }
+
             cout << "Invalid command: " << command[0] << endl;
             cout << visible_options << endl;
             return 0;
