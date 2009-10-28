@@ -335,86 +335,108 @@ namespace mongo {
     }
 
     ///////////////////
-    // FilterMatcher //
+    // FieldMatcher //
     ///////////////////
     
     void FieldMatcher::add( const BSONObj& o ){
+        massert("can only add to FieldMatcher once", source_.isEmpty());
+        source_ = o;
+
         BSONObjIterator i( o );
+        int true_false = -1;
         while ( i.more() ){
-            string s = i.next().fieldName();
-            if ( s.find( "." ) == string::npos ){
-                fields.insert( pair<string,string>( s , "" ) );
-            }
-            else {
-                string sub = s.substr( 0 , s.find( "." ) );
-                fields.insert(pair<string,string>( sub , s.substr( sub.size() + 1 ) ) );
+            BSONElement e = i.next();
+            add (e.fieldName(), e.trueValue());
+
+            // validate input
+            if (true_false == -1){
+                true_false = e.trueValue();
+                include_ = !e.trueValue();
+            }else{
+                if(true_false != e.trueValue())
+                    errmsg = "You cannot currently mix including and excluding fields. Contact us if this is an issue.";
             }
         }
-
-    }
-    
-    int FieldMatcher::size() const {
-        return fields.size();
     }
 
-    bool FieldMatcher::matches( const string& s ) const {
-        return fields.find( s ) != fields.end();
+    void FieldMatcher::add(const string& field, bool include){
+        if (field.empty()){ // this is the field the user referred to
+            include_ = include;
+        } else {
+            const size_t dot = field.find('.');
+            const string subfield = field.substr(0,dot);
+            const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos)); 
+
+            boost::shared_ptr<FieldMatcher>& fm = fields_[subfield];
+            if (!fm)
+                fm.reset(new FieldMatcher(!include));
+
+            fm->add(rest, include);
+        }
     }
-    
+
     BSONObj FieldMatcher::getSpec() const{
-        BSONObjBuilder b;
-        for ( multimap<string,string>::const_iterator i=fields.begin(); i!=fields.end(); i++ ) {
-            string s = i->first;
-            if ( i->second.size() > 0 )
-                s += "." + i->second;
-            b.append( s.c_str() , 1 );
-        }
-        return b.obj();
+        return source_;
     }
 
-    void FieldMatcher::extractDotted( const string& path , const BSONObj& o , BSONObjBuilder& b ) const {
-        string::size_type i = path.find( "." );
-        if ( i == string::npos ){
-            const BSONElement & e = o.getField( path.c_str() );
-            if ( e.eoo() )
-                return;
-            b.append(e);
-            return;
-        }
-        
-        string left = path.substr( 0 , i );
-        BSONElement e = o[left];
-        if ( e.type() != Object )
-            return;
+    //b will be the value part of an array-typed BSONElement
+    void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a ) const {
+        int i=0;
+        BSONObjIterator it(a);
+        while (it.more()){
+            BSONElement e = it.next();
 
-        BSONObj sub = e.embeddedObject();
-        if ( sub.isEmpty() )
-            return;
-        
-        BSONObjBuilder sub_b(32);
-        extractDotted( path.substr( i + 1 ) , sub , sub_b );
-        b.append( left.c_str() , sub_b.obj() );
+            switch(e.type()){
+                case Array:{
+                    BSONObjBuilder subb;
+                    appendArray(subb , e.embeddedObject());
+                    b.appendArray(b.numStr(i++).c_str(), subb.obj());
+                    break;
+                }
+                case Object:{
+                    BSONObjBuilder subb;
+                    BSONObjIterator jt(e.embeddedObject());
+                    while (jt.more()){
+                        append(subb , jt.next());
+                    }
+                    b.append(b.numStr(i++), subb.obj());
+                    break;
+                }
+                default:
+                    if (include_)
+                        b.appendAs(e, b.numStr(i++).c_str());
+            }
+            
+
+        }
     }
-    
+
     void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
-        pair<multimap<string,string>::const_iterator,multimap<string,string>::const_iterator> p = fields.equal_range( e.fieldName() );
-        BSONObjBuilder sub_b(32);
+        FieldMap::const_iterator field = fields_.find( e.fieldName() );
+        
+        if (field == fields_.end()){
+            if (include_)
+                b.append(e);
+        } else {
+            FieldMatcher& subfm = *field->second;
 
-        for( multimap<string,string>::const_iterator i = p.first; i != p.second; ++i ) {
-            string next = i->second;
+            if (subfm.fields_.empty() || !(e.type()==Object || e.type()==Array) ){
+                if (subfm.include_)
+                    b.append(e);
+            } else if (e.type() == Object){ 
+                BSONObjBuilder subb;
+                BSONObjIterator it(e.embeddedObject());
+                while (it.more()){
+                    subfm.append(subb, it.next());
+                }
+                b.append(e.fieldName(), subb.obj());
 
-            if ( e.eoo() ){
-            }
-            else if ( next.size() == 0 || next == "." || e.type() != Object ){
-                b.append( e );
-                return;
-            }
-            else {
-                extractDotted( next , e.embeddedObject() , sub_b );
+            } else { //Array
+                BSONObjBuilder subb;
+                subfm.appendArray(subb, e.embeddedObject());
+                b.appendArray(e.fieldName(), subb.obj());
             }
         }
-
-        b.append( e.fieldName() , sub_b.obj() );
     }
     
 } // namespace mongo
