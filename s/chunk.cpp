@@ -297,7 +297,7 @@ namespace mongo {
     
     void Chunk::serialize(BSONObjBuilder& to){
         if ( _lastmod )
-            to.appendDate( "lastmod" , _lastmod );
+            to.appendTimestamp( "lastmod" , _lastmod );
         else 
             to.appendTimestamp( "lastmod" );
 
