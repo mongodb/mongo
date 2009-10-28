@@ -62,8 +62,7 @@ namespace mongo {
                 if ( strcmp( fname , "_id" ) == 0 ){
                     b.append( e );
                     gotId = true;
-                }
-                else if ( filter->matches( fname ) ){
+                } else {
                     filter->append( b , e );
                 }
             }

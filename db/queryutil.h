@@ -184,20 +184,26 @@ namespace mongo {
      */
     class FieldMatcher {
     public:
+
+        FieldMatcher(bool include=false) : errmsg(NULL), include_(include)  {}
         
         void add( const BSONObj& o );
-        int size() const;
 
-        bool matches( const string& s ) const;
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
         BSONObj getSpec() const;
 
+        const char* errmsg; //null if FieldMatcher is valid
     private:
 
-        void extractDotted( const string& path , const BSONObj& o , BSONObjBuilder& b ) const ;
-        
-        multimap<string,string> fields; // { 'a' : 1 , 'b.c' : 1 } ==>> [ a -> '' , b -> c ]
+        void add( const string& field, bool include );
+        void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
+
+        bool include_; // true if default at this level is to include
+        //TODO: benchmark vector<pair> vs map
+        typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
+        FieldMap fields_;
+        BSONObj source_;
     };
 
 
