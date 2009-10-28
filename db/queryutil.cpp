@@ -353,7 +353,7 @@ namespace mongo {
                 true_false = e.trueValue();
                 include_ = !e.trueValue();
             }else{
-                if(true_false != e.trueValue())
+                if((bool) true_false != e.trueValue())
                     errmsg = "You cannot currently mix including and excluding fields. Contact us if this is an issue.";
             }
         }

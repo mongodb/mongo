@@ -4,13 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 10.00
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "db.vcproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{4082881B-EB00-486F-906C-843B8EC06E18}"
-	ProjectSection(SolutionItems) = preProject
-		..\client\examples\clientTest.cpp = ..\client\examples\clientTest.cpp
-		..\client\examples\first.cpp = ..\client\examples\first.cpp
-		..\client\examples\second.cpp = ..\client\examples\second.cpp
-		..\client\examples\tutorial.cpp = ..\client\examples\tutorial.cpp
-		..\client\examples\whereExample.cpp = ..\client\examples\whereExample.cpp
-	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dbtests", "dbtests", "{C72EBEDD-342D-4371-8B0D-D7505902FA69}"
 	ProjectSection(SolutionItems) = preProject
@@ -26,7 +19,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 		..\tools\export.cpp = ..\tools\export.cpp
 		..\tools\files.cpp = ..\tools\files.cpp
 		..\tools\import.cpp = ..\tools\import.cpp
-		..\tools\restore.cpp = ..\tools\restore.cpp
 		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
 		..\tools\tool.cpp = ..\tools\tool.cpp
 	EndProjectSection
