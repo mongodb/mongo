@@ -22,7 +22,9 @@ case "$1" in
     configure)
 	# create a mongodb group and user
         if ! grep -q mongodb /etc/passwd; then
-	    useradd --user-group mongodb
+		adduser --system mongodb
+		addgroup --system mongodb
+		adduser mongodb mongodb
         fi
 
 	# create db

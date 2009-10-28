@@ -1,20 +1,19 @@
 // queryutil.h
 
-/**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
 
 #pragma once
 
@@ -185,20 +184,26 @@ namespace mongo {
      */
     class FieldMatcher {
     public:
+
+        FieldMatcher(bool include=false) : errmsg(NULL), include_(include)  {}
         
         void add( const BSONObj& o );
-        int size() const;
 
-        bool matches( const string& s ) const;
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
         BSONObj getSpec() const;
 
+        const char* errmsg; //null if FieldMatcher is valid
     private:
 
-        void extractDotted( const string& path , const BSONObj& o , BSONObjBuilder& b ) const ;
-        
-        multimap<string,string> fields; // { 'a' : 1 , 'b.c' : 1 } ==>> [ a -> '' , b -> c ]
+        void add( const string& field, bool include );
+        void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
+
+        bool include_; // true if default at this level is to include
+        //TODO: benchmark vector<pair> vs map
+        typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
+        FieldMap fields_;
+        BSONObj source_;
     };
 
 
