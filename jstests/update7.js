@@ -97,3 +97,15 @@ assert.eq( "3,6" , s() , "D4" );
 
 t.update( { a : 2 } , { $inc : { x : 1 } } , false , true );
 assert.eq( "4,7" , s() , "D5" );
+
+t.save( { _id : 3 } );
+assert.eq( "4,7," , s() , "E1" );
+t.update( {} , { $inc : { x : 1 } } , false , true );
+assert.eq( "5,8,1" , s() , "E2" );
+
+t.save( { _id : 4 } );
+t.save( { _id : 5 } );
+assert.eq( "5,8,1,," , s() , "E3" );
+t.update( {} , { $inc : { x : 1 } } , false , true );
+assert.eq( "6,9,2,1,1" , s() , "E3" );
+
