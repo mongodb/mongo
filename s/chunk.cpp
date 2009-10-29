@@ -83,11 +83,15 @@ namespace mongo {
         
         ScopedDbConnection conn( getShard() );
         BSONObj result;
-        uassert( "medianKey failed!" , conn->runCommand( "admin" , BSON( "medianKey" << _ns
-                                                                         << "keyPattern" << _manager->getShardKey().key() 
-                                                                         << "min" << getMin() 
-                                                                         << "max" << getMax() 
-                                                                         ) , result ) );
+        if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
+                                                 << "keyPattern" << _manager->getShardKey().key() 
+                                                 << "min" << getMin() 
+                                                 << "max" << getMax() 
+                                                 ) , result ) ){
+            stringstream ss;
+            ss << "medianKey command failed: " << result;
+            uassert( ss.str() , 0 );
+        }
         conn.done();
         
         return result.getObjectField( "median" ).getOwned();
