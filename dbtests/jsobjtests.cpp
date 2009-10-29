@@ -597,6 +597,28 @@ namespace JsobjTests {
 
             }
         };
+
+        class increasing {
+        public:
+            BSONObj g(){
+                BSONObjBuilder b;
+                b.appendOID( "_id" , 0 , true );
+                return b.obj();
+            }
+            void run(){
+                BSONObj a = g();
+                BSONObj b = g();
+                
+                ASSERT( a.woCompare( b ) < 0 );
+                
+                // yes, there is a 1/1000 chance this won't increase time(0) 
+                // and therefore inaccurately say the function is behaving
+                // buf if its broken, it will fail 999/1000, so i think that's good enough
+                sleep( 1 );
+                BSONObj c = g();
+                ASSERT( a.woCompare( c ) < 0 );
+            }
+        };
     } // namespace OIDTests
 
     namespace ValueStreamTests {
@@ -1122,6 +1144,7 @@ namespace JsobjTests {
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
+            add< OIDTests::increasing >();
             add< ValueStreamTests::LabelBasic >();
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();
