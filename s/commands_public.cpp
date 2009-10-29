@@ -109,7 +109,7 @@ namespace mongo {
                 unsigned long long total = 0;
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
-                    total += c->countObjects();
+                    total += c->countObjects( filter );
                 }
                 
                 result.append( "n" , (double)total );

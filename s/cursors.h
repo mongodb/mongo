@@ -27,12 +27,13 @@ namespace mongo {
          */
         bool sendNextBatch( Request& r ){ return sendNextBatch( r , _ntoreturn ); }
         bool sendNextBatch( Request& r , int ntoreturn );
+
+        static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
         
     protected:
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
 
-        BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
-        BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
+        static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
 
         string _ns;
         int _options;

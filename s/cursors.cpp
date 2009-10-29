@@ -79,9 +79,8 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendElements( filter );
         b.appendElements( extra );
-        
-        FieldRangeSet s( "wrong" , b.obj() , false );
-        return s.simplifiedQuery();
+        return b.obj();
+        // TODO: should do some simplification here if possibl ideally
     }
 
     bool ShardedCursor::sendNextBatch( Request& r , int ntoreturn ){
@@ -149,7 +148,6 @@ namespace mongo {
             return false;
         
         ServerAndQuery& sq = _servers[_serverIndex++];
-        cout << "Extra: " << sq._extra << endl;
         _current = query( sq._server , 0 , sq._extra );
         return _current->more();
     }

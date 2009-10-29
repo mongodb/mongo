@@ -21,6 +21,7 @@
 #include "config.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "cursors.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -277,12 +278,14 @@ namespace mongo {
     }
 
     
-    long Chunk::countObjects(){
+    long Chunk::countObjects( const BSONObj& filter ){
         ScopedDbConnection conn( getShard() );
         
-
+        BSONObj f = getFilter();
+        if ( ! filter.isEmpty() )
+            f = ShardedCursor::concatQuery( f , filter );
         BSONObj result;
-        unsigned long long n = conn->count( _ns , getFilter() );
+        unsigned long long n = conn->count( _ns , f );
         
         conn.done();
         return (long)n;

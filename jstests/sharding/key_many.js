@@ -63,14 +63,18 @@ for ( var i=0; i<types.length; i++ ){
     
     assert.eq( curT.values , c.find().sort( makeObject( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
     assert.eq( curT.values.reverse() , c.find().sort( makeObject( -1 ) ).toArray().map( getKey ) , curT.name + " sort 2" );
-    
-/*
-    assert.eq( 0 , c.find( { xx : 17 } ).count() , curT.name + " xx 0 " );
+
+    assert.eq( 0 , c.find( { xx : 17 } ).sort( { zz : 1 } ).count() , curT.name + " xx 0a " );
+    assert.eq( 0 , c.find( { xx : 17 } ).sort( makeObject( 1 ) ).count() , curT.name + " xx 0b " );
+    assert.eq( 0 , c.find( { xx : 17 } ).count() , curT.name + " xx 0c " );
     assert.eq( 0 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 1 " );
     c.update( makeObject( curT.values[3] ) , { $set : { xx : 17 } } );
     assert.eq( 1 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 2 " );
     assert.eq( curT.values[3] , getKey( c.findOne( { xx : 17 } ) ) , curT.name + " xx 3 " );
-*/
+
+    // TODO multi update
+
+    // TODO remove
 }
 
   

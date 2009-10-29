@@ -122,6 +122,7 @@ namespace mongo {
             uassert( "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
 
+            BSONObj chunkFinder = query;
             
             bool upsert = flags & 1;
             if ( upsert && ! manager->hasShardKey( toupdate ) )
@@ -132,13 +133,19 @@ namespace mongo {
                 if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) )
                     throw UserException( "can't do update with query that doesn't have the shard key" );
                 save = true;
+                chunkFinder = toupdate;
             }
             
-            if ( ! save && manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
-                throw UserException( "change would move shards!" );
+            if ( ! save ){
+                if ( toupdate.firstElement().fieldName()[0] == '$' ){
+                    // TODO: check for $set, etc.. on shard key
+                }
+                else if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
+                    throw UserException( "change would move shards!" );
+                }
             }
 
-            Chunk& c = manager->findChunk( toupdate );
+            Chunk& c = manager->findChunk( chunkFinder );
             doWrite( dbUpdate , r , c.getShard() );
 
             c.splitIfShould( d.msg().data->dataLen() );

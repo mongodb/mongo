@@ -88,7 +88,7 @@ namespace mongo {
          */
         long getPhysicalSize();
         
-        long countObjects();
+        long countObjects( const BSONObj& filter = BSONObj() );
         
         /**
          * if the amount of data written nears the max size of a shard
