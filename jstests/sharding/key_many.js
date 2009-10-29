@@ -72,6 +72,9 @@ for ( var i=0; i<types.length; i++ ){
     assert.eq( 1 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 2 " );
     assert.eq( curT.values[3] , getKey( c.findOne( { xx : 17 } ) ) , curT.name + " xx 3 " );
 
+    c.ensureIndex( { _id : 1 } , { unique : true } );
+    assert.eq( null , db.getLastError() , curT.name + " creating _id index should be ok" );
+
     // TODO multi update
 
     // TODO remove
