@@ -614,7 +614,7 @@ namespace JsobjTests {
                 // yes, there is a 1/1000 chance this won't increase time(0) 
                 // and therefore inaccurately say the function is behaving
                 // buf if its broken, it will fail 999/1000, so i think that's good enough
-                sleep( 1 );
+                sleepsecs( 1 );
                 BSONObj c = g();
                 ASSERT( a.woCompare( c ) < 0 );
             }
