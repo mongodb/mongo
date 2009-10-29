@@ -94,6 +94,9 @@ namespace mongo {
             dbtemprelease r;
             c = conn->query( from_collection, query, 0, 0, 0, Option_NoCursorTimeout | ( slaveOk ? Option_SlaveOk : 0 ) );
         }
+        
+        list<BSONObj> storedForLater;
+        
         assert( c.get() );
         long long n = 0;
         time_t saveLast = time( 0 );
@@ -117,6 +120,8 @@ namespace mongo {
             if ( isindex ) {
                 assert( strstr(from_collection, "system.indexes") );
                 js = fixindex(tmp);
+                storedForLater.push_back( js.getOwned() );
+                continue;
             }
 
             try { 
@@ -133,8 +138,22 @@ namespace mongo {
                 saveLast = time( 0 );
             }
         }
-    }
 
+        if ( storedForLater.size() ){
+            for ( list<BSONObj>::iterator i = storedForLater.begin(); i!=storedForLater.end(); i++ ){
+                BSONObj js = *i;
+                try { 
+                    theDataFileMgr.insert(to_collection, js);
+                    if ( logForRepl )
+                        logOp("i", to_collection, js);
+                }
+                catch( UserException& e ) { 
+                    log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                }
+            }
+        }
+    }
+    
     bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot) {
 
 		massert( "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
