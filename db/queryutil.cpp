@@ -238,10 +238,8 @@ namespace mongo {
         }
         BSONObjBuilder b;
         BSONObjIterator i( fields );
-        while( i.moreWithEOO() ) {
+        while( i.more() ) {
             BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
             const char *name = e.fieldName();
             const FieldRange &range = ranges_[ name ];
             assert( !range.empty() );
