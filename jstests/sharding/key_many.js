@@ -3,7 +3,7 @@
 // values have to be sorted
 types = 
     [ { name : "string" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] } ,
-      { name : "double" , values : [ "1.2" , "3.5" , "4.5" , "4.6" , "6.7" , "9.9" ] , keyfield : "a" } ,
+      { name : "double" , values : [ 1.2 , 3.5 , 4.5 , 4.6 , 6.7 , 9.9 ] , keyfield : "a" } ,
       { name : "string_id" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "_id" } ]
 
 s = new ShardingTest( "key_many" , 2 );
