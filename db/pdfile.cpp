@@ -925,10 +925,9 @@ namespace mongo {
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
-    void DataFileMgr::update(
-                             const char *ns,
-                             Record *toupdate, const DiskLoc& dl,
-                             const char *_buf, int _len, stringstream& ss)
+    const DiskLoc DataFileMgr::update(const char *ns,
+                                       Record *toupdate, const DiskLoc& dl,
+                                       const char *_buf, int _len, stringstream& ss)
     {
         dassert( toupdate == dl.rec() );
 
@@ -966,8 +965,7 @@ namespace mongo {
             if ( cc().database()->profile )
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
-            insert(ns, objNew.objdata(), objNew.objsize(), false);
-            return;
+            return insert(ns, objNew.objdata(), objNew.objsize(), false);
         }
 
         NamespaceDetailsTransient::get( ns ).registerWriteOp();
@@ -1009,6 +1007,7 @@ namespace mongo {
 
         //	update in place
         memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
+        return dl;
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
