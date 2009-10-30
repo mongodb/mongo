@@ -74,9 +74,16 @@ for ( var i=0; i<types.length; i++ ){
 
     c.ensureIndex( { _id : 1 } , { unique : true } );
     assert.eq( null , db.getLastError() , curT.name + " creating _id index should be ok" );
-
-    // TODO multi update
-
+    
+    // multi update
+    var mysum = 0;
+    c.find().forEach( function(z){ mysum += z.xx || 0; } );
+    assert.eq( 17 , mysum, curT.name + " multi update pre" );
+    c.update( {} , { $inc : { xx : 1 } } , false , true );
+    var mysum = 0;
+    c.find().forEach( function(z){ mysum += z.xx || 0; } );
+    assert.eq( 23 , mysum, curT.name + " multi update" );
+    
     // TODO remove
 }
 

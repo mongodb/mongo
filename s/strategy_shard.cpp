@@ -124,16 +124,26 @@ namespace mongo {
 
             BSONObj chunkFinder = query;
             
-            bool upsert = flags & 1;
+            bool upsert = flags & Option_Upsert;
+            bool multi = flags & Option_Multi;
+
+            if ( multi )
+                uassert( "can't mix multi and upsert and sharding" , ! upsert );
+
             if ( upsert && ! manager->hasShardKey( toupdate ) )
                 throw UserException( "can't upsert something without shard key" );
 
             bool save = false;
             if ( ! manager->hasShardKey( query ) ){
-                if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) )
+                if ( multi ){
+                }
+                else if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) ){
                     throw UserException( "can't do update with query that doesn't have the shard key" );
-                save = true;
-                chunkFinder = toupdate;
+                }
+                else {
+                    save = true;
+                    chunkFinder = toupdate;
+                }
             }
             
             if ( ! save ){
@@ -144,11 +154,25 @@ namespace mongo {
                     throw UserException( "change would move shards!" );
                 }
             }
+            
+            if ( multi ){
+                vector<Chunk*> chunks;
+                manager->getChunksForQuery( chunks , chunkFinder );
+                set<string> seen;
+                for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
+                    Chunk * c = *i;
+                    if ( seen.count( c->getShard() ) )
+                        continue;
+                    doWrite( dbUpdate , r , c->getShard() );
+                    seen.insert( c->getShard() );
+                }
+            }
+            else {
+                Chunk& c = manager->findChunk( chunkFinder );
+                doWrite( dbUpdate , r , c.getShard() );
+                c.splitIfShould( d.msg().data->dataLen() );
+            }
 
-            Chunk& c = manager->findChunk( chunkFinder );
-            doWrite( dbUpdate , r , c.getShard() );
-
-            c.splitIfShould( d.msg().data->dataLen() );
         }
         
         void _delete( Request& r , DbMessage& d, ChunkManager* manager ){
