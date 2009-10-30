@@ -670,6 +670,8 @@ namespace mongo {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert("cannot update system collection", legalClientSystemNS( ns , true ) );
         }
+
+        set<DiskLoc> seenObjects;
         
         QueryPlanSet qps( ns, patternOrig, BSONObj() );
         UpdateOp original;
@@ -712,23 +714,36 @@ namespace mongo {
                regular ones at the moment. */
             
             const char *firstField = updateobj.firstElement().fieldName();
+            DiskLoc loc = c->currLoc();
             
             if ( firstField[0] == '$' ) {
-                if ( multi )
-                    updateobj = updateobj.copy();
 
+                if ( multi ){
+                    c->advance(); // go to next record in case this one moves
+                    if ( seenObjects.count( loc ) )
+                        continue;
+                    updateobj = updateobj.copy();
+                }
+                
                 ModSet mods;
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                if ( ! mods.isIndexed( idxKeys ) && mods.canApplyInPlaceAndVerify( c->currLoc().obj() ) ) {
-                    mods.applyModsInPlace( c->currLoc().obj() );
+                if ( ! mods.isIndexed( idxKeys ) && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
+                    mods.applyModsInPlace( loc.obj() );
+                    //seenObjects.insert( loc );
                     if ( profile )
                         ss << " fastmod ";
                 } else {
-                    BSONObj newObj = mods.createNewFromMods( c->currLoc().obj() );
-                    theDataFileMgr.update(ns, r, c->currLoc(), newObj.objdata(), newObj.objsize(), ss);
+                    BSONObj newObj = mods.createNewFromMods( loc.obj() );
+                    DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), ss);
+                    if ( newLoc != loc ){
+                        // object moved, need to make sure we don' get again
+                        seenObjects.insert( newLoc );
+                    }
+                        
                 }
+
                 if ( logop ) {
                     if ( mods.size() ) {
                         if ( mods.haveArrayDepMod() ) {
@@ -743,7 +758,6 @@ namespace mongo {
                 numModded++;
                 if ( ! multi )
                     break;
-                c->advance();
                 continue;
             } 
             
@@ -751,7 +765,7 @@ namespace mongo {
 
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
-            theDataFileMgr.update(ns, r, c->currLoc(), updateobj.objdata(), updateobj.objsize(), ss);
+            theDataFileMgr.update(ns, r, loc , updateobj.objdata(), updateobj.objsize(), ss);
             if ( logop )
                 logOp("u", ns, updateobj, &pattern );
             return UpdateResult( 1 , 0 , 1 );

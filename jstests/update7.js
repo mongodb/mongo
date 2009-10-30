@@ -103,9 +103,10 @@ assert.eq( "4,7," , s() , "E1" );
 t.update( {} , { $inc : { x : 1 } } , false , true );
 assert.eq( "5,8,1" , s() , "E2" );
 
-t.save( { _id : 4 } );
-t.save( { _id : 5 } );
-assert.eq( "5,8,1,," , s() , "E3" );
+for ( i = 4; i<8; i++ )
+    t.save( { _id : i } );
+t.save( { _id : i , x : 1 } );
+assert.eq( "5,8,1,,,,,1" , s() , "E4" );
 t.update( {} , { $inc : { x : 1 } } , false , true );
-assert.eq( "6,9,2,1,1" , s() , "E3" );
+assert.eq( "6,9,2,1,1,1,1,2" , s() , "E5" );
 
