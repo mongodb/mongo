@@ -154,12 +154,20 @@ namespace mongo {
             return (gridfs_offset)(_obj["length"].number());
         }
 
+        string getContentType(){
+            return _obj["contentType"].valuestr();
+        }
+
         unsigned long long getUploadDate(){
             return _obj["uploadDate"].date();
         }
 
         string getMD5(){
             return _obj["md5"].str();
+        }
+
+        BSONElement getFileField( const string& name ){
+            return _obj[name];
         }
 
         BSONObj getMetadata();
