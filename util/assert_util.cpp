@@ -43,6 +43,7 @@ namespace mongo {
         temp << "assertion " << file << ":" << line;
         AssertionException e;
         e.msg = temp.str();
+        breakpoint();
         throw e;
     }
 
@@ -66,6 +67,7 @@ namespace mongo {
         log() << "Assertion: " << msg << '\n';
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg && *msg ? msg : "massert failure");
+        breakpoint();
         throw MsgAssertionException(msg);
     }
 
