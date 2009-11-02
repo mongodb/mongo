@@ -25,6 +25,7 @@
 #include "../util/md5.hpp"
 #include <limits>
 #include "../util/unittest.h"
+#include "../util/embedded_builder.h"
 #include "json.h"
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
@@ -1187,6 +1188,30 @@ namespace mongo {
 
     ostream& operator<<( ostream &s, const BSONElement &e ) {
         return s << e.toString();
+    }
+
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base){
+        BSONObjIterator it(obj);
+        while (it.more()){
+            BSONElement e = it.next();
+            if (e.type() == Object){
+                string newbase = base + e.fieldName() + ".";
+                nested2dotted(b, e.embeddedObject(), newbase);
+            }else{
+                string newbase = base + e.fieldName();
+                b.appendAs(e, newbase.c_str());
+            }
+        }
+    }
+
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj){
+        //use map to sort fields
+        BSONMap sorted = bson2map(obj);
+        EmbeddedBuilder eb(&b);
+        for(BSONMap::const_iterator it=sorted.begin(); it!=sorted.end(); ++it){
+            eb.appendAs(it->second, it->first);
+        }
+        eb.done();
     }
 
     /*-- test things ----------------------------------------------------*/
