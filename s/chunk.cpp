@@ -113,15 +113,15 @@ namespace mongo {
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
         s->_shard = _shard;
-        s->_min = m.getOwned();
-        s->_max = _max;
+        s->setMin(m.getOwned());
+        s->setMax(_max);
         
         s->_markModified();
         _markModified();
         
         _manager->_chunks.push_back( s );
         
-        _max = m.getOwned(); 
+        setMax(m.getOwned());
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
@@ -310,14 +310,18 @@ namespace mongo {
 
         to << "ns" << _ns;
         to << "min" << _min;
+        to << "minDotted" << _minDotted;
         to << "max" << _max;
+        to << "maxDotted" << _maxDotted;
         to << "shard" << _shard;
     }
     
     void Chunk::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
         _min = from.getObjectField( "min" ).getOwned();
+        _minDotted = from.getObjectField( "minDotted" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
+        _maxDotted = from.getObjectField( "maxDotted" ).getOwned();
         _shard = from.getStringField( "shard" );
         _lastmod = from.hasField( "lastmod" ) ? from["lastmod"].date() : 0;
         
@@ -366,7 +370,7 @@ namespace mongo {
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _min << " max: " << _max;
+        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _minDotted << " max: " << _maxDotted;
         return ss.str();
     }
     
@@ -397,8 +401,8 @@ namespace mongo {
         if ( _chunks.size() == 0 ){
             Chunk * c = new Chunk( this );
             c->_ns = ns;
-            c->_min = _key.globalMin();
-            c->_max = _key.globalMax();
+            c->setMin(_key.globalMin());
+            c->setMax(_key.globalMax());
             c->_shard = config->getPrimary();
             c->_markModified();
             
