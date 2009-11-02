@@ -28,12 +28,12 @@
 #include "chunk.h"
 
 namespace mongo {
-
-    int port = 27017;
+    
     Database *database = 0;
     string ourHostname;
     OID serverID;
     bool dbexitCalled = false;
+    CmdLine cmdLine;
     
     bool inShutdown(){
         return dbexitCalled;
@@ -95,11 +95,11 @@ namespace mongo {
     }
 
     void start() {
-        log() << "waiting for connections on port " << port << endl;
+        log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
         //l.listen();
         ShardedMessageHandler handler;
-        MessageServer * server = createServer( port , &handler );
+        MessageServer * server = createServer( cmdLine.port , &handler );
         server->run();
     }
 
@@ -122,7 +122,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         if ( argv[i] == 0 ) continue;
         string s = argv[i];
         if ( s == "--port" ) {
-            port = atoi(argv[++i]);
+            cmdLine.port = atoi(argv[++i]);
         }
         else if ( s == "--infer" ) {
             infer = true;
@@ -169,7 +169,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 3;
     }
 
-    bool ok = port != 0;
+    bool ok = cmdLine.port != 0;
     
     if ( !ok ) {
         usage( argv );
