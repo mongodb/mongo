@@ -202,6 +202,28 @@ ShardingTest.prototype.sync = function(){
     this.adminCommand( "connpoolsync" );
 }
 
+ShardingTest.prototype.onNumShards = function( collName , dbName ){
+    dbName = dbName || "test";
+    var num=0;
+    for ( var i=0; i<this._connections.length; i++ )
+        if ( this._connections[i].getDB( dbName ).getCollection( collName ).count() > 0 )
+            num++;
+    return num;
+}
+
+ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
+    split = split || key;
+    move = move || split;
+    dbName = dbName || "test";
+
+    var c = dbName + "." + collName;
+
+    s.adminCommand( { shardcollection : c , key : key } );
+    s.adminCommand( { split : c , middle : split } );
+    s.adminCommand( { movechunk : c , find : move , to : this.getOther( s.getServer( dbName ) ).name } );
+    
+}
+
 MongodRunner = function( port, dbpath, peer, arbiter, extraArgs ) {
     this.port_ = port;
     this.dbpath_ = dbpath;
