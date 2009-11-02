@@ -687,7 +687,7 @@ namespace mongo {
             Record *r = c->_current();
             DiskLoc loc = c->currLoc();
 
-            if ( c->getsetdup( false , loc ) ){
+            if ( c->getsetdup( loc ) ){
                 c->advance();
                 continue;
             }

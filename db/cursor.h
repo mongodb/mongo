@@ -104,7 +104,7 @@ namespace mongo {
                          for backwards datafile compatibility.  'deep' can be eliminated next time we 
                          force a data file conversion. 7Jul09
         */
-        virtual bool getsetdup(bool deep, DiskLoc loc) = 0;
+        virtual bool getsetdup(DiskLoc loc) = 0;
 
         virtual BSONObj prettyStartKey() const { return BSONObj(); }
         virtual BSONObj prettyEndKey() const { return BSONObj(); }
@@ -184,7 +184,7 @@ namespace mongo {
         virtual bool tailable() {
             return tailable_;
         }
-        virtual bool getsetdup(bool deep, DiskLoc loc) { return false; }
+        virtual bool getsetdup(DiskLoc loc) { return false; }
     };
 
     /* used for order { $natural: -1 } */

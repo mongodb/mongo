@@ -250,13 +250,11 @@ namespace mongo {
            if a multikey index traversal:
              if loc has already been sent, returns true.
              otherwise, marks loc as sent.
-           @param deep - match was against an array, so we know it is multikey.  this is legacy and kept
-                         for backwards datafile compatibility.  'deep' can be eliminated next time we 
-                         force a data file conversion. 7Jul09
+             @return true if the loc has not been seen
         */
         set<DiskLoc> dups;
-        virtual bool getsetdup(bool deep, DiskLoc loc) {
-            if( deep || multikey ) { 
+        virtual bool getsetdup(DiskLoc loc) {
+            if( multikey ) { 
                 pair<set<DiskLoc>::iterator, bool> p = dups.insert(loc);
                 return !p.second;
             }

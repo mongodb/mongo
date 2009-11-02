@@ -71,7 +71,7 @@ namespace mongo {
             
             bool deep;
             if ( matcher_->matches(c_->currKey(), rloc, &deep) ) {
-                if ( !c_->getsetdup(deep, rloc) )
+                if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
 
@@ -144,7 +144,7 @@ namespace mongo {
             }
             else {
                 c->advance(); // must advance before deleting as the next ptr will die
-                assert( !c->getsetdup(deep, rloc) ); // can't be a dup, we deleted it!
+                assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
                 if ( !justOne )
                     c->noteLocation();
 
@@ -290,7 +290,7 @@ namespace mongo {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
-                    if( c->getsetdup(deep, c->currLoc()) ) {
+                    if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
                     }
                     else {
@@ -378,7 +378,7 @@ namespace mongo {
                 bool deep;
                 if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
                 }
-                else if( !c_->getsetdup(deep, c_->currLoc()) ) {
+                else if( !c_->getsetdup(c_->currLoc()) ) {
                     ++count_;
                 }                
             }
@@ -519,7 +519,7 @@ namespace mongo {
             }
             else {
                 DiskLoc cl = c_->currLoc();
-                if( !c_->getsetdup(deep, cl) ) { 
+                if( !c_->getsetdup(cl) ) { 
                     BSONObj js = c_->current();
                     // got a match.
                     assert( js.objsize() >= 0 ); //defensive for segfaults
