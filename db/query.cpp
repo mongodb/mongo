@@ -69,8 +69,7 @@ namespace mongo {
             
             DiskLoc rloc = c_->currLoc();
             
-            bool deep;
-            if ( matcher_->matches(c_->currKey(), rloc, &deep) ) {
+            if ( matcher_->matches(c_->currKey(), rloc ) ) {
                 if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
@@ -138,8 +137,7 @@ namespace mongo {
         do {
             DiskLoc rloc = c->currLoc();
             
-            bool deep;
-            if ( !matcher.matches(c->currKey(), rloc, &deep) ) {
+            if ( !matcher.matches(c->currKey(), rloc ) ) {
                 c->advance(); // advance must be after noMoreMatches() because it uses currKey()
             }
             else {
@@ -285,11 +283,10 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                bool deep;
-                if ( !cc->matcher->matches(c->currKey(), c->currLoc(), &deep) ) {
+                if ( !cc->matcher->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
-                    //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
+                    //out() << "matches " << c->currLoc().toString() << '\n';
                     if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
                     }
@@ -375,8 +372,7 @@ namespace mongo {
                     ++count_;
                 }
             } else {
-                bool deep;
-                if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+                if ( !matcher_->matches(c_->currKey(), c_->currLoc() ) ) {
                 }
                 else if( !c_->getsetdup(c_->currLoc()) ) {
                     ++count_;
@@ -513,8 +509,7 @@ namespace mongo {
             }
 
             nscanned_++;
-            bool deep;
-            if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+            if ( !matcher_->matches(c_->currKey(), c_->currLoc() ) ) {
                 ;
             }
             else {
