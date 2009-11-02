@@ -79,6 +79,10 @@ assert.eq( "3,6" , s() , "C4" );
 t.update( { a : 2 } , { $inc : { x : 1 } } , false , true );
 assert.eq( "4,7" , s() , "C5" );
 
+t.update( { a : { $gt : 0 } } , { $inc : { x : 1 } } , false , true );
+assert.eq( "5,8" , s() , "C6" );
+
+
 t.drop();
 
 t.save( { _id : 1 , x : 1 , a : [ 1 , 2 ] } );
@@ -97,6 +101,14 @@ assert.eq( "3,6" , s() , "D4" );
 
 t.update( { a : 2 } , { $inc : { x : 1 } } , false , true );
 assert.eq( "4,7" , s() , "D5" );
+
+t.update( { a : { $gt : 0 } } , { $inc : { x : 1 } } , false , true );
+assert.eq( "5,8" , s() , "D6" );
+
+t.update( { a : { $lt : 10 } } , { $inc : { x : -1 } } , false , true );
+assert.eq( "4,7" , s() , "D7" );
+
+// --- 
 
 t.save( { _id : 3 } );
 assert.eq( "4,7," , s() , "E1" );

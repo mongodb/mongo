@@ -684,8 +684,14 @@ namespace mongo {
                 c->advance();
                 continue;
             }
-
             Record *r = c->_current();
+            DiskLoc loc = c->currLoc();
+
+            if ( c->getsetdup( false , loc ) ){
+                c->advance();
+                continue;
+            }
+                               
             BSONObj js(r);
             
             BSONObj pattern = patternOrig;
@@ -714,7 +720,6 @@ namespace mongo {
                regular ones at the moment. */
             
             const char *firstField = updateobj.firstElement().fieldName();
-            DiskLoc loc = c->currLoc();
             
             if ( firstField[0] == '$' ) {
 
