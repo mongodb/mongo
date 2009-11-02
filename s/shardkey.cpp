@@ -284,7 +284,7 @@ namespace mongo {
        -> true
     */
 
-    bool ShardKeyPattern::relevant(const BSONObj& query, BSONObj& L, BSONObj& R) { 
+    bool ShardKeyPattern::relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R) { 
         BSONObj q = extractKey( query );
         if( q.isEmpty() )
             return true;

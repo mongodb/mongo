@@ -110,7 +110,7 @@ namespace mongo {
         /* question: better to have patternfields precomputed or not?  depends on if we use copy contructor often. */
         BSONObj pattern;
         set<string> patternfields;
-        bool relevant(const BSONObj& query, BSONObj& L, BSONObj& R);
+        bool relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R);
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const { 

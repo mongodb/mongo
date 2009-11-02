@@ -51,12 +51,8 @@ namespace mongo {
 
         Chunk( ChunkManager * info );
         
-        BSONObj& getMin(){
-            return _min;
-        }
-        BSONObj& getMax(){
-            return _max;
-        }
+        const BSONObj& getMin() const { return _min; }
+        const BSONObj& getMax() const { return _max; }
 
         string getShard(){
             return _shard;
