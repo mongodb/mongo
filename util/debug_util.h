@@ -17,7 +17,24 @@
 
 #pragma once
 
+#ifndef _WIN32
+#include <signal.h>
+#endif // ndef _WIN32
+
 namespace mongo {
+
+#ifndef _WIN32
+    // code for a breakpoint
+    inline void breakpoint(){
+        raise(SIGTRAP);
+    }
+
+    // conditional breakpoint
+    inline void breakif(bool test){
+        if (test)
+            breakpoint();
+    }
+#endif // ndef _WIN32
 
 // for debugging
     typedef struct _Ints {
