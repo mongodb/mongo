@@ -122,3 +122,17 @@ assert.eq( "5,8,1,,,,,1" , s() , "E4" );
 t.update( {} , { $inc : { x : 1 } } , false , true );
 assert.eq( "6,9,2,1,1,1,1,2" , s() , "E5" );
 
+
+// --- $inc indexed field
+
+t.drop();
+
+t.save( { x : 1 } );
+t.save( { x : 2 } );
+t.save( { x : 3 } );
+
+t.ensureIndex( { x : 1 } );
+
+assert.eq( "1,2,3" , s() , "F1" )
+t.update( { x : { $gt : 0 } } , { $inc : { x : 5 } } , false , true );
+assert.eq( "6,7,8" , s() , "F1" )

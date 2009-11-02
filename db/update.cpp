@@ -734,7 +734,13 @@ namespace mongo {
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                if ( ! mods.isIndexed( idxKeys ) && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
+                bool isIndexed = mods.isIndexed( idxKeys );
+                
+                if ( isIndexed && multi ){
+                    c->noteLocation();
+                }
+
+                if ( ! isIndexed && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
                     mods.applyModsInPlace( loc.obj() );
                     //seenObjects.insert( loc );
                     if ( profile )
@@ -742,7 +748,7 @@ namespace mongo {
                 } else {
                     BSONObj newObj = mods.createNewFromMods( loc.obj() );
                     DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), ss);
-                    if ( newLoc != loc ){
+                    if ( newLoc != loc || isIndexed ){
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
                     }
@@ -763,6 +769,8 @@ namespace mongo {
                 numModded++;
                 if ( ! multi )
                     break;
+                if ( multi && isIndexed )
+                    c->checkLocation();
                 continue;
             } 
             
