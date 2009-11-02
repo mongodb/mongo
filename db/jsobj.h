@@ -1707,5 +1707,38 @@ namespace mongo {
         s_->subobj()->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    
+
+    // {a: {b:1}} -> {a.b:1}
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base="");
+    inline BSONObj nested2dotted(const BSONObj& obj){
+        BSONObjBuilder b;
+        nested2dotted(b, obj);
+        return b.obj();
+    }
+
+    // {a.b:1} -> {a: {b:1}}
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj);
+    inline BSONObj dotted2nested(const BSONObj& obj){
+        BSONObjBuilder b;
+        dotted2nested(b, obj);
+        return b.obj();
+    }
+    
+    /* WARNING: nested/dotted conversions are not 100% reversible
+     * nested2dotted(dotted2nested({a.b: {c:1}})) -> {a.b.c: 1}
+     * also, dotted2nested ignores order
+     */
+
+    typedef map<string, BSONElement> BSONMap;
+    inline BSONMap bson2map(const BSONObj& obj){
+        BSONMap m;
+        BSONObjIterator it(obj);
+        while (it.more()){
+            BSONElement e = it.next();
+            m[e.fieldName()] = e;
+        }
+        return m;
+    }
+
         
 } // namespace mongo

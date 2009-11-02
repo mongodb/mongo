@@ -25,10 +25,12 @@
 #include "../util/md5.hpp"
 #include <limits>
 #include "../util/unittest.h"
+#include "../util/embedded_builder.h"
 #include "json.h"
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
 #include <boost/static_assert.hpp>
+#include <boost/foreach.hpp>
 #undef assert
 #define assert xassert
 
@@ -1187,6 +1189,30 @@ namespace mongo {
 
     ostream& operator<<( ostream &s, const BSONElement &e ) {
         return s << e.toString();
+    }
+
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base){
+        BSONObjIterator it(obj);
+        while (it.more()){
+            BSONElement e = it.next();
+            if (e.type() == Object){
+                string newbase = base + e.fieldName() + ".";
+                nested2dotted(b, e.embeddedObject(), newbase);
+            }else{
+                string newbase = base + e.fieldName();
+                b.appendAs(e, newbase.c_str());
+            }
+        }
+    }
+
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj){
+        //use map to sort fields
+        BSONMap sorted = bson2map(obj);
+        EmbeddedBuilder eb(&b);
+        BOOST_FOREACH(BSONMap::value_type kv, sorted){
+            eb.appendAs(kv.second, kv.first);
+        }
+        eb.done();
     }
 
     /*-- test things ----------------------------------------------------*/
