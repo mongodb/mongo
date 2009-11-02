@@ -422,7 +422,7 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
 
-elif "freebsd7" == os.sys.platform:
+elif os.sys.platform.startswith( "freebsd" ):
     nix = True
     freebsd = True
     env.Append( CPPPATH=[ "/usr/local/include" ] )
