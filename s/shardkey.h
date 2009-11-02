@@ -104,11 +104,6 @@ namespace mongo {
 
         string toString() const;
 
-        ShardKeyPattern(const ShardKeyPattern& p) { 
-            pattern = p.pattern;
-            patternfields = p.patternfields;
-        }
-
         BSONObj extractKey(const BSONObj& from) const;
 
     private:
