@@ -575,8 +575,6 @@ int main(int argc, char* argv[], char *envp[] )
     hidden_options.add_options()
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-        /* hiding this because it is deprecated */
-        ("deDupMem", po::value<long>(), "custom memory limit (in bytes) for query de-duping")
         ;
 
     /* support for -vv -vvvv etc. */
@@ -760,13 +758,6 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("notablescan")) {
             cmdLine.notablescan = true;
-        }
-        if (params.count("deDupMem")) {
-            uasserted("deprecated");
-            long x = params["deDupMem"].as<long>();
-            uassert("bad arg", x > 0);
-            // IdSet::maxSize_ = x;
-            // assert(IdSet::maxSize_ > 0);
         }
         if (params.count("install")) {
             installService = true;
