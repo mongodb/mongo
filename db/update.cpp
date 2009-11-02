@@ -22,79 +22,10 @@
 #include "jsobjmanipulator.h"
 #include "queryoptimizer.h"
 #include "repl.h"
+#include "util/embedded_builder.h"
 
 namespace mongo {
 
-    // utility class for assembling hierarchical objects
-    class EmbeddedBuilder {
-    public:
-        EmbeddedBuilder( BSONObjBuilder *b ) {
-            _builders.push_back( make_pair( "", b ) );
-        }
-        // It is assumed that the calls to prepareContext will be made with the 'name'
-        // parameter in lex ascending order.
-        void prepareContext( string &name ) {
-            int i = 1, n = _builders.size();
-            while( i < n && 
-                   name.substr( 0, _builders[ i ].first.length() ) == _builders[ i ].first && 
-                   ( name[ _builders[i].first.length() ] == '.' || name[ _builders[i].first.length() ] == 0 )
-                   ){
-                name = name.substr( _builders[ i ].first.length() + 1 );
-                ++i;
-            }
-            for( int j = n - 1; j >= i; --j ) {
-                popBuilder();
-            }
-            for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
-                addBuilder( next );
-            }
-        }
-        void appendAs( const BSONElement &e, string name ) {
-            if ( e.type() == Object && e.valuesize() == 5 ) { // empty object -- this way we can add to it later
-                string dummyName = name + ".foo";
-                prepareContext( dummyName );
-                return;
-            }
-            prepareContext( name );
-            back()->appendAs( e, name.c_str() );
-        }
-        BufBuilder &subarrayStartAs( string name ) {
-            prepareContext( name );
-            return back()->subarrayStart( name.c_str() );
-        }
-        void done() {
-            while( ! _builderStorage.empty() )
-                popBuilder();
-        }
-
-        static string splitDot( string & str ) {
-            size_t pos = str.find( '.' );
-            if ( pos == string::npos )
-                return "";
-            string ret = str.substr( 0, pos );
-            str = str.substr( pos + 1 );
-            return ret;
-        }
-
-    private:
-        void addBuilder( const string &name ) {
-            shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name.c_str() ) ) );
-            _builders.push_back( make_pair( name, newBuilder.get() ) );
-            _builderStorage.push_back( newBuilder );
-        }
-        void popBuilder() {
-            back()->done();
-            _builders.pop_back();
-            _builderStorage.pop_back();
-        }
-
-        BSONObjBuilder *back() { return _builders.back().second; }
-        
-        vector< pair< string, BSONObjBuilder * > > _builders;
-        vector< shared_ptr< BSONObjBuilder > > _builderStorage;
-
-    };
-    
     /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
         enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
