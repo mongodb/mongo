@@ -30,7 +30,6 @@
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
 #include <boost/static_assert.hpp>
-#include <boost/foreach.hpp>
 #undef assert
 #define assert xassert
 
@@ -1209,8 +1208,8 @@ namespace mongo {
         //use map to sort fields
         BSONMap sorted = bson2map(obj);
         EmbeddedBuilder eb(&b);
-        BOOST_FOREACH(BSONMap::value_type kv, sorted){
-            eb.appendAs(kv.second, kv.first);
+        for(BSONMap::const_iterator it=sorted.begin(); it!=sorted.end(); ++it){
+            eb.appendAs(it->second, it->first);
         }
         eb.done();
     }
