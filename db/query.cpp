@@ -143,8 +143,12 @@ namespace mongo {
             else {
                 c->advance(); // must advance before deleting as the next ptr will die
                 assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-                if ( !justOne )
+                if ( !justOne ) {
+                    /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
+                             blocks.  here we might call millions of times which would be bad.
+                    */
                     c->noteLocation();
+                }
 
                 if ( logop ) {
                     BSONElement e;
