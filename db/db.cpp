@@ -956,32 +956,6 @@ namespace mongo {
         exitCleanly();
     }
 
-    /* Magic gdb trampoline
-     * Assumptions:
-     *  1) gdbserver is on your path
-     *  2) You have run "handle SIGSTOP noprint" in gdb
-     *  3) cmdLine.port + 2000 is free
-     */
-    void launchGDB(int){
-        // Don't come back here
-        signal(SIGTRAP, SIG_IGN);
-
-        int newPort = cmdLine.port + 2000;
-        string newPortStr = "localhost:" + BSONObjBuilder::numStr(newPort);
-        string pidToDebug = BSONObjBuilder::numStr(getpid());
-
-        cout << "\n\n\t**** Launching gdbserver on " << newPortStr << " ****" << endl << endl;
-        if (fork() == 0){
-            //child
-            execlp("gdbserver", "gdbserver", "--attach", newPortStr.c_str(), pidToDebug.c_str(), NULL);
-            perror(NULL);
-        }else{
-            //parent
-            raise(SIGSTOP); // pause all threads until gdb connects and continues
-            raise(SIGTRAP); // break inside gdbserver
-        }
-    }
-
     void setupSignals() {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
@@ -990,11 +964,8 @@ namespace mongo {
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
 
-#ifdef _DEBUG //build with scons --dd to get this flag
-        // if running in gdb we never get this signal
-        assert( signal(SIGTRAP , launchGDB ) != SIG_ERR );
-#endif
-        
+        setupSIGTRAPforGDB();
+
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
