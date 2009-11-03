@@ -539,7 +539,7 @@ if not nojni and useJavaHome:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
-    env.Append( LINKFLAGS=" -fPIC -pthread " )
+    env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
     if debugBuild:
