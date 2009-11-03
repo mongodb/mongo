@@ -22,7 +22,7 @@
 #include "jsobjmanipulator.h"
 #include "queryoptimizer.h"
 #include "repl.h"
-#include "util/embedded_builder.h"
+#include "../util/embedded_builder.h"
 
 namespace mongo {
 
