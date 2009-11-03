@@ -204,6 +204,41 @@ namespace mongo {
         class MRCmd : public PublicGridCommand {
         public:
             MRCmd() : PublicGridCommand( "mapreduce" ){}
+            
+            string getTmpName( const string& coll ){
+                static int inc = 1;
+                stringstream ss;
+                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << inc++;
+                return ss.str();
+            }
+
+            BSONObj fixForShards( const BSONObj& orig , const string& output ){
+                BSONObjBuilder b;
+                BSONObjIterator i( orig );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    string fn = e.fieldName();
+                    if ( fn == "map" || 
+                         fn == "mapreduce" || 
+                         fn == "reduce" ||
+                         fn == "query" ||
+                         fn == "sort" ||
+                         fn == "verbose" ){
+                        b.append( e );
+                    }
+                    else if ( fn == "keeptemp" ||
+                              fn == "out" ||
+                              fn == "finalize" ){
+                        // we don't want to copy these
+                    }
+                    else {
+                        uassert( (string)"don't know mr field: " + fn , 0 );
+                    }
+                }
+                b.append( "out" , output );
+                return b.obj();
+            }
+            
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 
                 string dbName = getDBName( ns );
@@ -226,8 +261,13 @@ namespace mongo {
                 vector<Chunk*> chunks;
                 cm->getChunksForQuery( chunks , q );
                 
+                const string shardedOutputCollection = getTmpName( collection );
+
+                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection );
+
                 BSONObjBuilder finalB;
                 finalB.append( "mapreduce.shardedfinish" , cmdObj );
+                finalB.append( "shardedOutputCollection" , shardedOutputCollection );
                 
                 BSONObjBuilder shardresults;
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
@@ -235,7 +275,7 @@ namespace mongo {
                     ScopedDbConnection conn( c->getShard() );
 
                     BSONObj myres;
-                    if ( ! conn->runCommand( dbName , cmdObj , myres ) ){
+                    if ( ! conn->runCommand( dbName , shardedCommand , myres ) ){
                         errmsg = "mongod mr failed: ";
                         errmsg += myres.toString();
                         return 0;

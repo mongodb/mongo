@@ -87,10 +87,14 @@ namespace mongo {
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
         ParallelSortClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey );
+        ParallelSortClusteredCursor( set<ServerAndQuery> servers , const string& ns , 
+                                     const Query& q , int options=0, const BSONObj& fields=BSONObj() );
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
     private:
+        void _init();
+        
         void advance();
 
         int _numServers;

@@ -91,8 +91,8 @@ doMR = function( n ){
 doMR( "before" );
 
 assert.eq( 1 , s.onNumShards( "mr" ) , "E1" );
-//s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 } );
-//assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
+s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 } );
+assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );
 

@@ -113,16 +113,29 @@ namespace mongo {
 
     // --------  ParallelSortClusteredCursor -----------
     
-    ParallelSortClusteredCursor::ParallelSortClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey ) : ClusteredCursor( q ) , _servers( servers ){
-        _numServers = servers.size();
+    ParallelSortClusteredCursor::ParallelSortClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , 
+                                                              const BSONObj& sortKey ) 
+        : ClusteredCursor( q ) , _servers( servers ){
         _sortKey = sortKey.getOwned();
+        _init();
+    }
 
+    ParallelSortClusteredCursor::ParallelSortClusteredCursor( set<ServerAndQuery> servers , const string& ns , 
+                                                              const Query& q , 
+                                                              int options , const BSONObj& fields  )
+        : ClusteredCursor( ns , q.obj , options , fields ) , _servers( servers ){
+        _sortKey = q.getSort().copy();
+        _init();
+    }
+
+    void ParallelSortClusteredCursor::_init(){
+        _numServers = _servers.size();
         _cursors = new auto_ptr<DBClientCursor>[_numServers];
         _nexts = new BSONObj[_numServers];
             
         // TODO: parellize
         int num = 0;
-        for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
+        for ( set<ServerAndQuery>::iterator i = _servers.begin(); i!=_servers.end(); i++ ){
             const ServerAndQuery& sq = *i;
             _cursors[num++] = query( sq._server , 0 , sq._extra );
         }
