@@ -146,7 +146,7 @@ namespace mongo {
                 help << "{ distinct : 'collection name' , key : 'a.b' }";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
+                
                 string dbName = getDBName( ns );
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -200,5 +200,63 @@ namespace mongo {
                 return true;
             }
         } disinctCmd;
+
+        class MRCmd : public PublicGridCommand {
+        public:
+            MRCmd() : PublicGridCommand( "mapreduce" ){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                ChunkManager * cm = conf->getChunkManager( fullns );
+
+                BSONObj q;
+                if ( cmdObj["query"].type() == Object ){
+                    q = cmdObj["query"].embeddedObjectUserCheck();
+                }
+                
+                vector<Chunk*> chunks;
+                cm->getChunksForQuery( chunks , q );
+                
+                BSONObjBuilder finalB;
+                finalB.append( "mapreduce.shardedfinish" , cmdObj );
+                
+                BSONObjBuilder shardresults;
+                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    Chunk * c = *i;
+                    ScopedDbConnection conn( c->getShard() );
+
+                    BSONObj myres;
+                    if ( ! conn->runCommand( dbName , cmdObj , myres ) ){
+                        errmsg = "mongod mr failed: ";
+                        errmsg += myres.toString();
+                        return 0;
+                    }
+                    shardresults.append( c->getShard() , myres );
+                }
+
+                finalB.append( "shards" , shardresults.obj() );
+
+                BSONObj final = finalB.obj();
+                
+                ScopedDbConnection conn( conf->getPrimary() );
+                BSONObj finalResult;
+                if ( ! conn->runCommand( dbName , final , finalResult ) ){
+                    errmsg = "final reduce failed: ";
+                    errmsg += finalResult.toString();
+                    return 0;
+                }
+                result.appendElements( finalResult );
+                return 1;
+            }
+        } mrCmd;
     }
 }

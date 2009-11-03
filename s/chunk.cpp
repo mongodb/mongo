@@ -283,7 +283,7 @@ namespace mongo {
         
         BSONObj f = getFilter();
         if ( ! filter.isEmpty() )
-            f = ShardedCursor::concatQuery( f , filter );
+            f = ClusteredCursor::concatQuery( f , filter );
         BSONObj result;
         unsigned long long n = conn->count( _ns , f );
         

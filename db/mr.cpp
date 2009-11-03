@@ -20,6 +20,8 @@
 #include "instance.h"
 #include "commands.h"
 #include "../scripting/engine.h"
+#include "../client/dbclient.h"
+#include "../client/connpool.h"
 
 namespace mongo {
 
@@ -427,6 +429,40 @@ namespace mongo {
             DBDirectClient db;
 
         } mapReduceCommand;
+        
+        class MapReduceFinishCommand : public Command {
+        public:
+            MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
+            virtual bool slaveOk() { return true; }
+
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                string dbname = cc().database()->name;
+                
+                BSONObj origCmd = cmdObj.firstElement().embeddedObjectUserCheck();
+                cout << origCmd << endl;
+                errmsg = "eliot was here";
+
+                BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
+                vector< auto_ptr<DBClientCursor> > shardCursors;
+                BSONObjIterator i( shards );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    string shard = e.fieldName();
+                    BSONObj res = e.embeddedObjectUserCheck();
+                    cout << "\t" << shard << "\t" << res << endl;
+
+                    ScopedDbConnection conn( shard );
+                    //shardCursors.push_back( conn->query( dbname + "." + res["result"].valuestrsafe() , Query().sort( BSON( "_id" << 1 ) ) ) );
+                }
+                
+                //while ( true ){
+                    
+                //}
+
+                return 0;
+            }
+        } mapReduceFinishCommand;
 
     }
 

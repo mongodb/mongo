@@ -35,13 +35,13 @@ namespace mongo {
                 num++;
             }
             
-            ShardedCursor * cursor = 0;
+            ClusteredCursor * cursor = 0;
             
             BSONObj sort = query.getSort();
             
             if ( sort.isEmpty() ){
                 // 1. no sort, can just hit them in serial
-                cursor = new SerialServerShardedCursor( servers , q );
+                cursor = new SerialServerClusteredCursor( servers , q );
             }
             else {
                 int shardKeyOrder = info->getShardKey().canOrder( sort );
@@ -59,21 +59,23 @@ namespace mongo {
                         }
                         buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMin() ) );
                     }
-                    cursor = new SerialServerShardedCursor( buckets , q , shardKeyOrder );
+                    cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }
                 else {
                     // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
-                    cursor = new ParallelSortShardedCursor( servers , q , sort );
+                    cursor = new ParallelSortClusteredCursor( servers , q , sort );
                 }
             }
 
             assert( cursor );
-            if ( ! cursor->sendNextBatch( r ) ){
+            
+            ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
+            if ( ! cc->sendNextBatch( r ) ){
                 delete( cursor );
                 return;
             }
-            log(6) << "storing cursor : " << cursor->getId() << endl;
-            cursorCache.store( cursor );
+            log(6) << "storing cursor : " << cc->getId() << endl;
+            cursorCache.store( cc );
         }
         
         virtual void getMore( Request& r ){
@@ -82,7 +84,7 @@ namespace mongo {
 
             log(6) << "want cursor : " << id << endl;
 
-            ShardedCursor * cursor = cursorCache.get( id );
+            ShardedClientCursor * cursor = cursorCache.get( id );
             if ( ! cursor ){
                 log(6) << "\t invalid cursor :(" << endl;
                 replyToQuery( QueryResult::ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
