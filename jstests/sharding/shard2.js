@@ -169,5 +169,6 @@ placeCheck( 8 );
 db.getLastError();
 db.getPrevError();
 
+assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
 
 s.stop();
