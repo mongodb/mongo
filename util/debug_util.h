@@ -66,6 +66,10 @@ namespace mongo {
 #define strcasecmp _stricmp
 #endif
 
+    // Sets SIGTRAP handler to launch GDB
+    // Noop unless on *NIX and compiled with _DEBUG
+    void setupSIGTRAPforGDB();
+
 #if defined(_WIN32)
     inline void breakpoint() {} //noop
 #else // defined(_WIN32)
