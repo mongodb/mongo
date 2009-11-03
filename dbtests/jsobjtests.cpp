@@ -1087,6 +1087,20 @@ namespace JsobjTests {
             t( LEFT_SUBFIELD , "a.x" , "a" );
         }
     };
+
+    struct NestedDottedConversions{
+        void t(const BSONObj& nest, const BSONObj& dot){
+            ASSERT_EQUALS( nested2dotted(nest), dot);
+            ASSERT_EQUALS( nest, dotted2nested(dot));
+        }
+
+        void run(){
+            t( BSON("a" << BSON("b" << 1)), BSON("a.b" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1)), BSON("a.b" << 1 << "a.c" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1) << "d" << 1), BSON("a.b" << 1 << "a.c" << 1 << "d" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1 << "e" << BSON("f" << 1)) << "d" << 1), BSON("a.b" << 1 << "a.c" << 1 << "a.e.f" << 1 << "d" << 1) );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -1168,6 +1182,7 @@ namespace JsobjTests {
             add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
+            add< NestedDottedConversions >();
         }
     } myall;
     

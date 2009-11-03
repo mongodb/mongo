@@ -23,19 +23,6 @@
 
 namespace mongo {
 
-#ifndef _WIN32
-    // code for a breakpoint
-    inline void breakpoint(){
-        raise(SIGTRAP);
-    }
-
-    // conditional breakpoint
-    inline void breakif(bool test){
-        if (test)
-            breakpoint();
-    }
-#endif // ndef _WIN32
-
 // for debugging
     typedef struct _Ints {
         int i[100];
@@ -74,9 +61,33 @@ namespace mongo {
 #define OCCASIONALLY SOMETIMES( occasionally, 16 )
 #define RARELY SOMETIMES( rarely, 128 )
 #define ONCE for( static bool undone = true; undone; undone = false ) 
-    
+
 #if defined(_WIN32)
 #define strcasecmp _stricmp
 #endif
 
+#if defined(_WIN32)
+    inline void breakpoint() {} //noop
+#else // defined(_WIN32)
+    // code to raise a breakpoint in GDB
+    inline void breakpoint(){
+        ONCE {
+            //prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
+            struct sigaction current;
+            sigaction(SIGTRAP, NULL, &current);
+            if (current.sa_handler == SIG_DFL){
+                signal(SIGTRAP, SIG_IGN);
+            }
+        }
+
+        raise(SIGTRAP);
+    }
+#endif // defined(_WIN32)
+
+    // conditional breakpoint
+    inline void breakif(bool test){
+        if (test)
+            breakpoint();
+    }
+   
 } // namespace mongo
