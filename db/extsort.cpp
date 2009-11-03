@@ -108,7 +108,7 @@ namespace mongo {
         _cur->sort( MyCmp( _order ) );
         
         stringstream ss;
-        ss << _root.string() << "file." << _files.size();
+        ss << _root.string() << "/file." << _files.size();
         string file = ss.str();
         
         ofstream out;
