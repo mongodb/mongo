@@ -313,12 +313,13 @@ namespace mongo {
     }
     
     void repairDatabases() {
-
+        log(1) << "enter repairDatabases" << endl;
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
+            log(1) << "\t" << dbName << endl;
             assert( !setClient( dbName.c_str() ) );
             MongoDataFile *p = cc().database()->getFile( 0 );
             MDFHeader *h = p->getHeader();
@@ -345,6 +346,8 @@ namespace mongo {
                 closeClient( dbName.c_str() );
             }
         }
+
+        log(1) << "done repairDatabases" << endl;
 
         if ( shouldRepairDatabases ){
             log() << "finished checking dbs" << endl;
