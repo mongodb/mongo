@@ -240,7 +240,8 @@ namespace mongo {
             }
             
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                
+                Timer t;
+
                 string dbName = getDBName( ns );
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -295,6 +296,7 @@ namespace mongo {
                     return 0;
                 }
                 result.appendElements( finalResult );
+                result.append( "timeMillis" , t.millis() );
                 return 1;
             }
         } mrCmd;

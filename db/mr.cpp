@@ -445,7 +445,10 @@ namespace mongo {
                 BSONObj origCmd = cmdObj.firstElement().embeddedObjectUserCheck();
                 
                 set<ServerAndQuery> servers;
-
+                
+                BSONObjBuilder shardCounts;
+                map<string,long long> counts;
+                
                 BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
                 vector< auto_ptr<DBClientCursor> > shardCursors;
                 BSONObjIterator i( shards );
@@ -457,6 +460,14 @@ namespace mongo {
                     
                     uassert( "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
                     servers.insert( shard );
+                    shardCounts.appendAs( res["counts"] , shard.c_str() );
+
+                    BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
+                    while ( j.more() ){
+                        BSONElement temp = j.next();
+                        counts[temp.fieldName()] += temp.numberLong();
+                    }
+
                 }
 
                 BSONObj sortKey = BSON( "_id" << 1 );
@@ -504,6 +515,16 @@ namespace mongo {
                     conn->dropCollection( dbname + "." + shardedOutputCollection );
                 }
                 
+                result.append( "shardCounts" , shardCounts.obj() );
+                
+                {
+                    BSONObjBuilder c;
+                    for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); i++ ){
+                        c.append( i->first , i->second );
+                    }
+                    result.append( "counts" , c.obj() );
+                }
+
                 return 1;
             }
         } mapReduceFinishCommand;
