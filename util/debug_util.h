@@ -76,9 +76,7 @@ namespace mongo {
             struct sigaction current;
             sigaction(SIGTRAP, NULL, &current);
             if (current.sa_handler == SIG_DFL){
-                cout << "########3setting up SIGTRAP handler" << endl;
                 signal(SIGTRAP, SIG_IGN);
-                cout << "DONE" << endl;
             }
         }
 
