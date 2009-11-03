@@ -52,7 +52,8 @@ namespace mongo {
             _cur = 0;
         }
         
-        remove_all( _root );
+        unsigned long removed = remove_all( _root );
+        wassert( removed == 1 + _files.size() );
     }
 
     void BSONObjExternalSorter::sort(){
