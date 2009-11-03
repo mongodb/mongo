@@ -1117,6 +1117,7 @@ namespace mongo {
 
         /** append an element but with a new name */
         void appendAs(const BSONElement& e, const char *as) {
+            assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             b.append((char) e.type());
             b.append(as);
             b.append((void *) e.value(), e.valuesize());
