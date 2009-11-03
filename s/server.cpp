@@ -92,6 +92,7 @@ namespace mongo {
     
     void init(){
         serverID.init();
+        setupSIGTRAPforGDB();
     }
 
     void start() {
