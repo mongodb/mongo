@@ -279,6 +279,7 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp client/parallel.cpp" )
+commonFiles += [ "s/d_util.cpp" ]
 commonFiles += [ "scripting/engine.cpp" ]
 
 #mmap stuff
@@ -954,7 +955,6 @@ elif not onlyServer:
         shell32BitFiles = coreShellFiles
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
-
         shellEnv.VariantDir( "32bit" , "." )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )

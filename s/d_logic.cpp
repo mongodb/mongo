@@ -497,9 +497,4 @@ namespace mongo {
         return true;
     }
 
-    void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false ){
-        // no-op in mongod
-    }
-    
-
 }

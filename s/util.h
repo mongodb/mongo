@@ -16,7 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
+#pragma once
+
+#include "../stdafx.h"
+#include "../client/dbclient.h"
 
 /**
    some generic sharding utils that can be used in mongod or mongos
