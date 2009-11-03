@@ -230,6 +230,8 @@ usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
+enableSNMP = False
+
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
     env["CC"] = GetOption( "cxx" )
@@ -726,6 +728,21 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
     removeIfInList( myenv["LIBS"] , "wpcap" )
+
+    if enableSNMP and conf.CheckCXXHeader( "net-snmp/net-snmp-config.h" ):
+
+        snmplibs = [ "netsnmp" + x for x in [ "mibs" , "agent" , "helpers" , "" ] ]
+
+        gotAll = True
+        for x in snmplibs:
+            if not myCheckLib:
+                gotAll = False
+        if gotAll:
+            myenv.Append( CPPDEFINES=[ "_HAVESNMP" ] )
+        else:
+            for x in snmplibs:
+                removeIfInList( myenv["LIBS"] , x )
+        
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
