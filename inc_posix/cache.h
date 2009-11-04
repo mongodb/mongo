@@ -46,7 +46,6 @@ struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
-struct __wt_srvr;		typedef struct __wt_srvr WT_SRVR;
 struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 
 /*******************************************
@@ -63,77 +62,6 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 #include "stat.h"
 
 /*******************************************
- * Cache object.
- *******************************************/
-struct __wt_cache {
-#define	WT_CACHE_DEFAULT_SIZE		(20)	/* 20MB */
-	u_int64_t cache_max;			/* Cache bytes maximum */
-	u_int64_t cache_bytes;			/* Cache bytes allocated */
-
-	/*
-	 * Each in-memory page is threaded on two queues: a hash queue
-	 * based on its file and page number, and an LRU list.
-	 */
-	u_int32_t hashsize;
-#define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
-	TAILQ_HEAD(__wt_page_hqh, __wt_page) *hqh;
-	TAILQ_HEAD(__wt_page_lqh, __wt_page) lqh;
-
-	u_int32_t flags;
-};
-
-/*******************************************
- * Server thread-of-control information
- *******************************************/
- /*
-  * The primary shared object is an array of WT_TOC references.   We pad it
-  * to a cache-line to avoid collisions.
-  *
-  * !!!
-  * I've left this code in because it doesn't cost anything but a K or two of
-  * memory, but I've never seen a platform/test where it made a difference in
-  * the performance.  We use 64B as the default line size, that's the biggest
-  * D-cache line size I've seen.
-  */
-#define	WT_CACHELINE_SIZE	64
-typedef struct {
-	WT_TOC *toc;				/* Operation */
-	u_int8_t unused[WT_CACHELINE_SIZE - sizeof(void *)];
-} WT_TOC_CACHELINE;
-
-struct __wt_srvr {
-	pthread_t tid;			/* System thread ID */
-
-	int running;			/* Thread active */
-
-	/*
-	 * The server ID is a negative number for system-wide servers, and
-	 * 0 or positive for database servers (and, in the latter case,
-	 * doubles as an array offset into the IDB list of database servers.
-	 */
-#define	WT_SRVR_PRIMARY		-1
-#define	WT_IS_PRIMARY(srvr)						\
-	((srvr)->id == WT_SRVR_PRIMARY)
-	int id;				/* Server ID (array offset) */
-
-	/*
-	 * Enclosing environment, set when the WT_SRVR is created (which
-	 * implies that servers are confined to an environment).
-	 */
-	ENV	*env;			/* Server environment */
-
-	WT_TOC_CACHELINE *ops;		/* Job queue */
-
-	WT_CACHE *cache;		/* Database page cache */
-
-	WT_STATS *stats;		/* Server statistics */
-};
-
-#define	WT_SRVR_SELECT(toc)						\
-	((toc)->srvr == WT_SRVR_PRIMARY ?				\
-	    &(toc)->env->ienv->psrvr : (toc)->db->idb->srvrq + (toc->srvr - 1))
-
-/*******************************************
  * Cursor handle information that doesn't persist.
  *******************************************/
 struct __idbc {
@@ -147,11 +75,10 @@ struct __idbc {
  *******************************************/
 struct __idb {
 	DB *db;				/* Public object */
+	TAILQ_ENTRY(__idb) q;		/* Linked list of databases */
 
 	char	 *dbname;		/* Database name */
 	mode_t	  mode;			/* Database file create mode */
-
-	TAILQ_ENTRY(__idb) q;		/* Linked list of databases */
 
 	u_int32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
@@ -161,18 +88,52 @@ struct __idb {
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
-	/* Database servers. */
-#define	WT_SRVR_FOREACH(idb, srvr, i)					\
-	for ((i) = 0, (srvr) = (idb)->srvrq;				\
-	    (i) < (idb)->srvrq_entries; ++(i), ++(srvr))
-#define	WT_SRVR_SRVRQ_SIZE	64
-	WT_SRVR *srvrq;			/* Server thread queue */
-	u_int srvrq_entries;		/* Total server entries */
-
-	WT_CACHE *cache;		/* Primary server's database cache */
+#define	WT_TOC_INTERNAL(toc, db) do {					\
+	toc = (db)->idb->toc_internal;					\
+	WT_TOC_INIT(toc, db);						\
+} while (0)
+	WT_TOC	*toc_internal;		/* Internal WT_TOC */
 
 	WT_STATS *stats;		/* Database handle statistics */
 	WT_STATS *dstats;		/* Database file statistics */
+
+	u_int32_t flags;
+};
+
+/*******************************************
+ * Cache object.
+ *******************************************/
+struct __wt_cache {
+#define	WT_CACHE_DEFAULT_SIZE	(20)	/* 20MB */
+	u_int64_t bytes_max;		/* Maximum bytes */
+	u_int64_t bytes_alloc;		/* Allocated bytes */
+
+	/*
+	 * !!!
+	 * The "private" field needs to be written atomically, and without
+	 * overlap, that is, updating it shouldn't cause a read-write-cycle
+	 * of the shared field.  Assume a u_int is the correct size for a
+	 * single memory bus cycle.
+	 */
+	u_int private;		/* Cache currently private */
+	u_int shared;		/* Cache currently in use (count) */
+
+	/*
+	 * Each in-memory page is in a hash bucket based on its "address".
+	 *
+	 * Our hash buckets are very simple list structures.   We depend on
+	 * the ability to add/remove an element from the list by writing a
+	 * single pointer.  The underlying assumption is that writing a
+	 * single pointer will never been seen as a partial write by any
+	 * other thread of control, that is, the linked list will always
+	 * be consistent.  The end result is that while we have to serialize
+	 * the actual manipulation of the memory, we can support multiple
+	 * threads of control using the linked lists even while they are
+	 * being modified.
+	 */
+#define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
+	u_int32_t hashsize;
+	WT_PAGE **hb;
 
 	u_int32_t flags;
 };
@@ -185,15 +146,22 @@ struct __ienv {
 
 	WT_MTX mtx;			/* Global mutex */
 
+	pthread_t primary_tid;		/* Primary thread ID */
+
+	TAILQ_HEAD(			/* Locked: TOC list */
+	    __wt_toc_qh, __wt_toc) tocqh;
+	WT_TOC *toc_add;		/* Locked: TOC to add to list */
+	WT_TOC *toc_del;		/* Locked: TOC to delete from list */
+
 	TAILQ_HEAD(
 	    __wt_db_qh, __idb) dbqh;	/* Locked: database list */
+
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: serial file ID */
 
-	u_int next_toc_srvr_slot;	/* Locked: next server TOC array slot */
-
-	WT_SRVR psrvr;			/* Primary server */
+	WT_CACHE cache;			/* Page cache */
+	u_int32_t generation;		/* Page cache LRU generation number */
 
 	WT_STATS *stats;		/* Environment handle statistics */
 

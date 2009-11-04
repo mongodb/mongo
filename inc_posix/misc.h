@@ -12,8 +12,10 @@ extern "C" {
 #endif
 
 /* Basic constants. */
+#define	WT_BILLION	(1000000000)
 #define	WT_FRAGMENT	(512)
 #define	WT_MEGABYTE	(1048576)
+#define	WT_MILLION	(1000000)
 
 /* Align a number to a specified power-of-2. */
 #define	WT_ALIGN(n, v)							\
@@ -63,11 +65,12 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-/* Free memory if set. */
+/* Free memory if set, avoiding any race with another thread. */
 #define	WT_FREE_AND_CLEAR(env, p) do {					\
-	if ((p) != NULL) {						\
-		__wt_free(env, p);					\
+	void *__p;							\
+	if ((__p = p) != NULL) {					\
 		(p) = NULL;						\
+		__wt_free(env, __p);					\
 	}								\
 } while (0)
 

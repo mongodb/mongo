@@ -1,17 +1,18 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 int
-__wt_db_bulk_load(WT_TOC *toc);
+__wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_bt_close(WT_TOC *toc);
+__wt_bt_close(DB *db);
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_bt_dump_debug(WT_TOC *toc, char *ofile, FILE *fp);
+__wt_bt_dump_set_fp(char *ofile, FILE **fpp, int *close_varp);
 int
-__wt_bt_dump_page(
-    WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
+__wt_bt_dump_debug(DB *db, char *ofile, FILE *fp);
+int
+__wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
 void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
 void
@@ -25,24 +26,14 @@ __wt_bt_desc_read(WT_TOC *toc);
 int
 __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr);
 int
-__wt_db_dump(WT_TOC *toc);
+__wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags);
 void
 __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
 int
-__wt_db_get_stoc(WT_TOC *toc);
-int
-__wt_db_get(
+__wt_api_db_get(
     DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
-__wt_db_get_worker(
-    DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
-int
-__wt_db_get_recno_stoc(WT_TOC *toc);
-int
-__wt_db_get_recno(DB *db, WT_TOC *toc,
-    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
-int
-__wt_db_get_recno_worker(DB *db, WT_TOC *toc,
+__wt_api_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
 __wt_bt_build_verify(void);
@@ -57,7 +48,7 @@ __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
 __wt_bt_item_type(WT_ITEM *item);
 int
-__wt_bt_open(WT_TOC *toc);
+__wt_bt_open(DB *db);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
 int
@@ -86,59 +77,51 @@ int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return);
 int
-__wt_bt_stat(WT_TOC *toc);
+__wt_bt_stat(DB *db);
 int
-__wt_bt_sync(WT_TOC *toc);
+__wt_bt_sync(DB *db);
 int
-__wt_db_verify(WT_TOC *toc);
+__wt_api_db_verify(DB *db, u_int32_t flags);
 int
-__wt_bt_verify_int(WT_TOC *toc, FILE *fp);
+__wt_db_verify(DB *db, FILE *fp, u_int32_t flags);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp);
-int
-__wt_db_close(WT_TOC *toc);
 void
 __wt_db_err(DB *db, int error, const char *fmt, ...);
 void
 __wt_db_errx(DB *db, const char *fmt, ...);
 int
-__wt_db_set_btree_compare_int_verify(WT_TOC *toc);
+__wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
 int
-__wt_env_db_create(WT_TOC *toc);
+__wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp);
 int
-__wt_db_destroy(WT_TOC *toc);
+__wt_api_db_close(DB *db, u_int32_t flags);
 int
-__wt_idb_destroy(WT_TOC *toc, int refresh);
+__wt_idb_close(DB *db, int refresh);
 int
 __wt_db_lockout_err(DB *db);
 int
 __wt_db_lockout_open(DB *db);
 int
-__wt_db_open(WT_TOC *toc);
+__wt_api_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags);
 int
-__wt_db_stat_print(WT_TOC *toc);
+__wt_api_db_stat_print(DB *db, FILE *stream, u_int32_t flags);
 int
-__wt_db_stat_clear(WT_TOC *toc);
+__wt_api_db_stat_clear(DB *db, u_int32_t flags);
 int
-__wt_db_sync(WT_TOC *toc);
-int
-__wt_env_start(ENV *env, u_int32_t flags);
-int
-__wt_env_stop(ENV *env, u_int32_t flags);
+__wt_api_db_sync(DB *db, u_int32_t flags);
 void *
 __wt_workq(void *arg);
 int
-__wt_env_toc_create(ENV *env, u_int32_t flags, WT_TOC **tocp);
+__wt_api_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp);
 int
-__wt_toc_sched(WT_TOC *toc);
+__wt_api_wt_toc_close(WT_TOC *toc, u_int32_t flags);
 int
-__wt_cache_create(WT_TOC *toc, WT_CACHE **cache_addr);
+__wt_cache_create(ENV *env);
 int
-__wt_cache_destroy(WT_TOC *toc, WT_CACHE **cache_addr);
+__wt_cache_destroy(ENV *env);
 int
-__wt_cache_sync(WT_TOC *toc, WT_CACHE *cache);
-int
-__wt_cache_toc_lru(WT_TOC *toc);
+__wt_cache_sync(ENV *env, WT_FH *fh);
 int
 __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
 int
@@ -146,30 +129,28 @@ __wt_cache_in(WT_TOC *toc,
     off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
 int
 __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
-int
-__wt_env_close(WT_TOC *toc);
 void
-__wt_env_err(ENV *env, int error, const char *fmt, ...);
+__wt_api_env_err(ENV *env, int error, const char *fmt, ...);
 void
-__wt_env_errx(ENV *env, const char *fmt, ...);
+__wt_api_env_errx(ENV *env, const char *fmt, ...);
 int
-__wt_env_set_verbose_verify(WT_TOC *toc);
+__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose);
 int
-__wt_build_verify(void);
+__wt_library_init(void);
 int
 __wt_breakpoint(void);
 int
-__wt_env_destroy(ENV *env, u_int32_t flags);
+__wt_env_create(u_int32_t flags, ENV **envp);
 int
 __wt_ienv_destroy(ENV *env, int refresh);
 int
-__wt_env_lockout_err(ENV *env);
+__wt_api_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags);
 int
-__wt_env_open(WT_TOC *toc);
+__wt_api_env_close(ENV *env, u_int32_t flags);
 int
-__wt_env_stat_print(WT_TOC *toc);
+__wt_api_env_stat_print(ENV *env, FILE *stream, u_int32_t flags);
 int
-__wt_env_stat_clear(WT_TOC *toc);
+__wt_api_env_stat_clear(ENV *env, u_int32_t flags);
 void
 __wt_abort();
 int
@@ -182,24 +163,23 @@ __wt_strdup(ENV *env, const char *str, void *retp);
 void
 __wt_free(ENV *env, void *p);
 int
-__wt_filesize(WT_TOC *toc, WT_FH *fh, off_t *sizep);
+__wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
 __wt_mtx_init(WT_MTX *mtx);
-int
-__wt_lock(WT_MTX *mtx);
-int
+void
+__wt_lock(ENV *env, WT_MTX *mtx);
+void
 __wt_unlock(WT_MTX *mtx);
 int
 __wt_mtx_destroy(WT_MTX *mtx);
 int
-__wt_open(WT_TOC *toc,
-    const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp);
+__wt_open(ENV *env, const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp);
 int
-__wt_close(WT_TOC *toc, WT_FH *fh);
+__wt_close(ENV *env, WT_FH *fh);
 int
-__wt_read(WT_TOC *toc, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
+__wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 int
-__wt_write(WT_TOC *toc, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
+__wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf);
 void
 __wt_sleep(long seconds, long micro_seconds);
 int
@@ -209,19 +189,25 @@ __wt_thread_join(pthread_t tid);
 void
 __wt_yield(void);
 void
-__wt_env_config_methods(ENV *env);
+__wt_methods_db_lockout(DB *db);
 void
-__wt_env_config_methods_open(ENV *env);
+__wt_methods_db_open_off(DB *db);
 void
-__wt_env_config_methods_lockout(ENV *env);
+__wt_methods_db_init_on(DB *db);
 void
-__wt_db_config_methods(DB *db);
+__wt_methods_db_open_on(DB *db);
 void
-__wt_db_config_methods_open(DB *db);
+__wt_methods_env_lockout(ENV *env);
 void
-__wt_db_config_methods_lockout(DB *db);
+__wt_methods_env_open_off(ENV *env);
 void
-__wt_api_switch(WT_TOC *toc);
+__wt_methods_env_init_on(ENV *env);
+void
+__wt_methods_env_open_on(ENV *env);
+void
+__wt_methods_wt_toc_lockout(WT_TOC *wt_toc);
+void
+__wt_methods_wt_toc_init_on(WT_TOC *wt_toc);
 u_int32_t
 __wt_cksum(void *chunk, u_int32_t bytes);
 void
@@ -237,6 +223,12 @@ int
 __wt_api_flags(ENV *env, const char *name);
 int
 __wt_database_format(DB *db);
+int
+__wt_wt_toc_lockout(WT_TOC *toc);
+int
+__wt_db_lockout(DB *db);
+int
+__wt_env_lockout(ENV *env);
 u_int32_t
 __wt_prime(u_int32_t n);
 int
@@ -255,7 +247,3 @@ int
 __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_ienv_stats(WT_STATS *stats);
-int
-__wt_stat_alloc_srvr_stats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_srvr_stats(WT_STATS *stats);

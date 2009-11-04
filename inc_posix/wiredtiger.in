@@ -86,16 +86,6 @@ struct __dbt {
  * Application thread-of-control information
  *******************************************/
 struct __wt_toc {
-	WT_MTX  *block;			/* Thread's blocking mutex */
-
-	/*
-	 * Each thread-of-control has a reserved slot in each server's WT_TOC
-	 * array, which is how a thread-of-control schedules itself.   The
-	 * value is assigned when the WT_TOC is created.  Since these values
-	 * are unique across all WT_TOCs, it can also be used as an ID field.
-	 */
-	u_int	srvr_slot;
-
 	/*
 	 * Enclosing environment, set when the WT_TOC is created (which
 	 * implies that threads-of-control are confined to an environment).
@@ -103,78 +93,63 @@ struct __wt_toc {
 	ENV	*env;			/* Operation environment */
 
 	/*
-	 * Payload: when a WT_TOC crosses the API layer, it gets loaded with
-	 * the following information used by underlying functions to figure
-	 * out what to do.
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_ENTRY(__wt_toc) q;
 	 */
-	DB	*db;			/* Operation database */
-	int	 op;			/* Operation code */
-	void	*argp;			/* Operation parameters */
-	int      ret;			/* Operation return status */
+	struct {
+		struct __wt_toc *tqe_next;
+		struct __wt_toc **tqe_prev;
+	} q;				/* Linked list of WT_TOCs */
 
 	/*
-	 * Cache of database pages.   Normally, each server "owns" its cache
-	 * pages, and no locking is required since the server is the only
-	 * thread of control to access those pages.   An exception is the
-	 * primary server: (1) if the application is single-threaded, the
-	 * primary WT_TOC owns all the pages, (2) if the application has
-	 * multiple server threads, the primary WT_TOC owns the pinned pages
-	 * that are accessed by per-database server threads, without locking
-	 * and without coordination.   To handle these two architectures, we
-	 * don't put pages in the primary WT_TOC, instead, we maintain the
-	 * pages in the IDB structure.   That solves the problem in (1) where
-	 * we can't tell the pages in different databases apart (there's just
-	 * an addr/offset pair in the WT_PAGE, no file ID), and the problem
-	 * in (2) where multiple threads of control are walking the list of
-	 * pages because we only read those pages when the database is first
-	 * opened.
-	 *
-	 * When a thread-of-control is scheduled for an operation, the cache
-	 * pointer is set to reference the "true" cache.  Note that in some
-	 * operations (ENV operations, for example), there may be no cache
-	 * at all.
+	 * We pass around WT_TOCs internally in the Btree, (rather than a DB),
+	 * because the DB's are free-threaded, and the WT_TOCs are per-thread.
+	 * WT_TOCs always reference a DB handle, though.
 	 */
-#define	WT_TOC_SET_CACHE(toc, srvr) do {				\
-	if ((srvr) != NULL && (srvr)->cache != NULL)			\
-		(toc)->cache = (srvr)->cache;				\
-	else if ((toc)->db != NULL)					\
-		(toc)->cache = (toc)->db->idb->cache;			\
-	else								\
-		(toc)->cache = NULL;					\
-	} while (0)
+#define	WT_TOC_INIT(toc, _db) do {					\
+	(toc)->db = (_db);						\
+} while (0)
+#define	WT_TOC_CLEAR(toc) do {						\
+	(toc)->db = NULL;						\
+} while (0)
 
-	WT_CACHE *cache;
-
-	/*
-	 * Threads-of-control run (1) without any server, (2) in the primary
-	 * server, or (3) in a secondary server.   In cases 1 and 2, the op
-	 * may be rescheduled for a secondary server, in which case the server
-	 * ID and a Btree root page and isleaf information is set.   When we
-	 * are returning control to the application, clear any information we
-	 * have set so future calls don't get re-directed to the wrong server.
-	 */
-#define	WT_TOC_CLEAR_SRVR(toc) do {					\
-	(toc)->srvr = WT_SRVR_PRIMARY;					\
-	(toc)->root_addr = WT_ADDR_INVALID;				\
-	} while (0)
-
-	int	  srvr;			/* Requested server */
-	u_int32_t root_addr;		/* Server's root page */
-	u_int64_t root_record_cnt;	/* Server's record count */
-	int	  root_isleaf;		/* Server's root page type */
-
+	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	 u_int32_t flags;
+	/*
+	 * WT_TOCs make requests of server threads running in the environment.
+	 * This is done by calling a supporting function that takes the toc as
+	 * an argument.   No error can be returned to the server thread, the
+	 * WT_TOC has to somehow pass that information back to itself.
+	 */
+#define	WT_TOC_REQUEST(toc, f, args) do {				\
+	(toc)->request_args = args;					\
+	if (F_ISSET(toc, WT_SINGLE_THREADED))				\
+		f(toc);							\
+	else {								\
+		(toc)->request = f;					\
+		WT_FLUSH_MEMORY;					\
+		while ((toc)->request != NULL)				\
+			__wt_yield();					\
+	}								\
+} while (0)
+#define	WT_TOC_REQUEST_COMPLETE(toc) do {				\
+	(toc)->request = NULL;						\
+	WT_FLUSH_MEMORY;						\
+} while (0)
+	void (*request)(WT_TOC *);
+	void *request_args;
+
+	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * WT_TOC handle api section: BEGIN
+	 * WT_TOC methods: BEGIN
 	 */
-	int (*destroy)(
+	int (*close)(
 	    WT_TOC *, u_int32_t );
 	/*
-	 * WT_TOC handle api section: END
+	 * WT_TOC methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 };
@@ -193,121 +168,123 @@ struct __db {
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * Db handle api section: BEGIN
+	 * DB getter/setter variables: BEGIN
 	 */
-	int (*bulk_load)(
-	    DB *, WT_TOC *, u_int32_t , int (*)(DB *, DBT **, DBT **));
-
-	int (*close)(
-	    DB *, WT_TOC *, u_int32_t );
-
-	int (*destroy)(
-	    DB *, WT_TOC *, u_int32_t );
-
-	int (*dump)(
-	    DB *, WT_TOC *, FILE *, u_int32_t );
-
-	void (*err)(
-	    DB *, int , const char *, ...);
-
-	void (*errx)(
-	    DB *, const char *, ...);
-
-	int (*get)(
-	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
-
-	int (*get_btree_compare)(
-	    DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *));
-
-	int (*get_btree_compare_int)(
-	    DB *, WT_TOC *, int *);
-
-	int (*get_btree_dup_compare)(
-	    DB *, WT_TOC *, int (**)(DB *, const DBT *, const DBT *));
-
-	int (*get_btree_dup_offpage)(
-	    DB *, WT_TOC *, u_int32_t *);
-
-	int (*get_btree_itemsize)(
-	    DB *, WT_TOC *, u_int32_t *, u_int32_t *);
-
-	int (*get_btree_pagesize)(
-	    DB *, WT_TOC *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
-
-	int (*get_errcall)(
-	    DB *, WT_TOC *, void (**)(const DB *, const char *));
-
-	int (*get_errfile)(
-	    DB *, WT_TOC *, FILE **);
-
-	int (*get_errpfx)(
-	    DB *, WT_TOC *, const char **);
-
-	int (*get_recno)(
-	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
-
-	int (*get_recno_stoc)(
-	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
-
-	int (*get_stoc)(
-	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
-
-	int (*open)(
-	    DB *, WT_TOC *, const char *, mode_t , u_int32_t );
-
-	int (*btree_compare)(DB *, const DBT *, const DBT *);
-	int (*set_btree_compare)(
-	    DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *));
+	int (*btree_compare_dup)(DB *, const DBT *, const DBT *);
 
 	int btree_compare_int;
-	int (*set_btree_compare_int)(
-	    DB *, WT_TOC *, int );
 
-	int (*btree_dup_compare)(DB *, const DBT *, const DBT *);
-	int (*set_btree_dup_compare)(
-	    DB *, WT_TOC *, int (*)(DB *, const DBT *, const DBT *));
+	int (*btree_compare)(DB *, const DBT *, const DBT *);
 
 	u_int32_t btree_dup_offpage;
-	int (*set_btree_dup_offpage)(
-	    DB *, WT_TOC *, u_int32_t );
 
 	u_int32_t intlitemsize;
 	u_int32_t leafitemsize;
-	int (*set_btree_itemsize)(
-	    DB *, WT_TOC *, u_int32_t , u_int32_t );
 
 	u_int32_t allocsize;
 	u_int32_t intlsize;
 	u_int32_t leafsize;
 	u_int32_t extsize;
-	int (*set_btree_pagesize)(
-	    DB *, WT_TOC *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
 
 	void (*errcall)(const DB *, const char *);
-	int (*set_errcall)(
-	    DB *, WT_TOC *, void (*)(const DB *, const char *));
 
 	FILE *errfile;
-	int (*set_errfile)(
-	    DB *, WT_TOC *, FILE *);
 
 	const char *errpfx;
-	int (*set_errpfx)(
-	    DB *, WT_TOC *, const char *);
+	/*
+	 * DB getter/setter variables: END
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 */
+
+	/*
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 * DB methods: BEGIN
+	 */
+	int (*btree_compare_dup_get)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+
+	int (*btree_compare_dup_set)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
+
+	int (*btree_compare_get)(
+	    DB *, int (**)(DB *, const DBT *, const DBT *));
+
+	int (*btree_compare_int_get)(
+	    DB *, int *);
+
+	int (*btree_compare_int_set)(
+	    DB *, int );
+
+	int (*btree_compare_set)(
+	    DB *, int (*)(DB *, const DBT *, const DBT *));
+
+	int (*btree_dup_offpage_get)(
+	    DB *, u_int32_t *);
+
+	int (*btree_dup_offpage_set)(
+	    DB *, u_int32_t );
+
+	int (*btree_itemsize_get)(
+	    DB *, u_int32_t *, u_int32_t *);
+
+	int (*btree_itemsize_set)(
+	    DB *, u_int32_t , u_int32_t );
+
+	int (*btree_pagesize_get)(
+	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+
+	int (*btree_pagesize_set)(
+	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+
+	int (*bulk_load)(
+	    DB *, u_int32_t , int (*)(DB *, DBT **, DBT **));
+
+	int (*close)(
+	    DB *, u_int32_t );
+
+	int (*dump)(
+	    DB *, FILE *, u_int32_t );
+
+	int (*errcall_get)(
+	    DB *, void (**)(const DB *, const char *));
+
+	int (*errcall_set)(
+	    DB *, void (*)(const DB *, const char *));
+
+	int (*errfile_get)(
+	    DB *, FILE **);
+
+	int (*errfile_set)(
+	    DB *, FILE *);
+
+	int (*errpfx_get)(
+	    DB *, const char **);
+
+	int (*errpfx_set)(
+	    DB *, const char *);
+
+	int (*get)(
+	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
+
+	int (*get_recno)(
+	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
+
+	int (*open)(
+	    DB *, const char *, mode_t , u_int32_t );
 
 	int (*stat_clear)(
-	    DB *, WT_TOC *, u_int32_t );
+	    DB *, u_int32_t );
 
 	int (*stat_print)(
-	    DB *, WT_TOC *, FILE * , u_int32_t );
+	    DB *, FILE * , u_int32_t );
 
 	int (*sync)(
-	    DB *, WT_TOC *, u_int32_t );
+	    DB *, u_int32_t );
 
 	int (*verify)(
-	    DB *, WT_TOC *, u_int32_t );
+	    DB *, u_int32_t );
 	/*
-	 * Db handle api section: END
+	 * DB methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 };
@@ -333,77 +310,81 @@ struct __env {
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
-	 * Env handle api section: BEGIN
+	 * ENV getter/setter variables: BEGIN
 	 */
-	int (*close)(
-	    ENV *, WT_TOC *, u_int32_t );
+	u_int32_t cachesize;
 
-	int (*db_create)(
-	    ENV *, WT_TOC *, u_int32_t , DB **);
+	void (*errcall)(const ENV *, const char *);
 
-	int (*destroy)(
+	FILE *errfile;
+
+	const char *errpfx;
+
+	u_int32_t verbose;
+	/*
+	 * ENV getter/setter variables: END
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 */
+
+	/*
+	 * DO NOT EDIT: automatically built by dist/api.py.
+	 * ENV methods: BEGIN
+	 */
+	int (*cachesize_get)(
+	    ENV *, u_int32_t *);
+
+	int (*cachesize_set)(
 	    ENV *, u_int32_t );
+
+	int (*close)(
+	    ENV *, u_int32_t );
+
+	int (*db)(
+	    ENV *, u_int32_t , DB **);
 
 	void (*err)(
 	    ENV *, int , const char *, ...);
 
+	int (*errcall_get)(
+	    ENV *, void (**)(const ENV *, const char *));
+
+	int (*errcall_set)(
+	    ENV *, void (*)(const ENV *, const char *));
+
+	int (*errfile_get)(
+	    ENV *, FILE **);
+
+	int (*errfile_set)(
+	    ENV *, FILE *);
+
+	int (*errpfx_get)(
+	    ENV *, const char **);
+
+	int (*errpfx_set)(
+	    ENV *, const char *);
+
 	void (*errx)(
 	    ENV *, const char *, ...);
 
-	int (*get_cachesize)(
-	    ENV *, WT_TOC *, u_int32_t *);
-
-	int (*get_errcall)(
-	    ENV *, WT_TOC *, void (**)(const ENV *, const char *));
-
-	int (*get_errfile)(
-	    ENV *, WT_TOC *, FILE **);
-
-	int (*get_errpfx)(
-	    ENV *, WT_TOC *, const char **);
-
-	int (*get_verbose)(
-	    ENV *, WT_TOC *, u_int32_t *);
-
 	int (*open)(
-	    ENV *, WT_TOC *, const char *, mode_t , u_int32_t );
-
-	u_int32_t cachesize;
-	int (*set_cachesize)(
-	    ENV *, WT_TOC *, u_int32_t );
-
-	void (*errcall)(const ENV *, const char *);
-	int (*set_errcall)(
-	    ENV *, WT_TOC *, void (*)(const ENV *, const char *));
-
-	FILE *errfile;
-	int (*set_errfile)(
-	    ENV *, WT_TOC *, FILE *);
-
-	const char *errpfx;
-	int (*set_errpfx)(
-	    ENV *, WT_TOC *, const char *);
-
-	u_int32_t verbose;
-	int (*set_verbose)(
-	    ENV *, WT_TOC *, u_int32_t );
-
-	int (*start)(
-	    ENV *, u_int32_t );
+	    ENV *, const char *, mode_t , u_int32_t );
 
 	int (*stat_clear)(
-	    ENV *, WT_TOC *, u_int32_t );
-
-	int (*stat_print)(
-	    ENV *, WT_TOC *, FILE *, u_int32_t );
-
-	int (*stop)(
 	    ENV *, u_int32_t );
 
-	int (*toc_create)(
+	int (*stat_print)(
+	    ENV *, FILE *, u_int32_t );
+
+	int (*toc)(
 	    ENV *, u_int32_t , WT_TOC **);
+
+	int (*verbose_get)(
+	    ENV *, u_int32_t *);
+
+	int (*verbose_set)(
+	    ENV *, u_int32_t );
 	/*
-	 * Env handle api section: END
+	 * ENV methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 };
@@ -427,21 +408,23 @@ char	*wt_version(int *, int *, int *);
 #define	WT_DBT_ALLOC					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
+#define	WT_INITIALIZED					0x00000001
+#define	WT_INVALID					0x00000001
 #define	WT_MODIFIED					0x00000002
 #define	WT_PRINTABLES					0x00000001
-#define	WT_READONLY					0x00000001
 #define	WT_RESCHEDULE					0x00000001
 #define	WT_RUNNING					0x00000002
 #define	WT_SINGLE_THREADED				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
 #define	WT_UNFORMATTED					0x00000001
-#define	WT_VERB_FILEOPS					0x00000004
-#define	WT_VERB_FILEOPS_ALL				0x00000002
-#define	WT_VERB_SERVERS					0x00000001
+#define	WT_VERB_FILEOPS					0x00000002
+#define	WT_VERB_FILEOPS_ALL				0x00000001
+#define	WT_WAITING_PRIVATE				0x00000002
+#define	WT_WAITING_SHARED				0x00000001
 
 #define	WT_APIMASK_DB					0x00000000
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000003
-#define	WT_APIMASK_DB_CLOSE				0x00000000
+#define	WT_APIMASK_DB_CLOSE				0x00000001
 #define	WT_APIMASK_DB_DESTROY				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_GET				0x00000000
@@ -462,16 +445,16 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_STOP				0x00000000
 #define	WT_APIMASK_ENV_TOC_CREATE			0x00000000
-#define	WT_APIMASK_ENV_VERBOSE				0x00000007
+#define	WT_APIMASK_ENV_VERBOSE				0x00000003
 #define	WT_APIMASK_IDB					0x00000001
-#define	WT_APIMASK_IENV					0x00000001
+#define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_TOC					0x00000003
 #define	WT_APIMASK_TOC_DESTROY				0x00000000
 #define	WT_APIMASK_WT_CACHE				0x00000001
 #define	WT_APIMASK_WT_CACHE_IN				0x00000001
 #define	WT_APIMASK_WT_CACHE_OUT				0x00000003
 #define	WT_APIMASK_WT_DB_CREATE				0x00000000
-#define	WT_APIMASK_WT_ENV_CREATE			0x00000000
+#define	WT_APIMASK_WT_ENV_CREATE			0x00000001
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_OPEN				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003

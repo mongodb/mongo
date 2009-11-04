@@ -59,8 +59,6 @@ typedef	struct __wt_indx {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
-	int32_t srvr_id;		/* Server that owns the subtree */
-
 	/*
 	 * Associated on-page data item.
 	 *
@@ -95,6 +93,7 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the cache layer.
 	 *********************************************************/
+	WT_FH	 *fh;			/* Page's file handle */
 	off_t     offset;		/* Page's file offset */
 	u_int32_t addr;			/* Page's allocation address */
 
@@ -105,15 +104,9 @@ struct __wt_page {
 	 */
 	u_int32_t bytes;		/* Page size */
 
-	/*
-	 * The reference count is used to ensure that pages in use don't get
-	 * pushed out of memory.
-	 */
-	u_int8_t ref;			/* Reference count */
-	u_int8_t notused[3];		/* Spare bytes */
+	u_int32_t generation;		/* LRU generation number */
 
-	TAILQ_ENTRY(__wt_page) q;	/* LRU queue */
-	TAILQ_ENTRY(__wt_page) hq;	/* Hash queue */
+	WT_PAGE *next;			/* Hash queue */
 
 	WT_PAGE_HDR *hdr;		/* On-disk page */
 
@@ -364,7 +357,7 @@ struct __wt_item {
 #define	WT_ITEM_FOREACH(page, item, i)					\
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
-	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))		\
+	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
 /*
  * Btree internal items and off-page duplicates reference another page.
  *
