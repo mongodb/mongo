@@ -1,7 +1,12 @@
+b __wt_api_env_err
+b __wt_api_env_errx
 b __wt_assert
+#b __wt_breakpoint
 b __wt_database_format
 
-b __wt_debug_loadme
+define rr
+run -k 10 -r 1
+end
 
 define da
 print __wt_bt_dump_addr(db, $arg0, "DUMP", 0)

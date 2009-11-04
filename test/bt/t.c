@@ -161,49 +161,46 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 int
 load()
 {
-	WT_TOC *toc;
+	ENV *env;
 	DB *db;
 	FILE *fp;
 
-	__wt_simple_setup(progname, 1, &toc, &db);
-	if (verbose)
-		assert(
-		    db->env->set_verbose(db->env, toc, WT_VERB_SERVERS) == 0);
+	assert(wiredtiger_simple_setup(progname, singlethread, &db) == 0);
+	env = db->env;
 
-	db->set_errpfx(db, toc, progname);
-	assert(db->env->set_cachesize(
-	    db->env, toc, (u_int32_t)cachesize) == 0);
-	assert(db->set_btree_pagesize(
-	    db, toc, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
-	assert(db->open(db, toc, MYDB, 0660, WT_CREATE) == 0);
+	db->errpfx_set(db, progname);
+	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
+	assert(db->btree_pagesize_set(
+	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
+	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 
-	assert(db->bulk_load(db, toc,
+	assert(db->bulk_load(db,
 	    WT_DUPLICATES | WT_SORTED_INPUT, cb_bulk) == 0);
 
 	progress("sync", 0);
-	assert(db->sync(db, toc, 0) == 0);
+	assert(db->sync(db, 0) == 0);
 
 	if (dumps) {
 		progress("debug dump", 0);
 		assert((fp = fopen(MYDUMP, "w")) != NULL);
-		assert(db->dump(db, toc, fp, WT_DEBUG) == 0);
+		assert(db->dump(db, fp, WT_DEBUG) == 0);
 		assert(fclose(fp) == 0);
 
 		progress("print dump", 0);
 		assert((fp = fopen(MYPRINT, "w")) != NULL);
-		assert(db->dump(db, toc, fp, WT_PRINTABLES) == 0);
+		assert(db->dump(db, fp, WT_PRINTABLES) == 0);
 		assert(fclose(fp) == 0);
 	}
 
 	progress("verify", 0);
-	assert(db->verify(db, toc, 0) == 0);
+	assert(db->verify(db, 0) == 0);
 
 	if (stats) {
 		(void)printf("\nLoad statistics:\n");
-		assert(toc->env->stat_print(toc->env, toc, stdout, 0) == 0);
+		assert(env->stat_print(env, stdout, 0) == 0);
 	}
 
-	__wt_simple_teardown(progname, toc, db);
+	assert(wiredtiger_simple_teardown(progname, db) == 0);
 
 	return (0);
 }
@@ -213,6 +210,7 @@ read_check()
 {
 	DB *db;
 	DBT key, data;
+	ENV *env;
 	WT_TOC *toc;
 	int cnt, last_cnt, ret;
 	u_int32_t klen, dlen;
@@ -221,14 +219,13 @@ read_check()
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
 
-	__wt_simple_setup(progname, singlethread, &toc, &db);
-	if (verbose)
-		assert(
-		    db->env->set_verbose(db->env, toc, WT_VERB_SERVERS) == 0);
+	assert(wiredtiger_simple_setup(progname, singlethread, &db) == 0);
+	env = db->env;
 
-	db->set_errpfx(db, toc, progname);
-	assert(db->env->set_cachesize(db->env, toc, (u_int32_t)cachesize) == 0);
-	assert(db->open(db, toc, MYDB, 0660, WT_CREATE) == 0);
+	db->errpfx_set(db, progname);
+	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
+	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
+	assert(env->toc(env, 0, &toc) == 0);
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
@@ -243,7 +240,7 @@ read_check()
 		/* Get the key and look it up. */
 		setkd(cnt, &key.data, &key.size, NULL, NULL, 0);
 		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
-			db->err(db, ret, "get by key failed: {%.*s}",
+			env->err(env, ret, "get by key failed: {%.*s}",
 			    (int)key.size, (char *)key.data);
 			assert(0);
 		}
@@ -253,7 +250,7 @@ read_check()
 		    &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
-			db->errx(db,
+			env->errx(env,
 			    "get by key:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
@@ -277,7 +274,7 @@ read_check()
 		/* Look up the key/data pair by record number. */
 		if ((ret = db->get_recno(
 		    db, toc, (u_int64_t)cnt, &key, NULL, &data, 0)) != 0) {
-			db->err(db, ret, "get by record failed: %d", cnt);
+			env->err(env, ret, "get by record failed: %d", cnt);
 			assert(0);
 		}
 
@@ -286,7 +283,7 @@ read_check()
 		    &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
-			db->errx(db,
+			env->errx(env,
 			    "get by record number %d:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
@@ -297,12 +294,16 @@ read_check()
 		}
 	}
 
+	assert(toc->close(toc, 0) == 0);
+	assert(db->close(db, 0) == 0);
+
 	if (stats) {
 		(void)printf("\nVerify statistics:\n");
-		assert(toc->env->stat_print(toc->env, toc, stdout, 0) == 0);
+		assert(env->stat_print(env, stdout, 0) == 0);
 	}
 
-	__wt_simple_teardown(progname, toc, db);
+	assert(wiredtiger_simple_teardown(progname, NULL) == 0);
+
 	return (0);
 
 }
