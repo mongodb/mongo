@@ -15,13 +15,12 @@ static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 static int __wt_bt_promote(WT_TOC *, WT_PAGE *, u_int64_t, u_int32_t *);
 
 /*
- * __wt_db_bulk_load --
+ * __wt_api_db_bulk_load --
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(WT_TOC *toc)
+__wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 {
-	wt_args_db_bulk_load_unpack;
 	DBT *key, *data, key_copy, data_copy;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	IDB *idb;
@@ -29,10 +28,11 @@ __wt_db_bulk_load(WT_TOC *toc)
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
+	WT_TOC *toc;
 	u_int32_t dup_count, dup_space, len;
 	int ret;
 
-	env = toc->env;
+	env = db->env;
 	idb = db->idb;
 
 	WT_DB_FCHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
@@ -47,6 +47,8 @@ __wt_db_bulk_load(WT_TOC *toc)
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(lastkey_std);
+
+	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
 
 	/*
 	 * Allocate our first page -- we do this before we look at any keys
@@ -443,7 +445,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 
 		/* Loading duplicates, so a key change means we're done. */
 		if (lastkey->size != key->size ||
-		    db->btree_dup_compare(db, lastkey, key) != 0) {
+		    db->btree_compare_dup(db, lastkey, key) != 0) {
 			*keyp = key;
 			*datap = data;
 			break;

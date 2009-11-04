@@ -11,8 +11,8 @@
 # Threads-of-control
 #############################################
 Toc
-	SINGLE_THREADED			# Single threaded
-	RUNNING				# Thread being served
+	WAITING_SHARED			# waiting for shared cache access
+	WAITING_PRIVATE			# waiting for private cache access
 
 Toc.destroy
 
@@ -22,9 +22,12 @@ Toc.destroy
 Env					# Public handle
 
 IEnv					# Private handle
+	RUNNING
 	SINGLE_THREADED			# Single threaded
 
 wt_env_create
+	SINGLE_THREADED
+
 Env.close
 Env.db_create
 Env.destroy
@@ -41,7 +44,6 @@ Env.toc_create
 Env.verbose
 	VERB_FILEOPS			# Verbose: major file operations
 	VERB_FILEOPS_ALL		# Verbose: all file operations
-	VERB_SERVERS			# Verbose: server execution
 
 #############################################
 # Databases
@@ -58,6 +60,8 @@ Db.bulk_load
 	SORTED_INPUT			# Load input is in sorted order
 
 Db.close
+	INVALID				# Ignore the structure, it's dead.
+
 Db.destroy
 
 Db.dump
@@ -82,7 +86,7 @@ Dbt
 	DBT_ALLOC			# Allocate application-owned DBT memory
 
 wt_cache
-	READONLY			# Cache is readonly (multi-threaded)
+	INITIALIZED			# Cache has been initialized
 
 wt_indx
 	ALLOCATED			# Index key in allocated memory

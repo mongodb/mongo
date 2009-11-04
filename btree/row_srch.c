@@ -13,51 +13,11 @@ static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_INDX **);
 static int __wt_bt_search_recno(WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
 
 /*
- * __wt_db_get_stoc --
- *	Db.get method when scheduled by a server thread.
- */
-int
-__wt_db_get_stoc(WT_TOC *toc)
-{
-	wt_args_db_get_stoc_unpack;
-
-	return (__wt_db_get_worker(db, toc, key, pkey, data, flags));
-}
-
-/*
- * __wt_db_get --
+ * __wt_api_db_get --
  *	Db.get method when called directly from a user thread.
  */
 int
-__wt_db_get(
-    DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
-{
-	IDB *idb;
-	int ret;
-
-	/*
-	 * The initial search in a database is always done using the
-	 * the IDB cache.
-	 */
-	toc->db = db;
-	idb = db->idb;
-	toc->cache = idb->cache;
-	WT_STAT_INCR(idb->stats,
-	    DB_READ_BY_KEY, "database read-by-key operations");
-
-	if ((ret = __wt_db_get_worker(
-	    db, toc, key, pkey, data, flags)) == WT_RESCHEDULE)
-		ret = db->get_stoc(db, toc, key, pkey, data, flags);
-
-	return (ret);
-}
-
-/*
- * __wt_db_get_worker --
- *	Db.get method that does the real work.
- */
-int
-__wt_db_get_worker(
+__wt_api_db_get(
     DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
@@ -66,11 +26,16 @@ __wt_db_get_worker(
 	u_int32_t type;
 	int ret;
 
+	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
+	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
+
 	idb = db->idb;
 
-	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
+	WT_STAT_INCR(idb->stats,
+	    DB_READ_BY_KEY, "database read-by-key operations");
 
-	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
+	/* Initialize the thread-of-control structure. */
+	WT_TOC_INIT(toc, db);
 
 	/* Search the primary btree for the key. */
 	WT_RET(__wt_bt_search(toc, key, &page, &indx));
@@ -92,6 +57,8 @@ __wt_db_get_worker(
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
+	WT_TOC_CLEAR(toc);
+
 	return (ret);
 }
 
@@ -112,28 +79,13 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 	db = toc->db;
 	idb = db->idb;
 
-	/*
-	 * Check for a rescheduled operation, where the root for this server
-	 * was set by a previous search; check for an empty tree, as well.
-	 *
-	 * If the operation is being rescheduled to a different server, get
-	 * the page; otherwise, we can use the always-pinned root page for
-	 * the database.
-	 */
-	if ((addr = toc->root_addr) == WT_ADDR_INVALID) {
-		if ((addr = idb->root_addr) == WT_ADDR_INVALID)
-			return (WT_NOTFOUND);
-		page = idb->root_page;
-		isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
-		put_page = 0;
-	} else {
-		isleaf = toc->root_isleaf;
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
-		put_page = 1;
-	}
+	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+		return (WT_NOTFOUND);
+	page = idb->root_page;
+	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
 
 	/* Search the tree. */
-	for (;; put_page = 1) {
+	for (put_page = 0;; put_page = 1) {
 		/*
 		 * Do a binary search of the page -- this loop must be tight.
 		 */
@@ -204,14 +156,6 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		if (put_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
 
-		/* Check if we're switching servers. */
-		if (ip->srvr_id != 0) {
-			toc->srvr = ip->srvr_id;
-			toc->root_addr = addr;
-			toc->root_isleaf = next_isleaf;
-			return (WT_RESCHEDULE);
-		}
-
 		/*
 		 * Failed to match on a leaf page -- we're done, return the
 		 * failure.
@@ -232,36 +176,24 @@ err:	if (put_page)
 }
 
 /*
- * __wt_db_get_stoc --
- *	Db.get method when scheduled by a server thread.
- */
-int
-__wt_db_get_recno_stoc(WT_TOC *toc)
-{
-	wt_args_db_get_recno_stoc_unpack;
-
-	return (__wt_db_get_recno_worker(
-	    db, toc, recno, key, pkey, data, flags));
-}
-
-/*
- * __wt_db_get_recno --
+ * __wt_api_db_get_recno --
  *	Db.get_recno method when called directly from a user thread.
  */
 int
-__wt_db_get_recno(DB *db, WT_TOC *toc,
+__wt_api_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
+	WT_INDX *indx;
+	WT_PAGE *page;
+	u_int32_t type;
 	int ret;
 
-	/*
-	 * The initial search in a database is always done using the
-	 * the IDB cache.
-	 */
-	toc->db = db;
+	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
+	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
+
 	idb = db->idb;
-	toc->cache = idb->cache;
+
 	WT_STAT_INCR(idb->stats,
 	    DB_READ_BY_RECNO, "database read-by-recno operations");
 
@@ -269,37 +201,8 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	if (idb->root_page->records < recno)
 		return (WT_ERROR);
 
-	/*
-	 * The initial search in a database is always done using the
-	 * master server and the IDB cache.
-	 */
-	if ((ret = __wt_db_get_recno_worker(
-	    db, toc, recno, key, pkey, data, flags)) == WT_RESCHEDULE)
-		ret = db->get_recno_stoc(
-		    db, toc, recno, key, pkey, data, flags);
-
-	return (ret);
-}
-
-/*
- * __wt_db_get_recno_worker --
- *	Db.get_recno method that does the real work.
- */
-int
-__wt_db_get_recno_worker(DB *db, WT_TOC *toc,
-    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
-{
-	IDB *idb;
-	WT_PAGE *page;
-	WT_INDX *indx;
-	u_int32_t type;
-	int ret;
-
-	idb = db->idb;
-
-	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
-
-	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
+	/* Initialize the thread-of-control structure. */
+	WT_TOC_INIT(toc, db);
 
 	/* Search the primary btree for the key. */
 	WT_RET(__wt_bt_search_recno(toc, recno, &page, &indx));
@@ -321,6 +224,8 @@ __wt_db_get_recno_worker(DB *db, WT_TOC *toc,
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
+	WT_TOC_CLEAR(toc);
+
 	return (ret);
 }
 
@@ -341,30 +246,14 @@ __wt_bt_search_recno(
 
 	idb = toc->db->idb;
 
-	/*
-	 * Check for a rescheduled operation, where the root for this server
-	 * was set by a previous search; check for an empty tree, as well.
-	 *
-	 * If the operation is being rescheduled to a different server, get
-	 * the page; otherwise, we can use the always-pinned root page for
-	 * the database.
-	 */
-	if ((addr = toc->root_addr) == WT_ADDR_INVALID) {
-		if ((addr = idb->root_addr) == WT_ADDR_INVALID)
-			return (WT_NOTFOUND);
-		page = idb->root_page;
-		record_cnt = 0;
-		isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
-		put_page = 0;
-	} else {
-		record_cnt = toc->root_record_cnt;
-		isleaf = toc->root_isleaf;
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
-		put_page = 1;
-	}
+	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+		return (WT_NOTFOUND);
+	page = idb->root_page;
+	record_cnt = 0;
+	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
 
 	/* Search the tree. */
-	for (;; put_page = 1) {
+	for (put_page = 0;; put_page = 1) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
@@ -387,15 +276,6 @@ __wt_bt_search_recno(
 		/* We're done with the page. */
 		if (put_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
-
-		/* Check if we're switching servers. */
-		if (ip->srvr_id != 0) {
-			toc->srvr = ip->srvr_id;
-			toc->root_addr = addr;
-			toc->root_record_cnt = record_cnt;
-			toc->root_isleaf = next_isleaf;
-			return (WT_RESCHEDULE);
-		}
 
 		isleaf = next_isleaf;
 

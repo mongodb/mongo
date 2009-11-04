@@ -24,18 +24,18 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 }
 
 /*
- * __wt_db_dump --
+ * __wt_api_db_dump --
  *	Db.dump method.
  */
 int
-__wt_db_dump(WT_TOC *toc)
+__wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 {
-	wt_args_db_dump_unpack;
 	DBT last_key_ovfl, last_key_std, *last_key;
 	ENV *env;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE *page, *ovfl_page;
+	WT_TOC *toc;
 	u_int32_t addr, i, item_len;
 	int dup_ahead, ret;
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
@@ -46,12 +46,14 @@ __wt_db_dump(WT_TOC *toc)
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
-		return (__wt_bt_dump_debug(toc, NULL, stream));
+		return (__wt_bt_dump_debug(db, NULL, stream));
 #else
 		__wt_db_errx(db, "library not built for debugging");
 		return (WT_ERROR);
 #endif
 	}
+
+	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
 
 	dup_ahead = ret = 0;
 	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;

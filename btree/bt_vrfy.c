@@ -16,44 +16,43 @@ static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, bitstr_t *, FILE *);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
 
 /*
- * __wt_db_verify --
- *	Db.verify method.
+ * __wt_api_db_verify --
+ *	Verify a Btree.
  */
 int
-__wt_db_verify(WT_TOC *toc)
+__wt_api_db_verify(DB *db, u_int32_t flags)
 {
-	wt_args_db_verify_unpack;
-
-	WT_DB_FCHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
-
-	return (__wt_bt_verify_int(toc, NULL));
+	return (__wt_db_verify(db, NULL, flags));
 }
 
 /*
- * __wt_bt_verify_int --
+ * __wt_db_verify --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_bt_verify_int(WT_TOC *toc, FILE *fp)
+__wt_db_verify(DB *db, FILE *fp, u_int32_t flags)
 {
-	DB *db;
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
+	WT_TOC *toc;
 	bitstr_t *fragbits;
 	u_int32_t frags;
 	int ret;
 
-	env = toc->env;
-	db = toc->db;
+	env = db->env;
 	idb = db->idb;
 	ret = 0;
+
+	WT_DB_FCHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
+
+	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
 
 	/*
 	 * Read the database description chunk to get the allocation and
 	 * page sizes.
 	 */
-	WT_RET(__wt_bt_desc_read(toc));
+	WT_ERR(__wt_bt_desc_read(toc));
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -99,6 +98,7 @@ __wt_bt_verify_int(WT_TOC *toc, FILE *fp)
 	ret = __wt_bt_verify_checkfrag(db, fragbits);
 
 err:	__wt_free(env, fragbits);
+
 	return (ret);
 }
 
@@ -235,7 +235,7 @@ __wt_bt_verify_level(
 			 */
 			if (hdr->type == WT_PAGE_DUP_INT ||
 			    hdr->type == WT_PAGE_DUP_LEAF)
-				func = db->btree_dup_compare;
+				func = db->btree_compare_dup;
 			else
 				func = db->btree_compare;
 		}
@@ -392,7 +392,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, bitstr_t *fragbits)
 	/* Set the comparison function. */
 	if (hdr->type == WT_PAGE_DUP_INT ||
 	    hdr->type == WT_PAGE_DUP_LEAF)
-		func = db->btree_dup_compare;
+		func = db->btree_compare_dup;
 	else
 		func = db->btree_compare;
 
@@ -630,7 +630,7 @@ __wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 	/* Set the comparison function. */
 	if (hdr->type == WT_PAGE_DUP_INT ||
 	    hdr->type == WT_PAGE_DUP_LEAF)
-		func = db->btree_dup_compare;
+		func = db->btree_compare_dup;
 	else
 		func = db->btree_compare;
 
@@ -823,7 +823,7 @@ err:	WT_FREE_AND_CLEAR(env, _a.item_ovfl.data);
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (ret == 0 && fp != NULL)
-		ret = __wt_bt_dump_page(toc, page, NULL, fp, 0);
+		ret = __wt_bt_dump_page(db, page, NULL, fp, 0);
 #endif
 
 	return (ret);

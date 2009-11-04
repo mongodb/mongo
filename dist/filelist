@@ -18,7 +18,6 @@ btree/btree_ret.c
 btree/btree_stat.c
 btree/btree_sync.c
 btree/btree_vrfy.c
-db/db_close.c
 db/db_err.c
 db/db_getset.c
 db/db_handle.c
@@ -28,11 +27,11 @@ db/db_sync.c
 engine/engine.c
 engine/toc.c
 env/env_cache.c
-env/env_close.c
 env/env_err.c
 env/env_getset.c
 env/env_global.c
 env/env_handle.c
+env/env_init.c
 env/env_open.c
 env/env_stat.c
 os_posix/os_abort.c

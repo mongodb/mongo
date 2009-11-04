@@ -11,297 +11,300 @@
 #	manual page headers
 #	structure method fields
 #
-# The WiredTiger primary handles are the WT_TOC and the  DB.  The DB handle has
-# the same function as the Berkeley DB handle of the same name, that is, it's a
-# single table/database.  WiredTiger adds the WT_TOC handle, which identifies a
-# single thread of control running in an environment.  (There is an ENV
-# structure in WiredTiger, but it's not currently used by applications.)   In
-# other words, instead of surfacing an ENV handle as in Berkeley DB, WiredTiger
-# surfaces a thread-of-control handle which has a reference to its environment.
+# The WiredTiger primary handles are the WT_TOC, the DB and the ENV.  The DB/ENV
+# handles have the same functions as the Berkeley DB/ENV handles, that is, they
+# reference a database and a database environment.  WiredTiger adds the WT_TOC
+# handle, which identifies a single thread of control running in an environment.
 #
 # The initial line of each entry in the api file is the handle and method name,
-# separated by a single '.'.  The handles are either "toc" (a WT_TOC method),
-# or "db" (a DB method).
+# separated by a single '.'.
 #
 # Subsequent lines are a keyword, followed by additional information.  Possible
 # keywords and their following information are as follows:
 #
-#	argument: method argument name/declaration[1]
+#	argument: method argument name/declaration
+#		An argument to the function.  The "argument" keyword can be
+#		listed multiple times, in the argument order, all of the
+#		others are expected to be single lines.
 #
-#		In a declaration, @S is replaced by the argument name -- we
-#		do that because the name goes in different places in each
-#		declaration, and sometimes we want the name, and sometimes
-#		we don't.
+#		In a declaration, @S is replaced by the argument name when
+#		needed, sometimes we want the name, and sometimes we don't.
 #
-#	config: [arg,] arg
-#		getset  -- an API getter/setter method
-#		local	-- no need to connect to the server[2]
-#		method	-- a method returning an int
-#		methodV -- a method returning void
-#		notoc	-- method doesn't take a WT_TOC reference
-#		open    -- illegal until after the handle.open method call
-#		verify  -- setters call a subroutine to validate the arguments
+#	config: [arg, ] arg
+#		getter	-- getter method
+#		method	-- method returns an int
+#		methodV -- method returns void
+#		setter	-- setter method
+#		verify  -- setters call a function to validate the arguments
 #
 #	flag: [flag-name,] flag-name
+#		The name of a flag taken by this method or function.
 #
-# [1]
-# Only the "argument" keyword can be listed multiple times, all of the others
-# are expected to be single lines.
-#
-# [2]
-# Don't mark API methods as "local" unless you're sure -- what this keyword
-# means is that multiple threads of control can call the function without any
-# locking on the underlying structures being manipulated.  (It's not that the
-# server does "locking", but simply by switching to a server, you've serialized
-# access to the underlying structure.)
-env.open
-	config:	method
-	argument: home/const char *@S
-	argument: mode/mode_t @S
+#	off/on: [name, ] name
+#		List of method transitions to/from allowed/not-allowed.
+
+###################################################
+# WT_TOC method declarations
+###################################################
+wt_toc.close
+	config: method
 	argument: flags/u_int32_t @S
+	on: init
+
+###################################################
+# ENV method declarations
+###################################################
+env.cachesize_get
+	config: method, getter
+	argument: cachesize/u_int32_t *@S
+	on: init
+env.cachesize_set
+	config: method, setter
+	argument: cachesize/u_int32_t @S
+	on: init
 
 env.close
 	config: method
 	argument: flags/u_int32_t @S
+	on: init
 
-env.db_create
+env.db
 	config: method
 	argument: flags/u_int32_t @S
 	argument: dbp/DB **@S
-
-env.destroy
-	config: method,  local, notoc
-	argument: flags/u_int32_t @S
+	on: open
 
 env.err
-	config: methodV, local, notoc
+	config: methodV
 	argument: err/int @S
 	argument: fmt/const char *@S, ...
+	on: init
+
+env.errcall_get
+	config: method, getter
+	argument: errcall/void (**@S)(const ENV *, const char *)
+	on: init
+env.errcall_set
+	config: method, setter
+	argument: errcall/void (*@S)(const ENV *, const char *)
+	on: init
+
+env.errfile_get
+	config: method, getter
+	argument: errfile/FILE **@S
+	on: init
+env.errfile_set
+	config: method, setter
+	argument: errfile/FILE *@S
+	on: init
+
+env.errpfx_get
+	config: method, getter
+	argument: errpfx/const char **@S
+	on: init
+env.errpfx_set
+	config: method, setter
+	argument: errpfx/const char *@S
+	on: init
 
 env.errx
-	config: methodV, local, notoc
+	config: methodV
 	argument: fmt/const char *@S, ...
+	on: init
 
-env.start
-	config: method, local, notoc
+env.open
+	config: method
+	argument: home/const char *@S
+	argument: mode/mode_t @S
 	argument: flags/u_int32_t @S
+	on: init
+	off: open
 
 env.stat_clear
 	config: method
 	argument: flags/u_int32_t @S
+	on: open
 
 env.stat_print
 	config: method
 	argument: stream/FILE *@S
 	argument: flags/u_int32_t @S
+	on: open
 
-env.stop
-	config: method, local, notoc
-	argument: flags/u_int32_t @S
-
-env.toc_create
-	config: method, local, notoc
+env.toc
+	config: method
 	argument: flags/u_int32_t @S
 	argument: tocp/WT_TOC **@S
+	on: open
 
-###################################################
-# Env getter/setter method declarations
-###################################################
-env.get_errcall
-	config: method, getset
-	argument: errcall/void (**@S)(const ENV *, const char *)
-env.set_errcall
-	config: method, getset
-	argument: errcall/void (*@S)(const ENV *, const char *)
-
-env.get_errfile
-	config: method, getset
-	argument: errfile/FILE **@S
-env.set_errfile
-	config: method, getset
-	argument: errfile/FILE *@S
-
-env.get_errpfx
-	config: method, getset
-	argument: errpfx/const char **@S
-env.set_errpfx
-	config: method, getset
-	argument: errpfx/const char *@S
-
-env.get_verbose
-	config: method, getset
+env.verbose_get
+	config: method, getter
 	argument: verbose/u_int32_t *@S
-env.set_verbose
-	config: method, getset, verify
+	on: init
+env.verbose_set
+	config: method, setter, verify
 	argument: verbose/u_int32_t @S
-
-env.get_cachesize
-	config: method, getset
-	argument: cachesize/u_int32_t *@S
-env.set_cachesize
-	config: method, getset
-	argument: cachesize/u_int32_t @S
-
-###################################################
-# WT_TOC method declarations
-###################################################
-wt_toc.destroy
-	config: method, local, notoc
-	argument: flags/u_int32_t @S
+	on: init
 
 ###################################################
 # Db standalone method declarations
 ###################################################
+db.btree_compare_get
+	config: method, getter
+	argument: btree_compare/int (**@S)(DB *, const DBT *, const DBT *)
+	on: init
+db.btree_compare_set
+	config: method, setter
+	argument: btree_compare/int (*@S)(DB *, const DBT *, const DBT *)
+	off: open
+	on: init
+
+db.btree_compare_dup_get
+	config: method, getter
+	argument: btree_compare_dup/int (**@S)(DB *, const DBT *, const DBT *)
+	on: init
+db.btree_compare_dup_set
+	config: method, setter
+	argument: btree_compare_dup/int (*@S)(DB *, const DBT *, const DBT *)
+	on: init
+	off: open
+
+db.btree_compare_int_get
+	config: method, getter
+	argument: btree_compare_int/int *@S
+	on: init
+db.btree_compare_int_set
+	config: method, setter, verify
+	argument: btree_compare_int/int @S
+	on: init
+	off: open
+
+db.btree_dup_offpage_get
+	config: method, getter
+	argument: btree_dup_offpage/u_int32_t *@S
+	on: init
+db.btree_dup_offpage_set
+	config: method, setter
+	argument: btree_dup_offpage/u_int32_t @S
+	on: init
+	off: open
+
+db.btree_itemsize_get
+	config: method, getter
+	argument: intlitemsize/u_int32_t *@S
+	argument: leafitemsize/u_int32_t *@S
+	on: init
+db.btree_itemsize_set
+	config: method, setter
+	argument: intlitemsize/u_int32_t @S
+	argument: leafitemsize/u_int32_t @S
+	on: init
+	off: open
+
+db.btree_pagesize_get
+	config: method, getter
+	argument: allocsize/u_int32_t *@S
+	argument: intlsize/u_int32_t *@S
+	argument: leafsize/u_int32_t *@S
+	argument: extsize/u_int32_t *@S
+	on: init
+db.btree_pagesize_set
+	config: method, setter
+	argument: allocsize/u_int32_t @S
+	argument: intlsize/u_int32_t @S
+	argument: leafsize/u_int32_t @S
+	argument: extsize/u_int32_t @S
+	on: init
+	off: open
+
 db.bulk_load
 	config: method
 	argument: flags/u_int32_t @S
 	argument: cb/int (*@S)(DB *, DBT **, DBT **)
+	on: open
 
 db.close
 	config: method
 	argument: flags/u_int32_t @S
-
-db.destroy
-	config: method
-	argument: flags/u_int32_t @S
+	on: init
 
 db.dump
-	config: method, open
+	config: method
 	argument: stream/FILE *@S
 	argument: flags/u_int32_t @S
+	on: open
 
-db.err
-	config: methodV, local, notoc
-	argument: err/int @S
-	argument: fmt/const char *@S, ...
+db.errcall_get
+	config: method, getter
+	argument: errcall/void (**@S)(const DB *, const char *)
+	on: init
+db.errcall_set
+	config: method, setter
+	argument: errcall/void (*@S)(const DB *, const char *)
+	on: init
 
-db.errx
-	config: methodV, local, notoc
-	argument: fmt/const char *@S, ...
+db.errfile_get
+	config: method, getter
+	argument: errfile/FILE **@S
+	on: init
+db.errfile_set
+	config: method, setter
+	argument: errfile/FILE *@S
+	on: init
+
+db.errpfx_get
+	config: method, getter
+	argument: errpfx/const char **@S
+	on: init
+db.errpfx_set
+	config: method, setter
+	argument: errpfx/const char *@S
+	on: init
 
 db.get
-	config: method, local, open
+	config: method
+	argument: toc/WT_TOC *@S
 	argument: key/DBT *@S
 	argument: pkey/DBT *@S
 	argument: data/DBT *@S
 	argument: flags/u_int32_t @S
-
-db.get_stoc
-	config: method, open
-	argument: key/DBT *@S
-	argument: pkey/DBT *@S
-	argument: data/DBT *@S
-	argument: flags/u_int32_t @S
+	on: open
 
 db.get_recno
-	config: method, local, open
+	config: method
+	argument: toc/WT_TOC *@S
 	argument: recno/u_int64_t @S
 	argument: key/DBT *@S
 	argument: pkey/DBT *@S
 	argument: data/DBT *@S
 	argument: flags/u_int32_t @S
-
-db.get_recno_stoc
-	config: method, open
-	argument: recno/u_int64_t @S
-	argument: key/DBT *@S
-	argument: pkey/DBT *@S
-	argument: data/DBT *@S
-	argument: flags/u_int32_t @S
+	on: open
 
 db.open
 	config: method
 	argument: dbname/const char *@S
 	argument: mode/mode_t @S
 	argument: flags/u_int32_t @S
+	off: open
+	on: init
 
 db.stat_clear
 	config: method
 	argument: flags/u_int32_t @S
+	on: open
 
 db.stat_print
 	config: method
 	argument: stream/FILE * @S
 	argument: flags/u_int32_t @S
+	on: open
 
 db.sync
-	config: method, open
+	config: method
 	argument: flags/u_int32_t @S
+	on: open
 
 db.verify
-	config: method, open
+	config: method
 	argument: flags/u_int32_t @S
-
-###################################################
-# Db getter/setter method declarations
-###################################################
-db.get_errcall
-	config: method, getset
-	argument: errcall/void (**@S)(const DB *, const char *)
-db.set_errcall
-	config: method, getset
-	argument: errcall/void (*@S)(const DB *, const char *)
-
-db.get_errfile
-	config: method, getset
-	argument: errfile/FILE **@S
-db.set_errfile
-	config: method, getset
-	argument: errfile/FILE *@S
-
-db.get_errpfx
-	config: method, getset
-	argument: errpfx/const char **@S
-db.set_errpfx
-	config: method, getset
-	argument: errpfx/const char *@S
-
-db.get_btree_compare
-	config: method, getset
-	argument: btree_compare/int (**@S)(DB *, const DBT *, const DBT *)
-db.set_btree_compare
-	config: method, getset
-	argument: btree_compare/int (*@S)(DB *, const DBT *, const DBT *)
-
-db.get_btree_compare_int
-	config: method, getset
-	argument: btree_compare_int/int *@S
-db.set_btree_compare_int
-	config: method, getset, verify
-	argument: btree_compare_int/int @S
-
-db.get_btree_dup_compare
-	config: method, getset
-	argument: btree_dup_compare/int (**@S)(DB *, const DBT *, const DBT *)
-db.set_btree_dup_compare
-	config: method, getset
-	argument: btree_dup_compare/int (*@S)(DB *, const DBT *, const DBT *)
-
-db.get_btree_itemsize
-	config: method, getset
-	argument: intlitemsize/u_int32_t *@S
-	argument: leafitemsize/u_int32_t *@S
-db.set_btree_itemsize
-	config: method, getset
-	argument: intlitemsize/u_int32_t @S
-	argument: leafitemsize/u_int32_t @S
-
-db.get_btree_pagesize
-	config: method, getset
-	argument: allocsize/u_int32_t *@S
-	argument: intlsize/u_int32_t *@S
-	argument: leafsize/u_int32_t *@S
-	argument: extsize/u_int32_t *@S
-db.set_btree_pagesize
-	config: method, getset
-	argument: allocsize/u_int32_t @S
-	argument: intlsize/u_int32_t @S
-	argument: leafsize/u_int32_t @S
-	argument: extsize/u_int32_t @S
-
-db.get_btree_dup_offpage
-	config: method, getset
-	argument: btree_dup_offpage/u_int32_t *@S
-db.set_btree_dup_offpage
-	config: method, getset
-	argument: btree_dup_offpage/u_int32_t @S
+	on: open

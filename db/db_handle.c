@@ -9,18 +9,16 @@
 
 #include "wt_internal.h"
 
-static int __wt_db_config_default(DB *);
-static int __wt_db_destroy_int(WT_TOC *, u_int32_t);
-static int __wt_idb_config_default(WT_TOC *);
+static int  __wt_db_config_default(DB *);
+static int  __wt_idb_config_default(DB *);
 
 /*
- * wt_db_create --
+ * __wt_api_env_db --
  *	DB constructor.
  */
 int
-__wt_env_db_create(WT_TOC *toc)
+__wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
 {
-	wt_args_env_db_create_unpack;
 	DB *db;
 	IDB *idb;
 	IENV *ienv;
@@ -37,7 +35,6 @@ __wt_env_db_create(WT_TOC *toc)
 	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
 
 	/* Connect everything together. */
-	toc->db = db;
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
@@ -45,66 +42,12 @@ __wt_env_db_create(WT_TOC *toc)
 
 	/* Configure the DB and the IDB. */
 	WT_ERR(__wt_db_config_default(db));
-	WT_ERR(__wt_idb_config_default(toc));
-
-	/* Insert the database on the environment's list. */
-	WT_ERR(__wt_lock(&ienv->mtx));
-	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
-	WT_ERR(__wt_unlock(&ienv->mtx));
+	WT_ERR(__wt_idb_config_default(db));
 
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_destroy_int(toc, 0);
-	return (ret);
-}
-
-/*
- * __wt_db_destroy --
- *	Db.destroy method (DB destructor).
- */
-int
-__wt_db_destroy(WT_TOC *toc)
-{
-	wt_args_db_destroy_unpack;
-
-	return (__wt_db_destroy_int(toc, flags));
-}
-
-/*
- * __wt_db_destroy_int --
- *	Db.destroy method (DB destructor), internal version.
- */
-static int
-__wt_db_destroy_int(WT_TOC *toc, u_int32_t flags)
-{
-	DB *db;
-	ENV *env;
-	IDB *idb;
-	int ret;
-
-	db = toc->db;
-	env = toc->env;
-	idb = db->idb;
-	ret = 0;
-
-	WT_DB_FCHK_NOTFATAL(
-	    db, "Db.destroy", flags, WT_APIMASK_DB_DESTROY, ret);
-
-	/* Discard the underlying IDB structure. */
-	WT_TRET(__wt_idb_destroy(toc, 0));
-
-	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, idb->stats);
-	WT_FREE_AND_CLEAR(env, idb->dstats);
-
-	/* Free the DB structure. */
-	memset(db, OVERWRITE_BYTE, sizeof(db));
-	__wt_free(env, db);
-
-	/* The TOC can't even find it. */
-	toc->db = NULL;
-
+err:	(void)__wt_api_db_close(db, 0);
 	return (ret);
 }
 
@@ -121,9 +64,9 @@ __wt_db_config_default(DB *db)
 	env = db->env;
 	idb = db->idb;
 
-	__wt_db_config_methods(db);
+	__wt_methods_db_init_on(db);
 
-	db->btree_compare = db->btree_dup_compare = __wt_bt_lex_compare;
+	db->btree_compare = db->btree_compare_dup = __wt_bt_lex_compare;
 
 	WT_RET(__wt_stat_alloc_idb_stats(env, &idb->stats));
 	WT_RET(__wt_stat_alloc_idb_dstats(env, &idb->dstats));
@@ -132,35 +75,99 @@ __wt_db_config_default(DB *db)
 }
 
 /*
- * __wt_idb_destroy --
- *	Destroy the DB's underlying IDB structure.
+ * __wt_idb_config_default --
+ *	Set default configuration for a just-created IDB handle.
+ */
+static int
+__wt_idb_config_default(DB *db)
+{
+	ENV *env;
+	IDB *idb;
+	IENV *ienv;
+
+	env = db->env;
+	idb = db->idb;
+	ienv = env->ienv;
+
+	idb->db = db;
+
+	WT_RET(env->toc(env, 0, &idb->toc_internal));
+
+	__wt_lock(env, &ienv->mtx);		/* Add to the ENV's list */
+	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
+	__wt_unlock(&ienv->mtx);
+
+	return (0);
+}
+
+/*
+ * __wt_api_db_close --
+ *	Db.close method (DB close & handle destructor).
  */
 int
-__wt_idb_destroy(WT_TOC *toc, int refresh)
+__wt_api_db_close(DB *db, u_int32_t flags)
 {
-	DB *db;
 	ENV *env;
 	IDB *idb;
 	int ret;
 
-	env = toc->env;
-	db = toc->db;
+	env = db->env;
 	idb = db->idb;
 	ret = 0;
 
-	/* Check that there's something to destroy. */
+	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
+
+	/*
+	 * No matter what, this handle is dead -- make sure the structure is
+	 * ignored.
+	 */
+	F_SET(idb, WT_INVALID);
+	WT_FLUSH_MEMORY;
+
+	/* Flush any dirty blocks from the underlying cache. */
+	WT_TRET(__wt_bt_sync(db));
+
+	/* Close the underlying Btree. */
+	WT_TRET(__wt_bt_close(db));
+
+	/* Discard the underlying IDB object. */
+	WT_TRET(__wt_idb_close(db, 0));
+
+	/* Make sure the user can't screw up, and discard the DB object. */
+	memset(db, OVERWRITE_BYTE, sizeof(db));
+	WT_FREE_AND_CLEAR(env, db);
+
+	return (ret);
+}
+
+/*
+ * __wt_idb_close --
+ *	Db.close method (IDB close & handle destructor).
+ */
+int
+__wt_idb_close(DB *db, int refresh)
+{
+	ENV *env;
+	IDB *idb;
+	IENV *ienv;
+	int ret;
+
+	env = db->env;
+	idb = db->idb;
+	ienv = env->ienv;
+	ret = 0;
+
+	/* Check that there's something to close. */
 	if (idb == NULL)
 		return (0);
 
-	/* Free allocated memory. */
+	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->dbname);
 
-	/* If we're truly done, discard the actual memory. */
-	if (!refresh) {
-		__wt_free(env, idb);
-		db->idb = NULL;
-		return (0);
-	}
+	WT_TRET(idb->toc_internal->close(idb->toc_internal, 0));
+
+	WT_FREE_AND_CLEAR(env, idb->stats);
+	WT_FREE_AND_CLEAR(env, idb->dstats);
 
 	/*
 	 * This is the guts of the split between the public/private, DB/IDB
@@ -170,31 +177,19 @@ __wt_idb_destroy(WT_TOC *toc, int refresh)
 	 * just allocated.  This requires the IDB structure never be modified
 	 * by DB configuration, we'd lose that configuration here.
 	 */
-	memset(idb, 0, sizeof(idb));
-	WT_TRET(__wt_idb_config_default(toc));
+	if (refresh) {
+		memset(idb, 0, sizeof(idb));
+		WT_TRET(__wt_idb_config_default(db));
+		return (ret);
+	}
 
-	return (ret);
-}
+	__wt_lock(env, &ienv->mtx);		/* Delete from the ENV's list */
+	TAILQ_REMOVE(&ienv->dbqh, idb, q);
+	__wt_unlock(&ienv->mtx);
 
-/*
- * __wt_idb_config_default --
- *	Set default configuration for a just-created IDB handle.
- */
-static int
-__wt_idb_config_default(WT_TOC *toc)
-{
-	IDB *idb;
+	__wt_free(env, idb);
 
-	idb = toc->db->idb;
-
-	WT_RET(__wt_cache_create(toc, &idb->cache));
-
-	/*
-	 * BUG!!!
-	 * Why set this here?
-	 */
-	toc->cache = idb->cache;
-
+	db->idb = NULL;
 	return (0);
 }
 
@@ -203,7 +198,8 @@ __wt_db_lockout_err(DB *db)
 {
 	__wt_db_errx(db,
 	    "This Db handle has failed for some reason, and can no longer "
-	    "be used; the only method permitted on it is Db.destroy");
+	    "be used; the only method permitted on it is Db.close which "
+	    "discards the handle permanently");
 	return (WT_ERROR);
 }
 

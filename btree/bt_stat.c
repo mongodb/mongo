@@ -17,28 +17,20 @@ static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
  *	Return Btree statistics.
  */
 int
-__wt_bt_stat(WT_TOC *toc)
+__wt_bt_stat(DB *db)
 {
-	DB *db;
 	IDB *idb;
-	WT_PAGE *page;
-	int ret;
+	WT_TOC *toc;
 
-	fprintf(stderr, "stat not supported with multiple caches\n");
-	return (0);
-
-	db = toc->db;
 	idb = db->idb;
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL, "number of levels in the Btree");
 
+	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+
 	/* If no root address has been set, it's a one-leaf-page database. */
-	if (idb->root_addr == WT_ADDR_INVALID) {
-		WT_RET(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
-		ret = __wt_bt_stat_page(toc, page);
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
-		return (ret);
-	}
+	if (idb->root_addr == WT_ADDR_INVALID)
+		return (__wt_bt_stat_page(toc, idb->root_page));
 
 	return (__wt_bt_stat_level(toc, idb->root_addr, 0));
 }
@@ -50,16 +42,14 @@ __wt_bt_stat(WT_TOC *toc)
 static int
 __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 {
-	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr_arg;
 	int first, isleaf_arg, ret;
 
-	db = toc->db;
-	idb = db->idb;
-	ret = 0;
+	idb = toc->db->idb;
+	isleaf_arg = ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {

@@ -5,21 +5,25 @@
 #
 # $Id$
 
-import filecmp, os, re, shutil, string
+import filecmp, os, re, shutil, string, sys
 from collections import defaultdict
 
 # api_load --
 #       Read and parse the api file into a set of dictionaries:
 #
 #	    arguments	- a list of the arguments the method takes
-#	    config	- a list of the method's keywords
-#	    flags	- a list of the method's flags
+#	    config	- a string of the method's keywords
+#	    flags	- a string of the method's flags
+#	    off		- a list of the method's off transitions
+#	    on		- a list of the method's on transitions
 #
 #	The dictionaries are keyed by the "handle.method" name.
 def api_load():
 	arguments = defaultdict(list)
 	config = defaultdict(str)
 	flags = defaultdict(str)
+	off = defaultdict(list)
+	on = defaultdict(list)
 	for line in open('api', 'r').readlines():
 		# Skip comments and empty lines.
 		if line[:1] == '#' or line[:1] == '\n':
@@ -36,13 +40,17 @@ def api_load():
 				config[method] = s[1]
 			elif s[0] == 'flag':
 				flag[method] = s[1]
+			elif s[0] == 'off':
+				off[method].append(s[1])
+			elif s[0] == 'on':
+				on[method].append(s[1])
 			else:
 				print >> sys.stderr,\
 				    "api: unknown keyword: " + line
 				sys.exit(1)
 		else:
 			method = line.strip()
-	return arguments, config, flags
+	return arguments, config, flags, off, on
 
 # source_files_list --
 #	Return a list of the source file names in filelist.

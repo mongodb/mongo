@@ -97,13 +97,6 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	WT_INDX *indx;
 	u_int32_t i;
 
-	if (page->indx == NULL)
-		return;
-
-	/*
-	 * Release any allocated in-memory information, but keep the
-	 * in-memory array itself, unless it's too small for this page.
-	 */
 	if (F_ISSET(page, WT_ALLOCATED)) {
 		F_CLR(page, WT_ALLOCATED);
 		WT_INDX_FOREACH(page, indx, i)
@@ -112,10 +105,10 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 				__wt_free(env, indx->data);
 			}
 	}
-	memset(page->indx, 0, sizeof(WT_INDX) * page->indx_size);
-	page->indx_count = 0;
-
-	WT_FREE_AND_CLEAR(env, page->indx);
+	if (page->indx != NULL)
+		__wt_free(env, page->indx);
+	__wt_free(env, page->hdr);
+	__wt_free(env, page);
 }
 
 /*

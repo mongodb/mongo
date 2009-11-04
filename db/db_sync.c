@@ -10,18 +10,14 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_sync --
+ * __wt_api_db_sync --
  *	Flush a database to the backing file.
  */
 int
-__wt_db_sync(WT_TOC *toc)
+__wt_api_db_sync(DB *db, u_int32_t flags)
 {
-	wt_args_db_sync_unpack;
-
-	db = toc->db;
-
 	WT_DB_FCHK(db, "Db.sync", flags, WT_APIMASK_DB_SYNC);
 
 	/* Close the underlying Btree. */
-	return (__wt_bt_sync(toc));
+	return (__wt_bt_sync(db));
 }

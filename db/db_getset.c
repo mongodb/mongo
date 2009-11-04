@@ -10,14 +10,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_set_btree_compare_int_verify --
+ * __wt_db_btree_compare_int_set_verify --
  *	Verify arguments to the Db.set_btree_compare_int setter.
  */
 int
-__wt_db_set_btree_compare_int_verify(WT_TOC *toc)
+__wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
 {
-	wt_args_db_set_btree_compare_int_unpack;
-
 	if (btree_compare_int >= 0 && btree_compare_int <= 8)
 		return (0);
 

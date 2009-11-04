@@ -34,7 +34,7 @@ __wt_bt_build_verify(void)
 	for (lp = list; lp < list + sizeof(list) / sizeof(list[0]); ++lp) {
 		if (lp->s == lp->c)
 			continue;
-		__wt_env_errx(NULL,
+		__wt_api_env_errx(NULL,
 		    "WiredTiger build failed, the %s header structure is not "
 		    "the correct size (expected %u, got %u)",
 		    lp->name, lp->c, lp->s);
@@ -42,7 +42,7 @@ __wt_bt_build_verify(void)
 	}
 	if (WT_ALIGN(
 	    sizeof(WT_PAGE_HDR), sizeof(u_int32_t)) != WT_PAGE_HDR_SIZE) {
-		__wt_env_errx(NULL,
+		__wt_api_env_errx(NULL,
 		    "Build verification failed, the WT_PAGE_HDR structure"
 		    " isn't aligned correctly");
 		return (WT_ERROR);
@@ -55,7 +55,7 @@ __wt_bt_build_verify(void)
 	 * check, just to be sure.
 	 */
 	if (sizeof(size_t) < sizeof(u_int32_t)) {
-		__wt_env_errx(NULL, "%s",
+		__wt_api_env_errx(NULL, "%s",
 		    "Build verification failed, a size_t is smaller than "
 		    "4-bytes");
 		return (WT_ERROR);
