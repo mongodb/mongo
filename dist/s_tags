@@ -23,7 +23,7 @@ ctags $flags ../inc_*/*.in ../*/*.[ch] 2>/dev/null
 chmod 444 tags
 
 # Link to the tags file from standard build and source directories.
-dirs="build_posix `python -c\
+dirs="bench.1 build_posix `python -c\
      'from dist import directory_files;\
      directory_files();'`"
 for i in $dirs inc_posix; do
