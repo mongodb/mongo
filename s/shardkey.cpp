@@ -27,19 +27,42 @@
 */
 
 namespace mongo {
-
-    BSONObj ShardKeyPattern::globalMin() const {
-        BSONObjBuilder b;
-        BSONElement e = pattern.firstElement();
-        b.appendMinKey(e.fieldName());
-        return b.obj();
+    void minForPat(BSONObjBuilder& out, const BSONObj& pat){
+        BSONElement e = pat.firstElement();
+        if (e.type() == Object){
+            BSONObjBuilder sub;
+            minForPat(sub, e.embeddedObject());
+            out.append(e.fieldName(), sub.obj());
+        } else {
+            out.appendMinKey(e.fieldName());
+        }
     }
 
-    BSONObj ShardKeyPattern::globalMax() const {
-        BSONObjBuilder b;
-        BSONElement e = pattern.firstElement();
-        b.appendMaxKey(e.fieldName());
-        return b.obj();
+    void maxForPat(BSONObjBuilder& out, const BSONObj& pat){
+        BSONElement e = pat.firstElement();
+        if (e.type() == Object){
+            BSONObjBuilder sub;
+            maxForPat(sub, e.embeddedObject());
+            out.append(e.fieldName(), sub.obj());
+        } else {
+            out.appendMaxKey(e.fieldName());
+        }
+    }
+
+    ShardKeyPattern::ShardKeyPattern( BSONObj p ) : patternDotted( p.getOwned() ) {
+        //TODO: this will not preserve ordering on compound keys
+        pattern = dotted2nested(patternDotted);
+        patternDotted.getFieldNames(patternfields);
+
+        BSONObjBuilder min;
+        minForPat(min, pattern);
+        gMin = min.obj();
+        gMinDotted = nested2dotted(gMin);
+
+        BSONObjBuilder max;
+        maxForPat(max, pattern);
+        gMax = max.obj();
+        gMaxDotted = nested2dotted(gMax);
     }
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) {
@@ -261,16 +284,10 @@ namespace mongo {
         /* this is written s.t. if obj has lots of fields, if the shard key fields are early, 
            it is fast.  so a bit more work to try to be semi-fast.
            */
-        BSONObjIterator i(obj);
-        int n = patternfields.size();
-        while( 1 ) {
-            BSONElement e = i.next();
-            if( e.eoo() )
+
+        for(set<string>::iterator it = patternfields.begin(); it != patternfields.end(); ++it){
+            if(obj.getFieldDotted(it->c_str()).eoo())
                 return false;
-            if( patternfields.find(e.fieldName()) == patternfields.end() )
-                continue;
-            if( --n == 0 ) 
-                break;
         }
         return true;
     }
@@ -284,7 +301,7 @@ namespace mongo {
        -> true
     */
 
-    bool ShardKeyPattern::relevant(const BSONObj& query, BSONObj& L, BSONObj& R) { 
+    bool ShardKeyPattern::relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R) { 
         BSONObj q = extractKey( query );
         if( q.isEmpty() )
             return true;
@@ -353,8 +370,8 @@ normal:
     void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
         massert("not done for compound patterns", patternfields.size() == 1);
         BSONObjBuilder temp;
-        temp.appendAs( extractKey(min).firstElement(), "$gte" );
-        temp.appendAs( extractKey(max).firstElement(), "$lt" ); 
+        temp.appendAs( nested2dotted(extractKey(min)).firstElement(), "$gte" );
+        temp.appendAs( nested2dotted(extractKey(max)).firstElement(), "$lt" ); 
 
         b.append( patternfields.begin()->c_str(), temp.obj() );
     }    
@@ -379,7 +396,7 @@ normal:
         int dir = 0;
 
         BSONObjIterator s(sort);
-        BSONObjIterator p(pattern);
+        BSONObjIterator p(patternDotted);
         while( 1 ) {
             BSONElement e = s.next();
             if( e.eoo() )

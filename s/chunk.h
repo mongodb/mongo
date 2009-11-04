@@ -51,11 +51,18 @@ namespace mongo {
 
         Chunk( ChunkManager * info );
         
-        BSONObj& getMin(){
-            return _min;
+        const BSONObj& getMin() const { return _min; }
+        const BSONObj& getMinDotted() const { return _minDotted; }
+        const BSONObj& getMax() const { return _max; }
+        const BSONObj& getMaxDotted() const { return _maxDotted; }
+        
+        void setMin(const BSONObj& o){
+            _min = o;
+            _minDotted = nested2dotted(o);
         }
-        BSONObj& getMax(){
-            return _max;
+        void setMax(const BSONObj& o){
+            _max = o;
+            _maxDotted = nested2dotted(o);
         }
 
         string getShard(){
@@ -126,8 +133,10 @@ namespace mongo {
         ShardKeyPattern skey();
 
         string _ns;
-        BSONObj _min;
-        BSONObj _max;
+        BSONObj _min; //nested
+        BSONObj _minDotted;
+        BSONObj _max; //nested
+        BSONObj _maxDotted;
         string _shard;
         ShardChunkVersion _lastmod;
 
