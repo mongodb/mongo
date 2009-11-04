@@ -252,6 +252,8 @@ namespace mongo {
                     return passthrough( conf , cmdObj , result );
                 }
                 
+                BSONObjBuilder timingBuilder;
+
                 ChunkManager * cm = conf->getChunkManager( fullns );
 
                 BSONObj q;
@@ -263,12 +265,12 @@ namespace mongo {
                 cm->getChunksForQuery( chunks , q );
                 
                 const string shardedOutputCollection = getTmpName( collection );
-
+                
                 BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection );
-
-                BSONObjBuilder finalB;
-                finalB.append( "mapreduce.shardedfinish" , cmdObj );
-                finalB.append( "shardedOutputCollection" , shardedOutputCollection );
+                
+                BSONObjBuilder finalCmd;
+                finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
+                finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
                 
                 BSONObjBuilder shardresults;
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
@@ -283,20 +285,24 @@ namespace mongo {
                     }
                     shardresults.append( c->getShard() , myres );
                 }
-
-                finalB.append( "shards" , shardresults.obj() );
-
-                BSONObj final = finalB.obj();
                 
+                finalCmd.append( "shards" , shardresults.obj() );
+                timingBuilder.append( "shards" , t.millis() );
+
+                Timer t2;
                 ScopedDbConnection conn( conf->getPrimary() );
                 BSONObj finalResult;
-                if ( ! conn->runCommand( dbName , final , finalResult ) ){
+                if ( ! conn->runCommand( dbName , finalCmd.obj() , finalResult ) ){
                     errmsg = "final reduce failed: ";
                     errmsg += finalResult.toString();
                     return 0;
                 }
+                timingBuilder.append( "final" , t2.millis() );
+
                 result.appendElements( finalResult );
                 result.append( "timeMillis" , t.millis() );
+                result.append( "timing" , timingBuilder.obj() );
+                
                 return 1;
             }
         } mrCmd;
