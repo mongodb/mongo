@@ -105,4 +105,56 @@ namespace mongo {
         BSONObj * _nexts;
     };
 
+
+    class Future {
+    public:
+        class CommandResult {
+        public:
+            
+            string getServer() const { return _server; }
+
+            bool isDone() const { return _done; }
+            
+            bool ok() const {
+                assert( _done );
+                return _ok;
+            }
+
+            BSONObj result() const {
+                assert( _done );
+                return _res;
+            }
+
+            /**
+               blocks until command is done
+               returns ok()
+             */
+            bool join();
+            
+        private:
+            
+            CommandResult( const string& server , const string& db , const BSONObj& cmd );
+            
+            string _server;
+            string _db;
+            BSONObj _cmd;
+
+            boost::thread _thr;
+            
+            BSONObj _res;
+            bool _done;
+            bool _ok;
+            
+            friend class Future;
+        };
+        
+        static void commandThread();
+        
+        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd );
+
+    private:
+        static shared_ptr<CommandResult> * _grab;
+    };
+
+    
 }
