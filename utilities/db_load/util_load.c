@@ -14,8 +14,8 @@ const char *progname;
 
 int	bulk_callback(DB *, DBT **, DBT **);
 int	bulk_read(DBT *dbt, int);
-int	config(DB *, WT_TOC *, char *);
-int	config_process(DB *, WT_TOC *, char **);
+int	config(DB *, char *);
+int	config_process(DB *, char **);
 int	usage(void);
 
 int
@@ -24,7 +24,6 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 	DB *db;
-	WT_TOC *toc;
 	int ch, ret, text_input, tret;
 	char **config_list, **config_next;
 
@@ -80,19 +79,19 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	if ((ret = __wt_simple_setup(progname, 1, &toc, &db)) == 0) {
-		if (config_process(db, toc, config_list) != 0)
+	if ((ret = wiredtiger_simple_setup(progname, 1, &db)) == 0) {
+		if (config_process(db, config_list) != 0)
 			goto err;
 
 		(void)remove(*argv);
 
-		if ((ret = db->open(db, toc, *argv, 0600, WT_CREATE)) != 0) {
+		if ((ret = db->open(db, *argv, 0600, WT_CREATE)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
 			    progname, *argv, wt_strerror(ret));
 			goto err;
 		}
 
-		if ((ret = db->bulk_load(db, toc,
+		if ((ret = db->bulk_load(db,
 		    WT_DUPLICATES | WT_SORTED_INPUT, bulk_callback)) != 0) {
 			fprintf(stderr, "%s: Db.bulk_load: %s\n",
 			    progname, wt_strerror(ret));
@@ -103,7 +102,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = __wt_simple_teardown(progname, toc, db)) != 0 && ret == 0)
+	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -113,12 +112,12 @@ err:		ret = 1;
  *	Process command-line configuration options.
  */
 int
-config_process(DB *db, WT_TOC *toc, char **list)
+config_process(DB *db, char **list)
 {
 	int ret;
 
 	for (; *list != NULL; ++list)
-		if ((ret = config(db, toc, *list)) != 0)
+		if ((ret = config(db, *list)) != 0)
 			return (ret);
 	return (0);
 }
@@ -128,7 +127,7 @@ config_process(DB *db, WT_TOC *toc, char **list)
  *	Process a single command-line configuration option.
  */
 int
-config(DB *db, WT_TOC *toc, char *opt)
+config(DB *db, char *opt)
 {
 	u_int32_t a, b, c, d;
 	u_long v;
@@ -147,28 +146,24 @@ format:		fprintf(stderr,
 		return (EXIT_FAILURE);
 	}
 	if (strcmp(opt, "allocsize") == 0) {
-		if ((ret =
-		    db->get_btree_pagesize(db, toc, &a, &b, &c, &d)) != 0)
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
 			return (ret);
-		return (db->set_btree_pagesize(db, toc, v, b, c, d));
+		return (db->btree_pagesize_set(db, v, b, c, d));
 	}
 	if (strcmp(opt, "intlsize") == 0) {
-		if ((ret =
-		    db->get_btree_pagesize(db, toc, &a, &b, &c, &d)) != 0)
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
 			return (ret);
-		return (db->set_btree_pagesize(db, toc, a, v, c, d));
+		return (db->btree_pagesize_set(db, a, v, c, d));
 	}
 	if (strcmp(opt, "leafsize") == 0) {
-		if ((ret =
-		    db->get_btree_pagesize(db, toc, &a, &b, &c, &d)) != 0)
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
 			return (ret);
-		return (db->set_btree_pagesize(db, toc, a, b, v, d));
+		return (db->btree_pagesize_set(db, a, b, v, d));
 	}
 	if (strcmp(opt, "extsize") == 0) {
-		if ((ret =
-		    db->get_btree_pagesize(db, toc, &a, &b, &c, &d)) != 0)
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
 			return (ret);
-		return (db->set_btree_pagesize(db, toc, a, b, c, v));
+		return (db->btree_pagesize_set(db, a, b, c, v));
 	}
 
 	fprintf(stderr,

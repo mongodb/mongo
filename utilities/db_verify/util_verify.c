@@ -20,7 +20,6 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 	DB *db;
-	WT_TOC *toc;
 	int ch, ret, tret;
 
 	WT_UTILITY_INTRO(progname, argv);
@@ -41,13 +40,13 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = __wt_simple_setup(progname, 1, &toc, &db)) == 0) {
-		if ((ret = db->open(db, toc, *argv, 0, 0)) != 0) {
+	if ((ret = wiredtiger_simple_setup(progname, 1, &db)) == 0) {
+		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
 			    progname, *argv, wt_strerror(ret));
 			goto err;
 		}
-		if ((ret = db->verify(db, toc, 0)) != 0) {
+		if ((ret = db->verify(db, 0)) != 0) {
 			fprintf(stderr, "%s: Db.stat: %s\n",
 			    progname, wt_strerror(ret));
 			goto err;
@@ -57,7 +56,7 @@ main(int argc, char *argv[])
 	if (0) {
 err:		ret = 1;
 	}
-	if ((tret = __wt_simple_teardown(progname, toc, db)) != 0 && ret == 0)
+	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
