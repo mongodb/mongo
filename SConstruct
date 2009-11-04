@@ -369,9 +369,9 @@ if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
 
-    env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
+    if usejvm:
+        env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
-    env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
     if not nojni:
         env.Append( FRAMEWORKS=["JavaVM"] )
 
