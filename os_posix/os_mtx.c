@@ -59,13 +59,12 @@ __wt_mtx_init(WT_MTX *mtx)
  * __wt_lock
  *	Lock a mutex.
  */
-int
-__wt_lock(WT_MTX *mtx)
+void
+__wt_lock(ENV *env, WT_MTX *mtx)
 {
 	int ret;
 
-	if (pthread_mutex_lock(&mtx->mtx) != 0)
-		return (WT_ERROR);
+	WT_ERR(pthread_mutex_lock(&mtx->mtx));
 
 	/*
 	 * Check pthread_cond_wait() return for EINTR, ETIME and ETIMEDOUT,
@@ -80,29 +79,39 @@ __wt_lock(WT_MTX *mtx)
 #endif
 		    ret != ETIMEDOUT) {
 			(void)pthread_mutex_unlock(&mtx->mtx);
-			return (WT_ERROR);
+			goto err;
 		}
 	}
 
 	mtx->locked = 1;
+	WT_STAT_INCR(env->ienv->stats, MTX_LOCK, "mutex lock calls");
 
-	return (pthread_mutex_unlock(&mtx->mtx) == 0 ? 0 : WT_ERROR);
+	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
+	return;
+
+err:	__wt_api_env_err(env, ret, "mutex lock failed");
+	__wt_abort();
 }
 
 /*
  * __wt_unlock --
  *	Release a mutex.
  */
-int
+void
 __wt_unlock(WT_MTX *mtx)
 {
-	if (pthread_mutex_lock(&mtx->mtx) != 0)
-		return (WT_ERROR);
-	mtx->locked = 0;
-	if (pthread_cond_signal(&mtx->cond) != 0)
-		return (WT_ERROR);
+	int ret;
 
-	return (pthread_mutex_unlock(&mtx->mtx) == 0 ? 0 : WT_ERROR);
+	ret = 0;
+	WT_ERR(pthread_mutex_lock(&mtx->mtx));
+	mtx->locked = 0;
+	WT_ERR(pthread_cond_signal(&mtx->cond));
+
+	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
+	return;
+
+err:	__wt_api_env_err(NULL, ret, "mutex unlock failed");
+	__wt_abort();
 }
 
 /*

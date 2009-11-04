@@ -14,24 +14,21 @@
  *	Open a file handle.
  */
 int
-__wt_open(WT_TOC *toc,
-    const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
+__wt_open(ENV *env, const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
 {
-	ENV *env;
 	IDB *idb;
 	IENV *ienv;
 	WT_FH *fh;
 	int f, fd, ret;
 
 	fh = NULL;
-	env = toc->env;
 	ienv = env->ienv;
 
 	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
-		__wt_env_errx(env, "fileops: %s: open", name);
+		__wt_api_env_errx(env, "fileops: %s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
-	WT_RET(__wt_lock(&ienv->mtx));
+	__wt_lock(env, &ienv->mtx);
 	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 		if ((fh = idb->fh) == NULL)
 			continue;
@@ -41,7 +38,7 @@ __wt_open(WT_TOC *toc,
 			break;
 		}
 	}
-	WT_RET(__wt_unlock(&ienv->mtx));
+	__wt_unlock(&ienv->mtx);
 	if (fh != NULL)
 		return (0);
 
@@ -54,7 +51,7 @@ __wt_open(WT_TOC *toc,
 		f |= O_CREAT;
 
 	if ((fd = open(name, f, mode)) == -1) {
-		__wt_env_err(env, errno, "%s", name);
+		__wt_api_env_err(env, errno, "%s", name);
 		return (WT_ERROR);
 	}
 
@@ -71,7 +68,7 @@ __wt_open(WT_TOC *toc,
 	 */
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
 	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1) {
-		__wt_env_err(env, errno, "%s: fcntl", name);
+		__wt_api_env_err(env, errno, "%s: fcntl", name);
 		goto err;
 	}
 #endif
@@ -81,12 +78,12 @@ __wt_open(WT_TOC *toc,
 	*fhp = fh;
 
 	/* Set the file's size. */
-	WT_ERR(__wt_filesize(toc, fh, &fh->file_size));
+	WT_ERR(__wt_filesize(env, fh, &fh->file_size));
 
 	/* Link onto the environment's list of files. */
-	WT_ERR(__wt_lock(&ienv->mtx));
+	__wt_lock(env, &ienv->mtx);
 	TAILQ_INSERT_TAIL(&ienv->fhqh, fh, q);
-	WT_ERR(__wt_unlock(&ienv->mtx));
+	__wt_unlock(&ienv->mtx);
 
 	return (0);
 
@@ -104,13 +101,11 @@ err:	if (fh != NULL) {
  *	Close a file handle.
  */
 int
-__wt_close(WT_TOC *toc, WT_FH *fh)
+__wt_close(ENV *env, WT_FH *fh)
 {
-	ENV *env;
 	IENV *ienv;
 	int ret;
 
-	env = toc->env;
 	ienv = env->ienv;
 	ret = 0;
 
@@ -118,12 +113,12 @@ __wt_close(WT_TOC *toc, WT_FH *fh)
 		return (0);
 
 	/* Remove from the list and discard the memory. */
-	WT_RET(__wt_lock(&ienv->mtx));
+	__wt_lock(env, &ienv->mtx);
 	TAILQ_REMOVE(&ienv->fhqh, fh, q);
-	WT_RET(__wt_unlock(&ienv->mtx));
+	__wt_unlock(&ienv->mtx);
 
 	if (close(fh->fd) != 0) {
-		__wt_env_err(env, errno, "%s", fh->name);
+		__wt_api_env_err(env, errno, "%s", fh->name);
 		ret = WT_ERROR;
 	}
 

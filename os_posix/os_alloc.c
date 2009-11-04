@@ -59,7 +59,7 @@ __wt_open_mfp(ENV *env)
 	char *v;
 
 	if ((__wt_mfp = fopen(WT_MEMORY_FILE, "w")) == NULL) {
-		__wt_env_err(env, errno, "%s: open", WT_MEMORY_FILE);
+		__wt_api_env_err(env, errno, "%s: open", WT_MEMORY_FILE);
 		__wt_abort(env);
 	}
 
@@ -96,7 +96,7 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 		WT_STAT_INCR(env->ienv->stats, MEMALLOC, "memory allocations");
 
 	if ((p = calloc(number, (size_t)size)) == NULL) {
-		__wt_env_err(env, errno, "memory allocation");
+		__wt_api_env_err(env, errno, "memory allocation");
 		return (WT_ERROR);
 	}
 	*(void **)retp = p;
@@ -143,7 +143,7 @@ __wt_realloc(ENV *env,
 	}
 #endif
 	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL) {
-		__wt_env_err(env, errno, "memory allocation");
+		__wt_api_env_err(env, errno, "memory allocation");
 		return (WT_ERROR);
 	}
 

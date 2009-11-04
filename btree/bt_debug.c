@@ -176,8 +176,8 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
 	if (inmemory) {
 		icnt = 0;
 		WT_INDX_FOREACH(page, ip, i) {
-			fprintf(fp, "%6lu: {cache %ld, flags %#lx}\n",
-			    ++icnt, (long)ip->cache_id, (u_long)ip->flags);
+			fprintf(fp, "%6lu: {flags %#lx}\n",
+			    ++icnt, (u_long)ip->flags);
 			if (ip->data != NULL) {
 				fprintf(fp, "\tdbt: ");
 				__wt_bt_dump_dbt((DBT *)ip, fp);
