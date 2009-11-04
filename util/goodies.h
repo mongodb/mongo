@@ -170,6 +170,17 @@ namespace mongo {
         }        
         boost::thread::sleep(xt);
     }
+    inline void sleepmicros(int s) {
+        boost::xtime xt;
+        boost::xtime_get(&xt, boost::TIME_UTC);
+        xt.sec += ( s / 1000000 );
+        xt.nsec += ( s % 1000000 ) * 1000;
+        if ( xt.nsec >= 1000000000 ) {
+            xt.nsec -= 1000000000;
+            xt.sec++;
+        }        
+        boost::thread::sleep(xt);
+    }
 // note this wraps
     inline int tdiff(unsigned told, unsigned tnew) {
         return WrappingInt::diff(tnew, told);
