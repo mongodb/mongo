@@ -149,8 +149,8 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
 
-        if ( j.getField( "autoIndexId" ).isBoolean() ) {
-            if ( j.getBoolField( "autoIndexId" ) ) {
+        if ( j.getField( "autoIndexId" ).type() ) {
+            if ( j["autoIndexId"].trueValue() ){
                 ensureIdIndexForNewNs( ns );
             }
         } else {
