@@ -85,7 +85,7 @@ __wt_errfile(FILE *fp,
 void
 __wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
 {
-	__wt_env_errx(env,
+	__wt_api_env_errx(env,
 	    "assertion failure: %s/%d: \"%s\"", file_name, line_number, check);
 
 	__wt_abort();
@@ -101,7 +101,7 @@ __wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
 int
 __wt_api_flags(ENV *env, const char *name)
 {
-	__wt_env_errx(env, "%s: illegal API flag specified", name);
+	__wt_api_env_errx(env, "%s: illegal API flag specified", name);
 	return (WT_ERROR);
 }
 
@@ -115,5 +115,40 @@ __wt_database_format(DB *db)
 {
 	__wt_db_errx(db, "the database is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the database");
+	return (WT_ERROR);
+}
+
+/*
+ * __wt_wt_toc_lockout --
+ *	Standard WT_TOC handle lockout error message.
+ */
+int
+__wt_wt_toc_lockout(WT_TOC *toc)
+{
+	return (__wt_env_lockout(toc->env));
+}
+
+/*
+ * __wt_db_lockout --
+ *	Standard DB handle lockout error message.
+ */
+int
+__wt_db_lockout(DB *db)
+{
+	return (__wt_env_lockout(db->env));
+}
+
+/*
+ * __wt_env_lockout --
+ *	Standard ENV handle lockout error message.
+ */
+int
+__wt_env_lockout(ENV *env)
+{
+	__wt_api_env_errx(env,
+	    "This handle method is not available for some reason: for example, "
+	    "handle methods are restricted after an error, or configuration "
+	    "methods may be restricted after the database or environment have "
+	    "been opened.");
 	return (WT_ERROR);
 }

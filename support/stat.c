@@ -142,11 +142,20 @@ __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_CACHE_WRITE_EVICT].desc =
 	    "dirty pages evicted from the cache";
 	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
+	stats[WT_STAT_HASH_BUCKETS].desc = "hash buckets";
+	stats[WT_STAT_LONGEST_BUCKET].desc =
+	    "longest hash bucket chain search";
 	stats[WT_STAT_MEMALLOC].desc = "memory allocations";
 	stats[WT_STAT_MEMFREE].desc = "memory frees";
-	stats[WT_STAT_TOTAL_OPS].desc = "total operations";
+	stats[WT_STAT_MTX_LOCK].desc = "mutex lock calls";
 	stats[WT_STAT_TOTAL_READ_IO].desc = "total read I/Os";
 	stats[WT_STAT_TOTAL_WRITE_IO].desc = "total write I/Os";
+	stats[WT_STAT_WORKQ_CACHE_ALLOC_REQUESTS].desc =
+	    "workQ cache allocations";
+	stats[WT_STAT_WORKQ_PASSES].desc = "workQ queue passes";
+	stats[WT_STAT_WORKQ_REQUESTS].desc = "workQ requests";
+	stats[WT_STAT_WORKQ_SLEEP].desc = "workQ sleeps";
+	stats[WT_STAT_WORKQ_YIELD].desc = "workQ yields";
 
 	*statsp = stats;
 	return (0);
@@ -164,35 +173,16 @@ __wt_stat_clear_ienv_stats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_WRITE].v = 0;
 	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
 	stats[WT_STAT_DATABASE_OPEN].v = 0;
+	stats[WT_STAT_HASH_BUCKETS].v = 0;
+	stats[WT_STAT_LONGEST_BUCKET].v = 0;
 	stats[WT_STAT_MEMALLOC].v = 0;
 	stats[WT_STAT_MEMFREE].v = 0;
-	stats[WT_STAT_TOTAL_OPS].v = 0;
+	stats[WT_STAT_MTX_LOCK].v = 0;
 	stats[WT_STAT_TOTAL_READ_IO].v = 0;
 	stats[WT_STAT_TOTAL_WRITE_IO].v = 0;
-}
-
-int
-__wt_stat_alloc_srvr_stats(ENV *env, WT_STATS **statsp)
-{
-	WT_STATS *stats;
-
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_SRVR_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
-
-	stats[WT_STAT_SRVR_ARRAY].desc = "server thread array passes";
-	stats[WT_STAT_SRVR_OPS].desc = "server thread operations";
-	stats[WT_STAT_SRVR_SLEEP].desc = "server thread sleeps";
-	stats[WT_STAT_SRVR_YIELD].desc = "server thread yields";
-
-	*statsp = stats;
-	return (0);
-}
-
-void
-__wt_stat_clear_srvr_stats(WT_STATS *stats)
-{
-	stats[WT_STAT_SRVR_ARRAY].v = 0;
-	stats[WT_STAT_SRVR_OPS].v = 0;
-	stats[WT_STAT_SRVR_SLEEP].v = 0;
-	stats[WT_STAT_SRVR_YIELD].v = 0;
+	stats[WT_STAT_WORKQ_CACHE_ALLOC_REQUESTS].v = 0;
+	stats[WT_STAT_WORKQ_PASSES].v = 0;
+	stats[WT_STAT_WORKQ_REQUESTS].v = 0;
+	stats[WT_STAT_WORKQ_SLEEP].v = 0;
+	stats[WT_STAT_WORKQ_YIELD].v = 0;
 }
