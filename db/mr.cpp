@@ -44,12 +44,13 @@ namespace mongo {
     
         BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
             uassert( "need values" , values.size() );
-        
+            
+            int sizeEstimate = ( values.size() * values.begin()->getField( "value" ).size() ) + 128;
             BSONObj key;
 
-            BSONObjBuilder reduceArgs;
+            BSONObjBuilder reduceArgs( sizeEstimate );
         
-            BSONObjBuilder valueBuilder;
+            BSONObjBuilder valueBuilder( sizeEstimate );
             int n = 0;
             for ( list<BSONObj>::iterator i=values.begin(); i!=values.end(); i++){
                 BSONObj o = *i;
