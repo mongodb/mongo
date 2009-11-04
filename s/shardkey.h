@@ -29,20 +29,20 @@ namespace mongo {
     */
     class ShardKeyPattern {
     public:
-        ShardKeyPattern( BSONObj p = BSONObj() ) : pattern( p.getOwned() ) {
-            pattern.getFieldNames(patternfields);
-        }
+        ShardKeyPattern( BSONObj p = BSONObj() );
         
         /**
            global min is the lowest possible value for this key
 		   e.g. { num : MinKey }
          */
-        BSONObj globalMin() const;
+        BSONObj globalMin() const { return gMin; }
+        BSONObj globalMinDotted() const { return gMinDotted; }
 
         /**
            global max is the highest possible value for this key
          */
-        BSONObj globalMax() const;
+        BSONObj globalMax() const { return gMax; }
+        BSONObj globalMaxDotted() const { return gMax; }
 
         bool isGlobalMin( const BSONObj& k ){
             return k.woCompare( globalMin() ) == 0;
@@ -101,14 +101,24 @@ namespace mongo {
         int canOrder( const BSONObj& sort );
 
         BSONObj key() { return pattern; }
+        BSONObj keyDotted() { return patternDotted; }
 
         string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
 
     private:
-        /* question: better to have patternfields precomputed or not?  depends on if we use copy contructor often. */
+        // all BSONObj stored with both nested and dotted form
         BSONObj pattern;
+        BSONObj patternDotted;
+
+        BSONObj gMin;
+        BSONObj gMinDotted;
+
+        BSONObj gMax;
+        BSONObj gMaxDotted;
+
+        /* question: better to have patternfields precomputed or not?  depends on if we use copy contructor often. */
         set<string> patternfields;
         bool relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R);
     };

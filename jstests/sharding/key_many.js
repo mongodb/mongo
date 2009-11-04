@@ -2,9 +2,12 @@
 
 // values have to be sorted
 types = 
-    [ { name : "string" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] } ,
+    [ { name : "string" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield: "k" } ,
       { name : "double" , values : [ 1.2 , 3.5 , 4.5 , 4.6 , 6.7 , 9.9 ] , keyfield : "a" } ,
-      { name : "string_id" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "_id" } ]
+      { name : "string_id" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "_id" },
+      { name : "embedded" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b" } ,
+      { name : "embedded 2" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b.c" } ,
+    ]
 
 s = new ShardingTest( "key_many" , 2 );
 
@@ -13,29 +16,47 @@ db = s.getDB( "test" );
 primary = s.getServer( "test" ).getDB( "test" );
 seconday = s.getOther( primary ).getDB( "test" );
 
-function makeObject( v ){
-    if ( ! curT.keyfield )
-        return { k : v };
+function makeObjectDotted( v ){
     var o = {};
     o[curT.keyfield] = v;
     return o;
 }
 
+function makeObject( v ){
+    var o = {};
+    var p = o;
+
+    var keys = curT.keyfield.split('.');
+    for(var i=0; i<keys.length-1; i++){
+        p[keys[i]] = {};
+        p = p[keys[i]];
+    }
+
+    p[keys[i]] = v;
+
+    return o;
+}
+
 function getKey( o ){
-    var mykey = curT.keyfield || "k";
-    return o[mykey];
+    var keys = curT.keyfield.split('.');
+    for(var i=0; i<keys.length; i++){
+        o = o[keys[i]];
+    }
+    return o;
 }
 
 
 
 for ( var i=0; i<types.length; i++ ){
-    curT = types[i];
-    
+    curT = types[i]; //global
+
+    print("\n\n#### Now Testing " + curT.name + " ####\n\n");
+
     var shortName = "foo_" + curT.name;
     var longName = "test." + shortName;
     
-    var c = db[shortName]
-    s.adminCommand( { shardcollection : longName , key : makeObject( 1 ) } );
+    var c = db[shortName];
+    s.adminCommand( { shardcollection : longName , key : makeObjectDotted( 1 ) } );
     
     assert.eq( 1 , s.config.chunks.find( { ns : longName } ).count() , curT.name + " sanity check A" );
 
@@ -45,11 +66,11 @@ for ( var i=0; i<types.length; i++ ){
     
     assert.eq( 6 , c.find().count() , curT.name + " basic count" );
     
-    s.adminCommand( { split : longName , find : makeObject( curT.values[3] ) } );
-    s.adminCommand( { split : longName , find : makeObject( curT.values[3] ) } );
-    s.adminCommand( { split : longName , find : makeObject( curT.values[3] ) } );
+    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
+    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
+    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
 
-    s.adminCommand( { movechunk : longName , find : makeObject( curT.values[3] ) , to : seconday.getMongo().name } );
+    s.adminCommand( { movechunk : longName , find : makeObjectDotted( curT.values[3] ) , to : seconday.getMongo().name } );
     
     s.printChunks();
     
@@ -57,18 +78,20 @@ for ( var i=0; i<types.length; i++ ){
     assert.eq( 3 , seconday[shortName].find().toArray().length , curT.name + " secondary count" );
     
     assert.eq( 6 , c.find().toArray().length , curT.name + " total count" );
-    assert.eq( 6 , c.find().sort( makeObject( 1 ) ).toArray().length , curT.name + " total count sorted" );
+    assert.eq( 6 , c.find().sort( makeObjectDotted( 1 ) ).toArray().length , curT.name + " total count sorted" );
     
-    assert.eq( 6 , c.find().sort( makeObject( 1 ) ).count() , curT.name + " total count with count()" );
-    
-    assert.eq( curT.values , c.find().sort( makeObject( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
-    assert.eq( curT.values.reverse() , c.find().sort( makeObject( -1 ) ).toArray().map( getKey ) , curT.name + " sort 2" );
+    assert.eq( 6 , c.find().sort( makeObjectDotted( 1 ) ).count() , curT.name + " total count with count()" );
+
+    assert.eq( curT.values , c.find().sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
+    assert.eq( curT.values.reverse() , c.find().sort( makeObjectDotted( -1 ) ).toArray().map( getKey ) , curT.name + " sort 2" );
+
 
     assert.eq( 0 , c.find( { xx : 17 } ).sort( { zz : 1 } ).count() , curT.name + " xx 0a " );
-    assert.eq( 0 , c.find( { xx : 17 } ).sort( makeObject( 1 ) ).count() , curT.name + " xx 0b " );
+    assert.eq( 0 , c.find( { xx : 17 } ).sort( makeObjectDotted( 1 ) ).count() , curT.name + " xx 0b " );
     assert.eq( 0 , c.find( { xx : 17 } ).count() , curT.name + " xx 0c " );
     assert.eq( 0 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 1 " );
-    c.update( makeObject( curT.values[3] ) , { $set : { xx : 17 } } );
+
+    c.update( makeObjectDotted( curT.values[3] ) , { $set : { xx : 17 } } );
     assert.eq( 1 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 2 " );
     assert.eq( curT.values[3] , getKey( c.findOne( { xx : 17 } ) ) , curT.name + " xx 3 " );
 

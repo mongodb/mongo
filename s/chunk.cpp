@@ -63,7 +63,7 @@ namespace mongo {
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
             else {
-                BSONObj k = _manager->getShardKey().key();
+                BSONObj k = _manager->getShardKey().keyDotted();
                 BSONObjBuilder r;
                 
                 BSONObjIterator i(k);
@@ -85,9 +85,9 @@ namespace mongo {
         ScopedDbConnection conn( getShard() );
         BSONObj result;
         if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
-                                                 << "keyPattern" << _manager->getShardKey().key() 
-                                                 << "min" << getMin() 
-                                                 << "max" << getMax() 
+                                                 << "keyPattern" << _manager->getShardKey().keyDotted() 
+                                                 << "min" << getMinDotted() 
+                                                 << "max" << getMaxDotted() 
                                                  ) , result ) ){
             stringstream ss;
             ss << "medianKey command failed: " << result;
@@ -110,10 +110,12 @@ namespace mongo {
 
         uassert( "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
 
+        BSONObj nested = dotted2nested(m);
+
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
         s->_shard = _shard;
-        s->setMin(m.getOwned());
+        s->setMin(nested.getOwned());
         s->setMax(_max);
         
         s->_markModified();
@@ -121,7 +123,7 @@ namespace mongo {
         
         _manager->_chunks.push_back( s );
         
-        setMax(m.getOwned());
+        setMax(nested.getOwned());
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
@@ -364,7 +366,7 @@ namespace mongo {
     
     void Chunk::ensureIndex(){
         ScopedDbConnection conn( getShard() );
-        conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
+        conn->ensureIndex( _ns , _manager->getShardKey().keyDotted() , _manager->_unique );
         conn.done();
     }
 

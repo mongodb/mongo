@@ -13,7 +13,7 @@ namespace mongo {
 
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
-            
+
             log(3) << "shard query: " << q.ns << "  " << q.query << endl;
             
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
@@ -57,7 +57,7 @@ namespace mongo {
                             extra = b.obj();
                             cout << s->toString() << " -->> " << extra << endl;
                         }
-                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMin() ) );
+                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMinDotted() ) );
                     }
                     cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }
@@ -147,6 +147,7 @@ namespace mongo {
                     chunkFinder = toupdate;
                 }
             }
+
             
             if ( ! save ){
                 if ( toupdate.firstElement().fieldName()[0] == '$' ){
@@ -170,7 +171,7 @@ namespace mongo {
                 }
             }
             else {
-                Chunk& c = manager->findChunk( chunkFinder );
+                Chunk& c = manager->findChunk( dotted2nested(chunkFinder) );
                 doWrite( dbUpdate , r , c.getShard() );
                 c.splitIfShould( d.msg().data->dataLen() );
             }
