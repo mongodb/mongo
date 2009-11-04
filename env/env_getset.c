@@ -10,14 +10,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_env_set_verbose_verify --
+ * __wt_env_verbose_set_verify --
  *	Verify an argument to the Env.set_verbose setter.
  */
 int
-__wt_env_set_verbose_verify(WT_TOC *toc)
+__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose)
 {
-	wt_args_env_set_verbose_unpack;
-
 	WT_ENV_FCHK(env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE);
 	return (0);
 }

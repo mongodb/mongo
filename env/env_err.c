@@ -9,7 +9,16 @@
 
 #include "wt_internal.h"
 
+void
+wiredtiger_err_stream(FILE *stream)
+{
+	extern FILE *__wt_err_stream;
+
+	__wt_err_stream = stream;
+}
+
 #define	WT_ENV_ERR(env, error, fmt) {					\
+	extern FILE *__wt_err_stream;					\
 	va_list __ap;							\
 	/*								\
 	 * Support error messages even when we don't yet have an ENV	\
@@ -17,16 +26,17 @@
 	 */								\
 	if ((env) == NULL) {						\
 		va_start(__ap, fmt);					\
-		__wt_errfile(stderr, NULL, NULL, error, fmt, __ap);	\
+		__wt_errfile(						\
+		    __wt_err_stream, NULL, NULL, error, fmt, __ap);	\
 		va_end(__ap);						\
 		return;							\
 	}								\
 									\
 	/* Application-specified callback function. */			\
-	if ((env)->errcall != NULL) {					\
+	if (env->errcall != NULL) {					\
 		va_start(__ap, fmt);					\
-		__wt_errcall((env)->errcall, (env),			\
-		    (env)->errpfx, NULL, error, fmt, __ap);		\
+		__wt_errcall(env->errcall, env,				\
+		    env->errpfx, NULL, error, fmt, __ap);		\
 		va_end(__ap);						\
 	}								\
 									\
@@ -34,31 +44,31 @@
 	 * If the application set an error callback function but not an	\
 	 * error stream, we're done.  Otherwise, write an error	stream.	\
 	 */								\
-	if ((env)->errcall != NULL && (env)->errfile == NULL)		\
+	if (env->errcall != NULL && env->errfile == NULL)		\
 			return;						\
 									\
 	va_start(__ap, fmt);						\
-	__wt_errfile((env)->errfile,					\
-	    (env)->errpfx, NULL, error, fmt, __ap);			\
+	__wt_errfile(env->errfile,					\
+	    env->errpfx, NULL, error, fmt, __ap);			\
 	va_end(__ap);							\
 }
 
 /*
- * __wt_env_err --
+ * __wt_api_env_err --
  *	Env.err method.
  */
 void
-__wt_env_err(ENV *env, int error, const char *fmt, ...)
+__wt_api_env_err(ENV *env, int error, const char *fmt, ...)
 {
 	WT_ENV_ERR(env, error, fmt);
 }
 
 /*
- * __wt_env_errx --
+ * __wt_api_env_errx --
  *	Env.errx method.
  */
 void
-__wt_env_errx(ENV *env, const char *fmt, ...)
+__wt_api_env_errx(ENV *env, const char *fmt, ...)
 {
 	WT_ENV_ERR(env, 0, fmt);
 }
