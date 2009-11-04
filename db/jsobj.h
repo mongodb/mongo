@@ -277,6 +277,9 @@ namespace mongo {
         /** Wrap this element up as a singleton object. */
         BSONObj wrap() const;
 
+        /** Wrap this element up as a singleton object with a new name. */
+        BSONObj wrap( const char* newName) const;
+
         /** field name of the element.  e.g., for 
            name : "Joe"
            "name" is the fieldname
@@ -1602,10 +1605,17 @@ namespace mongo {
 
 // wrap this element up as a singleton object.
     inline BSONObj BSONElement::wrap() const {
-        BSONObjBuilder b;
+        BSONObjBuilder b(size()+6);
         b.append(*this);
         return b.obj();
     }
+
+    inline BSONObj BSONElement::wrap( const char * newName ) const {
+        BSONObjBuilder b(size()+6+strlen(newName));
+        b.appendAs(*this,newName);
+        return b.obj();
+    }
+
 
     inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
