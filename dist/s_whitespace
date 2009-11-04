@@ -4,8 +4,9 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
+inc=`cd .. && echo inc_posix/*.h inc_posix/*.in`
 (
-for f in `sed -e '/^[a-z]/! d' filelist`; do
+for f in `sed -e '/^[a-z]/! d' filelist` $inc; do
 	f="../$f"
 	sed -e 's/[	 ][	 ]*$//' < $f > $t
 	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
