@@ -134,6 +134,11 @@ namespace mongo {
                     
                     if ( cmdObj["sort"].type() == Object )
                         q.sort( cmdObj["sort"].embeddedObjectUserCheck() );
+
+                    if ( cmdObj["limit"].isNumber() )
+                        limit = cmdObj["limit"].numberLong();
+                    else 
+                        limit = 0;
                 }
             }
             
@@ -152,7 +157,7 @@ namespace mongo {
                 
             string dbname;
             string ns;
-
+            
             // options
             bool verbose;            
             bool keeptemp;
@@ -161,6 +166,7 @@ namespace mongo {
             
             BSONObj filter;
             Query q;
+            long long limit;
 
             // functions
             
@@ -377,6 +383,9 @@ namespace mongo {
                             inReduce += t.micros();
                         }
                         pm.hit();
+
+                        if ( mr.limit && num >= mr.limit )
+                            break;
                     }
                     
                     
