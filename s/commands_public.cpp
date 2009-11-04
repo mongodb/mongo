@@ -21,6 +21,7 @@
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
+#include "../client/parallel.h"
 #include "../db/commands.h"
 
 #include "config.h"
@@ -272,18 +273,22 @@ namespace mongo {
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
                 finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
                 
-                BSONObjBuilder shardresults;
+                list< shared_ptr<Future::CommandResult> > futures;
+                
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
-                    ScopedDbConnection conn( c->getShard() );
-
-                    BSONObj myres;
-                    if ( ! conn->runCommand( dbName , shardedCommand , myres ) ){
+                    futures.push_back( Future::spawnCommand( c->getShard() , dbName , shardedCommand ) );
+                }
+                
+                BSONObjBuilder shardresults;
+                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ){
+                    shared_ptr<Future::CommandResult> res = *i;
+                    if ( ! res->join() ){
                         errmsg = "mongod mr failed: ";
-                        errmsg += myres.toString();
+                        errmsg += res->result().toString();
                         return 0;
                     }
-                    shardresults.append( c->getShard() , myres );
+                    shardresults.append( res->getServer() , res->result() );
                 }
                 
                 finalCmd.append( "shards" , shardresults.obj() );
