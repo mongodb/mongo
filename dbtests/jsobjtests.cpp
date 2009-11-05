@@ -1143,6 +1143,19 @@ namespace JsobjTests {
         }
     };
     
+    struct ArrayMacroTest{
+        void run(){
+            BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+            BSONObj obj = BSON( "0" << "hello"
+                             << "1" << 1
+                             << "2" << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+            ASSERT_EQUALS(arr, obj);
+            ASSERT_EQUALS(arr["2"].type(), Object);
+            ASSERT_EQUALS(arr["2"].embeddedObject()["foo"].type(), Array);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1225,6 +1238,7 @@ namespace JsobjTests {
             add< CompareDottedFieldNamesTest >();
             add< NestedDottedConversions >();
             add< BSONArrayBuilderTest >();
+            add< ArrayMacroTest >();
         }
     } myall;
     

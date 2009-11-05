@@ -1033,6 +1033,13 @@ namespace mongo {
 */
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
 
+/** Use BSON_ARRAY macro like BSON macro, but without keys
+
+    BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+ */
+#define BSON_ARRAY(x) (( mongo::BSONArrayBuilder() << x ).arr())
+
     /* Utility class to auto assign object IDs.
        Example:
          cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
