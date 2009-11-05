@@ -214,7 +214,8 @@ namespace mongo {
                 BSONObj key = values.begin()->firstElement().wrap( "_id" );
                 BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
                 
-                db.insert( setup.tempLong , res );
+                dblock l;
+                theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
             }
 
             
