@@ -409,8 +409,8 @@ namespace mongo {
                     BSONObj prev;
                     list<BSONObj> all;
                     
+                    ProgressMeter fpm( db.count( mr.incLong ) );
                     cursor = db.query( mr.incLong, Query().sort( sortKey ) );
-                    
                     while ( cursor->more() ){
                         BSONObj o = cursor->next().getOwned();
                         
@@ -424,6 +424,7 @@ namespace mongo {
                         all.clear();
                         prev = o;
                         all.push_back( o );
+                        fpm.hit();
                     }
                     
                     state.finalReduce( all );
@@ -436,6 +437,7 @@ namespace mongo {
                     throw;
                 }
                 
+                db.dropCollection( mr.incLong );
                 
                 long long finalCount = mr.renameIfNeeded( db );
 
