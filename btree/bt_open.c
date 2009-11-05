@@ -16,7 +16,7 @@ static int __wt_bt_vrfy_sizes(DB *);
  *	Open a Btree.
  */
 int
-__wt_bt_open(DB *db)
+__wt_bt_open(DB *db, int ok_create)
 {
 	ENV *env;
 	IDB *idb;
@@ -30,8 +30,8 @@ __wt_bt_open(DB *db)
 	WT_RET(__wt_bt_vrfy_sizes(db));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(env, idb->dbname, idb->mode,
-	    F_ISSET(idb, WT_CREATE) ? WT_CREATE : 0, &idb->fh));
+	WT_RET(__wt_open(
+	    env, idb->dbname, idb->mode, ok_create, &idb->fh));
 
 	if (idb->fh->file_size == 0) {
 		idb->root_addr = WT_ADDR_INVALID;

@@ -515,33 +515,7 @@ __wt_methods_db_lockout(DB *db)
 }
 
 void
-__wt_methods_db_open_off(DB *db)
-{
-	db->btree_compare_dup_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
-	db->btree_compare_int_set = (int (*)
-	    (DB *, int ))
-	    __wt_db_lockout;
-	db->btree_compare_set = (int (*)
-	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
-	    __wt_db_lockout;
-	db->btree_dup_offpage_set = (int (*)
-	    (DB *, u_int32_t ))
-	    __wt_db_lockout;
-	db->btree_itemsize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t ))
-	    __wt_db_lockout;
-	db->btree_pagesize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
-	    __wt_db_lockout;
-	db->open = (int (*)
-	    (DB *, const char *, mode_t , u_int32_t ))
-	    __wt_db_lockout;
-}
-
-void
-__wt_methods_db_init_on(DB *db)
+__wt_methods_db_init_transition(DB *db)
 {
 	db->btree_compare_dup_get = __wt_api_db_btree_compare_dup_get;
 	db->btree_compare_dup_set = __wt_api_db_btree_compare_dup_set;
@@ -566,8 +540,26 @@ __wt_methods_db_init_on(DB *db)
 }
 
 void
-__wt_methods_db_open_on(DB *db)
+__wt_methods_db_open_transition(DB *db)
 {
+	db->btree_compare_dup_set = (int (*)
+	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout;
+	db->btree_compare_int_set = (int (*)
+	    (DB *, int ))
+	    __wt_db_lockout;
+	db->btree_compare_set = (int (*)
+	    (DB *, int (*)(DB *, const DBT *, const DBT *)))
+	    __wt_db_lockout;
+	db->btree_dup_offpage_set = (int (*)
+	    (DB *, u_int32_t ))
+	    __wt_db_lockout;
+	db->btree_itemsize_set = (int (*)
+	    (DB *, u_int32_t , u_int32_t ))
+	    __wt_db_lockout;
+	db->btree_pagesize_set = (int (*)
+	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
 	db->dump = __wt_api_db_dump;
 	db->get = __wt_api_db_get;
@@ -635,15 +627,7 @@ __wt_methods_env_lockout(ENV *env)
 }
 
 void
-__wt_methods_env_open_off(ENV *env)
-{
-	env->open = (int (*)
-	    (ENV *, const char *, mode_t , u_int32_t ))
-	    __wt_env_lockout;
-}
-
-void
-__wt_methods_env_init_on(ENV *env)
+__wt_methods_env_init_transition(ENV *env)
 {
 	env->cachesize_get = __wt_api_env_cachesize_get;
 	env->cachesize_set = __wt_api_env_cachesize_set;
@@ -657,16 +641,19 @@ __wt_methods_env_init_on(ENV *env)
 	env->errpfx_set = __wt_api_env_errpfx_set;
 	env->errx = __wt_api_env_errx;
 	env->open = __wt_api_env_open;
+	env->stat_clear = __wt_api_env_stat_clear;
+	env->stat_print = __wt_api_env_stat_print;
 	env->verbose_get = __wt_api_env_verbose_get;
 	env->verbose_set = __wt_api_env_verbose_set;
 }
 
 void
-__wt_methods_env_open_on(ENV *env)
+__wt_methods_env_open_transition(ENV *env)
 {
+	env->open = (int (*)
+	    (ENV *, const char *, mode_t , u_int32_t ))
+	    __wt_env_lockout;
 	env->db = __wt_api_env_db;
-	env->stat_clear = __wt_api_env_stat_clear;
-	env->stat_print = __wt_api_env_stat_print;
 	env->toc = __wt_api_env_toc;
 }
 
@@ -676,7 +663,7 @@ __wt_methods_wt_toc_lockout(WT_TOC *wt_toc)
 }
 
 void
-__wt_methods_wt_toc_init_on(WT_TOC *wt_toc)
+__wt_methods_wt_toc_init_transition(WT_TOC *wt_toc)
 {
 	wt_toc->close = __wt_api_wt_toc_close;
 }

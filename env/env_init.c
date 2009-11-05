@@ -30,6 +30,9 @@ wiredtiger_env_init(ENV **envp, u_int32_t flags)
 		library_init = 1;
 	}
 
+	WT_ENV_FCHK(NULL,
+	    "wiredtiger_env_init", flags, WT_APIMASK_WIREDTIGER_ENV_INIT);
+
 	/* Create the ENV handle. */
 	WT_RET(__wt_env_create(flags, &env));
 

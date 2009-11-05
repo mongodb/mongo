@@ -16,6 +16,7 @@
 int
 __wt_env_verbose_set_verify(ENV *env, u_int32_t verbose)
 {
-	WT_ENV_FCHK(env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE);
+	WT_ENV_FCHK(
+	    env, "Env.set_verbose", verbose, WT_APIMASK_ENV_VERBOSE_SET);
 	return (0);
 }

@@ -14,7 +14,7 @@
  *	Open a file handle.
  */
 int
-__wt_open(ENV *env, const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
+__wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 {
 	IDB *idb;
 	IENV *ienv;
@@ -47,7 +47,7 @@ __wt_open(ENV *env, const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp)
 	/* Windows clones: we always want to treat the file as a binary. */
 	f |= O_BINARY;
 #endif
-	if (LF_ISSET(WT_CREATE))
+	if (ok_create)
 		f |= O_CREAT;
 
 	if ((fd = open(name, f, mode)) == -1) {

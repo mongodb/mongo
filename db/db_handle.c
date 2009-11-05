@@ -28,7 +28,7 @@ __wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
 	idb = NULL;
 	ienv = env->ienv;
 
-	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_WT_DB_CREATE);
+	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_ENV_DB);
 
 	/* Create the DB and IDB structures. */
 	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
@@ -64,7 +64,8 @@ __wt_db_config_default(DB *db)
 	env = db->env;
 	idb = db->idb;
 
-	__wt_methods_db_init_on(db);
+	__wt_methods_db_lockout(db);
+	__wt_methods_db_init_transition(db);
 
 	db->btree_compare = db->btree_compare_dup = __wt_bt_lex_compare;
 
@@ -116,13 +117,6 @@ __wt_api_db_close(DB *db, u_int32_t flags)
 	ret = 0;
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
-
-	/*
-	 * No matter what, this handle is dead -- make sure the structure is
-	 * ignored.
-	 */
-	F_SET(idb, WT_INVALID);
-	WT_FLUSH_MEMORY;
 
 	/* Flush any dirty blocks from the underlying cache. */
 	WT_TRET(__wt_bt_sync(db));

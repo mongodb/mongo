@@ -32,7 +32,7 @@ __wt_api_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
 	WT_RET(__wt_cache_create(env));
 
 	/* Turn on the methods that require open. */
-	__wt_methods_env_open_on(env);
+	__wt_methods_env_open_transition(env);
 
 	return (0);
 }

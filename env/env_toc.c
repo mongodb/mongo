@@ -24,14 +24,14 @@ __wt_api_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp)
 	ienv = env->ienv;
 	*tocp = NULL;
 
-	WT_ENV_FCHK(env, "Env.toc", flags, WT_APIMASK_ENV_TOC_CREATE);
+	WT_ENV_FCHK(env, "Env.toc", flags, WT_APIMASK_ENV_TOC);
 
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_TOC), &toc));
 	toc->env = env;
 
 	/* Initialize the methods. */
 	__wt_methods_wt_toc_lockout(toc);
-	__wt_methods_wt_toc_init_on(toc);
+	__wt_methods_wt_toc_init_transition(toc);
 
 	if (F_ISSET(ienv, WT_SINGLE_THREADED))
 		F_SET(toc, WT_SINGLE_THREADED);
@@ -56,7 +56,7 @@ __wt_api_wt_toc_close(WT_TOC *toc, u_int32_t flags)
 	ret = 0;
 
 	WT_ENV_FCHK_NOTFATAL(
-	    env, "WtToc.close", flags, WT_APIMASK_TOC_DESTROY, ret);
+	    env, "WtToc.close", flags, WT_APIMASK_WT_TOC_CLOSE, ret);
 
 	/*
 	 * No matter what, this handle is dead -- make sure the structure is

@@ -30,10 +30,10 @@ __wt_api_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	WT_RET(__wt_db_idb_open(db, dbname, mode, flags));
 
 	/* Open the underlying Btree. */
-	WT_RET(__wt_bt_open(db));
+	WT_RET(__wt_bt_open(db, LF_ISSET(WT_CREATE) ? 1 : 0));
 
 	/* Turn on the methods that require open. */
-	__wt_methods_db_open_on(db);
+	__wt_methods_db_open_transition(db);
 
 	return (0);
 }
@@ -59,9 +59,6 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	__wt_lock(env, &ienv->mtx);
 	idb->file_id = ++ienv->next_file_id;
 	__wt_unlock(&ienv->mtx);
-
-	if (LF_ISSET(WT_CREATE))
-		F_SET(idb, WT_CREATE);
 
 	return (0);
 }

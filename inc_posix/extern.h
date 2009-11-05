@@ -48,7 +48,7 @@ __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
 __wt_bt_item_type(WT_ITEM *item);
 int
-__wt_bt_open(DB *db);
+__wt_bt_open(DB *db, int ok_create);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
 int
@@ -173,7 +173,7 @@ __wt_unlock(WT_MTX *mtx);
 int
 __wt_mtx_destroy(WT_MTX *mtx);
 int
-__wt_open(ENV *env, const char *name, mode_t mode, u_int32_t flags, WT_FH **fhp);
+__wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp);
 int
 __wt_close(ENV *env, WT_FH *fh);
 int
@@ -191,23 +191,19 @@ __wt_yield(void);
 void
 __wt_methods_db_lockout(DB *db);
 void
-__wt_methods_db_open_off(DB *db);
+__wt_methods_db_init_transition(DB *db);
 void
-__wt_methods_db_init_on(DB *db);
-void
-__wt_methods_db_open_on(DB *db);
+__wt_methods_db_open_transition(DB *db);
 void
 __wt_methods_env_lockout(ENV *env);
 void
-__wt_methods_env_open_off(ENV *env);
+__wt_methods_env_init_transition(ENV *env);
 void
-__wt_methods_env_init_on(ENV *env);
-void
-__wt_methods_env_open_on(ENV *env);
+__wt_methods_env_open_transition(ENV *env);
 void
 __wt_methods_wt_toc_lockout(WT_TOC *wt_toc);
 void
-__wt_methods_wt_toc_init_on(WT_TOC *wt_toc);
+__wt_methods_wt_toc_init_transition(WT_TOC *wt_toc);
 u_int32_t
 __wt_cksum(void *chunk, u_int32_t bytes);
 void

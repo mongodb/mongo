@@ -9,7 +9,7 @@
 # functions, and other API initialization.
 
 import os, string, sys
-from dist import api_load, compare_srcfile
+from dist import compare_srcfile
 
 # Temporary file.
 tmp_file = '__tmp'
@@ -36,48 +36,50 @@ def func_method_single(handle, method, config, args, func, f):
 # func_method_lockout --
 #	Set a handle's methods to the lockout function (skipping the close
 #	method, it's always legal).
-def func_method_lockout(handle, name, decl, f):
-	f.write('void\n__wt_methods_' + name + '_lockout(' + decl + ')\n{\n')
-	for i in sorted(filter(
-	    lambda _i: _i[0].split('.')[1] != 'close' and
-	    _i[0].count(handle), arguments.iteritems())):
-		func_method_single(i[0].split('.')[0],
-		    i[0].split('.')[1], config[i[0]], i[1], 'lockout', f)
+def func_method_lockout(handle, decl, f):
+	f.write('void\n__wt_methods_' + handle + '_lockout(' + decl + ')\n{\n')
+	for i in sorted(filter(lambda _i:
+	    _i[1].handle == handle and _i[1].method != 'close',
+	    api.iteritems())):
+		func_method_single(i[1].handle,
+		    i[1].method, i[1].config, i[1].args, 'lockout', f)
 	f.write('}\n\n')
 
 # func_method_transition --
 #	Write functions that transition a handle's methods on or off.
-def func_method_transition(handle, name, decl, trans, f):
-	# Build a list of the transitions.
-	list={}
-	if trans == 'off':
-		t = off
-	else:
-		t = on
-	for j in t.iteritems():
-		for i in j[1]:
-			list[i] = 1;
+def func_method_transition(handle, decl, f):
+	# Build dictionaries of methods that need on/off transitions, keyed
+	# by the name of the transition, and a list of the transition names.
+	on={}
+	off={}
+	trans=[]
+	for i in sorted(filter(lambda _i:
+	    _i[1].handle == handle, api.iteritems())):
+		for j in i[1].off:
+			if j not in off:
+				off[j] = []
+			if j not in on:
+				on[j] = []
+			off[j].append(i[1])
+		for j in i[1].on:
+			if j not in trans:
+				trans.append(j)
+			if j not in off:
+				off[j] = []
+			if j not in on:
+				on[j] = []
+			on[j].append(i[1])
 
-	# For each transition, build a function the performs it.
-	for j in sorted(list):
-		write_func = 0;
-		s = 'void\n__wt_methods_' +\
-		    name + '_' + j + '_' + trans + '(' + decl + ')\n{\n'
-		for i in sorted(filter(lambda _i:
-		    _i[0].count(handle) and t[_i[0]].count(j),
-		    arguments.iteritems())):
-			if write_func == 0:
-				f.write(s);
-				write_func = 1;
-			if trans == 'off':
-				func_method_single(
-				    i[0].split('.')[0], i[0].split('.')[1],
-				    config[i[0]], i[1], 'lockout', f)
-			else:
-				func_method_std(i[0].split('.')[0],
-				    i[0].split('.')[1], config[i[0]], f)
-		if write_func == 1:
-			f.write('}\n\n')
+	# Write a transition function that turns methods on/off.
+	for i in trans:
+		f.write('void\n__wt_methods_' +\
+		    handle + '_' + i + '_transition' + '(' + decl + ')\n{\n')
+		for j in off[i]:
+			func_method_single(
+			    j.handle, j.method, j.config, j.args, 'lockout', f)
+		for j in on[i]:
+			func_method_std(j.handle, j.method, j.config, f)
+		f.write('}\n\n')
 
 # func_struct --
 #	Output method name for a structure entry.
@@ -167,9 +169,10 @@ def func_method_getset(handle, method, config, args, f):
 	f.write('\treturn (0);\n}\n\n')
 
 #####################################################################
-# Read in the api.py file.
+# Build the API dictionary.
 #####################################################################
-arguments, config, flags, off, on = api_load()
+import api_class
+api = api_class.methods
 
 #####################################################################
 # Update api.h, the API header file.
@@ -204,26 +207,26 @@ tfile.write('#include "wt_internal.h"\n\n')
 
 # Write the getter/setter methods.
 for i in sorted(filter(lambda _i:
-    config[_i[0]].count('getter') or config[_i[0]].count('setter'),
-    arguments.iteritems())):
+    _i[1].config.count('getter') or _i[1].config.count('setter'),
+    api.iteritems())):
 	func_method_getset(
-	    i[0].split('.')[0],i[0].split('.')[1], config[i[0]], i[1], tfile)
+	    i[1].handle, i[1].method, i[1].config, i[1].args, tfile)
 
 # Write the method lockout and transition functions.
-func_method_lockout('db.', 'db', 'DB *db', tfile)
-func_method_transition('db.', 'db', 'DB *db', 'off', tfile)
-func_method_transition('db.', 'db', 'DB *db', 'on', tfile)
+func_method_lockout('db', 'DB *db', tfile)
+func_method_transition('db', 'DB *db', tfile)
 
-func_method_lockout('env.', 'env', 'ENV *env', tfile)
-func_method_transition('env.', 'env', 'ENV *env', 'off', tfile)
-func_method_transition('env.', 'env', 'ENV *env', 'on', tfile)
+func_method_lockout('env', 'ENV *env', tfile)
+func_method_transition('env', 'ENV *env', tfile)
 
-func_method_lockout('wt_toc.', 'wt_toc', 'WT_TOC *wt_toc', tfile)
-func_method_transition('wt_toc.', 'wt_toc', 'WT_TOC *wt_toc', 'off', tfile)
-func_method_transition('wt_toc.', 'wt_toc', 'WT_TOC *wt_toc', 'on', tfile)
+func_method_lockout('wt_toc', 'WT_TOC *wt_toc', tfile)
+func_method_transition('wt_toc', 'WT_TOC *wt_toc', tfile)
 
 tfile.close()
 compare_srcfile(tmp_file, '../support/api.c')
+
+sys.exit(0);
+
 
 #####################################################################
 # Update wiredtiger.in file with WT_TOC/DB methods and DB/ENV getter/setter

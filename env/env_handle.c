@@ -41,12 +41,6 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	WT_ERR(__wt_env_config_default(env));
 	WT_ERR(__wt_ienv_config_default(env));
 
-	/* We have an environment -- check the API flags. */
-	WT_ENV_FCHK_NOTFATAL(
-	    NULL, "wiredtiger_init", flags, WT_APIMASK_WT_ENV_CREATE, ret);
-	if (ret != 0)
-		goto err;
-
 	/* If we're not single-threaded, start the workQ thread. */
 	if (LF_ISSET(WT_SINGLE_THREADED))
 		F_SET(ienv, WT_SINGLE_THREADED);
@@ -66,7 +60,7 @@ static int
 __wt_env_config_default(ENV *env)
 {
 	__wt_methods_env_lockout(env);
-	__wt_methods_env_init_on(env);
+	__wt_methods_env_init_transition(env);
 	return (0);
 }
 
