@@ -1105,33 +1105,41 @@ namespace JsobjTests {
     struct BSONArrayBuilderTest{
         void run(){
             int i = 0;
-            BSONObjBuilder obj;
-            BSONArrayBuilder arr;
+            BSONObjBuilder objb;
+            BSONArrayBuilder arrb;
 
-            obj << obj.numStr(i++) << 100;
-            arr                    << 100;
+            objb << objb.numStr(i++) << 100;
+            arrb                     << 100;
 
-            obj << obj.numStr(i++) << 1.0;
-            arr                    << 1.0;
+            objb << objb.numStr(i++) << 1.0;
+            arrb                     << 1.0;
 
-            obj << obj.numStr(i++) << "Hello";
-            arr                    << "Hello";
+            objb << objb.numStr(i++) << "Hello";
+            arrb                     << "Hello";
 
-            obj << obj.numStr(i++) << string("World");
-            arr                    << string("World");
+            objb << objb.numStr(i++) << string("World");
+            arrb                     << string("World");
 
-            obj << obj.numStr(i++) << BSON( "a" << 1 << "b" << "foo" );
-            arr                    << BSON( "a" << 1 << "b" << "foo" );
+            objb << objb.numStr(i++) << BSON( "a" << 1 << "b" << "foo" );
+            arrb                     << BSON( "a" << 1 << "b" << "foo" );
 
-            obj << obj.numStr(i++) << BSON( "a" << 1)["a"];
-            arr                    << BSON( "a" << 1)["a"];
+            objb << objb.numStr(i++) << BSON( "a" << 1)["a"];
+            arrb                     << BSON( "a" << 1)["a"];
 
             OID oid;
             oid.init();
-            obj << obj.numStr(i++) << oid;
-            arr                    << oid;
+            objb << objb.numStr(i++) << oid;
+            arrb                     << oid;
 
-            ASSERT_EQUALS(obj.obj(), arr.obj());
+            BSONObj obj = objb.obj();
+            BSONArray arr = arrb.arr();
+
+            ASSERT_EQUALS(obj, arr);
+
+            BSONObj o = BSON( "obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) );
+            ASSERT_EQUALS(o["obj"].type(), Object);
+            ASSERT_EQUALS(o["arr"].type(), Array);
+            ASSERT_EQUALS(o["arr2"].type(), Array);
         }
     };
     

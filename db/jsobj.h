@@ -38,6 +38,7 @@
 namespace mongo {
 
     class BSONObj;
+    class BSONArray; // empty subclass of BSONObj useful for overloading
     class BSONElement;
     class Record;
     class BSONObjBuilder;
@@ -984,6 +985,12 @@ namespace mongo {
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
 
+    struct BSONArray: BSONObj {
+        // Don't add anything other than forwarding constructors!!!
+        BSONArray(): BSONObj() {}
+        explicit BSONArray(const BSONObj& obj): BSONObj(obj) {}
+    };
+
     class BSONObjCmp {
     public:
         BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
@@ -1154,6 +1161,8 @@ namespace mongo {
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
+        void append(const char *fieldName, BSONArray arr) { appendArray(fieldName, arr); }
+        
 
         /** add header for a new subarray and return bufbuilder for writing to
             the subarray's body */
@@ -1488,7 +1497,7 @@ namespace mongo {
         BSONObjBuilderValueStream s_;
     };
 
-    class BSONArrayBuilder{
+    class BSONArrayBuilder : boost::noncopyable{
     public:
         BSONArrayBuilder() :i(0), b() {}
 
@@ -1508,7 +1517,7 @@ namespace mongo {
             return append(x);
         }
 
-        BSONObj obj(){ return b.obj(); }
+        BSONArray arr(){ return BSONArray(b.obj()); }
 
     private:
         string num(){ return b.numStr(i++); }
