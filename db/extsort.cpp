@@ -52,7 +52,8 @@ namespace mongo {
             _cur = 0;
         }
         
-        remove_all( _root );
+        unsigned long removed = remove_all( _root );
+        wassert( removed == 1 + _files.size() );
     }
 
     void BSONObjExternalSorter::sort(){
@@ -107,7 +108,7 @@ namespace mongo {
         _cur->sort( MyCmp( _order ) );
         
         stringstream ss;
-        ss << _root.string() << "file." << _files.size();
+        ss << _root.string() << "/file." << _files.size();
         string file = ss.str();
         
         ofstream out;

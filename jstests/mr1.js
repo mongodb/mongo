@@ -136,7 +136,7 @@ print( "t1: " + Date.timeFunc(
         var out = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
         if ( ks == "_id" ) assert( out.ok , "XXX" );
         db[out.result].drop();
-    } , 10 ) + " (~500 on 2.8ghz)" );    
+    } , 10 ) + " (~500 on 2.8ghz) - itcount: " + Date.timeFunc( function(){ db.mr1.find().itcount(); } , 10 ) );    
 
 
 
@@ -158,7 +158,7 @@ if ( true ){
     
     res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r } );
     d( res );
-    print( "t2: " + res.timeMillis + " (~3500 on 2.8ghz)" );
+    print( "t2: " + res.timeMillis + " (~3500 on 2.8ghz) - itcount: " + Date.timeFunc( function(){ db.mr1.find().itcount(); } ) );
     x = db[res.result];
     z = {};
     x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );

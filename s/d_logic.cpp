@@ -496,6 +496,5 @@ namespace mongo {
 
         return true;
     }
-    
 
 }

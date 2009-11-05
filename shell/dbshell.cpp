@@ -23,6 +23,10 @@ string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
 
+#if defined(USE_READLINE) && !defined(__freebsd__) && !defined(_WIN32)
+#define CTRLC_HANDLE
+#endif
+
 void shellHistoryInit(){
 #ifdef USE_READLINE
     stringstream ss;
@@ -53,7 +57,7 @@ void shellHistoryAdd( const char * line ){
 }
 
 void intr( int sig ){
-#ifdef USE_READLINE
+#ifdef CTRLC_HANDLE
     longjmp( jbuf , 1 );
 #endif
 }
@@ -73,6 +77,8 @@ void quitNicely( int sig ){
 
 char * shellReadline( const char * prompt , int handlesigint = 0 ){
 #ifdef USE_READLINE
+
+#ifdef CTRLC_HANDLE
     if ( ! handlesigint )
         return readline( prompt );
     if ( setjmp( jbuf ) ){
@@ -82,6 +88,8 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ){
         return 0;
     }
     signal( SIGINT , intr );
+#endif
+
     char * ret = readline( prompt );
     signal( SIGINT , quitNicely );
     return ret;

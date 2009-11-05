@@ -81,7 +81,10 @@ namespace mongo {
                     BSONObj o = d.nextJsObj();
                     const char * ns = o["ns"].valuestr();
                     if ( r.getConfig()->isSharded( ns ) ){
-                        uassert( "can't use unique indexes with sharding" , ! o["unique"].trueValue() );
+                        uassert( (string)"can't use unique indexes with sharding  ns:" + ns + 
+                                 " key: " + o["key"].embeddedObjectUserCheck().toString() , 
+                                 IndexDetails::isIdIndexPattern( o["key"].embeddedObjectUserCheck() ) || 
+                                 ! o["unique"].trueValue() );
                         ChunkManager * cm = r.getConfig()->getChunkManager( ns );
                         assert( cm );
                         for ( int i=0; i<cm->numChunks();i++)

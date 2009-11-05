@@ -21,6 +21,7 @@
 #include "config.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "cursors.h"
 #include "strategy.h"
 
 namespace mongo {
@@ -62,7 +63,7 @@ namespace mongo {
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
             else {
-                BSONObj k = _manager->getShardKey().key();
+                BSONObj k = _manager->getShardKey().keyDotted();
                 BSONObjBuilder r;
                 
                 BSONObjIterator i(k);
@@ -83,11 +84,15 @@ namespace mongo {
         
         ScopedDbConnection conn( getShard() );
         BSONObj result;
-        uassert( "medianKey failed!" , conn->runCommand( "admin" , BSON( "medianKey" << _ns
-                                                                         << "keyPattern" << _manager->getShardKey().key() 
-                                                                         << "min" << getMin() 
-                                                                         << "max" << getMax() 
-                                                                         ) , result ) );
+        if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
+                                                 << "keyPattern" << _manager->getShardKey().keyDotted() 
+                                                 << "min" << getMinDotted() 
+                                                 << "max" << getMaxDotted() 
+                                                 ) , result ) ){
+            stringstream ss;
+            ss << "medianKey command failed: " << result;
+            uassert( ss.str() , 0 );
+        }
         conn.done();
         
         return result.getObjectField( "median" ).getOwned();
@@ -105,18 +110,20 @@ namespace mongo {
 
         uassert( "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
 
+        BSONObj nested = dotted2nested(m);
+
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
         s->_shard = _shard;
-        s->_min = m.getOwned();
-        s->_max = _max;
+        s->setMin(nested.getOwned());
+        s->setMax(_max);
         
         s->_markModified();
         _markModified();
         
         _manager->_chunks.push_back( s );
         
-        _max = m.getOwned(); 
+        setMax(nested.getOwned());
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
@@ -273,12 +280,14 @@ namespace mongo {
     }
 
     
-    long Chunk::countObjects(){
+    long Chunk::countObjects( const BSONObj& filter ){
         ScopedDbConnection conn( getShard() );
         
-
+        BSONObj f = getFilter();
+        if ( ! filter.isEmpty() )
+            f = ClusteredCursor::concatQuery( f , filter );
         BSONObj result;
-        unsigned long long n = conn->count( _ns , getFilter() );
+        unsigned long long n = conn->count( _ns , f );
         
         conn.done();
         return (long)n;
@@ -297,20 +306,24 @@ namespace mongo {
     
     void Chunk::serialize(BSONObjBuilder& to){
         if ( _lastmod )
-            to.appendDate( "lastmod" , _lastmod );
+            to.appendTimestamp( "lastmod" , _lastmod );
         else 
             to.appendTimestamp( "lastmod" );
 
         to << "ns" << _ns;
         to << "min" << _min;
+        to << "minDotted" << _minDotted;
         to << "max" << _max;
+        to << "maxDotted" << _maxDotted;
         to << "shard" << _shard;
     }
     
     void Chunk::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
         _min = from.getObjectField( "min" ).getOwned();
+        _minDotted = from.getObjectField( "minDotted" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
+        _maxDotted = from.getObjectField( "maxDotted" ).getOwned();
         _shard = from.getStringField( "shard" );
         _lastmod = from.hasField( "lastmod" ) ? from["lastmod"].date() : 0;
         
@@ -353,13 +366,13 @@ namespace mongo {
     
     void Chunk::ensureIndex(){
         ScopedDbConnection conn( getShard() );
-        conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
+        conn->ensureIndex( _ns , _manager->getShardKey().keyDotted() , _manager->_unique );
         conn.done();
     }
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _min << " max: " << _max;
+        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _minDotted << " max: " << _maxDotted;
         return ss.str();
     }
     
@@ -390,8 +403,8 @@ namespace mongo {
         if ( _chunks.size() == 0 ){
             Chunk * c = new Chunk( this );
             c->_ns = ns;
-            c->_min = _key.globalMin();
-            c->_max = _key.globalMax();
+            c->setMin(_key.globalMin());
+            c->setMax(_key.globalMax());
             c->_shard = config->getPrimary();
             c->_markModified();
             

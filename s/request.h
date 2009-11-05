@@ -6,6 +6,7 @@
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "config.h"
+#include "util.h"
 
 namespace mongo {
     
@@ -85,23 +86,6 @@ namespace mongo {
         
         int _clientId;
         ClientInfo * _clientInfo;
-    };
-    
-    class StaleConfigException : public std::exception {
-    public:
-        StaleConfigException( const string& ns , const string& msg){
-            stringstream s;
-            s << "StaleConfigException ns: " << ns << " " << msg;
-            _msg = s.str();
-        }
-
-        virtual ~StaleConfigException() throw(){}
-        
-        virtual const char* what() const throw(){
-            return _msg.c_str();
-        }
-    private:
-        string _msg;
     };
 
     typedef map<int,ClientInfo*> ClientCache;

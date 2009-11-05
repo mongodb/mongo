@@ -99,7 +99,8 @@ namespace mongo {
     public:
         void init(const string& path );
 
-        void update(
+        /** @return DiskLoc where item ends up */
+        const DiskLoc update(
             const char *ns,
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, stringstream& profiling);

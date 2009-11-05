@@ -202,6 +202,28 @@ ShardingTest.prototype.sync = function(){
     this.adminCommand( "connpoolsync" );
 }
 
+ShardingTest.prototype.onNumShards = function( collName , dbName ){
+    dbName = dbName || "test";
+    var num=0;
+    for ( var i=0; i<this._connections.length; i++ )
+        if ( this._connections[i].getDB( dbName ).getCollection( collName ).count() > 0 )
+            num++;
+    return num;
+}
+
+ShardingTest.prototype.shardGo = function( collName , key , split , move , dbName ){
+    split = split || key;
+    move = move || split;
+    dbName = dbName || "test";
+
+    var c = dbName + "." + collName;
+
+    s.adminCommand( { shardcollection : c , key : key } );
+    s.adminCommand( { split : c , middle : split } );
+    s.adminCommand( { movechunk : c , find : move , to : this.getOther( s.getServer( dbName ) ).name } );
+    
+}
+
 MongodRunner = function( port, dbpath, peer, arbiter, extraArgs ) {
     this.port_ = port;
     this.dbpath_ = dbpath;
@@ -436,4 +458,82 @@ ToolTest.prototype.runTool = function(){
     }
 
     runMongoProgram.apply( null , a );
+}
+
+
+ReplTest = function( name ){
+    this.name = name;
+    this.ports = allocatePorts( 2 );
+}
+
+ReplTest.prototype.getPort = function( master ){
+    if ( master )
+        return this.ports[ 0 ];
+    return this.ports[ 1 ]
+}
+
+ReplTest.prototype.getPath = function( master ){
+    var p = "/data/db/" + this.name + "-";
+    if ( master )
+        p += "master";
+    else
+        p += "slave"
+    return p;
+}
+
+
+ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
+
+    if ( ! extra )
+        extra = {};
+
+    if ( ! extra.oplogSize )
+        extra.oplogSize = 10;
+        
+    var a = []
+    if ( putBinaryFirst )
+        a.push( "mongod" )
+    a.push( "--nohttpinterface", "--noprealloc", "--bind_ip" , "127.0.0.1" , "--smallfiles" );
+
+    a.push( "--port" );
+    a.push( this.getPort( master ) );
+
+    a.push( "--dbpath" );
+    a.push( this.getPath( master ) );
+    
+
+    if ( master ){
+        a.push( "--master" );
+    }
+    else {
+        a.push( "--slave" );
+        a.push( "--source" );
+        a.push( "127.0.0.1:" + this.ports[0] );
+    }
+    
+    for ( var k in extra ){
+        var v = extra[k];
+        a.push( "--" + k );
+        if ( v != null )
+            a.push( v );                    
+    }
+
+    return a;
+}
+
+ReplTest.prototype.start = function( master , options , restart ){
+    var o = this.getOptions( master , options , restart );
+    if ( restart )
+        return startMongoProgram.apply( null , o );
+    else
+        return startMongod.apply( null , o );
+}
+
+ReplTest.prototype.stop = function( master , signal ){
+    if ( arguments.length == 0 ){
+        this.stop( true );
+        this.stop( false );
+        return;
+    }
+    stopMongod( this.getPort( master ) , signal || 15 );
 }

@@ -94,9 +94,15 @@ class Import : public Tool {
         b.append( fieldName.c_str() , data );
     }
     
-    BSONObj parseLine( const char * line ){
-        if ( _type == JSON )
+    BSONObj parseLine( char * line ){
+        if ( _type == JSON ){
+            char * end = ( line + strlen( line ) ) - 1;
+            while ( isspace(*end) ){
+                *end = 0;
+                end--;
+            }
             return fromjson( line );
+        }
         
         BSONObjBuilder b;
 
@@ -113,7 +119,7 @@ class Import : public Tool {
             }
             pos++;
 
-            const char * end = strstr( line , _sep );
+            char * end = strstr( line , _sep );
             if ( ! end ){
                 _append( b , name , string( line ) );
                 break;

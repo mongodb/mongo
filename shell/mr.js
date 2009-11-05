@@ -19,7 +19,7 @@ MR.cleanup = function(){
 
 MR.emit = function(k,v){
     $numEmits++;
-    var num = get_num( k );
+    var num = nativeHelper.apply( get_num_ , [ k ] );
     var data = $arr[num];
     if ( ! data ){
         data = { key : k , values : new Array(1000) , count : 0 };

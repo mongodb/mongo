@@ -115,12 +115,12 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const BasicMatcher& bm, bool *deep, bool isArr = false);
+            int compareOp, const BasicMatcher& bm, bool isArr = false);
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const BasicMatcher&bm, bool *deep);
+            const BasicMatcher&bm);
         
     public:
         static int opDirection(int op) {
@@ -133,9 +133,7 @@ namespace mongo {
 
         ~JSMatcher();
 
-        /* deep - means we looked into arrays for a match
-        */
-        bool matches(const BSONObj& j, bool *deep = 0);
+        bool matches(const BSONObj& j);
         
         bool keyMatch() const { return !all && !haveSize && !hasArray; }
     private:
@@ -146,7 +144,7 @@ namespace mongo {
             basics.push_back( BasicMatcher( e , c ) );
         }
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm , bool *deep=0);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm);
 
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
@@ -171,8 +169,8 @@ namespace mongo {
     class KeyValJSMatcher : boost::noncopyable {
     public:
         KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matches(const BSONObj &j, bool *deep = 0);
-        bool matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep = 0);
+        bool matches(const BSONObj &j);
+        bool matches(const BSONObj &key, const DiskLoc &recLoc);
         bool needRecord(){ return _needRecord; }
     private:
         JSMatcher _keyMatcher;

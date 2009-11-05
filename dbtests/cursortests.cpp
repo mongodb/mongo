@@ -26,88 +26,6 @@
 
 namespace CursorTests {
     
-//    typedef IdSet_Deprecated IdSet;
-
-/*
-    namespace IdSetTests {
-        
-        class BasicSize {
-        public:
-            void run() {
-                IdSet a;
-                IdSet b;
-                int baseSize = BSON( "a" << 4 ).objsize() + sizeof( BSONObj );
-                ASSERT_EQUALS( 0, IdSet::aggregateSize() );
-                a.put( BSON( "a" << 4 ) );
-                ASSERT_EQUALS( baseSize, a.mySize() );
-                a.put( BSON( "ab" << 4 ) );
-                ASSERT_EQUALS( baseSize * 2 + 1, a.mySize() );
-                ASSERT_EQUALS( baseSize * 2 + 1, IdSet::aggregateSize() );
-                b.put( BSON( "abc" << 4 ) );
-                ASSERT_EQUALS( baseSize + 2, b.mySize() );
-                ASSERT_EQUALS( baseSize * 3 + 1 + 2, IdSet::aggregateSize() );                
-            }
-            ~BasicSize() {
-                if ( 0 != IdSet::aggregateSize() )
-                    FAIL( "aggregateSize not reset" );
-            }
-        private:
-            dblock lk_;
-        };
-        
-        class Upgrade {
-        public:
-            Upgrade() : num_() {}
-            void run() {
-                setClient( "unittests.bar" );
-                
-                IdSet::maxSize_ = ( BSON( "_id" << int( 1 ) ).objsize() + sizeof( BSONObj ) - 1 ) * 8;
-                
-                IdSet a;
-                IdSet b;
-                ASSERT( a.inMem() );
-                ASSERT( b.inMem() );
-                a.put( obj() );
-                b.put( obj() );
-                b.put( obj() );
-                b.put( obj() );
-                b.mayUpgradeStorage( "b" );
-                ASSERT( b.inMem() );
-                a.put( obj() );
-                a.put( obj() );
-                a.mayUpgradeStorage( "a" );
-                ASSERT( a.inMem() );
-                a.put( obj() );
-                a.mayUpgradeStorage( "a" );
-                ASSERT( !a.inMem() );
-                b.put( obj() );
-                b.mayUpgradeStorage( "b" );
-                ASSERT( !b.inMem() );
-                
-                ASSERT( a.get( obj( 0 ) ) );
-                for( int i = 1; i < 4; ++i )
-                    ASSERT( b.get( obj( i ) ) );
-                for( int i = 4; i < 7; ++i )
-                    ASSERT( a.get( obj( i ) ) );
-                ASSERT( b.get( obj( 7 ) ) );
-            }
-            ~Upgrade() {
-                setClient( "local.temp" );
-                if ( nsdetails( "local.temp.clientcursor.a" ) || nsdetails( "local.temp.clientcursor.b" ) )
-                    FAIL( "client cursor temp collection not deleted" );
-            }
-        private:
-            BSONObj obj( int i = -1 ) {
-                if ( i == -1 )
-                    i = num_++;
-                return BSON( "_id" << i );
-            }
-            dblock lk_;
-            int num_;
-        };
-
-    } // namespace IdSetTests
-*/
     namespace BtreeCursorTests {
 
         class MultiRange {
@@ -201,8 +119,6 @@ namespace CursorTests {
         All() : Suite( "cursor" ){}
         
         void setupTests(){
-//            add< IdSetTests::BasicSize >();
-  //          add< IdSetTests::Upgrade >();
             add< BtreeCursorTests::MultiRange >();
             add< BtreeCursorTests::MultiRangeGap >();
             add< BtreeCursorTests::MultiRangeReverse >();

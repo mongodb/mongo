@@ -597,6 +597,28 @@ namespace JsobjTests {
 
             }
         };
+
+        class increasing {
+        public:
+            BSONObj g(){
+                BSONObjBuilder b;
+                b.appendOID( "_id" , 0 , true );
+                return b.obj();
+            }
+            void run(){
+                BSONObj a = g();
+                BSONObj b = g();
+                
+                ASSERT( a.woCompare( b ) < 0 );
+                
+                // yes, there is a 1/1000 chance this won't increase time(0) 
+                // and therefore inaccurately say the function is behaving
+                // buf if its broken, it will fail 999/1000, so i think that's good enough
+                sleepsecs( 1 );
+                BSONObj c = g();
+                ASSERT( a.woCompare( c ) < 0 );
+            }
+        };
     } // namespace OIDTests
 
     namespace ValueStreamTests {
@@ -1065,7 +1087,75 @@ namespace JsobjTests {
             t( LEFT_SUBFIELD , "a.x" , "a" );
         }
     };
+
+    struct NestedDottedConversions{
+        void t(const BSONObj& nest, const BSONObj& dot){
+            ASSERT_EQUALS( nested2dotted(nest), dot);
+            ASSERT_EQUALS( nest, dotted2nested(dot));
+        }
+
+        void run(){
+            t( BSON("a" << BSON("b" << 1)), BSON("a.b" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1)), BSON("a.b" << 1 << "a.c" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1) << "d" << 1), BSON("a.b" << 1 << "a.c" << 1 << "d" << 1) );
+            t( BSON("a" << BSON("b" << 1 << "c" << 1 << "e" << BSON("f" << 1)) << "d" << 1), BSON("a.b" << 1 << "a.c" << 1 << "a.e.f" << 1 << "d" << 1) );
+        }
+    };
+
+    struct BSONArrayBuilderTest{
+        void run(){
+            int i = 0;
+            BSONObjBuilder objb;
+            BSONArrayBuilder arrb;
+
+            objb << objb.numStr(i++) << 100;
+            arrb                     << 100;
+
+            objb << objb.numStr(i++) << 1.0;
+            arrb                     << 1.0;
+
+            objb << objb.numStr(i++) << "Hello";
+            arrb                     << "Hello";
+
+            objb << objb.numStr(i++) << string("World");
+            arrb                     << string("World");
+
+            objb << objb.numStr(i++) << BSON( "a" << 1 << "b" << "foo" );
+            arrb                     << BSON( "a" << 1 << "b" << "foo" );
+
+            objb << objb.numStr(i++) << BSON( "a" << 1)["a"];
+            arrb                     << BSON( "a" << 1)["a"];
+
+            OID oid;
+            oid.init();
+            objb << objb.numStr(i++) << oid;
+            arrb                     << oid;
+
+            BSONObj obj = objb.obj();
+            BSONArray arr = arrb.arr();
+
+            ASSERT_EQUALS(obj, arr);
+
+            BSONObj o = BSON( "obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) );
+            ASSERT_EQUALS(o["obj"].type(), Object);
+            ASSERT_EQUALS(o["arr"].type(), Array);
+            ASSERT_EQUALS(o["arr2"].type(), Array);
+        }
+    };
     
+    struct ArrayMacroTest{
+        void run(){
+            BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+            BSONObj obj = BSON( "0" << "hello"
+                             << "1" << 1
+                             << "2" << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+            ASSERT_EQUALS(arr, obj);
+            ASSERT_EQUALS(arr["2"].type(), Object);
+            ASSERT_EQUALS(arr["2"].embeddedObject()["foo"].type(), Array);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1122,6 +1212,7 @@ namespace JsobjTests {
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
+            add< OIDTests::increasing >();
             add< ValueStreamTests::LabelBasic >();
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();
@@ -1145,6 +1236,9 @@ namespace JsobjTests {
             add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
+            add< NestedDottedConversions >();
+            add< BSONArrayBuilderTest >();
+            add< ArrayMacroTest >();
         }
     } myall;
     

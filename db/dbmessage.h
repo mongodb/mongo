@@ -171,10 +171,11 @@ namespace mongo {
             ntoreturn = d.pullInt();
             query = d.nextJsObj();
             if ( d.moreJSObjs() ) {
-                fields = auto_ptr< FieldMatcher >(new FieldMatcher() );
-                fields->add( d.nextJsObj() );
-                if ( fields->size() == 0 )
-                    fields.reset();
+                BSONObj o = d.nextJsObj();
+                if (!o.isEmpty()){
+                    fields = auto_ptr< FieldMatcher >(new FieldMatcher() );
+                    fields->add( o );
+                }
             }
             queryOptions = d.msg().data->dataAsInt();
         }

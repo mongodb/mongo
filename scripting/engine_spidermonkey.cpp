@@ -1,5 +1,20 @@
 // engine_spidermonkey.cpp
 
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 #include "stdafx.h"
 #include "engine_spidermonkey.h"
 
@@ -465,9 +480,8 @@ namespace mongo {
                 }
 
                 int n = embed.nFields();
-                assert( n > 0 );
 
-                JSObject * array = JS_NewArrayObject( _context , embed.nFields() , 0 );
+                JSObject * array = JS_NewArrayObject( _context , n , 0 );
                 assert( array );
 
                 jsval myarray = OBJECT_TO_JSVAL( array );
@@ -747,17 +761,19 @@ namespace mongo {
 
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ){
         Convertor c(cx);
-        uassert( "native_helper needs at least 1 arg" , argc >= 1 );
         
-        NativeFunction func = (NativeFunction)((long long)c.toNumber( argv[0] ));
+        NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
         assert( func );
         
-        BSONObjBuilder args;
-        for ( uintN i=1; i<argc; i++ ){
-            c.append( args , args.numStr( i ) , argv[i] );
+        BSONObj a;
+        if ( argc > 0 ){
+            BSONObjBuilder args;
+            for ( uintN i=0; i<argc; i++ ){
+                c.append( args , args.numStr( i ) , argv[i] );
+            }
+            
+            a = args.obj();
         }
-        
-        BSONObj a = args.obj();
         BSONObj out = func( a );
         
         if ( out.isEmpty() ){
@@ -1285,7 +1301,8 @@ namespace mongo {
             _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
 
             stringstream code;
-            code << field << " = function(){ var a = [ " << field << "_ ]; for ( var i=0; i<arguments.length; i++ ){ a.push( arguments[i] ); } return nativeHelper.apply( null , a ); }";
+            code << field << "_" << " = { x : " << field << "_ }; ";
+            code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
             exec( code.str().c_str() );
 
         }

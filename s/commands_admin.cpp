@@ -333,7 +333,7 @@ namespace mongo {
                 }
 
                 ChunkManager * info = config->getChunkManager( ns );
-                Chunk& old = info->findChunk( find );
+                Chunk& old = info->findChunk( dotted2nested(find) );
 
 
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
@@ -415,7 +415,7 @@ namespace mongo {
                 }
 
                 ChunkManager * info = config->getChunkManager( ns );
-                Chunk& c = info->findChunk( find );
+                Chunk& c = info->findChunk( dotted2nested(find) );
                 string from = c.getShard();
 
                 if ( from == to ){

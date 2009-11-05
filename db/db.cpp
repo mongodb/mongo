@@ -313,12 +313,13 @@ namespace mongo {
     }
     
     void repairDatabases() {
-
+        log(1) << "enter repairDatabases" << endl;
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
+            log(1) << "\t" << dbName << endl;
             assert( !setClient( dbName.c_str() ) );
             MongoDataFile *p = cc().database()->getFile( 0 );
             MDFHeader *h = p->getHeader();
@@ -345,6 +346,8 @@ namespace mongo {
                 closeClient( dbName.c_str() );
             }
         }
+
+        log(1) << "done repairDatabases" << endl;
 
         if ( shouldRepairDatabases ){
             log() << "finished checking dbs" << endl;
@@ -575,8 +578,6 @@ int main(int argc, char* argv[], char *envp[] )
     hidden_options.add_options()
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-        /* hiding this because it is deprecated */
-        ("deDupMem", po::value<long>(), "custom memory limit (in bytes) for query de-duping")
         ;
 
     /* support for -vv -vvvv etc. */
@@ -761,13 +762,6 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("notablescan")) {
             cmdLine.notablescan = true;
         }
-        if (params.count("deDupMem")) {
-            uasserted("deprecated");
-            long x = params["deDupMem"].as<long>();
-            uassert("bad arg", x > 0);
-            // IdSet::maxSize_ = x;
-            // assert(IdSet::maxSize_ > 0);
-        }
         if (params.count("install")) {
             installService = true;
         }
@@ -861,6 +855,11 @@ int main(int argc, char* argv[], char *envp[] )
                 }
 
                 initAndListen(cmdLine.port);
+                return 0;
+            }
+
+            if (command[0].compare("dbpath") == 0) {
+                cout << dbpath << endl;
                 return 0;
             }
 
@@ -964,7 +963,9 @@ namespace mongo {
         assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
-        
+
+        setupSIGTRAPforGDB();
+
         sigemptyset( &asyncSignals );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );

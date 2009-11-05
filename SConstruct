@@ -230,6 +230,8 @@ usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
+enableSNMP = False
+
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
     env["CC"] = GetOption( "cxx" )
@@ -276,9 +278,9 @@ if GetOption( "extralib" ) is not None:
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
-                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp" ]
+                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp"  ]
 commonFiles += Glob( "util/*.c" )
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp" )
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp client/parallel.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
 
 #mmap stuff
@@ -298,7 +300,7 @@ else:
 coreDbFiles = []
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbcommands.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbinfo.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
 
 if usesm:
     commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
@@ -316,7 +318,7 @@ coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shardkey.cpp" , "s/config.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
-allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
+allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" , "s/d_util.cpp" ];
 
 allCXXFiles = allClientFiles + coreShardFiles + shardServerFiles + serverOnlyFiles;
 
@@ -367,9 +369,9 @@ if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
 
-    env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
+    if usejvm:
+        env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
 
-    env.Append( CPPFLAGS=" -mmacosx-version-min=10.4 " )
     if not nojni:
         env.Append( FRAMEWORKS=["JavaVM"] )
 
@@ -422,7 +424,7 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
 
-elif "freebsd7" == os.sys.platform:
+elif os.sys.platform.startswith( "freebsd" ):
     nix = True
     freebsd = True
     env.Append( CPPPATH=[ "/usr/local/include" ] )
@@ -539,7 +541,7 @@ if not nojni and useJavaHome:
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
-    env.Append( LINKFLAGS=" -fPIC -pthread " )
+    env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
     if debugBuild:
@@ -726,6 +728,21 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
     removeIfInList( myenv["LIBS"] , "pcap" )
     removeIfInList( myenv["LIBS"] , "wpcap" )
+
+    if enableSNMP and conf.CheckCXXHeader( "net-snmp/net-snmp-config.h" ):
+
+        snmplibs = [ "netsnmp" + x for x in [ "mibs" , "agent" , "helpers" , "" ] ]
+
+        gotAll = True
+        for x in snmplibs:
+            if not myCheckLib:
+                gotAll = False
+        if gotAll:
+            myenv.Append( CPPDEFINES=[ "_HAVESNMP" ] )
+        else:
+            for x in snmplibs:
+                removeIfInList( myenv["LIBS"] , x )
+        
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:
@@ -954,7 +971,6 @@ elif not onlyServer:
         shell32BitFiles = coreShellFiles
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
-
         shellEnv.VariantDir( "32bit" , "." )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )

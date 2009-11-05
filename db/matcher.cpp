@@ -93,9 +93,9 @@ namespace mongo {
                           );
     }
     
-    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc, bool *deep) {
+    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc ) {
         if ( _keyMatcher.keyMatch() ) {
-            if ( !_keyMatcher.matches(key, deep) ) {
+            if ( !_keyMatcher.matches(key) ) {
                 return false;
             }
         }
@@ -104,7 +104,7 @@ namespace mongo {
             return true;
         }
 
-        return _recordMatcher.matches(recLoc.rec(), deep);
+        return _recordMatcher.matches(recLoc.rec());
     }
     
     
@@ -268,7 +268,7 @@ namespace mongo {
         constrainIndexKey_ = constrainIndexKey;
     }
 
-    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm, bool *deep) {
+    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
         if ( op == 0 )
@@ -314,8 +314,8 @@ namespace mongo {
         return (op & z);
     }
 
-    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm, bool *deep) {
-        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm, deep );
+    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm ) {
+        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm );
         if ( bm.toMatch.type() != jstNULL )
             return ( ret <= 0 ) ? 1 : 0;
         else
@@ -334,7 +334,6 @@ namespace mongo {
        toMatch   - element we want to match.
        obj       - database object to check against
        compareOp - Equality, LT, GT, etc.
-       deep      - out param.  set to true/false if we scanned an array
        isArr     -
 
        Special forms:
@@ -348,7 +347,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const BasicMatcher& bm , bool *deep, bool isArr) {
+    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const BasicMatcher& bm , bool isArr) {
 
         if ( compareOp == BSONObj::opALL ) {
             if ( bm.myset->size() == 0 )
@@ -371,10 +370,10 @@ namespace mongo {
         }
 
         if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, bm, deep );
+            return matchesNe( fieldName, toMatch, obj, bm );
         if ( compareOp == BSONObj::NIN ) {
             for( set<BSONElement,element_lt>::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, bm, deep );
+                int ret = matchesNe( fieldName, *i, obj, bm );
                 if ( ret != 1 )
                     return ret;
             }
@@ -394,9 +393,8 @@ namespace mongo {
                     BSONElement z = ai.next();
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, bm, deep, false);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, bm, false);
                         if ( cmp > 0 ) {
-                            if ( deep ) *deep = true;
                             return 1;
                         } else if ( cmp < 0 ) {
                             found = true;
@@ -416,7 +414,7 @@ namespace mongo {
                     return retMissing( bm );
 
                 BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, bm, deep, se.type() == Array);
+                return matchesDotted(p+1, toMatch, eo, compareOp, bm, se.type() == Array);
             } else {
                 e = obj.getField(fieldName);
             }
@@ -425,15 +423,13 @@ namespace mongo {
         if ( compareOp == BSONObj::opEXISTS ) {
             return ( e.eoo() ^ toMatch.boolean() ) ? 1 : -1;
         } else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
-            valuesMatch(e, toMatch, compareOp, bm, deep) ) {
+            valuesMatch(e, toMatch, compareOp, bm ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
             while ( ai.moreWithEOO() ) {
                 BSONElement z = ai.next();
                 if ( valuesMatch( z, toMatch, compareOp, bm) ) {
-                    if ( deep )
-                        *deep = true;
                     return 1;
                 }
             }
@@ -468,12 +464,8 @@ namespace mongo {
     }
 
     /* See if an object matches the query.
-       deep - return true when means we looked into arrays for a match
     */
-    bool JSMatcher::matches(const BSONObj& jsobj, bool *deep) {
-        if ( deep )
-            *deep = false;
-
+    bool JSMatcher::matches(const BSONObj& jsobj ) {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
@@ -482,7 +474,7 @@ namespace mongo {
             BasicMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
-            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm, deep);
+            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm );
             if ( cmp < 0 )
                 return false;
             if ( cmp == 0 ) {
@@ -505,7 +497,7 @@ namespace mongo {
                 if ( !e.eoo() )
                     s.insert( e );
             } else {
-                jsobj.getFieldsDotted( rm.fieldName, s, deep );
+                jsobj.getFieldsDotted( rm.fieldName, s );
             }
             bool match = false;
             for( BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i )

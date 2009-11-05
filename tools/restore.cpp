@@ -148,7 +148,10 @@ public:
         while ( read < fileLength ) {
             file.read( buf , 4 );
             int size = ((int*)buf)[0];
-            assert( size < BUF_SIZE );
+            if ( size >= BUF_SIZE ){
+                cerr << "got an object of size: " << size << "  terminating..." << endl;
+            }
+            uassert( "invalid object size" , size < BUF_SIZE );
 
             file.read( buf + 4 , size - 4 );
 

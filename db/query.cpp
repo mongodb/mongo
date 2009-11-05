@@ -69,9 +69,8 @@ namespace mongo {
             
             DiskLoc rloc = c_->currLoc();
             
-            bool deep;
-            if ( matcher_->matches(c_->currKey(), rloc, &deep) ) {
-                if ( !c_->getsetdup(deep, rloc) )
+            if ( matcher_->matches(c_->currKey(), rloc ) ) {
+                if ( !c_->getsetdup(rloc) )
                     ++count_;
             }
 
@@ -138,15 +137,18 @@ namespace mongo {
         do {
             DiskLoc rloc = c->currLoc();
             
-            bool deep;
-            if ( !matcher.matches(c->currKey(), rloc, &deep) ) {
+            if ( !matcher.matches(c->currKey(), rloc ) ) {
                 c->advance(); // advance must be after noMoreMatches() because it uses currKey()
             }
             else {
                 c->advance(); // must advance before deleting as the next ptr will die
-                assert( !c->getsetdup(deep, rloc) ); // can't be a dup, we deleted it!
-                if ( !justOne )
+                assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+                if ( !justOne ) {
+                    /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
+                             blocks.  here we might call millions of times which would be bad.
+                    */
                     c->noteLocation();
+                }
 
                 if ( logop ) {
                     BSONElement e;
@@ -285,39 +287,23 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                bool deep;
-                if ( !cc->matcher->matches(c->currKey(), c->currLoc(), &deep) ) {
+                if ( !cc->matcher->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
-                    //out() << "matches " << c->currLoc().toString() << ' ' << deep << '\n';
-                    if( c->getsetdup(deep, c->currLoc()) ) {
+                    //out() << "matches " << c->currLoc().toString() << '\n';
+                    if( c->getsetdup(c->currLoc()) ) {
                         //out() << "  but it's a dup \n";
                     }
                     else {
                         BSONObj js = c->current();
-                        /* if ( cc->ids_.get() ) {
-                           BSONElement idRef = js.getField( "_id" );
-                           if ( !idRef.eoo() ) {
-                           BSONObjBuilder idBuilder;
-                           idBuilder.append( idRef );
-                           BSONObj id = idBuilder.obj();
-                           if ( cc->ids_->get( id ) ) {
-                           c->advance();
-                           continue;
-                           }
-                           cc->ids_->put( id ); 
-                           }
-                           }*/
-                        bool ok = fillQueryResultFromObj(b, cc->filter.get(), js);
-                        if ( ok ) {
-                            n++;
-                            if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                 (ntoreturn==0 && b.len()>1*1024*1024) ) {
-                                c->advance();
-                                cc->pos += n;
-                                //cc->updateLocation();
-                                break;
-                            }
+                        fillQueryResultFromObj(b, cc->filter.get(), js);
+                        n++;
+                        if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
+                             (ntoreturn==0 && b.len()>1*1024*1024) ) {
+                            c->advance();
+                            cc->pos += n;
+                            //cc->updateLocation();
+                            break;
                         }
                     }
                 }
@@ -377,10 +363,9 @@ namespace mongo {
                     ++count_;
                 }
             } else {
-                bool deep;
-                if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+                if ( !matcher_->matches(c_->currKey(), c_->currLoc() ) ) {
                 }
-                else if( !c_->getsetdup(deep, c_->currLoc()) ) {
+                else if( !c_->getsetdup(c_->currLoc()) ) {
                     ++count_;
                 }                
             }
@@ -505,9 +490,6 @@ namespace mongo {
             }
             
             bool mayCreateCursor1 = wantMore_ && ntoreturn_ != 1 && useCursors;
-            /*            if ( !ids_.get() && !c_->capped() && ( mayCreateCursor1 || mayCreateCursor2() ) ) {
-                          ids_.reset( new IdSet() );
-                          }*/
             
             if( 0 ) { 
                 BSONObj js = c_->current();
@@ -515,25 +497,15 @@ namespace mongo {
             }
 
             nscanned_++;
-            bool deep;
-            if ( !matcher_->matches(c_->currKey(), c_->currLoc(), &deep) ) {
+            if ( !matcher_->matches(c_->currKey(), c_->currLoc() ) ) {
                 ;
             }
             else {
                 DiskLoc cl = c_->currLoc();
-                if( !c_->getsetdup(deep, cl) ) { 
+                if( !c_->getsetdup(cl) ) { 
                     BSONObj js = c_->current();
                     // got a match.
                     assert( js.objsize() >= 0 ); //defensive for segfaults
-                    /*if ( ids_.get() ) {
-                      BSONElement idRef = js.getField( "_id" );
-                      if ( !idRef.eoo() ) {
-                      BSONObjBuilder b;
-                      b.append( idRef );
-                      BSONObj id = b.obj();
-                      ids_->put( id );
-                      }
-                      }*/
                     if ( ordering_ ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
                         so_->add(js);
@@ -550,30 +522,28 @@ namespace mongo {
                             }
                         }
                         else {
-                            bool ok = fillQueryResultFromObj(b_, filter_, js);
-                            if ( ok ) n_++;
-                            if ( ok ) {
-                                if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
-                                     (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
-                                    /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-                                       is only a size limit.  The idea is that on a find() where one doesn't use much results,
-                                       we don't return much, but once getmore kicks in, we start pushing significant quantities.
-                                 
-                                       The n limit (vs. size) is important when someone fetches only one small field from big
-                                       objects, which causes massive scanning server-side.
-                                    */
-                                    /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                    if ( mayCreateCursor1 ) {
-                                        c_->advance();
-                                        if ( c_->ok() ) {
-                                            // more...so save a cursor
-                                            saveClientCursor_ = true;
-                                        }
+                            fillQueryResultFromObj(b_, filter_, js);
+                            n_++;
+                            if ( (ntoreturn_>0 && (n_ >= ntoreturn_ || b_.len() > MaxBytesToReturnToClientAtOnce)) ||
+                                 (ntoreturn_==0 && (b_.len()>1*1024*1024 || n_>=101)) ) {
+                                /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+                                   is only a size limit.  The idea is that on a find() where one doesn't use much results,
+                                   we don't return much, but once getmore kicks in, we start pushing significant quantities.
+                             
+                                   The n limit (vs. size) is important when someone fetches only one small field from big
+                                   objects, which causes massive scanning server-side.
+                                */
+                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                                if ( mayCreateCursor1 ) {
+                                    c_->advance();
+                                    if ( c_->ok() ) {
+                                        // more...so save a cursor
+                                        saveClientCursor_ = true;
                                     }
-                                    finish();
-                                    return;
                                 }
-                            }
+                                finish();
+                                return;
+                                }
                         }
                     }
                 }
@@ -603,7 +573,6 @@ namespace mongo {
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
         auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
-        //        auto_ptr< IdSet > ids() { return ids_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -627,7 +596,6 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
-        //        auto_ptr< IdSet > ids_; /* for dedupping traversal of multikey indexes */
     };
     
     auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
@@ -793,7 +761,6 @@ namespace mongo {
                 cc->query = jsobj.getOwned();
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
                 cc->matcher = dqo.matcher();
-                //                cc->ids_ = dqo.ids();
                 cc->ns = ns;
                 cc->pos = n;
                 cc->filter = filter;

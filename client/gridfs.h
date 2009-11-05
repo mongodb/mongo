@@ -1,5 +1,20 @@
 /** @file gridfs.h */
 
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 #pragma once
 
 #include "dbclient.h"
@@ -139,12 +154,20 @@ namespace mongo {
             return (gridfs_offset)(_obj["length"].number());
         }
 
+        string getContentType(){
+            return _obj["contentType"].valuestr();
+        }
+
         unsigned long long getUploadDate(){
             return _obj["uploadDate"].date();
         }
 
         string getMD5(){
             return _obj["md5"].str();
+        }
+
+        BSONElement getFileField( const string& name ){
+            return _obj[name];
         }
 
         BSONObj getMetadata();

@@ -70,10 +70,12 @@ namespace mongo {
 		void *p;
         if( boost::filesystem::exists(nsPath) ) { 
 			p = f.map(pathString.c_str());
-			len = f.length();
-            if ( len % (1024*1024) != 0 ){
-                log() << "bad .ns file: " << pathString << endl;
-                uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+            if( p ) {
+                len = f.length();
+                if ( len % (1024*1024) != 0 ){
+                    log() << "bad .ns file: " << pathString << endl;
+                    uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+                }
             }
 		}
 		else {
@@ -81,8 +83,10 @@ namespace mongo {
 			massert( "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
 			long l = lenForNewNsFiles;
 			p = f.map(pathString.c_str(), l);
-			len = (int) l;
-			assert( len == lenForNewNsFiles );
+            if( p ) { 
+                len = (int) l;
+                assert( len == lenForNewNsFiles );
+            }
 		}
 
         if ( p == 0 ) {

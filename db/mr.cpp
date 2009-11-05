@@ -20,43 +20,47 @@
 #include "instance.h"
 #include "commands.h"
 #include "../scripting/engine.h"
+#include "../client/dbclient.h"
+#include "../client/connpool.h"
+#include "../client/parallel.h"
 
 namespace mongo {
 
     namespace mr {
-        
-        typedef pair<BSONObj,BSONObj> Data;
-        //typedef list< Data > InMemory;
-        typedef map< BSONObj,list<BSONObj>,BSONObjCmp > InMemory;
-        typedef map< BSONObj,int,BSONObjCmp > KeyNums;
 
-        
         class MyCmp {
         public:
             MyCmp(){}
-            bool operator()( const Data &l, const Data &r ) const {
-                return l.first.woCompare( r.first ) < 0;
+            bool operator()( const BSONObj &l, const BSONObj &r ) const {
+                return l.firstElement().woCompare( r.firstElement() ) < 0;
             }
         };
-    
-        BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
+
+        typedef pair<BSONObj,BSONObj> Data;
+        //typedef list< Data > InMemory;
+        typedef map< BSONObj,list<BSONObj>,MyCmp > InMemory;
+
+        BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce , bool final , ScriptingFunction finalize ){
             uassert( "need values" , values.size() );
-        
+            
+            int sizeEstimate = ( values.size() * values.begin()->getField( "value" ).size() ) + 128;
             BSONObj key;
 
-            BSONObjBuilder reduceArgs;
+            BSONObjBuilder reduceArgs( sizeEstimate );
         
-            BSONObjBuilder valueBuilder;
+            BSONObjBuilder valueBuilder( sizeEstimate );
             int n = 0;
             for ( list<BSONObj>::iterator i=values.begin(); i!=values.end(); i++){
                 BSONObj o = *i;
+                BSONObjIterator j(o);
+                BSONElement keyE = j.next();
                 if ( n == 0 ){
-                    reduceArgs.append( o["_id"] );
+                    reduceArgs.append( keyE );
                     BSONObjBuilder temp;
-                    temp.append( o["_id"] );
+                    temp.append( keyE );
                     key = temp.obj();
                 }
-                valueBuilder.appendAs( o["value"] , BSONObjBuilder::numStr( n++ ).c_str() );
+                valueBuilder.appendAs( j.next() , BSONObjBuilder::numStr( n++ ).c_str() );
             }
         
             reduceArgs.appendArray( "values" , valueBuilder.obj() );
@@ -67,25 +71,177 @@ namespace mongo {
                 uassert("reduce -> multiple not supported yet",0);                
                 return BSONObj();
             }
+            
+            if ( finalize ){
+                BSONObjBuilder b;
+                b.appendAs( key.firstElement() , "_id" );
+                s->append( b , "value" , "return" );
+                s->invokeSafe( finalize , b.obj() );
+            }
+            
             BSONObjBuilder b;
-            b.append( key["_id"] );
-            s->append( b , "value" , "return" );
+            b.appendAs( key.firstElement() , final ? "_id" : "0" );
+            s->append( b , final ? "value" : "1" , "return" );
             return b.obj();
         }
         
+        class MRSetup {
+        public:
+            MRSetup( const string& _dbname , const BSONObj& cmdObj , bool markAsTemp = true ){
+                static int jobNumber = 1;
+                
+                dbname = _dbname;
+                ns = dbname + "." + cmdObj.firstElement().valuestr();
 
+                verbose = cmdObj["verbose"].trueValue();
+                keeptemp = cmdObj["keeptemp"].trueValue();
+                
+                { // setup names
+                    stringstream ss;
+                    if ( ! keeptemp )
+                        ss << "tmp.";
+                    ss << "mr." << cmdObj.firstElement().fieldName() << "_" << time(0) << "_" << jobNumber++;    
+                    tempShort = ss.str();
+                    tempLong = dbname + "." + tempShort;
+                    incLong = tempLong + "_inc";
+
+                    if ( ! keeptemp && markAsTemp )
+                        cc().addTempCollection( tempLong );
+
+                    if ( cmdObj["out"].type() == String )
+                        finalShort = cmdObj["out"].valuestr();
+                    else
+                        finalShort = tempShort;
+                    
+                    finalLong = dbname + "." + finalShort;
+                    
+                }
+             
+                { // code
+                    mapCode = cmdObj["map"].ascode();
+                    reduceCode = cmdObj["reduce"].ascode();
+                    if ( cmdObj["finalize"].type() ){
+                        finalizeCode = cmdObj["finalize"].ascode();
+                    }
+                    
+                }
+                
+                { // query options
+                    if ( cmdObj["query"].type() == Object ){
+                        filter = cmdObj["query"].embeddedObjectUserCheck();
+                        q = filter;
+                    }
+                    
+                    if ( cmdObj["sort"].type() == Object )
+                        q.sort( cmdObj["sort"].embeddedObjectUserCheck() );
+
+                    if ( cmdObj["limit"].isNumber() )
+                        limit = cmdObj["limit"].numberLong();
+                    else 
+                        limit = 0;
+                }
+            }
+            
+            /**
+               @return number objects in collection
+             */
+            long long renameIfNeeded( DBDirectClient& db ){
+                if ( finalLong != tempLong ){
+                    dblock l;
+                    db.dropCollection( finalLong );
+                    BSONObj info;
+                    uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                }
+                return db.count( finalLong );
+            }
+                
+            string dbname;
+            string ns;
+            
+            // options
+            bool verbose;            
+            bool keeptemp;
+
+            // query options
+            
+            BSONObj filter;
+            Query q;
+            long long limit;
+
+            // functions
+            
+            string mapCode;
+            string reduceCode;
+            string finalizeCode;
+
+            // output tables
+            string incLong;
+            
+            string tempShort;
+            string tempLong;
+            
+            string finalShort;
+            string finalLong;
+            
+        }; // end MRsetup
+
+        class MRState {
+        public:
+            MRState( MRSetup& s ) : setup(s){
+                scope = globalScriptEngine->getPooledScope( setup.dbname );
+                scope->localConnect( setup.dbname.c_str() );
+                
+                map = scope->createFunction( setup.mapCode.c_str() );
+                reduce = scope->createFunction( setup.reduceCode.c_str() );
+                if ( setup.finalizeCode.size() )
+                    finalize  = scope->createFunction( setup.finalizeCode.c_str() );
+                else
+                    finalize = 0;
+                
+                db.dropCollection( setup.tempLong );
+                db.dropCollection( setup.incLong );
+                
+                dblock l;
+                string err;
+                assert( userCreateNS( setup.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
+
+            }
+
+            void finalReduce( list<BSONObj>& values ){
+                if ( values.size() == 0 )
+                    return;
+
+                BSONObj key = values.begin()->firstElement().wrap( "_id" );
+                BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
+                
+                dblock l;
+                theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
+            }
+
+            
+            MRSetup& setup;
+            auto_ptr<Scope> scope;
+            DBDirectClient db;
+
+            ScriptingFunction map;
+            ScriptingFunction reduce;
+            ScriptingFunction finalize;
+            
+        };
+        
         class MRTL {
         public:
-            MRTL( DBDirectClient * db , string coll , Scope * s , ScriptingFunction reduce ) : 
-                _db( db ) , _coll( coll ) , _scope( s ) , _reduce( reduce ) , _size(0){
+            MRTL( MRState& state ) : _state( state ){
                 _temp = new InMemory();
+                _size = 0;
+                numEmits = 0;
             }
             ~MRTL(){
                 delete _temp;
             }
             
+            
             void reduceInMemory(){
-                BSONObj prevKey;
                 
                 InMemory * old = _temp;
                 InMemory * n = new InMemory();
@@ -97,45 +253,47 @@ namespace mongo {
                     list<BSONObj>& all = i->second;
                     
                     if ( all.size() == 1 ){
-                        insert( key , *(all.begin()) );
+                        // this key has low cardinality, so just write to db
+                        write( *(all.begin()) );
                     }
                     else if ( all.size() > 1 ){
-                        BSONObj res = reduceValues( all , _scope , _reduce );
-                        insert( key , res );
+                        BSONObj res = reduceValues( all , _state.scope.get() , _state.reduce , false , 0 );
+                        insert( res );
                     }
                 }
                 
                 delete( old );
+
             }
-        
+
+            void write( BSONObj& o ){
+                theDataFileMgr.insert( _state.setup.incLong.c_str() , o , true );
+            }
+            
             void dump(){
+                dblock l;
+                    
                 for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
-                    BSONObj key = i->first;
                     list<BSONObj>& all = i->second;
                     if ( all.size() < 1 )
                         continue;
-                    assert( all.size() == 1 );
                     
-                    BSONObj value = *(all.begin());
-
-                    BSONObjBuilder b;
-                    b.appendElements( value );
-                
-                    BSONObj o = b.obj();
-                    _db->insert( _coll , o );
+                    for ( list<BSONObj>::iterator j=all.begin(); j!=all.end(); j++ )
+                        write( *j );
                 }
                 _temp->clear();
                 _size = 0;
+
             }
             
-            void insert( const BSONObj& key , const BSONObj& value ){
-                list<BSONObj>& all = (*_temp)[key];
-                all.push_back( value );
-                _size += key.objsize() + value.objsize() + 32;
+            void insert( const BSONObj& a ){
+                list<BSONObj>& all = (*_temp)[a];
+                all.push_back( a );
+                _size += a.objsize() + 16;
             }
-            
+
             void checkSize(){
-                if ( _size < 1024 * 10 )
+                if ( _size < 1024 * 5 )
                     return;
 
                 long before = _size;
@@ -149,67 +307,24 @@ namespace mongo {
                 log(1) << "  mr: dumping to db" << endl;
             }
             
-            int getNum( const BSONObj& key ){
-                KeyNums::iterator i = _nums.find( key );
-                if ( i != _nums.end() )
-                    return i->second;
-                int n = _nums.size() + 1;
-                _nums[key] = n;
-                return n;
-            }
-
-            void resetNum(){
-                _nums.clear();
-            }
-
-        private:
-            DBDirectClient * _db;
-            string _coll;
-            Scope * _scope;
-            ScriptingFunction _reduce;
+            //private:
+            MRState& _state;
         
             InMemory * _temp;
-            
             long _size;
-
-            map<BSONObj,int,BSONObjCmp> _nums;
+            
+            long long numEmits;
         };
 
         boost::thread_specific_ptr<MRTL> _tlmr;
 
         BSONObj fast_emit( const BSONObj& args ){
-            BSONObj key,value;
-
-            BSONObjIterator i( args );
-        
-            {
-                assert( i.more() );
-                BSONObjBuilder b;
-                b.appendAs( i.next() , "_id" );
-                key = b.obj();
-            }
-
-            {
-                assert( i.more() );
-                BSONObjBuilder b;
-                b.append( key.firstElement() );
-                b.appendAs( i.next() , "value" );
-                value = b.obj();
-            }
-            assert( ! i.more() );
-            _tlmr->insert( key , value );
-            return BSON( "x" << 1 );
-        }
-
-        BSONObj get_num( const BSONObj& args ){
-            return BSON( "" << _tlmr->getNum( args ) );
-        }
-        
-        BSONObj reset_num( const BSONObj& args ){
-            _tlmr->resetNum();
+            uassert( "fast_emit takes 2 args" , args.nFields() == 2 );
+            _tlmr->insert( args );
+            _tlmr->numEmits++;
             return BSONObj();
         }
-    
+
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapreduce"){}
@@ -219,129 +334,66 @@ namespace mongo {
                 help << "see http://www.mongodb.org/display/DOCS/MapReduce";
             }
         
-            string tempCollectionName( string coll , bool tmp ){
-                static int inc = 1;
-                stringstream ss;
-                ss << cc().database()->name << ".";
-                if ( tmp )
-                    ss << "tmp.";
-                ss << "mr." << coll << "_" << time(0) << "_" << inc++;
-                return ss.str();
-            }
-
-            void doReduce( const string& resultColl , list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
-                if ( values.size() == 0 )
-                    return;
-
-                BSONObj res = reduceValues( values , s , reduce );
-                db.update( resultColl , res.extractFields( BSON( "_id" << 1 ) ) , res , true );
-            }
-
-            void finalReduce( const string& resultColl , list<BSONObj>& values , Scope * s , ScriptingFunction reduce ){
-                if ( values.size() == 0 )
-                    return;
-                
-                BSONObj key = values.begin()->extractFields( BSON( "_id" << 1 ) );
-                
-                if ( values.size() == 1 ){
-                    assert( db.count( resultColl , key  ) == 1 );
-                    return;
-                }
-
-                db.remove( resultColl , key );
-                doReduce( resultColl , values , s , reduce );
-            }
-        
-            bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
-                bool verboseOutput = cmdObj["verbose"].trueValue();
+                MRSetup mr( cc().database()->name , cmd );
 
-                string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
-                log(1) << "mr ns: " << ns << endl;
+                log(1) << "mr ns: " << mr.ns << endl;
                 
-                if ( ! db.exists( ns ) ){
+                if ( ! db.exists( mr.ns ) ){
                     errmsg = "ns doesn't exist";
                     return false;
                 }
                 
-
-                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
-                s->localConnect( cc().database()->name.c_str() );
+                bool shouldHaveData = false;
                 
-                bool istemp = ! cmdObj["keeptemp"].trueValue();
-                string resultColl = tempCollectionName( cmdObj.firstElement().valuestr() , istemp );
-                if ( istemp )
-                    currentClient->addTempCollection( resultColl );
-                string finalOutput = resultColl;
-                if ( cmdObj["out"].type() == String )
-                    finalOutput = cc().database()->name + "." + cmdObj["out"].valuestr();
-                
-                string resultCollShort = resultColl.substr( cc().database()->name.size() + 1 );
-                string finalOutputShort = finalOutput.substr( cc().database()->name.size() + 1 );
-                log(1) << "\t resultColl: " << resultColl << " short: " << resultCollShort << endl;
-                db.dropCollection( resultColl );
-            
                 long long num = 0;
                 long long inReduce = 0;
-                long long numEmits = 0;
+                
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 try {
                     dbtemprelease temprlease;
                     
-                    s->execSetup( (string)"tempcoll = db[\"" + resultCollShort + "\"]; db.getMongo().setSlaveOk();" , "tempcoll1" );
-                    s->execSetup( "MR.init()" );
-
-                    s->injectNative( "get_num" , get_num );
-                    s->injectNative( "reset_num" , reset_num );
+                    MRState state( mr );
+                    state.scope->injectNative( "emit" , fast_emit );
                     
-                    ScriptingFunction mapFunction = s->createFunction( cmdObj["map"].ascode().c_str() );
-                    ScriptingFunction reduceFunction = s->createFunction( cmdObj["reduce"].ascode().c_str() );
-                    s->execSetup( (string)"$reduce = " + cmdObj["reduce"].ascode() );
-                    
-                    MRTL * mrtl = new MRTL( &db , resultColl , s.get() , reduceFunction );
+                    MRTL * mrtl = new MRTL( state );
                     _tlmr.reset( mrtl );
 
-                    Query q;
-                    BSONObj filter;
-                    if ( cmdObj["query"].type() == Object ){
-                        filter = cmdObj["query"].embeddedObjectUserCheck();
-                        q = filter;
-                    }
-                    
-                    if ( cmdObj["sort"].type() == Object )
-                        q.sort( cmdObj["sort"].embeddedObjectUserCheck() );
-
-                    ProgressMeter pm( db.count( ns , filter ) );
-                    auto_ptr<DBClientCursor> cursor = db.query( ns , q );
+                    ProgressMeter pm( db.count( mr.ns , mr.filter ) );
+                    auto_ptr<DBClientCursor> cursor = db.query( mr.ns , mr.q );
                     long long mapTime = 0;
                     Timer mt;
                     while ( cursor->more() ){
                         BSONObj o = cursor->next(); 
                     
-                        if ( verboseOutput ) mt.reset();
+                        if ( mr.verbose ) mt.reset();
                         
-                        s->setThis( &o );
-                        if ( s->invoke( mapFunction , BSONObj() , 0 , true ) )
-                            throw UserException( (string)"map invoke failed: " + s->getError() );
+                        state.scope->setThis( &o );
+                        if ( state.scope->invoke( state.map , BSONObj() , 0 , true ) )
+                            throw UserException( (string)"map invoke failed: " + state.scope->getError() );
                         
-                        if ( verboseOutput ) mapTime += mt.micros();
+                        if ( mr.verbose ) mapTime += mt.micros();
                     
                         num++;
                         if ( num % 100 == 0 ){
                             Timer t;
-                            s->exec( "MR.check();" , "reduce-i" , false , true , true );
+                            mrtl->checkSize();
                             inReduce += t.micros();
-                            //mrtl->checkSize();
                         }
                         pm.hit();
+
+                        if ( mr.limit && num >= mr.limit )
+                            break;
                     }
                     
                     
                     countsBuilder.append( "input" , num );
-                    numEmits = s->getNumber( "$numEmits" );
-                    countsBuilder.append( "emit" , numEmits );
+                    countsBuilder.append( "emit" , mrtl->numEmits );
+                    if ( mrtl->numEmits )
+                        shouldHaveData = true;
                     
                     timingBuilder.append( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
@@ -350,74 +402,54 @@ namespace mongo {
                     
                     mrtl->reduceInMemory();
                     mrtl->dump();
-                                     
-                    {
-                        Timer t;
-                        s->exec( "MR.doReduce(true)" , "reduce" , false , true , true );
-                        inReduce += t.micros();
-                        timingBuilder.append( "reduce" , inReduce / 1000 );
-                    }
-                    if ( verboseOutput ){
-                        countsBuilder.append( "reduces" , s->getNumber( "$numReduces" ) );
-                        countsBuilder.append( "reducesToDB" , s->getNumber( "$numReducesToDB" ) );
-                    }
                     
-                    if ( cmdObj["finalize"].type() ){
-                        s->execSetup( (string)"$finalize = " + cmdObj["finalize"].ascode() );
-                        s->execSetup( "MR.finalize()" );
-                    }
-
-                    s->execSetup( "MR.cleanup()" );
-                    _tlmr.reset( 0 );
-                    /*
+                    BSONObj sortKey = BSON( "0" << 1 );
+                    db.ensureIndex( mr.incLong , sortKey );
+                    
                     BSONObj prev;
                     list<BSONObj> all;
-                    BSONObj sortKey = BSON( "_id" << 1 );
-                
-                    cursor = db.query( resultColl, Query().sort( sortKey ) );
+                    
+                    cursor = db.query( mr.incLong, Query().sort( sortKey ) );
+                    
                     while ( cursor->more() ){
                         BSONObj o = cursor->next().getOwned();
-
+                        
                         if ( o.woSortOrder( prev , sortKey ) == 0 ){
                             all.push_back( o );
                             continue;
                         }
-                    
-                        finalReduce( resultColl , all , s.get() , reduceFunction );
-
+                        
+                        state.finalReduce( all );
+                        
                         all.clear();
                         prev = o;
                         all.push_back( o );
                     }
                     
-                    finalReduce( resultColl , all , s.get() , reduceFunction );
-                    */
+                    state.finalReduce( all );
+
+                    _tlmr.reset( 0 );
                 }
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
-                    db.dropCollection( resultColl );
+                    db.dropCollection( mr.tempLong );
                     throw;
                 }
                 
                 
-                if ( finalOutput != resultColl ){
-                    // need to do this with the full dblock, that's why its after the try/catch
-                    db.dropCollection( finalOutput );
-                    BSONObj info;
-                    uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << resultColl << "to" << finalOutput ) , info ) );
-                }
+                long long finalCount = mr.renameIfNeeded( db );
 
-                if ( db.count( finalOutput ) == 0 && numEmits > 0 ){
+                if ( finalCount == 0 && shouldHaveData ){
                     errmsg = "there were emits but no data!";
                     return false;
                 }
 
                 timingBuilder.append( "total" , t.millis() );
                 
-                result.append( "result" , finalOutputShort );
+                result.append( "result" , mr.finalShort );
                 result.append( "timeMillis" , t.millis() );
-                countsBuilder.append( "output" , (long long)(db.count( finalOutput )) );
-                if ( verboseOutput ) result.append( "timing" , timingBuilder.obj() );
+                countsBuilder.append( "output" , finalCount );
+                if ( mr.verbose ) result.append( "timing" , timingBuilder.obj() );
                 result.append( "counts" , countsBuilder.obj() );
                 
                 return true;
@@ -427,6 +459,106 @@ namespace mongo {
             DBDirectClient db;
 
         } mapReduceCommand;
+        
+        class MapReduceFinishCommand : public Command {
+        public:
+            MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
+            virtual bool slaveOk() { return true; }
+
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                dbtemprelease temprlease; // we don't touch the db directly
+                                    
+                string dbname = cc().database()->name;
+                string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
+
+                MRSetup mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
+                
+                set<ServerAndQuery> servers;
+                
+                BSONObjBuilder shardCounts;
+                map<string,long long> counts;
+                
+                BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
+                vector< auto_ptr<DBClientCursor> > shardCursors;
+                BSONObjIterator i( shards );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    string shard = e.fieldName();
+
+                    BSONObj res = e.embeddedObjectUserCheck();
+                    
+                    uassert( "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
+                    servers.insert( shard );
+                    shardCounts.appendAs( res["counts"] , shard.c_str() );
+
+                    BSONObjIterator j( res["counts"].embeddedObjectUserCheck() );
+                    while ( j.more() ){
+                        BSONElement temp = j.next();
+                        counts[temp.fieldName()] += temp.numberLong();
+                    }
+
+                }
+
+                BSONObj sortKey = BSON( "_id" << 1 );
+
+                ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
+                                                    Query().sort( sortKey ) );
+                
+                
+                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
+                ScriptingFunction reduceFunction = s->createFunction( mr.reduceCode.c_str() );
+                ScriptingFunction finalizeFunction = 0;
+                if ( mr.finalizeCode.size() )
+                    finalizeFunction = s->createFunction( mr.finalizeCode.c_str() );
+
+                list<BSONObj> values;
+
+                result.append( "result" , mr.finalShort );
+
+                DBDirectClient db;
+                
+                while ( cursor.more() ){
+                    BSONObj t = cursor.next();
+                                        
+                    if ( values.size() == 0 ){
+                        values.push_back( t );
+                        continue;
+                    }
+                    
+                    if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ){
+                        values.push_back( t );
+                        continue;
+                    }
+                    
+                    db.insert( mr.tempLong , reduceValues( values , s.get() , reduceFunction , 1 , finalizeFunction ) );
+                    values.clear();
+                    values.push_back( t );
+                }
+                
+                if ( values.size() )
+                    db.insert( mr.tempLong , reduceValues( values , s.get() , reduceFunction , 1 , finalizeFunction ) );
+                
+                long long finalCount = mr.renameIfNeeded( db );
+                log(0) << " mapreducefinishcommand " << mr.finalLong << " " << finalCount << endl;
+
+                for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ){
+                    ScopedDbConnection conn( i->_server );
+                    conn->dropCollection( dbname + "." + shardedOutputCollection );
+                }
+                
+                result.append( "shardCounts" , shardCounts.obj() );
+                
+                {
+                    BSONObjBuilder c;
+                    for ( map<string,long long>::iterator i=counts.begin(); i!=counts.end(); i++ ){
+                        c.append( i->first , i->second );
+                    }
+                    result.append( "counts" , c.obj() );
+                }
+
+                return 1;
+            }
+        } mapReduceFinishCommand;
 
     }
 

@@ -587,6 +587,13 @@ namespace mongo {
                     id = &ii;
                     break;
                 }
+                if ( keyPattern.nFields() == 1 && ii.keyPattern().nFields() == 1 &&
+                     IndexDetails::isIdIndexPattern( keyPattern ) &&
+                     ii.isIdIndex() ){
+                    id = &ii;
+                    break;
+                }
+                     
             }
         }
 
@@ -597,7 +604,7 @@ namespace mongo {
         }
                 
         if ( !id ) {
-            errmsg = "no index found for specified keyPattern";
+            errmsg = (string)"no index found for specified keyPattern: " + keyPattern.toString();
             return 0;
         }
         

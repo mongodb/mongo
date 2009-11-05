@@ -21,6 +21,7 @@
 #include "../util/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
+#include "../client/parallel.h"
 #include "../db/commands.h"
 
 #include "config.h"
@@ -109,7 +110,7 @@ namespace mongo {
                 unsigned long long total = 0;
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
-                    total += c->countObjects();
+                    total += c->countObjects( filter );
                 }
                 
                 result.append( "n" , (double)total );
@@ -146,7 +147,7 @@ namespace mongo {
                 help << "{ distinct : 'collection name' , key : 'a.b' }";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-
+                
                 string dbName = getDBName( ns );
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -200,5 +201,115 @@ namespace mongo {
                 return true;
             }
         } disinctCmd;
+
+        class MRCmd : public PublicGridCommand {
+        public:
+            MRCmd() : PublicGridCommand( "mapreduce" ){}
+            
+            string getTmpName( const string& coll ){
+                static int inc = 1;
+                stringstream ss;
+                ss << "tmp.mrs." << coll << "_" << time(0) << "_" << inc++;
+                return ss.str();
+            }
+
+            BSONObj fixForShards( const BSONObj& orig , const string& output ){
+                BSONObjBuilder b;
+                BSONObjIterator i( orig );
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    string fn = e.fieldName();
+                    if ( fn == "map" || 
+                         fn == "mapreduce" || 
+                         fn == "reduce" ||
+                         fn == "query" ||
+                         fn == "sort" ||
+                         fn == "verbose" ){
+                        b.append( e );
+                    }
+                    else if ( fn == "keeptemp" ||
+                              fn == "out" ||
+                              fn == "finalize" ){
+                        // we don't want to copy these
+                    }
+                    else {
+                        uassert( (string)"don't know mr field: " + fn , 0 );
+                    }
+                }
+                b.append( "out" , output );
+                return b.obj();
+            }
+            
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                Timer t;
+
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                BSONObjBuilder timingBuilder;
+
+                ChunkManager * cm = conf->getChunkManager( fullns );
+
+                BSONObj q;
+                if ( cmdObj["query"].type() == Object ){
+                    q = cmdObj["query"].embeddedObjectUserCheck();
+                }
+                
+                vector<Chunk*> chunks;
+                cm->getChunksForQuery( chunks , q );
+                
+                const string shardedOutputCollection = getTmpName( collection );
+                
+                BSONObj shardedCommand = fixForShards( cmdObj , shardedOutputCollection );
+                
+                BSONObjBuilder finalCmd;
+                finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
+                finalCmd.append( "shardedOutputCollection" , shardedOutputCollection );
+                
+                list< shared_ptr<Future::CommandResult> > futures;
+                
+                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    Chunk * c = *i;
+                    futures.push_back( Future::spawnCommand( c->getShard() , dbName , shardedCommand ) );
+                }
+                
+                BSONObjBuilder shardresults;
+                for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ){
+                    shared_ptr<Future::CommandResult> res = *i;
+                    if ( ! res->join() ){
+                        errmsg = "mongod mr failed: ";
+                        errmsg += res->result().toString();
+                        return 0;
+                    }
+                    shardresults.append( res->getServer() , res->result() );
+                }
+                
+                finalCmd.append( "shards" , shardresults.obj() );
+                timingBuilder.append( "shards" , t.millis() );
+
+                Timer t2;
+                ScopedDbConnection conn( conf->getPrimary() );
+                BSONObj finalResult;
+                if ( ! conn->runCommand( dbName , finalCmd.obj() , finalResult ) ){
+                    errmsg = "final reduce failed: ";
+                    errmsg += finalResult.toString();
+                    return 0;
+                }
+                timingBuilder.append( "final" , t2.millis() );
+
+                result.appendElements( finalResult );
+                result.append( "timeMillis" , t.millis() );
+                result.append( "timing" , timingBuilder.obj() );
+                
+                return 1;
+            }
+        } mrCmd;
     }
 }

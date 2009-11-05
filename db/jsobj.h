@@ -2,6 +2,21 @@
     BSON classes
 */
 
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 /**
    BSONObj and its helpers
 
@@ -10,23 +25,6 @@
 
    http://www.mongodb.org/display/DOCS/BSON
 */
-
-/**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 
 #pragma once
 
@@ -40,9 +38,11 @@
 namespace mongo {
 
     class BSONObj;
+    class BSONArray; // empty subclass of BSONObj useful for overloading
     class BSONElement;
     class Record;
     class BSONObjBuilder;
+    class BSONArrayBuilder;
     class BSONObjBuilderValueStream;
 
 #pragma pack(1)
@@ -278,6 +278,9 @@ namespace mongo {
 
         /** Wrap this element up as a singleton object. */
         BSONObj wrap() const;
+
+        /** Wrap this element up as a singleton object with a new name. */
+        BSONObj wrap( const char* newName) const;
 
         /** field name of the element.  e.g., for 
            name : "Joe"
@@ -982,6 +985,12 @@ namespace mongo {
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
 
+    struct BSONArray: BSONObj {
+        // Don't add anything other than forwarding constructors!!!
+        BSONArray(): BSONObj() {}
+        explicit BSONArray(const BSONObj& obj): BSONObj(obj) {}
+    };
+
     class BSONObjCmp {
     public:
         BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
@@ -1023,6 +1032,13 @@ namespace mongo {
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
 */
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
+
+/** Use BSON_ARRAY macro like BSON macro, but without keys
+
+    BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+ */
+#define BSON_ARRAY(x) (( mongo::BSONArrayBuilder() << x ).arr())
 
     /* Utility class to auto assign object IDs.
        Example:
@@ -1119,6 +1135,7 @@ namespace mongo {
 
         /** append an element but with a new name */
         void appendAs(const BSONElement& e, const char *as) {
+            assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             b.append((char) e.type());
             b.append(as);
             b.append((void *) e.value(), e.valuesize());
@@ -1151,6 +1168,8 @@ namespace mongo {
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
+        void append(const char *fieldName, BSONArray arr) { appendArray(fieldName, arr); }
+        
 
         /** add header for a new subarray and return bufbuilder for writing to
             the subarray's body */
@@ -1424,7 +1443,14 @@ namespace mongo {
             b.decouple();    // post done() call version.  be sure jsobj frees...
         }
 
+
+    private:
+        static const string numStrs[100]; // cache of 0 to 99 inclusive
+    public:
         static string numStr( int i ) {
+            if (i>=0 && i<100)
+                return numStrs[i];
+
             stringstream o;
             o << i;
             return o.str();
@@ -1476,6 +1502,34 @@ namespace mongo {
         BufBuilder buf_;
         int offset_;
         BSONObjBuilderValueStream s_;
+    };
+
+    class BSONArrayBuilder : boost::noncopyable{
+    public:
+        BSONArrayBuilder() :i(0), b() {}
+
+        template <typename T>
+        BSONArrayBuilder& append(const T& x){
+            b.append(num().c_str(), x);
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const BSONElement& e){
+            b.appendAs(e, num().c_str());
+            return *this;
+        }
+
+        template <typename T>
+        BSONArrayBuilder& operator<<(const T& x){
+            return append(x);
+        }
+
+        BSONArray arr(){ return BSONArray(b.obj()); }
+
+    private:
+        string num(){ return b.numStr(i++); }
+        int i;
+        BSONObjBuilder b;
     };
 
 
@@ -1603,10 +1657,17 @@ namespace mongo {
 
 // wrap this element up as a singleton object.
     inline BSONObj BSONElement::wrap() const {
-        BSONObjBuilder b;
+        BSONObjBuilder b(size()+6);
         b.append(*this);
         return b.obj();
     }
+
+    inline BSONObj BSONElement::wrap( const char * newName ) const {
+        BSONObjBuilder b(size()+6+strlen(newName));
+        b.appendAs(*this,newName);
+        return b.obj();
+    }
+
 
     inline bool BSONObj::hasElement(const char *name) const {
         if ( !isEmpty() ) {
@@ -1709,5 +1770,38 @@ namespace mongo {
         s_->subobj()->appendAs( e, l_.l_ );
         return *s_->_builder;
     }    
+
+    // {a: {b:1}} -> {a.b:1}
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base="");
+    inline BSONObj nested2dotted(const BSONObj& obj){
+        BSONObjBuilder b;
+        nested2dotted(b, obj);
+        return b.obj();
+    }
+
+    // {a.b:1} -> {a: {b:1}}
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj);
+    inline BSONObj dotted2nested(const BSONObj& obj){
+        BSONObjBuilder b;
+        dotted2nested(b, obj);
+        return b.obj();
+    }
+    
+    /* WARNING: nested/dotted conversions are not 100% reversible
+     * nested2dotted(dotted2nested({a.b: {c:1}})) -> {a.b.c: 1}
+     * also, dotted2nested ignores order
+     */
+
+    typedef map<string, BSONElement> BSONMap;
+    inline BSONMap bson2map(const BSONObj& obj){
+        BSONMap m;
+        BSONObjIterator it(obj);
+        while (it.more()){
+            BSONElement e = it.next();
+            m[e.fieldName()] = e;
+        }
+        return m;
+    }
+
         
 } // namespace mongo

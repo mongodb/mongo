@@ -2,21 +2,20 @@
     http://www.mongodb.org/display/DOCS/BSON
 */
 
-/**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
 
 #include "stdafx.h"
 #include "jsobj.h"
@@ -26,6 +25,7 @@
 #include "../util/md5.hpp"
 #include <limits>
 #include "../util/unittest.h"
+#include "../util/embedded_builder.h"
 #include "json.h"
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
@@ -1190,6 +1190,30 @@ namespace mongo {
         return s << e.toString();
     }
 
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base){
+        BSONObjIterator it(obj);
+        while (it.more()){
+            BSONElement e = it.next();
+            if (e.type() == Object){
+                string newbase = base + e.fieldName() + ".";
+                nested2dotted(b, e.embeddedObject(), newbase);
+            }else{
+                string newbase = base + e.fieldName();
+                b.appendAs(e, newbase.c_str());
+            }
+        }
+    }
+
+    void dotted2nested(BSONObjBuilder& b, const BSONObj& obj){
+        //use map to sort fields
+        BSONMap sorted = bson2map(obj);
+        EmbeddedBuilder eb(&b);
+        for(BSONMap::const_iterator it=sorted.begin(); it!=sorted.end(); ++it){
+            eb.appendAs(it->second, it->first);
+        }
+        eb.done();
+    }
+
     /*-- test things ----------------------------------------------------*/
 
 #pragma pack(1)
@@ -1541,6 +1565,19 @@ namespace mongo {
             appendMinForType( field , t + 1 );
         }
     }
+
+    const string BSONObjBuilder::numStrs[] = {
+         "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",
+        "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+        "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
+        "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
+        "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
+        "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
+        "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
+        "70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
+        "80", "81", "82", "83", "84", "85", "86", "87", "88", "89",
+        "90", "91", "92", "93", "94", "95", "96", "97", "98", "99",
+    };
 
 
 } // namespace mongo

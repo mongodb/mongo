@@ -149,8 +149,8 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         assert(d);
 
-        if ( j.getField( "autoIndexId" ).isBoolean() ) {
-            if ( j.getBoolField( "autoIndexId" ) ) {
+        if ( j.getField( "autoIndexId" ).type() ) {
+            if ( j["autoIndexId"].trueValue() ){
                 ensureIdIndexForNewNs( ns );
             }
         } else {
@@ -925,10 +925,9 @@ namespace mongo {
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
-    void DataFileMgr::update(
-                             const char *ns,
-                             Record *toupdate, const DiskLoc& dl,
-                             const char *_buf, int _len, stringstream& ss)
+    const DiskLoc DataFileMgr::update(const char *ns,
+                                       Record *toupdate, const DiskLoc& dl,
+                                       const char *_buf, int _len, stringstream& ss)
     {
         dassert( toupdate == dl.rec() );
 
@@ -966,8 +965,7 @@ namespace mongo {
             if ( cc().database()->profile )
                 ss << " moved ";
             deleteRecord(ns, toupdate, dl);
-            insert(ns, objNew.objdata(), objNew.objsize(), false);
-            return;
+            return insert(ns, objNew.objdata(), objNew.objsize(), false);
         }
 
         NamespaceDetailsTransient::get( ns ).registerWriteOp();
@@ -1009,6 +1007,7 @@ namespace mongo {
 
         //	update in place
         memcpy(toupdate->data, objNew.objdata(), objNew.objsize());
+        return dl;
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
@@ -1318,6 +1317,7 @@ namespace mongo {
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         uassert("cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
+        uassert("invalid ns", strchr( ns , '.' ) > 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             uassert("attempt to insert in reserved database name 'system'", sys != ns);
@@ -1359,7 +1359,7 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
-
+            uassert( "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
             if ( cc().database()->name != nsToClient(tabletoidxns.c_str()) ) {
                 uassert("bad table to index name on add index attempt", false);
                 return DiskLoc();

@@ -13,7 +13,7 @@ namespace mongo {
 
         virtual void queryOp( Request& r ){
             QueryMessage q( r.d() );
-            
+
             log(3) << "shard query: " << q.ns << "  " << q.query << endl;
             
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
@@ -35,13 +35,13 @@ namespace mongo {
                 num++;
             }
             
-            ShardedCursor * cursor = 0;
+            ClusteredCursor * cursor = 0;
             
             BSONObj sort = query.getSort();
             
             if ( sort.isEmpty() ){
                 // 1. no sort, can just hit them in serial
-                cursor = new SerialServerShardedCursor( servers , q );
+                cursor = new SerialServerClusteredCursor( servers , q );
             }
             else {
                 int shardKeyOrder = info->getShardKey().canOrder( sort );
@@ -57,23 +57,25 @@ namespace mongo {
                             extra = b.obj();
                             cout << s->toString() << " -->> " << extra << endl;
                         }
-                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMin() ) );
+                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMinDotted() ) );
                     }
-                    cursor = new SerialServerShardedCursor( buckets , q , shardKeyOrder );
+                    cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }
                 else {
                     // 3. sort on non-sharded key, pull back a portion from each server and iterate slowly
-                    cursor = new ParallelSortShardedCursor( servers , q , sort );
+                    cursor = new ParallelSortClusteredCursor( servers , q , sort );
                 }
             }
 
             assert( cursor );
-            if ( ! cursor->sendNextBatch( r ) ){
+            
+            ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
+            if ( ! cc->sendNextBatch( r ) ){
                 delete( cursor );
                 return;
             }
-            log(6) << "storing cursor : " << cursor->getId() << endl;
-            cursorCache.store( cursor );
+            log(6) << "storing cursor : " << cc->getId() << endl;
+            cursorCache.store( cc );
         }
         
         virtual void getMore( Request& r ){
@@ -82,7 +84,7 @@ namespace mongo {
 
             log(6) << "want cursor : " << id << endl;
 
-            ShardedCursor * cursor = cursorCache.get( id );
+            ShardedClientCursor * cursor = cursorCache.get( id );
             if ( ! cursor ){
                 log(6) << "\t invalid cursor :(" << endl;
                 replyToQuery( QueryResult::ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
@@ -122,26 +124,58 @@ namespace mongo {
             uassert( "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
 
+            BSONObj chunkFinder = query;
             
-            bool upsert = flags & 1;
+            bool upsert = flags & Option_Upsert;
+            bool multi = flags & Option_Multi;
+
+            if ( multi )
+                uassert( "can't mix multi and upsert and sharding" , ! upsert );
+
             if ( upsert && ! manager->hasShardKey( toupdate ) )
                 throw UserException( "can't upsert something without shard key" );
 
             bool save = false;
             if ( ! manager->hasShardKey( query ) ){
-                if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) )
+                if ( multi ){
+                }
+                else if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) ){
                     throw UserException( "can't do update with query that doesn't have the shard key" );
-                save = true;
+                }
+                else {
+                    save = true;
+                    chunkFinder = toupdate;
+                }
+            }
+
+            
+            if ( ! save ){
+                if ( toupdate.firstElement().fieldName()[0] == '$' ){
+                    // TODO: check for $set, etc.. on shard key
+                }
+                else if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
+                    throw UserException( "change would move shards!" );
+                }
             }
             
-            if ( ! save && manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
-                throw UserException( "change would move shards!" );
+            if ( multi ){
+                vector<Chunk*> chunks;
+                manager->getChunksForQuery( chunks , chunkFinder );
+                set<string> seen;
+                for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
+                    Chunk * c = *i;
+                    if ( seen.count( c->getShard() ) )
+                        continue;
+                    doWrite( dbUpdate , r , c->getShard() );
+                    seen.insert( c->getShard() );
+                }
+            }
+            else {
+                Chunk& c = manager->findChunk( dotted2nested(chunkFinder) );
+                doWrite( dbUpdate , r , c.getShard() );
+                c.splitIfShould( d.msg().data->dataLen() );
             }
 
-            Chunk& c = manager->findChunk( toupdate );
-            doWrite( dbUpdate , r , c.getShard() );
-
-            c.splitIfShould( d.msg().data->dataLen() );
         }
         
         void _delete( Request& r , DbMessage& d, ChunkManager* manager ){
@@ -151,18 +185,17 @@ namespace mongo {
             
             uassert( "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
-            
-            if ( manager->hasShardKey( pattern ) ){
-                Chunk& c = manager->findChunk( pattern );
-                doWrite( dbDelete , r , c.getShard() );
+
+            vector<Chunk*> chunks;
+            manager->getChunksForQuery( chunks , pattern );
+            cout << "delete : " << pattern << " \t " << chunks.size() << " justOne: " << justOne << endl;
+            if ( chunks.size() == 1 ){
+                doWrite( dbDelete , r , chunks[0]->getShard() );
                 return;
             }
             
-            if ( ! justOne && ! pattern.hasField( "_id" ) )
+            if ( justOne && ! pattern.hasField( "_id" ) )
                 throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
-            
-            vector<Chunk*> chunks;
-            manager->getChunksForQuery( chunks , pattern );
             
             set<string> seen;
             for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){

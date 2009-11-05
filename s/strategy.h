@@ -27,8 +27,6 @@ namespace mongo {
     extern Strategy * SINGLE;
     extern Strategy * SHARDED;
 
-    void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );
-    
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
 
     bool lockNamespaceOnServer( const string& server , const string& ns );
