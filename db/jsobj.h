@@ -1426,7 +1426,14 @@ namespace mongo {
             b.decouple();    // post done() call version.  be sure jsobj frees...
         }
 
+
+    private:
+        static const string numStrs[100]; // cache of 0 to 99 inclusive
+    public:
         static string numStr( int i ) {
+            if (i>=0 && i<100)
+                return numStrs[i];
+
             stringstream o;
             o << i;
             return o.str();
