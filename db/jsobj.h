@@ -41,6 +41,7 @@ namespace mongo {
     class BSONElement;
     class Record;
     class BSONObjBuilder;
+    class BSONArrayBuilder;
     class BSONObjBuilderValueStream;
 
 #pragma pack(1)
@@ -1485,6 +1486,34 @@ namespace mongo {
         BufBuilder buf_;
         int offset_;
         BSONObjBuilderValueStream s_;
+    };
+
+    class BSONArrayBuilder{
+    public:
+        BSONArrayBuilder() :i(0), b() {}
+
+        template <typename T>
+        BSONArrayBuilder& append(const T& x){
+            b.append(num().c_str(), x);
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const BSONElement& e){
+            b.appendAs(e, num().c_str());
+            return *this;
+        }
+
+        template <typename T>
+        BSONArrayBuilder& operator<<(const T& x){
+            return append(x);
+        }
+
+        BSONObj obj(){ return b.obj(); }
+
+    private:
+        string num(){ return b.numStr(i++); }
+        int i;
+        BSONObjBuilder b;
     };
 
 

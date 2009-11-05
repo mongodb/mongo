@@ -1101,6 +1101,39 @@ namespace JsobjTests {
             t( BSON("a" << BSON("b" << 1 << "c" << 1 << "e" << BSON("f" << 1)) << "d" << 1), BSON("a.b" << 1 << "a.c" << 1 << "a.e.f" << 1 << "d" << 1) );
         }
     };
+
+    struct BSONArrayBuilderTest{
+        void run(){
+            int i = 0;
+            BSONObjBuilder obj;
+            BSONArrayBuilder arr;
+
+            obj << obj.numStr(i++) << 100;
+            arr                    << 100;
+
+            obj << obj.numStr(i++) << 1.0;
+            arr                    << 1.0;
+
+            obj << obj.numStr(i++) << "Hello";
+            arr                    << "Hello";
+
+            obj << obj.numStr(i++) << string("World");
+            arr                    << string("World");
+
+            obj << obj.numStr(i++) << BSON( "a" << 1 << "b" << "foo" );
+            arr                    << BSON( "a" << 1 << "b" << "foo" );
+
+            obj << obj.numStr(i++) << BSON( "a" << 1)["a"];
+            arr                    << BSON( "a" << 1)["a"];
+
+            OID oid;
+            oid.init();
+            obj << obj.numStr(i++) << oid;
+            arr                    << oid;
+
+            ASSERT_EQUALS(obj.obj(), arr.obj());
+        }
+    };
     
     class All : public Suite {
     public:
@@ -1183,6 +1216,7 @@ namespace JsobjTests {
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
             add< NestedDottedConversions >();
+            add< BSONArrayBuilderTest >();
         }
     } myall;
     
