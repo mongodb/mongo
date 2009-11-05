@@ -38,9 +38,11 @@
 namespace mongo {
 
     class BSONObj;
+    class BSONArray; // empty subclass of BSONObj useful for overloading
     class BSONElement;
     class Record;
     class BSONObjBuilder;
+    class BSONArrayBuilder;
     class BSONObjBuilderValueStream;
 
 #pragma pack(1)
@@ -983,6 +985,12 @@ namespace mongo {
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
 
+    struct BSONArray: BSONObj {
+        // Don't add anything other than forwarding constructors!!!
+        BSONArray(): BSONObj() {}
+        explicit BSONArray(const BSONObj& obj): BSONObj(obj) {}
+    };
+
     class BSONObjCmp {
     public:
         BSONObjCmp( const BSONObj &_order = BSONObj() ) : order( _order ) {}
@@ -1024,6 +1032,13 @@ namespace mongo {
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
 */
 #define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
+
+/** Use BSON_ARRAY macro like BSON macro, but without keys
+
+    BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+
+ */
+#define BSON_ARRAY(x) (( mongo::BSONArrayBuilder() << x ).arr())
 
     /* Utility class to auto assign object IDs.
        Example:
@@ -1153,6 +1168,8 @@ namespace mongo {
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
+        void append(const char *fieldName, BSONArray arr) { appendArray(fieldName, arr); }
+        
 
         /** add header for a new subarray and return bufbuilder for writing to
             the subarray's body */
@@ -1426,7 +1443,14 @@ namespace mongo {
             b.decouple();    // post done() call version.  be sure jsobj frees...
         }
 
+
+    private:
+        static const string numStrs[100]; // cache of 0 to 99 inclusive
+    public:
         static string numStr( int i ) {
+            if (i>=0 && i<100)
+                return numStrs[i];
+
             stringstream o;
             o << i;
             return o.str();
@@ -1478,6 +1502,34 @@ namespace mongo {
         BufBuilder buf_;
         int offset_;
         BSONObjBuilderValueStream s_;
+    };
+
+    class BSONArrayBuilder : boost::noncopyable{
+    public:
+        BSONArrayBuilder() :i(0), b() {}
+
+        template <typename T>
+        BSONArrayBuilder& append(const T& x){
+            b.append(num().c_str(), x);
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const BSONElement& e){
+            b.appendAs(e, num().c_str());
+            return *this;
+        }
+
+        template <typename T>
+        BSONArrayBuilder& operator<<(const T& x){
+            return append(x);
+        }
+
+        BSONArray arr(){ return BSONArray(b.obj()); }
+
+    private:
+        string num(){ return b.numStr(i++); }
+        int i;
+        BSONObjBuilder b;
     };
 
 
