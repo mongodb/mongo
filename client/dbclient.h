@@ -181,6 +181,7 @@ namespace mongo {
 
 	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
+        friend class DBClientBase;
     public:
 		/** if true, safe to call next() */
         bool more();
@@ -229,9 +230,9 @@ namespace mongo {
         bool hasResultFlag( int flag ){
             return (resultFlags & flag) != 0;
         }
-
+    private:
         bool init();
-
+    public:
         DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions ) :
                 connector(_connector),
