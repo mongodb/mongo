@@ -118,9 +118,6 @@ __wt_api_db_close(DB *db, u_int32_t flags)
 
 	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
-	/* Flush any dirty blocks from the underlying cache. */
-	WT_TRET(__wt_bt_sync(db));
-
 	/* Close the underlying Btree. */
 	WT_TRET(__wt_bt_close(db));
 
