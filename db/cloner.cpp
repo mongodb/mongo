@@ -273,6 +273,17 @@ namespace mongo {
         char db[256];
         nsToClient( ns, db );
 
+        NamespaceDetails *nsd = nsdetails( ns );
+        if ( nsd ){
+            /** note: its ok to clone into a collection, but only if the range you're copying 
+                doesn't exist on this server */
+            string err;
+            if ( runCount( ns , BSON( "query" << query ) , err ) > 0 ){
+                errmsg = "already data in that range, delete before calling startCloneCollection";
+                return false;
+            }
+        }
+
         {
             dbtemprelease r;
             auto_ptr< DBClientConnection > c( new DBClientConnection() );
@@ -294,10 +305,12 @@ namespace mongo {
             }
         }
         
-        BSONObj spec = conn->findOne( string( db ) + ".system.namespaces", BSON( "name" << ns ) );
-        if ( !userCreateNS( ns, spec.getObjectField( "options" ), errmsg, true ) )
-            return false;
-        
+        if ( ! nsd ) {
+            BSONObj spec = conn->findOne( string( db ) + ".system.namespaces", BSON( "name" << ns ) );
+            if ( !userCreateNS( ns, spec.getObjectField( "options" ), errmsg, true ) )
+                return false;
+        }
+
         copy( ns, ns, false, logForRepl, false, false, query );
 
         if ( copyIndexes ) {

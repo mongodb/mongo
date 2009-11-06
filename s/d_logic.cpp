@@ -301,7 +301,10 @@ namespace mongo {
             if ( ok ){
                 result.append( res["finishToken"] );
             }
-
+            else {
+                errmsg = "startCloneCollection failed: ";
+                errmsg += res["errmsg"].valuestrsafe();
+            }
             return ok;
         }
         
