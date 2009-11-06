@@ -262,6 +262,7 @@ __wt_cache_in(WT_TOC *toc,
 	WT_PAGE **hb, *page;
 	WT_PAGE_HDR *hdr;
 	WT_REQ_IN req;
+	u_int32_t checksum;
 	u_int bucket_cnt;
 	int ret;
 
@@ -319,7 +320,7 @@ __wt_cache_in(WT_TOC *toc,
 	/* Verify the checksum. */
 	if (!LF_ISSET(WT_UNFORMATTED)) {
 		hdr = page->hdr;
-		u_int32_t checksum = hdr->checksum;
+		checksum = hdr->checksum;
 		hdr->checksum = 0;
 		if (checksum != __wt_cksum(hdr, bytes)) {
 			__wt_db_errx(db,
