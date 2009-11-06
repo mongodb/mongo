@@ -246,6 +246,14 @@ Array.fetchRefs = function( arr , coll ){
     return n;
 }
 
+Array.sum = function( arr ){
+    if ( arr.length == 0 )
+        return null;
+    var s = arr[0];
+    for ( var i=1; i<arr.length; i++ )
+        s += arr[i];
+    return s;
+}
 
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
