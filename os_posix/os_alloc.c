@@ -92,8 +92,13 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC, "memory allocations");
+	if (env != NULL) {
+		WT_ASSERT(env, size != 0);
+
+		if (env->ienv != NULL && env->ienv->stats != NULL)
+			WT_STAT_INCR(
+			    env->ienv->stats, MEMALLOC, "memory allocations");
+	}
 
 	if ((p = calloc(number, (size_t)size)) == NULL) {
 		__wt_api_env_err(env, errno, "memory allocation");
@@ -132,8 +137,12 @@ __wt_realloc(ENV *env,
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC, NULL);
+	if (env != NULL) {
+		WT_ASSERT(env, bytes_to_allocate != 0);
+		if (env->ienv != NULL && env->ienv->stats != NULL)
+			WT_STAT_INCR(env->ienv->stats, MEMALLOC, NULL);
+	}
+
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (p != NULL) {
