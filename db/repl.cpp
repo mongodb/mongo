@@ -1660,7 +1660,7 @@ namespace mongo {
         }
 
         log() << "******\n";
-        log() << "creating oplog  size : " << (int)( sz / ( 1024 * 1024 ) ) << "mb\n";
+        log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB (use --oplogSize to change)\n";
         log() << "******" << endl;
 
         b.append("size", sz);
