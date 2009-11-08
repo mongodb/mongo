@@ -185,6 +185,13 @@ AddOption( "--pg",
            nargs=0,
            action="store" )
 
+AddOption( "--snmp",
+           dest="snmp",
+           type="string",
+           nargs=0,
+           action="store" )
+
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -230,7 +237,7 @@ usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
 
-enableSNMP = False
+enableSNMP = GetOption( "snmp" ) is not None
 
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
@@ -735,14 +742,15 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
         gotAll = True
         for x in snmplibs:
-            if not myCheckLib:
+            if not myCheckLib(x):
                 gotAll = False
         if gotAll:
             myenv.Append( CPPDEFINES=[ "_HAVESNMP" ] )
+            global serverOnlyFiles
+            serverOnlyFiles += [ "db/snmp.cpp" ]
         else:
             for x in snmplibs:
                 removeIfInList( myenv["LIBS"] , x )
-        
 
     # this is outside of usesm block so don't have to rebuild for java
     if windows:

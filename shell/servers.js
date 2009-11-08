@@ -112,7 +112,8 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     this._serverNames = [];
 
     for ( var i=0; i<numServers; i++){
-        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , noprealloc : "" , smallfiles : "" } );
+        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , 
+            noprealloc : "" , smallfiles : "" , oplogSize : "2" } );
         conn.name = "localhost:" + ( 30000 + i );
 
         this._connections.push( conn );
@@ -196,6 +197,44 @@ ShardingTest.prototype.getChunksString = function( ns ){
 
 ShardingTest.prototype.printChunks = function( ns ){
     print( this.getChunksString( ns ) );
+}
+
+ShardingTest.prototype.printShardingStatus = function(){
+    printShardingStatus( this.config );
+}
+
+printShardingStatus = function( configDB ){
+    var raw = "";
+    var output = function(s){
+        raw += s + "\n";
+    }
+    output( "--- Sharding Status --- " );
+    output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
+    
+    output( "  shards:" );
+    configDB.shards.find().forEach( 
+        function(z){
+            output( "      " + tojson(z) );
+        }
+    );
+
+    output( "  databases:" );
+    configDB.databases.find().sort( { name : 1 } ).forEach( 
+        function(z){
+            output( "\t" + tojson(z,"",true) );
+        
+            output( "\t\tmy chunks" );
+            
+            configDB.chunks.find( { "ns" : new RegExp( "^" + z.name ) } ).sort( { ns : 1 } ).forEach( 
+                function(z){
+                    output( "\t\t\t" + z.ns + " " + tojson( z.min ) + " -->> " + tojson( z.max ) + 
+                           " on : " + z.shard + " " + tojson( z.lastmod ) );
+                }
+            );
+        }
+    );
+
+    print( raw );
 }
 
 ShardingTest.prototype.sync = function(){

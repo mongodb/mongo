@@ -38,7 +38,7 @@ namespace mongo {
         unsigned long long lastTime = 0;
         unsigned long long lastLockTime = 0;
         
-        while ( 1 ){
+        while ( ! inShutdown() ){
             sleepsecs( secsToSleep );
             
             stringstream url;

@@ -182,11 +182,17 @@ namespace mongo {
         {
 
             ShardChunkVersion newVersion = _manager->getVersion( from );
-            if ( newVersion <= oldVersion ){
+            if ( newVersion == 0 && oldVersion > 0 ){
+                newVersion = oldVersion;
+                newVersion++;
+                _manager->_maxMarkers[ from ] = newVersion;
+                _manager->save();
+            }
+            else if ( newVersion <= oldVersion ){
                 log() << "newVersion: " << newVersion << " oldVersion: " << oldVersion << endl;
                 uassert( "version has to be higher" , newVersion > oldVersion );
             }
-
+            
             BSONObjBuilder b;
             b << "movechunk.finish" << _ns;
             b << "to" << to;
@@ -357,8 +363,8 @@ namespace mongo {
             string b = toString();
             BSONObj q = _id.copy();
             massert( "how could load fail?" , load( q ) );
-            cout << "before: " << q << "\t" << b << endl;
-            cout << "after : " << _id << "\t" << toString() << endl;
+            log(2) << "before: " << q << "\t" << b << endl;
+            log(2) << "after : " << _id << "\t" << toString() << endl;
             massert( "chunk reload changed content!" , b == toString() );
             massert( "id changed!" , q["_id"] == _id["_id"] );
         }
@@ -392,8 +398,13 @@ namespace mongo {
         ScopedDbConnection conn( temp.modelServer() );
         auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  ns ) );
         while ( cursor->more() ){
-            Chunk * c = new Chunk( this );
             BSONObj d = cursor->next();
+            if ( d["isMaxMarker"].trueValue() ){
+                _maxMarkers[ d["shard"].valuestrsafe() ] = d["maxMarker"].date();
+                continue;
+            }
+
+            Chunk * c = new Chunk( this );
             c->unserialize( d );
             _chunks.push_back( c );
             c->_id = d["_id"].wrap().getOwned();
@@ -478,14 +489,47 @@ namespace mongo {
     void ChunkManager::save(){
         ShardChunkVersion a = getVersion();
         
+        set<string> withRealChunks;
+        
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
             if ( ! c->_modified )
                 continue;
             c->save( true );
             _sequenceNumber = ++NextSequenceNumber;
+
+            withRealChunks.insert( c->getShard() );
         }
         
+        
+        if ( _maxMarkers.size() ){
+            Chunk temp(0);
+            
+            ScopedDbConnection conn( temp.modelServer() );
+            for ( map<string,unsigned long long>::iterator i=_maxMarkers.begin(); i !=_maxMarkers.end(); i++ ){
+                
+                BSONObjBuilder b;
+                b.append( "ns" , _ns );
+                b.append( "shard" , i->first );
+                b.appendTimestamp( "isMaxMarker" , true );
+                BSONObj q = b.obj();
+                
+                if ( withRealChunks.count( i->first ) ){
+                    // this shard went frmo >0, to 0, to >0 chunks, so lets clean up the old marker
+                    conn->remove( temp.getNS() , q );
+                    continue;
+                }
+
+
+                BSONObjBuilder n;
+                n.appendElements( q );
+                n.appendTimestamp( "maxMarker" , i->second );
+
+                conn->update( temp.getNS() , q , n.obj() , true );
+            }
+        }
+        
+
         massert( "how did version get smalled" , getVersion() >= a );
 
         ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
@@ -504,6 +548,10 @@ namespace mongo {
             if ( c->_lastmod > max )
                 max = c->_lastmod;
         }        
+        
+        map<string,unsigned long long>::const_iterator i = _maxMarkers.find( server );
+        if ( i != _maxMarkers.end() && i->second > max )
+            max = i->second;
 
         return max;
     }

@@ -38,6 +38,9 @@
 
 #include "../scripting/engine.h"
 #include "mms.h"
+#ifdef _HAVESNMP
+#include "snmp.h"
+#endif
 #include "cmdline.h"
 
 namespace mongo {
@@ -425,6 +428,9 @@ namespace mongo {
         _oplog.init();
 
         mms.go();
+#ifdef _HAVESNMP
+        snmpAgent.go();
+#endif
 
 #if 0
         {
@@ -562,6 +568,9 @@ int main(int argc, char* argv[], char *envp[] )
         ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
         ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
         ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
+#ifdef _HAVESNMP
+        ( "snmp-subagent" , "run snmp subagent" )
+#endif
         ;
 
     replication_options.add_options()
@@ -836,6 +845,12 @@ int main(int argc, char* argv[], char *envp[] )
 			if( params.count("shardsvr") )
 				cmdLine.port = CmdLine::ShardServerPort;
 		}
+
+#ifdef _HAVESNMP
+        if ( params.count( "snmp-subagent" ) ){
+            snmpAgent.enable();
+        }
+#endif
 
         if ( params.count( "mms-token" ) ){
             mms.setToken( params["mms-token"].as<string>() );

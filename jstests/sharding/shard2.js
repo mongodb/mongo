@@ -32,10 +32,10 @@ assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not 
 assert.eq( 3 , db.foo.find().length() , "not right on shard" );
 
 primary = s.getServer( "test" ).getDB( "test" );
-seconday = s.getOther( primary ).getDB( "test" );
+secondary = s.getOther( primary ).getDB( "test" );
 
 assert.eq( 3 , primary.foo.find().length() , "primary wrong B" );
-assert.eq( 0 , seconday.foo.find().length() , "seconday wrong C" );
+assert.eq( 0 , secondary.foo.find().length() , "secondary wrong C" );
 assert.eq( 3 , db.foo.find().sort( { num : 1 } ).length() );
 
 placeCheck( 2 );
@@ -46,8 +46,8 @@ placeCheck( 2 );
 assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
 assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
 
-s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : seconday.getMongo().name } );
-assert.eq( 2 , seconday.foo.find().length() , "seconday should have 2 after move shard" );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : secondary.getMongo().name } );
+assert.eq( 2 , secondary.foo.find().length() , "secondary should have 2 after move shard" );
 assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
 assert.eq( 2 , s.config.chunks.count() , "still should have 2 shards after move not:" + s.getChunksString() );
@@ -61,18 +61,18 @@ placeCheck( 3 );
 db.foo.save( { num : 3 , name : "bob" } );
 s.adminCommand( "connpoolsync" );
 assert.eq( 1 , primary.foo.find().length() , "after move insert go wrong place?" );
-assert.eq( 3 , seconday.foo.find().length() , "after move insert go wrong place?" );
+assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
 db.foo.save( { num : -2 , name : "funny man" } );
 s.adminCommand( "connpoolsync" );
 assert.eq( 2 , primary.foo.find().length() , "after move insert go wrong place?" );
-assert.eq( 3 , seconday.foo.find().length() , "after move insert go wrong place?" );
+assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
 
 db.foo.save( { num : 0 , name : "funny guy" } );
 s.adminCommand( "connpoolsync" );
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
-assert.eq( 4 , seconday.foo.find().length() , "boundary B" );
+assert.eq( 4 , secondary.foo.find().length() , "boundary B" );
 
 placeCheck( 4 );
 
@@ -169,6 +169,20 @@ placeCheck( 8 );
 db.getLastError();
 db.getPrevError();
 
+// ---- move all to the secondary
+
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
+
+secondary.foo.insert( { num : -3 } );
+
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name } );; } );
+secondary.foo.remove( { num : -3 } );
+
+s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name } );
+assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shards" );
+
+s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : primary.getMongo().name } );
+assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards again" );
+assert.eq( 3 , s.config.chunks.count() , "only 3 chunks" );
 
 s.stop();
