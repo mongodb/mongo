@@ -53,8 +53,6 @@ namespace mongo {
         out() << " -v+  verbose\n";
         out() << " --port <portno>\n";
         out() << " --configdb <configdbname> [<configdbname>...]\n";
-//        out() << " --infer                                   infer configdbname by replacing \"-n<n>\"\n";
-//        out() << "                                           in our hostname with \"-grid\".\n";
         out() << endl;
     }
 
@@ -116,7 +114,6 @@ using namespace mongo;
 int main(int argc, char* argv[], char *envp[] ) {
     
     bool justTests = false;
-    bool infer = false;
     vector<string> configdbs;
     
     for (int i = 1; i < argc; i++)  {
@@ -125,11 +122,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         if ( s == "--port" ) {
             cmdLine.port = atoi(argv[++i]);
         }
-        else if ( s == "--infer" ) {
-            infer = true;
-        }
         else if ( s == "--configdb" ) {
-            assert( ! infer );
             
             while ( ++i < argc ) 
                 configdbs.push_back(argv[i]);
@@ -170,8 +163,8 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 3;
     }
 
-    bool ok = cmdLine.port != 0;
-    
+    bool ok = cmdLine.port != 0 && configdbs.size();
+
     if ( !ok ) {
         usage( argv );
         return 1;
@@ -180,8 +173,8 @@ int main(int argc, char* argv[], char *envp[] ) {
     log() << argv[0] << " v0.3- (alpha 3) starting (--help for usage)" << endl;
     printGitVersion();
     printSysInfo();
-
-    if ( ! configServer.init( configdbs , infer ) ){
+    
+    if ( ! configServer.init( configdbs ) ){
         cout << "couldn't connectd to config db" << endl;
         return 7;
     }

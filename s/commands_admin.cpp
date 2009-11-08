@@ -483,6 +483,12 @@ namespace mongo {
                     }
                 }
                 
+                if ( host.find( ":" ) == string::npos ){
+                    stringstream ss;
+                    ss << host << ":" << CmdLine::ShardServerPort;
+                    host = ss.str();
+                }
+
                 BSONObj shard;
                 {
                     BSONObjBuilder b;

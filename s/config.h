@@ -131,8 +131,6 @@ namespace mongo {
     class ConfigServer : public DBConfig {
     public:
 
-        enum { Port = 27016 }; /* standard port # for a grid db */
-        
         ConfigServer();
         ~ConfigServer();
 
@@ -149,7 +147,7 @@ namespace mongo {
         /**
            call at startup, this will initiate connection to the grid db 
         */
-        bool init( vector<string> configHosts , bool infer );
+        bool init( vector<string> configHosts );
         
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );

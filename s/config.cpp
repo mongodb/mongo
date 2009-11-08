@@ -22,6 +22,7 @@
 #include "../client/connpool.h"
 #include "../client/model.h"
 #include "../db/pdfile.h"
+#include "../db/cmdline.h"
 
 #include "server.h"
 #include "config.h"
@@ -229,91 +230,40 @@ namespace mongo {
     ConfigServer::~ConfigServer() {
     }
 
-    bool ConfigServer::init( vector<string> configHosts , bool infer ){
+    bool ConfigServer::init( vector<string> configHosts ){
+        uassert( "need configdbs" , configHosts.size() );
+
         string hn = getHostName();
         if ( hn.empty() ) {
             sleepsecs(5);
             dbexit( EXIT_BADOPTIONS );
         }
         ourHostname = hn;
-
-        char buf[256];
-        strcpy(buf, hn.c_str());
-
-        if ( configHosts.empty() ) {
-            char *p = strchr(buf, '-');
-            if ( p )
-                p = strchr(p+1, '-');
-            if ( !p ) {
-                log() << "can't parse server's hostname, expect <city>-<locname>-n<nodenum>, got: " << buf << endl;
-                sleepsecs(5);
-                dbexit( EXIT_BADOPTIONS );
-            }
-            p[1] = 0;
-        }
-
-        string left, right; // with :port#
-        string hostLeft, hostRight;
-
-        if ( configHosts.empty() ) {
-            if ( ! infer ) {
-                out() << "--configdb or --infer required\n";
-                dbexit( EXIT_BADOPTIONS );
-            }
-            stringstream sl, sr;
-            sl << buf << "grid-l";
-            sr << buf << "grid-r";
-            hostLeft = sl.str();
-            hostRight = sr.str();
-            sl << ":" << Port;
-            sr << ":" << Port;
-            left = sl.str();
-            right = sr.str();
-        }
-        else {
-            hostLeft = getHost( configHosts[0] , false );
-            left = getHost( configHosts[0] , true );
-
-            if ( configHosts.size() > 1 ) {
-                hostRight = getHost( configHosts[1] , false );
-                right = getHost( configHosts[1] , true );
-            }
-        }
         
+        set<string> hosts;
+        for ( size_t i=0; i<configHosts.size(); i++ ){
+            string host = configHosts[i];
+            hosts.insert( getHost( host , false ) );
+            configHosts[i] = getHost( host , true );
+        }
 
-        if ( !isdigit(left[0]) )
-            /* this loop is not really necessary, we we print out if we can't connect
-               but it gives much prettier error msg this way if the config is totally
-               wrong so worthwhile.
-               */
-            while ( 1 ) {
-                if ( hostbyname(hostLeft.c_str()).empty() ) {
-                    log() << "can't resolve DNS for " << hostLeft << ", sleeping and then trying again" << endl;
-                    sleepsecs(15);
-                    continue;
+        for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ){
+            string host = *i;
+            bool ok = false;
+            for ( int x=0; x<10; x++ ){
+                if ( ! hostbyname( host.c_str() ).empty() ){
+                    ok = true;
+                    break;
                 }
-                if ( !hostRight.empty() && hostbyname(hostRight.c_str()).empty() ) {
-                    log() << "can't resolve DNS for " << hostRight << ", sleeping and then trying again" << endl;
-                    sleepsecs(15);
-                    continue;
-                }
-                break;
+                log() << "can't resolve DNS for [" << host << "]  sleeping and trying " << (10-x) << " more times" << endl;
+                sleepsecs( 10 );
             }
-        
-        Nullstream& l = log();
-        l << "connecting to griddb ";
-        
-        if ( !hostRight.empty() ) {
-            // connect in paired mode
-            l << "L:" << left << " R:" << right << "...";
-            l.flush();
-            _primary = left + "," + right;
+            if ( ! ok )
+                return false;
         }
-        else {
-            l << left << "...";
-            l.flush();
-            _primary = left;
-        }
+        
+        uassert( "can only hand 1 config db right now" , configHosts.size() == 1 );
+        _primary = configHosts[0];
         
         return true;
     }
@@ -369,7 +319,7 @@ namespace mongo {
 
         if ( withPort ){
             stringstream ss;
-            ss << name << ":" << Port;
+            ss << name << ":" << CmdLine::ConfigServerPort;
             return ss.str();
         }
         
