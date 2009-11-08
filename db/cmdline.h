@@ -39,11 +39,13 @@ namespace mongo {
         long long oplogSize;   // --oplogSize
 
         enum { 
-            DefaultDBPort = 27017
+            DefaultDBPort = 27017,
+			ConfigServerPort = 27019,
+			ShardServerPort = 27018
         };
 
         CmdLine() : 
-            port(27017), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            port(DefaultDBPort), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0)
         { } 
 

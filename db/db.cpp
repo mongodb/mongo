@@ -513,6 +513,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     po::options_description general_options("General options");
     po::options_description replication_options("Replication options");
+    po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
     po::options_description cmdline_options("Command line options");
@@ -523,7 +524,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("help,h", "show this usage information")
         ("version", "show version information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
-        ("port", po::value<int>(&cmdLine.port)->default_value(CmdLine::DefaultDBPort), "specify port number")
+        ("port", po::value<int>(&cmdLine.port)/*->default_value(CmdLine::DefaultDBPort)*/, "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
@@ -575,6 +576,11 @@ int main(int argc, char* argv[], char *envp[] )
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
         ;
 
+	sharding_options.add_options()
+		("configsvr", "declare this is a config db of a cluster")
+		("shardsvr", "declare this is a shard db of a cluster")
+		;
+
     hidden_options.add_options()
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
@@ -587,7 +593,9 @@ int main(int argc, char* argv[], char *envp[] )
 
     positional_options.add("command", 3);
     visible_options.add(general_options).add(replication_options);
-    cmdline_options.add(general_options).add(replication_options).add(hidden_options);
+    visible_options.add(sharding_options);
+    cmdline_options.add(general_options).add(replication_options);
+	cmdline_options.add(hidden_options).add(visible_options);
 
     setupSignals();
 
@@ -821,6 +829,13 @@ int main(int argc, char* argv[], char *envp[] )
             uassert("bad --cacheSize arg", x > 0);
             setRecCacheSize(x);
         }
+		if (params.count("port") == 0 ) { 
+			if( params.count("configsvr") ) {
+				cmdLine.port = CmdLine::ConfigServerPort;
+			}
+			if( params.count("shardsvr") )
+				cmdLine.port = CmdLine::ShardServerPort;
+		}
 
         if ( params.count( "mms-token" ) ){
             mms.setToken( params["mms-token"].as<string>() );
