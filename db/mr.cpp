@@ -149,8 +149,10 @@ namespace mongo {
                 if ( finalLong != tempLong ){
                     dblock l;
                     db.dropCollection( finalLong );
-                    BSONObj info;
-                    uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                    if ( db.count( tempLong ) ){
+                        BSONObj info;
+                        uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                    }
                 }
                 return db.count( finalLong );
             }
