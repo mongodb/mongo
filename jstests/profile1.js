@@ -14,8 +14,7 @@ assert.gt(capped_size, 999, "D");
 assert.lt(capped_size, 2000, "E");
 
 /* Make sure we can't drop if profiling is still on */
-db.getCollection("system.profile").drop();
-assert(db.getLastError(), "Y");
+assert.throws( function(z){ db.getCollection("system.profile").drop(); } )
 
 /* With pre-created system.profile (un-capped) */
 db.runCommand({profile: 0});

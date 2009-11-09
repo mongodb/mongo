@@ -296,8 +296,12 @@ DBCollection.prototype.dropIndexes = function(){
 DBCollection.prototype.drop = function(){
     this.resetIndexCache();
     var ret = this._db.runCommand( { drop: this.getName() } );
-    if ( ! ret.ok )
+    if ( ! ret.ok ){
+        if ( ret.errmsg == "ns not found" )
+            return false;
         throw "drop failed: " + tojson( ret );
+    }
+    return true;
 }
 
 DBCollection.prototype.renameCollection = function( newName ){

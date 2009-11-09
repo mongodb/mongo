@@ -1,6 +1,6 @@
 
 t = db.getCollection( "basic1" );
-assert( t.drop() );
+t.drop();
 
 o = { a : 1 };
 t.save( o );

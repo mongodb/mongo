@@ -4,9 +4,7 @@ t.drop();
 
 t.save( { a : 1 } );
 t.ensureIndex( { a : 1 } );
-db.indexd.$_id_.drop();
-r = t.drop();
-assert.eq( 1 , r.ok , "drop failed: " + tojson( r ) );
-
+assert.throws( function(){ db.indexd.$_id_.drop(); } );
+assert( t.drop() );
 
 //db.indexd.$_id_.remove({});
