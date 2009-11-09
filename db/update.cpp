@@ -83,6 +83,21 @@ namespace mongo {
             }
         }
         
+        bool isIndexed( const set<string>& idxKeys ) const {
+            // check if there is an index key that is a parent of mod
+            for( const char *dot = strchr( fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
+                if ( idxKeys.count( string( fieldName, dot - fieldName ) ) )
+                    return true;
+            string fullName = fieldName;
+            // check if there is an index key equal to mod
+            if ( idxKeys.count(fullName) )
+                return true;
+            // check if there is an index key that is a child of mod
+            set< string >::const_iterator j = idxKeys.upper_bound( fullName );
+            if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
+                return true;
+            return false;
+        }
     };
 
     class ModSet {
@@ -154,22 +169,16 @@ namespace mongo {
         void applyModsInPlace( const BSONObj &obj ) const;
         BSONObj createNewFromMods( const BSONObj &obj );
 
-        bool isIndexed( const set<string>& idxKeys ) const {
-            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
-                // check if there is an index key that is a parent of mod
-                for( const char *dot = strchr( i->fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
-                    if ( idxKeys.count( string( i->fieldName, dot - i->fieldName ) ) )
-                        return true;
-                string fullName = i->fieldName;
-                // check if there is an index key equal to mod
-                if ( idxKeys.count(fullName) )
-                    return true;
-                // check if there is an index key that is a child of mod
-                set< string >::const_iterator j = idxKeys.upper_bound( fullName );
-                if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
-                    return true;
+        /**
+         *
+         */
+        int isIndexed( const set<string>& idxKeys ) const {
+            int numIndexes = 0;
+            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ){
+                if ( i->isIndexed( idxKeys ) )
+                    numIndexes++;
             }
-            return false;
+            return numIndexes;
         }
 
         unsigned size() const { return _mods.size(); }
@@ -665,18 +674,23 @@ namespace mongo {
                 mods.getMods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
                 set<string>& idxKeys = ndt.indexKeys();
-                bool isIndexed = mods.isIndexed( idxKeys );
+                int isIndexed = mods.isIndexed( idxKeys );
                 
                 if ( isIndexed && multi ){
                     c->noteLocation();
                 }
 
-                if ( ! isIndexed && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
+                if ( isIndexed <= 0 && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
                     mods.applyModsInPlace( loc.obj() );
                     //seenObjects.insert( loc );
                     if ( profile )
                         ss << " fastmod ";
-                } else {
+                    
+                    if ( isIndexed ){
+                        seenObjects.insert( loc );
+                    }
+                } 
+                else {
                     BSONObj newObj = mods.createNewFromMods( loc.obj() );
                     DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), ss);
                     if ( newLoc != loc || isIndexed ){
