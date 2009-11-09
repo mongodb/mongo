@@ -35,6 +35,21 @@ assert.eq( 3 , primary.find().itcount() + secondary.find().itcount() , "blah 3" 
 assert.eq( 3 , a.find().toArray().length , "normal B" );
 assert.eq( 3 , b.find().toArray().length , "other B" );
 
+// --- filtering ---
+
+function doCounts( name ){
+    assert.eq( 3 , a.count() , name + " count" );    
+    assert.eq( 3 , a.find().sort( { n : 1 } ).itcount() , name + " itcount - sort n" );
+    assert.eq( 3 , a.find().itcount() , name + " itcount" );
+    assert.eq( 3 , a.find().sort( { _id : 1 } ).itcount() , name + " itcount - sort _id" );
+}
+
+doCounts( "before wrong save" )
+secondary.save( { num : -3 } );
+doCounts( "after wrong save" )
+
+// --- move all to 1 ---
+
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
 
 assert( a.findOne( { num : 1 } ) )

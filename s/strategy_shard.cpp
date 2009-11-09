@@ -30,7 +30,7 @@ namespace mongo {
             set<ServerAndQuery> servers;
             map<string,int> serverCounts;
             for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                servers.insert( (*i)->getShard() );
+                servers.insert( ServerAndQuery( (*i)->getShard() , (*i)->getFilter() ) );
                 int& num = serverCounts[(*i)->getShard()];
                 num++;
             }
@@ -50,14 +50,7 @@ namespace mongo {
                     set<ServerAndQuery> buckets;
                     for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Chunk * s = *i;
-                        BSONObj extra = BSONObj();
-                        if ( serverCounts[s->getShard()] > 1 ){
-                            BSONObjBuilder b;
-                            s->getFilter( b );
-                            extra = b.obj();
-                            cout << s->toString() << " -->> " << extra << endl;
-                        }
-                        buckets.insert( ServerAndQuery( s->getShard() , extra , s->getMinDotted() ) );
+                        buckets.insert( ServerAndQuery( s->getShard() , s->getFilter() , s->getMinDotted() ) );
                     }
                     cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }

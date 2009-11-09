@@ -279,8 +279,8 @@ namespace mongo {
                 doesn't exist on this server */
             string err;
             if ( runCount( ns , BSON( "query" << query ) , err ) > 0 ){
-                errmsg = "already data in that range, delete before calling startCloneCollection";
-                return false;
+                log() << "WARNING: data already exists for: " << ns << " in range : " << query << " deleting..." << endl;
+                deleteObjects( ns , query , false , logForRepl , false );
             }
         }
 

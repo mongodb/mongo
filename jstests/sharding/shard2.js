@@ -175,9 +175,6 @@ assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
 
 secondary.foo.insert( { num : -3 } );
 
-assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name } );; } );
-secondary.foo.remove( { num : -3 } );
-
 s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name } );
 assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shards" );
 
