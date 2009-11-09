@@ -65,12 +65,38 @@ namespace mongo {
 
     struct dblock : public lock {
         dblock() :
-                lock( dbMutex, dbMutexInfo ) {
+            lock( dbMutex, dbMutexInfo ) {
         }
         ~dblock() { 
             dbunlocking();
         }
     };
+    
+    struct writelock : public lock {
+        writelock(const string& ns) :
+            lock( dbMutex, dbMutexInfo ) {
+        }
+        writelock(const char * ns) :
+            lock( dbMutex, dbMutexInfo ) {
+        }
+        ~writelock() { 
+            dbunlocking();
+        }
+    };
+    
+    struct readlock : public lock {
+        readlock(const string& ns) :
+            lock( dbMutex, dbMutexInfo ) {
+        }
+        readlock(const char* ns) :
+            lock( dbMutex, dbMutexInfo ) {
+        }
+        ~readlock() { 
+            dbunlocking();
+        }
+    };
+    
+
 
       /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
     */
