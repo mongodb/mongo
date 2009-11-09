@@ -485,7 +485,59 @@ namespace mongo {
             c->ensureIndex();
         }
     }
+    
+    void ChunkManager::drop(){
+        uassert( "config servers not all up" , configServer.allUp() );
+        
+        map<string,ShardChunkVersion> seen;
+        
+        log(1) << "ChunkManager::drop : " << _ns << endl;
 
+        for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
+            Chunk * c = *i;
+            ShardChunkVersion& version = seen[ c->getShard() ];
+            if ( version ) 
+                continue;
+            version = lockNamespaceOnServer( c->getShard() , _ns );
+            if ( version )
+                continue;
+
+            // rollback
+            uassert( "don't know how to rollback locks b/c drop can't lock all shards" , 0 );
+        }
+
+        log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
+        
+        _chunks.clear();
+
+        for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+            string shard = i->first;
+            ScopedDbConnection conn( shard );
+            conn->dropCollection( _ns );
+            _maxMarkers[shard] = i->second;
+            conn.done();
+        }
+
+        log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;        
+
+        Chunk temp(0);
+
+        ScopedDbConnection conn( temp.modelServer() );
+        conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
+        conn.done();
+
+        log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;        
+
+        save();
+
+        log(1) << "ChunkManager::drop : " << _ns << "\t saved markers" << endl;        
+        
+        uassert( "no sharding data?" , _config->removeSharding( _ns ) );
+        _config->save();
+
+        log(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;        
+    }
+    
     void ChunkManager::save(){
         ShardChunkVersion a = getVersion();
         
@@ -524,9 +576,10 @@ namespace mongo {
                 BSONObjBuilder n;
                 n.appendElements( q );
                 n.appendTimestamp( "maxMarker" , i->second );
-
+                
                 conn->update( temp.getNS() , q , n.obj() , true );
             }
+            conn.done();
         }
         
 

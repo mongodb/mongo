@@ -80,6 +80,33 @@ namespace mongo {
         
         // ----
 
+        class DropCmd : public PublicGridCommand {
+        public:
+            DropCmd() : PublicGridCommand( "drop" ){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+                
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                log() << "DROP: " << fullns << endl;
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                ChunkManager * cm = conf->getChunkManager( fullns );
+                massert( "how could chunk manager be null!" , cm );
+                
+                cm->drop();
+
+                result.append( "ok" , 1 );
+                return 1;
+            }
+        } dropCmd;
+
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand("count") { }

@@ -295,7 +295,9 @@ DBCollection.prototype.dropIndexes = function(){
 
 DBCollection.prototype.drop = function(){
     this.resetIndexCache();
-    return this._db.runCommand( { drop: this.getName() } );
+    var ret = this._db.runCommand( { drop: this.getName() } );
+    if ( ! ret.ok )
+        throw "drop failed: " + tojson( ret );
 }
 
 DBCollection.prototype.renameCollection = function( newName ){

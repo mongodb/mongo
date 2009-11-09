@@ -204,6 +204,8 @@ namespace mongo {
         unsigned long long getSequenceNumber(){
             return _sequenceNumber;
         }
+
+        void drop();
         
     private:
         DBConfig * _config;

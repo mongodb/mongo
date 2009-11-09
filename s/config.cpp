@@ -75,6 +75,27 @@ namespace mongo {
 
     }
 
+    bool DBConfig::removeSharding( const string& ns ){
+        if ( ! _shardingEnabled ){
+            cout << "AAAA" << endl;
+            return false;
+        }
+        
+        ChunkManager * info = _shards[ns];
+        map<string,CollectionInfo>::iterator i = _sharded.find( ns );
+
+        if ( info == 0 && i == _sharded.end() ){
+            cout << "BBBB" << endl;
+            return false;
+        }
+        uassert( "_sharded but no info" , info );
+        uassert( "info but no sharded" , i != _sharded.end() );
+        
+        _sharded.erase( i );
+        _shards.erase( ns ); // TODO: clean this up, maybe switch to shared_ptr
+        return true;
+    }
+
     ChunkManager* DBConfig::getChunkManager( const string& ns , bool reload ){
         ChunkManager* m = _shards[ns];
         if ( m && ! reload )
@@ -266,6 +287,20 @@ namespace mongo {
         _primary = configHosts[0];
         
         return true;
+    }
+
+    bool ConfigServer::allUp(){
+        try {
+            ScopedDbConnection conn( _primary );
+            conn->getLastError();
+            conn.done();
+            return true;
+        }
+        catch ( DBException& e ){
+            log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
+            return false;
+        }
+        
     }
     
     int ConfigServer::dbConfigVersion(){
