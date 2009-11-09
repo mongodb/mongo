@@ -147,7 +147,6 @@ namespace mongo {
              */
             long long renameIfNeeded( DBDirectClient& db ){
                 if ( finalLong != tempLong ){
-                    dblock l;
                     db.dropCollection( finalLong );
                     if ( db.count( tempLong ) ){
                         BSONObj info;
@@ -203,7 +202,7 @@ namespace mongo {
                 db.dropCollection( setup.tempLong );
                 db.dropCollection( setup.incLong );
                 
-                dblock l;
+                writelock l( setup.incLong );
                 string err;
                 assert( userCreateNS( setup.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
 
@@ -216,7 +215,7 @@ namespace mongo {
                 BSONObj key = values.begin()->firstElement().wrap( "_id" );
                 BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
                 
-                dblock l;
+                writelock l( setup.tempLong );
                 theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
             }
 
@@ -256,6 +255,7 @@ namespace mongo {
                     
                     if ( all.size() == 1 ){
                         // this key has low cardinality, so just write to db
+                        writelock l(_state.setup.incLong);
                         write( *(all.begin()) );
                     }
                     else if ( all.size() > 1 ){
@@ -268,12 +268,8 @@ namespace mongo {
 
             }
 
-            void write( BSONObj& o ){
-                theDataFileMgr.insert( _state.setup.incLong.c_str() , o , true );
-            }
-            
             void dump(){
-                dblock l;
+                writelock l(_state.setup.incLong);
                     
                 for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                     list<BSONObj>& all = i->second;
@@ -308,13 +304,18 @@ namespace mongo {
                 dump();
                 log(1) << "  mr: dumping to db" << endl;
             }
+
+        private:
+            void write( BSONObj& o ){
+                theDataFileMgr.insert( _state.setup.incLong.c_str() , o , true );
+            }
             
-            //private:
             MRState& _state;
         
             InMemory * _temp;
             long _size;
             
+        public:
             long long numEmits;
         };
 
