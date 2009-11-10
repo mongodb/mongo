@@ -255,6 +255,23 @@ Array.sum = function( arr ){
     return s;
 }
 
+Array.avg = function( arr ){
+    if ( arr.length == 0 )
+        return null;
+    return Array.sum( arr ) / arr.length;
+}
+
+Array.stdDev = function( arr ){
+    var avg = Array.avg( arr );
+    var sum = 0;
+
+    for ( var i=0; i<arr.length; i++ ){
+        sum += Math.pow( arr[i] - avg , 2 );
+    }
+
+    return Math.sqrt( sum / arr.length );
+}
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
