@@ -212,7 +212,7 @@ namespace mongo {
         void operator() ( const char *start, const char *end ) const {
             string name = b.popString();
             massert( "Invalid use of reserved field name",
-                     name != "$ns" &&
+                     name != "$ref" &&
                      name != "$oid" &&
                      name != "$binary" &&
                      name != "$type" &&
@@ -329,7 +329,7 @@ namespace mongo {
         }
         ObjectBuilder &b;
     };
-    
+
     struct binDataBinary {
         binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
@@ -477,7 +477,7 @@ public:
                 unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) | ch_p( '_' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_'  )) ) ];
 
                 dbref = dbrefS | dbrefT;
-                dbrefS = ch_p( '{' ) >> "\"$ns\"" >> ':' >>
+                dbrefS = ch_p( '{' ) >> "\"$ref\"" >> ':' >>
                          str[ dbrefNS( self.b ) ] >> ',' >> "\"$id\"" >> ':' >> quotedOid >> '}';
                 dbrefT = str_p( "Dbref" ) >> '(' >> str[ dbrefNS( self.b ) ] >> ',' >>
                          quotedOid >> ')';

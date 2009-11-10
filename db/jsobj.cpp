@@ -256,7 +256,7 @@ namespace mongo {
             if ( format == TenGen )
                 s << "Dbref( ";
             else
-                s << "{ \"$ns\" : ";
+                s << "{ \"$ref\" : ";
             s << '"' << valuestr() << "\", ";
             if ( format != TenGen )
                 s << "\"$id\" : ";
@@ -656,7 +656,7 @@ namespace mongo {
     int getGtLtOp(const BSONElement& e) {
         if ( e.type() != Object )
             return BSONObj::Equality;
-        
+
         BSONElement fe = e.embeddedObject().firstElement();
         return fe.getGtLtOp();
     }
@@ -675,7 +675,7 @@ namespace mongo {
 
             size_t a = l.find( '.' , lstart );
             size_t b = r.find( '.' , rstart );
-            
+
             size_t lend = a == string::npos ? l.size() : a;
             size_t rend = b == string::npos ? r.size() : b;
 

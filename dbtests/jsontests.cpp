@@ -204,9 +204,9 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
                 BSONObj built = b.done();
-                ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
+                ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
                               built.jsonString( Strict ) );
-                ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
+                ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
                               built.jsonString( JS ) );
                 ASSERT_EQUALS( "{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
                               built.jsonString( TenGen ) );
@@ -220,7 +220,7 @@ namespace JsonTests {
                 memset( &oid, 0, 12 );
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
-                ASSERT_EQUALS( "{ \"a\" : { \"$ns\" : \"namespace\", \"$id\" : \"000000000000000000000000\" } }",
+                ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"000000000000000000000000\" } }",
                               b.done().jsonString( Strict ) );
             }
         };
@@ -407,7 +407,7 @@ namespace JsonTests {
 
         class ReservedFieldName : public Bad {
             virtual string json() const {
-                return "{ \"$ns\" : \"b\" }";
+                return "{ \"$ref\" : \"b\" }";
             }
         };
 
@@ -645,7 +645,7 @@ namespace JsonTests {
             }
             // NOTE Testing other formats handled by by Base class.
             virtual string json() const {
-                return "{ \"a\" : { \"$ns\" : \"foo\", \"$id\" : \"000000000000000000000000\" } }";
+                return "{ \"a\" : { \"$ref\" : \"foo\", \"$id\" : \"000000000000000000000000\" } }";
             }
         };
 
@@ -906,7 +906,7 @@ namespace JsonTests {
     public:
         All() : Suite( "json" ){
         }
-        
+
         void setupTests(){
             add< JsonStringTests::Empty >();
             add< JsonStringTests::SingleStringMember >();
