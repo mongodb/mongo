@@ -782,7 +782,7 @@ found:
                              const BSONObj& key, const BSONObj &order, bool dupsAllowed,
                              DiskLoc lChild, DiskLoc rChild, IndexDetails& idx) {
         if ( key.objsize() > KeyMax ) {
-            problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << idx.indexNamespace() << endl;
+            problem() << "ERROR: key too large len:" << key.objsize() << " max:" << KeyMax << ' ' << key.objsize() << ' ' << idx.indexNamespace() << endl;
             return 2;
         }
         assert( key.objsize() > 0 );
@@ -848,7 +848,7 @@ found:
     {
         if ( toplevel ) {
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << '\n';
                 return 3;
             }
         }
@@ -949,7 +949,7 @@ namespace mongo {
         if ( ! b->_pushBack(loc, key, order, DiskLoc()) ){
             // no room
             if ( key.objsize() > KeyMax ) {
-                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.toString() << '\n';
+                problem() << "Btree::insert: key too large to index, skipping " << idx.indexNamespace().c_str() << ' ' << key.objsize() << ' ' << key.toString() << '\n';
             }
             else { 
                 // bucket was full
