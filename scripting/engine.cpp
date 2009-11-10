@@ -149,6 +149,16 @@ namespace mongo {
     }
 
     ScriptingFunction Scope::createFunction( const char * code ){
+        if ( code[0] == '/' && code [1] == '*' ){
+            code += 2;
+            while ( code[0] && code[1] ){
+                if ( code[0] == '*' && code[1] == '/' ){
+                    code += 2;
+                    break;
+                }
+                code++;
+            }
+        }
         map<string,ScriptingFunction>::iterator i = _cachedFunctions.find( code );
         if ( i != _cachedFunctions.end() )
             return i->second;
