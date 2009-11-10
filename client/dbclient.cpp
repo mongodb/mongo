@@ -783,6 +783,7 @@ namespace mongo {
             // cursor id no longer valid at the server.
             assert( qr->cursorId == 0 );
             cursorId = 0; // 0 indicates no longer valid (dead)
+            // TODO: should we throw a UserException here???
         }
         if ( cursorId == 0 || ! ( opts & Option_CursorTailable ) ) {
             // only set initially: we don't want to kill it on end of data
