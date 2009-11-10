@@ -407,7 +407,7 @@ namespace JsonTests {
 
         class ReservedFieldName : public Bad {
             virtual string json() const {
-                return "{ \"$ref\" : \"b\" }";
+                return "{ \"$oid\" : \"b\" }";
             }
         };
 

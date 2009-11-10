@@ -212,7 +212,6 @@ namespace mongo {
         void operator() ( const char *start, const char *end ) const {
             string name = b.popString();
             massert( "Invalid use of reserved field name",
-                     name != "$ref" &&
                      name != "$oid" &&
                      name != "$binary" &&
                      name != "$type" &&
