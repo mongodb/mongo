@@ -502,6 +502,14 @@ MapReduceResult.prototype.drop = function(){
     return this._coll.drop();
 }
 
+/**
+* just for debugging really
+*/
+MapReduceResult.prototype.convertToSingleObject = function(){
+    var z = {};
+    this._coll.find().forEach( function(a){ z[a._id] = a.value; } );
+    return z;
+}
 
 /**
 * @param optional object of optional fields;

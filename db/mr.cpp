@@ -124,6 +124,13 @@ namespace mongo {
                         finalizeCode = cmdObj["finalize"].ascode();
                     }
                     
+
+                    if ( cmdObj["mapparams"].type() == Array ){
+                        mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
+                    }
+                    else {
+                        mapparams = BSONObj();
+                    }
                 }
                 
                 { // query options
@@ -174,6 +181,8 @@ namespace mongo {
             string mapCode;
             string reduceCode;
             string finalizeCode;
+            
+            BSONObj mapparams;
 
             // output tables
             string incLong;
@@ -375,7 +384,7 @@ namespace mongo {
                         if ( mr.verbose ) mt.reset();
                         
                         state.scope->setThis( &o );
-                        if ( state.scope->invoke( state.map , BSONObj() , 0 , true ) )
+                        if ( state.scope->invoke( state.map , state.setup.mapparams , 0 , true ) )
                             throw UserException( (string)"map invoke failed: " + state.scope->getError() );
                         
                         if ( mr.verbose ) mapTime += mt.micros();
