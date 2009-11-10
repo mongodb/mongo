@@ -170,7 +170,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 1;
     }
 
-    log() << argv[0] << " v0.2.5 (alpha 2.5) starting (--help for usage)" << endl;
+    log() << argv[0] << " v0.3- (alpha 3r) starting (--help for usage)" << endl;
     printGitVersion();
     printSysInfo();
     
