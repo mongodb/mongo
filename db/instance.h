@@ -27,26 +27,23 @@
 
 namespace mongo {
 
-// turn on or off the oplog.* files which the db can generate.
-// these files are for diagnostic purposes and are unrelated to
-// local.oplog.$main used by replication.
-//
-#define OPLOG if( 0 )
-
-    int getOpLogging();
-
     extern string dbExecCommand;
 
-#define OPWRITE if( getOpLogging() & 1 ) _oplog.write((char *) m.data, m.data->len);
-#define OPREAD if( getOpLogging() & 2 ) _oplog.readop((char *) m.data, m.data->len);
+#define OPWRITE if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len);
+#define OPREAD if( _diaglog.level & 2 ) _diaglog.readop((char *) m.data, m.data->len);
 
-    struct OpLog {
+    struct DiagLog {
         ofstream *f;
-        OpLog() : f(0) { }
+        /* 0 = off; 1 = writes, 2 = reads, 3 = both
+           7 = log a few reads, and all writes.
+        */
+        int level;
+        DiagLog() : f(0) , level(0) { }
         void init() {
-            OPLOG {
+            if ( ! f && level ){
+                log() << "diagLogging = " << level << endl;
                 stringstream ss;
-                ss << "oplog." << hex << time(0);
+                ss << "diaglog." << hex << time(0);
                 string name = ss.str();
                 f = new ofstream(name.c_str(), ios::out | ios::binary);
                 if ( ! f->good() ) {
@@ -55,21 +52,32 @@ namespace mongo {
                 }
             }
         }
+        /**
+         * @return old
+         */
+        int setLevel( int newLevel ){
+            int old = level;
+            level = newLevel;
+            init();
+            return old;
+        }
         void flush() {
-            OPLOG f->flush();
+            if ( level ) f->flush();
         }
         void write(char *data,int len) {
-            OPLOG f->write(data,len);
+            if ( level & 1 ) f->write(data,len);
         }
         void readop(char *data, int len) {
-            OPLOG {
-                bool log = (getOpLogging() & 4) == 0;
+            if ( level & 2 ) {
+                bool log = (level & 4) == 0;
                 OCCASIONALLY log = true;
                 if ( log )
                     f->write(data,len);
             }
         }
     };
+
+    extern DiagLog _diaglog;
 
     /* we defer response until we unlock.  don't want a blocked socket to
        keep things locked.

@@ -55,16 +55,11 @@ namespace mongo {
     string dbExecCommand;
 
     string bind_ip = "";
-    /* 0 = off; 1 = writes, 2 = reads, 3 = both
-       7 = log a few reads, and all writes.
-    */
-    int diagLogging = 0;
+
     char *appsrvPath = null;
 
-    int getOpLogging() {
-        return diagLogging;
-    }
-    OpLog _oplog;
+    DiagLog _diaglog;
+
     int opIdMem = 100000000;
 
     bool useCursors = true;
@@ -72,9 +67,9 @@ namespace mongo {
     
     void closeAllSockets();
     void flushOpLog( stringstream &ss ) {
-        if( _oplog.f && _oplog.f->is_open() ) {
+        if( _diaglog.f && _diaglog.f->is_open() ) {
             ss << "flushing op log and files\n";
-            _oplog.flush();
+            _diaglog.flush();
         }
     }
 
@@ -396,7 +391,7 @@ namespace mongo {
                 uassert(q.fields->errmsg, false);
 
             /* note these are logged BEFORE authentication -- which is sort of ok */
-            if ( diagLogging && logit ) {
+            if ( _diaglog.level && logit ) {
                 if ( strstr(q.ns, ".$cmd") ) {
                     /* $cmd queries are "commands" and usually best treated as write operations */
                     OPWRITE;

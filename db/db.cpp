@@ -58,7 +58,6 @@ namespace mongo {
     extern char *appsrvPath;
     extern bool autoresync;
     extern int diagLogging;
-    extern OpLog _oplog;
     extern int lenForNewNsFiles;
     extern int lockFile;
 
@@ -419,9 +418,7 @@ namespace mongo {
 
         clearTmpCollections();
 
-        if ( diagLogging )
-            log() << "diagLogging = " << diagLogging << endl;
-        _oplog.init();
+        _diaglog.init();
 
         mms.go();
 #ifdef _HAVESNMP
@@ -759,7 +756,7 @@ int main(int argc, char* argv[], char *envp[] )
                 out() << "can't interpret --diaglog setting" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            diagLogging = x;
+            _diaglog.level = x;
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();

@@ -40,7 +40,6 @@
 namespace mongo {
 
     extern int otherTraceLevel;
-    extern int diagLogging;
     void flushOpLog( stringstream &ss );
 
     class CmdShutdown : public Command {
@@ -381,13 +380,12 @@ namespace mongo {
             return true;
         }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            int was = diagLogging;
-            diagLogging = cmdObj.firstElement().numberInt();
+            int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             stringstream ss;
             flushOpLog( ss );
             out() << ss.str() << endl;
             if ( !cmdLine.quiet )
-                log() << "CMD: diagLogging set to " << diagLogging << " from: " << diagLogging << endl;
+                log() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
             result.append( "was" , was );
             return true;
         }
