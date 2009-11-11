@@ -838,7 +838,9 @@ int main(int argc, char* argv[], char *envp[] )
 			if( params.count("shardsvr") )
 				cmdLine.port = CmdLine::ShardServerPort;
 		}
-
+        if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
+            _diaglog.level = 1;
+        }
 #ifdef _HAVESNMP
         if ( params.count( "snmp-subagent" ) ){
             snmpAgent.enable();
