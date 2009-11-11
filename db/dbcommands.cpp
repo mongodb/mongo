@@ -40,7 +40,7 @@
 namespace mongo {
 
     extern int otherTraceLevel;
-    extern int opLogging;
+    extern int diagLogging;
     void flushOpLog( stringstream &ss );
 
     class CmdShutdown : public Command {
@@ -371,25 +371,27 @@ namespace mongo {
     } cmd;
     */
 
-    class CmdOpLogging : public Command {
+    class CmdDiagLogging : public Command {
     public:
         virtual bool slaveOk() {
             return true;
         }
-        CmdOpLogging() : Command("opLogging") { }
+        CmdDiagLogging() : Command("diagLogging") { }
         bool adminOnly() {
             return true;
         }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            opLogging = (int) cmdObj.findElement(name).number();
+            int was = diagLogging;
+            diagLogging = cmdObj.firstElement().numberInt();
             stringstream ss;
             flushOpLog( ss );
             out() << ss.str() << endl;
             if ( !cmdLine.quiet )
-                log() << "CMD: opLogging set to " << opLogging << endl;
+                log() << "CMD: diagLogging set to " << diagLogging << " from: " << diagLogging << endl;
+            result.append( "was" , was );
             return true;
         }
-    } cmdoplogging;
+    } cmddiaglogging;
 
     /* remove bit from a bit array - actually remove its slot, not a clear
        note: this function does not work with x == 63 -- that is ok

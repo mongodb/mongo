@@ -57,7 +57,7 @@ namespace mongo {
     extern string bind_ip;
     extern char *appsrvPath;
     extern bool autoresync;
-    extern int opLogging;
+    extern int diagLogging;
     extern OpLog _oplog;
     extern int lenForNewNsFiles;
     extern int lockFile;
@@ -125,10 +125,6 @@ namespace mongo {
     void webServerThread();
     void pdfileInit();
 
-    /* versions
-       114 bad memory bug fixed
-       115 replay, opLogging
-    */
     void listen(int port) {
         log() << mongodVersion() << endl;
         printGitVersion();
@@ -423,8 +419,8 @@ namespace mongo {
 
         clearTmpCollections();
 
-        if ( opLogging )
-            log() << "opLogging = " << opLogging << endl;
+        if ( diagLogging )
+            log() << "diagLogging = " << diagLogging << endl;
         _oplog.init();
 
         mms.go();
@@ -555,7 +551,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("noprealloc", "disable data file preallocation")
         ("smallfiles", "use a smaller default file size")
         ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-        ("oplog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
+        ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
         ("sysinfo", "print some diagnostic system information")
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
@@ -757,13 +753,13 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
         }
-        if (params.count("oplog")) {
-            int x = params["oplog"].as<int>();
+        if (params.count("diaglog")) {
+            int x = params["diaglog"].as<int>();
             if ( x < 0 || x > 7 ) {
-                out() << "can't interpret --oplog setting" << endl;
+                out() << "can't interpret --diaglog setting" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            opLogging = x;
+            diagLogging = x;
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();

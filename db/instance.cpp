@@ -58,11 +58,11 @@ namespace mongo {
     /* 0 = off; 1 = writes, 2 = reads, 3 = both
        7 = log a few reads, and all writes.
     */
-    int opLogging = 0;
+    int diagLogging = 0;
     char *appsrvPath = null;
 
     int getOpLogging() {
-        return opLogging;
+        return diagLogging;
     }
     OpLog _oplog;
     int opIdMem = 100000000;
@@ -396,7 +396,7 @@ namespace mongo {
                 uassert(q.fields->errmsg, false);
 
             /* note these are logged BEFORE authentication -- which is sort of ok */
-            if ( opLogging && logit ) {
+            if ( diagLogging && logit ) {
                 if ( strstr(q.ns, ".$cmd") ) {
                     /* $cmd queries are "commands" and usually best treated as write operations */
                     OPWRITE;
