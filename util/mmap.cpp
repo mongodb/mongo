@@ -57,9 +57,13 @@ namespace mongo {
         return total;
     }
 
-    void MemoryMappedFile::flushAll( bool sync ){
-        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+    int MemoryMappedFile::flushAll( bool sync ){
+        int num = 0;
+        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
+            num++;
             (*i)->flush( sync );
+        }
+        return num;
     }
 
 

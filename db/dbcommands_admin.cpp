@@ -36,9 +36,7 @@ namespace mongo {
     public:
         CleanCmd() : Command( "clean" ){}
 
-        virtual bool slaveOk(){
-            return true;
-        }
+        virtual bool slaveOk(){ return true; }
 
         bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string dropns = cc().database()->name + "." + cmdObj.firstElement().valuestrsafe();
@@ -242,5 +240,22 @@ namespace mongo {
             return ss.str();
         }
     } validateCmd;
+
+    class FSyncCommand : public Command {
+    public:
+        FSyncCommand() : Command( "fsync" ){}
+
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return true; }
+        
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            bool sync = ! cmdObj["async"].trueValue();
+            log() << "CMD fsync:  sync:" << sync << endl;
+            result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
+            return 1;
+        }
+        
+    } fsyncCmd;
+    
 }
 
