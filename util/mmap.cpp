@@ -57,6 +57,12 @@ namespace mongo {
         return total;
     }
 
+    void MemoryMappedFile::flushAll( bool sync ){
+        for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+            (*i)->flush( sync );
+    }
+
+
     void MemoryMappedFile::updateLength( const char *filename, long &length ) {
         if ( !boost::filesystem::exists( filename ) )
             return;
