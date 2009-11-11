@@ -172,7 +172,6 @@ namespace mongo {
         return nDeleted;
     }
 
-    int queryTraceLevel = 0;
     int otherTraceLevel = 0;
 
     int initialExtentSize(int len);

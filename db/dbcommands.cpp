@@ -39,169 +39,9 @@
 
 namespace mongo {
 
-    extern int queryTraceLevel;
     extern int otherTraceLevel;
     extern int opLogging;
     void flushOpLog( stringstream &ss );
-
-    void clean(const char *ns, NamespaceDetails *d) {
-        for ( int i = 0; i < Buckets; i++ )
-            d->deletedList[i].Null();
-    }
-
-    /* { validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
-    string validateNS(const char *ns, NamespaceDetails *d, BSONObj *cmdObj) {
-        bool scanData = true;
-        if( cmdObj && cmdObj->hasElement("scandata") && !cmdObj->getBoolField("scandata") )
-            scanData = false;
-        bool valid = true;
-        stringstream ss;
-        ss << "\nvalidate\n";
-        ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
-        if ( d->capped )
-            ss << "  capped:" << d->capped << " max:" << d->max << '\n';
-
-        ss << "  firstExtent:" << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.buf << '\n';
-        ss << "  lastExtent:" << d->lastExtent.toString()    << " ns:" << d->lastExtent.ext()->nsDiagnostic.buf << '\n';
-        try {
-            d->firstExtent.ext()->assertOk();
-            d->lastExtent.ext()->assertOk();
-
-            DiskLoc el = d->firstExtent;
-            int ne = 0;
-            while( !el.isNull() ) {
-                Extent *e = el.ext();
-                e->assertOk();
-                el = e->xnext;
-                ne++;
-                checkForInterrupt();
-            }
-            ss << "  # extents:" << ne << '\n';
-        } catch (...) {
-            valid=false;
-            ss << " extent asserted ";
-        }
-
-        ss << "  datasize?:" << d->datasize << " nrecords?:" << d->nrecords << " lastExtentSize:" << d->lastExtentSize << '\n';
-        ss << "  padding:" << d->paddingFactor << '\n';
-        try {
-
-            try {
-                ss << "  first extent:\n";
-                d->firstExtent.ext()->dump(ss);
-                valid = valid && d->firstExtent.ext()->validates();
-            }
-            catch (...) {
-                ss << "\n    exception firstextent\n" << endl;
-            }
-
-            set<DiskLoc> recs;
-            if( scanData ) {
-                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-                int n = 0;
-                long long len = 0;
-                long long nlen = 0;
-                int outOfOrder = 0;
-                DiskLoc cl_last;
-                while ( c->ok() ) {
-                    n++;
-
-                    DiskLoc cl = c->currLoc();
-                    if ( n < 1000000 )
-                        recs.insert(cl);
-                    if ( d->capped ) {
-                        if ( cl < cl_last )
-                            outOfOrder++;
-                        cl_last = cl;
-                    }
-
-                    Record *r = c->_current();
-                    len += r->lengthWithHeaders;
-                    nlen += r->netLength();
-                    c->advance();
-                }
-                if ( d->capped ) {
-                    ss << "  capped outOfOrder:" << outOfOrder;
-                    if ( outOfOrder > 1 ) {
-                        valid = false;
-                        ss << " ???";
-                    }
-                    else ss << " (OK)";
-                    ss << '\n';
-                }
-                ss << "  " << n << " objects found, nobj:" << d->nrecords << "\n";
-                ss << "  " << len << " bytes data w/headers\n";
-                ss << "  " << nlen << " bytes data wout/headers\n";
-            }
-
-            ss << "  deletedList: ";
-            for ( int i = 0; i < Buckets; i++ ) {
-                ss << (d->deletedList[i].isNull() ? '0' : '1');
-            }
-            ss << endl;
-            int ndel = 0;
-            long long delSize = 0;
-            int incorrect = 0;
-            for ( int i = 0; i < Buckets; i++ ) {
-                DiskLoc loc = d->deletedList[i];
-                try {
-                    int k = 0;
-                    while ( !loc.isNull() ) {
-                        if ( recs.count(loc) )
-                            incorrect++;
-                        ndel++;
-
-                        if ( loc.questionable() ) {
-                            if ( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
-                                ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
-                                valid = false;
-                                break;
-                            }
-                        }
-
-                        DeletedRecord *d = loc.drec();
-                        delSize += d->lengthWithHeaders;
-                        loc = d->nextDeleted;
-                        k++;
-                        checkForInterrupt();
-                    }
-                } catch (...) {
-                    ss <<"    ?exception in deleted chain for bucket " << i << endl;
-                    valid = false;
-                }
-            }
-            ss << "  deleted: n: " << ndel << " size: " << delSize << endl;
-            if ( incorrect ) {
-                ss << "    ?corrupt: " << incorrect << " records from datafile are in deleted list\n";
-                valid = false;
-            }
-
-            int idxn = 0;
-            try  {
-                ss << "  nIndexes:" << d->nIndexes << endl;
-                NamespaceDetails::IndexIterator i = d->ii();
-                while( i.more() ) {
-                    IndexDetails& id = i.next();
-                    ss << "    " << id.indexNamespace() << " keys:" <<
-                        id.head.btree()->fullValidate(id.head, id.keyPattern()) << endl;
-                }
-            }
-            catch (...) {
-                ss << "\n    exception during index validate idxn:" << idxn << endl;
-                valid=false;
-            }
-
-        }
-        catch (AssertionException) {
-            ss << "\n    exception during validate\n" << endl;
-            valid = false;
-        }
-
-        if ( !valid )
-            ss << " ns corrupt, requires dbchk\n";
-
-        return ss.str();
-    }
 
     class CmdShutdown : public Command {
     public:
@@ -661,36 +501,6 @@ namespace mongo {
             return true;
         }
     } cmdDrop;
-
-    class CmdQueryTraceLevel : public Command {
-    public:
-        virtual bool slaveOk() {
-            return true;
-        }
-        CmdQueryTraceLevel() : Command("queryTraceLevel") { }
-        bool adminOnly() {
-            return true;
-        }
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            queryTraceLevel = (int) cmdObj.findElement(name).number();
-            return true;
-        }
-    } cmdquerytracelevel;
-
-    class CmdTraceAll : public Command {
-    public:
-        virtual bool slaveOk() {
-            return true;
-        }
-        CmdTraceAll() : Command("traceAll") { }
-        bool adminOnly() {
-            return true;
-        }
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            queryTraceLevel = otherTraceLevel = (int) cmdObj.findElement(name).number();
-            return true;
-        }
-    } cmdtraceall;
 
     /* select count(*) */
     class CmdCount : public Command {
@@ -1482,20 +1292,12 @@ namespace mongo {
         }
 
         bool ok = false;
-        bool valid = false;
 
-        BSONElement e;
-        e = jsobj.firstElement();
+        BSONElement e = jsobj.firstElement();
 
         map<string,Command*>::iterator i;
 
-        if ( e.eoo() )
-            ;
-        /* check for properly registered command objects.  Note that all the commands below should be
-           migrated over to the command object format.
-           */
-        else if ( (i = commands->find(e.fieldName())) != commands->end() ) {
-            valid = true;
+        if ( e.type() && ( i = commands->find(e.fieldName()) ) != commands->end() ){
             string errmsg;
             Command *c = i->second;
             AuthenticationInfo *ai = currentClient.get()->ai;
@@ -1510,14 +1312,14 @@ namespace mongo {
             else if ( isMaster() ||
                       c->slaveOk() ||
                       ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
-                      fromRepl )
-            {
+                      fromRepl ){
                 if ( jsobj.getBoolField( "help" ) ) {
                     stringstream help;
                     help << "help for: " << e.fieldName() << " ";
                     c->help( help );
                     anObjBuilder.append( "help" , help.str() );
-                } else {
+                } 
+                else {
                     if( admin )
                         log( 2 ) << "command: " << jsobj << endl;
                     ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
@@ -1532,48 +1334,7 @@ namespace mongo {
             if ( !ok )
                 anObjBuilder.append("errmsg", errmsg);
         }
-        else if ( e.type() == String ) {
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
-
-            /* { count: "collectionname"[, query: <query>] } */
-            string us(ns, p-ns);
-
-            /* we allow clean and validate on slaves */
-            if ( strcmp( e.fieldName(), "clean") == 0 ) {
-                valid = true;
-                string dropNs = us + '.' + e.valuestr();
-                NamespaceDetails *d = nsdetails(dropNs.c_str());
-                if ( !cmdLine.quiet )
-                    log() << "CMD: clean " << dropNs << endl;
-                if ( d ) {
-                    ok = true;
-                    anObjBuilder.append("ns", dropNs.c_str());
-                    clean(dropNs.c_str(), d);
-                }
-                else {
-                    anObjBuilder.append("errmsg", "ns not found");
-                }
-            }
-            else if ( strcmp( e.fieldName(), "validate") == 0 ) {
-                valid = true;
-                string toValidateNs = us + '.' + e.valuestr();
-                NamespaceDetails *d = nsdetails(toValidateNs.c_str());
-                if ( !cmdLine.quiet )
-                    log() << "CMD: validate " << toValidateNs << endl;
-                if ( d ) {
-                    ok = true;
-                    anObjBuilder.append("ns", toValidateNs.c_str());
-                    string s = validateNS(toValidateNs.c_str(), d, &jsobj);
-                    anObjBuilder.append("result", s.c_str());
-                }
-                else {
-                    anObjBuilder.append("errmsg", "ns not found");
-                }
-            }
-        }
-
-        if ( !valid ){
+        else {
             anObjBuilder.append("errmsg", "no such cmd");
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
