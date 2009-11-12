@@ -415,10 +415,18 @@ namespace mongo {
             return -1;
         }
         BSONObj query = cmd.getObjectField("query");
-        BSONObj fields = cmd.getObjectField("fields");
+
         // count of all objects
-        if ( query.isEmpty() && fields.isEmpty() ) {
-            return d->nrecords;
+        if ( query.isEmpty() ){
+            long long num = d->nrecords;
+            num = num - cmd["skip"].numberLong();
+            if ( cmd["limit"].isNumber() ){
+                long long limit = cmd["limit"].numberLong();
+                if ( limit < num ){
+                    num = limit;
+                }
+            }
+            return num;
         }
         QueryPlanSet qps( ns, query, BSONObj() );
         CountOp original( cmd );

@@ -21,5 +21,7 @@ assert.eq( 1 , t.find( q ).limit(1).itcount() , "F" );
 
 assert.eq( 5 , t.find( q ).limit(5).size() , "G" );
 assert.eq( 5 , t.find( q ).skip(5).limit(5).size() , "H" );
-assert.eq( 2 , t.find( q ).skip(48).limit(5).size() , "H" );
+assert.eq( 2 , t.find( q ).skip(48).limit(5).size() , "I" );
+
+assert.eq( 20 , t.find().limit(20).size() , "J" );
 
