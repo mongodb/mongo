@@ -579,16 +579,16 @@ namespace mongo {
         say( toSend );
     }
 
-    auto_ptr<DBClientCursor> DBClientBase::getIndexes( const string &ns ){
+    auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ){
         return query( Namespace( ns.c_str() ).getSisterNS( "system.indexes" ).c_str() , BSON( "ns" << ns ) );
     }
     
-    void DBClientBase::dropIndex( const string& ns , BSONObj keys ){
+    void DBClientWithCommands::dropIndex( const string& ns , BSONObj keys ){
         dropIndex( ns , genIndexName( keys ) );
     }
 
 
-    void DBClientBase::dropIndex( const string& ns , const string& indexName ){
+    void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ){
         BSONObj info;
         if ( ! runCommand( nsToClient( ns.c_str() ) , 
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
@@ -599,7 +599,7 @@ namespace mongo {
         resetIndexCache();
     }
     
-    void DBClientBase::dropIndexes( const string& ns ){
+    void DBClientWithCommands::dropIndexes( const string& ns ){
         BSONObj info;
         uassert( "dropIndexes failed" , runCommand( nsToClient( ns.c_str() ) , 
                                                     BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") , 
@@ -607,7 +607,7 @@ namespace mongo {
         resetIndexCache();
     }
 
-    void DBClientBase::reIndex( const string& ns ){
+    void DBClientWithCommands::reIndex( const string& ns ){
         list<BSONObj> all;
         auto_ptr<DBClientCursor> i = getIndexes( ns );
         while ( i->more() ){
@@ -624,7 +624,7 @@ namespace mongo {
     }
     
 
-    string DBClientBase::genIndexName( const BSONObj& keys ){
+    string DBClientWithCommands::genIndexName( const BSONObj& keys ){
         stringstream ss;
         
         bool first = 1;
@@ -643,7 +643,7 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientBase::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name ) {
+    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -672,7 +672,7 @@ namespace mongo {
         return 1;
     }
 
-    void DBClientBase::resetIndexCache() {
+    void DBClientWithCommands::resetIndexCache() {
         _seenIndexes.clear();
     }
 

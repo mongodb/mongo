@@ -317,6 +317,7 @@ namespace mongo {
     */
     class DBClientWithCommands : public DBClientInterface {
         bool isOk(const BSONObj&);
+        set<string> _seenIndexes;
     public:
 
 		/** helper function.  run a simple command where the command expression is simply
@@ -407,11 +408,6 @@ namespace mongo {
         */
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
-        /** Erase / drop an entire database */
-        virtual bool dropDatabase(const string &dbname, BSONObj *info = 0) {
-            return simpleCommand(dbname, info, "dropDatabase");
-        }
-
         /** Delete the specified collection. */        
         virtual bool dropCollection( const string &ns ){
             string db = nsGetDB( ns );
@@ -420,7 +416,9 @@ namespace mongo {
 
             BSONObj info;
             
-            return runCommand( db.c_str() , BSON( "drop" << coll ) , info );
+            bool res = runCommand( db.c_str() , BSON( "drop" << coll ) , info );
+            resetIndexCache();
+            return res;
         }
 
         /** Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
@@ -554,6 +552,45 @@ namespace mongo {
 
         bool exists( const string& ns );
 
+
+        /** Create an index if it does not already exist.
+            ensureIndex calls are remembered so it is safe/fast to call this function many 
+            times in your code.
+           @param ns collection to be indexed
+           @param keys the "key pattern" for the index.  e.g., { name : 1 }
+           @param unique if true, indicates that key uniqueness should be enforced for this index
+           @param name if not isn't specified, it will be created from the keys (recommended)
+           @return whether or not sent message to db.
+             should be true on first call, false on subsequent unless resetIndexCache was called
+         */
+        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "" );
+
+        /**
+           clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
+         */
+        virtual void resetIndexCache();
+
+        virtual auto_ptr<DBClientCursor> getIndexes( const string &ns );
+        
+        virtual void dropIndex( const string& ns , BSONObj keys );
+        virtual void dropIndex( const string& ns , const string& indexName );
+        
+        /**
+           drops all indexes for the collection
+         */
+        virtual void dropIndexes( const string& ns );
+
+        virtual void reIndex( const string& ns );
+        
+        string genIndexName( const BSONObj& keys );
+
+        /** Erase / drop an entire database */
+        virtual bool dropDatabase(const string &dbname, BSONObj *info = 0) {
+            bool ret = simpleCommand(dbname, info, "dropDatabase");
+            resetIndexCache();
+            return ret;
+        }
+
         virtual string toString() = 0;
 
         /** @return the database name portion of an ns string */
@@ -631,58 +668,11 @@ namespace mongo {
            updates objects matching query
          */
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
-
-        /** Create an index if it does not already exist.
-            ensureIndex calls are remembered so it is safe/fast to call this function many 
-            times in your code.
-           @param ns collection to be indexed
-           @param keys the "key pattern" for the index.  e.g., { name : 1 }
-           @param unique if true, indicates that key uniqueness should be enforced for this index
-           @param name if not isn't specified, it will be created from the keys (recommended)
-           @return whether or not sent message to db.
-             should be true on first call, false on subsequent unless resetIndexCache was called
-         */
-        virtual bool ensureIndex( const string &ns , BSONObj keys , bool unique = false, const string &name = "" );
-
-        /**
-           clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
-         */
-        virtual void resetIndexCache();
-
-        virtual auto_ptr<DBClientCursor> getIndexes( const string &ns );
-        
-        virtual void dropIndex( const string& ns , BSONObj keys );
-        virtual void dropIndex( const string& ns , const string& indexName );
-        
-        /**
-           drops all indexes for the collection
-         */
-        virtual void dropIndexes( const string& ns );
-
-        virtual void reIndex( const string& ns );
-        
-        string genIndexName( const BSONObj& keys );
         
         virtual string getServerAddress() const = 0;
         
-        /** Erase / drop an entire database */
-        virtual bool dropDatabase(const string &dbname, BSONObj *info = 0) {
-            bool ret = DBClientWithCommands::dropDatabase( dbname, info );
-            resetIndexCache();
-            return ret;
-        }
-        
-        /** Delete the specified collection. */        
-        virtual bool dropCollection( const string &ns ){
-            bool ret = DBClientWithCommands::dropCollection( ns );
-            resetIndexCache();
-            return ret;
-        }        
-        
         virtual bool isFailed() const = 0;
 
-    private:
-        set<string> _seenIndexes;
     };
     
     class DBClientPaired;
