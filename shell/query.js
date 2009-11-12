@@ -25,11 +25,12 @@ DBQuery.prototype.help = function(){
     print( "\t.sort( {...} )" )
     print( "\t.limit( n )" )
     print( "\t.skip( n )" )
-    print( "\t.count()" )
+    print( "\t.count() - total # of objects matching query, ignores skip,limit" )
+    print( "\t.size() - total # of objects cursor would return skip,limit effect this" )
     print( "\t.explain()" )
     print( "\t.forEach( func )" )
     print( "\t.map( func )" )
-
+    
 }
 
 DBQuery.prototype.clone = function(){
@@ -112,7 +113,7 @@ DBQuery.prototype.toArray = function(){
     return a;
 }
 
-DBQuery.prototype.count = function(){
+DBQuery.prototype.count = function( applySkipLimit ){
     var cmd = { count: this._collection.getName() };
     if ( this._query ){
         if ( this._special )
@@ -121,10 +122,21 @@ DBQuery.prototype.count = function(){
             cmd.query = this._query;
     }
     cmd.fields = this._fields || {};
+
+    if ( applySkipLimit ){
+        if ( this._limit )
+            cmd.limit = this._limit;
+        if ( this._skip )
+            cmd.skip = this._skip;
+    }
     
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
     throw "count failed: " + tojson( res );
+}
+
+DBQuery.prototype.size = function(){
+    return this.count( true );
 }
 
 DBQuery.prototype.countReturn = function(){
