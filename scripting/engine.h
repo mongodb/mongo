@@ -67,7 +67,10 @@ namespace mongo {
          */
         virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false ) = 0;
         void invokeSafe( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 ){
-            assert( invoke( func , args , timeoutMs ) == 0 );
+            int res = invoke( func , args , timeoutMs );
+            if ( res == 0 )
+                return;
+            throw UserException( (string)"invoke failed: " + getError() );
         }
         virtual string getError() = 0;
         

@@ -446,6 +446,7 @@ namespace mongo {
                 catch ( ... ){
                     log() << "mr failed, removing collection" << endl;
                     db.dropCollection( mr.tempLong );
+                    db.dropCollection( mr.incLong );
                     throw;
                 }
                 

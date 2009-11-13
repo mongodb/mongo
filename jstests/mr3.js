@@ -45,3 +45,29 @@ assert.eq( 12 , z.c.count , "B4" );
 
 res.drop();
 
+// -- just some random tests
+
+realm = m;
+
+m = function(){
+    emit( this._id , 1 );
+}
+res = t.mapReduce( m , r );
+res.drop();
+
+m = function(){
+    emit( this._id , this.xzz.a );
+}
+
+before = db.getCollectionNames().length;
+assert.throws( function(){ t.mapReduce( m , r ); } );
+assert.eq( before , db.getCollectionNames().length , "after throw crap" );
+
+
+m = realm;
+r = function( k , v ){
+    return v.x.x.x;
+}
+before = db.getCollectionNames().length;
+assert.throws( function(){ t.mapReduce( m , r ); } );
+assert.eq( before , db.getCollectionNames().length , "after throw crap" );

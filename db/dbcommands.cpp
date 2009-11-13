@@ -1322,7 +1322,14 @@ namespace mongo {
                 else {
                     if( admin )
                         log( 2 ) << "command: " << jsobj << endl;
-                    ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
+                    try {
+                        ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
+                    }
+                    catch ( AssertionException& e ){
+                        ok = false;
+                        errmsg = "assersion: ";
+                        errmsg += e.what();
+                    }
                     if ( ok && c->logTheOp() && !fromRepl )
                         logOp("c", ns, jsobj);
                 }
