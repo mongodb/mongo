@@ -1113,21 +1113,6 @@ namespace mongo {
 
         log(1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << (double)t.millis() / 1000 << " secs" << endl;
 
-        /*        if( 0 && idxNo == 1 ) { 
-        // TEMP!
-
-        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-        while( i->more() ) { 
-        BSONObjExternalSorter::Data d = i->next();
-        cout << d.second.toString() << endl;
-        cout << d.first.objsize() << endl;
-        cout<<"SORTER next:" << d.first.toString() << endl;
-        }
-
-        cout << "stop here" << endl;
-        cout << "stop here" << endl;
-        }
-        */
         list<DiskLoc> dupsToDrop;
 
         /* build index --- */ 
@@ -1143,17 +1128,19 @@ namespace mongo {
                     btBuilder.addKey(d.first, d.second);
                 }
                 catch( AssertionException& ) { 
-                    if( !dupsAllowed ) { 
-                        if( dropDups ) { 
-                            /* we could queue these on disk, but normally there are very few dups, so instead we 
-                               keep in ram and have a limit.
-                            */
-                            dupsToDrop.push_back(d.second);
-                            uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
-                        }
-                        else
-                            throw;
+                    if ( dupsAllowed ){
+                        // unknow exception??
+                        throw;
                     }
+                    
+                    if ( ! dropDups )
+                        throw;
+
+                    /* we could queue these on disk, but normally there are very few dups, so instead we 
+                       keep in ram and have a limit.
+                    */
+                    dupsToDrop.push_back(d.second);
+                    uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
             }
             btBuilder.commit();
