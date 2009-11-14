@@ -420,6 +420,9 @@ namespace mongo {
         if ( query.isEmpty() ){
             long long num = d->nrecords;
             num = num - cmd["skip"].numberLong();
+            if ( num < 0 ) {
+                num = 0;
+            }
             if ( cmd["limit"].isNumber() ){
                 long long limit = cmd["limit"].numberLong();
                 if ( limit < num ){

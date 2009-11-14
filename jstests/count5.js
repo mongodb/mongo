@@ -6,7 +6,7 @@ for ( i=0; i<100; i++ ){
     t.save( { x : i } );
 }
 
-q = { x : { $gt : 25 , $lte : 75 } }
+q = { x : { $gt : 25 , $lte : 75 } };
 
 assert.eq( 50 , t.find( q ).count() , "A" );
 assert.eq( 50 , t.find( q ).itcount() , "B" );
@@ -25,3 +25,6 @@ assert.eq( 2 , t.find( q ).skip(48).limit(5).size() , "I" );
 
 assert.eq( 20 , t.find().limit(20).size() , "J" );
 
+assert.eq( 0 , t.find().skip(120).size() , "K" );
+assert.eq( 1 , db.$cmd.findOne( { count: "count5" } )["ok"] , "L" );
+assert.eq( 1 , db.$cmd.findOne( { count: "count5", skip: 120 } )["ok"] , "M" );
