@@ -55,7 +55,7 @@ namespace mongo {
         
         stringstream ss;
         
-        while ( try_catch ){
+        //while ( try_catch ){
             
             v8::String::Utf8Value exception(try_catch->Exception());
             Handle<v8::Message> message = try_catch->Message();
@@ -83,8 +83,8 @@ namespace mongo {
                 ss << endl;
             }    
             
-            try_catch = try_catch->next_;
-        }
+            //try_catch = try_catch->next_;
+        //}
         
         return ss.str();
     }
@@ -124,8 +124,8 @@ namespace mongo {
             cout << endl;
         }    
 
-        if ( try_catch->next_ )
-            s << try_catch->next_;
+        //if ( try_catch->next_ )
+        //    s << try_catch->next_;
 
         return s;
     }
