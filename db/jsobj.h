@@ -1207,6 +1207,12 @@ namespace mongo {
             b.append(n);
         }
 
+        /** Append a NumberLong */
+        void append(const string& fieldName, long long n) { 
+            append( fieldName.c_str() , n );
+        }
+
+
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
             b.append((char) NumberDouble);
@@ -1214,6 +1220,11 @@ namespace mongo {
             b.append(n);
             return *this;
         }
+
+        /** tries to append the data as a number
+         * @return true if the data was able to be converted to a number
+         */
+        bool appendAsNumber( const string& fieldName , const string& data );
 
         /** Append a BSON Object ID (OID type). */
         void appendOID(const char *fieldName, OID *oid = 0 , bool generateIfBlank = false ) {

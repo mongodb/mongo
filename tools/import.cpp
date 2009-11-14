@@ -39,53 +39,8 @@ class Import : public Tool {
     const char * _sep;
     bool _ignoreBlanks;
 
-    bool _appendNumber( BSONObjBuilder& b , const string& fieldName , const string& data ){
-        if ( data.size() == 0 )
-            return false;
-        
-        unsigned int pos=0;
-        if ( data[0] == '-' )
-            pos++;
-
-        bool hasDec = false;
-
-        for ( ; pos<data.size(); pos++ ){
-            if ( isdigit(data[pos]) )
-                continue;
-
-            if ( data[pos] == '.' ){
-                if ( hasDec )
-                    return false;
-                hasDec = true;
-                continue;
-            }
-            
-            return false;
-        }
-
-        if ( hasDec ){
-            double d = atof( data.c_str() );
-            b.append( fieldName.c_str() , d );
-            return true;
-        }
-        
-        if ( data.size() < 8 ){
-            b.append( fieldName , atoi( data.c_str() ) );
-            return true;
-        }
-        
-        try {
-            long long num = boost::lexical_cast<long long>( data );
-            b.append( fieldName.c_str() , num );
-            return true;
-        }
-        catch(bad_lexical_cast &){
-            return false;
-        }
-    }
-
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
-        if ( _appendNumber( b , fieldName , data ) )
+        if ( b.appendAsNumber( fieldName , data ) )
             return;
         
         if ( _ignoreBlanks && data.size() == 0 )
