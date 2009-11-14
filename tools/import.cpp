@@ -75,7 +75,8 @@ class Import : public Tool {
         }
         
         try {
-            b.append( fieldName , boost::lexical_cast<long long>( data ) );
+            long long num = boost::lexical_cast<long long>( data );
+            b.append( fieldName.c_str() , num );
             return true;
         }
         catch(bad_lexical_cast &){
