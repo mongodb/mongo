@@ -1174,7 +1174,7 @@ namespace JsobjTests {
             a.append( "d" , -1.1 );
             ASSERT( b.appendAsNumber( "d" , "-1.1" ) );
 
-            a.append( "e" , (long long)32131231231232313 );
+            a.append( "e" , (long long)32131231231232313LL );
             ASSERT( b.appendAsNumber( "e" , "32131231231232313" ) );
             
             ASSERT( ! b.appendAsNumber( "f" , "zz" ) );
