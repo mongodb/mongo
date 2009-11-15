@@ -594,10 +594,11 @@ int main(int argc, char* argv[], char *envp[] )
     }
 
     positional_options.add("command", 3);
-    visible_options.add(general_options).add(replication_options);
+    visible_options.add(general_options);
+    visible_options.add(replication_options);
     visible_options.add(sharding_options);
-    cmdline_options.add(general_options).add(replication_options);
-	cmdline_options.add(hidden_options).add(visible_options);
+    cmdline_options.add(visible_options);
+    cmdline_options.add(hidden_options);
 
     setupSignals();
 
