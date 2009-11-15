@@ -39,7 +39,7 @@ namespace mongo {
                 test();
             }
             ~Alphabet(){
-                delete( decode );
+                free( decode );
             }
 
             void test(){
