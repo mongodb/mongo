@@ -178,7 +178,7 @@ string RecCache::findStoreFilename(const char *_ns, bool& found) {
     try {
         directory_iterator i(dir);
         while ( i != end ) {
-            string s = i->leaf();
+            string s = path(*i).leaf();
             const char *p = strstr(s.c_str(), namefrag.c_str());
             if( p ) {
                 found = true;

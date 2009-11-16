@@ -628,7 +628,7 @@ namespace mongo {
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = i->leaf();
+            string fileName = boost::filesystem::path(*i).leaf();
             if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
                 names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
         }

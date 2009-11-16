@@ -357,7 +357,7 @@ namespace mongo {
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = i->leaf();
+            string fileName = boost::filesystem::path(*i).leaf();
             if ( boost::filesystem::is_directory( *i ) &&
                     fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
                 boost::filesystem::remove_all( *i );
