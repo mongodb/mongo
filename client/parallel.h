@@ -25,6 +25,10 @@
 
 namespace mongo {
 
+    /**
+     * this is a cursor that works over a set of servers
+     * can be used in serial/paralellel as controlled by sub classes
+     */
     class ClusteredCursor {
     public:
         ClusteredCursor( QueryMessage& q );
@@ -50,6 +54,9 @@ namespace mongo {
     };
 
 
+    /**
+     * holder for a server address and a query to run
+     */
     class ServerAndQuery {
     public:
         ServerAndQuery( const string& server , BSONObj extra = BSONObj() , BSONObj orderObject = BSONObj() ) : 
@@ -72,6 +79,11 @@ namespace mongo {
         BSONObj _orderObject;
     };
 
+
+    /**
+     * runs a query in serial across any number of servers
+     * returns all results from 1 server, then the next, etc...
+     */
     class SerialServerClusteredCursor : public ClusteredCursor {
     public:
         SerialServerClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , int sortOrder=0);
@@ -83,7 +95,12 @@ namespace mongo {
         
         auto_ptr<DBClientCursor> _current;
     };
-        
+
+
+    /**
+     * runs a query in parellel across N servers
+     * sots
+     */        
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
         ParallelSortClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey );
@@ -105,7 +122,11 @@ namespace mongo {
         BSONObj * _nexts;
     };
 
-
+    /**
+     * tools for doing asynchronous operations
+     * right now uses underlying sync network ops and uses another thread
+     * should be changed to use non-blocking io
+     */
     class Future {
     public:
         class CommandResult {
