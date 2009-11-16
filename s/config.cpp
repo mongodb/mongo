@@ -296,7 +296,7 @@ namespace mongo {
             conn.done();
             return true;
         }
-        catch ( DBException& e ){
+        catch ( DBException& ){
             log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
             return false;
         }

@@ -38,7 +38,7 @@
 namespace mongo {
 
     class BSONObj;
-    class BSONArray; // empty subclass of BSONObj useful for overloading
+    struct BSONArray; // empty subclass of BSONObj useful for overloading
     class BSONElement;
     class Record;
     class BSONObjBuilder;

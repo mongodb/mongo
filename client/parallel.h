@@ -19,7 +19,7 @@
    tools for wokring in parallel/sharded/clustered environment
  */
 
-#include "stdafx.h"
+#include "../stdafx.h"
 #include "dbclient.h"
 #include "../db/dbmessage.h"
 

@@ -437,6 +437,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\debug_util.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\jsobj.cpp"
 					>
 				</File>
@@ -530,6 +534,10 @@
 				</File>
 				<File
 					RelativePath="..\db\nonce.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\client\parallel.cpp"
 					>
 				</File>
 				<File
