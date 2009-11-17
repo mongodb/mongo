@@ -165,5 +165,5 @@ namespace mongo {
 		problem() << "caught boost exception: " << e.what() << endl; \
 		assert( false ); \
 	} catch ( ... ) { \
-		assert( false ); \
+		massert( "unknown boost failed" , false );   \
 	}
