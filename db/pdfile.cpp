@@ -1491,6 +1491,12 @@ namespace mongo {
             try {
                 buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
+                // save our error msg string as an exception on deleteIndexes will overwrite our message
+                LastError *le = lastError.get();
+                assert( le );
+                string saveerrmsg = le->msg;
+                assert( !saveerrmsg.empty() );
+
                 // roll back this index
                 string name = idx.indexName();
                 BSONObjBuilder b;
@@ -1499,6 +1505,7 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
+                raiseError(saveerrmsg.c_str());
                 throw;
             }
         }

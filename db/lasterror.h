@@ -59,8 +59,6 @@ namespace mongo {
         }
         void appendSelf( BSONObjBuilder &b );
         static LastError noError;
-
-        
     };
 
     extern class LastErrorHolder {
@@ -115,4 +113,5 @@ namespace mongo {
         if ( le )
             le->recordDelete( nDeleted );        
     }
+
 } // namespace mongo
