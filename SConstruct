@@ -328,6 +328,10 @@ shardServerFiles += [ "client/quorum.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
+for x in os.listdir( "db/modules/" ):
+    if x.find( "." ) >= 0:
+        continue
+    serverOnlyFiles += Glob( "db/modules/" + x + "/*.cpp" )
 
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" , "s/d_util.cpp" ];
 
