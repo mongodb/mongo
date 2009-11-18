@@ -1,49 +1,72 @@
 // mms.cpp
 
 #include "stdafx.h"
-#include "mms.h"
-#include "db.h"
-#include "instance.h"
-#include "../util/httpclient.h"
+#include "../db.h"
+#include "../instance.h"
+#include "../module.h"
+#include "../../util/httpclient.h"
+#include "../../util/background.h"
+
+namespace po = boost::program_options;
 
 namespace mongo {
-    
-    MMS::MMS() : 
-        baseurl( "http://mms.10gen.com/ping/" ) , secsToSleep(1) , token( "" ) , name( "" ) {
-    }
-    
-    MMS::~MMS(){
+
+    /** Mongo Monitoring Service
+        if enabled, this runs in the background ands pings mss
+     */
+    class MMS : public BackgroundJob , Module {
+    public:
+
+        MMS()
+            : Module( "mms" ) , _baseurl( "http://mms.10gen.com/ping/" ) , 
+              _secsToSleep(1) , _token( "" ) , _name( "" ) {
+            
+            add_options()
+                ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
+                ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
+                ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
+                ;
+        }    
         
-    }
-    
-    void MMS::run(){
+        ~MMS(){}
+
+        void config( program_options::variables_map& params ){
+            if ( params.count( "mms-token" ) ){
+                _token = params["mms-token"].as<string>();
+            }
+            if ( params.count( "mms-name" ) ){
+                _name = params["mms-name"].as<string>();
+            }
+            _secsToSleep = params["mms-interval"].as<int>();
+        }
         
-        if ( token.size() == 0  && name.size() == 0 ){
+        void run(){
+        if ( _token.size() == 0  && _name.size() == 0 ){
             log(1) << "mms not configured" << endl;
             return;
         }
 
-        if ( token.size() == 0 ){
+        if ( _token.size() == 0 ){
             log() << "no token for mms - not running" << endl;
             return;
         }
         
-        if ( name.size() == 0 ){
+        if ( _name.size() == 0 ){
             log() << "no name for mms - not running" << endl;
             return;
         }
 
-        log() << "mms monitor staring...  token:" << token << " name:" << name << " interval: " << secsToSleep << endl;
+        log() << "mms monitor staring...  token:" << _token << " name:" << _name << " interval: " << _secsToSleep << endl;
 
         unsigned long long lastTime = 0;
         unsigned long long lastLockTime = 0;
         
         while ( ! inShutdown() ){
-            sleepsecs( secsToSleep );
+            sleepsecs( _secsToSleep );
             
             stringstream url;
-            url << baseurl << token << "?";
-            url << "monitor_name=" << name << "&";
+            url << _baseurl << _token << "?";
+            url << "monitor_name=" << _name << "&";
             url << "version=" << versionString << "&";
             url << "git_hash=" << gitVersion() << "&";
 
@@ -98,8 +121,24 @@ namespace mongo {
                 log() << "mms get exception: " << e.what() << endl;
             }
         }
-    }
+        }
 
+        void init(){ go(); }
 
-    MMS mms;    
+        void shutdown(){
+            // TODO
+        }
+
+    private:
+        string _baseurl;
+        int _secsToSleep;
+        
+        string _token;
+        string _name;
+
+    } mms;
+
 }
+
+        
+

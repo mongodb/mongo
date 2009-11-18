@@ -37,10 +37,7 @@
 #endif
 
 #include "../scripting/engine.h"
-#include "mms.h"
-#ifdef _HAVESNMP
-#include "snmp.h"
-#endif
+#include "module.h"
 #include "cmdline.h"
 
 namespace mongo {
@@ -420,10 +417,7 @@ namespace mongo {
 
         _diaglog.init();
 
-        mms.go();
-#ifdef _HAVESNMP
-        snmpAgent.go();
-#endif
+        Module::initAll();
 
 #if 0
         {
@@ -558,12 +552,6 @@ int main(int argc, char* argv[], char *envp[] )
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
 #endif
-        ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
-        ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
-        ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
-#ifdef _HAVESNMP
-        ( "snmp-subagent" , "run snmp subagent" )
-#endif
         ;
 
     replication_options.add_options()
@@ -597,6 +585,7 @@ int main(int argc, char* argv[], char *envp[] )
     visible_options.add(general_options);
     visible_options.add(replication_options);
     visible_options.add(sharding_options);
+    Module::addOptions( visible_options );
     cmdline_options.add(visible_options);
     cmdline_options.add(hidden_options);
 
@@ -842,19 +831,8 @@ int main(int argc, char* argv[], char *envp[] )
         if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
             _diaglog.level = 1;
         }
-#ifdef _HAVESNMP
-        if ( params.count( "snmp-subagent" ) ){
-            snmpAgent.enable();
-        }
-#endif
 
-        if ( params.count( "mms-token" ) ){
-            mms.setToken( params["mms-token"].as<string>() );
-        }
-        if ( params.count( "mms-name" ) ){
-            mms.setName( params["mms-name"].as<string>() );
-        }
-        mms.setPingInterval( params["mms-interval"].as<int>() );
+        Module::configAll( params );
 
         if (params.count("command")) {
             vector<string> command = params["command"].as< vector<string> >();

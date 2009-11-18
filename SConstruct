@@ -327,6 +327,8 @@ shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_ad
 shardServerFiles += [ "client/quorum.cpp" ]
 serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 
+serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
+
 allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" , "s/d_util.cpp" ];
 
 allCXXFiles = allClientFiles + coreShardFiles + shardServerFiles + serverOnlyFiles;
@@ -748,8 +750,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                 gotAll = False
         if gotAll:
             myenv.Append( CPPDEFINES=[ "_HAVESNMP" ] )
-            global serverOnlyFiles
-            serverOnlyFiles += [ "db/snmp.cpp" ]
         else:
             for x in snmplibs:
                 removeIfInList( myenv["LIBS"] , x )
@@ -892,7 +892,7 @@ testEnv.Prepend( LIBPATH=["."] )
 
 
 # main db target
-mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" , "db/mms.cpp" ]  )
+mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ] )
 Default( mongod )
 
 # tools
