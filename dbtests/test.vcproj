@@ -1543,10 +1543,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\db\mms.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\db\namespace.cpp"
 					>
 				</File>

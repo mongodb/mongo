@@ -62,9 +62,8 @@ namespace mongo {
         static void configAll( program_options::variables_map& params );
         static void initAll();
 
-        static std::list<Module*> * ALL;
-
     private:
+        static std::list<Module*> _all;
         string _name;
         program_options::options_description _options;
     };

@@ -28,6 +28,7 @@ namespace mongo {
     struct LastError {
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
+        /* todo: nObjects should be 64 bit */
         int nObjects;
         int nPrev;
         bool valid;

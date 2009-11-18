@@ -1567,7 +1567,7 @@
 					>
 				</File>
 				<File
-					RelativePath=".\mms.cpp"
+					RelativePath=".\modules\mms.cpp"
 					>
 				</File>
 				<File
