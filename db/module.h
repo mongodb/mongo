@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "stdafx.h"
-
+#include "../stdafx.h"
 #include <boost/program_options.hpp>
 #include <list>
 

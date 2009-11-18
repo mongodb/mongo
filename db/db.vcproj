@@ -1571,6 +1571,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\module.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\mr.cpp"
 					>
 				</File>
