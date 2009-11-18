@@ -63,7 +63,7 @@ namespace mongo {
         static void initAll();
 
     private:
-        static std::list<Module*> _all;
+        static std::list<Module*> * _all;
         string _name;
         program_options::options_description _options;
     };
