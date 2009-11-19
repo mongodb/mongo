@@ -1263,6 +1263,7 @@ def installBinary( e , name ):
     global allBinaries
 
     if windows:
+        e.Alias( name , name + ".exe" )
         name += ".exe"
 
     inst = e.Install( installDir + "/bin" , name )
@@ -1321,6 +1322,13 @@ if distBuild or release:
 
 #final alias
 env.Alias( "install" , installDir )
+
+# aliases
+if windows:
+    env.Alias( "mongoclient" , "mongoclient.lib" )
+else:
+    env.Alias( "mongoclient" , "libmongoclient.a" )
+
 
 #  ---- CONVENIENCE ----
 

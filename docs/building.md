@@ -22,6 +22,13 @@ Scons
 
   Please note that prebuilt binaries are available on mongodb.org and may be the easier way to get started.
 
+scons targets
+-------------
+* mongod
+* mongos
+* mongo
+* mongoclient
+
 *general notes
 ---------------
   COMPILER VERSIONS
