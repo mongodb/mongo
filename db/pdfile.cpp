@@ -1091,6 +1091,7 @@ namespace mongo {
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
         unsigned long long nkeys = 0;
+        ProgressMeter pm( d->nrecords , 10 );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1108,10 +1109,11 @@ namespace mongo {
 
             c->advance();
             n++;
+            pm.hit();
         };
         sorter.sort();
-
-        log(1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << (double)t.millis() / 1000 << " secs" << endl;
+        
+        log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
         list<DiskLoc> dupsToDrop;
 
@@ -1120,6 +1122,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+            ProgressMeter pm2( nkeys , 10 );
             while( i->more() ) { 
                 BSONObjExternalSorter::Data d = i->next();
 
@@ -1142,6 +1145,7 @@ namespace mongo {
                     dupsToDrop.push_back(d.second);
                     uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
+                pm2.hit();
             }
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 
