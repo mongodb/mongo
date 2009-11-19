@@ -42,7 +42,8 @@ tags
 dump
 log
 logs
-docs
+docs/html
+docs/latex
 32bit
 scratch
 
