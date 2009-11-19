@@ -261,6 +261,7 @@ DB.prototype.help = function() {
     print("\tdb.printCollectionStats()" );
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
+    print("\tdb.printShardingStatus()");
     print("\tdb.removeUser(username)");
     print("\tdb.repairDatabase()");
     print("\tdb.resetError()");
@@ -619,4 +620,8 @@ DB.prototype.serverStatus = function(){
 
 DB.prototype.version = function(){
     return this.serverBuildInfo().version;
+}
+
+DB.prototype.printShardingStatus = function(){
+    printShardingStatus( this.getSisterDB( "config" ) );
 }

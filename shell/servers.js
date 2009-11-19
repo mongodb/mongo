@@ -204,6 +204,13 @@ ShardingTest.prototype.printShardingStatus = function(){
 }
 
 printShardingStatus = function( configDB ){
+    
+    var version = configDB.getCollection( "version" ).findOne();
+    if ( version == null ){
+        print( "not a shard db!" );
+        return;
+    }
+    
     var raw = "";
     var output = function(s){
         raw += s + "\n";
