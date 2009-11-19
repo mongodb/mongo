@@ -224,6 +224,9 @@ namespace mongo {
         Timer() {
             reset();
         }
+        int seconds(){
+            return (int)(micros() / 1000000);
+        }
         int millis() {
             return (long)(micros() / 1000);
         }
