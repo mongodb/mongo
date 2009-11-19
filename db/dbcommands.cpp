@@ -1202,6 +1202,17 @@ namespace mongo {
             }
 
             BSONElement reduce = p["$reduce"];
+            if ( reduce.eoo() ){
+                errmsg = "$reduce has to be set";
+                return false;
+            }
+
+            BSONElement initial = p["initial"];
+            if ( initial.type() != Object ){
+                errmsg = "initial has to be an object";
+                return false;
+            }
+
 
             string finalize;
             if (p["finalize"].type())
@@ -1209,7 +1220,7 @@ namespace mongo {
 
             return group( realdbname , cursor ,
                           key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
-                          p["initial"].embeddedObjectUserCheck() , finalize ,
+                          initial.embeddedObject() , finalize ,
                           errmsg , result );
         }
 
@@ -1327,7 +1338,7 @@ namespace mongo {
                     }
                     catch ( AssertionException& e ){
                         ok = false;
-                        errmsg = "assersion: ";
+                        errmsg = "assertion: ";
                         errmsg += e.what();
                     }
                     if ( ok && c->logTheOp() && !fromRepl )
