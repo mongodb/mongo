@@ -4,7 +4,8 @@ import os
 def insert( env , options ):
     
     if not foundxulrunner( env , options ):
-        env.Append( CPPDEFINES=[ "MOZJS" ] )
+        if os.path.exists( "usr/include/mozjs/" ):
+            env.Append( CPPDEFINES=[ "MOZJS" ] )
 
 
 def foundxulrunner( env , options ):
