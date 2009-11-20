@@ -98,8 +98,22 @@ namespace mongo {
             while ( d.moreJSObjs() ){
                 BSONObj o = d.nextJsObj();
                 if ( ! manager->hasShardKey( o ) ){
-                    log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
-                    throw UserException( "tried to insert object without shard key" );
+
+                    bool bad = true;
+
+                    if ( manager->getShardKey().partOfShardKey( "_id" ) ){
+                        BSONObjBuilder b;
+                        b.appendOID( "_id" , 0 , true );
+                        b.appendElements( o );
+                        o = b.obj();
+                        bad = ! manager->hasShardKey( o );
+                    }
+                    
+                    if ( bad ){
+                        log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
+                        throw UserException( "tried to insert object without shard key" );
+                    }
+                    
                 }
                 
                 Chunk& c = manager->findChunk( o );

@@ -106,7 +106,11 @@ namespace mongo {
         string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
-
+        
+        bool partOfShardKey(const string& key ) const {
+            return patternfields.count( key ) > 0;
+        }
+        
     private:
         // all BSONObj stored with both nested and dotted form
         BSONObj pattern;

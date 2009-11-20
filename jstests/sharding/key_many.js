@@ -61,7 +61,8 @@ for ( var i=0; i<types.length; i++ ){
     assert.eq( 1 , s.config.chunks.find( { ns : longName } ).count() , curT.name + " sanity check A" );
 
     var unsorted = Array.shuffle( Object.extend( [] , curT.values ) );
-    for ( var x=0; x<unsorted.length; x++ )
+    c.insert( makeObject( unsorted[0] ) );
+    for ( var x=1; x<unsorted.length; x++ )
         c.save( makeObject( unsorted[x] ) );
     
     assert.eq( 6 , c.find().count() , curT.name + " basic count" );

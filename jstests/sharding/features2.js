@@ -49,6 +49,21 @@ assert.eq( 3 , db.foo.count() , "D6" );
 db.foo.remove( {} );
 assert.eq( 0 , db.foo.count() , "D7" );
 
+// --- _id key ---
+
+db.foo2.save( { _id : new ObjectId() } );
+db.foo2.save( { _id : new ObjectId() } );
+db.foo2.save( { _id : new ObjectId() } );
+
+assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
+
+s.adminCommand( { shardcollection : "test.foo2" , key : { _id : 1 } } );
+
+assert.eq( 3 , db.foo2.count() , "F2" )
+db.foo2.insert( {} );
+assert.eq( 4 , db.foo2.count() , "F3" )
+
+
 // --- map/reduce
 
 db.mr.save( { x : 1 , tags : [ "a" , "b" ] } );
