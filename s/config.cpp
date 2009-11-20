@@ -216,8 +216,8 @@ namespace mongo {
                         log() << "\t put [" << database << "] on: " << cc->_primary << endl;
                     }
                     else {
-                        log() << "\t can't find a server" << endl;
-                        cc = 0;
+                        log() << "\t can't find a shard to put new db on" << endl;
+                        uassert( "can't find a shard to put new db on" , 0 );
                     }
                 }
                 else {
