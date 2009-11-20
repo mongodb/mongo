@@ -843,7 +843,7 @@ def jsToH(target, source, env):
 
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()
-        l = l.partition( "//" )[0]
+        l = l.split( "//" )[0]
         l = l.replace( '\\' , "\\\\" )
         l = l.replace( '"' , "\\\"" )
 
