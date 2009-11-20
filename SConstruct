@@ -1200,8 +1200,15 @@ def getSystemInstallName():
         n += "-static"
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
-    return n
 
+    try:
+        import settings
+        if "distmod" in dir( settings ):
+            n = n + "-" + str( settings.distmod )
+    except:
+        pass
+
+    return n
 
 def getCodeVersion():
     fullSource = open( "stdafx.cpp" , "r" ).read()
