@@ -138,7 +138,7 @@ DBCollection.prototype.findOne = function( query , fields ){
 
 DBCollection.prototype.insert = function( obj , _allow_dot ){
     if ( ! obj )
-        throw "no object!";
+        throw "no object passed to insert!";
     if ( ! _allow_dot ) {
         this._validateForStorage( obj );
     }
