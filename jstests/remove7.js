@@ -24,8 +24,12 @@ t.ensureIndex( { tags : 1 } );
 for ( i=0; i<200; i++ ){
     for ( var j=0; j<10; j++ )
         t.save( { tags : getTags( 100 ) } );
-    t.remove( { tags : { $in : getTags( 10 ) } } );
+    var q = { tags : { $in : getTags( 10 ) } };
+    var before = t.find( q ).count();
+    t.remove( q );
     var o = db.getLastErrorObj();
+    var after = t.find( q ).count();
+    assert.eq( 0 , after , "not zero after!" );
     assert.isnull( o.err , "error: " + tojson( o ) );
 }
     

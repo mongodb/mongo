@@ -187,12 +187,8 @@ namespace mongo {
         /* TODO: Switch to keep indexdetails and do idx.head! */
         bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
-        if ( found )
+        if ( ! bucket.isNull() )
             skipUnusedKeys();
-        else {
-            RARELY log() << "  can't find key, probably empty" << endl;
-            bucket = DiskLoc(); 
-        }
 
     }
 
