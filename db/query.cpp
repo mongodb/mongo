@@ -136,37 +136,38 @@ namespace mongo {
 
         do {
             DiskLoc rloc = c->currLoc();
+            BSONObj key = c->currKey();
             
-            if ( !matcher.matches(c->currKey(), rloc ) ) {
-                c->advance(); // advance must be after noMoreMatches() because it uses currKey()
-            }
-            else {
-                c->advance(); // must advance before deleting as the next ptr will die
-                assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-                if ( !justOne ) {
-                    /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
-                             blocks.  here we might call millions of times which would be bad.
-                    */
-                    c->noteLocation();
-                }
+            c->advance();
+            
+            if ( ! matcher.matches( key , rloc ) )
+                continue;
 
-                if ( logop ) {
-                    BSONElement e;
-                    if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
-                        BSONObjBuilder b;
-                        b.append( e );
-                        bool replJustOne = true;
-                        logOp( "d", ns, b.done(), 0, &replJustOne );
-                    } else {
-                        problem() << "deleted object without id, not logging" << endl;
-                    }
-                }
-                theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
-                nDeleted++;
-                if ( justOne )
-                    break;
-                c->checkLocation();
+            assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+
+            if ( !justOne ) {
+                /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
+                   blocks.  here we might call millions of times which would be bad.
+                */
+                c->noteLocation();
             }
+            
+            if ( logop ) {
+                BSONElement e;
+                if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                    BSONObjBuilder b;
+                    b.append( e );
+                    bool replJustOne = true;
+                    logOp( "d", ns, b.done(), 0, &replJustOne );
+                } else {
+                    problem() << "deleted object without id, not logging" << endl;
+                }
+            }
+            theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+            nDeleted++;
+            if ( justOne )
+                break;
+            c->checkLocation();
         } while ( c->ok() );
 
         return nDeleted;
