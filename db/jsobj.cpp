@@ -1435,8 +1435,9 @@ namespace mongo {
         data[3] = T[0];
 
         (unsigned&) data[4] = machine;
-        ++inc;
-        T = (char *) &inc;
+        // TODO: use compiler intrinsic atomic increment instead of inc++
+        int old_inc = inc++;
+        T = (char *) &old_inc;
         char * raw = (char*)&b;
         raw[0] = T[3];
         raw[1] = T[2];
