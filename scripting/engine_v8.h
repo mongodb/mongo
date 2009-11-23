@@ -73,6 +73,8 @@ namespace mongo {
         void _startCall();
         
         static Handle< Value > nativeCallback( const Arguments &args );
+
+        static Handle< Value > loadCallback( const Arguments &args );
         
         V8ScriptEngine * _engine;
 
