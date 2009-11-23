@@ -189,6 +189,11 @@ namespace mongo {
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( found )
             skipUnusedKeys();
+        else {
+            RARELY log() << "  can't find key, probably empty" << endl;
+            bucket = DiskLoc(); 
+        }
+
     }
 
     /* ----------------------------------------------------------------------------- */
