@@ -2,9 +2,11 @@
 t = db.remove6;
 t.drop();
 
+N = 1000;
+
 function pop(){
     t.drop();
-    for ( var i=0; i<1000; i++ ){
+    for ( var i=0; i<N; i++ ){
         t.save( { x : 1 , tags : [ "a" , "b" , "c" ] } );
     }
 }
@@ -15,7 +17,7 @@ function del(){
 
 function test( n , idx ){
     pop();
-    assert.eq( 1000 , t.count() , n + " A " + idx );
+    assert.eq( N , t.count() , n + " A " + idx );
     if ( idx )
         t.ensureIndex( idx );
     del();
@@ -27,3 +29,10 @@ function test( n , idx ){
 test( "a" );
 test( "b" , { x : 1 } );
 test( "c" , { tags : 1 } );
+
+N = 5000
+
+test( "a2" );
+test( "b2" , { x : 1 } );
+test( "c2" , { tags : 1 } );
+
