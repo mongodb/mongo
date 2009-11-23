@@ -179,12 +179,15 @@ namespace mongo {
                 return BSONObj();
 
             if ( JS_InstanceOf( _context , o , &bson_ro_class , 0 ) ){
-                return GETHOLDER( _context , o )->_obj.getOwned();
+                BSONHolder * holder = GETHOLDER( _context , o );
+                assert( holder );
+                return holder->_obj.getOwned();
             }
 
             BSONObj orig;
             if ( JS_InstanceOf( _context , o , &bson_class , 0 ) ){
                 BSONHolder * holder = GETHOLDER(_context,o);
+                assert( holder );
                 if ( ! holder->_modified ){
                     return holder->_obj;
                 }
@@ -650,15 +653,26 @@ namespace mongo {
 
     JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ){
 
+        BSONHolder * o = GETHOLDER( cx , obj );
+        
         if ( enum_op == JSENUMERATE_INIT ){
-            BSONFieldIterator * it = GETHOLDER( cx , obj )->it();
-            *statep = PRIVATE_TO_JSVAL( it );
+            if ( o ){
+                BSONFieldIterator * it = o->it();
+                *statep = PRIVATE_TO_JSVAL( it );
+            }
+            else {
+                *statep = 0;                
+            }
             if ( idp )
                 *idp = JSVAL_ZERO;
             return JS_TRUE;
         }
 
         BSONFieldIterator * it = (BSONFieldIterator*)JSVAL_TO_PRIVATE( *statep );
+        if ( ! it ){
+            *statep = 0;
+            return JS_TRUE;
+        }
 
         if ( enum_op == JSENUMERATE_NEXT ){
             if ( it->more() ){
@@ -685,6 +699,10 @@ namespace mongo {
 
     JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
         BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( ! holder ){
+            // in init code still
+            return JS_TRUE;
+        }
         if ( holder->_inResolve )
             return JS_TRUE;
         JS_ReportError( cx , "doing write op on read only operation" );
@@ -697,9 +715,35 @@ namespace mongo {
         (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
+
+    JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        BSONHolder * o = GETHOLDER( cx , obj );
+        double size = 0;
+        if ( o ){
+            size = o->_obj.objsize();
+        }
+        Convertor c(cx);
+        *rval = c.toval( size );
+        return JS_TRUE;
+    }
+    
+    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
+        cerr << "bson_cons : shouldn't be here!" << endl;
+        JS_ReportError( cx , "can't construct bson object" );
+        return JS_FALSE;
+    }
+
+    JSFunctionSpec bson_functions[] = {
+        { "bsonsize" , bson_get_size , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } , 
+        { 0 }
+    };
     
     JSBool bson_add_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
         BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( ! holder ){
+            // static init
+            return JS_TRUE;
+        }
         if ( ! holder->_inResolve ){
             Convertor c(cx);
             string name = c.toString( idval );
@@ -810,13 +854,18 @@ namespace mongo {
         Convertor c( cx );
 
         BSONHolder * holder = GETHOLDER( cx , obj );
-        assert( holder );
+        if ( ! holder ){
+            // static init
+            *objp = 0;
+            JS_LeaveLocalRootScope( cx );
+            return JS_TRUE;
+        }
         holder->check();
         
         string s = c.toString( id );
 
         BSONElement e = holder->_obj[ s.c_str() ];
-
+        
         if ( e.type() == EOO || holder->_removed.count( s ) ){
             *objp = 0;
             JS_LeaveLocalRootScope( cx );

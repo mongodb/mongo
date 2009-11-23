@@ -723,6 +723,9 @@ namespace mongo {
 
         assert( JS_InitClass( cx , global , 0 , &map_class , map_constructor , 0 , 0 , map_functions , 0 , 0 ) );
         
+        assert( JS_InitClass( cx , global , 0 , &bson_ro_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &bson_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
+        
         scope->exec( jsconcatcode );
     }
 
