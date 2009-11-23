@@ -293,7 +293,7 @@ namespace mongo {
             return;
         }
 
-        cout << "don't know how to covert to mongo field [" << name << "]\t" << value << endl;
+        cout << "don't know how to convert to mongo field [" << name << "]\t" << value << endl;
     }
 
     BSONObj v8ToMongo( v8::Handle<v8::Object> o ){

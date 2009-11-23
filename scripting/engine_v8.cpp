@@ -60,6 +60,9 @@ namespace mongo {
         _global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print)->GetFunction() );
         _global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version)->GetFunction() );
 
+        _global->Set(v8::String::New("load")
+                    ,v8::FunctionTemplate::New(loadCallback, v8::External::New(this))->GetFunction() );
+
         //_externalTemplate = getMongoFunctionTemplate( false );
         //_localTemplate = getMongoFunctionTemplate( true );
 
@@ -90,6 +93,22 @@ namespace mongo {
             return v8::ThrowException(v8::String::New("unknown exception"));            
         }
         return mongoToV8Element( ret.firstElement() );
+    }
+
+    Handle< Value > V8Scope::loadCallback( const Arguments &args ) {
+        HandleScope scope;
+        Handle<External> field = Handle<External>::Cast(args.Data());
+        void* ptr = field->Value();
+        V8Scope* self = static_cast<V8Scope*>(ptr);
+
+        Context::Scope context_scope(self->_context);
+        for (int i = 0; i < args.Length(); ++i) {
+            std::string filename(toSTLString(args[i]));
+            if (!self->execFile(filename, false , true , false)) {
+                return v8::ThrowException(v8::String::New((std::string("error loading file: ") + filename).c_str()));
+            }
+        }
+        return v8::True();
     }
 
     // ---- global stuff ----
