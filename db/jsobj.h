@@ -109,6 +109,8 @@ namespace mongo {
         is likely to be unique to the system.  You may also use other types for _id's.
         When _id field is missing from a BSON object, on an insert the database may insert one 
         automatically in certain circumstances.
+
+        Warning: You must call OID::newState() after a fork().
     */
     class OID {
         union {
@@ -118,7 +120,11 @@ namespace mongo {
             };
             unsigned char data[12];
         };
+        static unsigned _machine;
     public:
+        /** call this after a fork */
+        static void newState();
+
 		/** initialize to 'null' */
 		void clear() { a = 0; b = 0; }
 

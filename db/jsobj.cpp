@@ -1423,10 +1423,14 @@ namespace mongo {
     }
 */
 
+    unsigned OID::_machine = (unsigned) security.getNonce();
+    void OID::newState(){
+        // using fresh Security object to avoid buffered devrandom
+        _machine = (unsigned) Security().getNonce();
+    }
+    
     void OID::init() {
-        static unsigned machine = (unsigned) security.getNonce();
         static unsigned inc = (unsigned) security.getNonce();
-
         unsigned t = (unsigned) time(0);
         char *T = (char *) &t;
         data[0] = T[3];
@@ -1434,7 +1438,8 @@ namespace mongo {
         data[2] = T[1];
         data[3] = T[0];
 
-        (unsigned&) data[4] = machine;
+        (unsigned&) data[4] = _machine;
+
         // TODO: use compiler intrinsic atomic increment instead of inc++
         int old_inc = inc++;
         T = (char *) &old_inc;
