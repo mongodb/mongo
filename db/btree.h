@@ -196,6 +196,9 @@ namespace mongo {
 
         /* locate may return an "unused" key that is just a marker.  so be careful.
              looks for a key:recordloc pair.
+
+           found - returns true if exact match found.  note you can get back a position 
+                   result even if found is false.
         */
         DiskLoc locate(const IndexDetails& , const DiskLoc& thisLoc, const BSONObj& key, const BSONObj &order, 
                        int& pos, bool& found, DiskLoc recordLoc, int direction=1);
