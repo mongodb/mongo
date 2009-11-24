@@ -578,7 +578,7 @@ if nix:
         env.Append( LINKFLAGS="-m32" )
 
     if GetOption( "profile" ) is not None:
-        env.Append( LINKFLAGS=" -pg " )
+        env.Append( LIBS=[ "profiler" ] )
 
     # pre-compiled headers
     if False and 'Gch' in dir( env ):
