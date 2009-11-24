@@ -63,6 +63,8 @@ namespace mongo {
         global->Set(v8::String::New("DBQuery") , dbQuery );
 
         global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit ) );
+
+        global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit ) );
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -80,6 +82,8 @@ namespace mongo {
         global->Set(v8::String::New("DBQuery") , dbQuery->GetFunction() );
 
         global->Set( v8::String::New("ObjectId") , FunctionTemplate::New( objectIdInit )->GetFunction() );
+
+        global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit )->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
@@ -420,6 +424,26 @@ namespace mongo {
    
         return it;
     }
+
+    v8::Handle<v8::Value> dbRefInit( const v8::Arguments& args ) {
+
+        if (args.Length() != 2) {
+            return v8::ThrowException( v8::String::New( "DBRef needs 2 arguments" ) );
+        }
+
+        v8::Handle<v8::Object> it = args.This();
+
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ){
+            v8::Function* f = getNamedCons( "DBRef" );
+            it = f->NewInstance();
+        }
+
+        it->Set( v8::String::New( "$ref" ) , args[0] );
+        it->Set( v8::String::New( "$id" ) , args[1] );
+
+        return it;
+    }
+
 
 
 }

@@ -30,14 +30,28 @@ namespace mongo {
 #define DDD(x)
 
     Local<v8::Object> mongoToV8( const BSONObj& m , bool array ){
+
+        // handle DBRef. needs to come first. isn't it? (metagoto)
+        static string ref = "$ref";
+        if ( ref == m.firstElement().fieldName() ) {
+            const BSONElement& id = m["$id"];
+            if (!id.eoo()) { // there's no check on $id exitence in sm implementation. risky ?
+                v8::Function* dbRef = getNamedCons( "DBRef" );
+                v8::Handle<v8::Value> argv[2];
+                argv[0] = mongoToV8Element(m.firstElement());
+                argv[1] = mongoToV8Element(m["$id"]);
+                return dbRef->NewInstance(2, argv);
+            }
+        }
+
         Local<v8::Object> o;
         if ( array )
             o = v8::Array::New();
         else 
             o = v8::Object::New();
-    
+
         mongo::BSONObj sub;
-    
+
         for ( BSONObjIterator i(m); i.more(); ) {
             const BSONElement& f = i.next();
         

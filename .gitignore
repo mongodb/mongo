@@ -92,3 +92,11 @@ debian/mongodb.*
 
 #osx
 .DS_Store
+
+# QtCreator
+*.config
+*.creator
+*.creator.user
+*.files
+*.includes
+

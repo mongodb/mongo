@@ -55,7 +55,7 @@ namespace mongo {
         
         stringstream ss;
         
-        //while ( try_catch ){
+        //while ( try_catch ){ // disabled for v8 bleeding edge
             
             v8::String::Utf8Value exception(try_catch->Exception());
             Handle<v8::Message> message = try_catch->Message();
@@ -124,7 +124,7 @@ namespace mongo {
             cout << endl;
         }    
 
-        //if ( try_catch->next_ )
+        //if ( try_catch->next_ ) // disabled for v8 bleeding edge
         //    s << try_catch->next_;
 
         return s;
