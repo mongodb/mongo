@@ -362,6 +362,7 @@ again:
             out() << "  old:" << (unsigned)old << endl;
             out() << "  response msgid:" << (unsigned)response.data->id << endl;
             out() << "  response len:  " << (unsigned)response.data->len << endl;
+            out() << "  farEnd: " << farEnd << endl;
             assert(false);
             response.reset();
         }
