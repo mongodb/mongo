@@ -124,11 +124,15 @@ namespace mongo {
 #endif
         }
 
-        string toString() {
+        string toString() const{
             stringstream out;
             out << inet_ntoa(sa.sin_addr) << ':'
-            << sa.sin_port;
+                << ntohs(sa.sin_port);
             return out.str();
+        }
+
+        operator string() const{
+            return toString();
         }
 
         unsigned getPort() {
