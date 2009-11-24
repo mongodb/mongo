@@ -46,6 +46,15 @@ Mongo.prototype.getDBNames = function(){
     );
 }
 
+Mongo.prototype.getCollection = function(ns){
+    var idx = ns.indexOf( "." );
+    if ( idx < 0 ) 
+        throw "need . in ns";
+    var db = ns.substring( 0 , idx );
+    var c = ns.substring( idx + 1 );
+    return this.getDB( db ).getCollection( c );
+}
+
 Mongo.prototype.toString = function(){
     return "mongo connection to " + this.host;
 }

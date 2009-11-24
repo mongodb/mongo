@@ -235,7 +235,6 @@ namespace mongo {
             else 
                 result.appendTimestamp( "mine" , 0 );
             
-            result.append( "ok" , 1 );
             return true;
         }
         
