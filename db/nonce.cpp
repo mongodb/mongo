@@ -22,7 +22,16 @@ extern int do_md5_test(void);
 
 namespace mongo {
     
-    Security::Security(){
+	Security::Security() {
+		static int n;
+		massert("Security is a singleton class", ++n == 1);
+		init(); 
+	}
+
+    void Security::init(){
+		if( _initialized ) return;
+		_initialized = true;
+
 #if defined(__linux__)
         devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
         massert( "can't open dev/urandom", devrandom->is_open() );
@@ -30,6 +39,7 @@ namespace mongo {
         srand(curTimeMicros());
 #else
         srandomdev();
+		cout << "TEMP random() returns " << hex << random() << endl;
 #endif
         assert( sizeof(nonce) == 8 );
         
@@ -40,6 +50,11 @@ namespace mongo {
     }
     
     nonce Security::getNonce(){
+
+		/* question/todo: /dev/random works on OS X.  is it better 
+		   to use that than random() / srandom()?
+		*/
+
         nonce n;
 #if defined(__linux__)
         devrandom->read((char*)&n, sizeof(n));
@@ -52,6 +67,7 @@ namespace mongo {
         return n;
     }
     
+	bool Security::_initialized;
     Security security;
         
 } // namespace mongo

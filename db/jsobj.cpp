@@ -1423,7 +1423,7 @@ namespace mongo {
     }
 */
 
-    unsigned OID::_machine = (unsigned) security.getNonce();
+    unsigned OID::_machine = (unsigned) security.getNonceInitSafe();
     void OID::newState(){
         // using fresh Security object to avoid buffered devrandom
         _machine = (unsigned) Security().getNonce();
