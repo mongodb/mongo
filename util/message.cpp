@@ -22,6 +22,7 @@
 #include "message.h"
 #include <time.h>
 #include "../util/goodies.h"
+#include "../util/background.h"
 #include <fcntl.h>
 #include <errno.h>
 
@@ -186,12 +187,6 @@ namespace mongo {
         shutdown();
         ports.erase(this);
     }
-
-} // namespace mongo
-
-#include "../util/background.h"
-
-namespace mongo {
 
     class ConnectBG : public BackgroundJob {
     public:
