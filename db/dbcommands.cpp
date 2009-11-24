@@ -1169,8 +1169,8 @@ namespace mongo {
                 q = p["cond"].embeddedObject();
             else if ( p["condition"].type() == Object )
                 q = p["condition"].embeddedObject();
-            else if ( p["q"].type() == Object )
-                q = p["q"].embeddedObject();
+            else 
+                q = getQuery( p );
 
             string ns = dbname;
             ns = ns.substr( 0 , ns.size() - 4 );
@@ -1248,7 +1248,7 @@ namespace mongo {
 
             long long size = 0;
 
-            auto_ptr<DBClientCursor> cursor = db.query( ns , BSONObj() , 0 , 0 , &keyPattern );
+            auto_ptr<DBClientCursor> cursor = db.query( ns , getQuery( cmdObj ) , 0 , 0 , &keyPattern );
             while ( cursor->more() ){
                 BSONObj o = cursor->next();
                 BSONObj value = o.extractFields( keyPattern );

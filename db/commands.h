@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include "stdafx.h"
+#include "jsobj.h"
+
 namespace mongo {
 
     class BSONObj;
@@ -74,6 +77,15 @@ namespace mongo {
 
         Command(const char *_name);
         virtual ~Command() {}
+
+    protected:
+        BSONObj getQuery( const BSONObj& cmdObj ){
+            if ( cmdObj["query"].type() == Object )
+                return cmdObj["query"].embeddedObject();
+            if ( cmdObj["q"].type() == Object )
+                return cmdObj["q"].embeddedObject();
+            return BSONObj();
+        }
     };
 
     bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
