@@ -855,7 +855,7 @@ namespace mongo {
         NamespaceDetails* d = nsdetails(ns);
         if ( d->capped && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
-            uassert( "can't remove from a capped collection" , 0 );
+            uassert( "can't remove from a capped collection E00051" , 0 );
             return;
         }
 

@@ -122,6 +122,11 @@ namespace mongo {
             }
         }
 
+        NamespaceDetails *d = nsdetails( ns );
+        if ( ! d )
+            return 0;
+        uassert( "can't remove from a capped collection E00052" , ! d->capped );
+
         int nDeleted = 0;
         QueryPlanSet s( ns, pattern, BSONObj() );
         int best = 0;
