@@ -88,6 +88,8 @@ namespace mongo {
         void setPrimary( string s ){
             _primary = s;
         }
+
+        bool reload();
         
         virtual void save( bool check=true);
 
@@ -98,9 +100,10 @@ namespace mongo {
         virtual const char * getNS(){ return "config.databases"; }
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(const BSONObj& from);
-        bool loadByName(const char *nm);
         
     protected:
+        
+        bool doload();
         
         /**
            @return true if there was sharding info to remove

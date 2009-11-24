@@ -46,6 +46,8 @@ namespace mongo {
 
     void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
+        if ( reload )
+            uassert( "db config reload failed!" , _config->reload() );
 
         if ( _config->isSharded( getns() ) ){
             _chunkManager = _config->getChunkManager( getns() , reload );

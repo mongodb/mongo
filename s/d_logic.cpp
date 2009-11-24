@@ -40,7 +40,7 @@ namespace mongo {
     
     typedef map<string,unsigned long long> NSVersions;
     
-    NSVersions myVersions;
+    NSVersions globalVersions;
     boost::thread_specific_ptr<NSVersions> clientShardVersions;
 
     string shardConfigServer;
@@ -116,6 +116,8 @@ namespace mongo {
         
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             
+            bool authoritative = cmdObj.getBoolField( "authoritative" );
+
             string configdb = cmdObj["configdb"].valuestrsafe();
             { // configdb checking
                 if ( configdb.size() == 0 ){
@@ -124,7 +126,7 @@ namespace mongo {
                 }
                 
                 if ( shardConfigServer.size() == 0 ){
-                    if ( ! cmdObj.getBoolField( "authoritative" ) ){
+                    if ( ! authoritative ){
                         result.appendBool( "need_authoritative" , true );
                         errmsg = "first setShardVersion";
                         return false;
@@ -163,8 +165,9 @@ namespace mongo {
             }
             
             unsigned long long version = getVersion( cmdObj["version"] , errmsg );
-            if ( ! version )
+            if ( errmsg.size() ){
                 return false;
+            }
 
             NSVersions * versions = clientShardVersions.get();
             
@@ -181,20 +184,44 @@ namespace mongo {
             }
 
             unsigned long long& oldVersion = (*versions)[ns];
+            unsigned long long& globalVersion = globalVersions[ns];
+            
+            if ( version == 0 && globalVersion == 0 ){
+                // this connection is cleaning itself
+                oldVersion = 0;
+                return 1;
+            }
+
+            if ( version == 0 && globalVersion > 0 ){
+                if ( ! authoritative ){
+                    result.appendBool( "need_authoritative" , true );
+                    result.appendTimestamp( "globalVersion" , globalVersion );
+                    result.appendTimestamp( "oldVersion" , oldVersion );
+                    errmsg = "dropping needs to be authoritative";
+                    return 0;
+                }
+                log() << "wiping data for: " << ns << endl;
+                result.appendTimestamp( "beforeDrop" , globalVersion );
+                // only setting global version on purpose
+                // need clients to re-find meta-data
+                globalVersion = 0;
+                oldVersion = 0;
+                return 1;
+            }
+
             if ( version < oldVersion ){
                 errmsg = "you already have a newer version";
                 result.appendTimestamp( "oldVersion" , oldVersion );
                 result.appendTimestamp( "newVersion" , version );
                 return false;
             }
-
-            unsigned long long& myVersion = myVersions[ns];
-            if ( version < myVersion ){
+            
+            if ( version < globalVersion ){
                 errmsg = "going to older version for global";
                 return false;
             }
             
-            if ( myVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ){
+            if ( globalVersion == 0 && ! cmdObj.getBoolField( "authoritative" ) ){
                 // need authoritative for first look
                 result.appendBool( "need_authoritative" , true );
                 result.append( "ns" , ns );
@@ -204,7 +231,7 @@ namespace mongo {
 
             result.appendTimestamp( "oldVersion" , oldVersion );
             oldVersion = version;
-            myVersion = version;
+            globalVersion = version;
 
             result.append( "ok" , 1 );
             return 1;
@@ -229,7 +256,7 @@ namespace mongo {
             
             result.append( "configServer" , shardConfigServer.c_str() );
 
-            result.appendTimestamp( "global" , myVersions[ns] );
+            result.appendTimestamp( "global" , globalVersions[ns] );
             if ( clientShardVersions.get() )
                 result.appendTimestamp( "mine" , (*clientShardVersions.get())[ns] );
             else 
@@ -350,7 +377,7 @@ namespace mongo {
             }
             
             // now we're locked
-            myVersions[ns] = newVersion;
+            globalVersions[ns] = newVersion;
             NSVersions * versions = clientShardVersions.get();
             if ( ! versions ){
                 versions = new NSVersions();
@@ -397,7 +424,7 @@ namespace mongo {
             return false;
         
 
-        unsigned long long version = myVersions[ns];
+        unsigned long long version = globalVersions[ns];
         if ( version == 0 )
             return false;
         
@@ -416,11 +443,10 @@ namespace mongo {
         if ( shardConfigServer.empty() ){
             return true;
         }
-        
-        unsigned long long version = myVersions[ns];
-        if ( version == 0 ){
+
+        NSVersions::iterator i = globalVersions.find( ns );
+        if ( i == globalVersions.end() )
             return true;
-        }
         
         NSVersions * versions = clientShardVersions.get();
         if ( ! versions ){
@@ -431,19 +457,25 @@ namespace mongo {
         }
 
         unsigned long long clientVersion = (*versions)[ns];
+        unsigned long long version = i->second;
+                
+        if ( version == 0 && clientVersion > 0 ){
+            stringstream ss;
+            ss << "version: " << version << " clientVersion: " << clientVersion;
+            errmsg = ss.str();
+            return false;
+        }
+        
+        if ( clientVersion >= version )
+            return true;
+        
 
         if ( clientVersion == 0 ){
             errmsg = "client in sharded mode, but doesn't have version set for this collection";
             return false;
         }
-        
-        if ( clientVersion >= version ){
-            return true;
-        }
 
-        errmsg = "your version is too old.  ";
-        errmsg += " ns: " + ns;
-
+        errmsg = (string)"your version is too old  ns: " + ns;
         return false;
     }
 
@@ -456,8 +488,11 @@ namespace mongo {
         
         const char *ns = m.data->_data + 4;
         string errmsg;
-        if ( shardVersionOk( ns , errmsg ) )
+        if ( shardVersionOk( ns , errmsg ) ){
             return false;
+        }
+
+        log() << "shardVersionOk failed  ns:" << ns << " " << errmsg << endl;
         
         if ( doesOpGetAResponse( op ) ){
             BufBuilder b( 32768 );

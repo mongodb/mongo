@@ -152,24 +152,26 @@ namespace mongo {
         if ( ! conf )
             return;
         
-        if ( ! conf->isSharded( ns ) )
-            return;
-        
-        
-        ChunkManager * manager = conf->getChunkManager( ns , authoritative );
+        ShardChunkVersion version = 0;
+        unsigned long long officialSequenceNumber = 0;
+
+        if ( conf->isSharded( ns ) ){
+            ChunkManager * manager = conf->getChunkManager( ns , authoritative );
+            officialSequenceNumber = manager->getSequenceNumber();
+            version = manager->getVersion( conn.getServerAddress() );
+        }
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
-        if ( manager->getSequenceNumber() == sequenceNumber )
+        if ( officialSequenceNumber == sequenceNumber )
             return;
         
-        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << manager->getSequenceNumber() << endl;
-
-        ShardChunkVersion version = manager->getVersion( conn.getServerAddress() ); 
+        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber << endl;
 
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
             // success!
-            sequenceNumber = manager->getSequenceNumber();
+            log(1) << "      setShardVersion success!" << endl;
+            sequenceNumber = officialSequenceNumber;
             return;
         }
 

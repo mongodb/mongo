@@ -266,7 +266,7 @@ ShardingTest.prototype.sync = function(){
 }
 
 ShardingTest.prototype.onNumShards = function( collName , dbName ){
-    //this.sync(); // we should sync since we're going directly to mongod here
+    this.sync(); // we should sync since we're going directly to mongod here
     dbName = dbName || "test";
     var num=0;
     for ( var i=0; i<this._connections.length; i++ )
