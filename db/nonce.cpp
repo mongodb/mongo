@@ -39,7 +39,6 @@ namespace mongo {
         srand(curTimeMicros());
 #else
         srandomdev();
-		cout << "TEMP random() returns " << hex << random() << endl;
 #endif
         assert( sizeof(nonce) == 8 );
         
