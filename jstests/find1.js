@@ -25,6 +25,6 @@ assert( t.findOne( id ).a , "F" );
 assert( t.findOne( id ).b , "G" );
 
 assert( t.findOne( id , { a : 1 } ).a , "H" );
-assert( ! t.findOne( id , { a : 1 } ).b ), "I" ;
+assert( ! t.findOne( id , { a : 1 } ).b , "I" );
 
-assert(t.validate().valid);
+assert(t.validate().valid,"not valid");

@@ -778,7 +778,7 @@ namespace mongo {
                 bool found = Helpers::findById( ns , query , resObject );
                 if ( found ){
                     n = 1;
-                    bb.append( (void*)resObject.objdata() , resObject.objsize() );
+                    fillQueryResultFromObj( bb , filter.get() , resObject );
                 }
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
