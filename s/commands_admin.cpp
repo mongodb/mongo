@@ -256,6 +256,9 @@ namespace mongo {
                 if ( key.isEmpty() ){
                     errmsg = "no shard key";
                     return false;
+                } else if (key.nFields() > 1){
+                    errmsg = "compound shard keys not supported yet";
+                    return false;
                 }
 
                 if ( ns.find( ".system." ) != string::npos ){
