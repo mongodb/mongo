@@ -865,6 +865,7 @@ namespace QueryTests {
             add< DifferentNumbers >();
             add< SymbolStringSame >();
             add< TailableCappedRaceCondition >();
+            add< HelperTest >();
             add< HelperByIdTest >();
         }
     } myall;
