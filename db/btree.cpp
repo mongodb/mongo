@@ -862,6 +862,17 @@ found:
     void BtreeBucket::shape(stringstream& ss) {
         _shape(0, ss);
     }
+    
+    DiskLoc BtreeBucket::findSingle( const IndexDetails& indexdetails , const DiskLoc& thisLoc, const BSONObj& key ){
+        int pos;
+        bool found;
+        DiskLoc bucket = locate( indexdetails , indexdetails.head , key , BSONObj() , pos , found , minDiskLoc );
+        if ( bucket.isNull() )
+            return bucket;
+        KeyNode kn = bucket.btree()->keyNode( pos );
+        uassert( "why don't keys match" , key.woCompare( kn.key ) == 0 );
+        return kn.recordLoc;
+    }
 
 } // namespace mongo
 
