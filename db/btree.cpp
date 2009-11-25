@@ -869,8 +869,20 @@ found:
         DiskLoc bucket = locate( indexdetails , indexdetails.head , key , BSONObj() , pos , found , minDiskLoc );
         if ( bucket.isNull() )
             return bucket;
-        KeyNode kn = bucket.btree()->keyNode( pos );
-        uassert( "why don't keys match" , key.woCompare( kn.key ) == 0 );
+
+        BtreeBucket *b = bucket.btree();
+        while ( 1 ){
+            _KeyNode& knraw = b->k(pos);
+            if ( knraw.isUsed() )
+                break;
+            bucket = b->advance( bucket , pos , 1 , "findSingle" );
+            if ( bucket.isNull() )
+                return bucket;
+            b = bucket.btree();
+        }
+        KeyNode kn = b->keyNode( pos );
+        if ( key.woCompare( kn.key ) != 0 )
+            return DiskLoc();
         return kn.recordLoc;
     }
 

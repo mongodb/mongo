@@ -770,71 +770,92 @@ namespace mongo {
                 out() << query.toString() << endl;
                 uassert("bad query object", false);
             }
+            
+            if ( strcmp( query.firstElement().fieldName() , "_id" ) == 0 && query.nFields() == 1 && query.firstElement().isSimpleType() ){
+                nscanned = 1;
 
-            BSONObj oldPlan;
-            if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
-                QueryPlanSet qps( ns, query, order );
-                if ( qps.usingPrerecordedPlan() )
-                    oldPlan = qps.explain();
-            }
-            QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
-            DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
-            shared_ptr< DoQueryOp > o = qps.runOp( original );
-            DoQueryOp &dqo = *o;
-            massert( dqo.exceptionMessage(), dqo.complete() );
-            n = dqo.n();
-            nscanned = dqo.nscanned();
-            if ( dqo.scanAndOrderRequired() )
-                ss << " scanAndOrder ";
-            auto_ptr< Cursor > c = dqo.cursor();
-            log( 5 ) << "   used cursor: " << c.get() << endl;
-            if ( dqo.saveClientCursor() ) {
-                ClientCursor *cc = new ClientCursor();
-                if ( queryOptions & Option_NoCursorTimeout )
-                    cc->liveForever();
-                cc->c = c;
-                cursorid = cc->cursorid;
-                cc->query = jsobj.getOwned();
-                DEV out() << "  query has more, cursorid: " << cursorid << endl;
-                cc->matcher = dqo.matcher();
-                cc->ns = ns;
-                cc->pos = n;
-                cc->filter = filter;
-                cc->originalMessage = m;
-                cc->updateLocation();
-                if ( !cc->c->ok() && cc->c->tailable() ) {
-                    DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
-                } else {
-                    DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                BSONObj resObject;
+                bool found = Helpers::findById( ns , query , resObject );
+                if ( found ){
+                    n = 1;
+                    bb.append( (void*)resObject.objdata() , resObject.objsize() );
                 }
+                qr.reset( (QueryResult *) bb.buf() );
+                bb.decouple();
+                qr->resultFlags() = 0;
+                qr->len = bb.len();
+                ss << " reslen:" << bb.len();
+                qr->setOperation(opReply);
+                qr->cursorId = cursorid;
+                qr->startingFrom = 0;
+                qr->nReturned = n;            
             }
-            if ( explain ) {
-                BSONObjBuilder builder;
-                builder.append("cursor", c->toString());
-                builder.append("startKey", c->prettyStartKey());
-                builder.append("endKey", c->prettyEndKey());
-                builder.append("nscanned", double( dqo.nscanned() ) );
-                builder.append("n", n);
+            else { // non-simple _id lookup
+                BSONObj oldPlan;
+                if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
+                    QueryPlanSet qps( ns, query, order );
+                    if ( qps.usingPrerecordedPlan() )
+                        oldPlan = qps.explain();
+                }
+                QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
+                DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
+                shared_ptr< DoQueryOp > o = qps.runOp( original );
+                DoQueryOp &dqo = *o;
+                massert( dqo.exceptionMessage(), dqo.complete() );
+                n = dqo.n();
+                nscanned = dqo.nscanned();
                 if ( dqo.scanAndOrderRequired() )
-                    builder.append("scanAndOrder", true);
-                builder.append("millis", t.millis());
-                if ( !oldPlan.isEmpty() )
-                    builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
-                if ( hint.eoo() )
-                    builder.appendElements(qps.explain());
-                BSONObj obj = builder.done();
-                fillQueryResultFromObj(dqo.builder(), 0, obj);
-                n = 1;
+                    ss << " scanAndOrder ";
+                auto_ptr< Cursor > c = dqo.cursor();
+                log( 5 ) << "   used cursor: " << c.get() << endl;
+                if ( dqo.saveClientCursor() ) {
+                    ClientCursor *cc = new ClientCursor();
+                    if ( queryOptions & Option_NoCursorTimeout )
+                        cc->liveForever();
+                    cc->c = c;
+                    cursorid = cc->cursorid;
+                    cc->query = jsobj.getOwned();
+                    DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                    cc->matcher = dqo.matcher();
+                    cc->ns = ns;
+                    cc->pos = n;
+                    cc->filter = filter;
+                    cc->originalMessage = m;
+                    cc->updateLocation();
+                    if ( !cc->c->ok() && cc->c->tailable() ) {
+                        DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
+                    } else {
+                        DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                    }
+                }
+                if ( explain ) {
+                    BSONObjBuilder builder;
+                    builder.append("cursor", c->toString());
+                    builder.append("startKey", c->prettyStartKey());
+                    builder.append("endKey", c->prettyEndKey());
+                    builder.append("nscanned", double( dqo.nscanned() ) );
+                    builder.append("n", n);
+                    if ( dqo.scanAndOrderRequired() )
+                        builder.append("scanAndOrder", true);
+                    builder.append("millis", t.millis());
+                    if ( !oldPlan.isEmpty() )
+                        builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
+                    if ( hint.eoo() )
+                        builder.appendElements(qps.explain());
+                    BSONObj obj = builder.done();
+                    fillQueryResultFromObj(dqo.builder(), 0, obj);
+                    n = 1;
+                }
+                qr.reset( (QueryResult *) dqo.builder().buf() );
+                dqo.builder().decouple();
+                qr->cursorId = cursorid;
+                qr->resultFlags() = 0;
+                qr->len = dqo.builder().len();
+                ss << " reslen:" << qr->len;
+                qr->setOperation(opReply);
+                qr->startingFrom = 0;
+                qr->nReturned = n;
             }
-            qr.reset( (QueryResult *) dqo.builder().buf() );
-            dqo.builder().decouple();
-            qr->cursorId = cursorid;
-            qr->resultFlags() = 0;
-            qr->len = dqo.builder().len();
-            ss << " reslen:" << qr->len;
-            qr->setOperation(opReply);
-            qr->startingFrom = 0;
-            qr->nReturned = n;
         }
         
         int duration = t.millis();

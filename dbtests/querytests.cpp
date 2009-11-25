@@ -146,7 +146,7 @@ namespace QueryTests {
             return !client_.getPrevError().getField( "err" ).isNull();
         }
         DBDirectClient &client() const { return client_; }
-    private:
+
         static DBDirectClient client_;
     };
     DBDirectClient ClientBase::client_;
@@ -801,6 +801,30 @@ namespace QueryTests {
         }
     };
 
+    class HelperByIdTest : public CollectionBase {
+    public:
+        
+        HelperByIdTest() : CollectionBase( "helpertestbyid" ){
+        }
+
+        void run(){
+            for ( int i=0; i<1000; i++ ){
+                insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
+            }
+            for ( int i=0; i<1000; i+=2 ){
+                client_.remove( ns() , BSON( "_id" << i ) );
+            }
+
+            BSONObj res;            
+            for ( int i=0; i<1000; i++ ){
+                bool found = Helpers::findById( ns() , BSON( "_id" << i ) , res );
+                ASSERT_EQUALS( i % 2 , found );
+            }
+
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -841,7 +865,7 @@ namespace QueryTests {
             add< DifferentNumbers >();
             add< SymbolStringSame >();
             add< TailableCappedRaceCondition >();
-            add< HelperTest >();
+            add< HelperByIdTest >();
         }
     } myall;
     
