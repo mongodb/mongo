@@ -185,7 +185,6 @@ namespace mongo {
             if ( newVersion == 0 && oldVersion > 0 ){
                 newVersion = oldVersion;
                 newVersion++;
-                _manager->_maxMarkers[ from ] = newVersion;
                 _manager->save();
             }
             else if ( newVersion <= oldVersion ){
@@ -401,7 +400,6 @@ namespace mongo {
         while ( cursor->more() ){
             BSONObj d = cursor->next();
             if ( d["isMaxMarker"].trueValue() ){
-                _maxMarkers[ d["shard"].valuestrsafe() ] = d["maxMarker"].date();
                 continue;
             }
 
@@ -494,6 +492,7 @@ namespace mongo {
         
         log(1) << "ChunkManager::drop : " << _ns << endl;
 
+        // lock all shards so no one can do a split/migrate
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
             ShardChunkVersion& version = seen[ c->getShard() ];
@@ -506,35 +505,43 @@ namespace mongo {
             // rollback
             uassert( "don't know how to rollback locks b/c drop can't lock all shards" , 0 );
         }
-
-        log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
         
+        log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
+
+        // wipe my meta-data
         _chunks.clear();
 
+        
+        // delete data from mongod
         for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
             string shard = i->first;
             ScopedDbConnection conn( shard );
             conn->dropCollection( _ns );
-            _maxMarkers[shard] = i->second;
             conn.done();
         }
-
+        
         log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;        
 
+        // clean up database meta-data
+        uassert( "no sharding data?" , _config->removeSharding( _ns ) );
+        _config->save();
+        
+        
+        // remove chunk data
         Chunk temp(0);
-
         ScopedDbConnection conn( temp.modelServer() );
         conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
         conn.done();
-
-        log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;        
-
-        save();
-
-        log(1) << "ChunkManager::drop : " << _ns << "\t saved markers" << endl;        
+        log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
-        uassert( "no sharding data?" , _config->removeSharding( _ns ) );
-        _config->save();
+        for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+            ScopedDbConnection conn( i->first );
+            BSONObj res;
+            if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
+                throw UserException( (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
+            conn.done();
+        }
+
 
         log(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;        
     }
@@ -554,36 +561,6 @@ namespace mongo {
             withRealChunks.insert( c->getShard() );
         }
         
-        
-        if ( _maxMarkers.size() ){
-            Chunk temp(0);
-            
-            ScopedDbConnection conn( temp.modelServer() );
-            for ( map<string,unsigned long long>::iterator i=_maxMarkers.begin(); i !=_maxMarkers.end(); i++ ){
-                
-                BSONObjBuilder b;
-                b.append( "ns" , _ns );
-                b.append( "shard" , i->first );
-                b.appendTimestamp( "isMaxMarker" , true );
-                BSONObj q = b.obj();
-                
-                if ( withRealChunks.count( i->first ) ){
-                    // this shard went frmo >0, to 0, to >0 chunks, so lets clean up the old marker
-                    conn->remove( temp.getNS() , q );
-                    continue;
-                }
-
-
-                BSONObjBuilder n;
-                n.appendElements( q );
-                n.appendTimestamp( "maxMarker" , i->second );
-                
-                conn->update( temp.getNS() , q , n.obj() , true );
-            }
-            conn.done();
-        }
-        
-
         massert( "how did version get smalled" , getVersion() >= a );
 
         ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
@@ -603,10 +580,6 @@ namespace mongo {
                 max = c->_lastmod;
         }        
         
-        map<string,unsigned long long>::const_iterator i = _maxMarkers.find( server );
-        if ( i != _maxMarkers.end() && i->second > max )
-            max = i->second;
-
         return max;
     }
 

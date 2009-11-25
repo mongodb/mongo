@@ -256,6 +256,9 @@ namespace mongo {
                 if ( key.isEmpty() ){
                     errmsg = "no shard key";
                     return false;
+                } else if (key.nFields() > 1){
+                    errmsg = "compound shard keys not supported yet";
+                    return false;
                 }
 
                 if ( ns.find( ".system." ) != string::npos ){
@@ -293,6 +296,37 @@ namespace mongo {
             }
         } shardCollectionCmd;
 
+        class GetShardVersion : public GridAdminCmd {
+        public:
+            GetShardVersion() : GridAdminCmd( "getShardVersion" ){}
+            virtual void help( stringstream& help ) const {
+                help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
+            }
+            
+            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string ns = cmdObj["getShardVersion"].valuestrsafe();
+                if ( ns.size() == 0 ){
+                    errmsg = "need to speciy fully namespace";
+                    return false;
+                }
+                
+                DBConfig * config = grid.getDBConfig( ns );
+                if ( ! config->isSharded( ns ) ){
+                    errmsg = "ns not sharded.";
+                    return false;
+                }
+                
+                ChunkManager * cm = config->getChunkManager( ns );
+                if ( ! cm ){
+                    errmsg = "no chunk manager?";
+                    return false;
+                }
+                
+                result.appendTimestamp( "version" , cm->getVersion() );
+
+                return 1;
+            }
+        } getShardVersionCmd;
 
         class SplitCollectionHelper : public GridAdminCmd {
         public:

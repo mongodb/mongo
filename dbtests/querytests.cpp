@@ -146,7 +146,7 @@ namespace QueryTests {
             return !client_.getPrevError().getField( "err" ).isNull();
         }
         DBDirectClient &client() const { return client_; }
-    private:
+
         static DBDirectClient client_;
     };
     DBDirectClient ClientBase::client_;
@@ -669,15 +669,35 @@ namespace QueryTests {
             t(ns);
         }
     };
-
-    class SymbolStringSame : public ClientBase {
+    
+    class CollectionBase : public ClientBase {
     public:
-        ~SymbolStringSame(){
+    
+        CollectionBase( string leaf ){
+            _ns = "unittests.querytests.";
+            _ns += leaf;
+        }
+        
+        virtual ~CollectionBase(){
             client().dropCollection( ns() );
         }
-        const char * ns(){
-            return "unittests.querytests.symbolstringsame";
+        
+        int count(){
+            return (int) client().count( ns() );
         }
+
+        const char * ns(){
+            return _ns.c_str();
+        }
+        
+    private:
+        string _ns;
+    };
+
+    class SymbolStringSame : public CollectionBase {
+    public:
+        SymbolStringSame() : CollectionBase( "symbolstringsame" ){}
+
         void run(){
             { BSONObjBuilder b; b.appendSymbol( "x" , "eliot" ); b.append( "z" , 17 ); client().insert( ns() , b.obj() ); }
             ASSERT_EQUALS( 17 , client().findOne( ns() , BSONObj() )["z"].number() );
@@ -692,21 +712,13 @@ namespace QueryTests {
         }
     };
 
-    class TailableCappedRaceCondition : public ClientBase {
+    class TailableCappedRaceCondition : public CollectionBase {
     public:
-
-        TailableCappedRaceCondition(){
+        
+        TailableCappedRaceCondition() : CollectionBase( "tailablecappedrace" ){
             client().dropCollection( ns() );
             _n = 0;
         }
-        ~TailableCappedRaceCondition(){
-            client().dropCollection( ns() );
-        }
-
-        int count(){
-            return (int) client().count( ns() );
-        }
-        
         void run(){
             string err;
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
@@ -737,16 +749,81 @@ namespace QueryTests {
             ASSERT( c->isDead() );
         }
         
-        const char * ns(){
-            return "unittests.querytests.tailablecappedrace";
-        }
-        
         void insertNext(){
             insert( ns() , BSON( "i" << _n++ ) );
         }
 
         int _n;
     };
+
+    class HelperTest : public CollectionBase {
+    public:
+        
+        HelperTest() : CollectionBase( "helpertest" ){
+        }
+
+        void run(){
+            for ( int i=0; i<50; i++ ){
+                insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
+            }
+
+            ASSERT_EQUALS( 50 , count() );
+            
+            BSONObj res;
+            ASSERT( Helpers::findOne( ns() , BSON( "_id" << 20 ) , res , true ) );
+            ASSERT_EQUALS( 40 , res["x"].numberInt() );
+            
+            ASSERT( Helpers::findById( ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT_EQUALS( 40 , res["x"].numberInt() );
+
+            ASSERT( ! Helpers::findById( ns() , BSON( "_id" << 200 ) , res ) );
+
+            unsigned long long slow , fast;
+            
+            int n = 10000;
+            {
+                Timer t;
+                for ( int i=0; i<n; i++ ){
+                    ASSERT( Helpers::findOne( ns() , BSON( "_id" << 20 ) , res , true ) );
+                }
+                slow = t.micros();
+            }
+            {
+                Timer t;
+                for ( int i=0; i<n; i++ ){
+                    ASSERT( Helpers::findById( ns() , BSON( "_id" << 20 ) , res ) );
+                }
+                fast = t.micros();
+            }
+            
+            cout << "HelperTest  slow:" << slow << " fast:" << fast << endl;
+
+        }
+    };
+
+    class HelperByIdTest : public CollectionBase {
+    public:
+        
+        HelperByIdTest() : CollectionBase( "helpertestbyid" ){
+        }
+
+        void run(){
+            for ( int i=0; i<1000; i++ ){
+                insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
+            }
+            for ( int i=0; i<1000; i+=2 ){
+                client_.remove( ns() , BSON( "_id" << i ) );
+            }
+
+            BSONObj res;            
+            for ( int i=0; i<1000; i++ ){
+                bool found = Helpers::findById( ns() , BSON( "_id" << i ) , res );
+                ASSERT_EQUALS( i % 2 , found );
+            }
+
+        }
+    };
+
 
     class All : public Suite {
     public:
@@ -788,8 +865,10 @@ namespace QueryTests {
             add< DifferentNumbers >();
             add< SymbolStringSame >();
             add< TailableCappedRaceCondition >();
+            add< HelperTest >();
+            add< HelperByIdTest >();
         }
     } myall;
-
+    
 } // namespace QueryTests
 

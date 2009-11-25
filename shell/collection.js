@@ -55,6 +55,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.totalSize() - storage allocated for all data and indexes");
     print("\tdb.foo.update(query, object[, upsert_bool])");
     print("\tdb.foo.validate() - SLOW");
+    print("\tdb.foo.getShardVersion() - only for use with sharding" );
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -327,6 +328,10 @@ DBCollection.prototype.validate = function() {
     return res;
 }
 
+DBCollection.prototype.getShardVersion = function(){
+    return this._db._adminCommand( { getShardVersion : this._fullName } );
+}
+
 DBCollection.prototype.getIndexes = function(){
     return this.getDB().getCollection( "system.indexes" ).find( { ns : this.getFullName() } ).toArray();
 }
@@ -465,8 +470,8 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
-DBCollection.prototype.distinct = function( keyString ){
-    var res = this._dbCommand( { distinct : this._shortName , key : keyString } );
+DBCollection.prototype.distinct = function( keyString , query ){
+    var res = this._dbCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
     if ( ! res.ok )
         throw "distinct failed: " + tojson( res );
     return res.values;

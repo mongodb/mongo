@@ -22,6 +22,7 @@
 #include "query.h"
 #include "json.h"
 #include "queryoptimizer.h"
+#include "btree.h"
 
 namespace mongo {
 
@@ -100,6 +101,24 @@ namespace mongo {
         if ( res->one().isEmpty() )
             return false;
         result = res->one();
+        return true;
+    }
+
+    bool Helpers::findById(const char *ns, BSONObj query, BSONObj& result ){
+        NamespaceDetails *d = nsdetails(ns);
+        if ( ! d )
+            return false;
+        int idxNo = d->findIdIndex();
+        if ( idxNo < 0 )
+            return false;
+        IndexDetails& i = d->idx( idxNo );
+        
+        BSONObj key = i.getKeyFromQuery( query );
+        
+        DiskLoc loc = i.head.btree()->findSingle( i , i.head , key );
+        if ( loc.isNull() )
+            return false;
+        result = loc.obj();
         return true;
     }
 

@@ -578,7 +578,7 @@ if nix:
         env.Append( LINKFLAGS="-m32" )
 
     if GetOption( "profile" ) is not None:
-        env.Append( LINKFLAGS=" -pg " )
+        env.Append( LIBS=[ "profiler" ] )
 
     # pre-compiled headers
     if False and 'Gch' in dir( env ):
@@ -631,10 +631,13 @@ def add_exe(target):
 def setupBuildInfoFile( outFile ):
     version = getGitVersion()
     sysInfo = getSysInfo()
-    contents = "#include \"stdafx.h\"\n"
-    contents += "#include <iostream>\n"
-    contents += "namespace mongo { const char * gitVersion(){ return \"" + version + "\"; } }\n"
-    contents += "namespace mongo { const char * sysInfo(){ return \"" + sysInfo + "\"; } }\n"
+    contents = '\n'.join([
+        '#include "stdafx.h"',
+        '#include <iostream>',
+        '#include <boost/version.hpp>',
+        'namespace mongo { const char * gitVersion(){ return "' + version + '"; } }',
+        'namespace mongo { const char * sysInfo(){ return "' + sysInfo + ' BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; } }',
+        ])
 
     if os.path.exists( outFile ) and open( outFile ).read().strip() == contents.strip():
         return

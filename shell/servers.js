@@ -203,6 +203,23 @@ ShardingTest.prototype.printShardingStatus = function(){
     printShardingStatus( this.config );
 }
 
+ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
+    var out = "";
+    if ( msg )
+        out += msg + "\n";
+    out += "sharding collection info: " + ns + "\n";
+    for ( var i=0; i<this._connections.length; i++ ){
+        var c = this._connections[i];
+        out += "  mongod " + c + " " + tojson( c.getCollection( ns ).getShardVersion() , " " , true ) + "\n";
+    }
+    for ( var i=0; i<this._mongos.length; i++ ){
+        var c = this._mongos[i];
+        out += "  mongos " + c + " " + tojson( c.getCollection( ns ).getShardVersion() , " " , true ) + "\n";
+    }
+    
+    print( out );
+}
+
 printShardingStatus = function( configDB ){
     
     var version = configDB.getCollection( "version" ).findOne();
@@ -240,7 +257,7 @@ printShardingStatus = function( configDB ){
             );
         }
     );
-
+    
     print( raw );
 }
 
@@ -249,7 +266,7 @@ ShardingTest.prototype.sync = function(){
 }
 
 ShardingTest.prototype.onNumShards = function( collName , dbName ){
-    //this.sync(); // we should sync since we're going directly to mongod here
+    this.sync(); // we should sync since we're going directly to mongod here
     dbName = dbName || "test";
     var num=0;
     for ( var i=0; i<this._connections.length; i++ )

@@ -49,23 +49,32 @@ secondary.save( { num : -3 } );
 doCounts( "after wrong save" )
 
 // --- move all to 1 ---
+print( "MOVE ALL TO 1" );
 
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
+s.printCollectionInfo( "test.foo" );
 
 assert( a.findOne( { num : 1 } ) )
 assert( b.findOne( { num : 1 } ) )
 
+print( "GOING TO MOVE" );
+s.printCollectionInfo( "test.foo" );
 s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.printCollectionInfo( "test.foo" );
 assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shard again" );
 assert( a.findOne( { num : 1 } ) )
 assert( b.findOne( { num : 1 } ) )
 
-// ---- drop ----
+print( "*** drop" );
 
+s.printCollectionInfo( "test.foo" , "before drop" );
 a.drop();
+s.printCollectionInfo( "test.foo" , "after drop" );
 
 assert.eq( 0 , a.count() , "a count after drop" )
 assert.eq( 0 , b.count() , "b count after drop" )
+
+s.printCollectionInfo( "test.foo" , "after counts" );
 
 assert.eq( 0 , primary.count() , "p count after drop" )
 assert.eq( 0 , secondary.count() , "s count after drop" )
@@ -76,13 +85,23 @@ secondary.save( { num : 4 } );
 assert.eq( 1 , primary.count() , "p count after drop adn save" )
 assert.eq( 1 , secondary.count() , "s count after drop save " )
 
-// this makes sure that sharding knows where things live
+
+print("*** makes sure that sharding knows where things live" );
+
 assert.eq( 1 , a.count() , "a count after drop and save" )
+s.printCollectionInfo( "test.foo" , "after a count" );
 assert.eq( 1 , b.count() , "b count after drop and save" )
+s.printCollectionInfo( "test.foo" , "after b count" );
+
 assert( a.findOne( { num : 1 } ) , "a drop1" );
 assert.isnull( a.findOne( { num : 4 } ) , "a drop1" );
+
+s.printCollectionInfo( "test.foo" , "after a findOne tests" );
+
 assert( b.findOne( { num : 1 } ) , "b drop1" );
 assert.isnull( b.findOne( { num : 4 } ) , "b drop1" );
+
+s.printCollectionInfo( "test.foo" , "after b findOne tests" );
 
 
 s.stop();

@@ -151,10 +151,15 @@ namespace mongo {
         for ( map<string,ChunkManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
             i->second->save();
     }
+
+    bool DBConfig::reload(){
+        // TODO: i don't think is 100% correct
+        return doload();
+    }
     
-    bool DBConfig::loadByName(const char *nm){
+    bool DBConfig::doload(){
         BSONObjBuilder b;
-        b.append("name", nm);
+        b.append("name", _name.c_str());
         BSONObj q = b.done();
         return load(q);
     }
@@ -201,7 +206,7 @@ namespace mongo {
         DBConfig*& cc = _databases[database];
         if ( cc == 0 ){
             cc = new DBConfig( database );
-            if ( ! cc->loadByName(database.c_str()) ){
+            if ( ! cc->doload() ){
                 if ( create ){
                     // note here that cc->primary == 0.
                     log() << "couldn't find database [" << database << "] in config db" << endl;

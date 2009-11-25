@@ -185,8 +185,8 @@ namespace mongo {
         bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
 
         static DiskLoc addBucket(IndexDetails&); /* start a new index off, empty */
-
-	static void renameIndexNamespace(const char *oldNs, const char *newNs);
+        
+        static void renameIndexNamespace(const char *oldNs, const char *newNs);
 
         int bt_insert(DiskLoc thisLoc, DiskLoc recordLoc,
                    const BSONObj& key, const BSONObj &order, bool dupsAllowed,
@@ -202,6 +202,13 @@ namespace mongo {
         */
         DiskLoc locate(const IndexDetails& , const DiskLoc& thisLoc, const BSONObj& key, const BSONObj &order, 
                        int& pos, bool& found, DiskLoc recordLoc, int direction=1);
+        
+        /**
+         * find the first instance of the key
+         * does not handle dups
+         * returned DiskLock isNull if can't find anything with that
+         */
+        DiskLoc findSingle( const IndexDetails& , const DiskLoc& thisLoc, const BSONObj& key );
 
         /* advance one key position in the index: */
         DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller);
@@ -211,6 +218,7 @@ namespace mongo {
         void shape(stringstream&);
 
         static void a_test(IndexDetails&);
+
     private:
         void fixParentPtrs(const DiskLoc& thisLoc);
         void delBucket(const DiskLoc& thisLoc, IndexDetails&);

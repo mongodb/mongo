@@ -367,6 +367,7 @@ namespace mongo {
             case String:
             case Bool:
             case Date:
+            case jstOID:
                 return true;
             default: 
                 return false;
