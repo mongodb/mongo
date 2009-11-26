@@ -9,34 +9,48 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_verify_item(WT_TOC *, WT_PAGE *, bitstr_t *, FILE *);
-static int __wt_bt_verify_checkfrag(DB *, bitstr_t *);
-static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, bitstr_t *);
-static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, bitstr_t *, FILE *);
-static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, bitstr_t *, FILE *);
-
 /*
- * __wt_api_db_verify --
- *	Verify a Btree.
+ * There's a bunch of stuff we pass around during verification, group it
+ * together to make the code prettier.
  */
-int
-__wt_api_db_verify(DB *db, u_int32_t flags)
-{
-	return (__wt_db_verify(db, NULL, flags));
-}
+typedef struct {
+	bitstr_t *fragbits;			/* Frag tracking bit list */
+
+	FILE *fp;				/* Dump file stream */
+
+	void (*f)(const char *s, u_int32_t);	/* Progress callback */
+	u_int32_t fcnt;				/* Progress counter */
+} VSTUFF;
+
+static int __wt_bt_verify_item(WT_TOC *, WT_PAGE *, VSTUFF *);
+static int __wt_bt_verify_checkfrag(DB *, VSTUFF *);
+static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, VSTUFF *);
+static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, VSTUFF *);
+static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, VSTUFF *);
 
 /*
  * __wt_db_verify --
+ *	Verify a Btree.
+ */
+int
+__wt_db_verify(DB *db, void (*f)(const char *s, u_int32_t), u_int32_t flags)
+{
+	return (__wt_db_verify_int(db, f, NULL, flags));
+}
+
+/*
+ * __wt_db_verify_int --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_db_verify(DB *db, FILE *fp, u_int32_t flags)
+__wt_db_verify_int(DB *db,
+    void (*f)(const char *s, u_int32_t), FILE *fp, u_int32_t flags)
 {
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_TOC *toc;
-	bitstr_t *fragbits;
+	VSTUFF vstuff;
 	u_int32_t frags;
 	int ret;
 
@@ -44,9 +58,14 @@ __wt_db_verify(DB *db, FILE *fp, u_int32_t flags)
 	idb = db->idb;
 	ret = 0;
 
+	memset(&vstuff, 0, sizeof(vstuff));
+	vstuff.f = f;
+	vstuff.fp = fp;
+
 	WT_DB_FCHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
 
-	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.verify");
 
 	/*
 	 * Read the database description chunk to get the allocation and
@@ -74,13 +93,13 @@ __wt_db_verify(DB *db, FILE *fp, u_int32_t flags)
 		__wt_db_errx(db, "file is too large to verify");
 		return (WT_ERROR);
 	}
-	WT_RET(bit_alloc(env, (int)frags, &fragbits));
+	WT_RET(bit_alloc(env, (int)frags, &vstuff.fragbits));
 
 	/* If no root address has been set, it's a one-leaf-page database. */
 	if (idb->root_addr == WT_ADDR_INVALID) {
 		WT_RET(
 		    __wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
-		ret = __wt_bt_verify_page(toc, page, fragbits, fp);
+		ret = __wt_bt_verify_page(toc, page, &vstuff);
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 		if (ret != 0)
 			goto err;
@@ -91,13 +110,14 @@ __wt_db_verify(DB *db, FILE *fp, u_int32_t flags)
 		 * level in the DESC structure, so there's no way to know
 		 * what the correct level is yet.
 		 */
-		WT_ERR(__wt_bt_verify_level(
-		    toc, idb->root_addr, 0, fragbits, fp));
+		WT_ERR(__wt_bt_verify_level(toc, idb->root_addr, 0, &vstuff));
 	}
 
-	ret = __wt_bt_verify_checkfrag(db, fragbits);
+	ret = __wt_bt_verify_checkfrag(db, &vstuff);
 
-err:	__wt_free(env, fragbits);
+err:	__wt_free(env, vstuff.fragbits);
+
+	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
 }
@@ -107,10 +127,10 @@ err:	__wt_free(env, fragbits);
  *	Verify a level of a tree.
  */
 static int
-__wt_bt_verify_level(
-    WT_TOC *toc, u_int32_t addr, int isleaf, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 {
 	DB *db;
+	IENV *ienv;
 	WT_INDX *page_indx, *prev_indx;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
@@ -119,6 +139,7 @@ __wt_bt_verify_level(
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
+	ienv = toc->env->ienv;
 	addr_arg = WT_ADDR_INVALID;
 	ret = 0;
 
@@ -212,7 +233,7 @@ __wt_bt_verify_level(
 		WT_ERR(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
 
 		/* Verify the page. */
-		WT_ERR(__wt_bt_verify_page(toc, page, fragbits, fp));
+		WT_ERR(__wt_bt_verify_page(toc, page, vs));
 
 		/*
 		 * If we're walking an internal page, we'll want to descend
@@ -248,7 +269,7 @@ __wt_bt_verify_level(
 			WT_ERR(__wt_bt_page_inmem(db, page));
 
 		/* Verify its connections. */
-		WT_ERR(__wt_bt_verify_connections(toc, page, fragbits));
+		WT_ERR(__wt_bt_verify_connections(toc, page, vs));
 
 		if (prev == NULL)
 			continue;
@@ -275,6 +296,22 @@ __wt_bt_verify_level(
 
 		/* We're done with the previous page. */
 		WT_ERR(__wt_bt_page_out(toc, prev, 0));
+
+		/*
+		 * Verification is a long-lived action and we can't let it block
+		 * the cache server thread for the entire time.  If API calls
+		 * are blocked because we're running out of room, pin the page
+		 * we're holding and wait for the cache thread.
+		 *
+		 * Pinning the page is ALMOST safe -- this is a database verify,
+		 * and the only risk is if there were somehow to be two threads
+		 * verifying the same database at the same time.
+		 */
+		if (ienv->cache_lockout) {
+			F_SET(page, WT_PINNED);
+			WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+			F_CLR(page, WT_PINNED);
+		}
 	}
 
 err:	if (prev != NULL)
@@ -283,18 +320,17 @@ err:	if (prev != NULL)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
-		ret = __wt_bt_verify_level(
-		    toc, addr_arg, isleaf_arg, fragbits, fp);
+		ret = __wt_bt_verify_level(toc, addr_arg, isleaf_arg, vs);
 
 	return (ret);
 }
 
 /*
  * __wt_bt_verify_connections --
- *	Verify that the page is in the right place in the tree.
+ *	Verify the page is in the right place in the tree.
  */
 static int
-__wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, bitstr_t *fragbits)
+__wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
 	IDB *idb;
@@ -355,7 +391,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, bitstr_t *fragbits)
 	 */
 	frags = WT_OFF_TO_ADDR(db, db->intlsize);
 	for (i = 0; i < frags; ++i)
-		if (!bit_test(fragbits, (int)hdr->prntaddr + i)) {
+		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
 			__wt_db_errx(db,
 			    "parent of page at addr %lu not found on internal "
 			    "page links",
@@ -503,30 +539,36 @@ err:	if (parent != NULL)
  *	Verify a single Btree page.
  */
 int
-__wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 {
 	DB *db;
 	WT_PAGE_HDR *hdr;
+	VSTUFF *vs;
 	u_int32_t addr, frags, i;
+
+	vs = vs_arg;
 
 	db = toc->db;
 	hdr = page->hdr;
 	addr = page->addr;
 
+	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 10 == 0)
+		vs->f("Db.verify", vs->fcnt);
+
 	/*
 	 * If we're verifying the whole tree, complain if there's a page
 	 * we've already verified.
 	 */
-	if (fragbits != NULL) {
+	if (vs != NULL && vs->fragbits != NULL) {
 		frags = WT_OFF_TO_ADDR(db, page->bytes);
 		for (i = 0; i < frags; ++i)
-			if (bit_test(fragbits, (int)addr + i)) {
+			if (bit_test(vs->fragbits, (int)addr + i)) {
 				__wt_db_errx(db,
 				    "page at addr %lu already verified",
 				    (u_long)addr);
 				return (WT_ERROR);
 			}
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
 	}
 
 	/*
@@ -575,7 +617,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
 
 	/* Verify the items on the page. */
 	if (hdr->type != WT_PAGE_OVFL)
-		WT_RET(__wt_bt_verify_item(toc, page, fragbits, fp));
+		WT_RET(__wt_bt_verify_item(toc, page, vs));
 
 	return (0);
 }
@@ -585,7 +627,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
  *	Walk the items on a page and verify them.
  */
 static int
-__wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -726,14 +768,13 @@ eop:			__wt_db_errx(db,
 		 * When walking the whole file, verify off-page and overflow
 		 * references.
 		 */
-		if (fragbits != NULL)
+		if (vs != NULL && vs->fragbits != NULL)
 			switch (item_type) {
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				WT_ERR(__wt_bt_verify_ovfl(toc,
-				    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item),
-				    fragbits, fp));
+				    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item), vs));
 				break;
 			case WT_ITEM_OFFP_INTL:
 			case WT_ITEM_OFFP_LEAF:
@@ -742,7 +783,7 @@ eop:			__wt_db_errx(db,
 					    ((WT_ITEM_OFFP *)
 					    WT_ITEM_BYTE(item))->addr,
 					    item_type == WT_ITEM_OFFP_LEAF ?
-					    1 : 0, fragbits, fp));
+					    1 : 0, vs));
 				break;
 			default:
 				break;
@@ -822,8 +863,8 @@ err:	WT_FREE_AND_CLEAR(env, _a.item_ovfl.data);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
-	if (ret == 0 && fp != NULL)
-		ret = __wt_bt_dump_page(db, page, NULL, fp, 0);
+	if (ret == 0 && vs != NULL && vs->fp != NULL)
+		ret = __wt_bt_dump_page(db, page, NULL, vs->fp, 0);
 #endif
 
 	return (ret);
@@ -834,15 +875,14 @@ err:	WT_FREE_AND_CLEAR(env, _a.item_ovfl.data);
  *	Verify an overflow item.
  */
 static int
-__wt_bt_verify_ovfl(
-    WT_TOC *toc, WT_ITEM_OVFL *ovfl, bitstr_t *fragbits, FILE *fp)
+__wt_bt_verify_ovfl(WT_TOC *toc, WT_ITEM_OVFL *ovfl, VSTUFF *vs)
 {
 	WT_PAGE *ovfl_page;
 	int ret;
 
 	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
 
-	ret = __wt_bt_verify_page(toc, ovfl_page, fragbits, fp);
+	ret = __wt_bt_verify_page(toc, ovfl_page, vs);
 
 	WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
 
@@ -854,7 +894,7 @@ __wt_bt_verify_ovfl(
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_bt_verify_checkfrag(DB *db, bitstr_t *fragbits)
+__wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
 {
 	IDB *idb;
 	int ffc, ffc_start, ffc_end, frags, ret;
@@ -865,9 +905,9 @@ __wt_bt_verify_checkfrag(DB *db, bitstr_t *fragbits)
 	/* Check for page fragments we haven't verified. */
 	frags = (int)WT_OFF_TO_ADDR(db, idb->fh->file_size);
 	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(fragbits, frags, &ffc);
+		bit_ffc(vs->fragbits, frags, &ffc);
 		if (ffc != -1) {
-			bit_set(fragbits, ffc);
+			bit_set(vs->fragbits, ffc);
 			if (ffc_start == -1) {
 				ffc_start = ffc_end = ffc;
 				continue;
