@@ -153,7 +153,7 @@ __wt_bt_desc_read(WT_TOC *toc)
 	idb->root_addr = desc.root_addr;
 
 	/* Then discard it from the cache, it's probably the wrong size. */
-	WT_RET(__wt_cache_out(toc, page, WT_UNFORMATTED));
+	WT_RET(__wt_cache_out(toc, page, 0));
 
 	return (0);
 }
