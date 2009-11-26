@@ -21,7 +21,7 @@ __wt_bt_open(DB *db, int ok_create)
 	ENV *env;
 	IDB *idb;
 	WT_TOC *toc;
-	int isleaf;
+	int isleaf, ret;
 
 	idb = db->idb;
 	env = db->env;
@@ -30,15 +30,16 @@ __wt_bt_open(DB *db, int ok_create)
 	WT_RET(__wt_bt_vrfy_sizes(db));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(
-	    env, idb->dbname, idb->mode, ok_create, &idb->fh));
+	WT_RET(__wt_open(env, idb->dbname, idb->mode, ok_create, &idb->fh));
 
+	/* If it's zero-length, we're done. */
 	if (idb->fh->file_size == 0) {
 		idb->root_addr = WT_ADDR_INVALID;
 		return (0);
 	}
 
-	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.open");
 
 	/*
 	 * If the file exists, update the DB handle based on the information
@@ -46,21 +47,20 @@ __wt_bt_open(DB *db, int ok_create)
 	 * there had better be a description record.)  Then, read in the root
 	 * page.
 	 */
-	WT_RET(__wt_bt_desc_read(toc));
+	WT_ERR(__wt_bt_desc_read(toc));
 
 	/*
 	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf page.
-	 *
-	 * BUG!!!
-	 * Need an out-of-band generation value so this page never gets
-	 * pushed out of the cache.
 	 */
 	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-	WT_RET(
-	    __wt_bt_page_in(toc, idb->root_addr, isleaf, 1, &idb->root_page));
+	if ((ret = __wt_bt_page_in(
+	    toc, idb->root_addr, isleaf, 1, &idb->root_page)) == 0)
+		F_SET(idb->root_page, WT_PINNED);
 
-	return (0);
+err:	WT_TRET(toc->close(toc, 0));
+
+	return (ret);
 }
 
 /*
