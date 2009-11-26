@@ -79,7 +79,7 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	if ((ret = wiredtiger_simple_setup(progname, 1, &db)) == 0) {
+	if ((ret = wiredtiger_simple_setup(progname, &db)) == 0) {
 		if (config_process(db, config_list) != 0)
 			goto err;
 

@@ -13,6 +13,7 @@
 const char *progname;
 
 int	usage(void);
+void	progress(const char *, u_int32_t);
 
 int
 main(int argc, char *argv[])
@@ -20,12 +21,15 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 	DB *db;
-	int ch, ret, tret;
+	int ch, ret, tret, verbose;
 
 	WT_UTILITY_INTRO(progname, argv);
 
-	while ((ch = getopt(argc, argv, "V")) != EOF)
+	while ((ch = getopt(argc, argv, "Vv")) != EOF)
 		switch (ch) {
+		case 'v':			/* verbose */
+			verbose = 1;
+			break;
 		case 'V':			/* version */
 			printf("%s\n", wt_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
@@ -40,14 +44,14 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, 1, &db)) == 0) {
+	if ((ret = wiredtiger_simple_setup(progname, &db)) == 0) {
 		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
 			    progname, *argv, wt_strerror(ret));
 			goto err;
 		}
-		if ((ret = db->verify(db, 0)) != 0) {
-			fprintf(stderr, "%s: Db.stat: %s\n",
+		if ((ret = db->verify(db, verbose ? progress : NULL, 0)) != 0) {
+			fprintf(stderr, "%s: Db.verify: %s\n",
 			    progname, wt_strerror(ret));
 			goto err;
 		}
@@ -61,9 +65,16 @@ err:		ret = 1;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
+void
+progress(const char *s, u_int32_t p)
+{
+	printf("\r\t%s: %lu", s, (u_long)p);
+	fflush(stdout);
+}
+
 int
 usage()
 {
-	(void)fprintf(stderr, "usage: %s [-V] database\n", progname);
+	(void)fprintf(stderr, "usage: %s [-Vv] database\n", progname);
 	return (EXIT_FAILURE);
 }

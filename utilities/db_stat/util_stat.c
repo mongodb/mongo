@@ -41,7 +41,7 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((ret = wiredtiger_simple_setup(progname, 1, &db)) == 0) {
+	if ((ret = wiredtiger_simple_setup(progname, &db)) == 0) {
 		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
 			    progname, *argv, wt_strerror(ret));
