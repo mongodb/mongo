@@ -132,10 +132,9 @@ __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 	    WT_STAT_IENV_STATS_TOTAL + 1, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
-	stats[WT_STAT_CACHE_CLEAN].desc = "clean pages in the cache";
-	stats[WT_STAT_CACHE_DIRTY].desc = "dirty pages in the cache";
 	stats[WT_STAT_CACHE_EVICT].desc = "clean pages evicted from the cache";
 	stats[WT_STAT_CACHE_HIT].desc = "cache hit: reads found in the cache";
+	stats[WT_STAT_CACHE_LOCKOUT].desc = "API cache lockout";
 	stats[WT_STAT_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
 	stats[WT_STAT_CACHE_WRITE].desc = "writes from the cache";
@@ -150,10 +149,10 @@ __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_MTX_LOCK].desc = "mutex lock calls";
 	stats[WT_STAT_TOTAL_READ_IO].desc = "total read I/Os";
 	stats[WT_STAT_TOTAL_WRITE_IO].desc = "total write I/Os";
-	stats[WT_STAT_WORKQ_CACHE_ALLOC_REQUESTS].desc =
-	    "workQ cache allocations";
 	stats[WT_STAT_WORKQ_PASSES].desc = "workQ queue passes";
-	stats[WT_STAT_WORKQ_REQUESTS].desc = "workQ requests";
+	stats[WT_STAT_WORKQ_PRIVATE_SERIALIZE].desc =
+	    "workQ private serialization requests";
+	stats[WT_STAT_WORKQ_SERIALIZE].desc = "workQ serialization requests";
 	stats[WT_STAT_WORKQ_SLEEP].desc = "workQ sleeps";
 	stats[WT_STAT_WORKQ_YIELD].desc = "workQ yields";
 
@@ -165,10 +164,9 @@ void
 __wt_stat_clear_ienv_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
-	stats[WT_STAT_CACHE_CLEAN].v = 0;
-	stats[WT_STAT_CACHE_DIRTY].v = 0;
 	stats[WT_STAT_CACHE_EVICT].v = 0;
 	stats[WT_STAT_CACHE_HIT].v = 0;
+	stats[WT_STAT_CACHE_LOCKOUT].v = 0;
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_WRITE].v = 0;
 	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
@@ -180,9 +178,9 @@ __wt_stat_clear_ienv_stats(WT_STATS *stats)
 	stats[WT_STAT_MTX_LOCK].v = 0;
 	stats[WT_STAT_TOTAL_READ_IO].v = 0;
 	stats[WT_STAT_TOTAL_WRITE_IO].v = 0;
-	stats[WT_STAT_WORKQ_CACHE_ALLOC_REQUESTS].v = 0;
 	stats[WT_STAT_WORKQ_PASSES].v = 0;
-	stats[WT_STAT_WORKQ_REQUESTS].v = 0;
+	stats[WT_STAT_WORKQ_PRIVATE_SERIALIZE].v = 0;
+	stats[WT_STAT_WORKQ_SERIALIZE].v = 0;
 	stats[WT_STAT_WORKQ_SLEEP].v = 0;
 	stats[WT_STAT_WORKQ_YIELD].v = 0;
 }
