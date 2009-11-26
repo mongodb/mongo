@@ -11,29 +11,71 @@
 
 static int  __wt_cache_clean(WT_TOC *, u_int64_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
-static void __wt_cache_alloc_server(WT_TOC *);
+static int  __wt_cache_alloc_serialize_func(WT_TOC *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
-static void __wt_cache_discard_server(WT_TOC *);
-static void __wt_cache_in_server(WT_TOC *);
+static int  __wt_cache_discard_serialize_func(WT_TOC *);
+static int  __wt_cache_in_serialize_func(WT_TOC *);
 
 #ifdef HAVE_DIAGNOSTIC
-static int __wt_cache_dump(ENV *, char *, FILE *);
+static int __wt_cache_dump(ENV *, const char *, FILE *);
 #endif
 
-typedef struct __wt_req_alloc {
-	DB	 *db;				/* Database reference */
+/*
+ * Page allocation serialization support.
+ */
+typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
 	u_int32_t bytes;			/* Bytes to allocate */
-} WT_REQ_ALLOC;
-typedef struct __wt_req_discard {
-	WT_PAGE  *page;				/* Discarded page */
-} WT_REQ_DISCARD;
-typedef struct __wt_req_in {
-	DB	 *db;				/* Database reference */
+ } __wt_alloc_args;
+#define	__wt_cache_alloc_serialize(toc, _page, _bytes) do {		\
+	__wt_alloc_args _args;						\
+	_args.page = _page;						\
+	_args.bytes = _bytes;						\
+	WT_TOC_SERIALIZE_REQUEST(toc,					\
+	    __wt_cache_alloc_serialize_func, NULL, &_args);		\
+} while (0)
+#define	__wt_cache_alloc_unpack(toc, _page, _bytes) do {		\
+	_page =	((__wt_alloc_args *)(toc)->serialize_args)->page;	\
+	_bytes = ((__wt_alloc_args *)(toc)->serialize_args)->bytes;	\
+} while (0)
+
+/*
+ * Page read serialization support.
+ */
+typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
 	u_int32_t bytes;			/* Bytes to allocate */
 	off_t	  offset;			/* File offset */
-} WT_REQ_IN;
+} __wt_in_args;
+#define	__wt_cache_in_serialize(toc, _page, _bytes, _offset) do {	\
+	__wt_in_args _args;						\
+	_args.page = _page;						\
+	_args.bytes = _bytes;						\
+	_args.offset = _offset;						\
+	WT_TOC_SERIALIZE_REQUEST(toc,					\
+	    __wt_cache_in_serialize_func, NULL, &_args);		\
+} while (0);
+#define	__wt_cache_in_unpack(toc, _page, _bytes, _offset) do {		\
+	_page =	((__wt_in_args *)(toc)->serialize_args)->page;		\
+	_bytes = ((__wt_in_args *)(toc)->serialize_args)->bytes;	\
+	_offset = ((__wt_in_args *)(toc)->serialize_args)->offset;	\
+} while (0)
+
+/*
+ * Page discard serialization support.
+ */
+typedef struct {
+	WT_PAGE  *page;				/* Allocated page */
+} __wt_discard_args;
+#define	__wt_cache_discard_serialize(toc, _serial, _page) do {		\
+	__wt_discard_args _args;					\
+	_args.page = _page;						\
+	WT_TOC_SERIALIZE_REQUEST(toc,					\
+	    __wt_cache_discard_serialize_func, _serial, &_args);	\
+} while (0)
+#define	__wt_cache_discard_unpack(toc, _page) do {			\
+	_page = ((__wt_discard_args *)(toc)->serialize_args)->page;	\
+} while (0)
 
 /*
  * __wt_cache_create --
@@ -46,21 +88,32 @@ __wt_cache_create(ENV *env)
 	WT_CACHE *cache;
 
 	ienv = env->ienv;
+	cache = &ienv->cache;
+
+	WT_RET(__wt_mtx_init(&cache->mtx));	/* Cache server mutex */
+	__wt_lock(env, &cache->mtx);		/* Blocking mutex */
+
+	cache->bytes_max = env->cachesize * WT_MEGABYTE;
 
 	/*
 	 * Initialize the cache page queues.  No server support needed, this is
 	 * done when the environment is first opened, before there are multiple
 	 * threads of control using the cache.
 	 *
-	 * Size for a cache filled with 16KB pages, and 8 pages per bucket
-	 * (which works out to 8 buckets per MB).
+	 * We don't sort the hash queues in page LRU order because that requires
+	 * manipulating the linked list as part of each read operation.  As a
+	 * result, WiredTiger is much more sensitive to long bucket chains than
+	 * Berkeley DB, and the bucket chains need to be short to avoid spending
+	 * all our time walking the linked list.  To help, we do put the bucket
+	 * into LRU order when looking for pages to evict.
+	 *
+	 * Size for a cache filled with 8KB pages, and 4 pages per bucket (or,
+	 * 32 buckets per MB).
 	 */
-	cache = &ienv->cache;
-	cache->hashsize = __wt_prime(env->cachesize * 8);
-	cache->hashsize = 32771;
+	cache->hashsize = __wt_prime(env->cachesize * 32);
 	WT_STAT_SET(ienv->stats, HASH_BUCKETS, "hash buckets", cache->hashsize);
-	WT_RET(
-	    __wt_calloc(env, cache->hashsize, sizeof(*cache->hb), &cache->hb));
+
+	WT_RET(__wt_calloc(env, cache->hashsize, sizeof(WT_HB), &cache->hb));
 
 	F_SET(cache, WT_INITIALIZED);
 	return (0);
@@ -84,20 +137,19 @@ __wt_cache_destroy(ENV *env)
 	if (!F_ISSET(cache, WT_INITIALIZED))
 		return (0);
 
-	/* Write any modified pages. */
-	WT_TRET(__wt_cache_sync(env, NULL));
-
 	/*
 	 * Discard all pages.  No server support needed, this is done when the
 	 * environment is closed, after all threads of control have exited the
 	 * cache.
+	 *
+	 * There shouldn't be any modified pages, because all of the databases
+	 * have been closed.
 	 */
 	for (i = 0; i < cache->hashsize; ++i)
-		while ((page = cache->hb[i]) != NULL) {
+		while ((page = cache->hb[i].list) != NULL) {
+			WT_ASSERT(env, !F_ISSET(page, WT_MODIFIED));
 			__wt_cache_discard(env, page);
-
 			__wt_bt_page_recycle(env, page);
-			WT_STAT_DECR(env->ienv->stats, CACHE_CLEAN, NULL);
 		}
 
 	/* There shouldn't be any allocated bytes. */
@@ -118,26 +170,38 @@ __wt_cache_destroy(ENV *env)
  *	Flush an underlying cache to disk.
  */
 int
-__wt_cache_sync(ENV *env, WT_FH *fh)
+__wt_cache_sync(WT_TOC *toc, WT_FH *fh, void (*f)(const char *, u_int32_t))
 {
+	ENV *env;
 	WT_CACHE *cache;
+	WT_HB *hb;
 	WT_PAGE *page;
+	u_int32_t fcnt;
 	u_int i;
 
+	env = toc->env;
 	cache = &env->ienv->cache;
 
 	/*
 	 * Write any modified pages -- if the handle is set, write only pages
 	 * belong to the specified file.
+	 *
+	 * We only report progress on every 10 writes, to minimize callbacks.
 	 */
-	for (i = 0; i < cache->hashsize; ++i)
-		for (page = cache->hb[i]; page != NULL; page = page->next) {
-			if (!F_ISSET(page, WT_MODIFIED))
+	for (i = 0, fcnt = 0; i < cache->hashsize; ++i) {
+		hb = &cache->hb[i];
+		WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
+		for (page = hb->list; page != NULL; page = page->next) {
+			if (!F_ISSET(page, WT_MODIFIED | WT_PINNED))
 				continue;
 			if (fh != NULL && fh != page->fh)
 				continue;
 			WT_RET(__wt_cache_write(env, page));
+
+			if (f != NULL && ++fcnt % 10 == 0)
+				f("Db.sync", fcnt);
 		}
+	}
 	return (0);
 }
 
@@ -152,7 +216,6 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
-	WT_REQ_ALLOC req;
 	int ret;
 
 	*pagep = NULL;
@@ -183,42 +246,34 @@ err:		__wt_free(env, page);
 
 	/*
 	 * Allocate "bytes" bytes from the end of the file; we must serialize
-	 * the size of the file, the bytes in the cache and the insert onto
-	 * the hash queue, so ask the workQ thread of control to do the work
-	 * for us.
+	 * the allocation of bytes from the file, the change of total bytes
+	 * in the cache, and the insert onto the hash queue.
 	 */
-	req.db = db;
-	req.page = page;
-	req.bytes = bytes;
-	WT_TOC_REQUEST(toc, __wt_cache_alloc_server, &req);
+	__wt_cache_alloc_serialize(toc, page, bytes);
 
 	*pagep = page;
 	return (0);
 }
 
 /*
- * __wt_cache_alloc_server --
+ * __wt_cache_alloc_serialize_func --
  *	Server function to allocate bytes from a file.
  */
-static void
-__wt_cache_alloc_server(WT_TOC *toc)
+static int
+__wt_cache_alloc_serialize_func(WT_TOC *toc)
 {
 	DB *db;
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_FH *fh;
+	WT_HB *hb;
 	WT_PAGE *page;
-	WT_REQ_ALLOC *req;
-	WT_PAGE **hb;
 	u_int32_t bytes;
 
-	/* Unpack request. */
-	req = toc->request_args;
-	db = req->db;
-	page = req->page;
-	bytes = req->bytes;
+	__wt_cache_alloc_unpack(toc, page, bytes);
 
-	ienv = db->ienv;
+	db = toc->db;
+	ienv = toc->env->ienv;
 	cache = &ienv->cache;
 	fh = db->idb->fh;
 
@@ -228,26 +283,22 @@ __wt_cache_alloc_server(WT_TOC *toc)
 	fh->file_size += bytes;
 	page->addr = WT_OFF_TO_ADDR(db, page->offset);
 	page->bytes = bytes;
-	page->generation = ++ienv->generation;
+	page->page_gen = ++ienv->page_gen;
 
-	/* Insert onto the head of the linked list. */
+	/* Insert as the head of the linked list. */
 	hb = &cache->hb[WT_HASH(cache, page->offset)];
-	page->next = *hb;
-	*hb = page;
+	page->next = hb->list;
+	hb->list = page;
 
 	/* Increment total cache byte count. */
 	cache->bytes_alloc += bytes;
 
-	WT_STAT_INCR(ienv->stats, CACHE_CLEAN, NULL);
-	WT_STAT_INCR(ienv->stats,
-	    WORKQ_CACHE_ALLOC_REQUESTS, "workQ cache allocations");
-
-	WT_TOC_REQUEST_COMPLETE(toc);
+	return (0);
 }
 
 /*
  * __wt_cache_in --
- *	Pin bytes of a file, reading as necessary.
+ *	Return a database page, reading as necessary.
  */
 int
 __wt_cache_in(WT_TOC *toc,
@@ -259,9 +310,9 @@ __wt_cache_in(WT_TOC *toc,
 	IDB *idb;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_PAGE **hb, *page;
+	WT_HB *hb;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_REQ_IN req;
 	u_int32_t checksum;
 	u_int bucket_cnt;
 	int ret;
@@ -276,12 +327,16 @@ __wt_cache_in(WT_TOC *toc,
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
-	WT_ENV_FCHK(env, "__wt_cache_in", flags, WT_APIMASK_WT_CACHE_IN);
-
-	/* Check for the page in the cache. */
+	/*
+	 * If there's a prviate serialization request on the hash bucket,
+	 * wait until it clears.
+	 */
 	hb = &cache->hb[WT_HASH(cache, offset)];
+	WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
+
+	/* Search for the page in the cache. */
 	for (bucket_cnt = 0,
-	    page = *hb; page != NULL; ++bucket_cnt, page = page->next)
+	    page = hb->list; page != NULL; ++bucket_cnt, page = page->next)
 		if (page->offset == offset && idb->fh == page->fh)
 			break;
 	if (bucket_cnt > longest_bucket_cnt) {
@@ -295,7 +350,7 @@ __wt_cache_in(WT_TOC *toc,
 		WT_STAT_INCR(idb->stats,
 		    DB_CACHE_HIT, "cache hit: reads found in the cache");
 
-		page->generation = ++ienv->generation;
+		page->page_gen = ++ienv->page_gen;
 		*pagep = page;
 		return (0);
 	}
@@ -317,63 +372,59 @@ __wt_cache_in(WT_TOC *toc,
 	WT_ERR(__wt_calloc(env, 1, (size_t)bytes, &page->hdr));
 	WT_ERR(__wt_read(env, idb->fh, offset, bytes, page->hdr));
 
-	/* Verify the checksum. */
-	if (!LF_ISSET(WT_UNFORMATTED)) {
-		hdr = page->hdr;
-		checksum = hdr->checksum;
-		hdr->checksum = 0;
-		if (checksum != __wt_cksum(hdr, bytes)) {
-			__wt_db_errx(db,
-			    "file offset %llu with length %lu was read and "
-			    "had a checksum error",
-			    (u_quad)offset, (u_long)bytes);
-			ret = WT_ERROR;
-err:			if (page->hdr != NULL)
-				__wt_free(env, page->hdr);
-			__wt_free(env, page);
-			return (ret);
-		}
+	/*
+	 * If this is an unformatted read, ensure we never find it again in the
+	 * cache by not linking it in.
+	 */
+	if (LF_ISSET(WT_UNFORMATTED)) {
+		F_SET(page, WT_UNFORMATTED);
+		*pagep = page;
+		return (0);
 	}
 
-	/*
-	 * We must serialize the insert onto the hash queue, so ask the workQ
-	 * thread of control to do the work for us.
-	 */
-	req.db = db;
-	req.page = page;
-	req.bytes = bytes;
-	req.offset = offset;
-	WT_TOC_REQUEST(toc, __wt_cache_in_server, &req);
+	/* Verify the checksum. */
+	hdr = page->hdr;
+	checksum = hdr->checksum;
+	hdr->checksum = 0;
+	if (checksum != __wt_cksum(hdr, bytes)) {
+		__wt_db_errx(db,
+		    "file offset %llu with length %lu was read and had a "
+		    "checksum error", (u_quad)offset, (u_long)bytes);
+		ret = WT_ERROR;
+
+err:		if (page->hdr != NULL)
+			__wt_free(env, page->hdr);
+		__wt_free(env, page);
+		return (ret);
+	}
+
+	/* Serialize the insert onto the hash queue. */
+	__wt_cache_in_serialize(toc, page, bytes, offset);
 
 	*pagep = page;
 	return (0);
 }
 
 /*
- * __wt_cache_in_server --
+ * __wt_cache_in_serialize_func --
  *	Server function to read bytes from a file.
  */
-static void
-__wt_cache_in_server(WT_TOC *toc)
+static int
+__wt_cache_in_serialize_func(WT_TOC *toc)
 {
 	DB *db;
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_FH *fh;
+	WT_HB *hb;
 	WT_PAGE *page;
-	WT_REQ_IN *req;
-	WT_PAGE **hb;
 	off_t offset;
 	u_int32_t bytes;
 
-	/* Unpack request. */
-	req = toc->request_args;
-	db = req->db;
-	page = req->page;
-	bytes = req->bytes;
-	offset = req->offset;
+	__wt_cache_in_unpack(toc, page, bytes, offset);
 
-	ienv = db->ienv;
+	db = toc->db;
+	ienv = toc->env->ienv;
 	cache = &ienv->cache;
 	fh = db->idb->fh;
 
@@ -382,111 +433,198 @@ __wt_cache_in_server(WT_TOC *toc)
 	page->offset = offset;
 	page->addr = WT_OFF_TO_ADDR(db, offset);
 	page->bytes = bytes;
-	page->generation = ++ienv->generation;
+	page->page_gen = ++ienv->page_gen;
 
-	/* Insert onto the head of the linked list. */
+	/*
+	 * BUG!!!
+	 * Somebody else may have read the same page, check.
+	 */
+
+	/* Insert as the head of the linked list. */
 	hb = &cache->hb[WT_HASH(cache, page->offset)];
-	page->next = *hb;
-	*hb = page;
+	page->next = hb->list;
+	hb->list = page;
 
 	/* Increment total cache byte count. */
 	cache->bytes_alloc += bytes;
 
-	WT_STAT_INCR(ienv->stats, CACHE_CLEAN, NULL);
-
-	WT_TOC_REQUEST_COMPLETE(toc);
+	return (0);
 }
 
 /*
  * __wt_cache_out --
- *	Unpin bytes of a file, writing as necessary.
+ *	Discard a database page, writing as necessary.
  */
 int
 __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
 	ENV *env;
-	WT_REQ_DISCARD req;
 
 	env = toc->env;
 
-	WT_ENV_FCHK(env, "__wt_cache_out", flags, WT_APIMASK_WT_CACHE_OUT);
+	/* Unformatted pages may not be modified. */
+	WT_ASSERT(env,
+	    !(LF_ISSET(WT_MODIFIED) && F_ISSET(page, WT_UNFORMATTED)));
 
-	/* Set modify flag, and update clean/dirty statistics. */
-	if (LF_ISSET(WT_MODIFIED) && !F_ISSET(page, WT_MODIFIED)) {
+	/* If the page has been modified, set the local flag. */
+	if (LF_ISSET(WT_MODIFIED))
 		F_SET(page, WT_MODIFIED);
 
-		WT_STAT_INCR(
-		    env->ienv->stats, CACHE_DIRTY, "dirty pages in the cache");
-		WT_STAT_DECR(
-		    env->ienv->stats, CACHE_CLEAN, "clean pages in the cache");
-	}
-
-	/*
-	 * If the page isn't to be retained in the cache, write it if it's
-	 * dirty, and discard it.
-	 */
-	if (LF_ISSET(WT_UNFORMATTED)) {
-		if (F_ISSET(page, WT_MODIFIED))
-			WT_RET(__wt_cache_write(env, page));
-		req.page = page;
-		WT_TOC_REQUEST(toc, __wt_cache_discard_server, &req);
-
+	/* Unformatted pages are discarded as soon as they're returned. */
+	if (F_ISSET(page, WT_UNFORMATTED))
 		__wt_bt_page_recycle(env, page);
-		WT_STAT_DECR(env->ienv->stats, CACHE_CLEAN, NULL);
-	}
 
 	return (0);
 }
 
-#if 0
 /*
- * __wt_cache_clean --
- *	Clear some space out of the cache.
+ * __wt_cache_srvr --
+ *	Server routine to process the cache.
  */
-static int
-__wt_cache_clean(WT_TOC *toc, u_int64_t bytes_to_free)
+void *
+__wt_cache_srvr(void *arg)
 {
-	DB *db;
 	ENV *env;
+	IENV *ienv;
 	WT_CACHE *cache;
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-	u_int64_t bytes;
+	WT_HB *hb, *chosen_hb;
+	WT_PAGE *page, *chosen_page;
+	WT_TOC *toc;
+	u_int32_t chosen_gen, i;
+	int ret, review, review_max;
 
-	db = toc->db;
-	env = toc->env;
-	cache = toc->cache;
+	env = arg;
+	ienv = env->ienv;
+	cache = &env->ienv->cache;
 
-	bytes_free = 0;
-	bytes_need_free = (u_int64_t)bytes * 3;
+	/* Create a WT_TOC so we can make serialization requests. */
+	if (env->toc(env, 0, &toc) != 0)
+		return (NULL);
+	toc->name = "cache server";
 
 	/*
-	 * Free 10% of each cache until we get to our limit, starting at a new
-	 * cache each time.
+	 * Review 1% of the hash buckets to choose a buffer to toss, but never
+	 * less than 10 buckets.
 	 */
+	if ((review_max = cache->hashsize / 100) < 10)
+		review_max = 20;
 
-	do {
-		if (page == NULL)
-			break;
+	i = 0;
+	while (F_ISSET(ienv, WT_SERVER_RUN)) {
+		/*
+		 * If there's no work to do, go to sleep.  We check the workQ's
+		 * cache_lockout field because the workQ wants us to be more
+		 * agressive about cleaning up than we would normally be.
+		 */
+		if (ienv->cache_lockout == 0 &&
+		    cache->bytes_alloc <= cache->bytes_max) {
+			F_SET(cache, WT_SERVER_SLEEPING);
+			WT_MEMORY_FLUSH;
+			__wt_lock(env, &cache->mtx);
+			continue;
+		}
+
+		/*
+		 * Look at review_max hash buckets, and pick a page with the
+		 * lowest LRU.  An unformatted page is totally useless, and
+		 * won't need to be written, so it's even better.
+		 */
+		for (chosen_gen = 0, review = 0;; ++i) {
+			if (i == cache->hashsize)
+				i = 0;
+			hb = &cache->hb[i];
+			for (page = hb->list; page != NULL; page = page->next) {
+				if (F_ISSET(page, WT_PINNED))
+					continue;
+				if (chosen_gen == 0 ||
+				    page->page_gen < chosen_gen) {
+					chosen_hb = hb;
+					chosen_page = page;
+					chosen_gen = page->page_gen;
+				}
+			}
+			if (++review >= review_max && chosen_gen != 0)
+				break;
+		}
+		hb = chosen_hb;
+		page = chosen_page;
 
 		/* Write the page if it's been modified. */
 		if (F_ISSET(page, WT_MODIFIED)) {
 			WT_STAT_INCR(env->ienv->stats, CACHE_WRITE_EVICT,
 			    "dirty pages evicted from the cache");
 
-			WT_RET(__wt_cache_write(env, page));
+			if ((ret = __wt_cache_write(env, page)) != 0) {
+				__wt_api_env_err(env, ret,
+				    "cache server thread unable to write page");
+				return (NULL);
+			}
 		} else
 			WT_STAT_INCR(env->ienv->stats, CACHE_EVICT,
 			    "clean pages evicted from the cache");
 
-		bytes += page->bytes;
+		/*
+		 * If the page is modified while we wait for serialized access,
+		 * keep the page.
+		 */
+		__wt_cache_discard_serialize(toc, &hb->serialize_private, page);
+		if (toc->serialize_ret == 0)
+			__wt_bt_page_recycle(env, page);
+	}
 
-		WT_RET(__wt_cache_discard(env, page));
-	} while (bytes < bytes_to_free
+	(void)toc->close(toc, 0);
 
+	return (NULL);
+}
+
+/*
+ * __wt_cache_discard_serialize_func --
+ *	Server version: discard a page of a file.
+ */
+static int
+__wt_cache_discard_serialize_func(WT_TOC *toc)
+{
+	WT_PAGE *page;
+
+	__wt_cache_discard_unpack(toc, page);
+
+	/*
+	 * If the page was modified or pinned while we waited for serialized
+	 * access, return with a failed status.
+	 */
+	if (F_ISSET(page, WT_MODIFIED | WT_PINNED))
+		return (1);
+
+	__wt_cache_discard(toc->env, page);
 	return (0);
 }
-#endif
+
+/*
+ * __wt_cache_discard --
+ *	Remove a page from its hash bucket.
+ */
+static void
+__wt_cache_discard(ENV *env, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+	WT_HB *hb;
+	WT_PAGE *tpage;
+
+	cache = &env->ienv->cache;
+
+	WT_ASSERT(env, cache->bytes_alloc >= page->bytes);
+	cache->bytes_alloc -= page->bytes;
+
+	hb = &cache->hb[WT_HASH(cache, page->offset)];
+	if (hb->list == page)
+		hb->list = page->next;
+	else
+		for (tpage = hb->list;; tpage = tpage->next)
+			if (tpage->next == page) {
+				tpage->next = page->next;
+				break;
+			}
+}
 
 /*
  * __wt_cache_write --
@@ -497,11 +635,6 @@ __wt_cache_write(ENV *env, WT_PAGE *page)
 {
 	WT_PAGE_HDR *hdr;
 
-	/*
-	 * BUG!!!
-	 * There's a race here, we need to ask the server (or an I/O thread)
-	 * for help.
-	 */
 	/* Update the checksum. */
 	hdr = page->hdr;
 	hdr->checksum = 0;
@@ -512,49 +645,9 @@ __wt_cache_write(ENV *env, WT_PAGE *page)
 
 	F_CLR(page, WT_MODIFIED);
 
-	WT_STAT_DECR(env->ienv->stats, CACHE_DIRTY, NULL);
-	WT_STAT_INCR(env->ienv->stats, CACHE_CLEAN, NULL);
 	WT_STAT_INCR(env->ienv->stats, CACHE_WRITE, "writes from the cache");
 
 	return (0);
-}
-
-/*
- * __wt_cache_discard_server --
- *	Sever version: discard a page of a file.
- */
-static void
-__wt_cache_discard_server(WT_TOC *toc)
-{
-	__wt_cache_discard(toc->env,
-	    ((WT_REQ_DISCARD *)toc->request_args)->page);
-	WT_TOC_REQUEST_COMPLETE(toc);
-}
-
-/*
- * __wt_cache_discard --
- *	Discard a page of a file.
- */
-static void
-__wt_cache_discard(ENV *env, WT_PAGE *page)
-{
-	WT_CACHE *cache;
-	WT_PAGE **hb, *tpage;
-
-	cache = &env->ienv->cache;
-
-	WT_ASSERT(env, cache->bytes_alloc >= page->bytes);
-	cache->bytes_alloc -= page->bytes;
-
-	hb = &cache->hb[WT_HASH(cache, page->offset)];
-	if (*hb == page)
-		*hb = page->next;
-	else
-		for (tpage = *hb;; tpage = tpage->next)
-			if (tpage->next == page) {
-				tpage->next = page->next;
-				break;
-			}
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -563,7 +656,7 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
  *	Dump a cache.
  */
 static int
-__wt_cache_dump(ENV *env, char *ofile, FILE *fp)
+__wt_cache_dump(ENV *env, const char *ofile, FILE *fp)
 {
 	WT_CACHE *cache;
 	WT_PAGE *page;
@@ -572,7 +665,7 @@ __wt_cache_dump(ENV *env, char *ofile, FILE *fp)
 	int do_close, page_count;
 	char *sep;
 
-	WT_RET(__wt_bt_dump_set_fp(ofile, &fp, &do_close));
+	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "Cache dump: ==================\n");
 	page_total = 0;
@@ -580,7 +673,8 @@ __wt_cache_dump(ENV *env, char *ofile, FILE *fp)
 	for (i = 0; i < cache->hashsize; ++i) {
 		sep = "";
 		page_count = 0;
-		for (page = cache->hb[i]; page != NULL; page = page->next) {
+		for (
+		    page = cache->hb[i].list; page != NULL; page = page->next) {
 			++page_total;
 			if (page_count == 0) {
 				fprintf(fp, "hash bucket %3d: ", i);
