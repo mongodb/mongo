@@ -15,16 +15,17 @@ static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 static int __wt_bt_promote(WT_TOC *, WT_PAGE *, u_int64_t, u_int32_t *);
 
 /*
- * __wt_api_db_bulk_load --
+ * __wt_db_bulk_load --
  *	Db.bulk_load method.
  */
 int
-__wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
+__wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 {
 	DBT *key, *data, key_copy, data_copy;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
-	IDB *idb;
 	ENV *env;
+	IDB *idb;
+	IENV *ienv;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
@@ -33,9 +34,10 @@ __wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	int ret;
 
 	env = db->env;
+	ienv = env->ienv;
 	idb = db->idb;
+	ret = 0;
 
-	WT_DB_FCHK(db, "Db.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
 	dup_space = dup_count = 0;
@@ -48,7 +50,8 @@ __wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(lastkey_std);
 
-	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.bulk_load");
 
 	/*
 	 * Allocate our first page -- we do this before we look at any keys
@@ -56,7 +59,7 @@ __wt_api_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	 * case we would allocate page 0 as an overflow page, which is, for
 	 * lack of a better phrase, "bad".
 	 */
-	WT_RET(__wt_bt_page_alloc(toc, 1, &page));
+	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
 	page->hdr->type = WT_PAGE_LEAF;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
@@ -237,6 +240,23 @@ skip_read:
 
 			/* Switch to the next page. */
 			page = next;
+
+			/*
+			 * Bulk-load is a long-lived action and we can't let it
+			 * block the cache server thread for the entire time.
+			 * If API calls are blocked because we're running out
+			 * of room, pin the page we're holding and wait for the
+			 * cache thread.
+			 *
+			 * Pinning the page is safe -- this is a bulk load,
+			 * nobody else better be looking at this page.
+			 */
+			if (ienv->cache_lockout) {
+				F_SET(page, WT_PINNED);
+				WT_TOC_SERIALIZE_VALUE(
+				    toc, &ienv->cache_lockout);
+				F_CLR(page, WT_PINNED);
+			}
 		}
 
 		/* Copy the key item onto the page. */
@@ -347,6 +367,8 @@ err:		if (page != NULL)
 	}
 
 	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data);
+
+	WT_TRET(toc->close(toc, 0));
 
 	return (ret == 1 ? 0 : ret);
 }
