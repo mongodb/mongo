@@ -49,7 +49,7 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 
 /*
  * __wt_bt_page_in --
- *	Read a btree page from the cache.
+ *	Get a btree page from the cache.
  */
 int
 __wt_bt_page_in(
@@ -64,7 +64,7 @@ __wt_bt_page_in(
 	    isleaf ? db->leafsize : db->intlsize, 0, &page)));
 
 	/* Verify the page. */
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL, NULL) == 0);
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
@@ -76,15 +76,19 @@ __wt_bt_page_in(
 
 /*
  * __wt_bt_page_out --
- *	Write a btree page to the cache.
+ *	Return a btree page to the cache.
  */
 int
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
-	/* Verify the page. */
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL, NULL) == 0);
+	/*
+	 * We don't have to call the cache code unless the page was modified
+	 * (WT_MODIFIED).   We have this function as a place to verify a page
+	 * after it's been accessed.
+	 */
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
-	return (__wt_cache_out(toc, page, flags));
+	return (flags == 0 ? 0 : __wt_cache_out(toc, page, flags));
 }
 
 /*
@@ -107,7 +111,14 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	}
 	if (page->indx != NULL)
 		__wt_free(env, page->indx);
+#ifdef HAVE_DIAGNOSTIC
+	memset(page->hdr, WT_OVERWRITE, page->bytes);
+#endif
 	__wt_free(env, page->hdr);
+
+#ifdef HAVE_DIAGNOSTIC
+	memset(page, WT_OVERWRITE, sizeof(WT_PAGE));
+#endif
 	__wt_free(env, page);
 }
 
