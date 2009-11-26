@@ -1,6 +1,7 @@
 #include <sys/types.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,23 +21,27 @@ int keys_cnt = 0;				/* Count of keys in this run */
 int leafsize = 0;				/* Leaf page size */
 int nodesize = 0;				/* Node page size */
 int runs = 0;					/* Runs: default forever */
-int singlethread = 0;				/* Single-threaded */
 int stats = 0;					/* Show statistics */
 int verbose = 0;				/* Verbose debugging */
 
 const char *progname;
 
-int  load(void);
-void progress(const char *, int);
-int  read_check(void);
-void setkd(int, void *, u_int32_t *, void *, u_int32_t *, int);
-void usage(void);
+FILE *logfp;
+char *logfile;
+
+void	track(const char *, u_int32_t);
+int	load(void);
+void	progress(const char *, u_int32_t);
+int	read_check(void);
+void	setkd(int, void *, u_int32_t *, void *, u_int32_t *, int);
+void	usage(void);
 
 int
 main(int argc, char *argv[])
 {
 	u_int r;
-	int ch, defkeys, defleafsize, defnodesize, defthread, i, ret, run_cnt;
+	int ch, i, ret, run_cnt;
+	int defcachesize, defkeys, defleafsize, defnodesize;
 
 	ret = 0;
 	_malloc_options = "AJZ";
@@ -47,10 +52,11 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
-	defkeys = defleafsize = defnodesize = defthread = 1;
-	while ((ch = getopt(argc, argv, "c:dk:l:mn:R:r:Ssv")) != EOF)
+	defcachesize = defkeys = defleafsize = defnodesize =  1;
+	while ((ch = getopt(argc, argv, "c:dk:L:l:n:R:r:Sv")) != EOF)
 		switch (ch) {
 		case 'c':
+			defcachesize = 0;
 			cachesize = atoi(optarg);
 			break;
 		case 'd':
@@ -64,8 +70,8 @@ main(int argc, char *argv[])
 			defleafsize = 0;
 			leafsize = atoi(optarg);
 			break;
-		case 'm':
-			defthread = singlethread = 0;
+		case 'L':
+			logfile = optarg;
 			break;
 		case 'n':
 			defnodesize = 0;
@@ -80,10 +86,6 @@ main(int argc, char *argv[])
 		case 'S':
 			stats = 1;
 			break;
-		case 's':
-			defthread = 0;
-			singlethread = 1;
-			break;
 		case 'v':
 			verbose = 1;
 			break;
@@ -94,16 +96,28 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	printf("get: process %lu\n", (u_long)getpid());
 	for (run_cnt = 1; runs == 0 || run_cnt < runs + 1; ++run_cnt) {
 		(void)remove(MYDB);
 		(void)remove(MYDUMP);
 		(void)remove(MYPRINT);
 
+		if (logfp != NULL)
+			(void)fclose(logfp);
+		if (logfile != NULL && (logfp = fopen(logfile, "w")) == NULL) {
+			fprintf(stderr, "%s: %s\n", logfile, strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
 		srand(r);
 
-		/* If no number of keys, choose up to 1M. */
+		/* If no number of keys, choose up to 5M. */
 		if (defkeys)
-			keys = rand() % 1000000;
+			keys = rand() % 5000000;
+
+		/* If no cachesize given, choose between 2M and 20M. */
+		if (defcachesize)
+			cachesize = 2 + rand() % 18;
 
 		/*
 		 * If no leafsize or nodesize given, choose between 512B and
@@ -116,13 +130,9 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
-		if (defthread)
-			singlethread = rand () % 2;
-
 		(void)printf(
-		    "%s: %4d { %s -k %6d -l %6d -n %6d -R %#010lx }\n\t",
-		    progname, run_cnt,
-		    singlethread ? "-s" : "-m", keys, leafsize, nodesize, r);
+		    "%s: %4d { -c %2d -k %7d -l %6d -n %6d -R %#010lx }\n\t",
+		    progname, run_cnt, cachesize, keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		keys_cnt = 0;
@@ -158,16 +168,27 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	return (0);
 }
 
+void
+track(const char *s, u_int32_t i)
+{
+	progress(s, i);
+}
+
 int
 load()
 {
+	pthread_t tid;
 	ENV *env;
 	DB *db;
 	FILE *fp;
 
-	assert(wiredtiger_simple_setup(progname, singlethread, &db) == 0);
+	assert(wiredtiger_simple_setup(progname, &db) == 0);
 	env = db->env;
 
+	if (logfp != NULL) {
+		env->msgfile_set(env, logfp);
+		env->verbose_set(env, 0);
+	}
 	db->errpfx_set(db, progname);
 	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
 	assert(db->btree_pagesize_set(
@@ -177,8 +198,7 @@ load()
 	assert(db->bulk_load(db,
 	    WT_DUPLICATES | WT_SORTED_INPUT, cb_bulk) == 0);
 
-	progress("sync", 0);
-	assert(db->sync(db, 0) == 0);
+	assert(db->sync(db, track, 0) == 0);
 
 	if (dumps) {
 		progress("debug dump", 0);
@@ -192,8 +212,7 @@ load()
 		assert(fclose(fp) == 0);
 	}
 
-	progress("verify", 0);
-	assert(db->verify(db, 0) == 0);
+	assert(db->verify(db, track, 0) == 0);
 
 	if (stats) {
 		(void)printf("\nLoad statistics:\n");
@@ -219,9 +238,13 @@ read_check()
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
 
-	assert(wiredtiger_simple_setup(progname, singlethread, &db) == 0);
+	assert(wiredtiger_simple_setup(progname, &db) == 0);
 	env = db->env;
 
+	if (logfp != NULL) {
+		env->msgfile_set(env, logfp);
+		env->verbose_set(env, 0);
+	}
 	db->errpfx_set(db, progname);
 	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
 	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
@@ -341,7 +364,7 @@ setkd(int cnt,
 }
 
 void
-progress(const char *s, int i)
+progress(const char *s, u_int32_t i)
 {
 	static int maxlen = 0;
 	int len;
@@ -355,7 +378,7 @@ progress(const char *s, int i)
 	else if (i == 0)
 		len = snprintf(msg, sizeof(msg), "%s", s);
 	else
-		len = snprintf(msg, sizeof(msg), "%s %d", s, i);
+		len = snprintf(msg, sizeof(msg), "%s %lu", s, (u_int32_t)i);
 
 	for (p = msg + len; len < maxlen; ++len)
 		*p++ = ' ';
@@ -371,7 +394,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: get [-dmSsv] [-c cachesize] [-k keys] [-l leafsize] "
-	    "[-n nodesize] [-R rand] [-r runs]\n");
+	    "usage: get [-dSv] [-c cachesize]\n    [-k keys] [-L logfile] "
+	    "[-l leafsize] [-n nodesize] [-R rand] [-r runs]\n");
 	exit(1);
 }
