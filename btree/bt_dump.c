@@ -24,11 +24,11 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
 }
 
 /*
- * __wt_api_db_dump --
+ * __wt_db_dump --
  *	Db.dump method.
  */
 int
-__wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
+__wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 {
 	DBT last_key_ovfl, last_key_std, *last_key;
 	ENV *env;
@@ -41,8 +41,7 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	void (*func)(u_int8_t *, u_int32_t, FILE *);
 
 	env = db->env;
-
-	WT_DB_FCHK(db, "Db.dump", flags, WT_APIMASK_DB_DUMP);
+	ret = 0;
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
@@ -53,7 +52,8 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 #endif
 	}
 
-	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.dump");
 
 	dup_ahead = ret = 0;
 	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
@@ -67,7 +67,7 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	WT_CLEAR(last_key_ovfl);
 
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		WT_RET(__wt_bt_page_in(toc, addr, 1, 0, &page));
+		WT_ERR(__wt_bt_page_in(toc, addr, 1, 0, &page));
 
 		WT_ITEM_FOREACH(page, item, i) {
 			item_len = WT_ITEM_LEN(item);
@@ -105,7 +105,7 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-				WT_RET(__wt_bt_ovfl_in(toc,
+				WT_ERR(__wt_bt_ovfl_in(toc,
 				    ovfl->addr, ovfl->len, &ovfl_page));
 
 				/*
@@ -122,7 +122,7 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 				 * later display.  Otherwise, dump this item.
 				 */
 				if (dup_ahead) {
-					WT_RET(__wt_bt_data_copy_to_dbt(db,
+					WT_ERR(__wt_bt_data_copy_to_dbt(db,
 					    WT_PAGE_BYTE(ovfl_page), ovfl->len,
 					    &last_key_ovfl));
 					last_key = &last_key_ovfl;
@@ -131,11 +131,11 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 					func(WT_PAGE_BYTE(ovfl_page),
 					    ovfl->len, stream);
 
-				WT_RET(__wt_bt_page_out(toc, ovfl_page, 0));
+				WT_ERR(__wt_bt_page_out(toc, ovfl_page, 0));
 				break;
 			case WT_ITEM_OFFP_INTL:
 			case WT_ITEM_OFFP_LEAF:
-				WT_RET(__wt_bt_dump_offpage(
+				WT_ERR(__wt_bt_dump_offpage(
 				    toc, last_key, item, stream, func));
 				break;
 			WT_DEFAULT_FORMAT(db);
@@ -143,13 +143,15 @@ __wt_api_db_dump(DB *db, FILE *stream, u_int32_t flags)
 		}
 
 		addr = page->hdr->nextaddr;
-		WT_RET(__wt_bt_page_out(toc, page, 0));
+		WT_ERR(__wt_bt_page_out(toc, page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
 	}
 
-	/* Discard any space allocated to hold an overflow key. */
+err:	/* Discard any space allocated to hold an overflow key. */
 	WT_FREE_AND_CLEAR(env, last_key_ovfl.data);
+
+	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
 }

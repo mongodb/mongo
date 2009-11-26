@@ -19,20 +19,28 @@ static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
 int
 __wt_bt_stat(DB *db)
 {
+	ENV *env;
 	IDB *idb;
 	WT_TOC *toc;
+	int ret;
 
+	env = db->env;
 	idb = db->idb;
+	ret = 0;
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL, "number of levels in the Btree");
 
-	WT_TOC_INTERNAL(toc, db);		/* Use the internal TOC. */
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.stat");
 
 	/* If no root address has been set, it's a one-leaf-page database. */
-	if (idb->root_addr == WT_ADDR_INVALID)
-		return (__wt_bt_stat_page(toc, idb->root_page));
+	ret = idb->root_addr == WT_ADDR_INVALID ?
+	    __wt_bt_stat_page(toc, idb->root_page) :
+	    __wt_bt_stat_level(toc, idb->root_addr, 0);
 
-	return (__wt_bt_stat_level(toc, idb->root_addr, 0));
+	WT_TRET(toc->close(toc, 0));
+
+	return (ret);
 }
 
 /*

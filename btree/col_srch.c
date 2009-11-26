@@ -13,11 +13,11 @@ static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_INDX **);
 static int __wt_bt_search_recno(WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
 
 /*
- * __wt_api_db_get --
+ * __wt_db_get --
  *	Db.get method when called directly from a user thread.
  */
 int
-__wt_api_db_get(
+__wt_db_get(
     DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
@@ -27,7 +27,6 @@ __wt_api_db_get(
 	int ret;
 
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
-	WT_DB_FCHK(db, "Db.get", flags, WT_APIMASK_DB_GET);
 
 	idb = db->idb;
 
@@ -35,7 +34,7 @@ __wt_api_db_get(
 	    DB_READ_BY_KEY, "database read-by-key operations");
 
 	/* Initialize the thread-of-control structure. */
-	WT_TOC_INIT(toc, db);
+	WT_TOC_DB_INIT(toc, db, "Db.get");
 
 	/* Search the primary btree for the key. */
 	WT_RET(__wt_bt_search(toc, key, &page, &indx));
@@ -57,7 +56,7 @@ __wt_api_db_get(
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
-	WT_TOC_CLEAR(toc);
+	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }
@@ -176,11 +175,11 @@ err:	if (put_page)
 }
 
 /*
- * __wt_api_db_get_recno --
+ * __wt_db_get_recno --
  *	Db.get_recno method when called directly from a user thread.
  */
 int
-__wt_api_db_get_recno(DB *db, WT_TOC *toc,
+__wt_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
@@ -190,7 +189,6 @@ __wt_api_db_get_recno(DB *db, WT_TOC *toc,
 	int ret;
 
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
-	WT_DB_FCHK(db, "Db.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
 
 	idb = db->idb;
 
@@ -202,7 +200,7 @@ __wt_api_db_get_recno(DB *db, WT_TOC *toc,
 		return (WT_ERROR);
 
 	/* Initialize the thread-of-control structure. */
-	WT_TOC_INIT(toc, db);
+	WT_TOC_DB_INIT(toc, db, "Db.get_recno");
 
 	/* Search the primary btree for the key. */
 	WT_RET(__wt_bt_search_recno(toc, recno, &page, &indx));
@@ -224,7 +222,7 @@ __wt_api_db_get_recno(DB *db, WT_TOC *toc,
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
-	WT_TOC_CLEAR(toc);
+	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }
