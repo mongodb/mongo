@@ -61,6 +61,10 @@ extern "C" {
 #define	FLD_ISSET(field, mask)	((field) & (mask) ? 1 : 0)
 #define	FLD_SET(field, mask)	((field) |= (mask))
 
+/* Check for a verbose flag setting. */
+#define	WT_VERB_ISSET(env, f)						\
+	FLD_ISSET((env)->verbose, WT_VERB_ALL | (f))
+
 /* Clear a chunk of memory. */
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
@@ -75,7 +79,7 @@ extern "C" {
 } while (0)
 
 /* A distinguished byte pattern to overwrite memory we are done using. */
-#define	OVERWRITE_BYTE	0xab
+#define	WT_OVERWRITE	0xab
 
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_ASSERT(env, e)						\
