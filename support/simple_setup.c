@@ -18,7 +18,7 @@ static ENV *__env;
  *	Standard setup for simple applications.
  */
 int
-wiredtiger_simple_setup(const char *progname, int singlethread, DB **dbp)
+wiredtiger_simple_setup(const char *progname, DB **dbp)
 {
 	DB *db;
 	ENV *env;
@@ -26,8 +26,7 @@ wiredtiger_simple_setup(const char *progname, int singlethread, DB **dbp)
 
 	db = *dbp = NULL;
 
-	if ((ret = wiredtiger_env_init(
-	    &env, singlethread ? WT_SINGLE_THREADED : 0)) != 0) {
+	if ((ret = wiredtiger_env_init(&env, 0)) != 0) {
 		fprintf(stderr,
 		    "%s: wiredtiger_env_init: %s\n",
 		    progname, wt_strerror(ret));
