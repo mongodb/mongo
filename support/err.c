@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_errcall --
- *	Pass an error message to a callback function.
+ * __wt_msg_call --
+ *	Pass a message to a callback function.
  */
 void
-__wt_errcall(void *cb, void *handle,
+__wt_msg_call(void *cb, void *handle,
     const char *pfx1, const char *pfx2,
     int error, const char *fmt, va_list ap)
 {
@@ -56,11 +56,11 @@ __wt_errcall(void *cb, void *handle,
 }
 
 /*
- * __wt_errfile --
- *	Write an error message to a FILE stream.
+ * __wt_msg_stream --
+ *	Write a message to a FILE stream.
  */
 void
-__wt_errfile(FILE *fp,
+__wt_msg_stream(FILE *fp,
     const char *pfx1, const char *pfx2, int error, const char *fmt, va_list ap)
 {
 	if (fp == NULL)
