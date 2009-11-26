@@ -30,17 +30,6 @@ struct __wt_stats {
 #define	WT_STAT_DECR(stats, def, str)					\
 	--(stats)[WT_STAT_ ## def].v
 
-#define	WT_STAT_FIELD_PRINT(stream, s) do {				\
-	if ((s)->v >= WT_BILLION)					\
-		fprintf(stream, "%lluB\t%s (%llu)\n",			\
-		    stats->v / WT_BILLION, stats->desc, stats->v);	\
-	else if ((s)->v >= WT_MILLION)					\
-		fprintf(stream, "%lluM\t%s (%llu)\n",			\
-		    stats->v / WT_MILLION, stats->desc, stats->v);	\
-	else								\
-		fprintf(stream, "%llu\t%s\n", stats->v, stats->desc);	\
-} while (0)
-
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
@@ -96,27 +85,25 @@ struct __wt_stats {
  * Statistics entries for IENV_STATS
  */
 #define	WT_STAT_CACHE_ALLOC		    0
-#define	WT_STAT_CACHE_CLEAN		    1
-#define	WT_STAT_CACHE_DIRTY		    2
-#define	WT_STAT_CACHE_EVICT		    3
-#define	WT_STAT_CACHE_HIT		    4
-#define	WT_STAT_CACHE_MISS		    5
-#define	WT_STAT_CACHE_WRITE		    6
-#define	WT_STAT_CACHE_WRITE_EVICT	    7
-#define	WT_STAT_DATABASE_OPEN		    8
-#define	WT_STAT_HASH_BUCKETS		    9
-#define	WT_STAT_LONGEST_BUCKET		   10
-#define	WT_STAT_MEMALLOC		   11
-#define	WT_STAT_MEMFREE			   12
-#define	WT_STAT_MTX_LOCK		   13
-#define	WT_STAT_TOTAL_READ_IO		   14
-#define	WT_STAT_TOTAL_WRITE_IO		   15
-#define	WT_STAT_WORKQ_CACHE_ALLOC_REQUESTS	   16
-#define	WT_STAT_WORKQ_PASSES		   17
-#define	WT_STAT_WORKQ_REQUESTS		   18
-#define	WT_STAT_WORKQ_SLEEP		   19
-#define	WT_STAT_WORKQ_YIELD		   20
-#define	WT_STAT_IENV_STATS_TOTAL	   21
+#define	WT_STAT_CACHE_EVICT		    1
+#define	WT_STAT_CACHE_HIT		    2
+#define	WT_STAT_CACHE_MISS		    3
+#define	WT_STAT_CACHE_WRITE		    4
+#define	WT_STAT_CACHE_WRITE_EVICT	    5
+#define	WT_STAT_DATABASE_OPEN		    6
+#define	WT_STAT_HASH_BUCKETS		    7
+#define	WT_STAT_LONGEST_BUCKET		    8
+#define	WT_STAT_MEMALLOC		    9
+#define	WT_STAT_MEMFREE			   10
+#define	WT_STAT_MTX_LOCK		   11
+#define	WT_STAT_TOTAL_READ_IO		   12
+#define	WT_STAT_TOTAL_WRITE_IO		   13
+#define	WT_STAT_WORKQ_PASSES		   14
+#define	WT_STAT_WORKQ_PRIVATE_SERIALIZE	   15
+#define	WT_STAT_WORKQ_SERIALIZE		   16
+#define	WT_STAT_WORKQ_SLEEP		   17
+#define	WT_STAT_WORKQ_YIELD		   18
+#define	WT_STAT_IENV_STATS_TOTAL	   19
 
 /* Statistics section: END */
 
