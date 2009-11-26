@@ -35,20 +35,15 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 
 	/* Connect everything together. */
 	env->ienv = ienv;
-	ienv->env = env;
 
 	/* Configure the ENV and the IENV. */
 	WT_ERR(__wt_env_config_default(env));
 	WT_ERR(__wt_ienv_config_default(env));
 
-	/* If we're not single-threaded, start the workQ thread. */
-	if (LF_ISSET(WT_SINGLE_THREADED))
-		F_SET(ienv, WT_SINGLE_THREADED);
-
 	*envp = env;
 	return (0);
 
-err:	(void)__wt_api_env_close(env, 0);
+err:	(void)__wt_env_close(env, 0);
 	return (ret);
 }
 
@@ -59,6 +54,8 @@ err:	(void)__wt_api_env_close(env, 0);
 static int
 __wt_env_config_default(ENV *env)
 {
+	env->cachesize = WT_CACHE_DEFAULT_SIZE;
+
 	__wt_methods_env_lockout(env);
 	__wt_methods_env_init_transition(env);
 	return (0);
@@ -75,10 +72,11 @@ __wt_ienv_config_default(ENV *env)
 	IENV *ienv;
 
 	ienv = env->ienv;
-	ienv->env = env;
 
-	/* Initialize the global mutex. */
-	WT_RET(__wt_mtx_init(&ienv->mtx));
+	WT_RET(__wt_mtx_init(&ienv->mtx));	/* Global mutex */
+
+						/* API generation */
+	ienv->api_gen = WT_TOC_GEN_IGNORE + 1;
 
 	TAILQ_INIT(&ienv->tocqh);		/* WT_TOC list */
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
