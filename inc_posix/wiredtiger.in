@@ -86,61 +86,30 @@ struct __dbt {
  * Application thread-of-control information
  *******************************************/
 struct __wt_toc {
+	char	 *name;			/* Name */
+
 	/*
 	 * Enclosing environment, set when the WT_TOC is created (which
 	 * implies that threads-of-control are confined to an environment).
-	 */
-	ENV	*env;			/* Operation environment */
-
-	/*
+	 *
 	 * Explicit representations of structures from queue.h.
 	 * TAILQ_ENTRY(__wt_toc) q;
 	 */
+	ENV	*env;			/* Operation environment */
 	struct {
 		struct __wt_toc *tqe_next;
 		struct __wt_toc **tqe_prev;
-	} q;				/* Linked list of WT_TOCs */
+	} q;				/* Environment's list of WT_TOCs */
 
-	/*
-	 * We pass around WT_TOCs internally in the Btree, (rather than a DB),
-	 * because the DB's are free-threaded, and the WT_TOCs are per-thread.
-	 * WT_TOCs always reference a DB handle, though.
-	 */
-#define	WT_TOC_INIT(toc, _db) do {					\
-	(toc)->db = (_db);						\
-} while (0)
-#define	WT_TOC_CLEAR(toc) do {						\
-	(toc)->db = NULL;						\
-} while (0)
+	u_int32_t api_gen;		/* API generation */
 
 	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	/*
-	 * WT_TOCs make requests of server threads running in the environment.
-	 * This is done by calling a supporting function that takes the toc as
-	 * an argument.   No error can be returned to the server thread, the
-	 * WT_TOC has to somehow pass that information back to itself.
-	 */
-#define	WT_TOC_REQUEST(toc, f, args) do {				\
-	(toc)->request_args = args;					\
-	if (F_ISSET(toc, WT_SINGLE_THREADED))				\
-		f(toc);							\
-	else {								\
-		(toc)->request = f;					\
-		WT_FLUSH_MEMORY;					\
-		while ((toc)->request != NULL)				\
-			__wt_yield();					\
-	}								\
-} while (0)
-#define	WT_TOC_REQUEST_COMPLETE(toc) do {				\
-	(toc)->request = NULL;						\
-	WT_FLUSH_MEMORY;						\
-} while (0)
-	void (*request)(WT_TOC *);
-	void *request_args;
-
-	u_int32_t flags;
+	int	 (*serialize)(WT_TOC *);/* Serialization function */
+	void	  *serialize_args;	/* Serialization function argument */
+	int	   serialize_ret;	/* Serialization function return */
+	u_int32_t *serialize_private;	/* Private serialization reference */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -159,12 +128,9 @@ struct __wt_toc {
  *******************************************/
 struct __db {
 	ENV	*env;			/* Enclosing environment */
-	IENV	*ienv;			/* Private environment object */
 	IDB	*idb;			/* Private object */
 
 	void	*app_private;		/* Application-private information */
-
-	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -276,13 +242,13 @@ struct __db {
 	    DB *, u_int32_t );
 
 	int (*stat_print)(
-	    DB *, FILE * , u_int32_t );
+	    DB *, FILE *, u_int32_t );
 
 	int (*sync)(
-	    DB *, u_int32_t );
+	    DB *, void (*)(const char *, u_int32_t), u_int32_t );
 
 	int (*verify)(
-	    DB *, u_int32_t );
+	    DB *, void (*)(const char *, u_int32_t), u_int32_t );
 	/*
 	 * DB methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -294,8 +260,6 @@ struct __db {
  *******************************************/
 struct __dbc {
 	IDBC *idbc;			/* Private object */
-
-	u_int32_t flags;
 };
 
 /*******************************************
@@ -305,8 +269,6 @@ struct __env {
 	IENV	*ienv;			/* Private object */
 
 	void	*app_private;		/* Application-private information */
-
-	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -319,6 +281,10 @@ struct __env {
 	FILE *errfile;
 
 	const char *errpfx;
+
+	void (*msgcall)(const ENV *, const char *);
+
+	FILE *msgfile;
 
 	u_int32_t verbose;
 	/*
@@ -366,6 +332,18 @@ struct __env {
 	void (*errx)(
 	    ENV *, const char *, ...);
 
+	int (*msgcall_get)(
+	    ENV *, void (**)(const ENV *, const char *));
+
+	int (*msgcall_set)(
+	    ENV *, void (*)(const ENV *, const char *));
+
+	int (*msgfile_get)(
+	    ENV *, FILE **);
+
+	int (*msgfile_set)(
+	    ENV *, FILE *);
+
 	int (*open)(
 	    ENV *, const char *, mode_t , u_int32_t );
 
@@ -407,18 +385,19 @@ char	*wt_version(int *, int *, int *);
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
-#define	WT_INITIALIZED					0x00000001
-#define	WT_INVALID					0x00000002
-#define	WT_MODIFIED					0x00000002
+#define	WT_INITIALIZED					0x00000002
+#define	WT_MODIFIED					0x00000008
+#define	WT_PINNED					0x00000004
 #define	WT_PRINTABLES					0x00000001
-#define	WT_RUNNING					0x00000002
-#define	WT_SINGLE_THREADED				0x00000001
+#define	WT_SERVER_RUN					0x00000002
+#define	WT_SERVER_SLEEPING				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
-#define	WT_UNFORMATTED					0x00000001
-#define	WT_VERB_FILEOPS					0x00000002
-#define	WT_VERB_FILEOPS_ALL				0x00000001
+#define	WT_UNFORMATTED					0x00000002
+#define	WT_VERB_ALL					0x00000002
+#define	WT_VERB_FILEOPS					0x00000001
+#define	WT_WORKQ_RUN					0x00000001
 
-#define	WT_APIMASK_CACHE				0x00000001
+#define	WT_APIMASK_CACHE				0x00000003
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000003
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
@@ -438,12 +417,9 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_TOC				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
 #define	WT_APIMASK_IENV					0x00000003
-#define	WT_APIMASK_TOC					0x00000003
-#define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
-#define	WT_APIMASK_WT_CACHE_IN				0x00000001
-#define	WT_APIMASK_WT_CACHE_OUT				0x00000003
+#define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000001
-#define	WT_APIMASK_WT_PAGE				0x00000003
+#define	WT_APIMASK_WT_PAGE				0x0000000f
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END
