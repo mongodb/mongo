@@ -12,17 +12,15 @@
 static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
 
 /*
- * __wt_api_db_open --
+ * __wt_db_open --
  *	Open a DB handle.
  */
 int
-__wt_api_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
+__wt_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 {
 	ENV *env;
 
 	env = db->env;
-
-	WT_DB_FCHK(db, "Db.open", flags, WT_APIMASK_DB_OPEN);
 
 	WT_STAT_INCR(env->ienv->stats, DATABASE_OPEN, "database open");
 

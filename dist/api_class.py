@@ -19,9 +19,11 @@
 #	1: the method name
 #		 'handle' + '.' + 'method'
 #	2: a string of comma-separated configuration key words
+#		cache	-- method reads/writes the cache
 #		getter	-- getter method
 #		method	-- method returns an int
 #		methodV -- method returns void
+#		noauto	-- hand-coded method, don't create a stub
 #		setter	-- setter method
 #		verify  -- setters call a function to validate the arguments
 #	3: a list of argument and name/declaration pairs
@@ -91,8 +93,9 @@ methods['env.db'] = Api(
 
 methods['env.err'] = Api(
 	'env.err',
-	'methodV',
-	['err/int @S', 'fmt/const char *@S, ...'],
+	'methodV, noauto',
+	['err/int @S',
+	 'fmt/const char *@S, ...'],
 	[],
 	['init'], [])
 
@@ -137,15 +140,43 @@ methods['env.errpfx_set'] = Api(
 
 methods['env.errx'] = Api(
 	'env.errx',
-	'methodV',
+	'methodV, noauto',
 	['fmt/const char *@S, ...'],
+	[],
+	['init'], [])
+
+methods['env.msgcall_get'] = Api(
+	'env.msgcall_get',
+	'method, getter',
+	['msgcall/void (**@S)(const ENV *, const char *)'],
+	[],
+	['init'], [])
+methods['env.msgcall_set'] = Api(
+	'env.msgcall_set',
+	'method, setter',
+	['msgcall/void (*@S)(const ENV *, const char *)'],
+	[],
+	['init'], [])
+
+methods['env.msgfile_get'] = Api(
+	'env.msgfile_get',
+	'method, getter',
+	['msgfile/FILE **@S'],
+	[],
+	['init'], [])
+methods['env.msgfile_set'] = Api(
+	'env.msgfile_set',
+	'method, setter',
+	['msgfile/FILE *@S'],
 	[],
 	['init'], [])
 
 methods['env.open'] = Api(
 	'env.open',
 	'method',
-	['home/const char *@S', 'mode/mode_t @S', 'flags/u_int32_t @S'],
+	['home/const char *@S',
+	 'mode/mode_t @S',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['init'], ['open'])
 
@@ -159,14 +190,16 @@ methods['env.stat_clear'] = Api(
 methods['env.stat_print'] = Api(
 	'env.stat_print',
 	'method',
-	['stream/FILE *@S', 'flags/u_int32_t @S'],
+	['stream/FILE *@S',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['init'], [])
 
 methods['env.toc'] = Api(
 	'env.toc',
 	'method',
-	['flags/u_int32_t @S', 'tocp/WT_TOC **@S'],
+	['flags/u_int32_t @S',
+	 'tocp/WT_TOC **@S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -178,11 +211,10 @@ methods['env.verbose_get'] = Api(
 	['init'], [])
 methods['env.verbose_set'] = Api(
 	'env.verbose_set',
-	'method, setter, verify',
+	'method, setter',
 	['verbose/u_int32_t @S'],
-	[
-	'VERB_FILEOPS',
-	'VERB_FILEOPS_ALL'],
+	['VERB_ALL',
+	 'VERB_FILEOPS'],
 	['init'], [])
 
 ###################################################
@@ -243,35 +275,42 @@ methods['db.btree_dup_offpage_set'] = Api(
 methods['db.btree_itemsize_get'] = Api(
 	'db.btree_itemsize_get',
 	'method, getter',
-	['intlitemsize/u_int32_t *@S', 'leafitemsize/u_int32_t *@S'],
+	['intlitemsize/u_int32_t *@S',
+	 'leafitemsize/u_int32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_itemsize_set'] = Api(
 	'db.btree_itemsize_set',
 	'method, setter',
-	['intlitemsize/u_int32_t @S', 'leafitemsize/u_int32_t @S'],
+	['intlitemsize/u_int32_t @S',
+	 'leafitemsize/u_int32_t @S'],
 	[],
 	['init'], ['open'])
 
 methods['db.btree_pagesize_get'] = Api(
 	'db.btree_pagesize_get',
 	'method, getter',
-	['allocsize/u_int32_t *@S', 'intlsize/u_int32_t *@S',
-	    'leafsize/u_int32_t *@S', 'extsize/u_int32_t *@S'],
+	['allocsize/u_int32_t *@S',
+	 'intlsize/u_int32_t *@S',
+	 'leafsize/u_int32_t *@S',
+	 'extsize/u_int32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_pagesize_set'] = Api(
 	'db.btree_pagesize_set',
 	'method, setter',
-	['allocsize/u_int32_t @S', 'intlsize/u_int32_t @S',
-	    'leafsize/u_int32_t @S', 'extsize/u_int32_t @S'],
+	['allocsize/u_int32_t @S',
+	 'intlsize/u_int32_t @S',
+	 'leafsize/u_int32_t @S',
+	 'extsize/u_int32_t @S'],
 	[],
 	['init'], ['open'])
 
 methods['db.bulk_load'] = Api(
 	'db.bulk_load',
 	'method',
-	['flags/u_int32_t @S', 'cb/int (*@S)(DB *, DBT **, DBT **)'],
+	['flags/u_int32_t @S',
+	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
 	[
 	'DUPLICATES',
 	'SORTED_INPUT' ],
@@ -287,8 +326,10 @@ methods['db.close'] = Api(
 methods['db.dump'] = Api(
 	'db.dump',
 	'method',
-	['stream/FILE *@S', 'flags/u_int32_t @S'],
-	[ 'DEBUG', 'PRINTABLES' ],
+	['stream/FILE *@S',
+	 'flags/u_int32_t @S'],
+	['DEBUG',
+	 'PRINTABLES' ],
 	['open'], [])
 
 methods['db.errcall_get'] = Api(
@@ -332,24 +373,33 @@ methods['db.errpfx_set'] = Api(
 
 methods['db.get'] = Api(
 	'db.get',
-	'method',
-	['toc/WT_TOC *@S', 'key/DBT *@S',
-	    'pkey/DBT *@S', 'data/DBT *@S', 'flags/u_int32_t @S'],
+	'method, cache',
+	['toc/WT_TOC *@S',
+	 'key/DBT *@S',
+	 'pkey/DBT *@S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.get_recno'] = Api(
 	'db.get_recno',
-	'method',
-	['toc/WT_TOC *@S', 'recno/u_int64_t @S', 'key/DBT *@S',
-	    'pkey/DBT *@S', 'data/DBT *@S', 'flags/u_int32_t @S'],
+	'method, cache',
+	['toc/WT_TOC *@S',
+	 'recno/u_int64_t @S',
+	 'key/DBT *@S',
+	 'pkey/DBT *@S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.open'] = Api(
 	'db.open',
 	'method',
-	['dbname/const char *@S', 'mode/mode_t @S', 'flags/u_int32_t @S'],
+	['dbname/const char *@S',
+	 'mode/mode_t @S',
+	 'flags/u_int32_t @S'],
 	[ 'CREATE' ],
 	['init'], [])
 
@@ -363,33 +413,37 @@ methods['db.stat_clear'] = Api(
 methods['db.stat_print'] = Api(
 	'db.stat_print',
 	'method',
-	['stream/FILE * @S', 'flags/u_int32_t @S'],
+	['stream/FILE *@S',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.sync'] = Api(
 	'db.sync',
 	'method',
-	['flags/u_int32_t @S'],
+	['progress/void (*@S)(const char *, u_int32_t)',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 methods['db.verify'] = Api(
 	'db.verify',
 	'method',
-	['flags/u_int32_t @S'],
+	['progress/void (*@S)(const char *, u_int32_t)',
+	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
 
 ###################################################
-# Structure and internal routine flag declarations
+# Non-method external routine flag declarations
 ###################################################
-flags['cache'] = [ 'INITIALIZED' ]
+flags['wiredtiger_env_init'] = [ ]
+
+###################################################
+# Structure flag declarations
+###################################################
+flags['cache'] = [ 'INITIALIZED', 'SERVER_SLEEPING' ]
 flags['dbt'] = [ 'ALLOCATED' ]
-flags['ienv'] = [ 'RUNNING', 'SINGLE_THREADED' ]
-flags['toc'] = [ 'INVALID', 'SINGLE_THREADED' ]
-flags['wiredtiger_env_init'] = [ 'SINGLE_THREADED' ]
-flags['wt_cache_in'] = [ 'UNFORMATTED' ]
-flags['wt_cache_out'] = [ 'MODIFIED', 'UNFORMATTED' ]
+flags['ienv'] = [ 'WORKQ_RUN', 'SERVER_RUN' ]
 flags['wt_indx'] = [ 'ALLOCATED' ]
-flags['wt_page'] = [ 'ALLOCATED', 'MODIFIED' ]
+flags['wt_page'] = [ 'ALLOCATED', 'MODIFIED', 'PINNED', 'UNFORMATTED' ]

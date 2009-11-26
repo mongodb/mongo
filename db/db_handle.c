@@ -13,11 +13,11 @@ static int  __wt_db_config_default(DB *);
 static int  __wt_idb_config_default(DB *);
 
 /*
- * __wt_api_env_db --
+ * __wt_env_db --
  *	DB constructor.
  */
 int
-__wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
+__wt_env_db(ENV *env, u_int32_t flags, DB **dbp)
 {
 	DB *db;
 	IDB *idb;
@@ -28,8 +28,6 @@ __wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
 	idb = NULL;
 	ienv = env->ienv;
 
-	WT_ENV_FCHK(env, "Env.db_create", flags, WT_APIMASK_ENV_DB);
-
 	/* Create the DB and IDB structures. */
 	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
 	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
@@ -38,7 +36,6 @@ __wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
 	db->idb = idb;
 	idb->db = db;
 	db->env = env;
-	db->ienv = ienv;
 
 	/* Configure the DB and the IDB. */
 	WT_ERR(__wt_db_config_default(db));
@@ -47,7 +44,7 @@ __wt_api_env_db(ENV *env, u_int32_t flags, DB **dbp)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_api_db_close(db, 0);
+err:	(void)__wt_db_close(db, 0);
 	return (ret);
 }
 
@@ -92,8 +89,6 @@ __wt_idb_config_default(DB *db)
 
 	idb->db = db;
 
-	WT_RET(env->toc(env, 0, &idb->toc_internal));
-
 	__wt_lock(env, &ienv->mtx);		/* Add to the ENV's list */
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
 	__wt_unlock(&ienv->mtx);
@@ -102,21 +97,17 @@ __wt_idb_config_default(DB *db)
 }
 
 /*
- * __wt_api_db_close --
+ * __wt_db_close --
  *	Db.close method (DB close & handle destructor).
  */
 int
-__wt_api_db_close(DB *db, u_int32_t flags)
+__wt_db_close(DB *db, u_int32_t flags)
 {
 	ENV *env;
-	IDB *idb;
 	int ret;
 
 	env = db->env;
-	idb = db->idb;
 	ret = 0;
-
-	WT_DB_FCHK_NOTFATAL(db, "Db.close", flags, WT_APIMASK_DB_CLOSE, ret);
 
 	/* Close the underlying Btree. */
 	WT_TRET(__wt_bt_close(db));
@@ -125,7 +116,7 @@ __wt_api_db_close(DB *db, u_int32_t flags)
 	WT_TRET(__wt_idb_close(db, 0));
 
 	/* Make sure the user can't screw up, and discard the DB object. */
-	memset(db, OVERWRITE_BYTE, sizeof(db));
+	memset(db, WT_OVERWRITE, sizeof(db));
 	WT_FREE_AND_CLEAR(env, db);
 
 	return (ret);
@@ -154,8 +145,6 @@ __wt_idb_close(DB *db, int refresh)
 
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->dbname);
-
-	WT_TRET(idb->toc_internal->close(idb->toc_internal, 0));
 
 	WT_FREE_AND_CLEAR(env, idb->stats);
 	WT_FREE_AND_CLEAR(env, idb->dstats);
