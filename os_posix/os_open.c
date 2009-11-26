@@ -24,8 +24,8 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 	fh = NULL;
 	ienv = env->ienv;
 
-	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS | WT_VERB_FILEOPS_ALL))
-		__wt_api_env_errx(env, "fileops: %s: open", name);
+	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
+		__wt_msg(env, "fileops: %s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
 	__wt_lock(env, &ienv->mtx);

@@ -19,8 +19,8 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 	WT_STAT_INCR(fh->stats, READ_IO, "read I/Os");
 	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO, "total read I/Os");
 
-	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
-		__wt_api_env_errx(env,
+	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
+		__wt_msg(env,
 		    "fileops: %s: read %lu bytes at offset %lu",
 		    fh->name, (u_long)bytes, (u_long)offset);
 
@@ -41,8 +41,8 @@ __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 	WT_STAT_INCR(fh->stats, WRITE_IO, "write I/Os");
 	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO, "total write I/Os");
 
-	if (FLD_ISSET(env->verbose, WT_VERB_FILEOPS_ALL))
-		__wt_api_env_errx(env,
+	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
+		__wt_msg(env,
 		    "fileops: %s: write %lu bytes at offset %lu",
 		    fh->name, (u_long)bytes, (u_long)offset);
 
