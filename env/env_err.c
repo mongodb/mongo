@@ -26,7 +26,7 @@ wiredtiger_err_stream(FILE *stream)
 	 */								\
 	if ((env) == NULL) {						\
 		va_start(__ap, fmt);					\
-		__wt_errfile(						\
+		__wt_msg_stream(					\
 		    __wt_err_stream, NULL, NULL, error, fmt, __ap);	\
 		va_end(__ap);						\
 		return;							\
@@ -35,20 +35,20 @@ wiredtiger_err_stream(FILE *stream)
 	/* Application-specified callback function. */			\
 	if (env->errcall != NULL) {					\
 		va_start(__ap, fmt);					\
-		__wt_errcall(env->errcall, env,				\
-		    env->errpfx, NULL, error, fmt, __ap);		\
+		__wt_msg_call(env->errcall,				\
+		    env, env->errpfx, NULL, error, fmt, __ap);		\
 		va_end(__ap);						\
 	}								\
 									\
 	/*								\
 	 * If the application set an error callback function but not an	\
-	 * error stream, we're done.  Otherwise, write an error	stream.	\
+	 * error stream, we're done.  Otherwise, write the stream.	\
 	 */								\
 	if (env->errcall != NULL && env->errfile == NULL)		\
 			return;						\
 									\
 	va_start(__ap, fmt);						\
-	__wt_errfile(env->errfile,					\
+	__wt_msg_stream(env->errfile,					\
 	    env->errpfx, NULL, error, fmt, __ap);			\
 	va_end(__ap);							\
 }
