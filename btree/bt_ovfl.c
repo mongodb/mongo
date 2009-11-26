@@ -25,7 +25,7 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
 	    toc, WT_ADDR_TO_OFF(db, addr), WT_OVFL_BYTES(db, len), 0, &page));
 
 	/* Verify the page. */
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL, NULL) == 0);
+	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
 	*pagep = page;
 	return (0);
