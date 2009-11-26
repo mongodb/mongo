@@ -104,7 +104,7 @@ struct __wt_page {
 	 */
 	u_int32_t bytes;		/* Page size */
 
-	u_int32_t generation;		/* LRU generation number */
+	u_int32_t page_gen;		/* LRU generation number */
 
 	WT_PAGE *next;			/* Hash queue */
 
