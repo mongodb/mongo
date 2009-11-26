@@ -32,6 +32,7 @@ env/env_getset.c
 env/env_global.c
 env/env_handle.c
 env/env_init.c
+env/env_msg.c
 env/env_open.c
 env/env_stat.c
 os_posix/os_abort.c
