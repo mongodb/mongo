@@ -87,23 +87,24 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_ALLOC		    0
 #define	WT_STAT_CACHE_EVICT		    1
 #define	WT_STAT_CACHE_HIT		    2
-#define	WT_STAT_CACHE_MISS		    3
-#define	WT_STAT_CACHE_WRITE		    4
-#define	WT_STAT_CACHE_WRITE_EVICT	    5
-#define	WT_STAT_DATABASE_OPEN		    6
-#define	WT_STAT_HASH_BUCKETS		    7
-#define	WT_STAT_LONGEST_BUCKET		    8
-#define	WT_STAT_MEMALLOC		    9
-#define	WT_STAT_MEMFREE			   10
-#define	WT_STAT_MTX_LOCK		   11
-#define	WT_STAT_TOTAL_READ_IO		   12
-#define	WT_STAT_TOTAL_WRITE_IO		   13
-#define	WT_STAT_WORKQ_PASSES		   14
-#define	WT_STAT_WORKQ_PRIVATE_SERIALIZE	   15
-#define	WT_STAT_WORKQ_SERIALIZE		   16
-#define	WT_STAT_WORKQ_SLEEP		   17
-#define	WT_STAT_WORKQ_YIELD		   18
-#define	WT_STAT_IENV_STATS_TOTAL	   19
+#define	WT_STAT_CACHE_LOCKOUT		    3
+#define	WT_STAT_CACHE_MISS		    4
+#define	WT_STAT_CACHE_WRITE		    5
+#define	WT_STAT_CACHE_WRITE_EVICT	    6
+#define	WT_STAT_DATABASE_OPEN		    7
+#define	WT_STAT_HASH_BUCKETS		    8
+#define	WT_STAT_LONGEST_BUCKET		    9
+#define	WT_STAT_MEMALLOC		   10
+#define	WT_STAT_MEMFREE			   11
+#define	WT_STAT_MTX_LOCK		   12
+#define	WT_STAT_TOTAL_READ_IO		   13
+#define	WT_STAT_TOTAL_WRITE_IO		   14
+#define	WT_STAT_WORKQ_PASSES		   15
+#define	WT_STAT_WORKQ_PRIVATE_SERIALIZE	   16
+#define	WT_STAT_WORKQ_SERIALIZE		   17
+#define	WT_STAT_WORKQ_SLEEP		   18
+#define	WT_STAT_WORKQ_YIELD		   19
+#define	WT_STAT_IENV_STATS_TOTAL	   20
 
 /* Statistics section: END */
 
