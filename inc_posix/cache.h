@@ -37,6 +37,7 @@ extern "C" {
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
+struct __wt_hb;			typedef struct __wt_hb WT_HB;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
@@ -62,12 +63,36 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 #include "stat.h"
 
 /*******************************************
+ * WT_TOC support (the structures are public, so declared in wiredtiger.h).
+ *******************************************/
+/*
+ * We pass around WT_TOCs internally in the Btree, (rather than a DB), because
+ * the DB's are free-threaded, and the WT_TOCs are per-thread.  WT_TOCs always
+ * reference a DB handle, though.  The API generation number can be separately
+ * incremented by calls that spend a lot of time in the library.  For example,
+ * a bulk load call will increment the generation number on every loop, when it
+ * is no longer pinning any pages.
+ */
+#define	WT_TOC_API_IGNORE(toc)						\
+	(toc)->api_gen = WT_TOC_GEN_IGNORE
+#define	WT_TOC_API_RESET(toc)						\
+	(toc)->api_gen = (toc)->env->ienv->api_gen
+#define	WT_TOC_DB_INIT(toc, _db, _name) do {				\
+	WT_TOC_API_RESET(toc);						\
+	(toc)->db = (_db);						\
+	(toc)->name = (_name);						\
+} while (0)
+#define	WT_TOC_DB_CLEAR(toc) do {					\
+	WT_TOC_API_IGNORE(toc);						\
+	(toc)->db = NULL;						\
+	(toc)->name = NULL;						\
+} while (0)
+
+/*******************************************
  * Cursor handle information that doesn't persist.
  *******************************************/
 struct __idbc {
 	DBC *dbc;			/* Public object */
-
-	u_int32_t flags;
 };
 
 /*******************************************
@@ -88,22 +113,20 @@ struct __idb {
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
-#define	WT_TOC_INTERNAL(toc, db) do {					\
-	toc = (db)->idb->toc_internal;					\
-	WT_TOC_INIT(toc, db);						\
-} while (0)
-	WT_TOC	*toc_internal;		/* Internal WT_TOC */
-
 	WT_STATS *stats;		/* Database handle statistics */
 	WT_STATS *dstats;		/* Database file statistics */
-
-	u_int32_t flags;
 };
 
 /*******************************************
  * Cache object.
  *******************************************/
+struct __wt_hb {
+	u_int32_t serialize_private;	/* Private serialization field */
+	WT_PAGE *list;			/* Linked list */
+};
 struct __wt_cache {
+	WT_MTX mtx;			/* Cache server mutex */
+
 #define	WT_CACHE_DEFAULT_SIZE	(20)	/* 20MB */
 	u_int64_t bytes_max;		/* Maximum bytes */
 	u_int64_t bytes_alloc;		/* Allocated bytes */
@@ -133,7 +156,8 @@ struct __wt_cache {
 	 */
 #define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
 	u_int32_t hashsize;
-	WT_PAGE **hb;
+
+	WT_HB *hb;
 
 	u_int32_t flags;
 };
@@ -142,11 +166,14 @@ struct __wt_cache {
  * Environment handle information that doesn't persist.
  *******************************************/
 struct __ienv {
-	ENV *env;			/* Public object */
-
 	WT_MTX mtx;			/* Global mutex */
 
-	pthread_t primary_tid;		/* Primary thread ID */
+	u_int32_t api_gen;		/* API generation number */
+
+	pthread_t workq_tid;		/* workQ thread ID */
+
+	pthread_t cache_tid;		/* Cache thread ID */
+	u_int32_t cache_lockout;	/* Cache method lockout */
 
 	TAILQ_HEAD(			/* Locked: TOC list */
 	    __wt_toc_qh, __wt_toc) tocqh;
@@ -158,10 +185,10 @@ struct __ienv {
 
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
-	u_int next_file_id;		/* Locked: serial file ID */
+	u_int next_file_id;		/* Locked: file ID counter */
 
 	WT_CACHE cache;			/* Page cache */
-	u_int32_t generation;		/* Page cache LRU generation number */
+	u_int32_t page_gen;		/* Page cache LRU generation number */
 
 	WT_STATS *stats;		/* Environment handle statistics */
 
