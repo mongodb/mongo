@@ -14,7 +14,7 @@
 #define	MYDUMP	"a.debug"
 #define	MYPRINT	"a.print"
 
-int cachesize = 20;				/* Cache size: default 25MB */
+int cachesize = 20;				/* Cache size: default 20MB */
 int dumps = 0;					/* Dump database */
 int keys = 0;					/* Keys: default 5M */
 int keys_cnt = 0;				/* Count of keys in this run */
@@ -115,9 +115,9 @@ main(int argc, char *argv[])
 		if (defkeys)
 			keys = rand() % 5000000;
 
-		/* If no cachesize given, choose between 2M and 20M. */
+		/* If no cachesize given, choose between 2M and 30M. */
 		if (defcachesize)
-			cachesize = 2 + rand() % 18;
+			cachesize = 2 + rand() % 28;
 
 		/*
 		 * If no leafsize or nodesize given, choose between 512B and
