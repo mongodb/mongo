@@ -310,6 +310,7 @@ methods['db.bulk_load'] = Api(
 	'db.bulk_load',
 	'method',
 	['flags/u_int32_t @S',
+	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
 	[
 	'DUPLICATES',
@@ -421,7 +422,7 @@ methods['db.stat_print'] = Api(
 methods['db.sync'] = Api(
 	'db.sync',
 	'method',
-	['progress/void (*@S)(const char *, u_int32_t)',
+	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])
@@ -429,7 +430,7 @@ methods['db.sync'] = Api(
 methods['db.verify'] = Api(
 	'db.verify',
 	'method',
-	['progress/void (*@S)(const char *, u_int32_t)',
+	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
 	['open'], [])

@@ -235,10 +235,12 @@ static int __wt_api_db_btree_pagesize_set(
 static int __wt_api_db_bulk_load(
 	DB *db,
 	u_int32_t flags,
+	void (*progress)(const char *, u_int64_t),
 	int (*cb)(DB *, DBT **, DBT **));
 static int __wt_api_db_bulk_load(
 	DB *db,
 	u_int32_t flags,
+	void (*progress)(const char *, u_int64_t),
 	int (*cb)(DB *, DBT **, DBT **))
 {
 	ENV *env;
@@ -247,7 +249,7 @@ static int __wt_api_db_bulk_load(
 
 	WT_ENV_FCHK(env, "DB.bulk_load", flags, WT_APIMASK_DB_BULK_LOAD);
 
-	return (__wt_db_bulk_load(db, flags, cb));
+	return (__wt_db_bulk_load(db, flags, progress, cb));
 }
 
 static int __wt_api_db_close(
@@ -492,11 +494,11 @@ static int __wt_api_db_stat_print(
 
 static int __wt_api_db_sync(
 	DB *db,
-	void (*progress)(const char *, u_int32_t),
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags);
 static int __wt_api_db_sync(
 	DB *db,
-	void (*progress)(const char *, u_int32_t),
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags)
 {
 	ENV *env;
@@ -510,11 +512,11 @@ static int __wt_api_db_sync(
 
 static int __wt_api_db_verify(
 	DB *db,
-	void (*progress)(const char *, u_int32_t),
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags);
 static int __wt_api_db_verify(
 	DB *db,
-	void (*progress)(const char *, u_int32_t),
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags)
 {
 	ENV *env;
@@ -846,7 +848,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = (int (*)
-	    (DB *, u_int32_t , int (*)(DB *, DBT **, DBT **)))
+	    (DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout;
 	db->dump = (int (*)
 	    (DB *, FILE *, u_int32_t ))
@@ -885,10 +887,10 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, FILE *, u_int32_t ))
 	    __wt_db_lockout;
 	db->sync = (int (*)
-	    (DB *, void (*)(const char *, u_int32_t), u_int32_t ))
+	    (DB *, void (*)(const char *, u_int64_t), u_int32_t ))
 	    __wt_db_lockout;
 	db->verify = (int (*)
-	    (DB *, void (*)(const char *, u_int32_t), u_int32_t ))
+	    (DB *, void (*)(const char *, u_int64_t), u_int32_t ))
 	    __wt_db_lockout;
 }
 

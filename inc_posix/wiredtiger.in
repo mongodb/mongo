@@ -205,7 +205,7 @@ struct __db {
 	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
 
 	int (*bulk_load)(
-	    DB *, u_int32_t , int (*)(DB *, DBT **, DBT **));
+	    DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 
 	int (*close)(
 	    DB *, u_int32_t );
@@ -247,10 +247,10 @@ struct __db {
 	    DB *, FILE *, u_int32_t );
 
 	int (*sync)(
-	    DB *, void (*)(const char *, u_int32_t), u_int32_t );
+	    DB *, void (*)(const char *, u_int64_t), u_int32_t );
 
 	int (*verify)(
-	    DB *, void (*)(const char *, u_int32_t), u_int32_t );
+	    DB *, void (*)(const char *, u_int64_t), u_int32_t );
 	/*
 	 * DB methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.

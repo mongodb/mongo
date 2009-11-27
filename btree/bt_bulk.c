@@ -19,7 +19,8 @@ static int __wt_bt_promote(WT_TOC *, WT_PAGE *, u_int64_t, u_int32_t *);
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
+__wt_db_bulk_load(DB *db, u_int32_t flags,
+    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
 	DBT *key, *data, key_copy, data_copy;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
@@ -30,6 +31,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	WT_TOC *toc;
+	u_int32_t insert_cnt;
 	u_int32_t dup_count, dup_space, len;
 	int ret;
 
@@ -41,6 +43,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
 
 	dup_space = dup_count = 0;
+	insert_cnt = 0;
 
 	lastkey = &lastkey_std;
 	WT_CLEAR(data_copy);
@@ -63,6 +66,9 @@ __wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **))
 	page->hdr->type = WT_PAGE_LEAF;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
+		if (f != NULL && ++insert_cnt % 100 == 0)
+			f("Db.bulk_load", insert_cnt);
+
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
 		 * copy them carefully, all we want is a pointer and a length.

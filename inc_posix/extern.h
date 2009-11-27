@@ -1,6 +1,7 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 int
-__wt_db_bulk_load(DB *db, u_int32_t flags, int (*cb)(DB *, DBT **, DBT **));
+__wt_db_bulk_load(DB *db, u_int32_t flags,
+    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
 int
 __wt_bt_close(DB *db);
 int
@@ -81,7 +82,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 int
 __wt_bt_stat(DB *db);
 int
-__wt_bt_sync(DB *db, void (*f)(const char *, u_int32_t));
+__wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int32_t), u_int32_t flags);
 int
@@ -112,7 +113,7 @@ __wt_db_stat_print(DB *db, FILE *stream, u_int32_t flags);
 int
 __wt_db_stat_clear(DB *db, u_int32_t flags);
 int
-__wt_db_sync(DB *db, void (*f)(const char *, u_int32_t), u_int32_t flags);
+__wt_db_sync(DB *db, void (*f)(const char *, u_int64_t), u_int32_t flags);
 void *
 __wt_workq_srvr(void *arg);
 int
@@ -126,7 +127,7 @@ __wt_cache_create(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
 int
-__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int32_t));
+__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t));
 int
 __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
 int
@@ -238,6 +239,8 @@ int
 __wt_env_lockout(ENV *env);
 u_int32_t
 __wt_prime(u_int32_t n);
+void
+__wt_progress(const char *s, u_int64_t v);
 int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 void

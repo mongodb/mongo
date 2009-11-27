@@ -48,6 +48,7 @@ support/api.c
 support/cksum.c
 support/err.c
 support/prime.c
+support/progress.c
 support/stat.c
 support/strerror.c
 support/version.c

@@ -13,7 +13,6 @@
 const char *progname;
 
 int	usage(void);
-void	progress(const char *, u_int32_t);
 
 int
 main(int argc, char *argv[])
@@ -50,7 +49,8 @@ main(int argc, char *argv[])
 			    progname, *argv, wt_strerror(ret));
 			goto err;
 		}
-		if ((ret = db->verify(db, verbose ? progress : NULL, 0)) != 0) {
+		if ((ret =
+		    db->verify(db, verbose ? __wt_progress : NULL, 0)) != 0) {
 			fprintf(stderr, "%s: Db.verify: %s\n",
 			    progname, wt_strerror(ret));
 			goto err;
@@ -63,13 +63,6 @@ err:		ret = 1;
 	if ((tret = wiredtiger_simple_teardown(progname, db)) != 0 && ret == 0)
 		ret = tret;
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
-}
-
-void
-progress(const char *s, u_int32_t p)
-{
-	printf("\r\t%s: %lu", s, (u_long)p);
-	fflush(stdout);
 }
 
 int

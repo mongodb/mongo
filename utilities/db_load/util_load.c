@@ -24,7 +24,7 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 	DB *db;
-	int ch, ret, text_input, tret;
+	int ch, ret, text_input, tret, verbose;
 	char **config_list, **config_next;
 
 	WT_UTILITY_INTRO(progname, argv);
@@ -39,8 +39,8 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	text_input = 0;
-	while ((ch = getopt(argc, argv, "c:f:TV")) != EOF)
+	text_input = verbose = 0;
+	while ((ch = getopt(argc, argv, "c:f:TVv")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line option */
 			*config_next++ = optarg;
@@ -58,6 +58,9 @@ main(int argc, char *argv[])
 		case 'V':			/* version */
 			printf("%s\n", wt_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
+		case 'v':
+			verbose = 1;
+			break;
 		case '?':
 		default:
 			usage();
@@ -92,7 +95,8 @@ main(int argc, char *argv[])
 		}
 
 		if ((ret = db->bulk_load(db,
-		    WT_DUPLICATES | WT_SORTED_INPUT, bulk_callback)) != 0) {
+		    WT_DUPLICATES | WT_SORTED_INPUT,
+		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
 			fprintf(stderr, "%s: Db.bulk_load: %s\n",
 			    progname, wt_strerror(ret));
 			goto err;
@@ -228,7 +232,7 @@ int
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-TV] [-c configuration] [-f input-file] database\n",
+	    "usage: %s [-TVv] [-c configuration] [-f input-file] database\n",
 	    progname);
 	return (EXIT_FAILURE);
 }

@@ -170,7 +170,7 @@ __wt_cache_destroy(ENV *env)
  *	Flush a database's underlying cache to disk.
  */
 int
-__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int32_t))
+__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
 	DB *db;
 	ENV *env;
