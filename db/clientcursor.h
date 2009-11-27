@@ -76,9 +76,6 @@ namespace mongo {
         DiskLoc lastLoc() const {
             return _lastLoc;
         }
-    private:
-        void setLastLoc_inlock(DiskLoc);
-    public:
 
         auto_ptr< FieldMatcher > filter; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
@@ -89,6 +86,8 @@ namespace mongo {
         static void invalidate(const char *nsPrefix);
 
     private:
+        void setLastLoc_inlock(DiskLoc);
+
         static ClientCursor* find_inlock(CursorId id, bool warn = true) {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {

@@ -223,10 +223,14 @@ public:
     }
 };
 
-inline void dbunlocking() { 
-    theRecCache.ejectOld();
+inline void dbunlocking_read() { 
     Client *c = currentClient.get();
     c->top.clientStop();
+}
+
+inline void dbunlocking_write() { 
+    theRecCache.ejectOld();
+	dbunlocking_read();
 }
 
 } /*namespace*/
