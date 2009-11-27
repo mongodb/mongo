@@ -21,7 +21,7 @@ __wt_bt_open(DB *db, int ok_create)
 	ENV *env;
 	IDB *idb;
 	WT_TOC *toc;
-	int isleaf, ret;
+	int ret;
 
 	idb = db->idb;
 	env = db->env;
@@ -49,14 +49,8 @@ __wt_bt_open(DB *db, int ok_create)
 	 */
 	WT_ERR(__wt_bt_desc_read(toc));
 
-	/*
-	 * The isleaf value tells us how big a page to read.  If the tree has
-	 * split, the root page is an internal page, otherwise it's a leaf page.
-	 */
-	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-	if ((ret = __wt_bt_page_in(
-	    toc, idb->root_addr, isleaf, 1, &idb->root_page)) == 0)
-		F_SET(idb->root_page, WT_PINNED);
+	/* Get a permanent root page reference. */
+	WT_TRET(__wt_bt_root_page(toc));
 
 err:	WT_TRET(toc->close(toc, 0));
 
@@ -208,5 +202,30 @@ unexpected:	__wt_db_errx(db,
 		return (WT_ERROR);
 	}
 
+	return (0);
+}
+
+
+/*
+ * __wt_bt_root_page --
+ *	Read in, and pin, the root page.
+ */
+int
+__wt_bt_root_page(WT_TOC *toc)
+{
+	IDB *idb;
+	int isleaf;
+
+	idb = toc->db->idb;
+
+	/*
+	 * The isleaf value tells us how big a page to read.  If the tree has
+	 * split, the root page is an internal page, otherwise it's a leaf page.
+	 */
+	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
+	WT_RET(
+	    __wt_bt_page_in(toc, idb->root_addr, isleaf, 1, &idb->root_page));
+
+	F_SET(idb->root_page, WT_PINNED);
 	return (0);
 }

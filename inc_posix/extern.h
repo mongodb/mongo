@@ -50,6 +50,8 @@ __wt_bt_item_type(WT_ITEM *item);
 int
 __wt_bt_open(DB *db, int ok_create);
 int
+__wt_bt_root_page(WT_TOC *toc);
+int
 __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
 int
 __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp);
