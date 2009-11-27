@@ -93,8 +93,7 @@ struct __wt_page {
 	/*********************************************************
 	 * The following fields are owned by the cache layer.
 	 *********************************************************/
-	WT_FH	 *fh;			/* Page's file handle */
-	off_t     offset;		/* Page's file offset */
+	DB	 *db;			/* Page's backing database */
 	u_int32_t addr;			/* Page's allocation address */
 
 	/*

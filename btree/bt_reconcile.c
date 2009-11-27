@@ -60,8 +60,8 @@ __wt_bt_page_in(
 
 	db = toc->db;
 
-	WT_RET((__wt_cache_in(toc, WT_ADDR_TO_OFF(db, addr),
-	    isleaf ? db->leafsize : db->intlsize, 0, &page)));
+	WT_RET((__wt_cache_in(
+	    toc, addr, isleaf ? db->leafsize : db->intlsize, 0, &page)));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);

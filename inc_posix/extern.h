@@ -126,12 +126,12 @@ __wt_cache_create(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
 int
-__wt_cache_sync(WT_TOC *toc, WT_FH *fh, void (*f)(const char *, u_int32_t));
+__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int32_t));
 int
 __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
 int
 __wt_cache_in(WT_TOC *toc,
-    off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
+    u_int32_t addr, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep);
 int
 __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 void *

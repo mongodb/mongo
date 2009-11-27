@@ -44,21 +44,21 @@ typedef struct {
  */
 typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
+	u_int32_t addr;				/* File address */
 	u_int32_t bytes;			/* Bytes to allocate */
-	off_t	  offset;			/* File offset */
 } __wt_in_args;
-#define	__wt_cache_in_serialize(toc, _page, _bytes, _offset) do {	\
+#define	__wt_cache_in_serialize(toc, _page, _addr, _bytes) do {		\
 	__wt_in_args _args;						\
 	_args.page = _page;						\
+	_args.addr = _addr;						\
 	_args.bytes = _bytes;						\
-	_args.offset = _offset;						\
 	WT_TOC_SERIALIZE_REQUEST(toc,					\
 	    __wt_cache_in_serialize_func, NULL, &_args);		\
 } while (0);
-#define	__wt_cache_in_unpack(toc, _page, _bytes, _offset) do {		\
+#define	__wt_cache_in_unpack(toc, _page, _addr, _bytes) do {		\
 	_page =	((__wt_in_args *)(toc)->serialize_args)->page;		\
+	_addr = ((__wt_in_args *)(toc)->serialize_args)->addr;		\
 	_bytes = ((__wt_in_args *)(toc)->serialize_args)->bytes;	\
-	_offset = ((__wt_in_args *)(toc)->serialize_args)->offset;	\
 } while (0)
 
 /*
@@ -167,11 +167,12 @@ __wt_cache_destroy(ENV *env)
 
 /*
  * __wt_cache_sync --
- *	Flush an underlying cache to disk.
+ *	Flush a database's underlying cache to disk.
  */
 int
-__wt_cache_sync(WT_TOC *toc, WT_FH *fh, void (*f)(const char *, u_int32_t))
+__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int32_t))
 {
+	DB *db;
 	ENV *env;
 	WT_CACHE *cache;
 	WT_HB *hb;
@@ -179,6 +180,7 @@ __wt_cache_sync(WT_TOC *toc, WT_FH *fh, void (*f)(const char *, u_int32_t))
 	u_int32_t fcnt;
 	u_int i;
 
+	db = toc->db;
 	env = toc->env;
 	cache = &env->ienv->cache;
 
@@ -192,9 +194,8 @@ __wt_cache_sync(WT_TOC *toc, WT_FH *fh, void (*f)(const char *, u_int32_t))
 		hb = &cache->hb[i];
 		WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
 		for (page = hb->list; page != NULL; page = page->next) {
-			if (!F_ISSET(page, WT_MODIFIED | WT_PINNED))
-				continue;
-			if (fh != NULL && fh != page->fh)
+			if (page->db != db ||
+			    !F_ISSET(page, WT_MODIFIED | WT_PINNED))
 				continue;
 			WT_RET(__wt_cache_write(env, page));
 
@@ -287,15 +288,14 @@ __wt_cache_alloc_serialize_func(WT_TOC *toc)
 	fh = db->idb->fh;
 
 	/* Initialize the page structure, allocating "bytes" from the file. */
-	page->fh = fh;
-	page->offset = fh->file_size;
+	page->db = db;
+	page->addr = WT_OFF_TO_ADDR(db, fh->file_size);
 	fh->file_size += bytes;
-	page->addr = WT_OFF_TO_ADDR(db, page->offset);
 	page->bytes = bytes;
 	page->page_gen = ++ienv->page_gen;
 
 	/* Insert as the head of the linked list. */
-	hb = &cache->hb[WT_HASH(cache, page->offset)];
+	hb = &cache->hb[WT_HASH(cache, page->addr)];
 	page->next = hb->list;
 	hb->list = page;
 
@@ -311,7 +311,7 @@ __wt_cache_alloc_serialize_func(WT_TOC *toc)
  */
 int
 __wt_cache_in(WT_TOC *toc,
-    off_t offset, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep)
+    u_int32_t addr, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep)
 {
 	static u_int longest_bucket_cnt = 0;
 	DB *db;
@@ -322,6 +322,7 @@ __wt_cache_in(WT_TOC *toc,
 	WT_HB *hb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
+	off_t offset;
 	u_int32_t checksum;
 	u_int bucket_cnt;
 	int ret;
@@ -340,13 +341,13 @@ __wt_cache_in(WT_TOC *toc,
 	 * If there's a prviate serialization request on the hash bucket,
 	 * wait until it clears.
 	 */
-	hb = &cache->hb[WT_HASH(cache, offset)];
+	hb = &cache->hb[WT_HASH(cache, addr)];
 	WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
 
 	/* Search for the page in the cache. */
 	for (bucket_cnt = 0,
 	    page = hb->list; page != NULL; ++bucket_cnt, page = page->next)
-		if (page->offset == offset && idb->fh == page->fh)
+		if (page->addr == addr && page->db == db)
 			break;
 	if (bucket_cnt > longest_bucket_cnt) {
 		WT_STAT_SET(ienv->stats, LONGEST_BUCKET,
@@ -386,6 +387,7 @@ __wt_cache_in(WT_TOC *toc,
 	 */
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
 	WT_ERR(__wt_calloc(env, 1, (size_t)bytes, &page->hdr));
+	offset = WT_ADDR_TO_OFF(db, addr);
 	WT_ERR(__wt_read(env, idb->fh, offset, bytes, page->hdr));
 
 	/*
@@ -415,7 +417,7 @@ err:		if (page->hdr != NULL)
 	}
 
 	/* Serialize the insert onto the hash queue. */
-	__wt_cache_in_serialize(toc, page, bytes, offset);
+	__wt_cache_in_serialize(toc, page, addr, bytes);
 
 	*pagep = page;
 	return (0);
@@ -431,23 +433,19 @@ __wt_cache_in_serialize_func(WT_TOC *toc)
 	DB *db;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_FH *fh;
 	WT_HB *hb;
 	WT_PAGE *page;
-	off_t offset;
-	u_int32_t bytes;
+	u_int32_t addr, bytes;
 
-	__wt_cache_in_unpack(toc, page, bytes, offset);
+	__wt_cache_in_unpack(toc, page, addr, bytes);
 
 	db = toc->db;
 	ienv = toc->env->ienv;
 	cache = &ienv->cache;
-	fh = db->idb->fh;
 
 	/* Initialize the page structure. */
-	page->fh = fh;
-	page->offset = offset;
-	page->addr = WT_OFF_TO_ADDR(db, offset);
+	page->db = db;
+	page->addr = addr;
 	page->bytes = bytes;
 	page->page_gen = ++ienv->page_gen;
 
@@ -457,7 +455,7 @@ __wt_cache_in_serialize_func(WT_TOC *toc)
 	 */
 
 	/* Insert as the head of the linked list. */
-	hb = &cache->hb[WT_HASH(cache, page->offset)];
+	hb = &cache->hb[WT_HASH(cache, addr)];
 	page->next = hb->list;
 	hb->list = page;
 
@@ -631,7 +629,7 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 	WT_ASSERT(env, cache->bytes_alloc >= page->bytes);
 	cache->bytes_alloc -= page->bytes;
 
-	hb = &cache->hb[WT_HASH(cache, page->offset)];
+	hb = &cache->hb[WT_HASH(cache, page->addr)];
 	if (hb->list == page)
 		hb->list = page->next;
 	else
@@ -649,7 +647,10 @@ __wt_cache_discard(ENV *env, WT_PAGE *page)
 static int
 __wt_cache_write(ENV *env, WT_PAGE *page)
 {
+	DB *db;
 	WT_PAGE_HDR *hdr;
+
+	db = page->db;
 
 	/* Update the checksum. */
 	hdr = page->hdr;
@@ -657,7 +658,8 @@ __wt_cache_write(ENV *env, WT_PAGE *page)
 	hdr->checksum = __wt_cksum(hdr, page->bytes);
 
 	/* Write, and if successful, clear the modified flag. */
-	WT_RET(__wt_write(env, page->fh, page->offset, page->bytes, hdr));
+	WT_RET(__wt_write(env, db->idb->fh,
+	    WT_ADDR_TO_OFF(page->db, page->addr), page->bytes, hdr));
 
 	F_CLR(page, WT_MODIFIED);
 

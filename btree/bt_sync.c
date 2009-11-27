@@ -26,7 +26,7 @@ __wt_bt_sync(DB *db, void (*f)(const char *, u_int32_t))
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.sync");
 
-	ret = __wt_cache_sync(toc, db->idb->fh, f);
+	ret = __wt_cache_sync(toc, f);
 
 	WT_TRET(toc->close(toc, 0));
 

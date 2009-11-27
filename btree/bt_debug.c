@@ -74,7 +74,6 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	ENV *env;
 	WT_PAGE *page;
 	WT_TOC *toc;
-	off_t offset;
 	u_int32_t bytes;
 	int ret;
 
@@ -93,9 +92,8 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 	 * so we check the in-memory page information -- pages in the cache
 	 * should have in-memory page information.
 	 */
-	offset = WT_ADDR_TO_OFF(db, addr);
 	WT_RET(__wt_cache_in(toc,
-	    offset, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
+	    addr, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
 	if (page->indx_count == 0) {
 		switch (page->hdr->type) {
 		case WT_PAGE_OVFL:
@@ -113,7 +111,7 @@ __wt_bt_dump_addr(DB *db, u_int32_t addr, char *ofile, FILE *fp)
 		WT_DEFAULT_FORMAT(db);
 		}
 		WT_RET(__wt_cache_out(toc, page, 0));
-		WT_RET(__wt_cache_in(toc, offset, bytes, 0, &page));
+		WT_RET(__wt_cache_in(toc, addr, bytes, 0, &page));
 	}
 
 	ret = __wt_bt_dump_page(db, page, ofile, fp, 0);
@@ -155,8 +153,8 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
 	if (page->addr == 0)
 		__wt_bt_desc_dump(page, fp);
 
-	fprintf(fp, "offset %lu, addr %lu, bytes %lu\n",
-	    (u_long)page->offset, (u_long)page->addr, (u_long)page->bytes);
+	fprintf(fp,
+	    "addr %lu, bytes %lu\n", (u_long)page->addr, (u_long)page->bytes);
 	fprintf(fp, "first-free %#lx, space avail: %lu, records: %llu\n",
 	    (u_long)page->first_free, (u_long)page->space_avail, page->records);
 

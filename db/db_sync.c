@@ -16,6 +16,6 @@
 int
 __wt_db_sync(DB *db, void (*f)(const char *, u_int32_t), u_int32_t flags)
 {
-	/* Close the underlying Btree. */
+	/* Flush the underlying Btree. */
 	return (__wt_bt_sync(db, f));
 }

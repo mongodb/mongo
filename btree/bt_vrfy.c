@@ -650,7 +650,7 @@ __wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 
 	hdr = page->hdr;
 	end = (u_int8_t *)hdr + page->bytes;
-	addr = WT_OFF_TO_ADDR(db, page->offset);
+	addr = page->addr;
 
 	/*
 	 * We have 3 key/data items we track -- the last key, the last data

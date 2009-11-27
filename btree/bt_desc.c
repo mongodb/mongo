@@ -142,8 +142,7 @@ __wt_bt_desc_read(WT_TOC *toc)
 	 * Read in the first fragment of the database and get the root addr
 	 * and pagesizes from it.
 	 */
-	WT_RET(__wt_cache_in(toc,
-	    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE),
+	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE,
 	    (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
 
 	memcpy(
@@ -173,8 +172,7 @@ __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr)
 	db = toc->db;
 	idb = db->idb;
 
-	WT_RET(__wt_cache_in(toc,
-	    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE), db->leafsize, 0, &page));
+	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE, db->leafsize, 0, &page));
 
 	idb->root_addr = root_addr;
 
