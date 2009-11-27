@@ -36,9 +36,9 @@ DB *db;
 FILE *logfp;
 char *logfile;
 
-void	track(const char *, u_int32_t);
+void	track(const char *, u_int64_t);
 int	load(void);
-void	progress(const char *, u_int32_t);
+void	progress(const char *, u_int64_t);
 int	read_check(void);
 void	setkd(int, void *, u_int32_t *, void *, u_int32_t *, int);
 void	usage(void);
@@ -174,9 +174,6 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	if (++keys_cnt == keys + 1)
 		return (1);
 
-	if (keys_cnt % 1000 == 0)
-		progress("load", keys_cnt);
-
 	setkd(keys_cnt, &key.data, &key.size, &data.data, &data.size, 0);
     
 	*keyp = &key;
@@ -186,7 +183,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 }
 
 void
-track(const char *s, u_int32_t i)
+track(const char *s, u_int64_t i)
 {
 	progress(s, i);
 }
@@ -211,7 +208,7 @@ load()
 	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 
 	assert(db->bulk_load(db,
-	    WT_DUPLICATES | WT_SORTED_INPUT, cb_bulk) == 0);
+	    WT_DUPLICATES | WT_SORTED_INPUT, track, cb_bulk) == 0);
 
 	if (a_reopen)
 		assert(db->sync(db, track, 0) == 0);
@@ -247,9 +244,10 @@ read_check()
 {
 	DBT key, data;
 	WT_TOC *toc;
-	int cnt, last_cnt, ret;
+	u_int64_t cnt, last_cnt;
 	u_int32_t klen, dlen;
 	char *kbuf, *dbuf;
+	int ret;
 
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
@@ -382,7 +380,7 @@ setkd(int cnt,
 }
 
 void
-progress(const char *s, u_int32_t i)
+progress(const char *s, u_int64_t i)
 {
 	static int maxlen = 0;
 	int len;
