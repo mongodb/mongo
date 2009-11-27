@@ -3,25 +3,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_bulk.c (C)
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/btree_bulk.c  109  Warning 530: Symbol 'dup_data' (line 28) not
+../btree/btree_bulk.c  112  Warning 530: Symbol 'dup_data' (line 29) not
     initialized
-../btree/btree_bulk.c  28  Info 830: Location cited in prior message
+../btree/btree_bulk.c  29  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/btree_bulk.c  195  Warning 530: Symbol 'dup_key' (line 28) not
+../btree/btree_bulk.c  198  Warning 530: Symbol 'dup_key' (line 29) not
     initialized
-../btree/btree_bulk.c  28  Info 830: Location cited in prior message
+../btree/btree_bulk.c  29  Info 830: Location cited in prior message
                                        _
 	WT_64_CAST(offpage_item.records) = dup_count,
-../btree/btree_bulk.c  527  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  552  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                _
 	WT_64_CAST(offp.records) = page->records;
-../btree/btree_bulk.c  744  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  769  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                        _
 			WT_64_CAST(parent_offp->records) += increment;
-../btree/btree_bulk.c  787  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  812  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_close.c (C)
@@ -31,11 +31,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_debug.c (C)
                                                           _
 				__wt_bt_dump_dbt((DBT *)ip, fp);
-../btree/btree_debug.c  183  Info 740: Unusual pointer cast (incompatible
+../btree/btree_debug.c  194  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                                 _
 		    (u_long)offp->addr, WT_64_CAST(offp->records));
-../btree/btree_debug.c  263  Info 740: Unusual pointer cast (incompatible
+../btree/btree_debug.c  273  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
     --- Wrap-up for Module: ../btree/btree_debug.c
@@ -49,29 +49,37 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_dump.c (C)
 
 --- Module:   ../btree/btree_get.c (C)
+_
+}
+../btree/btree_get.c  72  Info 715: Symbol 'flags' (line 21) not referenced
+../btree/btree_get.c  21  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/btree_get.c  118  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  127  Info 740: Unusual pointer cast (incompatible
     indirect types)
                             _
 		if (cmp == 0) {
-../btree/btree_get.c  135  Warning 644: Variable 'cmp' (line 77) may not have
+../btree/btree_get.c  144  Warning 644: Variable 'cmp' (line 86) may not have
     been initialized
-../btree/btree_get.c  77  Info 830: Location cited in prior message
+../btree/btree_get.c  86  Info 830: Location cited in prior message
                                            _
 				*indxp = ip;
-../btree/btree_get.c  138  Info 771: Symbol 'ip' (line 74) conceivably not
+../btree/btree_get.c  147  Info 771: Symbol 'ip' (line 83) conceivably not
     initialized
-../btree/btree_get.c  74  Info 830: Location cited in prior message
+../btree/btree_get.c  83  Info 830: Location cited in prior message
+_
+}
+../btree/btree_get.c  249  Info 715: Symbol 'flags' (line 193) not referenced
+../btree/btree_get.c  193  Info 830: Location cited in prior message
                                                                 _
 #... 4_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
-../btree/btree_get.c  266  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  285  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                              _
 #... AST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			record_cnt += WT_INDX_OFFP_RECORDS(ip);
-../btree/btree_get.c  268  Info 740: Unusual pointer cast (incompatible
+../btree/btree_get.c  287  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_misc.c (C)
@@ -87,7 +95,7 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_page.c (C)
                                                            _
 			records += WT_64_CAST(offp->records);
-../btree/btree_page.c  276  Info 740: Unusual pointer cast (incompatible
+../btree/btree_page.c  287  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_ret.c (C)
@@ -97,213 +105,237 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/btree_sync.c (C)
 
 --- Module:   ../btree/btree_vrfy.c (C)
-                                                    _
-#... calloc( (env), (size_t)((((int)frags) + 7) >> 3), sizeof(bitstr_t), (&frag
-	WT_RET(bit_alloc(env, (int)frags, &fragbits));
-../btree/btree_vrfy.c  77  Info 702: Shift right of signed quantity (int)
-                                _
-err:	__wt_free(env, fragbits);
-../btree/btree_vrfy.c  100  Warning 644: Variable 'fragbits' (line 39) may not
-    have been initialized
-../btree/btree_vrfy.c  39  Info 830: Location cited in prior message
+                                                           _
+#...  (__wt_calloc( (env), (size_t)((((int)frags) + 7) >> 3), sizeof(bitstr_t),
+	WT_RET(bit_alloc(env, (int)frags, &vstuff.fragbits));
+../btree/btree_vrfy.c  96  Info 702: Shift right of signed quantity (int)
                                              _
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
-../btree/btree_vrfy.c  268  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  289  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  268  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  289  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  268  Warning 644: Variable 'func' (line 119) may not
+../btree/btree_vrfy.c  289  Warning 644: Variable 'func' (line 139) may not
     have been initialized
-../btree/btree_vrfy.c  119  Info 830: Location cited in prior message
-                                                            _
-		    toc, addr_arg, isleaf_arg, fragbits, fp);
-../btree/btree_vrfy.c  287  Warning 644: Variable 'isleaf_arg' (line 118) may
+../btree/btree_vrfy.c  139  Info 830: Location cited in prior message
+                                                                         _
+		ret = __wt_bt_verify_level(toc, addr_arg, isleaf_arg, vs);
+../btree/btree_vrfy.c  323  Warning 644: Variable 'isleaf_arg' (line 138) may
     not have been initialized
-../btree/btree_vrfy.c  118  Info 830: Location cited in prior message
-                                                              _
-#...                                  (((int)hdr->prntaddr + i) >> 3)
-#...              ((fragbits)[_bit_byte((int)hdr->prntaddr + i)] & _bit_mask((i
-		if (!bit_test(fragbits, (int)hdr->prntaddr + i)) {
-../btree/btree_vrfy.c  358  Info 737: Loss of sign in promotion from int to
+../btree/btree_vrfy.c  138  Info 830: Location cited in prior message
+                                                                  _
+#...                                      (((int)hdr->prntaddr + i) >> 3)
+#...              ((vs->fragbits)[_bit_byte((int)hdr->prntaddr + i)] & _bit_mas
+		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
+../btree/btree_vrfy.c  394  Info 737: Loss of sign in promotion from int to
     unsigned int
-                                                              _
-#...                            (1 << (((int)hdr->prntaddr + i)&0x7))
-#... nt)hdr->prntaddr + i)] & _bit_mask((int)hdr->prntaddr + i))
-		if (!bit_test(fragbits, (int)hdr->prntaddr + i)) {
-../btree/btree_vrfy.c  358  Info 737: Loss of sign in promotion from int to
+                                                                  _
+#...                                (1 << (((int)hdr->prntaddr + i)&0x7))
+#... e((int)hdr->prntaddr + i)] & _bit_mask((int)hdr->prntaddr + i))
+		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
+../btree/btree_vrfy.c  394  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                       _
 	if (child->records != WT_64_CAST(offp->records)) {
-../btree/btree_vrfy.c  384  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  420  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                           _
 		    (u_long)addr, WT_64_CAST(offp->records), child->records);
-../btree/btree_vrfy.c  388  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  424  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
-../btree/btree_vrfy.c  429  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  465  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  429  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  465  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
-../btree/btree_vrfy.c  482  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  518  Info 740: Unusual pointer cast (incompatible
     indirect types)
-../btree/btree_vrfy.c  482  Info 740: Unusual pointer cast (incompatible
+../btree/btree_vrfy.c  518  Info 740: Unusual pointer cast (incompatible
     indirect types)
-                                                            _
-#...                                         (((int)addr + i) >> 3)
-#...                     ((fragbits)[_bit_byte((int)addr + i)] & _bit_mask((int
-			if (bit_test(fragbits, (int)addr + i)) {
-../btree/btree_vrfy.c  523  Info 737: Loss of sign in promotion from int to
-    unsigned int
-                                                            _
-#...                                   (1 << (((int)addr + i)&0x7))
-#... ts)[_bit_byte((int)addr + i)] & _bit_mask((int)addr + i))
-			if (bit_test(fragbits, (int)addr + i)) {
-../btree/btree_vrfy.c  523  Info 737: Loss of sign in promotion from int to
+                                                                _
+#...                                             (((int)addr + i) >> 3)
+#...                     ((vs->fragbits)[_bit_byte((int)addr + i)] & _bit_mask(
+			if (bit_test(vs->fragbits, (int)addr + i)) {
+../btree/btree_vrfy.c  565  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                                 _
-#...  bitstr_t *_name = (fragbits); register int _start = (addr), _stop = ((int
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 713: Loss of precision (initialization)
+#...                                       (1 << (((int)addr + i)&0x7))
+#... agbits)[_bit_byte((int)addr + i)] & _bit_mask((int)addr + i))
+			if (bit_test(vs->fragbits, (int)addr + i)) {
+../btree/btree_vrfy.c  565  Info 737: Loss of sign in promotion from int to
+    unsigned int
+                                                                    _
+#...  bitstr_t *_name = (vs->fragbits); register int _start = (addr), _stop = (
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 713: Loss of precision (initialization)
     (unsigned int to int)
-                                                                _
-#... ister int _start = (addr), _stop = ((int)addr + (frags - 1)); register int
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 737: Loss of sign in promotion from int to
+                                                                    _
+#...  register int _start = (addr), _stop = ((int)addr + (frags - 1)); register
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 737: Loss of sign in promotion from int to
     unsigned int
-                                                                _
-#... ster int _start = (addr), _stop = ((int)addr + (frags - 1)); register int 
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 713: Loss of precision (initialization)
+                                                                    _
+#... register int _start = (addr), _stop = ((int)addr + (frags - 1)); register 
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 713: Loss of precision (initialization)
     (unsigned int to int)
-                                                                _
-#...  + (frags - 1)); register int _startbyte = _bit_byte(_start); register int
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 702: Shift right of signed quantity (int)
-                                                                _
-#... _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if (_startby
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 702: Shift right of signed quantity (int)
-                                                                _
-#... 7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++_sta
-		bit_nset(fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  529  Info 734: Loss of precision (assignment) (15 bits
+                                                                    _
+#... addr + (frags - 1)); register int _startbyte = _bit_byte(_start); register
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 702: Shift right of signed quantity (int)
+                                                                    _
+#... e = _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if (_sta
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 702: Shift right of signed quantity (int)
+                                                                    _
+#... p&0x7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++
+		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+../btree/btree_vrfy.c  571  Info 734: Loss of precision (assignment) (15 bits
     to 8 bits)
-                                             _
-#... ter int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0) fo
-		bit_ffc(fragbits, frags, &ffc);
-../btree/btree_vrfy.c  868  Info 702: Shift right of signed quantity (int)
-                                             _
-#... xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_lb&0x
-		bit_ffc(fragbits, frags, &ffc);
-../btree/btree_vrfy.c  868  Info 701: Shift left of signed quantity (int)
-                                             _
-#... e[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frags) _
-		bit_ffc(fragbits, frags, &ffc);
-../btree/btree_vrfy.c  868  Info 722: Suspicious use of ;
-                                             _
-#...                ((fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
-			bit_set(fragbits, ffc);
-../btree/btree_vrfy.c  870  Info 702: Shift right of signed quantity (int)
+                                                 _
+#... egister int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0
+		bit_ffc(vs->fragbits, frags, &ffc);
+../btree/btree_vrfy.c  908  Info 702: Shift right of signed quantity (int)
+                                                 _
+#... != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_l
+		bit_ffc(vs->fragbits, frags, &ffc);
+../btree/btree_vrfy.c  908  Info 701: Shift left of signed quantity (int)
+                                                 _
+#... _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frag
+		bit_ffc(vs->fragbits, frags, &ffc);
+../btree/btree_vrfy.c  908  Info 722: Suspicious use of ;
+                                                 _
+#...                ((vs->fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
+			bit_set(vs->fragbits, ffc);
+../btree/btree_vrfy.c  910  Info 702: Shift right of signed quantity (int)
 
 --- Module:   ../db/db_err.c (C)
 
 --- Module:   ../db/db_getset.c (C)
 
 --- Module:   ../db/db_handle.c (C)
-        _
-	WT_FLUSH_MEMORY;
-../db/db_handle.c  125  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../db/db_handle.c  125  Warning 522: Expected void type, assignment, increment
-    or decrement
+_
+}
+../db/db_handle.c  49  Warning 550: Symbol 'ienv' (line 24) not accessed
+../db/db_handle.c  24  Info 830: Location cited in prior message
+_
+}
+../db/db_handle.c  49  Info 715: Symbol 'flags' (line 20) not referenced
+../db/db_handle.c  20  Info 830: Location cited in prior message
+_
+}
+../db/db_handle.c  123  Info 715: Symbol 'flags' (line 104) not referenced
+../db/db_handle.c  104  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_open.c (C)
+_
+}
+../db/db_open.c  62  Info 715: Symbol 'flags' (line 44) not referenced
+../db/db_open.c  44  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_stat.c (C)
+_
+}
+../db/db_stat.c  44  Info 715: Symbol 'flags' (line 17) not referenced
+../db/db_stat.c  17  Info 830: Location cited in prior message
+_
+}
+../db/db_stat.c  63  Info 715: Symbol 'flags' (line 51) not referenced
+../db/db_stat.c  51  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_sync.c (C)
+_
+}
+../db/db_sync.c  21  Info 715: Symbol 'flags' (line 17) not referenced
+../db/db_sync.c  17  Info 830: Location cited in prior message
 
 --- Module:   ../engine/engine.c (C)
+                _
+		WT_MEMORY_FLUSH;
+../engine/engine.c  34  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  34  Warning 522: Expected void type, assignment, increment
+    or decrement
+                                        _
+					WT_MEMORY_FLUSH;
+../engine/engine.c  79  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  79  Warning 522: Expected void type, assignment, increment
+    or decrement
+                                        _
+					WT_MEMORY_FLUSH;
+../engine/engine.c  81  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  81  Warning 522: Expected void type, assignment, increment
+    or decrement
+                        _
+			WT_MEMORY_FLUSH;
+../engine/engine.c  149  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  149  Warning 522: Expected void type, assignment, increment
+    or decrement
+                _
+		WT_MEMORY_FLUSH;
+../engine/engine.c  223  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  223  Warning 522: Expected void type, assignment, increment
+    or decrement
+                        _
+			WT_MEMORY_FLUSH;
+../engine/engine.c  236  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  236  Warning 522: Expected void type, assignment, increment
+    or decrement
+                _
+		WT_MEMORY_FLUSH;
+../engine/engine.c  241  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  241  Warning 522: Expected void type, assignment, increment
+    or decrement
 
 --- Module:   ../engine/toc.c (C)
+_
+}
+../engine/toc.c  36  Info 715: Symbol 'flags' (line 19) not referenced
+../engine/toc.c  19  Info 830: Location cited in prior message
+_
+}
+../engine/toc.c  57  Info 715: Symbol 'flags' (line 43) not referenced
+../engine/toc.c  43  Info 830: Location cited in prior message
         _
-	WT_FLUSH_MEMORY;
-../engine/toc.c  66  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../engine/toc.c  66  Warning 522: Expected void type, assignment, increment or
-    decrement
-                _
-		WT_FLUSH_MEMORY;
-../engine/toc.c  110  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../engine/toc.c  110  Warning 522: Expected void type, assignment, increment or
+	WT_MEMORY_FLUSH;
+../engine/toc.c  83  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/toc.c  83  Warning 522: Expected void type, assignment, increment or
     decrement
 
 --- Module:   ../env/env_cache.c (C)
-                                                         _
-#... ->request = __wt_cache_alloc_server; WT_FLUSH_MEMORY; while ((toc)->reques
-	WT_TOC_REQUEST(toc, __wt_cache_alloc_server, &req);
-../env/env_cache.c  193  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                                         _
-#... ->request = __wt_cache_alloc_server; WT_FLUSH_MEMORY; while ((toc)->reques
-	WT_TOC_REQUEST(toc, __wt_cache_alloc_server, &req);
-../env/env_cache.c  193  Warning 522: Expected void type, assignment, increment
+                                            _
+	cache->bytes_max = env->cachesize * WT_MEGABYTE;
+../env/env_cache.c  96  Warning 647: Suspicious truncation
+                                               _
+	if ((review_max = cache->hashsize / 100) < 10)
+../env/env_cache.c  523  Info 713: Loss of precision (assignment) (unsigned int
+    to int)
+                        _
+			WT_MEMORY_FLUSH;
+../env/env_cache.c  536  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../env/env_cache.c  536  Warning 522: Expected void type, assignment, increment
     or decrement
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  245  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  245  Warning 522: Expected void type, assignment, increment
-    or decrement
-                                                      _
-#... ->request = __wt_cache_in_server; WT_FLUSH_MEMORY; while ((toc)->request !
-	WT_TOC_REQUEST(toc, __wt_cache_in_server, &req);
-../env/env_cache.c  345  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                                      _
-#... ->request = __wt_cache_in_server; WT_FLUSH_MEMORY; while ((toc)->request !
-	WT_TOC_REQUEST(toc, __wt_cache_in_server, &req);
-../env/env_cache.c  345  Warning 522: Expected void type, assignment, increment
-    or decrement
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  396  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  396  Warning 522: Expected void type, assignment, increment
-    or decrement
-                                                                   _
-#...  { (toc)->request = __wt_cache_discard_server; WT_FLUSH_MEMORY; while ((to
-		WT_TOC_REQUEST(toc, __wt_cache_discard_server, &req);
-../env/env_cache.c  431  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                                                   _
-#...  { (toc)->request = __wt_cache_discard_server; WT_FLUSH_MEMORY; while ((to
-		WT_TOC_REQUEST(toc, __wt_cache_discard_server, &req);
-../env/env_cache.c  431  Warning 522: Expected void type, assignment, increment
-    or decrement
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  530  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-                                   _
-#... equest = NULL; WT_FLUSH_MEMORY; } while (0)
-	WT_TOC_REQUEST_COMPLETE(toc);
-../env/env_cache.c  530  Warning 522: Expected void type, assignment, increment
-    or decrement
+                              _
+		hb = chosen_hb;
+../env/env_cache.c  563  Warning 644: Variable 'chosen_hb' (line 504) may not
+    have been initialized
+../env/env_cache.c  504  Info 830: Location cited in prior message
+                                  _
+		page = chosen_page;
+../env/env_cache.c  564  Warning 644: Variable 'chosen_page' (line 505) may not
+    have been initialized
+../env/env_cache.c  505  Info 830: Location cited in prior message
 
     --- Wrap-up for Module: ../env/env_cache.c
 
 Info 752: local declarator '__wt_cache_clean(struct __wt_toc *, unsigned long
     long)' (line 12, file ../env/env_cache.c) not referenced
 ../env/env_cache.c  12  Info 830: Location cited in prior message
-Warning 528: Symbol '__wt_cache_dump(struct __env *, char *, struct __sFILE *)'
-    (line 565, file ../env/env_cache.c) not referenced
-../env/env_cache.c  565  Info 830: Location cited in prior message
+Warning 528: Symbol '__wt_cache_dump(struct __env *, const char *, struct
+    __sFILE *)' (line 677, file ../env/env_cache.c) not referenced
+../env/env_cache.c  677  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_err.c (C)
 
@@ -312,23 +344,47 @@ Warning 528: Symbol '__wt_cache_dump(struct __env *, char *, struct __sFILE *)'
 --- Module:   ../env/env_global.c (C)
 
 --- Module:   ../env/env_handle.c (C)
+_
+}
+../env/env_handle.c  48  Info 715: Symbol 'flags' (line 20) not referenced
+../env/env_handle.c  20  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_init.c (C)
 
+--- Module:   ../env/env_msg.c (C)
+
 --- Module:   ../env/env_open.c (C)
-_
-}
-../env/env_open.c  38  Info 715: Symbol 'mode' (line 17) not referenced
-../env/env_open.c  17  Info 830: Location cited in prior message
-_
-}
-../env/env_open.c  38  Info 715: Symbol 'home' (line 17) not referenced
-../env/env_open.c  17  Info 830: Location cited in prior message
-                _
-		WT_FLUSH_MEMORY;
-../env/env_open.c  61  Error 40: Undeclared identifier 'WT_FLUSH_MEMORY'
-../env/env_open.c  61  Warning 522: Expected void type, assignment, increment
+        _
+	WT_MEMORY_FLUSH;
+../env/env_open.c  33  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../env/env_open.c  33  Warning 522: Expected void type, assignment, increment
     or decrement
+_
+}
+../env/env_open.c  42  Info 715: Symbol 'mode' (line 17) not referenced
+../env/env_open.c  17  Info 830: Location cited in prior message
+_
+}
+../env/env_open.c  42  Info 715: Symbol 'home' (line 17) not referenced
+../env/env_open.c  17  Info 830: Location cited in prior message
+_
+}
+../env/env_open.c  42  Info 715: Symbol 'flags' (line 17) not referenced
+../env/env_open.c  17  Info 830: Location cited in prior message
+        _
+	WT_MEMORY_FLUSH;
+../env/env_open.c  83  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../env/env_open.c  83  Warning 522: Expected void type, assignment, increment
+    or decrement
+        _
+	WT_MEMORY_FLUSH;
+../env/env_open.c  94  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../env/env_open.c  94  Warning 522: Expected void type, assignment, increment
+    or decrement
+_
+}
+../env/env_open.c  112  Info 715: Symbol 'flags' (line 49) not referenced
+../env/env_open.c  49  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_stat.c (C)
 
@@ -337,12 +393,12 @@ _
 --- Module:   ../os_posix/os_alloc.c (C)
 
 During Specific Walk:
-  File ../btree/btree_vrfy.c line 77: __wt_calloc(?, -268435456?, 1, [4])
-../os_posix/os_alloc.c  98  Warning 671: Possibly passing to function
+  File ../btree/btree_vrfy.c line 96: __wt_calloc(?, -268435456?, 1, [4])
+../os_posix/os_alloc.c  103  Warning 671: Possibly passing to function
     'calloc(unsigned int, unsigned int)' a negative value (-268435456), arg.
-    no. 1 [Reference: file ../btree/btree_vrfy.c: lines 73, 77]
-../btree/btree_vrfy.c  73  Info 831: Reference cited in prior message
-../btree/btree_vrfy.c  77  Info 831: Reference cited in prior message
+    no. 1 [Reference: file ../btree/btree_vrfy.c: lines 92, 96]
+../btree/btree_vrfy.c  92  Info 831: Reference cited in prior message
+../btree/btree_vrfy.c  96  Info 831: Reference cited in prior message
 
 --- Module:   ../os_posix/os_filesize.c (C)
 
@@ -361,8 +417,8 @@ During Specific Walk:
 --- Module:   ../support/api.c (C)
 _
 }
-../support/api.c  676  Info 715: Symbol 'wt_toc' (line 674) not referenced
-../support/api.c  674  Info 830: Location cited in prior message
+../support/api.c  1057  Info 715: Symbol 'wt_toc' (line 1055) not referenced
+../support/api.c  1055  Info 830: Location cited in prior message
 
 --- Module:   ../support/cksum.c (C)
 
