@@ -356,10 +356,13 @@ skip_read:
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(toc, page, page->records, NULL);
-			WT_TRET(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
 			page = NULL;
 		}
 	}
+
+	/* Get a permanent root page reference. */
+	WT_TRET(__wt_bt_root_page(toc));
 
 	if (0) {
 err:		if (page != NULL)
