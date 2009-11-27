@@ -407,8 +407,6 @@ static int __wt_api_db_get(
 
 	WT_ENV_FCHK(env, "DB.get", flags, WT_APIMASK_DB_GET);
 
-	WT_TOC_SERIALIZE_VALUE(toc, &env->ienv->cache_lockout);
-
 	return (__wt_db_get(db, toc, key, pkey, data, flags));
 }
 
@@ -434,8 +432,6 @@ static int __wt_api_db_get_recno(
 	env = db->env;
 
 	WT_ENV_FCHK(env, "DB.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
-
-	WT_TOC_SERIALIZE_VALUE(toc, &env->ienv->cache_lockout);
 
 	return (__wt_db_get_recno(db, toc, recno, key, pkey, data, flags));
 }

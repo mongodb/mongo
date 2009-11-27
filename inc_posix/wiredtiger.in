@@ -111,6 +111,8 @@ struct __wt_toc {
 	int	   serialize_ret;	/* Serialization function return */
 	u_int32_t *serialize_private;	/* Private serialization reference */
 
+	u_int32_t flags;
+
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC methods: BEGIN
@@ -382,6 +384,7 @@ char	*wt_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ALLOCATED					0x00000001
+#define	WT_CACHE_LOCK_RESTART				0x00000001
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
@@ -420,6 +423,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x0000000f
+#define	WT_APIMASK_WT_TOC				0x00000001
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END
@@ -435,7 +439,7 @@ char	*wt_version(int *, int *, int *);
  */
 #define	WT_ERROR	-31800
 #define	WT_NOTFOUND	-31801
-#define	WT_TOOSMALL	-31802
+#define	WT_RESTART	-31802
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

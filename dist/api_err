@@ -9,4 +9,4 @@
 
 WT_ERROR	non-specific WiredTiger error
 WT_NOTFOUND	database item not found
-WT_TOOSMALL	user-supplied DBT buffer is too small for returned item
+WT_RESTART	restart the operation (internal)

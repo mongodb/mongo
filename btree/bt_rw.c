@@ -215,6 +215,7 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	DB *db;
 	ENV *env;
 	IDB *idb;
+	IENV *ienv;
 	WT_PAGE *page;
 	int ret;
 
@@ -223,8 +224,16 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
+	ienv = env->ienv;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
+
+	/*
+	 * If the cache is too big, and we can restart the operation, return
+	 * that error.
+	 */
+	if (F_ISSET(toc, WT_CACHE_LOCK_RESTART) && ienv->cache_lockout)
+		return (WT_RESTART);
 
 	WT_STAT_INCR(
 	    env->ienv->stats, CACHE_ALLOC, "pages allocated in the cache");
@@ -359,6 +368,13 @@ __wt_cache_in(WT_TOC *toc,
 	    CACHE_MISS, "cache miss: reads not found in the cache");
 	WT_STAT_INCR(idb->stats,
 	    DB_CACHE_MISS, "cache miss: reads not found in the cache");
+
+	/*
+	 * If the cache is too big, and we can restart the operation, return
+	 * that error.
+	 */
+	if (F_ISSET(toc, WT_CACHE_LOCK_RESTART) && ienv->cache_lockout)
+		return (WT_RESTART);
 
 	/*
 	 * Allocate memory for the in-memory page information and for the page

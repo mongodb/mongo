@@ -21,6 +21,7 @@ __wt_db_get(
     DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
+	IENV *ienv;
 	WT_INDX *indx;
 	WT_PAGE *page;
 	u_int32_t type;
@@ -29,15 +30,24 @@ __wt_db_get(
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
 
 	idb = db->idb;
+	ienv = db->env->ienv;
 
 	WT_STAT_INCR(idb->stats,
 	    DB_READ_BY_KEY, "database read-by-key operations");
 
-	/* Initialize the thread-of-control structure. */
+	/*
+	 * Initialize the thread-of-control structure.
+	 * We're will to re-start if the cache is too full.
+	 */
 	WT_TOC_DB_INIT(toc, db, "Db.get");
 
 	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search(toc, key, &page, &indx));
+	F_SET(toc, WT_CACHE_LOCK_RESTART);
+	while ((ret = __wt_bt_search(toc, key, &page, &indx)) == WT_RESTART)
+		WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+	F_CLR(toc, WT_CACHE_LOCK_RESTART);
+	if (ret != 0)
+		goto err;
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -56,7 +66,7 @@ __wt_db_get(
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
-	WT_TOC_DB_CLEAR(toc);
+err:	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }
@@ -183,6 +193,7 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
+	IENV *ienv;
 	WT_INDX *indx;
 	WT_PAGE *page;
 	u_int32_t type;
@@ -191,6 +202,7 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
 
 	idb = db->idb;
+	ienv = db->env->ienv;
 
 	WT_STAT_INCR(idb->stats,
 	    DB_READ_BY_RECNO, "database read-by-recno operations");
@@ -199,11 +211,20 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	if (idb->root_page->records < recno)
 		return (WT_ERROR);
 
-	/* Initialize the thread-of-control structure. */
+	/*
+	 * Initialize the thread-of-control structure.
+	 * We're will to re-start if the cache is too full.
+	 */
 	WT_TOC_DB_INIT(toc, db, "Db.get_recno");
 
 	/* Search the primary btree for the key. */
-	WT_RET(__wt_bt_search_recno(toc, recno, &page, &indx));
+	F_SET(toc, WT_CACHE_LOCK_RESTART);
+	while ((ret =
+	    __wt_bt_search_recno(toc, recno, &page, &indx)) == WT_RESTART)
+		WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+	F_CLR(toc, WT_CACHE_LOCK_RESTART);
+	if (ret != 0)
+		goto err;
 
 	/*
 	 * The Db.get_recno method can only return single key/data pairs.
@@ -222,7 +243,7 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
-	WT_TOC_DB_CLEAR(toc);
+err:	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }

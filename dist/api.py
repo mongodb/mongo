@@ -215,12 +215,6 @@ def func_method(a, f):
 			    handle.upper() + '_' + method.upper() + ');\n\n')
 			break
 
-	# If we have a "toc" argument, check for a cache lockout.
-	for l in args:
-		if l.count('toc/') and config.count('cache'):
-			f.write('\tWT_TOC_SERIALIZE_VALUE(toc, ' +
-			    '&env->ienv->cache_lockout);\n\n')
-
 	f.write('\treturn (__wt_' + handle + '_' + method + '(' + handle)
 	for l in args:
 		f.write(', ' + l.split('/')[0])

@@ -443,6 +443,7 @@ flags['wiredtiger_env_init'] = [ ]
 # Structure flag declarations
 ###################################################
 flags['cache'] = [ 'INITIALIZED', 'SERVER_SLEEPING' ]
+flags['wt_toc'] = [ 'CACHE_LOCK_RESTART' ]
 flags['dbt'] = [ 'ALLOCATED' ]
 flags['ienv'] = [ 'WORKQ_RUN', 'SERVER_RUN' ]
 flags['wt_indx'] = [ 'ALLOCATED' ]
