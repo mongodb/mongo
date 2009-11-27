@@ -15,7 +15,6 @@
 #define	MYPRINT	"a.print"
 
 int cachesize = 20;				/* Cache size: default 20MB */
-int dumps = 0;					/* Dump database */
 int keys = 0;					/* Keys: default 5M */
 int keys_cnt = 0;				/* Count of keys in this run */
 int leafsize = 0;				/* Leaf page size */
@@ -24,7 +23,15 @@ int runs = 0;					/* Runs: default forever */
 int stats = 0;					/* Show statistics */
 int verbose = 0;				/* Verbose debugging */
 
+int a_dump = 0;					/* Dump database */
+int a_stat = 0;					/* Stat output */
+int a_reopen = 0;				/* Sync and reopen database */
+int a_verify = 0;				/* Verify database */
+
 const char *progname;
+
+ENV *env;
+DB *db;
 
 FILE *logfp;
 char *logfile;
@@ -53,25 +60,38 @@ main(int argc, char *argv[])
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
 	defcachesize = defkeys = defleafsize = defnodesize =  1;
-	while ((ch = getopt(argc, argv, "c:dk:L:l:n:R:r:Sv")) != EOF)
+	while ((ch = getopt(argc, argv, "a:c:k:L:l:n:R:r:v")) != EOF)
 		switch (ch) {
+		case 'a':
+			switch (optarg[0]) {
+			case 'd':
+				a_dump = 1;
+				break;
+			case 'r':
+				a_reopen = 1;
+				break;
+			case 's':
+				a_stat = 1;
+				break;
+			case 'v':
+				a_verify = 1;
+				break;
+			}
+			break;
 		case 'c':
 			defcachesize = 0;
 			cachesize = atoi(optarg);
-			break;
-		case 'd':
-			dumps = 1;
 			break;
 		case 'k':
 			defkeys = 0;
 			keys = atoi(optarg);
 			break;
+		case 'L':
+			logfile = optarg;
+			break;
 		case 'l':
 			defleafsize = 0;
 			leafsize = atoi(optarg);
-			break;
-		case 'L':
-			logfile = optarg;
 			break;
 		case 'n':
 			defnodesize = 0;
@@ -82,9 +102,6 @@ main(int argc, char *argv[])
 			break;
 		case 'r':
 			runs = atoi(optarg);
-			break;
-		case 'S':
-			stats = 1;
 			break;
 		case 'v':
 			verbose = 1;
@@ -178,8 +195,6 @@ int
 load()
 {
 	pthread_t tid;
-	ENV *env;
-	DB *db;
 	FILE *fp;
 
 	assert(wiredtiger_simple_setup(progname, &db) == 0);
@@ -198,9 +213,10 @@ load()
 	assert(db->bulk_load(db,
 	    WT_DUPLICATES | WT_SORTED_INPUT, cb_bulk) == 0);
 
-	assert(db->sync(db, track, 0) == 0);
+	if (a_reopen)
+		assert(db->sync(db, track, 0) == 0);
 
-	if (dumps) {
+	if (a_dump) {
 		progress("debug dump", 0);
 		assert((fp = fopen(MYDUMP, "w")) != NULL);
 		assert(db->dump(db, fp, WT_DEBUG) == 0);
@@ -212,14 +228,16 @@ load()
 		assert(fclose(fp) == 0);
 	}
 
-	assert(db->verify(db, track, 0) == 0);
+	if (a_verify)
+		assert(db->verify(db, track, 0) == 0);
 
-	if (stats) {
+	if (a_stat) {
 		(void)printf("\nLoad statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
 
-	assert(wiredtiger_simple_teardown(progname, db) == 0);
+	if (a_reopen)
+		assert(wiredtiger_simple_teardown(progname, db) == 0);
 
 	return (0);
 }
@@ -227,9 +245,7 @@ load()
 int
 read_check()
 {
-	DB *db;
 	DBT key, data;
-	ENV *env;
 	WT_TOC *toc;
 	int cnt, last_cnt, ret;
 	u_int32_t klen, dlen;
@@ -238,16 +254,18 @@ read_check()
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
 
-	assert(wiredtiger_simple_setup(progname, &db) == 0);
-	env = db->env;
+	if (a_reopen) {
+		assert(wiredtiger_simple_setup(progname, &db) == 0);
+		env = db->env;
 
-	if (logfp != NULL) {
-		env->msgfile_set(env, logfp);
-		env->verbose_set(env, 0);
+		if (logfp != NULL) {
+			env->msgfile_set(env, logfp);
+			env->verbose_set(env, 0);
+		}
+		db->errpfx_set(db, progname);
+		assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
+		assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 	}
-	db->errpfx_set(db, progname);
-	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
-	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 	assert(env->toc(env, 0, &toc) == 0);
 
 	/* Check a random subset of the records using the key. */
@@ -320,7 +338,7 @@ read_check()
 	assert(toc->close(toc, 0) == 0);
 	assert(db->close(db, 0) == 0);
 
-	if (stats) {
+	if (a_stat) {
 		(void)printf("\nVerify statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -394,7 +412,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: get [-dSv] [-c cachesize]\n    [-k keys] [-L logfile] "
-	    "[-l leafsize] [-n nodesize] [-R rand] [-r runs]\n");
+	    "usage: get [-dv] [-a d|r|s|v] [-c cachesize] [-k keys] "
+	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n");
 	exit(1);
 }
