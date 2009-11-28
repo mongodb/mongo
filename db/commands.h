@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "stdafx.h"
+#include "../stdafx.h"
 #include "jsobj.h"
 
 namespace mongo {
