@@ -398,6 +398,7 @@ namespace mongo {
 
     void show_32_warning(){
 #if BOOST_VERSION < 103500
+#warning built with boost version <= 1.34, limited concurrency
         //cout << \n** NOTE: built with boost version <= 1.34, limited concurrency" << endl;
 #endif
 
