@@ -135,8 +135,10 @@ namespace mongo {
         bool _writelock;
     public:
         mongolock(bool write) : _writelock(write) {
-            if( _writelock )
+            if( _writelock ) {
                 dbMutex.lock();
+                dbMutexInfo.entered();
+            }
             else
                 dbMutex.lock_shared();
         }
@@ -157,6 +159,7 @@ namespace mongo {
                 _writelock = true;
                 dbMutex.unlock_shared();
                 dbMutex.lock();
+                dbMutexInfo.entered();
             }
         }
     };
