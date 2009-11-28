@@ -1,216 +1,218 @@
 FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 
---- Module:   ../btree/btree_bulk.c (C)
+--- Module:   ../btree/bt_bulk.c (C)
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/btree_bulk.c  118  Warning 530: Symbol 'dup_data' (line 30) not
+../btree/bt_bulk.c  118  Warning 530: Symbol 'dup_data' (line 30) not
     initialized
-../btree/btree_bulk.c  30  Info 830: Location cited in prior message
+../btree/bt_bulk.c  30  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/btree_bulk.c  204  Warning 530: Symbol 'dup_key' (line 30) not
+../btree/bt_bulk.c  204  Warning 530: Symbol 'dup_key' (line 30) not
     initialized
-../btree/btree_bulk.c  30  Info 830: Location cited in prior message
+../btree/bt_bulk.c  30  Info 830: Location cited in prior message
                                        _
 	WT_64_CAST(offpage_item.records) = dup_count,
-../btree/btree_bulk.c  558  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_bulk.c  558  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                _
 	WT_64_CAST(offp.records) = page->records;
-../btree/btree_bulk.c  775  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_bulk.c  775  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                                        _
 			WT_64_CAST(parent_offp->records) += increment;
-../btree/btree_bulk.c  818  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_bulk.c  818  Info 740: Unusual pointer cast (incompatible indirect
+    types)
 
---- Module:   ../btree/btree_close.c (C)
+--- Module:   ../btree/bt_close.c (C)
 
---- Module:   ../btree/btree_cmp.c (C)
+--- Module:   ../btree/bt_cmp.c (C)
 
---- Module:   ../btree/btree_debug.c (C)
+--- Module:   ../btree/bt_debug.c (C)
                                                           _
 				__wt_bt_dump_dbt((DBT *)ip, fp);
-../btree/btree_debug.c  194  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_debug.c  194  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                                                 _
 		    (u_long)offp->addr, WT_64_CAST(offp->records));
-../btree/btree_debug.c  273  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_debug.c  273  Info 740: Unusual pointer cast (incompatible indirect
+    types)
 
-    --- Wrap-up for Module: ../btree/btree_debug.c
+    --- Wrap-up for Module: ../btree/bt_debug.c
 
 Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
-    struct __sFILE *)' (line 72, file ../btree/btree_debug.c) not referenced
-../btree/btree_debug.c  72  Info 830: Location cited in prior message
+    struct __sFILE *)' (line 72, file ../btree/bt_debug.c) not referenced
+../btree/bt_debug.c  72  Info 830: Location cited in prior message
 
---- Module:   ../btree/btree_desc.c (C)
+--- Module:   ../btree/bt_desc.c (C)
 
---- Module:   ../btree/btree_dump.c (C)
+--- Module:   ../btree/bt_dump.c (C)
 
---- Module:   ../btree/btree_get.c (C)
+--- Module:   ../btree/bt_key.c (C)
 _
 }
-../btree/btree_get.c  72  Info 715: Symbol 'flags' (line 21) not referenced
-../btree/btree_get.c  21  Info 830: Location cited in prior message
+../btree/bt_key.c  71  Info 715: Symbol 'flags' (line 20) not referenced
+../btree/bt_key.c  20  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/btree_get.c  127  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_key.c  126  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                             _
 		if (cmp == 0) {
-../btree/btree_get.c  144  Warning 644: Variable 'cmp' (line 86) may not have
-    been initialized
-../btree/btree_get.c  86  Info 830: Location cited in prior message
+../btree/bt_key.c  143  Warning 644: Variable 'cmp' (line 85) may not have been
+    initialized
+../btree/bt_key.c  85  Info 830: Location cited in prior message
                                            _
 				*indxp = ip;
-../btree/btree_get.c  147  Info 771: Symbol 'ip' (line 83) conceivably not
+../btree/bt_key.c  146  Info 771: Symbol 'ip' (line 82) conceivably not
     initialized
-../btree/btree_get.c  83  Info 830: Location cited in prior message
+../btree/bt_key.c  82  Info 830: Location cited in prior message
+
+--- Module:   ../btree/bt_misc.c (C)
+                                                                        _
+	page->space_avail = page->bytes - (addr - (u_int8_t *)page->hdr);
+../btree/bt_misc.c  114  Info 737: Loss of sign in promotion from int to
+    unsigned int
+
+--- Module:   ../btree/bt_open.c (C)
+
+--- Module:   ../btree/bt_ovfl.c (C)
+
+--- Module:   ../btree/bt_page.c (C)
+                                                           _
+			records += WT_64_CAST(offp->records);
+../btree/bt_page.c  287  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+
+--- Module:   ../btree/bt_recno.c (C)
 _
 }
-../btree/btree_get.c  249  Info 715: Symbol 'flags' (line 193) not referenced
-../btree/btree_get.c  193  Info 830: Location cited in prior message
+../btree/bt_recno.c  76  Info 715: Symbol 'flags' (line 20) not referenced
+../btree/bt_recno.c  20  Info 830: Location cited in prior message
                                                                 _
 #... 4_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
-../btree/btree_get.c  285  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_recno.c  112  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                                              _
 #... AST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			record_cnt += WT_INDX_OFFP_RECORDS(ip);
-../btree/btree_get.c  287  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_recno.c  114  Info 740: Unusual pointer cast (incompatible indirect
+    types)
 
---- Module:   ../btree/btree_misc.c (C)
-                                                                        _
-	page->space_avail = page->bytes - (addr - (u_int8_t *)page->hdr);
-../btree/btree_misc.c  114  Info 737: Loss of sign in promotion from int to
-    unsigned int
+--- Module:   ../btree/bt_ret.c (C)
 
---- Module:   ../btree/btree_open.c (C)
+--- Module:   ../btree/bt_stat.c (C)
 
---- Module:   ../btree/btree_ovfl.c (C)
+--- Module:   ../btree/bt_sync.c (C)
 
---- Module:   ../btree/btree_page.c (C)
-                                                           _
-			records += WT_64_CAST(offp->records);
-../btree/btree_page.c  287  Info 740: Unusual pointer cast (incompatible
-    indirect types)
-
---- Module:   ../btree/btree_ret.c (C)
-
---- Module:   ../btree/btree_stat.c (C)
-
---- Module:   ../btree/btree_sync.c (C)
-
---- Module:   ../btree/btree_vrfy.c (C)
+--- Module:   ../btree/bt_vrfy.c (C)
                                                            _
 #...  (__wt_calloc( (env), (size_t)((((int)frags) + 7) >> 3), sizeof(bitstr_t),
 	WT_RET(bit_alloc(env, (int)frags, &vstuff.fragbits));
-../btree/btree_vrfy.c  96  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  96  Info 702: Shift right of signed quantity (int)
                                              _
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
-../btree/btree_vrfy.c  289  Info 740: Unusual pointer cast (incompatible
-    indirect types)
-../btree/btree_vrfy.c  289  Info 740: Unusual pointer cast (incompatible
-    indirect types)
-../btree/btree_vrfy.c  289  Warning 644: Variable 'func' (line 139) may not
-    have been initialized
-../btree/btree_vrfy.c  139  Info 830: Location cited in prior message
+../btree/bt_vrfy.c  289  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+../btree/bt_vrfy.c  289  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+../btree/bt_vrfy.c  289  Warning 644: Variable 'func' (line 139) may not have
+    been initialized
+../btree/bt_vrfy.c  139  Info 830: Location cited in prior message
                                                                          _
 		ret = __wt_bt_verify_level(toc, addr_arg, isleaf_arg, vs);
-../btree/btree_vrfy.c  323  Warning 644: Variable 'isleaf_arg' (line 138) may
-    not have been initialized
-../btree/btree_vrfy.c  138  Info 830: Location cited in prior message
+../btree/bt_vrfy.c  323  Warning 644: Variable 'isleaf_arg' (line 138) may not
+    have been initialized
+../btree/bt_vrfy.c  138  Info 830: Location cited in prior message
                                                                   _
 #...                                      (((int)hdr->prntaddr + i) >> 3)
 #...              ((vs->fragbits)[_bit_byte((int)hdr->prntaddr + i)] & _bit_mas
 		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
-../btree/btree_vrfy.c  394  Info 737: Loss of sign in promotion from int to
+../btree/bt_vrfy.c  394  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                                   _
 #...                                (1 << (((int)hdr->prntaddr + i)&0x7))
 #... e((int)hdr->prntaddr + i)] & _bit_mask((int)hdr->prntaddr + i))
 		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
-../btree/btree_vrfy.c  394  Info 737: Loss of sign in promotion from int to
+../btree/bt_vrfy.c  394  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                       _
 	if (child->records != WT_64_CAST(offp->records)) {
-../btree/btree_vrfy.c  420  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_vrfy.c  420  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                                           _
 		    (u_long)addr, WT_64_CAST(offp->records), child->records);
-../btree/btree_vrfy.c  424  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_vrfy.c  424  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
-../btree/btree_vrfy.c  465  Info 740: Unusual pointer cast (incompatible
-    indirect types)
-../btree/btree_vrfy.c  465  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_vrfy.c  465  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+../btree/bt_vrfy.c  465  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                               _
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
-../btree/btree_vrfy.c  518  Info 740: Unusual pointer cast (incompatible
-    indirect types)
-../btree/btree_vrfy.c  518  Info 740: Unusual pointer cast (incompatible
-    indirect types)
+../btree/bt_vrfy.c  518  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+../btree/bt_vrfy.c  518  Info 740: Unusual pointer cast (incompatible indirect
+    types)
                                                                 _
 #...                                             (((int)addr + i) >> 3)
 #...                     ((vs->fragbits)[_bit_byte((int)addr + i)] & _bit_mask(
 			if (bit_test(vs->fragbits, (int)addr + i)) {
-../btree/btree_vrfy.c  565  Info 737: Loss of sign in promotion from int to
+../btree/bt_vrfy.c  565  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                                 _
 #...                                       (1 << (((int)addr + i)&0x7))
 #... agbits)[_bit_byte((int)addr + i)] & _bit_mask((int)addr + i))
 			if (bit_test(vs->fragbits, (int)addr + i)) {
-../btree/btree_vrfy.c  565  Info 737: Loss of sign in promotion from int to
+../btree/bt_vrfy.c  565  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                                     _
 #...  bitstr_t *_name = (vs->fragbits); register int _start = (addr), _stop = (
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 713: Loss of precision (initialization)
-    (unsigned int to int)
+../btree/bt_vrfy.c  571  Info 713: Loss of precision (initialization) (unsigned
+    int to int)
                                                                     _
 #...  register int _start = (addr), _stop = ((int)addr + (frags - 1)); register
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 737: Loss of sign in promotion from int to
+../btree/bt_vrfy.c  571  Info 737: Loss of sign in promotion from int to
     unsigned int
                                                                     _
 #... register int _start = (addr), _stop = ((int)addr + (frags - 1)); register 
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 713: Loss of precision (initialization)
-    (unsigned int to int)
+../btree/bt_vrfy.c  571  Info 713: Loss of precision (initialization) (unsigned
+    int to int)
                                                                     _
 #... addr + (frags - 1)); register int _startbyte = _bit_byte(_start); register
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  571  Info 702: Shift right of signed quantity (int)
                                                                     _
 #... e = _bit_byte(_start); register int _stopbyte = _bit_byte(_stop); if (_sta
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  571  Info 702: Shift right of signed quantity (int)
                                                                     _
 #... p&0x7)))); } else { _name[_startbyte] |= 0xff << ((_start)&0x7); while (++
 		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
-../btree/btree_vrfy.c  571  Info 734: Loss of precision (assignment) (15 bits
-    to 8 bits)
+../btree/bt_vrfy.c  571  Info 734: Loss of precision (assignment) (15 bits to 8
+    bits)
                                                  _
 #... egister int _stopbyte = _bit_byte(_nbits - 1), _value = -1; if (_nbits > 0
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/btree_vrfy.c  908  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  908  Info 702: Shift right of signed quantity (int)
                                                  _
 #... != 0xff) { bitstr_t _lb; _value = _byte << 3; for (_lb = _name[_byte]; (_l
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/btree_vrfy.c  908  Info 701: Shift left of signed quantity (int)
+../btree/bt_vrfy.c  908  Info 701: Shift left of signed quantity (int)
                                                  _
 #... _name[_byte]; (_lb&0x1); ++_value, _lb >>= 1); break; } if (_value >= frag
 		bit_ffc(vs->fragbits, frags, &ffc);
-../btree/btree_vrfy.c  908  Info 722: Suspicious use of ;
+../btree/bt_vrfy.c  908  Info 722: Suspicious use of ;
                                                  _
 #...                ((vs->fragbits)[_bit_byte(ffc)] |= _bit_mask(ffc))
 			bit_set(vs->fragbits, ffc);
-../btree/btree_vrfy.c  910  Info 702: Shift right of signed quantity (int)
+../btree/bt_vrfy.c  910  Info 702: Shift right of signed quantity (int)
 
 --- Module:   ../db/db_err.c (C)
 
@@ -393,12 +395,12 @@ _
 --- Module:   ../os_posix/os_alloc.c (C)
 
 During Specific Walk:
-  File ../btree/btree_vrfy.c line 96: __wt_calloc(?, -268435456?, 1, [4])
+  File ../btree/bt_vrfy.c line 96: __wt_calloc(?, -268435456?, 1, [4])
 ../os_posix/os_alloc.c  103  Warning 671: Possibly passing to function
     'calloc(unsigned int, unsigned int)' a negative value (-268435456), arg.
-    no. 1 [Reference: file ../btree/btree_vrfy.c: lines 92, 96]
-../btree/btree_vrfy.c  92  Info 831: Reference cited in prior message
-../btree/btree_vrfy.c  96  Info 831: Reference cited in prior message
+    no. 1 [Reference: file ../btree/bt_vrfy.c: lines 92, 96]
+../btree/bt_vrfy.c  92  Info 831: Reference cited in prior message
+../btree/bt_vrfy.c  96  Info 831: Reference cited in prior message
 
 --- Module:   ../os_posix/os_filesize.c (C)
 
