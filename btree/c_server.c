@@ -21,31 +21,12 @@ static int __wt_cache_dump(ENV *, const char *, FILE *);
 #endif
 
 /*
- * Page allocation serialization support.
- */
-typedef struct {
-	WT_PAGE  *page;				/* Allocated page */
-	u_int32_t bytes;			/* Bytes to allocate */
- } __wt_alloc_args;
-#define	__wt_cache_alloc_serialize(toc, _page, _bytes) do {		\
-	__wt_alloc_args _args;						\
-	_args.page = _page;						\
-	_args.bytes = _bytes;						\
-	WT_TOC_SERIALIZE_REQUEST(toc,					\
-	    __wt_cache_alloc_serialize_func, NULL, &_args);		\
-} while (0)
-#define	__wt_cache_alloc_unpack(toc, _page, _bytes) do {		\
-	_page =	((__wt_alloc_args *)(toc)->serialize_args)->page;	\
-	_bytes = ((__wt_alloc_args *)(toc)->serialize_args)->bytes;	\
-} while (0)
-
-/*
- * Page read serialization support.
+ * Page-in serialization support.
  */
 typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
 	u_int32_t addr;				/* File address */
-	u_int32_t bytes;			/* Bytes to allocate */
+	u_int32_t bytes;			/* Bytes */
 } __wt_in_args;
 #define	__wt_cache_in_serialize(toc, _page, _addr, _bytes) do {		\
 	__wt_in_args _args;						\
@@ -259,49 +240,9 @@ err:		__wt_free(env, page);
 	 * the allocation of bytes from the file, the change of total bytes
 	 * in the cache, and the insert onto the hash queue.
 	 */
-	__wt_cache_alloc_serialize(toc, page, bytes);
+	__wt_cache_in_serialize(toc, page, WT_ADDR_INVALID, bytes);
 
 	*pagep = page;
-	return (0);
-}
-
-/*
- * __wt_cache_alloc_serialize_func --
- *	Server function to allocate bytes from a file.
- */
-static int
-__wt_cache_alloc_serialize_func(WT_TOC *toc)
-{
-	DB *db;
-	IENV *ienv;
-	WT_CACHE *cache;
-	WT_FH *fh;
-	WT_HB *hb;
-	WT_PAGE *page;
-	u_int32_t bytes;
-
-	__wt_cache_alloc_unpack(toc, page, bytes);
-
-	db = toc->db;
-	ienv = toc->env->ienv;
-	cache = &ienv->cache;
-	fh = db->idb->fh;
-
-	/* Initialize the page structure, allocating "bytes" from the file. */
-	page->db = db;
-	page->addr = WT_OFF_TO_ADDR(db, fh->file_size);
-	fh->file_size += bytes;
-	page->bytes = bytes;
-	page->page_gen = ++ienv->page_gen;
-
-	/* Insert as the head of the linked list. */
-	hb = &cache->hb[WT_HASH(cache, page->addr)];
-	page->next = hb->list;
-	hb->list = page;
-
-	/* Increment total cache byte count. */
-	cache->bytes_alloc += bytes;
-
 	return (0);
 }
 
@@ -433,6 +374,7 @@ __wt_cache_in_serialize_func(WT_TOC *toc)
 	DB *db;
 	IENV *ienv;
 	WT_CACHE *cache;
+	WT_FH *fh;
 	WT_HB *hb;
 	WT_PAGE *page;
 	u_int32_t addr, bytes;
@@ -445,13 +387,19 @@ __wt_cache_in_serialize_func(WT_TOC *toc)
 
 	/* Initialize the page structure. */
 	page->db = db;
+	if (addr == WT_ADDR_INVALID) {
+		fh = db->idb->fh;
+		addr = WT_OFF_TO_ADDR(db, fh->file_size);
+		fh->file_size += bytes;
+	}
 	page->addr = addr;
 	page->bytes = bytes;
 	page->page_gen = ++ienv->page_gen;
 
 	/*
 	 * BUG!!!
-	 * Somebody else may have read the same page, check.
+	 * Somebody else may have read the same page, check the hash
+	 * buckets.
 	 */
 
 	/* Insert as the head of the linked list. */
