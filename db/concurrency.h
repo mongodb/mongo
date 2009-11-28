@@ -61,14 +61,16 @@ namespace mongo {
         }
     };
 
-    void dbunlocking();
+	void dbunlocking_write();
+	void dbunlocking_read();
 
+	/* use writelock and readlock instead */
     struct dblock : public lock {
         dblock() :
             lock( dbMutex, dbMutexInfo ) {
         }
         ~dblock() { 
-            dbunlocking();
+            dbunlocking_write();
         }
     };
     
@@ -80,7 +82,7 @@ namespace mongo {
             lock( dbMutex, dbMutexInfo ) {
         }
         ~writelock() { 
-            dbunlocking();
+            dbunlocking_write();
         }
     };
     
@@ -92,13 +94,11 @@ namespace mongo {
             lock( dbMutex, dbMutexInfo ) {
         }
         ~readlock() { 
-            dbunlocking();
+            dbunlocking_read();
         }
     };
     
-
-
-      /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
+    /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
     */
     struct temprelease {
         boost::mutex& m;

@@ -33,8 +33,8 @@ namespace mongo {
 		_initialized = true;
 
 #if defined(__linux__)
-        devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
-        massert( "can't open dev/urandom", devrandom->is_open() );
+        _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
+        massert( "can't open dev/urandom", _devrandom->is_open() );
 #elif defined(_WIN32)
         srand(curTimeMicros());
 #else
@@ -56,8 +56,8 @@ namespace mongo {
 
         nonce n;
 #if defined(__linux__)
-        devrandom->read((char*)&n, sizeof(n));
-        massert("devrandom failed", !devrandom->fail());
+        _devrandom->read((char*)&n, sizeof(n));
+        massert("devrandom failed", !_devrandom->fail());
 #elif defined(_WIN32)
         n = (((unsigned long long)rand())<<32) | rand();
 #else
