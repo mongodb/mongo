@@ -123,6 +123,7 @@ public:
         addPositionArg( "file" , 1 );
         _type = JSON;
         _ignoreBlanks = false;
+        _headerLine = false;
     }
     
     int run(){
