@@ -374,6 +374,9 @@ namespace mongo {
         }
     }
 
+    /**
+     * does background async flushes of mmapped files
+     */
     class DataFileSync : public BackgroundJob {
     public:
         DataFileSync() : _sleepsecs( 60 ){}
