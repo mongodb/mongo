@@ -74,15 +74,25 @@ class Import : public Tool {
                 name = ss.str();
             }
             pos++;
-
-            char * end = strstr( line , _sep );
+            
+            int skip = 1;
+            char * end;
+            if ( _type == CSV && line[0] == '"' ){
+                line++;
+                end = strstr( line , "\"" );
+                skip = 2;
+            }
+            else {
+                end = strstr( line , _sep );
+            }
+            
             if ( ! end ){
                 _append( b , name , string( line ) );
                 break;
             }
             
             _append( b , name , string( line , end - line ) );
-            line = end + 1;
+            line = end + skip;
         }
 
         return b.obj();
