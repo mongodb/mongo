@@ -84,10 +84,10 @@ __wt_bt_stat(DB *db);
 int
 __wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
-__wt_db_verify(DB *db, void (*f)(const char *s, u_int32_t), u_int32_t flags);
+__wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t), u_int32_t flags);
 int
 __wt_db_verify_int(DB *db,
-    void (*f)(const char *s, u_int32_t), FILE *fp, u_int32_t flags);
+    void (*f)(const char *s, u_int64_t), FILE *fp, u_int32_t flags);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 void

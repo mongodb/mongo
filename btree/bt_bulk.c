@@ -31,7 +31,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	WT_TOC *toc;
-	u_int32_t insert_cnt;
+	u_int64_t insert_cnt;
 	u_int32_t dup_count, dup_space, len;
 	int ret;
 

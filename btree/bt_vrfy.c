@@ -18,7 +18,7 @@ typedef struct {
 
 	FILE *fp;				/* Dump file stream */
 
-	void (*f)(const char *s, u_int32_t);	/* Progress callback */
+	void (*f)(const char *s, u_int64_t);	/* Progress callback */
 	u_int32_t fcnt;				/* Progress counter */
 } VSTUFF;
 
@@ -33,7 +33,7 @@ static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, VSTUFF *);
  *	Verify a Btree.
  */
 int
-__wt_db_verify(DB *db, void (*f)(const char *s, u_int32_t), u_int32_t flags)
+__wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t), u_int32_t flags)
 {
 	return (__wt_db_verify_int(db, f, NULL, flags));
 }
@@ -44,7 +44,7 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int32_t), u_int32_t flags)
  */
 int
 __wt_db_verify_int(DB *db,
-    void (*f)(const char *s, u_int32_t), FILE *fp, u_int32_t flags)
+    void (*f)(const char *s, u_int64_t), FILE *fp, u_int32_t flags)
 {
 	ENV *env;
 	IDB *idb;
