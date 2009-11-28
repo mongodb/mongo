@@ -3,25 +3,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/btree_bulk.c (C)
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/btree_bulk.c  112  Warning 530: Symbol 'dup_data' (line 29) not
+../btree/btree_bulk.c  118  Warning 530: Symbol 'dup_data' (line 30) not
     initialized
-../btree/btree_bulk.c  29  Info 830: Location cited in prior message
+../btree/btree_bulk.c  30  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/btree_bulk.c  198  Warning 530: Symbol 'dup_key' (line 29) not
+../btree/btree_bulk.c  204  Warning 530: Symbol 'dup_key' (line 30) not
     initialized
-../btree/btree_bulk.c  29  Info 830: Location cited in prior message
+../btree/btree_bulk.c  30  Info 830: Location cited in prior message
                                        _
 	WT_64_CAST(offpage_item.records) = dup_count,
-../btree/btree_bulk.c  552  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  558  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                _
 	WT_64_CAST(offp.records) = page->records;
-../btree/btree_bulk.c  769  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  775  Info 740: Unusual pointer cast (incompatible
     indirect types)
                                                        _
 			WT_64_CAST(parent_offp->records) += increment;
-../btree/btree_bulk.c  812  Info 740: Unusual pointer cast (incompatible
+../btree/btree_bulk.c  818  Info 740: Unusual pointer cast (incompatible
     indirect types)
 
 --- Module:   ../btree/btree_close.c (C)
@@ -307,26 +307,26 @@ _
 --- Module:   ../env/env_cache.c (C)
                                             _
 	cache->bytes_max = env->cachesize * WT_MEGABYTE;
-../env/env_cache.c  96  Warning 647: Suspicious truncation
+../env/env_cache.c  76  Warning 647: Suspicious truncation
                                                _
 	if ((review_max = cache->hashsize / 100) < 10)
-../env/env_cache.c  523  Info 713: Loss of precision (assignment) (unsigned int
+../env/env_cache.c  470  Info 713: Loss of precision (assignment) (unsigned int
     to int)
                         _
 			WT_MEMORY_FLUSH;
-../env/env_cache.c  536  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../env/env_cache.c  536  Warning 522: Expected void type, assignment, increment
+../env/env_cache.c  483  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../env/env_cache.c  483  Warning 522: Expected void type, assignment, increment
     or decrement
                               _
 		hb = chosen_hb;
-../env/env_cache.c  563  Warning 644: Variable 'chosen_hb' (line 504) may not
+../env/env_cache.c  510  Warning 644: Variable 'chosen_hb' (line 451) may not
     have been initialized
-../env/env_cache.c  504  Info 830: Location cited in prior message
+../env/env_cache.c  451  Info 830: Location cited in prior message
                                   _
 		page = chosen_page;
-../env/env_cache.c  564  Warning 644: Variable 'chosen_page' (line 505) may not
+../env/env_cache.c  511  Warning 644: Variable 'chosen_page' (line 452) may not
     have been initialized
-../env/env_cache.c  505  Info 830: Location cited in prior message
+../env/env_cache.c  452  Info 830: Location cited in prior message
 
     --- Wrap-up for Module: ../env/env_cache.c
 
@@ -334,8 +334,8 @@ Info 752: local declarator '__wt_cache_clean(struct __wt_toc *, unsigned long
     long)' (line 12, file ../env/env_cache.c) not referenced
 ../env/env_cache.c  12  Info 830: Location cited in prior message
 Warning 528: Symbol '__wt_cache_dump(struct __env *, const char *, struct
-    __sFILE *)' (line 677, file ../env/env_cache.c) not referenced
-../env/env_cache.c  677  Info 830: Location cited in prior message
+    __sFILE *)' (line 624, file ../env/env_cache.c) not referenced
+../env/env_cache.c  624  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_err.c (C)
 
@@ -417,14 +417,16 @@ During Specific Walk:
 --- Module:   ../support/api.c (C)
 _
 }
-../support/api.c  1057  Info 715: Symbol 'wt_toc' (line 1055) not referenced
-../support/api.c  1055  Info 830: Location cited in prior message
+../support/api.c  1059  Info 715: Symbol 'wt_toc' (line 1057) not referenced
+../support/api.c  1057  Info 830: Location cited in prior message
 
 --- Module:   ../support/cksum.c (C)
 
 --- Module:   ../support/err.c (C)
 
 --- Module:   ../support/prime.c (C)
+
+--- Module:   ../support/progress.c (C)
 
 --- Module:   ../support/stat.c (C)
 
