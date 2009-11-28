@@ -468,7 +468,8 @@ namespace mongo {
     DBDirectClient DbWebServer::db;
 
     void webServerThread() {
-        boost::thread thr(statsThread);
+        cout << "temp uncomment this:" << endl;
+//TEMP        boost::thread thr(statsThread);
         Client::initThread("websvr");
         DbWebServer mini;
         int p = cmdLine.port + 1000;

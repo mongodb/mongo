@@ -18,12 +18,25 @@
 namespace mongo {
 
 #if 0
-    typedef boost::shared_mutex MongoMutex;
+//#if BOOST_VERSION >= 103500
+    //typedef boost::shared_mutex MongoMutex;
+    class MongoMutex { 
+        boost::shared_mutex m;
+    public:
+        void lock() { 
+            m.lock(); 
+        }
+        void unlock() { m.unlock(); }
+        void lock_shared() { m.lock_shared(); }
+        void unlock_shared() { m.unlock_shared(); }
+    };
 #else
     /* this will be for old versions of boost */
     class MongoMutex { 
         boost::recursive_mutex m;
+        int x;
     public:
+        MongoMutex() { x=0; }
         void lock() { 
 #if BOOST_VERSION >= 103500
             m.lock();
@@ -115,6 +128,36 @@ namespace mongo {
         ~readlock() { 
             dbunlocking_read();
             dbMutex.unlock_shared();
+        }
+    };
+    
+    class mongolock {
+        bool _writelock;
+    public:
+        mongolock(bool write) : _writelock(write) {
+            if( _writelock )
+                dbMutex.lock();
+            else
+                dbMutex.lock_shared();
+        }
+        ~mongolock() { 
+            if( _writelock ) { 
+                dbunlocking_write();
+                dbMutexInfo.leaving();
+                dbMutex.unlock();
+            }
+            else {
+                dbunlocking_read();
+                dbMutex.unlock_shared();
+            }
+        }
+        /* this unlocks, does NOT upgrade. that works for our current usage */
+        void releaseAndWriteLock() { 
+            if( !_writelock ) {
+                _writelock = true;
+                dbMutex.unlock_shared();
+                dbMutex.lock();
+            }
         }
     };
     

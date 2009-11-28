@@ -397,6 +397,10 @@ namespace mongo {
     } dataFileSync;
 
     void show_32_warning(){
+#if BOOST_VERSION < 103500
+        //cout << \n** NOTE: built with boost version <= 1.34, limited concurrency" << endl;
+#endif
+
         if ( sizeof(int*) != 4 )
             return;
         cout << endl;

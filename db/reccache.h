@@ -223,6 +223,11 @@ public:
     }
 };
 
+/* see concurrency.h - note on a lock reset from read->write we don't 
+   call dbunlocking_read, we just wait for the final dbunlocking_write 
+   call 
+*/
+
 inline void dbunlocking_read() { 
     Client *c = currentClient.get();
     c->top.clientStop();

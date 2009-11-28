@@ -57,11 +57,6 @@ namespace mongo {
               name in different places (for example temp ones on repair).
     */
     inline bool setClient(const char *ns, const string& path=dbpath) {
-        /* we must be in critical section at this point as these are global
-           variables.
-        */
-        assertInWriteLock();
-
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
@@ -82,6 +77,8 @@ namespace mongo {
         // no longer helpful.  Commenting.
 //    if( !master )
 //        log() << "first operation for database " << key << endl;
+
+        assertInWriteLock();
 
         char cl[256];
         nsToClient(ns, cl);

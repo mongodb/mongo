@@ -125,8 +125,11 @@ namespace mongo {
     
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
+        bool writeLock = true;
+
         // before we lock...
-        if ( m.data->operation() == dbQuery ) {
+        int op = m.data->operation();
+        if ( op == dbQuery ) {
             const char *ns = m.data->_data + 4;
             if( strstr(ns, "$cmd.sys.") ) { 
                 if( strstr(ns, "$cmd.sys.inprog") ) {
@@ -139,6 +142,9 @@ namespace mongo {
                 }
             }
         }
+        else if( op == dbGetMore ) {
+            writeLock = false;
+        }
         
         if ( handlePossibleShardedMessage( m , dbresponse ) ){
             /* important to do this before we lock
@@ -147,7 +153,7 @@ namespace mongo {
             return true;
         }
 
-        dblock lk;
+        mongolock lk(writeLock);
         
         stringstream ss;
         char buf[64];
@@ -166,7 +172,7 @@ namespace mongo {
         int logThreshold = 100;
         int ms;
         bool log = logLevel >= 1;
-        c.curop()->op = m.data->operation();
+        c.curop()->op = op;
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -181,18 +187,18 @@ namespace mongo {
         }
 #endif
 
-        if ( m.data->operation() == dbQuery ) {
+        if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
             receivedQuery(dbresponse, m, ss, true);
         }
-        else if ( m.data->operation() == dbGetMore ) {
+        else if ( op == dbGetMore ) {
             // receivedQuery() does its own authorization processing.
             OPREAD;
             DEV log = true;
             ss << "getmore ";
             receivedGetMore(dbresponse, m, ss);
         }
-        else if ( m.data->operation() == dbMsg ) {
+        else if ( op == dbMsg ) {
 			/* deprecated / rarely used.  intended for connection diagnostics. */
             ss << "msg ";
             char *p = m.data->_data;
@@ -219,7 +225,7 @@ namespace mongo {
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
-            else if ( m.data->operation() == dbInsert ) {
+            else if ( op == dbInsert ) {
                 OPWRITE;
                 try {
                     ss << "insert ";
@@ -230,7 +236,7 @@ namespace mongo {
                     ss << " exception " + e.toString();
                 }
             }
-            else if ( m.data->operation() == dbUpdate ) {
+            else if ( op == dbUpdate ) {
                 OPWRITE;
                 try {
                     ss << "update ";
@@ -241,7 +247,7 @@ namespace mongo {
                     ss << " exception " + e.toString();
                 }
             }
-            else if ( m.data->operation() == dbDelete ) {
+            else if ( op == dbDelete ) {
                 OPWRITE;
                 try {
                     ss << "remove ";
@@ -252,7 +258,7 @@ namespace mongo {
                     ss << " exception " + e.toString();
                 }
             }
-            else if ( m.data->operation() == dbKillCursors ) {
+            else if ( op == dbKillCursors ) {
                 OPREAD;
                 try {
                     logThreshold = 10;
@@ -265,7 +271,7 @@ namespace mongo {
                 }
             }
             else {
-                out() << "    operation isn't supported: " << m.data->operation() << endl;
+                out() << "    operation isn't supported: " << op << endl;
                 currentOp.active = false;
                 assert(false);
             }
@@ -280,7 +286,8 @@ namespace mongo {
         Database *database = cc().database();
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= 100 ) {
-                // profile it
+                // performance profiling is on
+                lk.releaseAndWriteLock();
                 profile(ss.str().c_str()+20/*skip ts*/, ms);
             }
         }
@@ -354,7 +361,8 @@ namespace mongo {
             strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
         }        
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, ss, true);
-        recordUpdate( res.existing , res.num ); // for getlasterror
+        /* TODO FIX: recordUpdate should take a long int for parm #2 */
+        recordUpdate( res.existing , (int) res.num ); // for getlasterror
     }
 
     void receivedDelete(Message& m, stringstream &ss) {
