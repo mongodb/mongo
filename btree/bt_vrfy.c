@@ -19,7 +19,7 @@ typedef struct {
 	FILE *fp;				/* Dump file stream */
 
 	void (*f)(const char *s, u_int64_t);	/* Progress callback */
-	u_int32_t fcnt;				/* Progress counter */
+	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
 static int __wt_bt_verify_item(WT_TOC *, WT_PAGE *, VSTUFF *);

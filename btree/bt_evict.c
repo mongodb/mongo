@@ -158,7 +158,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	WT_CACHE *cache;
 	WT_HB *hb;
 	WT_PAGE *page;
-	u_int32_t fcnt;
+	u_int64_t fcnt;
 	u_int i;
 
 	db = toc->db;
