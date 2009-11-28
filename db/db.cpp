@@ -379,9 +379,8 @@ namespace mongo {
      */
     class DataFileSync : public BackgroundJob {
     public:
-        DataFileSync() : _sleepsecs( 60 ){}
-        
         void run(){
+            log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
             while ( ! inShutdown() ){
                 if ( _sleepsecs == 0 ){
                     // in case at some point we add an option to change at runtime
@@ -394,7 +393,7 @@ namespace mongo {
             }
         }
         
-        double _sleepsecs;
+        double _sleepsecs; // default value controlled by program options
     } dataFileSync;
 
     void show_32_warning(){
