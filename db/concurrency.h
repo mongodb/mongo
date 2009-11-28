@@ -13,7 +13,9 @@
 
 #pragma once
 
+#if BOOST_VERSION >= 103500
 #include <boost/thread/shared_mutex.hpp>
+#endif
 
 namespace mongo {
 
