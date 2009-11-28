@@ -113,7 +113,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	printf("get: process %lu\n", (u_long)getpid());
+	printf("t: process %lu\n", (u_long)getpid());
 	for (run_cnt = 1; runs == 0 || run_cnt < runs + 1; ++run_cnt) {
 		(void)remove(MYDB);
 		(void)remove(MYDUMP);
@@ -410,7 +410,8 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: get [-dv] [-a d|r|s|v] [-c cachesize] [-k keys] "
-	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n");
+	    "usage: %s [-dv] [-a d|r|s|v] [-c cachesize] [-k keys] "
+	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n",
+	    progname);
 	exit(1);
 }
