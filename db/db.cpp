@@ -24,6 +24,7 @@
 #include "repl.h"
 #include "../util/unittest.h"
 #include "../util/file_allocator.h"
+#include "../util/background.h"
 #include "dbmessage.h"
 #include "instance.h"
 #include "clientcursor.h"
@@ -373,6 +374,26 @@ namespace mongo {
         }
     }
 
+    class DataFileSync : public BackgroundJob {
+    public:
+        DataFileSync() : _sleepsecs( 60 ){}
+        
+        void run(){
+            while ( ! inShutdown() ){
+                if ( _sleepsecs == 0 ){
+                    // in case at some point we add an option to change at runtime
+                    sleepsecs(5);
+                    continue;
+                }
+                sleepmillis( _sleepsecs * 1000 );
+                MemoryMappedFile::flushAll( false );
+                log(1) << "flushing mmmap" << endl;
+            }
+        }
+        
+        double _sleepsecs;
+    } dataFileSync;
+
     void show_32_warning(){
         if ( sizeof(int*) != 4 )
             return;
@@ -547,6 +568,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("upgrade", "upgrade db if needed")
         ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
+        ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0 for never)")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -833,6 +855,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
         Module::configAll( params );
+        dataFileSync.go();
 
         if (params.count("command")) {
             vector<string> command = params["command"].as< vector<string> >();
