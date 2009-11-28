@@ -13,7 +13,7 @@ static int __wt_bt_search_recno(WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
 
 /*
  * __wt_db_get_recno --
- *	Db.get_recno method when called directly from a user thread.
+ *	Db.get_recno method.
  */
 int
 __wt_db_get_recno(DB *db, WT_TOC *toc,
