@@ -13,5 +13,5 @@ void
 __wt_progress(const char *s, u_int64_t v)
 {
 	printf("\r\t%s: %llu", s, (u_quad)v);
-	fflush(stdout);
+	(void)fflush(stdout);
 }
