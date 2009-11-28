@@ -191,7 +191,8 @@ namespace mongo {
 */
 
     inline void assertInWriteLock() { 
-        assert( dbMutexInfo.isLocked() );
+/* TEMP        assert( dbMutexInfo.isLocked() );
+*/
     }
 
 }
