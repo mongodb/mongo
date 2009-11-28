@@ -388,7 +388,7 @@ namespace mongo {
                     sleepsecs(5);
                     continue;
                 }
-                sleepmillis( _sleepsecs * 1000 );
+                sleepmillis( (int)(_sleepsecs * 1000) );
                 MemoryMappedFile::flushAll( false );
                 log(1) << "flushing mmmap" << endl;
             }
@@ -1043,7 +1043,16 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
     }
 #endif
 
+void temptestfoo() {
+    MongoMutex m;
+    m.lock();
+//    m.lock_upgrade();
+    m.lock_shared();
+}
+
+
 } // namespace mongo
 
 #include "recstore.h"
 #include "reccache.h"
+

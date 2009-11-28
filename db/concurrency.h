@@ -13,7 +13,37 @@
 
 #pragma once
 
+#include <boost/thread/shared_mutex.hpp>
+
 namespace mongo {
+
+#if 0
+    typedef boost::shared_mutex MongoMutex;
+#else
+    /* this will be for old versions of boost */
+    class MongoMutex { 
+        boost::recursive_mutex m;
+    public:
+        void lock() { 
+#if BOOST_VERSION >= 103500
+            m.lock();
+#else
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
+#endif
+        }
+
+        void unlock() {
+#if BOOST_VERSION >= 103500
+            m.unlock();
+#else
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
+#endif
+        }
+
+        void lock_shared() { lock(); }
+        void unlock_shared() { unlock(); }
+    };
+#endif
 
     /* mutex time stats */
     class MutexInfo {
@@ -45,9 +75,10 @@ namespace mongo {
         }
     };
 
-    extern boost::recursive_mutex &dbMutex;
+    extern MongoMutex &dbMutex;
     extern MutexInfo dbMutexInfo;
 
+/*
     struct lock {
         recursive_boostlock bl_;
         MutexInfo& info_;
@@ -60,46 +91,43 @@ namespace mongo {
             info_.leaving();
         }
     };
+*/
 
 	void dbunlocking_write();
 	void dbunlocking_read();
 
-	/* use writelock and readlock instead */
-    struct dblock : public lock {
-        dblock() :
-            lock( dbMutex, dbMutexInfo ) {
-        }
-        ~dblock() { 
-            dbunlocking_write();
-        }
-    };
-    
-    struct writelock : public lock {
-        writelock(const string& ns) :
-            lock( dbMutex, dbMutexInfo ) {
-        }
-        writelock(const char * ns) :
-            lock( dbMutex, dbMutexInfo ) {
+    struct writelock {
+        writelock(const string& ns) {
+            dbMutex.lock();
+            dbMutexInfo.entered();
         }
         ~writelock() { 
             dbunlocking_write();
+            dbMutexInfo.leaving();
+            dbMutex.unlock();
         }
     };
     
-    struct readlock : public lock {
-        readlock(const string& ns) :
-            lock( dbMutex, dbMutexInfo ) {
-        }
-        readlock(const char* ns) :
-            lock( dbMutex, dbMutexInfo ) {
+    struct readlock {
+        readlock(const string& ns) {
+            dbMutex.lock_shared();
         }
         ~readlock() { 
             dbunlocking_read();
+            dbMutex.unlock_shared();
+        }
+    };
+    
+	/* use writelock and readlock instead */
+    struct dblock : public writelock {
+        dblock() : writelock("") { }
+        ~dblock() { 
         }
     };
     
     /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
     */
+/*
     struct temprelease {
         boost::mutex& m;
         temprelease(boost::mutex& _m) : m(_m) {
@@ -117,6 +145,7 @@ namespace mongo {
 #endif
         }
     };
+*/
 
     inline void assertInWriteLock() { 
         assert( dbMutexInfo.isLocked() );

@@ -48,7 +48,6 @@
 
 namespace mongo {
 
-    extern boost::recursive_mutex &dbMutex;
     void ensureHaveIdIndex(const char *ns);
 
     /* if 1 sync() is running */

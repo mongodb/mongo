@@ -49,7 +49,7 @@ namespace mongo {
     bool autoresync = false;
     
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    boost::recursive_mutex &dbMutex( *(new boost::recursive_mutex) );
+    MongoMutex &dbMutex( *(new MongoMutex) );
     MutexInfo dbMutexInfo;
 
     string dbExecCommand;

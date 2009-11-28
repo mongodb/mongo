@@ -120,18 +120,10 @@ namespace mongo {
             }
             client.top.clientStop();
             dbMutexInfo.leaving();
-#if BOOST_VERSION >= 103500
             dbMutex.unlock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(dbMutex);
-#endif
         }
         ~dbtemprelease() {
-#if BOOST_VERSION >= 103500
             dbMutex.lock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(dbMutex);
-#endif
             dbMutexInfo.entered();
             if ( clientname.empty() )
                 cc().setns("", 0);
