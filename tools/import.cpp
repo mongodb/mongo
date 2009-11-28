@@ -175,6 +175,7 @@ public:
         char line[ (1024 * 1024 * 4) + 128];
         while ( *in ){
             in->getline( line , BUF_SIZE );
+            uassert( "unknown error reading file" , ( in->rdstate() & ios_base::badbit ) == 0 );
             log(1) << "got line:" << line << endl;
 
             char * buf = line;
