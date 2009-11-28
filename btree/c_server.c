@@ -11,7 +11,6 @@
 
 static int  __wt_cache_clean(WT_TOC *, u_int64_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
-static int  __wt_cache_alloc_serialize_func(WT_TOC *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
 static int  __wt_cache_discard_serialize_func(WT_TOC *);
 static int  __wt_cache_in_serialize_func(WT_TOC *);
