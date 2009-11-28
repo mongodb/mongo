@@ -14,7 +14,7 @@ assert.eq( 1 , c.count() , "setup2" );
 t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo" , "--csv" , "-f" , "a,b,c" )
 
 c.drop()
-assert.eq( 0 , c.count() , "after drop" , "-d" , t.baseName , "-c" , "foo" );;
+assert.eq( 0 , c.count() , "after drop" )
 
 t.runTool( "import" , "--file" , t.extFile , "-d" , t.baseName , "-c" , "foo" , "--type" , "csv" , "-f" , "a,b,c" );
 assert.soon( "c.findOne()" , "no data after sleep" );
@@ -25,6 +25,17 @@ delete a[0]._id
 delete a[1]._id
 assert.eq( tojson( { a : "a" , b : "b" , c : "c" } ) , tojson( a[1] ) , "csv parse 1" );
 assert.eq( tojson( base ) , tojson(a[0]) , "csv parse 0" )
+
+c.drop()
+assert.eq( 0 , c.count() , "after drop 2" )
+
+t.runTool( "import" , "--file" , t.extFile , "-d" , t.baseName , "-c" , "foo" , "--type" , "csv" , "--headerline" )
+assert.soon( "c.findOne()" , "no data after sleep" );
+assert.eq( 1 , c.count() , "after restore 2" );
+
+x = c.findOne()
+delete x._id;
+assert.eq( tojson( base ) , tojson(x) , "csv parse 2" )
 
 
 

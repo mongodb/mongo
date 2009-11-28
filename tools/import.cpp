@@ -38,7 +38,8 @@ class Import : public Tool {
 
     const char * _sep;
     bool _ignoreBlanks;
-
+    bool _headerLine;
+    
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( b.appendAsNumber( fieldName , data ) )
             return;
@@ -86,15 +87,26 @@ class Import : public Tool {
                 end = strstr( line , _sep );
             }
             
+            bool done = false;
+            string data;
+
             if ( ! end ){
-                _append( b , name , string( line ) );
-                break;
+                done = true;
+                data = string( line );
+            }
+            else {
+                data = string( line , end - line );
             }
             
-            _append( b , name , string( line , end - line ) );
+            if ( _headerLine )
+                _fields.push_back( data );
+            else
+                _append( b , name , data );
+            
+            if ( done )
+                break;
             line = end + skip;
         }
-
         return b.obj();
     }
     
@@ -106,6 +118,7 @@ public:
             ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
             ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
             ("drop", "drop collection first " )
+            ("headerline","CSV,TSV only - use first line as headers")
             ;
         addPositionArg( "file" , 1 );
         _type = JSON;
@@ -170,7 +183,9 @@ public:
         }
         
         if ( _type == CSV || _type == TSV ){
-            needFields();
+            _headerLine = hasParam( "headerline" );
+            if ( ! _headerLine )
+                needFields();
         }
 
         int errors = 0;
@@ -201,7 +216,10 @@ public:
 
             try {
                 BSONObj o = parseLine( buf );
-                conn().insert( ns.c_str() , o );
+                if ( _headerLine )
+                    _headerLine = false;
+                else
+                    conn().insert( ns.c_str() , o );
             }
             catch ( std::exception& e ){
                 cout << "exception:" << e.what() << endl;
