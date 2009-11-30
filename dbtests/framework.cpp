@@ -108,8 +108,10 @@ namespace mongo {
                 }
                 
                 if ( ! passes ){
+                    string s = err.str();
+                    log() << "FAIL: " << s << endl;
                     r->_fails++;
-                    r->_messages.push_back( err.str() );
+                    r->_messages.push_back( s );
                 }	
             }
             
