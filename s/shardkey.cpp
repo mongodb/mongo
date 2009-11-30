@@ -472,7 +472,7 @@ normal:
             ShardKeyPattern k( BSON( "key" << 1 ) );
             BSONObjBuilder b;
             k.getFilter(b, fromjson("{z:3,key:30}"), fromjson("{key:90}"));
-            BSONObj x = fromjson("{ key: { $gte: 30.0, $lt: 90.0 } }");
+            BSONObj x = fromjson("{ key: { $gte: 30, $lt: 90 } }");
             assert( x.woEqual(b.obj()) );
         }
         void div(const char *a, const char *res) { 

@@ -900,6 +900,56 @@ namespace JsonTests {
             }
         };
 
+        class NumericTypes : public Base {
+            public:
+            void run(){
+                Base::run();
+
+                BSONObj o = fromjson(json());
+
+                ASSERT(o["int"].type() == NumberInt);
+                ASSERT(o["long"].type() == NumberLong);
+                ASSERT(o["double"].type() == NumberDouble);
+
+                ASSERT(o["long"].numberLong() == 9223372036854775807ll);
+            }
+            
+            virtual BSONObj bson() const {
+                return BSON( "int" << 123
+                          << "long" << 9223372036854775807ll // 2**63 - 1
+                          << "double" << 3.14
+                          );
+            }
+            virtual string json() const {
+                return "{ \"int\": 123, \"long\": 9223372036854775807, \"double\": 3.14 }";
+            }
+        };
+
+        class NegativeNumericTypes : public Base {
+            public:
+            void run(){
+                Base::run();
+
+                BSONObj o = fromjson(json());
+
+                ASSERT(o["int"].type() == NumberInt);
+                ASSERT(o["long"].type() == NumberLong);
+                ASSERT(o["double"].type() == NumberDouble);
+
+                ASSERT(o["long"].numberLong() == -9223372036854775807ll);
+            }
+            
+            virtual BSONObj bson() const {
+                return BSON( "int" << -123
+                          << "long" << -9223372036854775807ll // -1 * (2**63 - 1)
+                          << "double" << -3.14
+                          );
+            }
+            virtual string json() const {
+                return "{ \"int\": -123, \"long\": -9223372036854775807, \"double\": -3.14 }";
+            }
+        };
+
     } // namespace FromJsonTests
 
     class All : public Suite {
@@ -978,6 +1028,8 @@ namespace JsonTests {
             add< FromJsonTests::SingleQuotes >();
             add< FromJsonTests::ObjectId >();
             add< FromJsonTests::ObjectId2 >();
+            add< FromJsonTests::NumericTypes >();
+            add< FromJsonTests::NegativeNumericTypes >();
         }
     } myall;
 

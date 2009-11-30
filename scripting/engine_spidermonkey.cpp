@@ -913,8 +913,7 @@ namespace mongo {
 
             int x = 0;
             assert( x = 1 );
-            if ( x != 1 )
-                throw -1;
+            uassert( "assert not being executed" , x == 1 );
         }
 
         ~SMEngine(){
