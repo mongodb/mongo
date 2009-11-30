@@ -107,9 +107,11 @@ namespace mongo {
 #define BOOST_SPIRIT_USE_OLD_NAMESPACE
 #include <boost/spirit/include/classic_core.hpp>
 #include <boost/spirit/include/classic_loops.hpp>
+#include <boost/spirit/include/classic_lists.hpp>
 #else
 #include <boost/spirit/core.hpp>
 #include <boost/spirit/utility/loops.hpp>
+#include <boost/spirit/utility/lists.hpp>
 #endif
 
 #include <boost/tuple/tuple.hpp>

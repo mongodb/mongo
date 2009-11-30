@@ -430,13 +430,13 @@ public:
         struct definition {
             definition( JsonGrammar const &self ) {
                 object = ch_p( '{' )[ objectStart( self.b ) ] >> !members >> '}';
-                members = fieldName >> ':' >> value >> !( ',' >> members );
+                members = list_p((fieldName >> ':' >> value) , ',');
                 fieldName =
                     str[ fieldNameEnd( self.b ) ] |
                     singleQuoteStr[ fieldNameEnd( self.b ) ] |
                     unquotedFieldName[ unquotedFieldNameEnd( self.b ) ];
                 array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
-                elements = value >> !( ch_p( ',' )[ arrayNext( self.b ) ] >> elements );
+                elements = list_p(value, ch_p(',')[arrayNext( self.b )]);
                 value =
                     oid[ oidEnd( self.b ) ] |
                     dbref[ dbrefEnd( self.b ) ] |
