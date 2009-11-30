@@ -107,7 +107,7 @@ exported symbols. That's why, in the non-Windows case, we set PCRE_EXP_DEFN and
 PCRE_EXP_DATA_DEFN only if they are not already set. */
 
 #ifndef PCRE_EXP_DECL
-#  ifdef _WIN32
+/*#  ifdef _WIN32
 #    ifndef PCRE_STATIC
 #      define PCRE_EXP_DECL       extern __declspec(dllexport)
 #      define PCRE_EXP_DEFN       __declspec(dllexport)
@@ -117,7 +117,7 @@ PCRE_EXP_DATA_DEFN only if they are not already set. */
 #      define PCRE_EXP_DEFN
 #      define PCRE_EXP_DATA_DEFN
 #    endif
-#  else
+#  else*/
 #    ifdef __cplusplus
 #      define PCRE_EXP_DECL       extern "C"
 #    else
@@ -130,7 +130,7 @@ PCRE_EXP_DATA_DEFN only if they are not already set. */
 #      define PCRE_EXP_DATA_DEFN
 #    endif
 #  endif
-#endif
+/*#endif*/
 
 /* We need to have types that specify unsigned 16-bit and 32-bit integers. We
 cannot determine these outside the compilation (e.g. by running a program as

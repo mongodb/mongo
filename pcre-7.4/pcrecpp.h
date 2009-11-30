@@ -355,7 +355,7 @@ PCRECPP_EXP_DECL Arg no_arg;
 // along with other options we put on top of pcre.
 // Only 9 modifiers, plus match_limit and match_limit_recursion,
 // are supported now.
-class PCRECPP_EXP_DEFN RE_Options {
+class RE_Options {
  public:
   // constructor
   RE_Options() : match_limit_(0), match_limit_recursion_(0), all_options_(0) {}
@@ -487,7 +487,7 @@ static inline RE_Options EXTENDED() {
 // Interface for regular expression matching.  Also corresponds to a
 // pre-compiled regular expression.  An "RE" object is safe for
 // concurrent use by multiple threads.
-class PCRECPP_EXP_DEFN RE {
+class RE {
  public:
   // We provide implicit conversions from strings so that users can
   // pass in a string or a "const char*" wherever an "RE" is expected.
