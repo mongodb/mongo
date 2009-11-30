@@ -77,6 +77,8 @@ namespace mongo {
     }
 
     void MemoryMappedFile::flush(bool sync) {
+        if ( view == 0 || fd == 0 )
+            return;
         if ( msync(view, len, sync ? MS_SYNC : MS_ASYNC) )
             problem() << "msync error " << errno << endl;
     }

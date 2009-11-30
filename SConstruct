@@ -639,8 +639,12 @@ def setupBuildInfoFile( outFile ):
         'namespace mongo { const char * sysInfo(){ return "' + sysInfo + ' BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; } }',
         ])
 
+    contents += '\n';
+
     if os.path.exists( outFile ) and open( outFile ).read().strip() == contents.strip():
         return
+
+    contents += '\n';
 
     out = open( outFile , 'w' )
     out.write( contents )

@@ -70,7 +70,7 @@ namespace mongo {
 
         int chunkNumber = 0;
         while (data < end){
-            int chunkLen = MIN(DEFAULT_CHUNK_SIZE, end-data);
+            int chunkLen = MIN(DEFAULT_CHUNK_SIZE, (unsigned)(end-data));
             Chunk c(idObj, chunkNumber, data, chunkLen);
             _client.insert( _chunksNS.c_str() , c._data );
 

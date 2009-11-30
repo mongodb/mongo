@@ -21,13 +21,16 @@
 namespace mongo {
 
     set<MemoryMappedFile*> mmfiles;
+    boost::mutex mmmutex;
 
     MemoryMappedFile::~MemoryMappedFile() {
         close();
+        boostlock lk( mmmutex );
         mmfiles.erase(this);
     }
 
     void MemoryMappedFile::created(){
+        boostlock lk( mmmutex );
         mmfiles.insert(this);
     }
 
@@ -51,6 +54,7 @@ namespace mongo {
     long long MemoryMappedFile::totalMappedLength(){
         unsigned long long total = 0;
         
+        boostlock lk( mmmutex );
         for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             total += (*i)->length();
 
@@ -59,9 +63,14 @@ namespace mongo {
 
     int MemoryMappedFile::flushAll( bool sync ){
         int num = 0;
+
+        boostlock lk( mmmutex );
         for ( set<MemoryMappedFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             num++;
-            (*i)->flush( sync );
+            MemoryMappedFile * mmf = *i;
+            if ( ! mmf )
+                continue;
+            mmf->flush( sync );
         }
         return num;
     }
