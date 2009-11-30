@@ -31,11 +31,11 @@
 using namespace boost;
 using namespace boost::asio;
 using namespace boost::asio::ip;
-using namespace std;
+//using namespace std;
 
 namespace mongo {
 
-    class MessageServerSession : public enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
+    class MessageServerSession : public boost::enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
     public:
         MessageServerSession( MessageHandler * handler , io_service& ioservice ) : _handler( handler ) , _socket( ioservice ){
             
@@ -73,7 +73,7 @@ namespace mongo {
             _cur.setData( data , true );
             async_read( _socket , 
                         buffer( raw + sizeof( _inHeader ) , _inHeader.len - sizeof( _inHeader ) ) ,
-                        bind( &MessageServerSession::handleReadBody , shared_from_this() , placeholders::error ) );
+                        boost::bind( &MessageServerSession::handleReadBody , shared_from_this() , boost::asio::placeholders::error ) );
         }
         
         void handleReadBody( const boost::system::error_code& error ){
@@ -105,7 +105,7 @@ namespace mongo {
             uassert( "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
             async_write( _socket , 
                          buffer( (char*)toSend.data , toSend.data->len ) , 
-                         bind( &MessageServerSession::handleWriteDone , shared_from_this() , placeholders::error ) );
+                         boost::bind( &MessageServerSession::handleWriteDone , shared_from_this() , boost::asio::placeholders::error ) );
         }
 
         
@@ -119,7 +119,7 @@ namespace mongo {
             _inHeader.len = 0;
             async_read( _socket , 
                         buffer( &_inHeader , sizeof( _inHeader ) ) ,
-                        bind( &MessageServerSession::handleReadHeader , shared_from_this() , placeholders::error ) );
+                        boost::bind( &MessageServerSession::handleReadHeader , shared_from_this() , boost::asio::placeholders::error ) );
         }
         
         MessageHandler * _handler;
@@ -162,7 +162,7 @@ namespace mongo {
         void _accept(){
             shared_ptr<MessageServerSession> session( new MessageServerSession( _handler , _ioservice ) );
             _acceptor.async_accept( session->socket() ,
-                                    bind( &AsyncMessageServer::handleAccept,
+                boost::bind( &AsyncMessageServer::handleAccept,
                                           this, 
                                           session,
                                           boost::asio::placeholders::error )

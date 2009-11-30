@@ -761,7 +761,7 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( 3, s.nPlans() );
                 bool threw = false;
                 auto_ptr< TestOp > t( new TestOp( true, threw ) );
-                shared_ptr< TestOp > done = s.runOp( *t );
+                boost::shared_ptr< TestOp > done = s.runOp( *t );
                 ASSERT( threw );
                 ASSERT( done->complete() );
                 ASSERT( done->exceptionMessage().empty() );
@@ -801,7 +801,7 @@ namespace QueryOptimizerTests {
                 QueryPlanSet s( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
                 auto_ptr< TestOp > t( new TestOp() );
-                shared_ptr< TestOp > done = s.runOp( *t );
+                boost::shared_ptr< TestOp > done = s.runOp( *t );
                 ASSERT( !done->complete() );
                 ASSERT_EQUALS( "throw", done->exceptionMessage() );
                 ASSERT( done->error() );

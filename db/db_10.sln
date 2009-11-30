@@ -1,0 +1,45 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "db.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\s\dbgrid.vcxproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "..\dbtests\test.vcxproj", "{215B2D68-0A70-4D10-8E75-B33010C62A91}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug Recstore|Win32 = Debug Recstore|Win32
+		Debug|Win32 = Debug|Win32
+		release_nojni|Win32 = release_nojni|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug Recstore|Win32.ActiveCfg = Debug Recstore|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug Recstore|Win32.Build.0 = Debug Recstore|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|Win32.ActiveCfg = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Debug|Win32.Build.0 = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.release_nojni|Win32.ActiveCfg = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|Win32.ActiveCfg = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B31010C62A91}.Release|Win32.Build.0 = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug Recstore|Win32.ActiveCfg = Debug Recstore|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug Recstore|Win32.Build.0 = Debug Recstore|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Debug|Win32.Build.0 = Debug|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.release_nojni|Win32.ActiveCfg = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.release_nojni|Win32.Build.0 = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.ActiveCfg = Release|Win32
+		{E03717ED-69B4-4D21-BC55-DF6690B585C6}.Release|Win32.Build.0 = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug Recstore|Win32.ActiveCfg = Debug Recstore|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug Recstore|Win32.Build.0 = Debug Recstore|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|Win32.ActiveCfg = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|Win32.Build.0 = Debug|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.release_nojni|Win32.ActiveCfg = release_nojni|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.release_nojni|Win32.Build.0 = release_nojni|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.ActiveCfg = Release|Win32
+		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
