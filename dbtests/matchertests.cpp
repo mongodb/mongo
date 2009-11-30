@@ -70,7 +70,7 @@ namespace MatcherTests {
         void run(){
             BSONObj query = fromjson( "{ a : { $in : [4,6] } }" );
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
-            ASSERT_EQUALS( NumberDouble , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
+            ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
             
             JSMatcher m( query );
 

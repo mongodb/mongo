@@ -248,6 +248,17 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
+    struct intValue {
+        intValue( ObjectBuilder &_b ) : b( _b ) {}
+        void operator() ( long long num ) const {
+            if (num >= numeric_limits<int>::min() && num <= numeric_limits<int>::max())
+                b.back()->append( b.fieldName(), (int)num );
+            else
+                b.back()->append( b.fieldName(), num );
+        }
+        ObjectBuilder &b;
+    };
+
     struct subobjectEnd {
         subobjectEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
@@ -435,6 +446,7 @@ public:
                     str[ stringEnd( self.b ) ] |
                     singleQuoteStr[ stringEnd( self.b ) ] |
                     number |
+                    integer |
                     object[ subobjectEnd( self.b ) ] |
                     array[ arrayEnd( self.b ) ] |
                     lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
@@ -470,7 +482,10 @@ public:
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
-                number = real_p[ numberValue( self.b ) ];
+                number = strict_real_p[ numberValue( self.b ) ];
+
+                static int_parser<long long, 10,  1, numeric_limits<long long>::digits10 + 1> long_long_p;
+                integer = long_long_p[ intValue(self.b) ];
 
                 // We allow a subset of valid js identifier names here.
                 unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) | ch_p( '_' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_'  )) ) ];
@@ -512,7 +527,7 @@ public:
                                       ( ~range_p( 0x00, 0x1f ) & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
                                    >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
             }
-            rule< ScannerT > object, members, array, elements, value, str, number,
+            rule< ScannerT > object, members, array, elements, value, str, number, integer,
             dbref, dbrefS, dbrefT, oid, oidS, oidT, bindata, date, dateS, dateT,
             regex, regexS, regexT, quotedOid, fieldName, unquotedFieldName, singleQuoteStr;
             const rule< ScannerT > &start() const {

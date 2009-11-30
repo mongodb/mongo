@@ -553,7 +553,7 @@ namespace NamespaceTests {
                 id().getKeysFromObject( fromjson( "{a:1,b:[]}" ), keys );
                 checkSize(1, keys );
                 cout << "YO : " << *(keys.begin()) << endl;
-                ASSERT_EQUALS( NumberDouble , keys.begin()->firstElement().type() );
+                ASSERT_EQUALS( NumberInt , keys.begin()->firstElement().type() );
                 keys.clear();
             }
 
