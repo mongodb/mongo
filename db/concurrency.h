@@ -15,6 +15,8 @@
 
 #if BOOST_VERSION >= 103500
 #include <boost/thread/shared_mutex.hpp>
+#undef assert
+#define assert xassert
 #endif
 
 namespace mongo {
