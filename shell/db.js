@@ -139,8 +139,10 @@ DB.prototype.shutdownServer = function() {
     }
 
     try {
-        this._dbCommand("shutdown");
-        throw "shutdownServer failed";
+        var res = this._dbCommand("shutdown");
+	if( res ) 
+	    throw "shutdownServer failed: " + res.errmsg;
+	throw "shutdownServer failed";
     }
     catch ( e ){
         assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
