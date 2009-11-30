@@ -724,7 +724,7 @@ namespace QueryTests {
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
             for ( int i=0; i<100; i++ ){
                 insertNext();
-                ASSERT( count() < 40 );
+                ASSERT( count() < 45 );
             }
             
             int a = count();
