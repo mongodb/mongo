@@ -90,9 +90,11 @@ typedef	struct __wt_indx {
 } WT_INDX;
 
 struct __wt_page {
-	/*********************************************************
-	 * The following fields are owned by the cache layer.
-	 *********************************************************/
+	WT_SERIAL serial_private;	/* Private serialization point */
+
+	WT_PAGE *next;			/* Hash queue */
+	u_int32_t page_gen;		/* LRU generation number */
+
 	DB	 *db;			/* Page's backing database */
 	u_int32_t addr;			/* Page's allocation address */
 
@@ -103,22 +105,15 @@ struct __wt_page {
 	 */
 	u_int32_t bytes;		/* Page size */
 
-	u_int32_t page_gen;		/* LRU generation number */
+	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
-	WT_PAGE *next;			/* Hash queue */
-
-	WT_PAGE_HDR *hdr;		/* On-disk page */
-
-	/*********************************************************
-	 * The following fields are owned by the btree layer.
-	 *********************************************************/
-	u_int8_t *first_free;		/* First free byte address */
-	u_int32_t space_avail;		/* Available page memory */
+	u_int8_t *first_free;		/* Page's first free byte address */
+	u_int32_t space_avail;		/* Page's available memory */
 
 	/*
 	 * Each page has an associated, in-memory structure describing it.
 	 * (This is where the on-page index array found in DB 1.85 and Berkeley
-	 * DB moved.)   It's always sorted, but it's not always aa "key", for
+	 * DB moved.)   It's always sorted, but it's not always a "key", for
 	 * example, offpage duplicate leaf pages contain sorted data items,
 	 * where the data is the interesting stuff.  For simplicity, and as
 	 * it's always a sorted list, we call it a key,

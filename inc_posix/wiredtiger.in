@@ -61,6 +61,7 @@ struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
+struct __wt_serial;		typedef struct __wt_serial WT_SERIAL;
 
 /*******************************************
  * Exported types
@@ -80,6 +81,14 @@ struct __dbt {
 	int (*callback)(DB *, DBT *, DBT *);
 
 	u_int32_t flags;
+};
+
+/*******************************************
+ * Private serialization point
+ *******************************************/
+struct __wt_serial {
+	u_int32_t api_gen;		/* API generation */
+	u_int32_t mod_gen;		/* Data modification generation */
 };
 
 /*******************************************
@@ -106,10 +115,12 @@ struct __wt_toc {
 	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	int	 (*serialize)(WT_TOC *);/* Serialization function */
-	void	  *serialize_args;	/* Serialization function argument */
-	int	   serialize_ret;	/* Serialization function return */
-	u_int32_t *serialize_private;	/* Private serialization reference */
+	int	 (*serial)(WT_TOC *);	/* Serialization function */
+	void	  *serial_args;		/* Serialization function argument */
+	int	   serial_ret;		/* Serialization function return */
+
+	WT_SERIAL *serial_private;	/* Private serialization reference */
+	u_int32_t  serial_mod;		/* Data modification generation */
 
 	u_int32_t flags;
 
@@ -239,6 +250,9 @@ struct __db {
 
 	int (*open)(
 	    DB *, const char *, mode_t , u_int32_t );
+
+	int (*put)(
+	    DB *, WT_TOC *, DBT *, DBT *, u_int32_t );
 
 	int (*stat_clear)(
 	    DB *, u_int32_t );
@@ -384,7 +398,7 @@ char	*wt_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ALLOCATED					0x00000001
-#define	WT_CACHE_LOCK_RESTART				0x00000001
+#define	WT_CACHE_LOCK_RESTART				0x00000002
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
@@ -398,6 +412,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_UNFORMATTED					0x00000002
 #define	WT_VERB_ALL					0x00000002
 #define	WT_VERB_FILEOPS					0x00000001
+#define	WT_WAITING					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_CACHE				0x00000003
@@ -407,6 +422,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_GET_RECNO				0x00000000
 #define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_DB_PUT				0x00000000
 #define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000000
@@ -423,7 +439,7 @@ char	*wt_version(int *, int *, int *);
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000001
 #define	WT_APIMASK_WT_PAGE				0x0000000f
-#define	WT_APIMASK_WT_TOC				0x00000001
+#define	WT_APIMASK_WT_TOC				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

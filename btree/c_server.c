@@ -12,8 +12,8 @@
 static int  __wt_cache_clean(WT_TOC *, u_int64_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
-static int  __wt_cache_discard_serialize_func(WT_TOC *);
-static int  __wt_cache_in_serialize_func(WT_TOC *);
+static int  __wt_cache_discard_serial_func(WT_TOC *);
+static int  __wt_cache_in_serial_func(WT_TOC *);
 
 #ifdef HAVE_DIAGNOSTIC
 static int __wt_cache_dump(ENV *, const char *, FILE *);
@@ -27,18 +27,18 @@ typedef struct {
 	u_int32_t addr;				/* File address */
 	u_int32_t bytes;			/* Bytes */
 } __wt_in_args;
-#define	__wt_cache_in_serialize(toc, _page, _addr, _bytes) do {		\
+#define	__wt_cache_in_serial(toc, _page, _addr, _bytes) do {		\
 	__wt_in_args _args;						\
 	_args.page = _page;						\
 	_args.addr = _addr;						\
 	_args.bytes = _bytes;						\
 	WT_TOC_SERIALIZE_REQUEST(toc,					\
-	    __wt_cache_in_serialize_func, NULL, &_args);		\
+	    __wt_cache_in_serial_func, NULL, &_args);			\
 } while (0);
 #define	__wt_cache_in_unpack(toc, _page, _addr, _bytes) do {		\
-	_page =	((__wt_in_args *)(toc)->serialize_args)->page;		\
-	_addr = ((__wt_in_args *)(toc)->serialize_args)->addr;		\
-	_bytes = ((__wt_in_args *)(toc)->serialize_args)->bytes;	\
+	_page =	((__wt_in_args *)(toc)->serial_args)->page;		\
+	_addr = ((__wt_in_args *)(toc)->serial_args)->addr;		\
+	_bytes = ((__wt_in_args *)(toc)->serial_args)->bytes;		\
 } while (0)
 
 /*
@@ -47,14 +47,14 @@ typedef struct {
 typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
 } __wt_discard_args;
-#define	__wt_cache_discard_serialize(toc, _serial, _page) do {		\
+#define	__wt_cache_discard_serial(toc, _serial, _page) do {		\
 	__wt_discard_args _args;					\
 	_args.page = _page;						\
 	WT_TOC_SERIALIZE_REQUEST(toc,					\
-	    __wt_cache_discard_serialize_func, _serial, &_args);	\
+	    __wt_cache_discard_serial_func, _serial, &_args);		\
 } while (0)
 #define	__wt_cache_discard_unpack(toc, _page) do {			\
-	_page = ((__wt_discard_args *)(toc)->serialize_args)->page;	\
+	_page = ((__wt_discard_args *)(toc)->serial_args)->page;	\
 } while (0)
 
 /*
@@ -172,7 +172,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	 */
 	for (i = 0, fcnt = 0; i < cache->hashsize; ++i) {
 		hb = &cache->hb[i];
-		WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
+		WT_TOC_SERIALIZE_WAIT(toc, &hb->serial_private);
 		for (page = hb->list; page != NULL; page = page->next) {
 			if (page->db != db ||
 			    !F_ISSET(page, WT_MODIFIED | WT_PINNED))
@@ -239,7 +239,7 @@ err:		__wt_free(env, page);
 	 * the allocation of bytes from the file, the change of total bytes
 	 * in the cache, and the insert onto the hash queue.
 	 */
-	__wt_cache_in_serialize(toc, page, WT_ADDR_INVALID, bytes);
+	__wt_cache_in_serial(toc, page, WT_ADDR_INVALID, bytes);
 
 	*pagep = page;
 	return (0);
@@ -282,7 +282,7 @@ __wt_cache_in(WT_TOC *toc,
 	 * wait until it clears.
 	 */
 	hb = &cache->hb[WT_HASH(cache, addr)];
-	WT_TOC_SERIALIZE_WAIT(toc, &hb->serialize_private);
+	WT_TOC_SERIALIZE_WAIT(toc, &hb->serial_private);
 
 	/* Search for the page in the cache. */
 	for (bucket_cnt = 0,
@@ -357,18 +357,18 @@ err:		if (page->hdr != NULL)
 	}
 
 	/* Serialize the insert onto the hash queue. */
-	__wt_cache_in_serialize(toc, page, addr, bytes);
+	__wt_cache_in_serial(toc, page, addr, bytes);
 
 	*pagep = page;
 	return (0);
 }
 
 /*
- * __wt_cache_in_serialize_func --
+ * __wt_cache_in_serial_func --
  *	Server function to read bytes from a file.
  */
 static int
-__wt_cache_in_serialize_func(WT_TOC *toc)
+__wt_cache_in_serial_func(WT_TOC *toc)
 {
 	DB *db;
 	IENV *ienv;
@@ -525,11 +525,20 @@ __wt_cache_srvr(void *arg)
 			    "clean pages evicted from the cache");
 
 		/*
-		 * If the page is modified while we wait for serialized access,
-		 * keep the page.
+		 * Discarding a page currently requires private serialization
+		 * on the hash bucket: (1) we require private serialization
+		 * because we need to know there are no readers accessing the
+		 * page when we remove it, (2) we serialize on the hash bucket
+		 * because the link we're modifying is in the page before the
+		 * page we're removing.  So, what we really need is to ensure
+		 * there are no readers of the link in page A, and no readers
+		 * of page B, and there's no way to do that at the moment.  So,
+		 * instead, we request private serialization of the whole hash
+		 * bucket so we know no thread is reading any page in the hash
+		 * bucket.
 		 */
-		__wt_cache_discard_serialize(toc, &hb->serialize_private, page);
-		if (toc->serialize_ret == 0)
+		__wt_cache_discard_serial(toc, &hb->serial_private, page);
+		if (toc->serial_ret == 0)
 			__wt_bt_page_recycle(env, page);
 	}
 
@@ -539,11 +548,11 @@ __wt_cache_srvr(void *arg)
 }
 
 /*
- * __wt_cache_discard_serialize_func --
+ * __wt_cache_discard_serial_func --
  *	Server version: discard a page of a file.
  */
 static int
-__wt_cache_discard_serialize_func(WT_TOC *toc)
+__wt_cache_discard_serial_func(WT_TOC *toc)
 {
 	WT_PAGE *page;
 
@@ -551,10 +560,13 @@ __wt_cache_discard_serialize_func(WT_TOC *toc)
 
 	/*
 	 * If the page was modified or pinned while we waited for serialized
-	 * access, return with a failed status.
+	 * access, or another thread is waiting on serialized access, return
+	 * with a failed status.
 	 */
 	if (F_ISSET(page, WT_MODIFIED | WT_PINNED))
-		return (1);
+		return (WT_RESTART);
+	if (page->serial_private.api_gen != 0)
+		return (WT_RESTART);
 
 	__wt_cache_discard(toc->env, page);
 	return (0);

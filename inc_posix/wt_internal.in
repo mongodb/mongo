@@ -121,7 +121,7 @@ struct __idb {
  * Cache object.
  *******************************************/
 struct __wt_hb {
-	u_int32_t serialize_private;	/* Private serialization field */
+	WT_SERIAL serial_private;	/* Private serialization field */
 	WT_PAGE *list;			/* Linked list */
 };
 struct __wt_cache {
