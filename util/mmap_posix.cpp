@@ -71,6 +71,9 @@ namespace mongo {
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
             out() << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;
+            if ( errno == ENOMEM ){
+                out() << "     mmap failed with out of memory, if you're using 32-bits, then you probably need to upgrade to 64" << endl;
+            }
             return 0;
         }
         return view;
