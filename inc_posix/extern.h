@@ -120,12 +120,6 @@ __wt_db_sync(DB *db, void (*f)(const char *, u_int64_t), u_int32_t flags);
 void *
 __wt_workq_srvr(void *arg);
 int
-__wt_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp);
-int
-__wt_wt_toc_close(WT_TOC *toc, u_int32_t flags);
-int
-__wt_toc_dump(ENV *env, const char *ofile, FILE *fp);
-int
 __wt_cache_create(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
@@ -166,6 +160,12 @@ int
 __wt_env_stat_clear(ENV *env, u_int32_t flags);
 void
 __wt_stat_print(ENV *env, WT_STATS *s, FILE *stream);
+int
+__wt_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp);
+int
+__wt_wt_toc_close(WT_TOC *toc, u_int32_t flags);
+int
+__wt_toc_dump(ENV *env, const char *ofile, FILE *fp);
 void
 __wt_abort();
 int
