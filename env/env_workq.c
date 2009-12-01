@@ -23,16 +23,16 @@ __wt_workq_srvr(void *arg)
 	IENV *ienv;
 	WT_TOC *toc;
 	u_int32_t low_api_gen;
-	int needflush, notfound;
+	int flush, notfound;
 
 	env = arg;
 	ienv = env->ienv;
 
+	flush = 0;
 	notfound = 1;
 	while (F_ISSET(ienv, WT_WORKQ_RUN)) {
 		/* Update everything, let's see what we can see. */
 		WT_MEMORY_FLUSH;
-		needflush = 0;
 
 		/*
 		 * Walk the WT_TOC queue and: execute non-private serialization
@@ -47,16 +47,13 @@ __wt_workq_srvr(void *arg)
 			 * are running in the library.
 			 */
 			if (toc->api_gen != WT_TOC_GEN_IGNORE &&
+			    toc->serial_private == NULL &&
 			    (low_api_gen == 0 || low_api_gen > toc->api_gen)) {
 				low_api_gen = toc->api_gen;
 			}
 
-			/*
-			 * We're done with free-running threads and threads
-			 * waiting on another thread's action.
-			 */
-			if (toc->serialize == NULL ||
-			    toc->serialize == WT_TOC_WAITER)
+			/* We're done with threads not waiting for anything. */
+			if (toc->serial == NULL)
 				continue;
 
 			/*
@@ -67,14 +64,29 @@ __wt_workq_srvr(void *arg)
 			 * Flush the current API generation number plus 1 into
 			 * the serialization point.  Then, increment the API
 			 * generation number, and flush that operation.  This
-			 * dance ensure that any thread with an API generation
+			 * dance ensures that any thread with an API generation
 			 * number larger than the serialization point's value
 			 * is NOT a problem, because the thread will be blocked
 			 * before it can access the data structure.
+			 *
+			 * There are no ordering issues for the modification
+			 * generation value.   It's checked (and updated) when
+			 * the private serialization function runs, and there's
+			 * always a flush between the update and the check.
+			 *
+			 * It's OK if multiple threads request the same field.
+			 * The first one we find in the list sets the api_gen
+			 * field, and the first one we find in the list will
+			 * run when the field becomes available, and then the
+			 * process will repeat.  Starvation is theoretically
+			 * possible, but I'm not going to worry about it until
+			 * I see it.
 			 */
-			if (toc->serialize_private != NULL) {
-				if (*toc->serialize_private == 0) {
-					*toc->serialize_private =
+			if (toc->serial_private != NULL) {
+				if (toc->serial_private->api_gen == 0) {
+					toc->serial_mod =
+					    toc->serial_private->mod_gen;
+					toc->serial_private->api_gen =
 					    ienv->api_gen + 1;
 					WT_MEMORY_FLUSH;
 					++ienv->api_gen;
@@ -90,13 +102,20 @@ __wt_workq_srvr(void *arg)
 			 * any thread running free before granting private
 			 * serialization requests.  Satisfy simple requests.
 			 */
-			notfound = 0;
-			toc->serialize_ret = toc->serialize(toc);
-			toc->serialize = NULL;
-			needflush = 1;
+			toc->serial_ret = toc->serial(toc);
+			toc->serial = NULL;
 
-			WT_STAT_INCR(ienv->stats,
-			    WORKQ_SERIALIZE, "workQ serialization requests");
+			flush = 1;
+			notfound = 0;
+		}
+
+		/*
+		 * Flush out changes.  There's no technical requirement for
+		 * this flush, but it keeps other threads up-to-date.
+		 */
+		if (flush) {
+			flush = 0;
+			WT_MEMORY_FLUSH;
 		}
 
 		/*
@@ -107,46 +126,60 @@ __wt_workq_srvr(void *arg)
 		 * to waste the queue walk.
 		 */
 		TAILQ_FOREACH(toc, &ienv->tocqh, q) {
-			/*
-			 * Skip threads not waiting for anything and threads
-			 * waiting on another thread.
-			 */
-			if (toc->serialize == NULL ||
-			    toc->serialize == WT_TOC_WAITER)
+			/* Skip threads not waiting for anything. */
+			if (toc->serial == NULL)
 				continue;
 
-			/*
-			 * Skip private requests appearing in the WT_TOC queue
-			 * after the previous loop (we haven't yet set their
-			 * private serialization value) and threads which can't
-			 * run yet because there remain threads in the system
-			 * with lower API generation numbers.
-			 */
-			if (toc->serialize_private != NULL) {
-				if (*toc->serialize_private == 0)
+			/* Run serialization requests */
+			if (toc->serial_private == NULL)
+				toc->serial_ret = toc->serial(toc);
+			else {
+				/*
+				 * Skip private requests appearing in the queue
+				 * after the previous loop (we haven't yet set
+				 * the serialization point's api_gen value).
+				 */
+				if (toc->serial_private->api_gen == 0)
 					continue;
+
+				/*
+				 * Skip threads that can't yet run because there
+				 * remain threads in the system with lower API
+				 * generation numbers.
+				 */
 				if (low_api_gen != 0 &&
-				    *toc->serialize_private > low_api_gen)
+				    toc->serial_private->api_gen > low_api_gen)
 					continue;
-			}
 
+				/*
+				 * Reject private requests where data has been
+				 * modified since the request was scheduled.
+				 */
+				if (toc->serial_mod ==
+				    toc->serial_private->mod_gen) {
+					toc->serial_ret = toc->serial(toc);
+					++toc->serial_private->mod_gen;
+				} else
+					toc->serial_ret = WT_RESTART;
+
+				/* Allow waiting threads to proceed. */
+				toc->serial_private->api_gen = 0;
+				toc->serial_private = NULL;
+			}
+			toc->serial = NULL;
+
+			flush = 1;
 			notfound = 0;
-			toc->serialize_ret = toc->serialize(toc);
-			toc->serialize = NULL;
-			needflush = 1;
-
-			if (toc->serialize_private != NULL) {
-				*toc->serialize_private = 0;
-				toc->serialize_private = NULL;
-			}
-
-			WT_STAT_INCR(ienv->stats,
-			    WORKQ_PRIVATE_SERIALIZE,
-			    "workQ private serialization requests");
 		}
 
-		if (needflush)
+		/*
+		 * Flush out changes.  There's no technical requirement for
+		 * this flush, but it keeps other threads up-to-date.
+		 */
+		if (flush) {
+			flush = 0;
 			WT_MEMORY_FLUSH;
+		}
 
 		__wt_queue_op_check(env);
 		__wt_queue_cache_check(env);
