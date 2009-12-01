@@ -354,9 +354,10 @@ again:
                 break;
             out() << "********************" << endl;
             out() << "ERROR: MessagingPort::call() wrong id got:" << (unsigned)response.data->responseTo << " expect:" << (unsigned)toSend.data->id << endl;
-            out() << "  old:" << (unsigned)old << endl;
+            out() << "  toSend op: " << toSend.data->operation() << " old id:" << (unsigned)old << endl;
             out() << "  response msgid:" << (unsigned)response.data->id << endl;
             out() << "  response len:  " << (unsigned)response.data->len << endl;
+            out() << "  response op:  " << response.data->operation() << endl;
             out() << "  farEnd: " << farEnd << endl;
             assert(false);
             response.reset();
