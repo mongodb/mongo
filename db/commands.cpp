@@ -72,7 +72,7 @@ namespace mongo {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
             }
 
-            anObjBuilder.append( "ok" , ok ? 1 : 0 );
+            anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
             
             if ( !ok ) {
                 anObjBuilder.append("errmsg", errmsg);
