@@ -458,6 +458,28 @@ static int __wt_api_db_open(
 	return (__wt_db_open(db, dbname, mode, flags));
 }
 
+static int __wt_api_db_put(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	DBT *data,
+	u_int32_t flags);
+static int __wt_api_db_put(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	DBT *data,
+	u_int32_t flags)
+{
+	ENV *env;
+
+	env = db->env;
+
+	WT_ENV_FCHK(env, "DB.put", flags, WT_APIMASK_DB_PUT);
+
+	return (__wt_db_put(db, toc, key, data, flags));
+}
+
 static int __wt_api_db_stat_clear(
 	DB *db,
 	u_int32_t flags);
@@ -880,6 +902,9 @@ __wt_methods_db_lockout(DB *db)
 	db->open = (int (*)
 	    (DB *, const char *, mode_t , u_int32_t ))
 	    __wt_db_lockout;
+	db->put = (int (*)
+	    (DB *, WT_TOC *, DBT *, DBT *, u_int32_t ))
+	    __wt_db_lockout;
 	db->stat_clear = (int (*)
 	    (DB *, u_int32_t ))
 	    __wt_db_lockout;
@@ -944,6 +969,7 @@ __wt_methods_db_open_transition(DB *db)
 	db->dump = __wt_api_db_dump;
 	db->get = __wt_api_db_get;
 	db->get_recno = __wt_api_db_get_recno;
+	db->put = __wt_api_db_put;
 	db->stat_clear = __wt_api_db_stat_clear;
 	db->stat_print = __wt_api_db_stat_print;
 	db->sync = __wt_api_db_sync;

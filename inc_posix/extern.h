@@ -34,6 +34,9 @@ int
 __wt_db_get(
     DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
+__wt_db_put(
+    DB *db, WT_TOC *toc, DBT *key, DBT *data, u_int32_t flags);
+int
 __wt_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int

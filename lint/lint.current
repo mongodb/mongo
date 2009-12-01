@@ -51,22 +51,26 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/bt_key.c (C)
 _
 }
-../btree/bt_key.c  71  Info 715: Symbol 'flags' (line 20) not referenced
-../btree/bt_key.c  20  Info 830: Location cited in prior message
+../btree/bt_key.c  72  Info 715: Symbol 'flags' (line 22) not referenced
+../btree/bt_key.c  22  Info 830: Location cited in prior message
+_
+}
+../btree/bt_key.c  117  Info 715: Symbol 'flags' (line 80) not referenced
+../btree/bt_key.c  80  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_key.c  126  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_key.c  274  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp == 0) {
-../btree/bt_key.c  143  Warning 644: Variable 'cmp' (line 85) may not have been
+../btree/bt_key.c  291  Warning 644: Variable 'cmp' (line 233) may not have
+    been initialized
+../btree/bt_key.c  233  Info 830: Location cited in prior message
+                                         _
+				*ipp = ip;
+../btree/bt_key.c  294  Info 771: Symbol 'ip' (line 230) conceivably not
     initialized
-../btree/bt_key.c  85  Info 830: Location cited in prior message
-                                           _
-				*indxp = ip;
-../btree/bt_key.c  146  Info 771: Symbol 'ip' (line 82) conceivably not
-    initialized
-../btree/bt_key.c  82  Info 830: Location cited in prior message
+../btree/bt_key.c  230  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_misc.c (C)
                                                                         _
@@ -87,17 +91,17 @@ _
 --- Module:   ../btree/bt_recno.c (C)
 _
 }
-../btree/bt_recno.c  76  Info 715: Symbol 'flags' (line 20) not referenced
+../btree/bt_recno.c  75  Info 715: Symbol 'flags' (line 20) not referenced
 ../btree/bt_recno.c  20  Info 830: Location cited in prior message
                                                                 _
 #... 4_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
-../btree/bt_recno.c  112  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_recno.c  111  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 #... AST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			record_cnt += WT_INDX_OFFP_RECORDS(ip);
-../btree/bt_recno.c  114  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_recno.c  113  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_ret.c (C)
@@ -257,38 +261,43 @@ _
 --- Module:   ../engine/engine.c (C)
                 _
 		WT_MEMORY_FLUSH;
-../engine/engine.c  34  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  34  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  35  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  35  Warning 522: Expected void type, assignment, increment
     or decrement
                                         _
 					WT_MEMORY_FLUSH;
-../engine/engine.c  79  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  79  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  91  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  91  Warning 522: Expected void type, assignment, increment
     or decrement
                                         _
 					WT_MEMORY_FLUSH;
-../engine/engine.c  81  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  81  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  93  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  93  Warning 522: Expected void type, assignment, increment
     or decrement
                         _
 			WT_MEMORY_FLUSH;
-../engine/engine.c  149  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  149  Warning 522: Expected void type, assignment, increment
-    or decrement
-                _
-		WT_MEMORY_FLUSH;
-../engine/engine.c  223  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  223  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  118  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  118  Warning 522: Expected void type, assignment, increment
     or decrement
                         _
 			WT_MEMORY_FLUSH;
-../engine/engine.c  236  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  236  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  181  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  181  Warning 522: Expected void type, assignment, increment
     or decrement
                 _
 		WT_MEMORY_FLUSH;
-../engine/engine.c  241  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
-../engine/engine.c  241  Warning 522: Expected void type, assignment, increment
+../engine/engine.c  256  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  256  Warning 522: Expected void type, assignment, increment
+    or decrement
+                        _
+			WT_MEMORY_FLUSH;
+../engine/engine.c  269  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  269  Warning 522: Expected void type, assignment, increment
+    or decrement
+                _
+		WT_MEMORY_FLUSH;
+../engine/engine.c  274  Error 40: Undeclared identifier 'WT_MEMORY_FLUSH'
+../engine/engine.c  274  Warning 522: Expected void type, assignment, increment
     or decrement
 
 --- Module:   ../engine/toc.c (C)
@@ -336,8 +345,8 @@ Info 752: local declarator '__wt_cache_clean(struct __wt_toc *, unsigned long
     long)' (line 12, file ../env/env_cache.c) not referenced
 ../env/env_cache.c  12  Info 830: Location cited in prior message
 Warning 528: Symbol '__wt_cache_dump(struct __env *, const char *, struct
-    __sFILE *)' (line 624, file ../env/env_cache.c) not referenced
-../env/env_cache.c  624  Info 830: Location cited in prior message
+    __sFILE *)' (line 636, file ../env/env_cache.c) not referenced
+../env/env_cache.c  636  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_err.c (C)
 
@@ -419,8 +428,8 @@ During Specific Walk:
 --- Module:   ../support/api.c (C)
 _
 }
-../support/api.c  1059  Info 715: Symbol 'wt_toc' (line 1057) not referenced
-../support/api.c  1057  Info 830: Location cited in prior message
+../support/api.c  1085  Info 715: Symbol 'wt_toc' (line 1083) not referenced
+../support/api.c  1083  Info 830: Location cited in prior message
 
 --- Module:   ../support/cksum.c (C)
 

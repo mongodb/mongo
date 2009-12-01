@@ -9,11 +9,13 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_page_put(WT_TOC *, DBT *, WT_PAGE *, WT_INDX *);
 static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_put_serial_func(WT_TOC *);
 
 /*
  * __wt_db_get --
- *	Db.get method when called directly from a user thread.
+ *	Db.get method.
  */
 int
 __wt_db_get(
@@ -21,7 +23,7 @@ __wt_db_get(
 {
 	IDB *idb;
 	IENV *ienv;
-	WT_INDX *indx;
+	WT_INDX *ip;
 	WT_PAGE *page;
 	u_int32_t type;
 	int ret;
@@ -42,7 +44,7 @@ __wt_db_get(
 
 	/* Search the primary btree for the key. */
 	F_SET(toc, WT_CACHE_LOCK_RESTART);
-	while ((ret = __wt_bt_search(toc, key, &page, &indx)) == WT_RESTART)
+	while ((ret = __wt_bt_search(toc, key, &page, &ip)) == WT_RESTART)
 		WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
 	F_CLR(toc, WT_CACHE_LOCK_RESTART);
 	if (ret != 0)
@@ -52,18 +54,17 @@ __wt_db_get(
 	 * The Db.get method can only return single key/data pairs.
 	 * If that's not what we found, we're done.
 	 */
-	type = WT_ITEM_TYPE(indx->ditem);
+	type = WT_ITEM_TYPE(ip->ditem);
 	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 		__wt_db_errx(db,
 		    "the Db.get method cannot return keys with duplicate "
 		    "data items; use the Db.cursor method instead");
 		ret = WT_ERROR;
 	} else
-		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 0);
+		ret = __wt_bt_dbt_return(toc, key, data, page, ip, 0);
 
-	/* Discard any page other than the root page, which remains pinned. */
-	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
+	/* Discard the page. */
+	WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 err:	WT_TOC_DB_CLEAR(toc);
 
@@ -71,11 +72,158 @@ err:	WT_TOC_DB_CLEAR(toc);
 }
 
 /*
+ * __wt_db_put --
+ *	Db.put method.
+ */
+int
+__wt_db_put(
+    DB *db, WT_TOC *toc, DBT *key, DBT *data, u_int32_t flags)
+{
+	IDB *idb;
+	IENV *ienv;
+	WT_INDX *ip;
+	WT_PAGE *page;
+	int ret;
+
+	idb = db->idb;
+	ienv = db->env->ienv;
+
+	WT_STAT_INCR(idb->stats,
+	    DB_WRITE_BY_KEY, "database put-by-key operations");
+
+	/*
+	 * Initialize the thread-of-control structure.
+	 * We're willing to restart if the cache is too full.
+	 */
+	WT_TOC_DB_INIT(toc, db, "Db.put");
+
+	/* Search the primary btree for the key. */
+	F_SET(toc, WT_CACHE_LOCK_RESTART);
+	while ((ret = __wt_bt_search(toc, key, &page, &ip)) == WT_RESTART)
+		WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+	F_CLR(toc, WT_CACHE_LOCK_RESTART);
+	if (ret != 0)
+		goto err;
+
+	/* Replace the item on the page. */
+	WT_ERR(__wt_bt_page_put(toc, data, page, ip));
+
+	/* Discard the returned page. */
+	WT_TRET(__wt_bt_page_out(toc, page, WT_MODIFIED));
+
+err:	WT_TOC_DB_CLEAR(toc);
+
+	return (ret);
+}
+
+/*
+ * Page modification serialization support.
+ */
+typedef struct {
+	WT_PAGE  *page;				/* Leaf page to modify */
+	WT_PAGE  *page_ovfl;			/* Overflow page to modify */
+	DBT *from;				/* Source data */
+	void *to;				/* Target data */
+} __wt_put_args;
+#define	__wt_put_serial(						\
+    toc, _serial, _page, _page_ovfl, _from, _to) do {			\
+	__wt_put_args _args;						\
+	_args.page = _page;						\
+	_args.page_ovfl = _page_ovfl;					\
+	_args.from = _from;						\
+	_args.to = _to;							\
+	WT_TOC_SERIALIZE_REQUEST(toc,					\
+	    __wt_put_serial_func, _serial, &_args);			\
+} while (0);
+#define	__wt_put_unpack(toc, _page, _page_ovfl, _from, _to) do {	\
+	_page =	((__wt_put_args *)(toc)->serial_args)->page;		\
+	_page_ovfl =							\
+	    ((__wt_put_args *)(toc)->serial_args)->page_ovfl;		\
+	_from = ((__wt_put_args *)(toc)->serial_args)->from;		\
+	_to = ((__wt_put_args *)(toc)->serial_args)->to;		\
+} while (0)
+
+/*
+ * __wt_bt_page_put --
+ *	Insert data onto a page.
+ */
+static int
+__wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
+{
+	DB *db;
+	WT_ITEM *item;
+	WT_ITEM_OVFL *ovfl;
+	WT_PAGE *page_ovfl;
+	u_int32_t psize;
+	void *pdata;
+
+	db = toc->db;
+	item = ip->ditem;
+
+	page_ovfl = NULL;
+	switch (page->hdr->type) {
+	case WT_PAGE_LEAF:
+		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
+			pdata = WT_ITEM_BYTE(item);
+			psize = (u_int32_t)WT_ITEM_LEN(item);
+			break;
+		}
+		goto overflow;
+	case WT_PAGE_DUP_LEAF:
+		if (WT_ITEM_TYPE(item) == WT_ITEM_DUP) {
+			pdata = ip->data;
+			psize = ip->size;
+			break;
+		}
+overflow:	ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
+		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &page_ovfl));
+		pdata = WT_PAGE_BYTE(page_ovfl);
+		psize = ovfl->len;
+		break;
+	WT_DEFAULT_FORMAT(db);
+	}
+
+	/*
+	 * Update the on-page data.
+	 * For now we can only handle overwriting items of the same size.
+	 */
+	WT_ASSERT(toc->env, data->size == psize);
+
+	__wt_put_serial(
+	    toc, &page->serial_private, page, page_ovfl, data, pdata);
+
+	return (toc->serial_ret);
+}
+
+/*
+ * __wt_put_serial_func --
+ *	Server function to write bytes onto a page.
+ */
+static int
+__wt_put_serial_func(WT_TOC *toc)
+{
+	WT_PAGE *page, *page_ovfl;
+	DBT *from;
+	void *to;
+
+	__wt_put_unpack(toc, page, page_ovfl, from, to);
+
+	memcpy(to, from->data, from->size);
+
+	if (page_ovfl != NULL)
+		WT_RET(__wt_bt_page_out(toc, page_ovfl, WT_MODIFIED));
+	WT_RET(
+	    __wt_bt_page_out(toc, page, page_ovfl == NULL ? WT_MODIFIED : 0));
+
+	return (0);
+}
+
+/*
  * __wt_bt_search --
  *	Search the tree for a specific key.
  */
 static int
-__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
+__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 {
 	DB *db;
 	IDB *idb;
@@ -143,7 +291,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **indxp)
 		if (cmp == 0) {
 			if (isleaf) {
 				*pagep = page;
-				*indxp = ip;
+				*ipp = ip;
 				return (0);
 			}
 		} else {
