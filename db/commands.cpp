@@ -72,6 +72,8 @@ namespace mongo {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
             }
 
+            anObjBuilder.append( "ok" , ok ? 1 : 0 );
+            
             if ( !ok ) {
                 anObjBuilder.append("errmsg", errmsg);
                 uassert_nothrow(errmsg.c_str());

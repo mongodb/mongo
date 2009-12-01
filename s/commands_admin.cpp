@@ -84,7 +84,6 @@ namespace mongo {
                 }
 
                 result.appendArray( "commands" , arr.done() );
-                result.append("ok" , 1 );
                 return true;
             }
         } listGridCommands;
@@ -187,7 +186,6 @@ namespace mongo {
                 fromconn->dropDatabase( dbname.c_str() );
                 fromconn.done();
 
-                result << "ok" << 1;
                 result << "primary" << to;
 
                 conn.done();
@@ -219,7 +217,6 @@ namespace mongo {
                 config->enableSharding();
                 config->save( true );
 
-                result << "ok" << 1;
                 return true;
             }
         } enableShardingCmd;
@@ -291,7 +288,6 @@ namespace mongo {
                 config->save( true );
 
                 result << "collectionsharded" << ns;
-                result << "ok" << 1;
                 return true;
             }
         } shardCollectionCmd;
@@ -388,7 +384,6 @@ namespace mongo {
 
                 result.append( "middle" , middle );
 
-                result << "ok" << 1;
                 return true;
             }
 
@@ -407,7 +402,6 @@ namespace mongo {
                 else
                     old.split( middle );
 
-                result << "ok" << 1;
                 return true;
             }
 
@@ -462,7 +456,6 @@ namespace mongo {
                 if ( ! c.moveAndCommit( to , errmsg ) )
                     return false;
 
-                result << "ok" << 1;
                 return true;
             }
         } moveChunkCmd;
@@ -486,7 +479,6 @@ namespace mongo {
                 }
 
                 result.append("shards" , all );
-                result.append("ok" , 1 );
                 conn.done();
 
                 return true;
@@ -534,7 +526,6 @@ namespace mongo {
 
                 BSONObj old = conn->findOne( "config.shards" , shard );
                 if ( ! old.isEmpty() ){
-                    result.append( "ok" , 0.0 );
                     result.append( "msg" , "already exists" );
                     conn.done();
                     return false;
@@ -549,7 +540,6 @@ namespace mongo {
                     errmsg = "couldn't connect to new shard";
                     result.append( "host" , host );
                     result.append( "exception" , e.what() );
-                    result.append( "ok" , 0 );
                     conn.done();
                     return false;
                 }
@@ -557,7 +547,6 @@ namespace mongo {
                 
 
                 conn->insert( "config.shards" , shard );
-                result.append( "ok", 1 );
                 result.append( "added" , shard["host"].valuestrsafe() );
                 conn.done();
                 return true;
@@ -598,7 +587,6 @@ namespace mongo {
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
                 result.append("hostname", ourHostname);
-                result << "ok" << 1;
                 return true;
             }
         } isdbgrid;
@@ -616,7 +604,6 @@ namespace mongo {
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
-                result.append("ok" , 1 );
                 return true;
             }
         } ismaster;
@@ -633,7 +620,6 @@ namespace mongo {
             CmdShardingGetPrevError() : Command("getpreverror") { }
             virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported for sharded environments";
-                result << "ok" << 0;
                 return false;
             }
         } cmdGetPrevError;
@@ -659,7 +645,6 @@ namespace mongo {
                 
                 if ( shards->size() == 0 ){
                     result.appendNull( "err" );
-                    result.append( "ok" , 1 );
                     return true;
                 }
                 
@@ -686,7 +671,6 @@ namespace mongo {
                 
                 if ( errors.size() == 0 ){
                     result.appendNull( "err" );
-                    result.append( "ok" , 1 );
                     return true;
                 }
                 
@@ -697,7 +681,6 @@ namespace mongo {
                     all.append( all.numStr( i ).c_str() , errors[i].c_str() );
                 }
                 result.appendArray( "errs" , all.obj() );
-                result.append( "ok" , 1 );
                 return true;
             }
         } cmdGetLastError;
