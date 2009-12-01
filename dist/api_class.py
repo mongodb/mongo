@@ -404,6 +404,16 @@ methods['db.open'] = Api(
 	[ 'CREATE' ],
 	['init'], [])
 
+methods['db.put'] = Api(
+	'db.put',
+	'method, cache',
+	['toc/WT_TOC *@S',
+	 'key/DBT *@S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
 methods['db.stat_clear'] = Api(
 	'db.stat_clear',
 	'method',
@@ -444,7 +454,7 @@ flags['wiredtiger_env_init'] = [ ]
 # Structure flag declarations
 ###################################################
 flags['cache'] = [ 'INITIALIZED', 'SERVER_SLEEPING' ]
-flags['wt_toc'] = [ 'CACHE_LOCK_RESTART' ]
+flags['wt_toc'] = [ 'CACHE_LOCK_RESTART', 'WAITING' ]
 flags['dbt'] = [ 'ALLOCATED' ]
 flags['ienv'] = [ 'WORKQ_RUN', 'SERVER_RUN' ]
 flags['wt_indx'] = [ 'ALLOCATED' ]
