@@ -40,7 +40,7 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 
 	/*
 	 * Initialize the thread-of-control structure.
-	 * We're will to re-start if the cache is too full.
+	 * We're willing to restart if the cache is too full.
 	 */
 	WT_TOC_DB_INIT(toc, db, "Db.get_recno");
 
@@ -66,9 +66,8 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	} else
 		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 1);
 
-	/* Discard any page other than the root page, which remains pinned. */
-	if (page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
+	/* Discard the returned page. */
+	WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 err:	WT_TOC_DB_CLEAR(toc);
 
