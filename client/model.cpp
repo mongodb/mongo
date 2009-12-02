@@ -35,7 +35,23 @@ namespace mongo {
         return true;
     }
 
-    void Model::save( bool check ){
+    void Model::remove( bool safe ){
+        uassert( "_id isn't set - needed for remove()" , _id["_id"].type() );
+        
+        ScopedDbConnection conn( modelServer() );
+        conn->remove( getNS() , _id );
+
+        string errmsg = "";
+        if ( safe )
+            errmsg = conn->getLastError();
+
+        conn.done();
+        
+        if ( safe && errmsg.size() )
+            throw UserException( (string)"error on Model::remove: " + errmsg );
+    }
+
+    void Model::save( bool safe ){
         ScopedDbConnection conn( modelServer() );
 
         BSONObjBuilder b;
@@ -69,12 +85,12 @@ namespace mongo {
         }
         
         string errmsg = "";
-        if ( check )
+        if ( safe )
             errmsg = conn->getLastError();
 
         conn.done();
 
-        if ( check && errmsg.size() )
+        if ( safe && errmsg.size() )
             throw UserException( (string)"error on Model::save: " + errmsg );
     }
 
