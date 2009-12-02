@@ -451,8 +451,8 @@ elif "win32" == os.sys.platform:
     if force64:
         release = True
 
-    for bv in reversed( range(3,10) ):
-        boostDir = "C:/Program Files/Boost/boost_1_3" + str(bv) + "_0"
+    for bv in reversed( range(33,50) ):
+        boostDir = "C:/Program Files/Boost/boost_1_" + str(bv) + "_0"
         if os.path.exists( boostDir ):
             break
 
