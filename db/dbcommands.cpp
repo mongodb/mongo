@@ -99,6 +99,26 @@ namespace mongo {
         }
     } cmdResetError;
 
+    /* for diagnostic / testing purposes. */
+    class CmdSleep : public Command { 
+    public:
+        bool adminOnly() { return true; }
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() {
+            return true;
+        }
+        virtual void help( stringstream& help ) const {
+            help << "internal / make db block for 100 seconds";
+        }
+        CmdSleep() : Command("sleep") {}
+        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            sleepsecs(100);
+            return true;
+        }
+    } cmdSleep;
+
     class CmdGetLastError : public Command {
     public:
         virtual bool requiresAuth() { return false; }
@@ -295,7 +315,7 @@ namespace mongo {
                 BSONObjBuilder t;
 
                 unsigned long long last, start, timeLocked;
-                dbMutexInfo.timingInfo(start, timeLocked);
+                dbMutexInfo.getTimingInfo(start, timeLocked);
                 last = curTimeMicros64();
                 double tt = (double) last-start;
                 double tl = (double) timeLocked;

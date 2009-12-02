@@ -97,6 +97,9 @@ namespace mongo {
         return *currentClient.get();
     }
 
+    /* each thread which does db operations has a Client object in TLS.  
+       call this when your thread starts. 
+    */
     inline void Client::initThread(const char *desc) {
         assert( currentClient.get() == 0 );
         currentClient.reset( new Client(desc) );

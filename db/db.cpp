@@ -163,6 +163,8 @@ namespace mongo {
     */
     void connThread()
     {
+static int zzz = 0;
+
         Client::initThread("conn");
 
         /* todo: move to Client object */
@@ -171,6 +173,15 @@ namespace mongo {
 
         MessagingPort& dbMsgPort = *grab;
         grab = 0;
+
+if( ++zzz > 0 )        {
+cout << "L1" << endl;
+            mongolock lk(false);
+cout << "L2" << endl;
+            sleepsecs(9999);
+cout << "L3" << endl;
+        }
+
 
         try {
 
@@ -460,6 +471,12 @@ namespace mongo {
         }
 
         repairDatabases();
+
+        /* we didn't want to pre-open all fiels for the repair check above. for regular
+           operation we do for read/write lock concurrency reasons.
+        */        
+        Database::_openAllFiles = true;
+
         if ( shouldRepairDatabases )
             return;
 

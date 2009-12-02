@@ -26,6 +26,8 @@ namespace mongo {
 
     class Database {
     public:
+        static bool _openAllFiles;
+
         Database(const char *nm, bool& newDb, const string& _path = dbpath) :
         name(nm),
         path(_path),
@@ -41,18 +43,39 @@ namespace mongo {
             }
 
             newDb = namespaceIndex.exists();
-            // If already exists, open.  Otherwise behave as if empty until
-            // there's a write, then open.
-            if ( !newDb )
-                namespaceIndex.init();            
             profile = 0;
             profileName = name + ".system.profile";
+
+            // If already exists, open.  Otherwise behave as if empty until
+            // there's a write, then open.
+            if ( !newDb ) {
+                namespaceIndex.init();
+                if( _openAllFiles )
+                    openAllFiles();
+            }
         }
+
         ~Database() {
             btreeStore->closeFiles(name, path);
             int n = files.size();
             for ( int i = 0; i < n; i++ )
                 delete files[i];
+        }
+
+        bool exists(int n) { 
+            stringstream ss;
+            ss << name << '.' << n;
+            boost::filesystem::path fullName;
+            fullName = boost::filesystem::path(path) / ss.str();
+            return boost::filesystem::exists(fullName);
+        }
+
+        void openAllFiles() { 
+            int n = 0;
+            while( exists(n) ) { 
+                getFile(n);
+                n++;
+            }
         }
 
         MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
@@ -136,7 +159,7 @@ namespace mongo {
             return getFile(n);
         }
 
-        void finishInit(); // ugly...
+        //void finishInit(); // ugly...
 
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"

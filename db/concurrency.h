@@ -21,22 +21,31 @@
 
 namespace mongo {
 
-#if 0
+#if 1
 //#if BOOST_VERSION >= 103500
-    //typedef boost::shared_mutex MongoMutex;
     class MongoMutex { 
         boost::shared_mutex m;
     public:
         void lock() { 
+cout << "LOCK" << endl;
             m.lock(); 
         }
-        void unlock() { m.unlock(); }
-        void lock_shared() { m.lock_shared(); }
-        void unlock_shared() { m.unlock_shared(); }
+        void unlock() { 
+            cout << "UNLOCK" << endl;
+            m.unlock(); 
+        }
+        void lock_shared() { 
+            cout << "LOCKSHARED" << endl;
+            m.lock_shared(); 
+        }
+        void unlock_shared() { 
+            cout << "UNLOCKSHARED" << endl;
+            m.unlock_shared(); 
+        }
     };
 #else
     /* this will be for old versions of boost */
-    class MongoMutex { 
+    class qMongoMutex { 
         boost::recursive_mutex m;
         int x;
     public:
@@ -86,13 +95,16 @@ namespace mongo {
         int isLocked() const {
             return locked;
         }
-        void timingInfo(unsigned long long &s, unsigned long long &tl) {
+        void getTimingInfo(unsigned long long &s, unsigned long long &tl) const {
             s = start;
             tl = timeLocked;
         }
     };
 
     extern MongoMutex &dbMutex;
+
+    /* as we are using this right now, dbMutexInfo.isLocked() == write locked 
+    */
     extern MutexInfo dbMutexInfo;
 
 /*
