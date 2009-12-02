@@ -117,8 +117,9 @@ namespace mongo {
             return x;
         }
 
+        // TODO: make atomic
         WrappingInt atomicIncrement(){
-            return boost::interprocess::detail::atomic_inc32(&x);
+            return x++;
         }
 
         static int diff(unsigned a, unsigned b) {
