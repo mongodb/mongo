@@ -19,7 +19,7 @@
 
 #pragma once
 
-#if defined(__MSCV__)
+#if defined(__MSVC__)
 #  include <windows.h>
 #endif
 
@@ -123,7 +123,7 @@ namespace mongo {
 
         // returns original value (like x++)
         WrappingInt atomicIncrement(){
-#if defined(__MSCV__)
+#if defined(__MSVC__)
             // InterlockedIncrement returns the new value
             return InterlockedIncrement((volatile long*)&x)-1; //long is 32bits in Win64
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
