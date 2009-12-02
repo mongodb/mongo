@@ -1430,7 +1430,7 @@ namespace mongo {
     }
     
     void OID::init() {
-        static unsigned inc = (unsigned) security.getNonce();
+        static WrappingInt inc = (unsigned) security.getNonce();
         unsigned t = (unsigned) time(0);
         char *T = (char *) &t;
         data[0] = T[3];
@@ -1440,9 +1440,8 @@ namespace mongo {
 
         (unsigned&) data[4] = _machine;
 
-        // TODO: use compiler intrinsic atomic increment instead of inc++
-        int old_inc = inc++;
-        T = (char *) &old_inc;
+        int new_inc = inc.atomicIncrement();
+        T = (char *) &new_inc;
         char * raw = (char*)&b;
         raw[0] = T[3];
         raw[1] = T[2];

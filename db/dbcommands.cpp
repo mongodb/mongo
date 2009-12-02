@@ -232,6 +232,7 @@ namespace mongo {
             if ( p != 1 )
                 return false;
             dropDatabase(ns);
+            result.append( "dropped" , ns );
             return true;
         }
     } cmdDropDatabase;
