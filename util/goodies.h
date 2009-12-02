@@ -112,14 +112,16 @@ namespace mongo {
             x = 0;
         }
         WrappingInt(unsigned z) : x(z) { }
-        unsigned x;
+        volatile unsigned x;
         operator unsigned() const {
             return x;
         }
-        WrappingInt& operator++() {
-            x++;
-            return *this;
+
+        // TODO: make atomic
+        WrappingInt atomicIncrement(){
+            return x++;
         }
+
         static int diff(unsigned a, unsigned b) {
             return a-b;
         }
