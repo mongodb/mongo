@@ -235,9 +235,8 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 	db = toc->db;
 	idb = db->idb;
 
-	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+	if ((page = idb->root_page) == NULL)
 		return (WT_NOTFOUND);
-	page = idb->root_page;
 	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
 
 	/* Search the tree. */

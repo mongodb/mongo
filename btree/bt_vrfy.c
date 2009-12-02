@@ -14,6 +14,7 @@
  * together to make the code prettier.
  */
 typedef struct {
+	u_int32_t frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
 	FILE *fp;				/* Dump file stream */
@@ -51,7 +52,6 @@ __wt_db_verify_int(DB *db,
 	WT_PAGE *page;
 	WT_TOC *toc;
 	VSTUFF vstuff;
-	u_int32_t frags;
 	int ret;
 
 	env = db->env;
@@ -68,10 +68,15 @@ __wt_db_verify_int(DB *db,
 	WT_TOC_DB_INIT(toc, db, "Db.verify");
 
 	/*
-	 * Read the database description chunk to get the allocation and
-	 * page sizes.
+	 * If we don't have a root page yet, read the database description
+	 * to get the allocation and page sizes.   If we still don't have
+	 * a root page, we're done, the file is empty.
 	 */
-	WT_ERR(__wt_bt_desc_read(toc));
+	if (idb->root_page == NULL) {
+		WT_ERR(__wt_bt_root_page(toc));
+		if (idb->root_page == NULL)
+			return (0);
+	}
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -88,21 +93,18 @@ __wt_db_verify_int(DB *db,
 	 * don't overflow.   I don't ever expect to see this error message, but
 	 * better safe than sorry.
 	 */
-	frags = WT_OFF_TO_ADDR(db, idb->fh->file_size);
-	if (frags > INT_MAX) {
+	vstuff.frags = WT_OFF_TO_ADDR(db, idb->fh->file_size);
+	if (vstuff.frags > INT_MAX) {
 		__wt_db_errx(db, "file is too large to verify");
-		return (WT_ERROR);
+		goto err;
 	}
-	WT_RET(bit_alloc(env, (int)frags, &vstuff.fragbits));
+	WT_ERR(bit_alloc(env, (int)vstuff.frags, &vstuff.fragbits));
 
-	/* If no root address has been set, it's a one-leaf-page database. */
-	if (idb->root_addr == WT_ADDR_INVALID) {
-		WT_RET(
-		    __wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
+	/* Check for one-page databases. */
+	if (idb->root_page->hdr->type == WT_PAGE_LEAF) {
+		WT_ERR(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
 		ret = __wt_bt_verify_page(toc, page, &vstuff);
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
-		if (ret != 0)
-			goto err;
 	} else {
 		/*
 		 * Construct an OFFP for __wt_bt_verify_level -- the addr
@@ -110,13 +112,14 @@ __wt_db_verify_int(DB *db,
 		 * level in the DESC structure, so there's no way to know
 		 * what the correct level is yet.
 		 */
-		WT_ERR(__wt_bt_verify_level(toc, idb->root_addr, 0, &vstuff));
+		WT_TRET(__wt_bt_verify_level(
+		    toc, idb->root_page->addr, 0, &vstuff));
 	}
 
-	ret = __wt_bt_verify_checkfrag(db, &vstuff);
+	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
-err:	__wt_free(env, vstuff.fragbits);
-
+err:	if (vstuff.fragbits != NULL)
+		__wt_free(env, vstuff.fragbits);
 	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
@@ -333,17 +336,15 @@ static int
 __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
-	IDB *idb;
 	WT_ITEM_OFFP *offp;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr, frags, i, nextaddr;
+	u_int32_t addr, frags, i, nextaddr, root_addr;
 	int (*func)(DB *, const DBT *, const DBT *);
 	int ret;
 
 	db = toc->db;
-	idb = db->idb;
 	parent = NULL;
 	hdr = child->hdr;
 	addr = child->addr;
@@ -371,14 +372,17 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		 * record (which we've already read in) points to the right
 		 * place.
 		 */
-		if (hdr->type == WT_PAGE_INT && idb->root_addr != addr) {
-			__wt_db_errx(db,
-			    "page at addr %lu appears to be a root page which "
-			    "doesn't match the database descriptor record",
-			    (u_long)addr);
-			return (WT_ERROR);
+		if (hdr->type == WT_PAGE_INT) {
+			WT_RET(__wt_bt_desc_read(toc, &root_addr));
+			if (root_addr != addr) {
+				__wt_db_errx(db,
+				    "page at addr %lu appears to be a root "
+				    "page which doesn't match the database "
+				    "descriptor record", (u_long)addr);
+				return (WT_ERROR);
+			}
+			return (0);
 		}
-		return (0);
 	}
 
 	/*
@@ -896,16 +900,13 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_ITEM_OVFL *ovfl, VSTUFF *vs)
 static int
 __wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
 {
-	IDB *idb;
-	int ffc, ffc_start, ffc_end, frags, ret;
+	int ffc, ffc_start, ffc_end, ret;
 
-	idb = db->idb;
 	ret = 0;
 
 	/* Check for page fragments we haven't verified. */
-	frags = (int)WT_OFF_TO_ADDR(db, idb->fh->file_size);
 	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(vs->fragbits, frags, &ffc);
+		bit_ffc(vs->fragbits, (int)vs->frags, &ffc);
 		if (ffc != -1) {
 			bit_set(vs->fragbits, ffc);
 			if (ffc_start == -1) {

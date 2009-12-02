@@ -34,7 +34,6 @@ __wt_bt_close(DB *db)
 		WT_TRET(__wt_bt_page_out(toc, idb->root_page, 0));
 		idb->root_page = NULL;
 	}
-	idb->root_addr = WT_ADDR_INVALID;
 
 	/* Flush any modified pages, and discard the tree. */
 	WT_TRET(__wt_bt_sync(db, NULL));

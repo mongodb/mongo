@@ -91,14 +91,12 @@ __wt_bt_search_recno(
 
 	idb = toc->db->idb;
 
-	if ((addr = idb->root_addr) == WT_ADDR_INVALID)
+	if ((page = idb->root_page) == NULL)
 		return (WT_NOTFOUND);
-	page = idb->root_page;
-	record_cnt = 0;
 	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
 
 	/* Search the tree. */
-	for (put_page = 0;; put_page = 1) {
+	for (record_cnt = 0, put_page = 0;; put_page = 1) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;

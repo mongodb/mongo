@@ -39,8 +39,7 @@ while :
 done
 
 # List of source files.
-l="../btree/*.c ../db/*.c ../engine/*.c ../env/*.c ../os_posix/*.c
-   ../support/*.c"
+l="../btree/*.c ../db/*.c ../env/*.c ../os_posix/*.c ../support/*.c"
 
 # Don't lint all of them.
 l=`echo $l |

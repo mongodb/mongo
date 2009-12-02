@@ -22,6 +22,7 @@ __wt_bt_stat(DB *db)
 	ENV *env;
 	IDB *idb;
 	WT_TOC *toc;
+	WT_PAGE *page;
 	int ret;
 
 	env = db->env;
@@ -33,10 +34,14 @@ __wt_bt_stat(DB *db)
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.stat");
 
-	/* If no root address has been set, it's a one-leaf-page database. */
-	ret = idb->root_addr == WT_ADDR_INVALID ?
-	    __wt_bt_stat_page(toc, idb->root_page) :
-	    __wt_bt_stat_level(toc, idb->root_addr, 0);
+	/* If no root page has been set, there's nothing to stat. */
+	if ((page = idb->root_page) == NULL)
+		return (0);
+
+	/* Check for one-page databases. */
+	ret = page->hdr->type == WT_PAGE_LEAF ?
+	    __wt_bt_stat_page(toc, page) :
+	    __wt_bt_stat_level(toc, page->addr, 0);
 
 	WT_TRET(toc->close(toc, 0));
 

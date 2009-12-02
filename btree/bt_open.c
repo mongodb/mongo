@@ -25,6 +25,7 @@ __wt_bt_open(DB *db, int ok_create)
 
 	idb = db->idb;
 	env = db->env;
+	ret = 0;
 
 	/* Check page size configuration. */
 	WT_RET(__wt_bt_vrfy_sizes(db));
@@ -32,25 +33,11 @@ __wt_bt_open(DB *db, int ok_create)
 	/* Open the fle. */
 	WT_RET(__wt_open(env, idb->dbname, idb->mode, ok_create, &idb->fh));
 
-	/* If it's zero-length, we're done. */
-	if (idb->fh->file_size == 0) {
-		idb->root_addr = WT_ADDR_INVALID;
-		return (0);
-	}
-
-	WT_RET(env->toc(env, 0, &toc));
+	WT_ERR(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.open");
 
-	/*
-	 * If the file exists, update the DB handle based on the information
-	 * in the on-disk WT_PAGE_DESC structure.  (If the file is not empty,
-	 * there had better be a description record.)  Then, read in the root
-	 * page.
-	 */
-	WT_ERR(__wt_bt_desc_read(toc));
-
 	/* Get a permanent root page reference. */
-	WT_TRET(__wt_bt_root_page(toc));
+	WT_ERR(__wt_bt_root_page(toc));
 
 err:	WT_TRET(toc->close(toc, 0));
 
@@ -214,17 +201,33 @@ int
 __wt_bt_root_page(WT_TOC *toc)
 {
 	IDB *idb;
+	u_int32_t root_addr;
 	int isleaf;
 
 	idb = toc->db->idb;
 
 	/*
+	 * Update the DB handle based on the information in the on-disk
+	 * WT_PAGE_DESC structure.  (If the file is not empty, there had
+	 * better be a description record.)
+	 */
+	WT_RET(__wt_bt_desc_read(toc, &root_addr));
+
+	/*
+	 * If the file is empty, the root address won't be set.  That's OK,
+	 * but we're done.  The caller can figure that out by looking at the
+	 * fact that we haven't set a root page reference.
+	 */
+	if (root_addr == WT_ADDR_INVALID)
+		return (0);
+
+	/*
 	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf page.
 	 */
-	isleaf = idb->root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
+	isleaf = root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
 	WT_RET(
-	    __wt_bt_page_in(toc, idb->root_addr, isleaf, 1, &idb->root_page));
+	    __wt_bt_page_in(toc, root_addr, isleaf, 1, &idb->root_page));
 
 	F_SET(idb->root_page, WT_PINNED);
 	return (0);

@@ -23,7 +23,7 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page);
 void
 __wt_bt_desc_dump(WT_PAGE *page, FILE *fp);
 int
-__wt_bt_desc_read(WT_TOC *toc);
+__wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp);
 int
 __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr);
 int

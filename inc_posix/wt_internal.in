@@ -108,7 +108,6 @@ struct __idb {
 	u_int32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
-	u_int32_t root_addr;		/* Root address */
 	WT_PAGE  *root_page;		/* Root page */
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */

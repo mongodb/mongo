@@ -125,7 +125,7 @@ __wt_bt_desc_dump(WT_PAGE *page, FILE *fp)
  *	to reflect that information.
  */
 int
-__wt_bt_desc_read(WT_TOC *toc)
+__wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp)
 {
 	DB *db;
 	IDB *idb;
@@ -134,6 +134,13 @@ __wt_bt_desc_read(WT_TOC *toc)
 
 	db = toc->db;
 	idb = db->idb;
+
+	/* If the file size is 0, we're done. */
+	if (idb->fh->file_size == 0) {
+		if (root_addrp != NULL)
+			*root_addrp = WT_ADDR_INVALID;
+		return (0);
+	}
 
 	/*
 	 * When we first read the description chunk after first opening the
@@ -149,7 +156,8 @@ __wt_bt_desc_read(WT_TOC *toc)
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 	db->leafsize = desc.leafsize;
 	db->intlsize = desc.intlsize;
-	idb->root_addr = desc.root_addr;
+	if (root_addrp != NULL)
+		*root_addrp = desc.root_addr;
 
 	/* Then discard it from the cache, it's probably the wrong size. */
 	WT_RET(__wt_cache_out(toc, page, 0));
@@ -165,16 +173,12 @@ int
 __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr)
 {
 	DB *db;
-	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_DESC desc;
 
 	db = toc->db;
-	idb = db->idb;
 
 	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE, db->leafsize, 0, &page));
-
-	idb->root_addr = root_addr;
 
 	memcpy(
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
