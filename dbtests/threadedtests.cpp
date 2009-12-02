@@ -37,21 +37,26 @@ namespace ThreadedTests {
             void run(){
                 setup();
 
-                boost::thread threads[nthreads];
-                for(int i=0; i < nthreads; i++){
-                    boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
-                    threads[i].swap(athread);
-                }
-
-                for(int i=0; i < nthreads; i++)
-                    threads[i].join();
+                launch_subthreads(nthreads);
 
                 validate();
             }
 
             virtual ~ThreadedTest() {}; // not necessary, but makes compilers happy
+
+        private:
+            void launch_subthreads(int remaining){
+                if (!remaining) return;
+
+                boost::thread athread(boost::bind(&ThreadedTest::subthread, this));
+
+                launch_subthreads(remaining - 1);
+
+                athread.join();
+            }
     };
 
+    // Tested with up to 30k threads
     class IsWrappingIntAtomic : public ThreadedTest<> {
         static const int iterations = 1000000;
         WrappingInt target;
