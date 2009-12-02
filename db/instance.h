@@ -103,8 +103,8 @@ namespace mongo {
     void receivedUpdate(Message& m, stringstream& ss);
     void receivedDelete(Message& m, stringstream& ss);
     void receivedInsert(Message& m, stringstream& ss);
-    void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss);
-    void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit);
+    bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
+    bool receivedQuery(DbResponse& dbresponse, Message& m, stringstream& ss, bool logit);
     void getDatabaseNames( vector< string > &names );
 
     // must call with db lock

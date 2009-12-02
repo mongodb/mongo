@@ -189,14 +189,16 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
-            receivedQuery(dbresponse, m, ss, true);
+            if ( ! receivedQuery(dbresponse, m, ss, true) )
+                log = true;
         }
         else if ( op == dbGetMore ) {
             // receivedQuery() does its own authorization processing.
             OPREAD;
             DEV log = true;
             ss << "getmore ";
-            receivedGetMore(dbresponse, m, ss);
+            if ( ! receivedGetMore(dbresponse, m, ss) )
+                log = true;
         }
         else if ( op == dbMsg ) {
 			/* deprecated / rarely used.  intended for connection diagnostics. */
@@ -234,6 +236,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion insert, continuing\n";
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbUpdate ) {
@@ -245,6 +248,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion update, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbDelete ) {
@@ -256,6 +260,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbKillCursors ) {
@@ -268,6 +273,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     problem() << " Caught Assertion in kill cursors, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else {
@@ -387,13 +393,17 @@ namespace mongo {
         recordDelete( n );
     }
 
-    void receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
+    /**
+     * @return if this was successful
+     */
+    bool receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
+        bool ok = true;
         MSGID responseTo = m.data->id;
 
         DbMessage d(m);
         QueryMessage q(d);
         QueryResult* msgdata;
-
+        
         try {
             if (q.fields.get() && q.fields->errmsg)
                 uassert(q.fields->errmsg, false);
@@ -416,6 +426,7 @@ namespace mongo {
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {
+            ok = false;
             ss << " exception ";
             LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
             log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
@@ -457,11 +468,14 @@ namespace mongo {
             if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
                 log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
         }
+        
+        return ok;
     }
-
+    
     QueryResult* emptyMoreResult(long long);
 
-    void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
+    bool receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
+        bool ok = true;
         DbMessage d(m);
         const char *ns = d.getns();
         ss << ns;
@@ -480,6 +494,7 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ss << " exception " + e.toString();
             msgdata = emptyMoreResult(cursorid);
+            ok = false;
         }
         Message *resp = new Message();
         resp->setData(msgdata, true);
@@ -488,6 +503,7 @@ namespace mongo {
         dbresponse.response = resp;
         dbresponse.responseTo = m.data->id;
         //dbMsgPort.reply(m, resp);
+        return ok;
     }
 
     void receivedInsert(Message& m, stringstream& ss) {
