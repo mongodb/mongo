@@ -190,6 +190,8 @@ namespace mongo {
          */
         int getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
 
+        void getAllServers( set<string>& allServers );
+
         void save();
 
         string toString() const;

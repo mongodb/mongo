@@ -163,9 +163,102 @@ namespace mongo {
         BSONObj q = b.done();
         return load(q);
     }
+
+    bool DBConfig::dropDatabase( string& errmsg ){
+        /**
+         * 1) make sure everything is up
+         * 2) update config server
+         * 3) drop and reset sharded collections
+         * 4) drop and reset primary
+         * 5) drop everywhere to clean up loose ends
+         */
+
+        log(1) << "DBConfig::dropDatabase: " << _name << endl;
+        
+        // 1
+        if ( ! configServer.allUp( errmsg ) ){
+            log(1) << "\t DBConfig::dropDatabase not all up" << endl;
+            return 0;
+        }
+        
+        // 2
+        grid.removeDB( _name );
+        remove( true );
+        if ( ! configServer.allUp( errmsg ) ){
+            log() << "error removing from config server even after checking!" << endl;
+            return 0;
+        }
+        log(1) << "\t removed entry from config server for: " << _name << endl;
+        
+        set<string> allServers;
+
+        // 3
+        while ( true ){
+            int num;
+            if ( ! _dropShardedCollections( num , allServers , errmsg ) )
+                return 0;
+            log() << "   DBConfig::dropDatabase: " << _name << " dropped sharded collections: " << num << endl;
+            if ( num == 0 )
+                break;
+        }
+        
+        // 4
+        {
+            ScopedDbConnection conn( _primary );
+            BSONObj res;
+            if ( ! conn->dropDatabase( _name , &res ) ){
+                errmsg = res.toString();
+                return 0;
+            }
+            conn.done();
+        }
+        
+        // 5
+        for ( set<string>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
+            string s = *i;
+            ScopedDbConnection conn( s );
+            BSONObj res;
+            if ( ! conn->dropDatabase( _name , &res ) ){
+                errmsg = res.toString();
+                return 0;
+            }
+            conn.done();            
+        }
+        
+        log(1) << "\t dropped primary db for: " << _name << endl;
+
+        return true;
+    }
+
+    bool DBConfig::_dropShardedCollections( int& num, set<string>& allServers , string& errmsg ){
+        num = 0;
+        set<string> seen;
+        while ( true ){
+            map<string,ChunkManager*>::iterator i = _shards.begin();
+
+            if ( i == _shards.end() )
+                break;
+
+            if ( seen.count( i->first ) ){
+                errmsg = "seen a collection twice!";
+                return false;
+            }
+
+            seen.insert( i->first );
+            log(1) << "\t dropping sharded collection: " << i->first << endl;
+
+            i->second->getAllServers( allServers );
+            i->second->drop();
+            
+            num++;
+            uassert( "_dropShardedCollections too many collections - bailing" , num < 100000 );
+            log(2) << "\t\t dropped " << num << " so far" << endl;
+        }
+        return true;
+    }
     
     /* --- Grid --- */
-
+    
     string Grid::pickShardForNewDB(){
         ScopedDbConnection conn( configServer.getPrimary() );
         
@@ -203,6 +296,8 @@ namespace mongo {
         if ( database == "config" )
             return &configServer;
 
+        boostlock l( _lock );
+
         DBConfig*& cc = _databases[database];
         if ( cc == 0 ){
             cc = new DBConfig( database );
@@ -233,6 +328,13 @@ namespace mongo {
         }
         
         return cc;
+    }
+
+    void Grid::removeDB( string database ){
+        uassert( "removeDB expects db name" , database.find( '.' ) == string::npos );
+        boostlock l( _lock );
+        _databases.erase( database );
+        
     }
 
     unsigned long long Grid::getNextOpTime() const {
@@ -295,6 +397,11 @@ namespace mongo {
     }
 
     bool ConfigServer::allUp(){
+        string errmsg;
+        return allUp( errmsg );
+    }
+    
+    bool ConfigServer::allUp( string& errmsg ){
         try {
             ScopedDbConnection conn( _primary );
             conn->getLastError();
@@ -303,6 +410,7 @@ namespace mongo {
         }
         catch ( DBException& ){
             log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
+            errmsg = _primary + " seems down";
             return false;
         }
         

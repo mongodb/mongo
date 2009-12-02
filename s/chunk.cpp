@@ -472,6 +472,12 @@ namespace mongo {
         }
         return added;
     }
+
+    void ChunkManager::getAllServers( set<string>& allServers ){
+        for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
+            allServers.insert( (*i)->getShard() );
+        }        
+    }
     
     void ChunkManager::ensureIndex(){
         set<string> seen;
