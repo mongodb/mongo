@@ -19,6 +19,10 @@
 
 #pragma once
 
+#if defined(__MSCV__)
+#  include <windows.h>
+#endif
+
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO)
@@ -112,14 +116,22 @@ namespace mongo {
             x = 0;
         }
         WrappingInt(unsigned z) : x(z) { }
-        unsigned x;
+        volatile unsigned x;
         operator unsigned() const {
             return x;
         }
-        WrappingInt& operator++() {
-            x++;
-            return *this;
+
+        WrappingInt atomicIncrement(){
+#if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+            return __sync_add_and_fetch(&x, 1);
+#elif defined(__MSCV__)
+            return InterlockedIncrement((long*)&x); //long is 32bits in Win64
+#else
+#  warning "OID and MSGID generation will not be thread safe"
+            return ++inc;
+#endif
         }
+
         static int diff(unsigned a, unsigned b) {
             return a-b;
         }

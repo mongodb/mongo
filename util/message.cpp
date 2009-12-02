@@ -429,8 +429,7 @@ again:
     } msgstart;
     
     MSGID nextMessageId(){
-        MSGID msgid = NextMsgId;
-        ++NextMsgId;
+        MSGID msgid = NextMsgId.atomicIncrement();
         
         if ( usingClientIds ){
             msgid = msgid & 0xFFFF;
