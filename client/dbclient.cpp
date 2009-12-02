@@ -109,9 +109,9 @@ namespace mongo {
         return o.getIntField("ok") == 1;
     }
 
-    inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info) {
+    inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
         string ns = dbname + ".$cmd";
-        info = findOne(ns, cmd);
+        info = findOne(ns, cmd, 0 , options);
         return isOk(info);
     }
 
@@ -127,11 +127,11 @@ namespace mongo {
         return runCommand(dbname, b.done(), *info);
     }
 
-    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query) { 
+    unsigned long long DBClientWithCommands::count(const string &_ns, const BSONObj& query, int options) { 
         NamespaceString ns(_ns);
         BSONObj cmd = BSON( "count" << ns.coll << "query" << query );
         BSONObj res;
-        if( !runCommand(ns.db.c_str(), cmd, res) )
+        if( !runCommand(ns.db.c_str(), cmd, res, options) )
             uasserted(string("count fails:") + res.toString());
         return res.getIntField("n");
     }
