@@ -19,6 +19,8 @@
 #include "engine.h"
 #include "../util/file.h"
 #include "../client/dbclient.h"
+#include "../db/dbinfo.h"
+#include "../db/dbhelpers.h"
 
 namespace mongo {
 
@@ -132,11 +134,10 @@ namespace mongo {
         
         _loadedVersion = _lastVersion;
 
-        static DBClientBase * db = createDirectClient();
-        
-        auto_ptr<DBClientCursor> c = db->query( _localDBName + ".system.js" , Query() );
-        while ( c->more() ){
-            BSONObj o = c->next();
+        string coll = _localDBName + ".system.js";
+        auto_ptr<CursorIterator> i = Helpers::find( coll.c_str() );
+        while ( i->hasNext() ){
+            BSONObj o = i->next();
 
             BSONElement n = o["_id"];
             BSONElement v = o["value"];
@@ -146,6 +147,7 @@ namespace mongo {
             
             setElement( n.valuestr() , v );
         }
+
     }
 
     ScriptingFunction Scope::createFunction( const char * code ){
