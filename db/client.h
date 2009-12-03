@@ -97,6 +97,9 @@ namespace mongo {
         return *currentClient.get();
     }
 
+    /* each thread which does db operations has a Client object in TLS.  
+       call this when your thread starts. 
+    */
     inline void Client::initThread(const char *desc) {
         assert( currentClient.get() == 0 );
         currentClient.reset( new Client(desc) );
@@ -109,6 +112,20 @@ namespace mongo {
 
     inline Client::GodScope::~GodScope(){
         cc()._god = _prev;
+    }
+
+/* this unlocks, does NOT upgrade. that works for our current usage */
+    inline void mongolock::releaseAndWriteLock() { 
+        if( !_writelock ) {
+            _writelock = true;
+            dbMutex.unlock_shared();
+            dbMutex.lock();
+
+            /* this is defensive; as we were unlocked for a moment above, 
+               the Database object we reference could have been deleted:
+            */
+            cc().clearns();
+        }
     }
     
 };

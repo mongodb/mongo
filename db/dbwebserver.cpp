@@ -68,16 +68,19 @@ namespace mongo {
     unsigned q = 0;
 
     void statsThread() {
+        /*cout << "TEMP disabled statsthread" << endl;
+        if( 1 ) 
+            return;*/
         Client::initThread("stats");
         unsigned long long timeLastPass = 0;
         while ( 1 ) {
             {
-                Timer lktm;
-                dblock lk;
+                /* todo: do we even need readlock here?  if so for what? */
+                readlock lk("");
                 Top::completeSnapshot();
                 q = (q+1)%NStats;
                 Timing timing;
-                dbMutexInfo.timingInfo(timing.start, timing.timeLocked);
+                dbMutex.info().getTimingInfo(timing.start, timing.timeLocked);
                 unsigned long long now = curTimeMicros64();
                 if ( timeLastPass ) {
                     unsigned long long dt = now - timeLastPass;
@@ -159,7 +162,7 @@ namespace mongo {
             ss << "git hash: " << gitVersion() << "\n";
             ss << "sys info: " << sysInfo() << "\n";
             ss << "\n";
-            ss << "dblocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
+            ss << "dbwritelocked:  " << dbMutex.info().isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
@@ -284,9 +287,9 @@ namespace mongo {
             int n = 2000;
             Timer t;
             while ( 1 ) {
-                if ( !dbMutexInfo.isLocked() ) {
+                if ( !dbMutex.info().isLocked() ) {
                     {
-                        dblock lk;
+                        readlock lk("");
                         ss << "time to get dblock: " << t.millis() << "ms\n";
                         doLockedStuff(ss);
                     }

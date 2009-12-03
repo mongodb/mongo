@@ -38,6 +38,14 @@
 
 namespace mongo {
 
+    void receivedKillCursors(Message& m);
+    void receivedUpdate(Message& m, stringstream& ss);
+    void receivedDelete(Message& m, stringstream& ss);
+    void receivedInsert(Message& m, stringstream& ss);
+    bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
+
+    bool Database::_openAllFiles = false;
+
     CmdLine cmdLine;
 
     int nloggedsome = 0;
@@ -45,12 +53,12 @@ namespace mongo {
 
     SlaveTypes slave = NotSlave;
     bool master = false; // true means keep an op log
-//    extern int curOp;
     bool autoresync = false;
     
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
     MongoMutex &dbMutex( *(new MongoMutex) );
     MutexInfo dbMutexInfo;
+
 
     string dbExecCommand;
 
@@ -123,24 +131,113 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
     
+    bool receivedQuery(DbResponse& dbresponse, Message& m, 
+                       stringstream& ss, bool logit, 
+                       mongolock& lock
+      ) {
+        bool ok = true;
+        MSGID responseTo = m.data->id;
+
+        DbMessage d(m);
+        QueryMessage q(d);
+        QueryResult* msgdata;
+
+        try {
+            if (q.fields.get() && q.fields->errmsg)
+                uassert(q.fields->errmsg, false);
+
+            /* note these are logged BEFORE authentication -- which is sort of ok */
+            if ( _diaglog.level && logit ) {
+                if ( strstr(q.ns, ".$cmd") ) {
+                    /* $cmd queries are "commands" and usually best treated as write operations */
+                    OPWRITE;
+                }
+                else {
+                    OPREAD;
+                }
+            }
+
+            setClient( q.ns, dbpath, &lock );
+            Client& client = cc();
+            client.top.setRead();
+            strncpy(client.curop()->ns, q.ns, Namespace::MaxNsLen);
+            msgdata = runQuery(m, ss ).release();
+        }
+        catch ( AssertionException& e ) {
+            ok = false;
+            ss << " exception ";
+            LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
+            log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
+            if ( q.query.valid() )
+                log() << "  query:" << q.query.toString() << endl;
+            else
+                log() << "  query object is not valid!" << endl;
+
+            BSONObjBuilder err;
+            err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
+            BSONObj errObj = err.done();
+
+            BufBuilder b;
+            b.skip(sizeof(QueryResult));
+            b.append((void*) errObj.objdata(), errObj.objsize());
+
+            // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
+            msgdata = (QueryResult *) b.buf();
+            b.decouple();
+            QueryResult *qr = msgdata;
+            qr->resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->len = b.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+
+        }
+        Message *resp = new Message();
+        resp->setData(msgdata, true); // transport will free
+        dbresponse.response = resp;
+        dbresponse.responseTo = responseTo;
+        Database *database = cc().database();
+        if ( database ) {
+            if ( database->profile )
+                ss << " bytes:" << resp->data->dataLen();
+        }
+        else {
+            if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
+                log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
+        }
+
+        return ok;
+    }
+
+    bool commandIsReadOnly(BSONObj& _cmdobj);
+
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
+
         bool writeLock = true;
 
         // before we lock...
         int op = m.data->operation();
+        const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
-            const char *ns = m.data->_data + 4;
-            if( strstr(ns, "$cmd.sys.") ) { 
-                if( strstr(ns, "$cmd.sys.inprog") ) {
-                    inProgCmd(m, dbresponse);
-                    return true;
+            if( strstr(ns, ".$cmd") ) {
+                if( strstr(ns, ".$cmd.sys.") ) { 
+                    if( strstr(ns, "$cmd.sys.inprog") ) {
+                        inProgCmd(m, dbresponse);
+                        return true;
+                    }
+                    if( strstr(ns, "$cmd.sys.killop") ) { 
+                        killOp(m, dbresponse);
+                        return true;
+                    }
                 }
-                if( strstr(ns, "$cmd.sys.killop") ) { 
-                    killOp(m, dbresponse);
-                    return true;
-                }
+                DbMessage d( m );
+                QueryMessage q( d );
+                writeLock = !commandIsReadOnly(q.query);
             }
+            else
+                writeLock = false;
         }
         else if( op == dbGetMore ) {
             writeLock = false;
@@ -154,7 +251,7 @@ namespace mongo {
         }
 
         mongolock lk(writeLock);
-        
+
         stringstream ss;
         char buf[64];
         time_t now = time(0);
@@ -189,11 +286,11 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(dbresponse, m, ss, true) )
+            if ( ! receivedQuery(dbresponse, m, ss, true, lk) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
-            // receivedQuery() does its own authorization processing.
+            // does its own authorization processing.
             OPREAD;
             DEV log = true;
             ss << "getmore ";
@@ -538,116 +635,6 @@ namespace mongo {
         Message & container;
     };
     
-    /* a call from jscript to the database locally.
-
-         m - inbound message
-         out - outbound message, if there is any, will be set here.
-               if there is one, out.data will be non-null on return.
-    		   The out.data buffer will automatically clean up when out
-    		   goes out of scope (out.freeIt==true)
-
-       note we should already be in the mutex lock from connThread() at this point.
-    */
-    /*
-    void jniCallbackDeprecated(Message& m, Message& out)
-    {
-		//
-        AuthenticationInfo *ai = currentClient.get()->ai;
-        
-        Database *clientOld = cc().database();
-
-        JniMessagingPort jmp(out);
-        callDepth++;
-        int curOpOld = curOp;
-
-        try {
-
-            stringstream ss;
-            char buf[64];
-            time_t_to_String(time(0), buf);
-            buf[20] = 0; // don't want the year
-            ss << buf << " dbjs ";
-
-            {
-                Timer t;
-
-                bool log = logLevel >= 1;
-                curOp = m.data->operation();
-
-                if ( m.data->operation() == dbQuery ) {
-                    // on a query, the Message must have m.freeIt true so that the buffer data can be
-                    // retained by cursors.  As freeIt is false, we make a copy here.
-                    assert( m.data->len > 0 && m.data->len < 32000000 );
-                    Message copy(malloc(m.data->len), true);
-                    memcpy(copy.data, m.data, m.data->len);
-                    DbResponse dbr;
-                    receivedQuery(dbr, copy, ss, false);
-                    jmp.reply(m, *dbr.response, dbr.responseTo);
-                }
-                else if ( m.data->operation() == dbInsert ) {
-                    ss << "insert ";
-                    receivedInsert(m, ss);
-                }
-                else if ( m.data->operation() == dbUpdate ) {
-                    ss << "update ";
-                    receivedUpdate(m, ss);
-                }
-                else if ( m.data->operation() == dbDelete ) {
-                    ss << "remove ";
-                    receivedDelete(m, ss);
-                }
-                else if ( m.data->operation() == dbGetMore ) {
-                    DEV log = true;
-                    ss << "getmore ";
-                    DbResponse dbr;
-                    receivedGetMore(dbr, m, ss);
-                    jmp.reply(m, *dbr.response, dbr.responseTo);
-                }
-                else if ( m.data->operation() == dbKillCursors ) {
-                    try {
-                        log = true;
-                        ss << "killcursors ";
-                        receivedKillCursors(m);
-                    }
-                    catch ( AssertionException& ) {
-                        problem() << "Caught Assertion in kill cursors, continuing" << endl;
-                        ss << " exception ";
-                    }
-                }
-                else {
-                    mongo::out() << "    jnicall: operation isn't supported: " << m.data->operation() << endl;
-                    assert(false);
-                }
-
-                int ms = t.millis();
-                log = log || ctr++ % 128 == 0;
-                if ( log || ms > 100 ) {
-                    ss << ' ' << t.millis() << "ms";
-                    mongo::out() << ss.str().c_str() << endl;
-                }
-                Database *database = cc().database();
-                if ( database && database->profile >= 1 ) {
-                    if ( database->profile >= 2 || ms >= 100 ) {
-                        // profile it
-                        profile(ss.str().c_str()+20, ms);
-                    }
-                }
-            }
-
-        }
-        catch ( AssertionException& ) {
-            problem() << "Caught AssertionException in jniCall()" << endl;
-        }
-
-        curOp = curOpOld;
-        callDepth--;
-
-        if ( cc().database() != clientOld ) {
-            assert(false);
-        }
-    }
-    */
-
     void getDatabaseNames( vector< string > &names ) {
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );

@@ -56,7 +56,7 @@ namespace mongo {
        path - datafiles directory, if not the default, so we can differentiate between db's of the same
               name in different places (for example temp ones on repair).
     */
-    inline bool setClient(const char *ns, const string& path=dbpath) {
+    inline bool setClient(const char *ns, const string& path=dbpath, mongolock *lock = 0) {
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
@@ -69,14 +69,17 @@ namespace mongo {
             return false;
         }
 
+        if( lock )
+            lock->releaseAndWriteLock();
+
         // when master for replication, we advertise all the db's, and that
         // looks like a 'first operation'. so that breaks this log message's
         // meaningfulness.  instead of fixing (which would be better), we just
         // stop showing for now.
         // 2008-12-22 We now open every database on startup, so this log is
         // no longer helpful.  Commenting.
-//    if( !master )
-//        log() << "first operation for database " << key << endl;
+        //    if( !master )
+        //        log() << "first operation for database " << key << endl;
 
         assertInWriteLock();
 
@@ -85,7 +88,7 @@ namespace mongo {
         bool justCreated;
         Database *newdb = new Database(cl, justCreated, path);
         databases[key] = newdb;
-        newdb->finishInit();
+        //newdb->finishInit();
         cc().setns(ns, newdb);
 
         return justCreated;
@@ -116,12 +119,10 @@ namespace mongo {
                 clientpath = database->path;
             }
             client.top.clientStop();
-            dbMutexInfo.leaving();
             dbMutex.unlock();
         }
         ~dbtemprelease() {
             dbMutex.lock();
-            dbMutexInfo.entered();
             if ( clientname.empty() )
                 cc().setns("", 0);
             else

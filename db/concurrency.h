@@ -21,47 +21,6 @@
 
 namespace mongo {
 
-#if 0
-//#if BOOST_VERSION >= 103500
-    //typedef boost::shared_mutex MongoMutex;
-    class MongoMutex { 
-        boost::shared_mutex m;
-    public:
-        void lock() { 
-            m.lock(); 
-        }
-        void unlock() { m.unlock(); }
-        void lock_shared() { m.lock_shared(); }
-        void unlock_shared() { m.unlock_shared(); }
-    };
-#else
-    /* this will be for old versions of boost */
-    class MongoMutex { 
-        boost::recursive_mutex m;
-        int x;
-    public:
-        MongoMutex() { x=0; }
-        void lock() { 
-#if BOOST_VERSION >= 103500
-            m.lock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
-#endif
-        }
-
-        void unlock() {
-#if BOOST_VERSION >= 103500
-            m.unlock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
-#endif
-        }
-
-        void lock_shared() { lock(); }
-        void unlock_shared() { unlock(); }
-    };
-#endif
-
     /* mutex time stats */
     class MutexInfo {
         unsigned long long start, enter, timeLocked; // all in microseconds
@@ -75,40 +34,103 @@ namespace mongo {
             if ( locked == 0 )
                 enter = curTimeMicros64();
             locked++;
-            assert( locked >= 1 );
+            assert( locked == 1 );
         }
         void leaving() {
             locked--;
-            assert( locked >= 0 );
+            assert( locked == 0 );
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }
         int isLocked() const {
             return locked;
         }
-        void timingInfo(unsigned long long &s, unsigned long long &tl) {
+        void getTimingInfo(unsigned long long &s, unsigned long long &tl) const {
             s = start;
             tl = timeLocked;
         }
     };
 
-    extern MongoMutex &dbMutex;
-    extern MutexInfo dbMutexInfo;
-
-/*
-    struct lock {
-        recursive_boostlock bl_;
-        MutexInfo& info_;
-        lock( boost::recursive_mutex &mutex, MutexInfo &info ) :
-                bl_( mutex ),
-                info_( info ) {
-            info_.entered();
+#if BOOST_VERSION >= 103500
+    class MongoMutex {
+        MutexInfo _minfo;
+        boost::shared_mutex _m;
+        ThreadLocalValue<int> _state;
+    public:
+        void lock() { 
+            DEV cout << "LOCK" << endl;
+            int s = _state.get();
+            if( s > 0 ) {
+                _state.set(s+1);
+                return;
+            }
+            assert( s == 0 );
+            _state.set(1);
+            _m.lock(); 
+            _minfo.entered();
         }
-        ~lock() {
-            info_.leaving();
+        void unlock() { 
+            DEV cout << "UNLOCK" << endl;
+            int s = _state.get();
+            if( s > 1 ) { 
+                _state.set(s-1);
+                return;
+            }
+            assert( s == 1 );
+            _state.set(0);
+            _minfo.leaving();
+            _m.unlock(); 
         }
+        void lock_shared() { 
+            DEV cout << " LOCKSHARED" << endl;
+            int s = _state.get();
+            assert( s >= 0 );
+            if( s > 0 ) { 
+                // already in write lock - just be recursive and stay write locked
+                _state.set(s+1);
+                return;
+            }
+            _state.set(-1);
+            _m.lock_shared(); 
+        }
+        void unlock_shared() { 
+            DEV cout << " UNLOCKSHARED" << endl;
+            int s = _state.get();
+            if( s > 1 ) { 
+                _state.set(s-1);
+                return;
+            }
+            assert( s == -1 );
+            _state.set(0);
+            _m.unlock_shared(); 
+        }
+        MutexInfo& info() { return _minfo; }
     };
-*/
+#else
+    /* this will be for old versions of boost */
+    class MongoMutex { 
+        MutexInfo _minfo;
+        boost::recursive_mutex m;
+    public:
+        MongoMutex() { }
+        void lock() { 
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
+            _minfo.entered();
+        }
+
+        void unlock() {
+            _minfo.leaving();
+            // boost >1.35 would be: m.unlock();
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
+        }
+
+        void lock_shared() { lock(); }
+        void unlock_shared() { unlock(); }
+        MutexInfo& info() { return _minfo; }
+    };
+#endif
+
+    extern MongoMutex &dbMutex;
 
 	void dbunlocking_write();
 	void dbunlocking_read();
@@ -116,11 +138,9 @@ namespace mongo {
     struct writelock {
         writelock(const string& ns) {
             dbMutex.lock();
-            dbMutexInfo.entered();
         }
         ~writelock() { 
             dbunlocking_write();
-            dbMutexInfo.leaving();
             dbMutex.unlock();
         }
     };
@@ -141,7 +161,6 @@ namespace mongo {
         mongolock(bool write) : _writelock(write) {
             if( _writelock ) {
                 dbMutex.lock();
-                dbMutexInfo.entered();
             }
             else
                 dbMutex.lock_shared();
@@ -149,7 +168,6 @@ namespace mongo {
         ~mongolock() { 
             if( _writelock ) { 
                 dbunlocking_write();
-                dbMutexInfo.leaving();
                 dbMutex.unlock();
             }
             else {
@@ -158,14 +176,7 @@ namespace mongo {
             }
         }
         /* this unlocks, does NOT upgrade. that works for our current usage */
-        void releaseAndWriteLock() { 
-            if( !_writelock ) {
-                _writelock = true;
-                dbMutex.unlock_shared();
-                dbMutex.lock();
-                dbMutexInfo.entered();
-            }
-        }
+        void releaseAndWriteLock();
     };
     
 	/* use writelock and readlock instead */

@@ -42,6 +42,11 @@ namespace mongo {
         */
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
+        /* true if a read lock is sufficient */
+        virtual bool readOnly() { 
+            return false;
+        }
+
         /* Return true if only the admin ns has privileges to run this command. */
         virtual bool adminOnly() {
             return false;

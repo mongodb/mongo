@@ -73,7 +73,7 @@ namespace mongo {
             { //percent_locked
                 unsigned long long time = curTimeMicros64();
                 unsigned long long start , lock;
-                dbMutexInfo.timingInfo( start , lock );
+                dbMutex.info().getTimingInfo( start , lock );
                 if ( lastTime ){
                     double timeDiff = (double) (time - lastTime);
                     double lockDiff = (double) (lock - lastLockTime);

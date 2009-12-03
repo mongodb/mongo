@@ -99,12 +99,6 @@ namespace mongo {
     
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client = unknownAddress.sa );
 
-    void receivedKillCursors(Message& m);
-    void receivedUpdate(Message& m, stringstream& ss);
-    void receivedDelete(Message& m, stringstream& ss);
-    void receivedInsert(Message& m, stringstream& ss);
-    bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
-    bool receivedQuery(DbResponse& dbresponse, Message& m, stringstream& ss, bool logit);
     void getDatabaseNames( vector< string > &names );
 
     // must call with db lock
