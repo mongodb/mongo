@@ -45,7 +45,7 @@ namespace mongo {
 
             string toString(){
                 char result[128];
-                snprintf(result, 128, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
+                sprintf(result, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
                 return string(result);
             }
 
