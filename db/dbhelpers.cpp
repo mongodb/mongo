@@ -27,22 +27,6 @@
 
 namespace mongo {
 
-    CursorIterator::CursorIterator( auto_ptr<Cursor> c )
-        : _cursor( c ){
-    }
-
-    CursorIterator::~CursorIterator(){
-    }
-
-    BSONObj CursorIterator::next(){
-        BSONObj o = _cursor->current();
-        _cursor->advance();
-        return o;
-    }
-    bool CursorIterator::hasNext(){
-        return _cursor->ok();
-    }
-
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )

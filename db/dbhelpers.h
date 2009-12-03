@@ -34,11 +34,18 @@ namespace mongo {
     class CursorIterator {
     public:
 
-        CursorIterator( auto_ptr<Cursor> c );
-        ~CursorIterator();
+        CursorIterator( auto_ptr<Cursor> c )
+            : _cursor( c ){
+        }
 
-        BSONObj next();
-        bool hasNext();
+        BSONObj next(){
+            BSONObj o = _cursor->current();
+            _cursor->advance();
+            return o;
+        }
+        bool hasNext(){
+            return _cursor->ok();
+        }
     private:
         auto_ptr<Cursor> _cursor;
     };
