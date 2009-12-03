@@ -59,28 +59,49 @@ namespace mongo {
     public:
         void lock() { 
             DEV cout << "LOCK" << endl;
-            DEV assert( _state.get() == 0 );
-            DEV _state.set(1);
+            int s = _state.get();
+            if( s > 0 ) {
+                _state.set(s+1);
+                return;
+            }
+            assert( s == 0 );
+            _state.set(1);
             _m.lock(); 
             _minfo.entered();
         }
         void unlock() { 
             DEV cout << "UNLOCK" << endl;
-            DEV assert( _state.get() == 1 );
-            DEV _state.set(0);
+            int s = _state.get();
+            if( s > 1 ) { 
+                _state.set(s-1);
+                return;
+            }
+            assert( s == 1 );
+            _state.set(0);
             _minfo.leaving();
             _m.unlock(); 
         }
         void lock_shared() { 
             DEV cout << " LOCKSHARED" << endl;
-            DEV assert( _state.get() == 0 );
-            DEV _state.set(2);
+            int s = _state.get();
+            assert( s >= 0 );
+            if( s > 0 ) { 
+                // already in write lock - just be recursive and stay write locked
+                _state.set(s+1);
+                return;
+            }
+            _state.set(-1);
             _m.lock_shared(); 
         }
         void unlock_shared() { 
             DEV cout << " UNLOCKSHARED" << endl;
-            DEV assert( _state.get() == 2 );
-            DEV _state.set(0);
+            int s = _state.get();
+            if( s > 1 ) { 
+                _state.set(s-1);
+                return;
+            }
+            assert( s == -1 );
+            _state.set(0);
             _m.unlock_shared(); 
         }
         MutexInfo& info() { return _minfo; }
