@@ -205,6 +205,8 @@ namespace mongo {
         }
     }
 
+    bool commandIsReadOnly(BSONObj& _cmdobj);
+
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
 
@@ -214,7 +216,7 @@ namespace mongo {
         int op = m.data->operation();
         const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
-            if( strstr(ns, ".$cmd.") ) {
+            if( strstr(ns, ".$cmd") ) {
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -225,6 +227,9 @@ namespace mongo {
                         return true;
                     }
                 }
+                DbMessage d( m );
+                QueryMessage q( d );
+                writeLock = !commandIsReadOnly(q.query);
             }
             else
                 writeLock = false;

@@ -68,6 +68,9 @@ namespace mongo {
     unsigned q = 0;
 
     void statsThread() {
+        /*cout << "TEMP disabled statsthread" << endl;
+        if( 1 ) 
+            return;*/
         Client::initThread("stats");
         unsigned long long timeLastPass = 0;
         while ( 1 ) {

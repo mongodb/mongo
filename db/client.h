@@ -113,6 +113,21 @@ namespace mongo {
     inline Client::GodScope::~GodScope(){
         cc()._god = _prev;
     }
+
+/* this unlocks, does NOT upgrade. that works for our current usage */
+    inline void mongolock::releaseAndWriteLock() { 
+        if( !_writelock ) {
+            _writelock = true;
+            dbMutex.unlock_shared();
+            dbMutex.lock();
+            dbMutexInfo.entered();
+
+            /* this is defensive; as we were unlocked for a moment above, 
+               the Database object we reference could have been deleted:
+            */
+            cc().clearns();
+        }
+    }
     
 };
 

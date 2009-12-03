@@ -163,8 +163,6 @@ namespace mongo {
     */
     void connThread()
     {
-static int zzz = 0;
-
         Client::initThread("conn");
 
         /* todo: move to Client object */
@@ -173,15 +171,6 @@ static int zzz = 0;
 
         MessagingPort& dbMsgPort = *grab;
         grab = 0;
-
-if( ++zzz > 0 )        {
-cout << "L1" << endl;
-            mongolock lk(false);
-cout << "L2" << endl;
-            sleepsecs(9999);
-cout << "L3" << endl;
-        }
-
 
         try {
 
@@ -409,8 +398,8 @@ cout << "L3" << endl;
 
     void show_32_warning(){
 #if BOOST_VERSION < 103500
-#warning built with boost version <= 1.34, limited concurrency
-        //cout << \n** NOTE: built with boost version <= 1.34, limited concurrency" << endl;
+#warning built with boost version 1.34 or older limited concurrency
+        cout << "\n** NOTE: built with boost version <= 1.34, limited concurrency" << endl;
 #endif
 
         if ( sizeof(int*) != 4 )

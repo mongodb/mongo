@@ -80,6 +80,7 @@ namespace mongo {
     */
     class CmdResetError : public Command {
     public:
+        virtual bool readOnly() { return true; }
         virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
@@ -102,7 +103,8 @@ namespace mongo {
     /* for diagnostic / testing purposes. */
     class CmdSleep : public Command { 
     public:
-        bool adminOnly() { return true; }
+        virtual bool readOnly() { return true; }
+        virtual bool adminOnly() { return true; }
         virtual bool logTheOp() {
             return false;
         }
@@ -121,6 +123,7 @@ namespace mongo {
 
     class CmdGetLastError : public Command {
     public:
+        virtual bool readOnly() { return true; }
         virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
@@ -162,6 +165,7 @@ namespace mongo {
 
     class CmdGetPrevError : public Command {
     public:
+        virtual bool readOnly() { return true; }
         virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
@@ -526,6 +530,7 @@ namespace mongo {
     /* select count(*) */
     class CmdCount : public Command {
     public:
+        virtual bool readOnly() { return true; }
         CmdCount() : Command("count") { }
         virtual bool logTheOp() {
             return false;
@@ -1298,6 +1303,26 @@ namespace mongo {
 
     extern map<string,Command*> *commands;
 
+    bool commandIsReadOnly(BSONObj& _cmdobj) { 
+        BSONObj jsobj;
+        {
+            BSONElement e = _cmdobj.firstElement();
+            if ( e.type() == Object && string("query") == e.fieldName() ) {
+                jsobj = e.embeddedObject();
+            }
+            else {
+                jsobj = _cmdobj;
+            }
+        }
+        BSONElement e = jsobj.firstElement();
+        map<string,Command*>::iterator i;
+        if ( e.type() && ( i = commands->find(e.fieldName()) ) != commands->end() ){
+            Command *c = i->second;
+            return c->readOnly();
+        }
+        return false;
+    }
+
     /* TODO make these all command objects -- legacy stuff here
 
        usage:
@@ -1306,7 +1331,8 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
-        log(1) << "run command " << ns << ' ' << _cmdobj << endl;
+        if( logLevel >= 1 ) 
+            log() << "run command " << ns << ' ' << _cmdobj << endl;
 
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
