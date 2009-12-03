@@ -231,11 +231,15 @@ namespace mongo {
         uassert( "mongo_find needs at elast 3 args" , argc >= 3 );
         uassert( "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
         uassert( "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
-        
-        DBClientBase * conn = getConnection( cx, obj );
-        uassert( "no connection!" , conn );
 
         Convertor c( cx );
+        if ( c.getBoolean( obj , "readOnly" ) ){
+            JS_ReportError( cx , "js db in read only mode - mongo_update" );
+            return JS_FALSE;
+        }
+
+        DBClientBase * conn = getConnection( cx, obj );
+        uassert( "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
 
@@ -255,11 +259,16 @@ namespace mongo {
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         uassert( "mongo_insert needs 2 args" , argc == 2 );
         uassert( "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+
+        Convertor c( cx );
+        if ( c.getBoolean( obj , "readOnly" ) ){
+            JS_ReportError( cx , "js db in read only mode - mongo_insert" );
+            return JS_FALSE;
+        }
         
         DBClientBase * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
         
-        Convertor c( cx );
         
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );
@@ -280,10 +289,14 @@ namespace mongo {
         uassert( "mongo_remove needs 2 arguments" , argc == 2 );
         uassert( "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
+        Convertor c( cx );
+        if ( c.getBoolean( obj , "readOnly" ) ){
+            JS_ReportError( cx , "js db in read only mode - mongo_remove" );
+            return JS_FALSE;
+        }
+
         DBClientBase * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
-
-        Convertor c( cx );
         
         string ns = c.toString( argv[0] );
         BSONObj o = c.toObject( argv[1] );

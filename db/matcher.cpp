@@ -40,6 +40,10 @@ namespace mongo {
         }
         ~Where() {
 
+            if ( scope.get() )
+                scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+
+
             if ( jsScope ){
                 delete jsScope;
             }
@@ -54,7 +58,7 @@ namespace mongo {
             massert( "scope has to be created first!" , scope.get() );
             func = scope->createFunction( code );
         }
-
+        
     };
 
     JSMatcher::~JSMatcher() {
@@ -136,6 +140,8 @@ namespace mongo {
                     const char *code = e.valuestr();
                     where->setFunc(code);
                 }
+                
+                where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
 
                 continue;
             }
@@ -520,7 +526,7 @@ namespace mongo {
             where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
             where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
             
-            int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 );
+            int err = where->scope->invoke( where->func , BSONObj() , 1000 * 60 , false );
             where->scope->setThis( 0 );
             if ( err == -3 ) { // INVOKE_ERROR
                 stringstream ss;
