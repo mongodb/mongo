@@ -24,6 +24,21 @@
 
 namespace mongo {
 
+    class CursorIterator {
+    public:
+
+        CursorIterator( auto_ptr<Cursor> c );
+        ~CursorIterator();
+
+        BSONObj next();
+        bool hasNext();
+    private:
+        auto_ptr<Cursor> _cursor;
+    };
+
+    /**
+       all helpers assume locking is handled above them
+     */
     struct Helpers { 
 
         /* ensure the specified index exists.
@@ -50,6 +65,8 @@ namespace mongo {
         static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex = false);
         
         static bool findById(const char *ns, BSONObj query, BSONObj& result );
+
+        static auto_ptr<CursorIterator> find( const char *ns , BSONObj query = BSONObj() , bool requireIndex = false );
 
         /* Get/put the first object from a collection.  Generally only useful if the collection
            only ever has a single object -- which is a "singleton collection".

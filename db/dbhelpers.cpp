@@ -23,8 +23,25 @@
 #include "json.h"
 #include "queryoptimizer.h"
 #include "btree.h"
+#include "pdfile.h"
 
 namespace mongo {
+
+    CursorIterator::CursorIterator( auto_ptr<Cursor> c )
+        : _cursor( c ){
+    }
+
+    CursorIterator::~CursorIterator(){
+    }
+
+    BSONObj CursorIterator::next(){
+        BSONObj o = _cursor->current();
+        _cursor->advance();
+        return o;
+    }
+    bool CursorIterator::hasNext(){
+        return _cursor->ok();
+    }
 
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
@@ -103,6 +120,15 @@ namespace mongo {
         result = res->one();
         return true;
     }
+
+    auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
+        uassert( "requireIndex not supported in Helpers::find yet" , ! requireIndex );
+        uassert( "queries not allowed on Helpers::find yet" , query.isEmpty() );
+        auto_ptr<CursorIterator> i;
+        i.reset( new CursorIterator( DataFileMgr::findAll( ns ) ) );
+        return i;
+    }
+    
 
     bool Helpers::findById(const char *ns, BSONObj query, BSONObj& result ){
         NamespaceDetails *d = nsdetails(ns);

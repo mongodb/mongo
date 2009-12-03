@@ -797,7 +797,17 @@ namespace QueryTests {
             }
             
             cout << "HelperTest  slow:" << slow << " fast:" << fast << endl;
-
+            
+            {
+                auto_ptr<CursorIterator> i = Helpers::find( ns() );
+                int n = 0;
+                while ( i->hasNext() ){
+                    BSONObj o = i->next();
+                    n++;
+                }
+                ASSERT_EQUALS( 50 , n );
+            }
+            
         }
     };
 
