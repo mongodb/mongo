@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# mongod - Startup script for mongod
+
+# chkconfig: 35 85 15
+# description: Mongo is a scalable, document-oriented database.
+# processname: mongod
+# config: /etc/mongod.conf
+# pidfile: /var/run/mongo/mongo.pid
+
+. /etc/rc.d/init.d/functions
+
+# things from mongod.conf get there by mongod reading it
+
+OPTIONS=" -f /etc/mongod.conf"
+
+mongod=${MONGOD-/usr/bin/mongod}
+pidfile=${PIDFILE-/var/run/mongod.pid}
+lockfile=${LOCKFILE-/var/lock/subsys/mongod}
+
+start()
+{
+  echo -n $"Starting mongod: "
+  #daemon --pidfile=${pidfile} $mongod $OPTIONS  > /var/log/mongod
+  $mongod $OPTIONS > /var/log/mongod 2>&1 &
+  RETVAL=$?
+  [ $RETVAL = 0 ] && touch ${lockfile}
+  echo OK
+}
+
+stop()
+{
+  echo -n $"Stopping mongod: "
+  #killproc -p ${pidfile} -d 10 $mongod
+  #RETVAL=$?
+  killall mongod > /dev/null 2>&1 
+  #[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+  echo OK
+}
+
+ulimit -n 12000
+RETVAL=0
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+#  status)
+#    status -p ${pidfile} $mongod
+#    ;;
+  *)
+    echo $"Usage: $0 {start|stop|restart}"
+    RETVAL=1
+esac
+
+exit $RETVAL
