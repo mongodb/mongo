@@ -128,9 +128,11 @@ namespace mongo {
                     if ( cmdObj["mapparams"].type() == Array ){
                         mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
                     }
-                    else {
-                        mapparams = BSONObj();
+
+                    if ( cmdObj["scope"].type() == Object ){
+                        scopeSetup = cmdObj["scope"].embeddedObjectUserCheck();
                     }
+                    
                 }
                 
                 { // query options
@@ -183,7 +185,8 @@ namespace mongo {
             string finalizeCode;
             
             BSONObj mapparams;
-
+            BSONObj scopeSetup;
+            
             // output tables
             string incLong;
             
@@ -208,6 +211,9 @@ namespace mongo {
                 else
                     finalize = 0;
                 
+                if ( ! setup.scopeSetup.isEmpty() )
+                    scope->init( &setup.scopeSetup );
+
                 db.dropCollection( setup.tempLong );
                 db.dropCollection( setup.incLong );
                 
