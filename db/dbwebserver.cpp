@@ -80,7 +80,7 @@ namespace mongo {
                 Top::completeSnapshot();
                 q = (q+1)%NStats;
                 Timing timing;
-                dbMutexInfo.getTimingInfo(timing.start, timing.timeLocked);
+                dbMutex.info().getTimingInfo(timing.start, timing.timeLocked);
                 unsigned long long now = curTimeMicros64();
                 if ( timeLastPass ) {
                     unsigned long long dt = now - timeLastPass;
@@ -162,7 +162,7 @@ namespace mongo {
             ss << "git hash: " << gitVersion() << "\n";
             ss << "sys info: " << sysInfo() << "\n";
             ss << "\n";
-            ss << "dbwritelocked:  " << dbMutexInfo.isLocked() << " (initial)\n";
+            ss << "dbwritelocked:  " << dbMutex.info().isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
@@ -287,7 +287,7 @@ namespace mongo {
             int n = 2000;
             Timer t;
             while ( 1 ) {
-                if ( !dbMutexInfo.isLocked() ) {
+                if ( !dbMutex.info().isLocked() ) {
                     {
                         readlock lk("");
                         ss << "time to get dblock: " << t.millis() << "ms\n";

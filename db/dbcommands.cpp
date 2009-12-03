@@ -320,7 +320,7 @@ namespace mongo {
                 BSONObjBuilder t;
 
                 unsigned long long last, start, timeLocked;
-                dbMutexInfo.getTimingInfo(start, timeLocked);
+                dbMutex.info().getTimingInfo(start, timeLocked);
                 last = curTimeMicros64();
                 double tt = (double) last-start;
                 double tl = (double) timeLocked;

@@ -120,7 +120,6 @@ namespace mongo {
             _writelock = true;
             dbMutex.unlock_shared();
             dbMutex.lock();
-            dbMutexInfo.entered();
 
             /* this is defensive; as we were unlocked for a moment above, 
                the Database object we reference could have been deleted:

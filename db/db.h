@@ -119,12 +119,10 @@ namespace mongo {
                 clientpath = database->path;
             }
             client.top.clientStop();
-            dbMutexInfo.leaving();
             dbMutex.unlock();
         }
         ~dbtemprelease() {
             dbMutex.lock();
-            dbMutexInfo.entered();
             if ( clientname.empty() )
                 cc().setns("", 0);
             else

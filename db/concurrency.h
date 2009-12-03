@@ -21,55 +21,6 @@
 
 namespace mongo {
 
-#if BOOST_VERSION >= 103500
-    class MongoMutex { 
-        boost::shared_mutex m;
-    public:
-        void lock() { 
-cout << "LOCK" << endl;
-            m.lock(); 
-        }
-        void unlock() { 
-            cout << "UNLOCK" << endl;
-            m.unlock(); 
-        }
-        void lock_shared() { 
-            cout << " LOCKSHARED" << endl;
-            m.lock_shared(); 
-        }
-        void unlock_shared() { 
-            cout << " UNLOCKSHARED" << endl;
-            m.unlock_shared(); 
-        }
-    };
-#else
-    /* this will be for old versions of boost */
-    class MongoMutex { 
-        boost::recursive_mutex m;
-        int x;
-    public:
-        MongoMutex() { x=0; }
-        void lock() { 
-#if BOOST_VERSION >= 103500
-            m.lock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
-#endif
-        }
-
-        void unlock() {
-#if BOOST_VERSION >= 103500
-            m.unlock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
-#endif
-        }
-
-        void lock_shared() { lock(); }
-        void unlock_shared() { unlock(); }
-    };
-#endif
-
     /* mutex time stats */
     class MutexInfo {
         unsigned long long start, enter, timeLocked; // all in microseconds
@@ -100,26 +51,63 @@ cout << "LOCK" << endl;
         }
     };
 
-    extern MongoMutex &dbMutex;
-
-    /* as we are using this right now, dbMutexInfo.isLocked() == write locked 
-    */
-    extern MutexInfo dbMutexInfo;
-
-/*
-    struct lock {
-        recursive_boostlock bl_;
-        MutexInfo& info_;
-        lock( boost::recursive_mutex &mutex, MutexInfo &info ) :
-                bl_( mutex ),
-                info_( info ) {
-            info_.entered();
+#if BOOST_VERSION >= 103500
+    class MongoMutex { 
+        MutexInfo _minfo;
+        boost::shared_mutex m;
+    public:
+        void lock() { 
+cout << "LOCK" << endl;
+            m.lock(); 
+            _minfo.entered();
         }
-        ~lock() {
-            info_.leaving();
+        void unlock() { 
+            cout << "UNLOCK" << endl;
+            _minfo.leaving();
+            m.unlock(); 
         }
+        void lock_shared() { 
+            cout << " LOCKSHARED" << endl;
+            m.lock_shared(); 
+        }
+        void unlock_shared() { 
+            cout << " UNLOCKSHARED" << endl;
+            m.unlock_shared(); 
+        }
+        MutexInfo& info() { return _minfo; }
     };
-*/
+#else
+    /* this will be for old versions of boost */
+    class MongoMutex { 
+        boost::recursive_mutex m;
+        int x;
+    public:
+        MongoMutex() { x=0; }
+        void lock() { 
+#if BOOST_VERSION >= 103500
+            m.lock();
+#else
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
+#endif
+            _minfo.entered();
+        }
+
+        void unlock() {
+            _minfo.leaving();
+#if BOOST_VERSION >= 103500
+            m.unlock();
+#else
+            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
+#endif
+        }
+
+        void lock_shared() { lock(); }
+        void unlock_shared() { unlock(); }
+        MutexInfo& info() { return _minfo; }
+    };
+#endif
+
+    extern MongoMutex &dbMutex;
 
 	void dbunlocking_write();
 	void dbunlocking_read();
@@ -127,11 +115,9 @@ cout << "LOCK" << endl;
     struct writelock {
         writelock(const string& ns) {
             dbMutex.lock();
-            dbMutexInfo.entered();
         }
         ~writelock() { 
             dbunlocking_write();
-            dbMutexInfo.leaving();
             dbMutex.unlock();
         }
     };
@@ -152,7 +138,6 @@ cout << "LOCK" << endl;
         mongolock(bool write) : _writelock(write) {
             if( _writelock ) {
                 dbMutex.lock();
-                dbMutexInfo.entered();
             }
             else
                 dbMutex.lock_shared();
@@ -160,7 +145,6 @@ cout << "LOCK" << endl;
         ~mongolock() { 
             if( _writelock ) { 
                 dbunlocking_write();
-                dbMutexInfo.leaving();
                 dbMutex.unlock();
             }
             else {
