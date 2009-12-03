@@ -352,12 +352,13 @@ namespace mongo {
     public:
         ThreadLocalValue( T def = 0 ) : _default( def ) { }
 
-        int get() {
+        T get() {
             T * val = _val.get();
             if ( val )
                 return *val;
             return _default;
         }
+
         void set( const T& i ) {
             T *v = _val.get();
             if( v ) { 
@@ -367,6 +368,7 @@ namespace mongo {
             v = new T(i);
             _val.reset( v );
         }
+
     private:
         T _default;
         boost::thread_specific_ptr<T> _val;

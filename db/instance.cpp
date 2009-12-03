@@ -59,6 +59,7 @@ namespace mongo {
     MongoMutex &dbMutex( *(new MongoMutex) );
     MutexInfo dbMutexInfo;
 
+
     string dbExecCommand;
 
     string bind_ip = "";

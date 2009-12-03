@@ -34,11 +34,11 @@ namespace mongo {
             if ( locked == 0 )
                 enter = curTimeMicros64();
             locked++;
-            assert( locked >= 1 );
+            assert( locked == 1 );
         }
         void leaving() {
             locked--;
-            assert( locked >= 0 );
+            assert( locked == 0 );
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }
@@ -52,27 +52,36 @@ namespace mongo {
     };
 
 #if BOOST_VERSION >= 103500
-    class MongoMutex { 
+    class MongoMutex {
         MutexInfo _minfo;
-        boost::shared_mutex m;
+        boost::shared_mutex _m;
+        ThreadLocalValue<int> _state;
     public:
         void lock() { 
-cout << "LOCK" << endl;
-            m.lock(); 
+            DEV cout << "LOCK" << endl;
+            DEV assert( _state.get() == 0 );
+            DEV _state.set(1);
+            _m.lock(); 
             _minfo.entered();
         }
         void unlock() { 
-            cout << "UNLOCK" << endl;
+            DEV cout << "UNLOCK" << endl;
+            DEV assert( _state.get() == 1 );
+            DEV _state.set(0);
             _minfo.leaving();
-            m.unlock(); 
+            _m.unlock(); 
         }
         void lock_shared() { 
-            cout << " LOCKSHARED" << endl;
-            m.lock_shared(); 
+            DEV cout << " LOCKSHARED" << endl;
+            DEV assert( _state.get() == 0 );
+            DEV _state.set(2);
+            _m.lock_shared(); 
         }
         void unlock_shared() { 
-            cout << " UNLOCKSHARED" << endl;
-            m.unlock_shared(); 
+            DEV cout << " UNLOCKSHARED" << endl;
+            DEV assert( _state.get() == 2 );
+            DEV _state.set(0);
+            _m.unlock_shared(); 
         }
         MutexInfo& info() { return _minfo; }
     };
@@ -84,21 +93,14 @@ cout << "LOCK" << endl;
     public:
         MongoMutex() { }
         void lock() { 
-#if BOOST_VERSION >= 103500
-            m.lock();
-#else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
-#endif
             _minfo.entered();
         }
 
         void unlock() {
             _minfo.leaving();
-#if BOOST_VERSION >= 103500
-            m.unlock();
-#else
+            // boost >1.35 would be: m.unlock();
             boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
-#endif
         }
 
         void lock_shared() { lock(); }
