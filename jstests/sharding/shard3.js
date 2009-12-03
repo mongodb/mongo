@@ -37,16 +37,18 @@ assert.eq( 3 , b.find().toArray().length , "other B" );
 
 // --- filtering ---
 
-function doCounts( name ){
-    assert.eq( 3 , a.count() , name + " count" );    
-    assert.eq( 3 , a.find().sort( { n : 1 } ).itcount() , name + " itcount - sort n" );
-    assert.eq( 3 , a.find().itcount() , name + " itcount" );
-    assert.eq( 3 , a.find().sort( { _id : 1 } ).itcount() , name + " itcount - sort _id" );
+function doCounts( name , total ){
+    total = total || ( primary.count() + secondary.count() );
+    assert.eq( total , a.count() , name + " count" );    
+    assert.eq( total , a.find().sort( { n : 1 } ).itcount() , name + " itcount - sort n" );
+    assert.eq( total , a.find().itcount() , name + " itcount" );
+    assert.eq( total , a.find().sort( { _id : 1 } ).itcount() , name + " itcount - sort _id" );
+    return total;
 }
 
-doCounts( "before wrong save" )
+var total = doCounts( "before wrong save" )
 secondary.save( { num : -3 } );
-doCounts( "after wrong save" )
+doCounts( "after wrong save" , total )
 
 // --- move all to 1 ---
 print( "MOVE ALL TO 1" );
@@ -103,5 +105,26 @@ assert.isnull( b.findOne( { num : 4 } ) , "b drop1" );
 
 s.printCollectionInfo( "test.foo" , "after b findOne tests" );
 
+print( "*** dropDatabase setup" )
+
+s.printShardingStatus()
+s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
+a.save( { num : 2 } );
+a.save( { num : 3 } );
+s.adminCommand( { split : "test.foo" , middle : { num : 2 } } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.printShardingStatus();
+
+s.printCollectionInfo( "test.foo" , "after dropDatabase setup" );
+doCounts( "after dropDatabase setup2" )
+s.printCollectionInfo( "test.foo" , "after dropDatabase setup3" );
+
+print( "*** ready to call dropDatabase" )
+res = s.getDB( "test" ).dropDatabase();
+assert.eq( 1 , res.ok , "dropDatabase failed : " + tojson( res ) );
+
+s.printShardingStatus();
+s.printCollectionInfo( "test.foo" , "after dropDatabase call 1" );
+assert.eq( 0 , doCounts( "after dropDatabase called" ) )
 
 s.stop();

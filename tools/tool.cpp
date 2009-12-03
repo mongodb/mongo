@@ -109,6 +109,7 @@ int mongo::Tool::main( int argc , char ** argv ){
             }
         }
         else {
+            log(1) << "using pairing" << endl;
             DBClientPaired * c = new DBClientPaired();
             _paired = true;
             _conn = c;

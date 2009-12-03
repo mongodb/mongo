@@ -338,7 +338,7 @@ namespace mongo {
 			       set.
 			@return true if the command returned "ok".
         */
-        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info);
+        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
         /** Authorize access to a particular database.
 			Authentication is separate for each database on the server -- you may authenticate for any 
@@ -353,7 +353,7 @@ namespace mongo {
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */
-        unsigned long long count(const string &ns, const BSONObj& query = BSONObj());
+        unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0 );
 
         string createPasswordDigest( const string &username , const string &clearTextPassword );
 

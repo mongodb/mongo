@@ -102,10 +102,39 @@ namespace mongo {
                 
                 cm->drop();
 
-                result.append( "ok" , 1 );
                 return 1;
             }
         } dropCmd;
+
+        class DropDBCmd : public PublicGridCommand {
+        public:
+            DropDBCmd() : PublicGridCommand( "dropDatabase" ){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                
+                BSONElement e = cmdObj.firstElement();
+                
+                if ( ! e.isNumber() || e.number() != 1 ){
+                    errmsg = "invalid params";
+                    return 0;
+                }
+                
+                string dbName = getDBName( ns );
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                log() << "DROP DATABASE: " << dbName << endl;
+
+                if ( ! conf || ! conf->isShardingEnabled() ){
+                    log(1) << "  passing though drop database for: " << dbName << endl;
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                if ( ! conf->dropDatabase( errmsg ) )
+                    return false;
+
+                result.append( "dropped" , dbName );
+                return true;
+            }
+        } dropDBCmd;
 
         class CountCmd : public PublicGridCommand {
         public:
@@ -124,7 +153,6 @@ namespace mongo {
                     ScopedDbConnection conn( conf->getPrimary() );
                     result.append( "n" , (double)conn->count( fullns , filter ) );
                     conn.done();
-                    result.append( "ok" , 1 );
                     return true;
                 }
                 
@@ -141,7 +169,6 @@ namespace mongo {
                 }
                 
                 result.append( "n" , (double)total );
-                result.append( "ok" , 1 );
                 return true;
             }
         } countCmd;
@@ -224,7 +251,6 @@ namespace mongo {
                 }
                 
                 result.appendArray( "values" , b.obj() );
-                result.append( "ok" , 1 );
                 return true;
             }
         } disinctCmd;

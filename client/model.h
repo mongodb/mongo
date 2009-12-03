@@ -47,7 +47,8 @@ namespace mongo {
             @return true if successful.
         */
         virtual bool load(BSONObj& query);
-        virtual void save( bool check=false );
+        virtual void save( bool safe=false );
+        virtual void remove( bool safe=false );
         
     protected:
         BSONObj _id;

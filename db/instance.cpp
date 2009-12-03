@@ -42,7 +42,7 @@ namespace mongo {
     void receivedUpdate(Message& m, stringstream& ss);
     void receivedDelete(Message& m, stringstream& ss);
     void receivedInsert(Message& m, stringstream& ss);
-    void receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
+    bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
 
     bool Database::_openAllFiles = false;
 
@@ -130,10 +130,11 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
     
-    void receivedQuery(DbResponse& dbresponse, Message& m, 
+    bool receivedQuery(DbResponse& dbresponse, Message& m, 
                        stringstream& ss, bool logit, 
                        mongolock& lock
       ) {
+        bool ok = true;
         MSGID responseTo = m.data->id;
 
         DbMessage d(m);
@@ -162,6 +163,7 @@ namespace mongo {
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {
+            ok = false;
             ss << " exception ";
             LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
             log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
@@ -203,6 +205,8 @@ namespace mongo {
             if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
                 log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
         }
+
+        return ok;
     }
 
     bool commandIsReadOnly(BSONObj& _cmdobj);
@@ -281,14 +285,16 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
-            receivedQuery(dbresponse, m, ss, true, lk);
+            if ( ! receivedQuery(dbresponse, m, ss, true, lk) )
+                log = true;
         }
         else if ( op == dbGetMore ) {
             // does its own authorization processing.
             OPREAD;
             DEV log = true;
             ss << "getmore ";
-            receivedGetMore(dbresponse, m, ss);
+            if ( ! receivedGetMore(dbresponse, m, ss) )
+                log = true;
         }
         else if ( op == dbMsg ) {
 			/* deprecated / rarely used.  intended for connection diagnostics. */
@@ -326,6 +332,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion insert, continuing\n";
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbUpdate ) {
@@ -337,6 +344,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion update, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbDelete ) {
@@ -348,6 +356,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else if ( op == dbKillCursors ) {
@@ -360,6 +369,7 @@ namespace mongo {
                 catch ( AssertionException& e ) {
                     problem() << " Caught Assertion in kill cursors, continuing" << endl;
                     ss << " exception " + e.toString();
+                    log = true;
                 }
             }
             else {
@@ -479,9 +489,89 @@ namespace mongo {
         recordDelete( n );
     }
 
+    /**
+     * @return if this was successful
+     */
+    bool receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
+        bool ok = true;
+        MSGID responseTo = m.data->id;
+
+        DbMessage d(m);
+        QueryMessage q(d);
+        QueryResult* msgdata;
+        
+        try {
+            if (q.fields.get() && q.fields->errmsg)
+                uassert(q.fields->errmsg, false);
+
+            /* note these are logged BEFORE authentication -- which is sort of ok */
+            if ( _diaglog.level && logit ) {
+                if ( strstr(q.ns, ".$cmd") ) {
+                    /* $cmd queries are "commands" and usually best treated as write operations */
+                    OPWRITE;
+                }
+                else {
+                    OPREAD;
+                }
+            }
+
+            setClient( q.ns );
+            Client& client = cc();
+            client.top.setRead();
+            strncpy(client.curop()->ns, q.ns, Namespace::MaxNsLen);
+            msgdata = runQuery(m, ss ).release();
+        }
+        catch ( AssertionException& e ) {
+            ok = false;
+            ss << " exception ";
+            LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
+            log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
+            if ( q.query.valid() )
+                log() << "  query:" << q.query.toString() << endl;
+            else
+                log() << "  query object is not valid!" << endl;
+
+            BSONObjBuilder err;
+            err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
+            BSONObj errObj = err.done();
+
+            BufBuilder b;
+            b.skip(sizeof(QueryResult));
+            b.append((void*) errObj.objdata(), errObj.objsize());
+
+            // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
+            msgdata = (QueryResult *) b.buf();
+            b.decouple();
+            QueryResult *qr = msgdata;
+            qr->resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->len = b.len();
+            qr->setOperation(opReply);
+            qr->cursorId = 0;
+            qr->startingFrom = 0;
+            qr->nReturned = 1;
+
+        }
+        Message *resp = new Message();
+        resp->setData(msgdata, true); // transport will free
+        dbresponse.response = resp;
+        dbresponse.responseTo = responseTo;
+        Database *database = cc().database();
+        if ( database ) {
+            if ( database->profile )
+                ss << " bytes:" << resp->data->dataLen();
+        }
+        else {
+            if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
+                log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
+        }
+        
+        return ok;
+    }
+    
     QueryResult* emptyMoreResult(long long);
 
-    void receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
+    bool receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
+        bool ok = true;
         DbMessage d(m);
         const char *ns = d.getns();
         ss << ns;
@@ -500,6 +590,7 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ss << " exception " + e.toString();
             msgdata = emptyMoreResult(cursorid);
+            ok = false;
         }
         Message *resp = new Message();
         resp->setData(msgdata, true);
@@ -508,6 +599,7 @@ namespace mongo {
         dbresponse.response = resp;
         dbresponse.responseTo = m.data->id;
         //dbMsgPort.reply(m, resp);
+        return ok;
     }
 
     void receivedInsert(Message& m, stringstream& ss) {

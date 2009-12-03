@@ -19,6 +19,10 @@
 
 #pragma once
 
+#if defined(_WIN32)
+#  include <windows.h>
+#endif
+
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO)
@@ -117,9 +121,30 @@ namespace mongo {
             return x;
         }
 
-        // TODO: make atomic
+        // returns original value (like x++)
         WrappingInt atomicIncrement(){
-            return x++;
+#if defined(_WIN32)
+            // InterlockedIncrement returns the new value
+            return InterlockedIncrement((volatile long*)&x)-1; //long is 32bits in Win64
+#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+            // this is in GCC >= 4.1
+            return __sync_fetch_and_add(&x, 1);
+#elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
+            // from boost 1.39 interprocess/detail/atomic.hpp
+            int r;
+            int val = 1;
+            asm volatile
+            (
+               "lock\n\t"
+               "xadd %1, %0":
+               "+m"( x ), "=r"( r ): // outputs (%0, %1)
+               "1"( val ): // inputs (%2 == %1)
+               "memory", "cc" // clobbers
+            );
+            return r;
+#else
+#  error "unsupported compiler or platform"
+#endif
         }
 
         static int diff(unsigned a, unsigned b) {

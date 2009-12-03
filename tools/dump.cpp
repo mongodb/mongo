@@ -41,7 +41,7 @@ public:
         out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
         uassert( "couldn't open file" , out.good() );
 
-        ProgressMeter m( conn( true ).count( coll.c_str() ) );
+        ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , Option_SlaveOk ) );
 
         auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
 

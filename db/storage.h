@@ -37,7 +37,8 @@ namespace mongo {
         int fileNo; /* this will be volume, file #, etc. */
         int ofs;
     public:
-        enum SentinelValues { MaxFiles=4000, NullOfs = -1 };
+        // Note: MaxFiles imposes a limit of about 32TB of data per process
+        enum SentinelValues { MaxFiles=16000, NullOfs = -1 };
 
         int a() const {
             return fileNo;

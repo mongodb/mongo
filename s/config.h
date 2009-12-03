@@ -48,7 +48,8 @@ namespace mongo {
     };
     
     /**
-       top level grid configuration for an entire database
+     * top level grid configuration for an entire database
+     * TODO: use shared_ptr for ChunkManager
     */
     class DBConfig : public Model {
     public:
@@ -90,6 +91,8 @@ namespace mongo {
         }
 
         bool reload();
+
+        bool dropDatabase( string& errmsg );
         
         virtual void save( bool check=true);
 
@@ -102,6 +105,8 @@ namespace mongo {
         virtual void unserialize(const BSONObj& from);
         
     protected:
+
+        bool _dropShardedCollections( int& num, set<string>& allServers , string& errmsg );
         
         bool doload();
         
@@ -121,6 +126,10 @@ namespace mongo {
         friend class ChunkManager;
     };
 
+    /**
+     * stores meta-information about the grid
+     * TODO: used shard_ptr for DBConfig pointers
+     */
     class Grid {
     public:
         /**
@@ -129,6 +138,12 @@ namespace mongo {
          */
         DBConfig * getDBConfig( string ns , bool create=true);
         
+        /**
+         * removes db entry.
+         * on next getDBConfig call will fetch from db
+         */
+        void removeDB( string db );
+
         string pickShardForNewDB();
         
         bool knowAboutShard( string name ) const;
@@ -136,6 +151,7 @@ namespace mongo {
         unsigned long long getNextOpTime() const;
     private:
         map<string,DBConfig*> _databases;
+        boost::mutex _lock; // TODO: change to r/w lock
     };
 
     class ConfigServer : public DBConfig {
@@ -160,6 +176,7 @@ namespace mongo {
         bool init( vector<string> configHosts );
 
         bool allUp();
+        bool allUp( string& errmsg );
         
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );
