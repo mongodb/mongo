@@ -34,11 +34,11 @@ namespace mongo {
             if ( locked == 0 )
                 enter = curTimeMicros64();
             locked++;
-            assert( locked == 1 );
+            assert( locked >= 1 );
         }
         void leaving() {
             locked--;
-            assert( locked == 0 );
+            assert( locked >= 0 );
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }
@@ -52,6 +52,7 @@ namespace mongo {
     };
 
 #if BOOST_VERSION >= 103500
+//#if 0
     class MongoMutex {
         MutexInfo _minfo;
         boost::shared_mutex _m;
@@ -114,14 +115,21 @@ namespace mongo {
     public:
         MongoMutex() { }
         void lock() { 
+#if BOOST_VERSION >= 103500
+            m.lock();
+#else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
+#endif
             _minfo.entered();
         }
 
         void unlock() {
             _minfo.leaving();
-            // boost >1.35 would be: m.unlock();
+#if BOOST_VERSION >= 103500
+            m.unlock();
+#else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
+#endif
         }
 
         void lock_shared() { lock(); }
