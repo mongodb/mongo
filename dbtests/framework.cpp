@@ -44,12 +44,9 @@ namespace mongo {
             }
 
             string toString(){
-                stringstream ss;
-                ss << _name << " tests:" << _tests << " fails:" << _fails << " assert calls:" << _asserts << "\n";
-                for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ){
-                    ss << "\t" << *i << "\n";
-                }
-                return ss.str();
+                char result[128];
+                sprintf(result, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
+                return string(result);
             }
 
             int rc(){
@@ -284,8 +281,13 @@ namespace mongo {
                 fails += r->_fails;
                 asserts += r->_asserts;
             }
+
+            Result totals ("TOTALS");
+            totals._tests = tests;
+            totals._fails = fails;
+            totals._asserts = asserts;
             
-            cout << "TOTALS  tests:" << tests << " fails: " << fails << " asserts calls: " << asserts << endl;
+            cout << totals.toString(); // includes endl
 
             return rc;
         }
