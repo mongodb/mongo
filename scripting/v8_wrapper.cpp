@@ -268,7 +268,7 @@ namespace mongo {
         }
     
         if ( value->IsDate() ){
-            b.appendDate( sname.c_str() , (unsigned long long )(v8::Date::Cast( *value )->NumberValue()) );
+            b.appendDate( sname.c_str() , Date_t(v8::Date::Cast( *value )->NumberValue()) );
             return;
         }
     

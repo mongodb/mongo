@@ -320,8 +320,8 @@ namespace mongo {
         /** Retrieve a java style date value from the element. 
             Ensure element is of type Date before calling.
         */
-        unsigned long long date() const {
-            return *reinterpret_cast< const unsigned long long* >( value() );
+        Date_t date() const {
+            return *reinterpret_cast< const Date_t* >( value() );
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion 
@@ -584,7 +584,7 @@ namespace mongo {
                 type() == CodeWScope;
         }
 
-        unsigned long long timestampTime() const{
+        Date_t timestampTime() const{
             unsigned long long t = ((unsigned int*)(value() + 4 ))[0];
             return t * 1000;
         }
@@ -1264,11 +1264,15 @@ namespace mongo {
             @param dt a Java-style 64 bit date value, that is 
                       the number of milliseconds since January 1, 1970, 00:00:00 GMT
         */
-        void appendDate(const char *fieldName, unsigned long long dt) {
+        void appendDate(const char *fieldName, Date_t dt) {
             b.append((char) Date);
             b.append(fieldName);
             b.append(dt);
         }
+        void append(const char *fieldName, Date_t dt) {
+            appendDate(fieldName, dt);
+        }
+
         /** Append a regular expression value
             @param regex the regular expression pattern
             @param regex options such as "i" or "g"

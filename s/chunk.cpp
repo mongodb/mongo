@@ -331,7 +331,7 @@ namespace mongo {
         _max = from.getObjectField( "max" ).getOwned();
         _maxDotted = from.getObjectField( "maxDotted" ).getOwned();
         _shard = from.getStringField( "shard" );
-        _lastmod = from.hasField( "lastmod" ) ? from["lastmod"].date() : 0;
+        _lastmod = from.hasField( "lastmod" ) ? from["lastmod"]._numberLong() : 0;
         
         uassert( "Chunk needs a ns" , ! _ns.empty() );
         uassert( "Chunk needs a server" , ! _ns.empty() );

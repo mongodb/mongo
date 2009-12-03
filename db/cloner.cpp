@@ -549,7 +549,7 @@ namespace mongo {
             long long cursorId = 0;
             BSONElement cursorIdToken = fromToken.getField( "cursorId" );
             if ( cursorIdToken.type() == Date ) {
-                cursorId = cursorIdToken.date();
+                cursorId = cursorIdToken._numberLong();
             }
             
             setClient( collection.c_str() );

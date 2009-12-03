@@ -219,7 +219,15 @@ namespace mongo {
         return (xt.sec & 0xfffff) * 1000 + t;
     }
 
-    inline unsigned long long jsTime() {
+    struct Date_t {
+        unsigned long long millis;
+        Date_t(): millis(0) {}
+        Date_t(unsigned long long m): millis(m) {}
+        operator unsigned long long&() { return millis; }
+        operator const unsigned long long&() const { return millis; }
+    };
+
+    inline Date_t jsTime() {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         unsigned long long t = xt.nsec / 1000000;

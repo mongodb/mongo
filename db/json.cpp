@@ -84,7 +84,7 @@ namespace mongo {
         BinDataType binDataType;
         string regex;
         string regexOptions;
-        unsigned long long date;
+        Date_t date;
     };
 
     struct objectStart {
@@ -369,7 +369,7 @@ namespace mongo {
 
     struct dateValue {
         dateValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( unsigned long long v ) const {
+        void operator() ( Date_t v ) const {
             b.date = v;
         }
         ObjectBuilder &b;
@@ -506,9 +506,10 @@ public:
                           lexeme_d[ '"' >> ( *( range_p( 'A', 'Z' ) | range_p( 'a', 'z' ) | range_p( '0', '9' ) | ch_p( '+' ) | ch_p( '/' ) ) >> *ch_p( '=' ) )[ binDataBinary( self.b ) ] >> '"' ] >> ',' >> "\"$type\"" >> ':' >>
                           lexeme_d[ '"' >> ( repeat_p( 2 )[ xdigit_p ] )[ binDataType( self.b ) ] >> '"' ] >> '}';
 
+                // TODO: this will need to use a signed parser at some point
                 date = dateS | dateT;
-                dateS = ch_p( '{' ) >> "\"$date\"" >> ':' >> uint_parser< unsigned long long >()[ dateValue( self.b ) ] >> '}';
-                dateT = str_p( "Date" ) >> '(' >> uint_parser< unsigned long long >()[ dateValue( self.b ) ] >> ')';
+                dateS = ch_p( '{' ) >> "\"$date\"" >> ':' >> uint_parser< Date_t >()[ dateValue( self.b ) ] >> '}';
+                dateT = str_p( "Date" ) >> '(' >> uint_parser< Date_t >()[ dateValue( self.b ) ] >> ')';
 
                 regex = regexS | regexT;
                 regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> lexeme_d[ '"' >> ( *( alpha_p ) )[ regexOptions( self.b ) ] >> '"' ] >> '}';

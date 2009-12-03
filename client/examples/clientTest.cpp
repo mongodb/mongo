@@ -161,7 +161,7 @@ int main( int argc, const char **argv ) {
         }
 
         mongo::BSONObj out = conn.findOne( tsns , mongo::BSONObj() );
-        unsigned long long oldTime = out["ts"].timestampTime();
+        Date_t oldTime = out["ts"].timestampTime();
         unsigned int oldInc = out["ts"].timestampInc();
 
         {

@@ -344,7 +344,7 @@ namespace mongo {
         massert( "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
         conn.done();
 
-        return result["optime"].date();
+        return result["optime"]._numberLong();
     }
 
     /* --- ConfigServer ---- */

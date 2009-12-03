@@ -215,7 +215,7 @@ namespace ReplTests {
                 deleteAll( ns() );
             }
         private:
-            mutable unsigned long long date_;
+            mutable Date_t date_;
         };
         
         class InsertAutoId : public Base {
@@ -305,7 +305,7 @@ namespace ReplTests {
                 insert( BSON( "_id" << 1 ) );
             }
         private:
-            mutable unsigned long long date_;
+            mutable Date_t date_;
         };
         
         class UpdateSameField : public Base {

@@ -207,8 +207,8 @@ namespace mongo {
             break;
         case Date:
             {
-                unsigned long long x = l.date();
-                unsigned long long y = r.date();
+                Date_t x = l.date();
+                Date_t y = r.date();
                 assert( y >= x );
                 b.appendDate(fn, x + (y - x)/2);
                 break;

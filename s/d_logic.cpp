@@ -58,7 +58,7 @@ namespace mongo {
             return (unsigned long long)e.number();
         
         if ( e.type() == Date || e.type() == Timestamp )
-            return e.date();
+            return e._numberLong();
 
         
         errmsg = "version is not a numberic type";

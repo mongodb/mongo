@@ -32,6 +32,9 @@ namespace mongo {
         unsigned getSecs() const {
             return secs;
         }
+        OpTime(Date_t date) {
+            reinterpret_cast<unsigned long long&>(*this) = date.millis;
+        }
         OpTime(unsigned long long date) {
             reinterpret_cast<unsigned long long&>(*this) = date;
         }

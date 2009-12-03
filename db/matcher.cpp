@@ -460,8 +460,8 @@ namespace mongo {
             sprintf(buf, "%f", e.number());
         }
         else if ( e.type() == Date ) {
-            unsigned long long d = e.date();
-            time_t t = (d/1000);
+            Date_t d = e.date();
+            time_t t = (d.millis/1000);
             time_t_to_String(t, buf);
         }
         else

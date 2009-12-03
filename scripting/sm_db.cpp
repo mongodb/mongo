@@ -784,20 +784,20 @@ namespace mongo {
         {
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
             if ( d ){
-                b.appendDate( name.c_str() , (unsigned long long)d );
+                b.appendDate( name.c_str() , Date_t(d) );
                 return true;
             }
         }
 #elif defined( XULRUNNER )
         if ( JS_InstanceOf( c->_context , o, globalSMEngine->_dateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            b.appendDate( name.c_str() , (unsigned long long)d );
+            b.appendDate( name.c_str() , Date_t(d) );
             return true;
         }
 #else
         if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            b.appendDate( name.c_str() , (unsigned long long)d );
+            b.appendDate( name.c_str() , Date_t(d) );
             return true;
         }
 #endif

@@ -158,7 +158,7 @@ namespace mongo {
             return _obj["contentType"].valuestr();
         }
 
-        unsigned long long getUploadDate(){
+        Date_t getUploadDate(){
             return _obj["uploadDate"].date();
         }
 
