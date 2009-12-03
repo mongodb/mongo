@@ -134,7 +134,7 @@ if ( true ){
 print( "t1: " + Date.timeFunc( 
     function(){
         var out = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r } );
-        if ( ks == "_id" ) assert( out.ok , "XXX" );
+        if ( ks == "_id" ) assert( out.ok , "XXX : " + tojson( out ) );
         db[out.result].drop();
     } , 10 ) + " (~500 on 2.8ghz) - itcount: " + Date.timeFunc( function(){ db.mr1.find().itcount(); } , 10 ) );    
 
