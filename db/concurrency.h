@@ -79,10 +79,10 @@ cout << "LOCK" << endl;
 #else
     /* this will be for old versions of boost */
     class MongoMutex { 
+        MutexInfo _minfo;
         boost::recursive_mutex m;
-        int x;
     public:
-        MongoMutex() { x=0; }
+        MongoMutex() { }
         void lock() { 
 #if BOOST_VERSION >= 103500
             m.lock();
