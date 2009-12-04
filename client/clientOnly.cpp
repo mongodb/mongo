@@ -19,15 +19,14 @@
 #include "../client/dbclient.h"
 #include "../db/dbinfo.h"
 #include "../db/dbhelpers.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     const char * curNs = "in client mode";
 
-    bool quiet = false;
-
-    //    Database* database = 0;
-    
     bool dbexitCalled = false;
 
     void dbexit( ExitCode returnCode, const char *whyMsg ) {

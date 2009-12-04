@@ -25,6 +25,7 @@
 #include "../util/background.h"
 #include <fcntl.h>
 #include <errno.h>
+#include "../db/cmdline.h"
 
 namespace mongo {
 
@@ -84,7 +85,7 @@ namespace mongo {
                 continue;
             }
             disableNagle(s);
-            log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+            if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
             accepted( new MessagingPort(s, from) );
         }
     }
