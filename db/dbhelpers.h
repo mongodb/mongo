@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "stdafx.h"
+#include "../stdafx.h"
 #include "client.h"
 #include "dbinfo.h"
 #include "db.h"
