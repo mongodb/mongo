@@ -44,9 +44,17 @@ namespace mongo {
             }
 
             string toString(){
+                stringstream ss;
+
                 char result[128];
                 sprintf(result, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
-                return string(result);
+                ss << result;
+
+                for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ){
+                    ss << "\t" << *i << "\n";
+                }
+                
+                return ss.str();
             }
 
             int rc(){
