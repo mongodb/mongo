@@ -21,6 +21,10 @@ extern "C" {
 #define	WT_ALIGN(n, v)							\
 	(((n) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
 
+/* Min, max. */
+#define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
+#define	WT_MAX(a, b)	((a) < (b) ? (b) : (a))
+
 /*
  * Convert a pointer to an unsigned long so we can print it without compiler
  * complaint.
