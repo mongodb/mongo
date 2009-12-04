@@ -169,7 +169,7 @@ namespace mongo {
     class KeyValJSMatcher : boost::noncopyable {
     public:
         KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matches(const BSONObj &j);
+        bool matches(const BSONObj &o){ return _recordMatcher.matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc);
         bool needRecord(){ return _needRecord; }
     private:
