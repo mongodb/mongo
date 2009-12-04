@@ -372,7 +372,6 @@ namespace mongo {
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 try {
-                    dbtemprelease temprlease;
                     
                     MRState state( mr );
                     state.scope->injectNative( "emit" , fast_emit );
@@ -394,19 +393,19 @@ namespace mongo {
                             throw UserException( (string)"map invoke failed: " + state.scope->getError() );
                         
                         if ( mr.verbose ) mapTime += mt.micros();
-                    
+                        
                         num++;
                         if ( num % 100 == 0 ){
                             Timer t;
                             mrtl->checkSize();
                             inReduce += t.micros();
+                            dbtemprelease temprlease;
                         }
                         pm.hit();
 
                         if ( mr.limit && num >= mr.limit )
                             break;
                     }
-                    
                     
                     countsBuilder.append( "input" , num );
                     countsBuilder.append( "emit" , mrtl->numEmits );
@@ -429,6 +428,7 @@ namespace mongo {
                     
                     ProgressMeter fpm( db.count( mr.incLong ) );
                     cursor = db.query( mr.incLong, Query().sort( sortKey ) );
+
                     while ( cursor->more() ){
                         BSONObj o = cursor->next().getOwned();
                         
@@ -443,6 +443,7 @@ namespace mongo {
                         prev = o;
                         all.push_back( o );
                         fpm.hit();
+                        dbtemprelease tl;
                     }
                     
                     state.finalReduce( all );
