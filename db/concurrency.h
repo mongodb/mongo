@@ -59,7 +59,8 @@ namespace mongo {
         ThreadLocalValue<int> _state;
     public:
         void assertWriteLocked() { assert( _state.get() > 0 ); }
-        void assertAtLeastReadLocked() { assert( _state.get() != 0 ); }
+        bool atLeastReadLocked() { return _state.get() != 0; }
+        void assertAtLeastReadLocked() { assert(atLeastReadLocked()); }
         void lock() { 
             DEV cout << "LOCK" << endl;
             int s = _state.get();
@@ -154,6 +155,7 @@ namespace mongo {
         void assertAtLeastReadLocked() { 
             assert( info().isLocked() );
         }
+        bool atLeastReadLocked() { return info().isLocked(); }
     };
 #endif
 

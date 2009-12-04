@@ -137,32 +137,37 @@ namespace mongo {
         class SavedContext {
         public:
             SavedContext() {
-                Client *c = currentClient.get();
-                if ( c->database() ) {
-                    /* note you must already be locked here or the database pointer could 
-                    be garbage as the db may have been dropped. there are definitely places 
-                    in the code where we are done with a db post setClient() and usage
-                    and left the pointer set.  if you called SavedContext thereafter unlocked,
-                    that is unsafe, although the code was doing it for a long time. 
-                    Thus this assert is required. Ideally context would be nulled out when 
-                    done so we never have this problem.
-                    */
-                    dbMutex.assertAtLeastReadLocked();
-                    _oldName = c->database()->name;
+                _save = dbMutex.atLeastReadLocked();
+                /* it only makes sense to manipulate a pointer - c->database() - if locked. 
+                   thus the _saved flag.
+                */
+                if( _save ) {
+                    Client *c = currentClient.get();
+                    if ( c->database() ) {
+                        dbMutex.assertAtLeastReadLocked();
+                        _oldName = c->database()->name;
+                    }
+                    oldAuth = c->ai;
+                    // careful, don't want to free this:
+                    c->ai = &always;
                 }
-                oldAuth = c->ai;
-                // careful, don't want to free this:
-                c->ai = &always;
             }
             ~SavedContext() {
-                Client *c = currentClient.get();
-                c->ai = oldAuth;
-                if ( !_oldName.empty() ) {
-                    dbMutex.assertAtLeastReadLocked();
-                    setClient( _oldName.c_str() );
+                if( _save ) {
+                    Client *c = currentClient.get();
+                    c->ai = oldAuth;
+                    if ( !_oldName.empty() ) {
+                        dbMutex.assertAtLeastReadLocked();
+                        setClient( _oldName.c_str() );
+                    }
+                }
+                else {
+                    // defensive
+                    cc().clearns();
                 }
             }
         private:
+            bool _save;
             static AlwaysAuthorized always;
             AuthenticationInfo *oldAuth;
             string _oldName;
