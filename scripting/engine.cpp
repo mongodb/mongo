@@ -20,7 +20,6 @@
 #include "../util/file.h"
 #include "../client/dbclient.h"
 #include "../db/dbinfo.h"
-#include "../db/dbhelpers.h"
 
 namespace mongo {
 
