@@ -660,6 +660,17 @@ namespace mongo {
         assembleResponse( toSend, dbResponse );
     }
 
+    auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
+                                                   const BSONObj *fieldsToReturn , int queryOptions ){
+        
+        //if ( ! query.obj.isEmpty() || nToReturn != 0 || nToSkip != 0 || fieldsToReturn || queryOptions )
+        return DBClientBase::query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions );
+        //
+        //assert( query.obj.isEmpty() );
+        //throw UserException( (string)"yay:" + ns );
+    }
+
+
     DBDirectClient::AlwaysAuthorized DBDirectClient::SavedContext::always;
 
     DBClientBase * createDirectClient(){

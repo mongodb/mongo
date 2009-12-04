@@ -107,6 +107,11 @@ namespace mongo {
 // --- local client ---
     
     class DBDirectClient : public DBClientBase {
+        
+    public:
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+                                               const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
         virtual bool isFailed() const {
             return false;
         }
@@ -127,6 +132,7 @@ namespace mongo {
                 return true;   
             }
         };
+
         /* TODO: this looks bad that auth is set to always.  is that really always safe? */
         class SavedContext {
         public:

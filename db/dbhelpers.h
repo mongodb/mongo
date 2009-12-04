@@ -30,24 +30,21 @@
 namespace mongo {
 
     class Cursor;
+    class KeyValJSMatcher;
 
     class CursorIterator {
     public:
+        CursorIterator( auto_ptr<Cursor> c , BSONObj filter = BSONObj() );
+        ~CursorIterator();
+        BSONObj next();
+        bool hasNext();
 
-        CursorIterator( auto_ptr<Cursor> c )
-            : _cursor( c ){
-        }
-
-        BSONObj next(){
-            BSONObj o = _cursor->current();
-            _cursor->advance();
-            return o;
-        }
-        bool hasNext(){
-            return _cursor->ok();
-        }
     private:
+        void _advance();
+
         auto_ptr<Cursor> _cursor;
+        BSONObj _o;
+        KeyValJSMatcher * _matcher;
     };
 
     /**
@@ -135,8 +132,8 @@ namespace mongo {
     class DbSet {
     public:
         DbSet( const string &name = "", const BSONObj &key = BSONObj() ) :
-        name_( name ),
-        key_( key.getOwned() ) {
+            name_( name ),
+            key_( key.getOwned() ) {
         }
         ~DbSet();
         void reset( const string &name = "", const BSONObj &key = BSONObj() );

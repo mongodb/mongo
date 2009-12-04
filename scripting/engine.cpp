@@ -135,9 +135,11 @@ namespace mongo {
         _loadedVersion = _lastVersion;
 
         string coll = _localDBName + ".system.js";
-        auto_ptr<CursorIterator> i = Helpers::find( coll.c_str() );
-        while ( i->hasNext() ){
-            BSONObj o = i->next();
+
+        static DBClientBase * db = createDirectClient();
+        auto_ptr<DBClientCursor> c = db->query( coll , Query() );
+        while ( c->more() ){
+            BSONObj o = c->next();
 
             BSONElement n = o["_id"];
             BSONElement v = o["value"];

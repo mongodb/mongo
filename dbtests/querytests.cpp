@@ -806,6 +806,14 @@ namespace QueryTests {
                     n++;
                 }
                 ASSERT_EQUALS( 50 , n );
+
+                i = Helpers::find( ns() , BSON( "_id" << 20 ) );
+                n = 0;
+                while ( i->hasNext() ){
+                    BSONObj o = i->next();
+                    n++;
+                }
+                ASSERT_EQUALS( 1 , n );
             }
             
         }

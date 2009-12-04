@@ -27,6 +27,48 @@
 
 namespace mongo {
 
+    CursorIterator::CursorIterator( auto_ptr<Cursor> c , BSONObj filter )
+        : _cursor( c ){
+            if ( filter.isEmpty() )
+                _matcher = 0;
+            else
+                _matcher = new KeyValJSMatcher( filter , BSONObj() );
+            _advance();
+    }
+
+    CursorIterator::~CursorIterator(){
+        if ( _matcher ){
+            delete _matcher;
+            _matcher = 0;
+        }
+    }
+    
+    BSONObj CursorIterator::next(){
+        BSONObj o = _o;
+        _advance();
+        return o;
+    }
+    
+    bool CursorIterator::hasNext(){
+        return ! _o.isEmpty();
+    }
+
+    void CursorIterator::_advance(){
+        if ( ! _cursor->ok() ){
+            _o = BSONObj();
+            return;
+        }
+        
+        while ( _cursor->ok() ){
+            _o = _cursor->current();
+            _cursor->advance();
+            if ( _matcher == 0 || _matcher->matches( _o ) )
+                return;
+        }
+
+        _o = BSONObj();
+    }
+
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
@@ -107,9 +149,8 @@ namespace mongo {
 
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
         uassert( "requireIndex not supported in Helpers::find yet" , ! requireIndex );
-        uassert( "queries not allowed on Helpers::find yet" , query.isEmpty() );
         auto_ptr<CursorIterator> i;
-        i.reset( new CursorIterator( DataFileMgr::findAll( ns ) ) );
+        i.reset( new CursorIterator( DataFileMgr::findAll( ns ) , query ) );
         return i;
     }
     
