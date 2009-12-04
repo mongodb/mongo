@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "../client/dbclient.h"
 #include "dbtests.h"
+#include "../db/concurrency.h"
  
 namespace ClientTests {
     
@@ -28,7 +29,6 @@ namespace ClientTests {
     public:
         DropIndex() : Base( "dropindex" ){}
         void run(){
-            
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
             

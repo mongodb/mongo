@@ -60,6 +60,8 @@ namespace mongo {
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
+        dbMutex.assertAtLeastReadLocked();
+
         cc().top.clientStart( ns );
 
         string key = makeDbKeyStr( ns, path );

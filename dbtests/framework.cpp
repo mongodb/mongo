@@ -82,6 +82,9 @@ namespace mongo {
             Result * r = new Result( _name );
             Result::cur = r;
 
+            /* see note in SavedContext */
+            writelock lk("");
+
             for ( list<TestCase*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ){
                 TestCase * tc = *i;
 
