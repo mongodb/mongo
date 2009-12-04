@@ -61,7 +61,9 @@ namespace mongo {
         Top top;
 
         CurOp* curop() { return _op; }
-        Database* database() { return _database; }
+        Database* database() { 
+            return _database; 
+        }
         const char *ns() { return _ns.buf; }
 
         void setns(const char *ns, Database *db) { 

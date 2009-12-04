@@ -390,7 +390,9 @@ namespace mongo {
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= 100 ) {
                 // performance profiling is on
+                string old_ns = cc().ns();
                 lk.releaseAndWriteLock();
+                resetClient(old_ns.c_str());
                 profile(ss.str().c_str()+20/*skip ts*/, ms);
             }
         }

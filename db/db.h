@@ -52,6 +52,17 @@ namespace mongo {
         return string( cl ) + ":" + path;
     }
 
+    inline void resetClient(const char *ns, const string& path=dbpath) {
+        dbMutex.assertAtLeastReadLocked();
+        string key = makeDbKeyStr( ns, path );
+        map<string,Database*>::iterator it = databases.find(key);
+        if ( it != databases.end() ) {
+            cc().setns(ns, it->second);
+            return;
+        }
+        assert(false);
+    }
+
     /* returns true if the database ("database") did not exist, and it was created on this call 
        path - datafiles directory, if not the default, so we can differentiate between db's of the same
               name in different places (for example temp ones on repair).
