@@ -58,6 +58,8 @@ namespace mongo {
         boost::shared_mutex _m;
         ThreadLocalValue<int> _state;
     public:
+        void assertWriteLocked() { assert( _state.get() > 0 ); }
+        void assertAtLeastReadLocked() { assert( _state.get() != 0 ); }
         void lock() { 
             DEV cout << "LOCK" << endl;
             int s = _state.get();
@@ -85,11 +87,17 @@ namespace mongo {
         void lock_shared() { 
             DEV cout << " LOCKSHARED" << endl;
             int s = _state.get();
-            assert( s >= 0 );
-            if( s > 0 ) { 
-                // already in write lock - just be recursive and stay write locked
-                _state.set(s+1);
-                return;
+            if( s ) {
+                if( s > 0 ) { 
+                    // already in write lock - just be recursive and stay write locked
+                    _state.set(s+1);
+                    return;
+                }
+                else { 
+                    // already in read lock - recurse
+                    _state.set(s-1);
+                    return;
+                }
             }
             _state.set(-1);
             _m.lock_shared(); 
@@ -97,8 +105,13 @@ namespace mongo {
         void unlock_shared() { 
             DEV cout << " UNLOCKSHARED" << endl;
             int s = _state.get();
-            if( s > 1 ) { 
+            if( s > 0 ) { 
+                assert( s > 1 ); /* we must have done a lock write first to have s > 1 */
                 _state.set(s-1);
+                return;
+            }
+            if( s < -1 ) { 
+                _state.set(s+1);
                 return;
             }
             assert( s == -1 );
@@ -135,6 +148,12 @@ namespace mongo {
         void lock_shared() { lock(); }
         void unlock_shared() { unlock(); }
         MutexInfo& info() { return _minfo; }
+        void assertWriteLocked() { 
+            assert( info().isLocked() );
+        }
+        void assertAtLeastReadLocked() { 
+            assert( info().isLocked() );
+        }
     };
 #endif
 
@@ -193,32 +212,8 @@ namespace mongo {
         ~dblock() { 
         }
     };
-    
-    /* a scoped release of a mutex temporarily -- like a scopedlock but reversed.
-    */
-/*
-    struct temprelease {
-        boost::mutex& m;
-        temprelease(boost::mutex& _m) : m(_m) {
-#if BOOST_VERSION >= 103500
-            m.unlock();
-#else
-            boost::detail::thread::lock_ops<boost::mutex>::unlock(m);
-#endif
-        }
-        ~temprelease() {
-#if BOOST_VERSION >= 103500
-            m.lock();
-#else
-            boost::detail::thread::lock_ops<boost::mutex>::lock(m);
-#endif
-        }
-    };
-*/
 
-    inline void assertInWriteLock() { 
-/* TEMP        assert( dbMutexInfo.isLocked() );
-*/
-    }
+    // eliminate
+    inline void assertInWriteLock() { dbMutex.assertWriteLocked(); }
 
 }

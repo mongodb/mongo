@@ -137,10 +137,11 @@ namespace mongo {
         class SavedContext {
         public:
             SavedContext() {
-                dblock lk;
                 Client *c = currentClient.get();
-                if ( c->database() )
-                    oldName = c->database()->name;
+                if ( c->database() ) {
+                    dbMutex.assertAtLeastReadLocked();
+                    _oldName = c->database()->name;
+                }
                 oldAuth = c->ai;
                 // careful, don't want to free this:
                 c->ai = &always;
@@ -148,15 +149,15 @@ namespace mongo {
             ~SavedContext() {
                 Client *c = currentClient.get();
                 c->ai = oldAuth;
-                if ( !oldName.empty() ) {
-                    dblock lk;
-                    setClient( oldName.c_str() );
+                if ( !_oldName.empty() ) {
+                    dbMutex.assertAtLeastReadLocked();
+                    setClient( _oldName.c_str() );
                 }
             }
         private:
             static AlwaysAuthorized always;
             AuthenticationInfo *oldAuth;
-            string oldName;
+            string _oldName;
         };
     };
 

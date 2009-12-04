@@ -350,6 +350,18 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\js\js\Debug\js.lib"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\js\js\Release\js.lib"
 				>
 				<FileConfiguration
@@ -362,18 +374,6 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug Recstore|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\..\js\js\Debug\js.lib"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -1519,6 +1519,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\dbcommands_admin.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\dbeval.cpp"
 					>
 				</File>
@@ -1663,6 +1667,10 @@
 		<Filter
 			Name="util"
 			>
+			<File
+				RelativePath="..\util\assert_util.h"
+				>
+			</File>
 			<File
 				RelativePath="..\util\builder.h"
 				>
