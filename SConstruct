@@ -604,6 +604,23 @@ except OSError:
 
 # --- check system ---
 
+def getGitBranch():
+    if not os.path.exists( ".git" ):
+        return None
+    
+    version = open( ".git/HEAD" ,'r' ).read().strip()
+    if not version.startswith( "ref: " ):
+        return version
+    version = version.split( "/" )
+    version = version[len(version)-1]
+    return version
+
+def getGitBranchString( prefix="" , postfix="" ):
+    b = getGitBranch()
+    if b == None or b == "master":
+        return ""
+    return prefix + b + postfix
+
 def getGitVersion():
     if not os.path.exists( ".git" ):
         return "nogitversion"
@@ -1240,7 +1257,9 @@ def getDistName( sofar ):
             distName = version
             return version
 
-    return today.strftime( "%Y-%m-%d" )
+
+    return getGitBranchString( "" , "-" ) + today.strftime( "%Y-%m-%d" )
+
 
 if distBuild:
     from datetime import date
@@ -1361,7 +1380,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if remotePrefix is None:
         if distName is None:
-            remotePrefix = "-latest"
+            remotePrefix = getGitBranchString( "-" ) + "-latest"
         else:
             remotePrefix = "-" + distName
 
