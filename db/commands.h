@@ -42,7 +42,9 @@ namespace mongo {
         */
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
-        /* true if a read lock is sufficient */
+        /* true if a read lock is sufficient 
+		   note: logTheTop() MUST be false if readOnly
+		 */
         virtual bool readOnly() { 
             return false;
         }
