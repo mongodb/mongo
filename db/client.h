@@ -118,12 +118,19 @@ namespace mongo {
         cc()._god = _prev;
     }
 
-/* this unlocks, does NOT upgrade. that works for our current usage */
+	/* this unlocks, does NOT upgrade. that works for our current usage */
     inline void mongolock::releaseAndWriteLock() { 
+#if BOOST_VERSION >= 103500
+		int s = dbMutex.getState();
+		if( s != -1 ) {
+			log() << "error: releaseAndWriteLock() s == " << s << endl;
+            msgasserted( "releaseAndWriteLock: unlock_shared failed, probably recursive" );
+		}
+#endif
+
         if( !_writelock ) {
             _writelock = true;
             dbMutex.unlock_shared();
-            massert( "releaseAndWriteLock: unlock_shared failed, probably recursive" , dbMutex.getState() == 0 );
             dbMutex.lock();
 
             /* this is defensive; as we were unlocked for a moment above, 
