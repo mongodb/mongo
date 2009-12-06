@@ -135,10 +135,14 @@ namespace mongo {
             client.top.clientStop();
             locktype = dbMutex.getState();
             assert( locktype );
-            if ( locktype > 0 )
+            if ( locktype > 0 ) {
+				massert("can't temprelease nested write lock", locktype == 1);
                 dbMutex.unlock();
-            else
+			}
+            else {
+				massert("can't temprelease nested read lock", locktype == -1);
                 dbMutex.unlock_shared();
+			}
         }
         ~dbtemprelease() {
             if ( locktype > 0 )
