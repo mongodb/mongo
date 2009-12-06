@@ -950,6 +950,34 @@ namespace JsonTests {
             }
         };
 
+        class EmbeddedDates : public Base  {
+        public:
+            
+            virtual void run(){
+                BSONObj o = fromjson( json() );
+                ASSERT_EQUALS( 3 , (o["time.valid"].type()) );
+                BSONObj e = o["time.valid"].embeddedObjectUserCheck();
+                ASSERT_EQUALS( 9 , e["$gt"].type() );
+                ASSERT_EQUALS( 9 , e["$lt"].type() );
+                Base::run();
+            }
+            
+            BSONObj bson() const {
+                BSONObjBuilder e;
+                e.appendDate( "$gt" , 1257829200000 );
+                e.appendDate( "$lt" , 1257829200100 );
+
+                BSONObjBuilder b;
+                b.append( "time.valid" , e.obj() );
+                return b.obj();
+            }
+
+            string json() const {
+                return "{ \"time.valid\" : { $gt : { \"$date\" :  1257829200000 } , $lt : { \"$date\" : 1257829200100 } } }";
+            }
+        };
+        
+
     } // namespace FromJsonTests
 
     class All : public Suite {
@@ -1030,6 +1058,7 @@ namespace JsonTests {
             add< FromJsonTests::ObjectId2 >();
             add< FromJsonTests::NumericTypes >();
             add< FromJsonTests::NegativeNumericTypes >();
+            add< FromJsonTests::EmbeddedDates >();
         }
     } myall;
 
