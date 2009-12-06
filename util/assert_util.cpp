@@ -68,6 +68,7 @@ namespace mongo {
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg && *msg ? msg : "massert failure");
         breakpoint();
+        printStackTrace(); // TEMP?? should we get rid of this?  TODO
         throw MsgAssertionException(msg);
     }
 
