@@ -964,8 +964,8 @@ namespace JsonTests {
             
             BSONObj bson() const {
                 BSONObjBuilder e;
-                e.appendDate( "$gt" , 1257829200000 );
-                e.appendDate( "$lt" , 1257829200100 );
+                e.appendDate( "$gt" , 1257829200000LL );
+                e.appendDate( "$lt" , 1257829200100LL );
 
                 BSONObjBuilder b;
                 b.append( "time.valid" , e.obj() );
