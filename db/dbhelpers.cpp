@@ -29,10 +29,8 @@ namespace mongo {
 
     CursorIterator::CursorIterator( auto_ptr<Cursor> c , BSONObj filter )
         : _cursor( c ){
-            if ( filter.isEmpty() )
-                _matcher = 0;
-            else
-                _matcher = new KeyValJSMatcher( filter , BSONObj() );
+            if ( ! filter.isEmpty() )
+                _matcher.reset( new KeyValJSMatcher( filter , BSONObj() ) );
             _advance();
     }
 
@@ -55,7 +53,7 @@ namespace mongo {
         while ( _cursor->ok() ){
             _o = _cursor->current();
             _cursor->advance();
-            if ( _matcher == 0 || _matcher->matches( _o ) )
+            if ( _matcher.get() == 0 || _matcher->matches( _o ) )
                 return;
         }
 
