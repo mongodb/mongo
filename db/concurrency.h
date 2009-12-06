@@ -58,6 +58,13 @@ namespace mongo {
         boost::shared_mutex _m;
         ThreadLocalValue<int> _state;
     public:
+        /**
+         * @return
+         *    > 0  write lock
+         *    = 0  no lock
+         *    < 0  read lock
+         */
+        int getState(){ return _state.get(); }
         void assertWriteLocked() { assert( _state.get() > 0 ); }
         bool atLeastReadLocked() { return _state.get() != 0; }
         void assertAtLeastReadLocked() { assert(atLeastReadLocked()); }

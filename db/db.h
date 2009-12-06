@@ -124,6 +124,7 @@ namespace mongo {
     struct dbtemprelease {
         string clientname;
         string clientpath;
+        int locktype;
         dbtemprelease() {
             Client& client = cc();
             Database *database = client.database();
@@ -132,10 +133,18 @@ namespace mongo {
                 clientpath = database->path;
             }
             client.top.clientStop();
-            dbMutex.unlock();
+            locktype = dbMutex.getState();
+            assert( locktype );
+            if ( locktype > 0 )
+                dbMutex.unlock();
+            else
+                dbMutex.unlock_shared();
         }
         ~dbtemprelease() {
-            dbMutex.lock();
+            if ( locktype > 0 )
+                dbMutex.lock();
+            else
+                dbMutex.lock_shared();
             if ( clientname.empty() )
                 cc().setns("", 0);
             else
