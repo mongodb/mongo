@@ -230,7 +230,8 @@ public:
 
 inline void dbunlocking_read() { 
     Client *c = currentClient.get();
-    c->top.clientStop();
+    if ( c )
+        c->top.clientStop();
 }
 
 inline void dbunlocking_write() { 
