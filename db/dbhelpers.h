@@ -35,7 +35,6 @@ namespace mongo {
     class CursorIterator {
     public:
         CursorIterator( auto_ptr<Cursor> c , BSONObj filter = BSONObj() );
-        ~CursorIterator();
         BSONObj next();
         bool hasNext();
 
@@ -43,8 +42,8 @@ namespace mongo {
         void _advance();
 
         auto_ptr<Cursor> _cursor;
+        auto_ptr<KeyValJSMatcher> _matcher;
         BSONObj _o;
-        KeyValJSMatcher * _matcher;
     };
 
     /**

@@ -123,6 +123,7 @@ namespace mongo {
         if( !_writelock ) {
             _writelock = true;
             dbMutex.unlock_shared();
+            massert( "releaseAndWriteLock: unlock_shared failed, probably recursive" , dbMutex.getState() == 0 );
             dbMutex.lock();
 
             /* this is defensive; as we were unlocked for a moment above, 
