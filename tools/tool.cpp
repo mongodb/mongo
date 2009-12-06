@@ -93,8 +93,6 @@ int mongo::Tool::main( int argc , char ** argv ){
         }
     }
 
-    writelock lk("");
-
     if ( ! hasParam( "dbpath" ) ) {
         _host = "127.0.0.1";
         if ( _params.count( "host" ) )
