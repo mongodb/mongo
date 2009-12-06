@@ -36,13 +36,6 @@ namespace mongo {
             _advance();
     }
 
-    CursorIterator::~CursorIterator(){
-        if ( _matcher ){
-            delete _matcher;
-            _matcher = 0;
-        }
-    }
-    
     BSONObj CursorIterator::next(){
         BSONObj o = _o;
         _advance();

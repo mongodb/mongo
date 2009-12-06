@@ -35,7 +35,12 @@ namespace mongo {
     class CursorIterator {
     public:
         CursorIterator( auto_ptr<Cursor> c , BSONObj filter = BSONObj() );
-        ~CursorIterator();
+        ~CursorIterator(){
+            if ( _matcher ){
+                delete _matcher;
+                _matcher = 0;
+            }
+        }
         BSONObj next();
         bool hasNext();
 
