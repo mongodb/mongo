@@ -1172,7 +1172,7 @@ def getDistName( sofar ):
             distName = version
             return version
 
-    return today.strftime( "%Y-%m-%d" )
+    return "v1.0-" + today.strftime( "%Y-%m-%d" )
 
 if distBuild:
     from datetime import date
@@ -1285,7 +1285,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     if remotePrefix is None:
         if distName is None:
-            remotePrefix = "-latest"
+            remotePrefix = "-v1.0-latest"
         else:
             remotePrefix = "-" + distName
 
