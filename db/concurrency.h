@@ -163,6 +163,7 @@ namespace mongo {
             assert( info().isLocked() );
         }
         bool atLeastReadLocked() { return info().isLocked(); }
+        int getState(){ return info().isLocked() ? 1 : 0; }
     };
 #endif
 
