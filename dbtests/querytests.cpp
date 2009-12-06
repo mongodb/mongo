@@ -721,6 +721,10 @@ namespace QueryTests {
         }
         void run(){
             string err;
+
+            writelock lk("");            
+            setClient( "unittests" );
+
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
             for ( int i=0; i<100; i++ ){
                 insertNext();
@@ -763,6 +767,9 @@ namespace QueryTests {
         }
 
         void run(){
+            writelock lk("");
+            setClient( "unittests" );
+            
             for ( int i=0; i<50; i++ ){
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
@@ -826,6 +833,9 @@ namespace QueryTests {
         }
 
         void run(){
+            writelock lk("");
+            setClient( "unittests" );
+
             for ( int i=0; i<1000; i++ ){
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
