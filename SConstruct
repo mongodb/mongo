@@ -616,6 +616,12 @@ def getGitBranch():
     return version
 
 def getGitBranchString( prefix="" , postfix="" ):
+    t = re.compile( '[/\\\]' ).split( os.getcwd() )
+    if len(t) > 2 and t[len(t)-1] == "mongo":
+        t = re.compile( ".*_([vV]\d+\.\d+)$" ).match( t[len(t)-2] )
+        if t is not None:
+            return t.group(1).lower()
+
     b = getGitBranch()
     if b == None or b == "master":
         return ""
