@@ -1156,6 +1156,7 @@ assert( !eloc.isNull() );
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
         uassert("cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
+        uassert("invalid ns", strchr( ns , '.' ) > 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
             uassert("attempt to insert in reserved database name 'system'", sys != ns);
@@ -1198,6 +1199,7 @@ assert( !eloc.isNull() );
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
 
+            uassert( "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
             if ( database->name != nsToClient(tabletoidxns.c_str()) ) {
                 uassert("bad table to index name on add index attempt", false);
                 return DiskLoc();
