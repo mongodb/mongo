@@ -31,11 +31,13 @@ namespace mongo {
         CurOp() { 
             active = false;
             opNum = 0; 
+            startTime = 0;
+            op = 0;
             // These addresses should never be written to again.  The zeroes are
             // placed here as a precaution because currentOp may be accessed
             // without the db mutex.
-            ns[sizeof(ns)-1] = 0;
-            query[sizeof(query)-1] = 0;
+            memset(ns, 0, sizeof(ns));
+            memset(query, 0, sizeof(query));
         }
 
         BSONObj info() { 
@@ -68,7 +70,7 @@ namespace mongo {
                 b.append("op", op);
             b.append("ns", ns);
             b.append("query", query);
-            b.append("inLock",  dbMutex.info().isLocked());
+            // b.append("inLock",  ??
             stringstream clientStr;
             clientStr << inet_ntoa( client.sin_addr ) << ":" << ntohs( client.sin_port );
             b.append("client", clientStr.str());

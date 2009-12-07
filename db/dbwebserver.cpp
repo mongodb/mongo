@@ -176,16 +176,27 @@ namespace mongo {
                 }
             }
 
-            ss << "\nreplInfo:  " << replInfo << '\n';
+            ss << "\nreplInfo:  " << replInfo << "\n\n";
 
+            ss << "Clients:\n";
+            ss << "<table border=1><tr align='left'><th>Thread</th><th>Current op</th>\n";
             {
                 boostlock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     CurOp& co = *(c->curop());
-                    ss << "currentOp (unlocked): " << co.infoNoauth() << "\n";
+                    ss << "<tr><td>" << c->desc() << "</td><td";
+                    BSONObj info = co.infoNoauth();
+                    /*
+                    if( info.getIntField("inLock") > 0 )
+                        ss << "style='color:red'";
+                    else if( info.getIntField("inLock") < 0 ) 
+                        ss << "style='color:green'";
+                        */
+                    ss << ">" << info << "</td></tr>\n";
                 }
             }
+            ss << "</table>\n";
         }
         
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){

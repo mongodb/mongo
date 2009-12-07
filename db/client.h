@@ -76,6 +76,8 @@ namespace mongo {
         Client(const char *desc);
         ~Client();
 
+        const char *desc() const { return _desc; }
+
         void addTempCollection( const string& ns ){
             _tempCollections.push_back( ns );
         }
