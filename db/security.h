@@ -59,7 +59,7 @@ namespace mongo {
 			if( m["admin"].level == 2 ) return true;
 			if( m["local"].level == 2 ) return true;
 			if( isLocalHost ) { 
-                dblock l; // TODO: this is bad, since we want to be able to check this even if outside global lock.  probably goes away with concurrency
+                readlock l(""); 
 				DBContext c("admin.system.users");
 				BSONObj result;
 				if( Helpers::getSingleton("admin.system.users", result) )
