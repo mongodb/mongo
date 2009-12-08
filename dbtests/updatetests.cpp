@@ -24,6 +24,7 @@
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
+#include "../db/update.h"
 
 #include "dbtests.h"
 
@@ -517,6 +518,53 @@ namespace UpdateTests {
             ASSERT_EQUALS( jstNULL, client().findOne( ns(), QUERY( "a" << 5 ) ).getField( "b" ).type() );
         }
     };
+
+    namespace ModSetTests {
+        
+        class Base {
+        public:
+
+            virtual ~Base(){}
+
+            
+            void test( BSONObj morig , BSONObj in , BSONObj wanted ){
+                
+                BSONObj m = morig.copy();
+                ModSet set;
+                set.getMods( m );
+                
+                BSONObj out = set.createNewFromMods( in );
+                ASSERT_EQUALS( wanted , out );
+
+                m = morig.copy();
+                BSONObj outr = set.createNewFromMods_r( in );
+                cout << "out_l: " << out << endl;
+                cout << "out_r: " << outr << endl;
+            }
+            
+        };
+        
+        class inc1 : public Base {
+        public:
+            void run(){
+                BSONObj m = BSON( "$inc" << BSON( "x" << 1 ) );
+                test( m , BSON( "x" << 5 )  , BSON( "x" << 6 ) );
+                test( m , BSON( "a" << 5 )  , BSON( "a" << 5 << "x" << 1 ) );
+            }
+        };
+        
+        class inc2 : public Base {
+        public:
+            void run(){
+                BSONObj m = BSON( "$inc" << BSON( "a.b" << 1 ) );
+                test( m , BSONObj() , BSON( "a" << BSON( "b" << 1 ) ) );
+                test( m , BSON( "a" << BSON( "b" << 2 ) ) , BSON( "a" << BSON( "b" << 3 ) ) );
+                
+            }
+        };
+        
+
+    };
     
     class All : public Suite {
     public:
@@ -571,6 +619,9 @@ namespace UpdateTests {
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
+
+            add< ModSetTests::inc1 >();
+            add< ModSetTests::inc2 >();
         }
     } myall;
 
