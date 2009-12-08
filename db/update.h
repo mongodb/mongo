@@ -19,7 +19,6 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "../util/embedded_builder.h"
-#include <strings.h>
 
 namespace mongo {
 
@@ -39,7 +38,7 @@ namespace mongo {
 
         void setFieldName( const char * s ){
             fieldName = s;
-            shortFieldName = rindex( fieldName , '.' );
+            shortFieldName = strrchr( fieldName , '.' );
             if ( shortFieldName )
                 shortFieldName++;
             else

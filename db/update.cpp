@@ -158,7 +158,7 @@ namespace mongo {
     void ModSet::_appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen ){
         const char * temp = m.fieldName;
         temp += root.size();
-        const char * dot = index( temp , '.' );
+        const char * dot = strchr( temp , '.' );
         if ( dot ){
             string nr( m.fieldName , 0 , 1 + ( dot - m.fieldName ) );
             string nf( temp , 0 , dot - temp );
