@@ -72,7 +72,14 @@ namespace mongo {
         throw MsgAssertionException(msg);
     }
 
+    boost::mutex *Assertion::_mutex = new boost::mutex();
+
     string Assertion::toString() {
+        if( _mutex == 0 )
+            return "";
+
+        boostlock lk(*_mutex);
+
         if ( !isSet() )
             return "";
 

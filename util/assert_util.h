@@ -21,7 +21,7 @@
 #include "../db/lasterror.h"
 
 namespace mongo {
-	
+
 	/* these are manipulated outside of mutexes, so be careful */
     struct Assertion {
         Assertion() {
@@ -31,12 +31,20 @@ namespace mongo {
             line = 0;
             when = 0;
         }
+    private:
+        static boost::mutex *_mutex;
         char msg[128];
         char context[128];
         const char *file;
         unsigned line;
         time_t when;
+    public:
         void set(const char *m, const char *ctxt, const char *f, unsigned l) {
+            if( _mutex == 0 ) {
+                /* asserted during global variable initialization */
+                return;
+            }
+            boostlock lk(*_mutex);
             strncpy(msg, m, 127);
             strncpy(context, ctxt, 127);
             file = f;
