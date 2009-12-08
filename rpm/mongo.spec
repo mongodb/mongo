@@ -1,6 +1,6 @@
 Name: mongo
-Version: 1.1.3
-Release: shopwiki_1%{?dist}
+Version: 1.3.0
+Release: mongodb_1%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
