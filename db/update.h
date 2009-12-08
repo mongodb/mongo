@@ -19,7 +19,7 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "../util/embedded_builder.h"
-
+#include <strings.h>
 
 namespace mongo {
 
