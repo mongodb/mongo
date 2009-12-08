@@ -178,9 +178,9 @@ bool isBalanced( string code ){
             }
             continue;
         case '{': brackets++; break;
-        case '}': brackets--; break;
+        case '}': if ( brackets <= 0 ) return true; brackets--; break;
         case '(': parens++; break;
-        case ')': parens--; break;
+        case ')': if ( parens <= 0 ) return true; parens--; break;
         case '"':
             i++;
             while ( i < code.size() && code[i] != '"' ) i++;
