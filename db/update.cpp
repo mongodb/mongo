@@ -26,12 +26,25 @@
 
 namespace mongo {
 
+    void Mod::apply( BSONObjBuilder& b , BSONElement in ){
+        switch ( op ){
+        case INC:
+            inc( in );
+            b.appendAs( elt , shortFieldName ); // TODO: this is horrible
+            break;
+        default:
+            stringstream ss;
+            ss << "Mod::apply can't handle type: " << op;
+            throw UserException( ss.str() );
+        }
+    }
+
     bool ModSet::canApplyInPlaceAndVerify(const BSONObj &obj) const {
         bool inPlacePossible = true;
 
         // Perform this check first, so that we don't leave a partially modified object on uassert.
-        for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            const Mod& m = *i;
+        for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
+            const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             if ( e.eoo() ) {
@@ -95,8 +108,8 @@ namespace mongo {
     }
     
     void ModSet::applyModsInPlace(const BSONObj &obj) const {
-        for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            const Mod& m = *i;
+        for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
+            const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             switch ( m.op ){
@@ -142,29 +155,109 @@ namespace mongo {
             fields[ base + top.fieldName() ] = top;            
     }
     
+    void ModSet::_appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen ){
+        const char * temp = m.fieldName;
+        temp += root.size();
+        const char * dot = index( temp , '.' );
+        if ( dot ){
+            string nr( m.fieldName , 0 , 1 + ( dot - m.fieldName ) );
+            string nf( temp , 0 , dot - temp );
+            if ( onedownseen.count( nf ) )
+                return;
+            onedownseen.insert( nf );
+            BSONObjBuilder bb ( b.subobjStart( nf.c_str() ) );
+            createNewFromMods( nr , bb , BSONObj() );
+            bb.done();
+        }
+        else
+            appendNewFromMod( m , b );
+        
+    }
+    
+    void ModSet::createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj ){
+        BSONObjIterator es( obj );
+        BSONElement e = es.next();
+
+        ModHolder::iterator m = _mods.lower_bound( root );
+        ModHolder::iterator mend = _mods.lower_bound( root + "{" );
+
+        set<string> onedownseen;
+        list<Mod*> toadd; // TODO: remove.  this is a hack to make new and old impls. identical.  when testing is complete, we should remove
+
+        while ( e.type() && m != mend ){
+            string field = root + e.fieldName();
+            FieldCompareResult cmp = compareDottedFieldNames( m->second.fieldName , field );
+
+            switch ( cmp ){
+            case LEFT_SUBFIELD: {
+                uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object );
+                BSONObjBuilder bb ( b.subobjStart( e.fieldName() ) );
+                stringstream nr; nr << root << e.fieldName() << ".";
+                createNewFromMods( nr.str() , bb , e.embeddedObject() );
+                bb.done();
+                // inc both as we handled both
+                e = es.next();
+                m++;
+                continue;
+            }
+            case LEFT_BEFORE: 
+                toadd.push_back( &(m->second) );
+                m++;
+                continue;
+            case SAME:
+                m->second.apply( b , e );
+                e = es.next();
+                m++;
+                continue;
+            case RIGHT_BEFORE:
+                b.append( e );
+                e = es.next();
+                continue;
+            case RIGHT_SUBFIELD:
+                massert( "ModSet::createNewFromMods - RIGHT_SUBFIELD should be impossible" , 0 ); 
+                break;
+            default:
+                massert( "unhandled case" , 0 );
+            }
+        }
+        
+        while ( e.type() ){
+            b.append( e );
+            e = es.next();
+        }
+        
+        for ( list<Mod*>::iterator i=toadd.begin(); i!=toadd.end(); i++ )
+            _appendNewFromMods( root , **i , b , onedownseen );
+
+
+        for ( ; m != mend; m++ ){
+            _appendNewFromMods( root , m->second , b , onedownseen );
+        }
+    }
+            
     BSONObj ModSet::createNewFromMods_r( const BSONObj &obj ) {
-        return obj;
+        BSONObjBuilder b;
+        createNewFromMods( "" , b , obj );
+        return b.obj();
     }
 
     BSONObj ModSet::createNewFromMods_l( const BSONObj &obj ) {
-        sortMods();
         map< string, BSONElement > existing;
         
         BSONObjBuilder b;
         BSONObjIterator i( obj );
-        while( i.moreWithEOO() ) {
+        while( i.more() ) {
             BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-            if ( !haveModForFieldOrSubfield( e.fieldName() ) ) {
+            if ( ! haveModForFieldOrSubfield( e.fieldName() ) ) {
                 b.append( e );
-            } else {
+            } 
+            else {
                 extractFields( existing, e, "" );
             }
         }
             
         EmbeddedBuilder b2( &b );
-        vector< Mod >::iterator m = _mods.begin();
+        ModHolder::iterator m = _mods.begin();
         map< string, BSONElement >::iterator p = existing.begin();
         while( m != _mods.end() || p != existing.end() ) {
 
@@ -180,28 +273,28 @@ namespace mongo {
             if ( p == existing.end() ){
                 uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
                          " or is referenced in another $set clause",
-                         mayAddEmbedded( existing, m->fieldName ) );                
+                         mayAddEmbedded( existing, m->second.fieldName ) );                
                 // $ modifier applied to missing field -- create field from scratch
-                appendNewFromMod( *m , b2 );
+                appendNewFromMod( m->second , b2 );
                 m++;
                 continue;
             }
 
-            FieldCompareResult cmp = compareDottedFieldNames( m->fieldName , p->first );
+            FieldCompareResult cmp = compareDottedFieldNames( m->second.fieldName , p->first );
             if ( cmp <= 0 )
                 uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
                          " or is referenced in another $set clause",
-                         mayAddEmbedded( existing, m->fieldName ) );                
+                         mayAddEmbedded( existing, m->second.fieldName ) );                
             if ( cmp == 0 ) {
                 BSONElement e = p->second;
-                if ( m->op == Mod::INC ) {
-                    m->inc(e);
+                if ( m->second.op == Mod::INC ) {
+                    m->second.inc(e);
                     //m->setn( m->getn() + e.number() );
-                    b2.appendAs( m->elt, m->fieldName );
-                } else if ( m->op == Mod::SET ) {
-                    b2.appendAs( m->elt, m->fieldName );
-                } else if ( m->op == Mod::PUSH || m->op == Mod::PUSH_ALL ) {
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+                    b2.appendAs( m->second.elt, m->second.fieldName );
+                } else if ( m->second.op == Mod::SET ) {
+                    b2.appendAs( m->second.elt, m->second.fieldName );
+                } else if ( m->second.op == Mod::PUSH || m->second.op == Mod::PUSH_ALL ) {
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     int startCount = 0;
                     while( i.moreWithEOO() ) {
@@ -211,13 +304,13 @@ namespace mongo {
                         arr.append( arrI );
                         ++startCount;
                     }
-                    if ( m->op == Mod::PUSH ) {
+                    if ( m->second.op == Mod::PUSH ) {
                         stringstream ss;
                         ss << startCount;
                         string nextIndex = ss.str();
-                        arr.appendAs( m->elt, nextIndex.c_str() );
+                        arr.appendAs( m->second.elt, nextIndex.c_str() );
                     } else {
-                        BSONObjIterator i( m->elt.embeddedObject() );
+                        BSONObjIterator i( m->second.elt.embeddedObject() );
                         int count = startCount;
                         while( i.moreWithEOO() ) {
                             BSONElement arrI = i.next();
@@ -230,9 +323,9 @@ namespace mongo {
                         }
                     }
                     arr.done();
-                    m->pushStartSize = startCount;
-                } else if ( m->op == Mod::PULL || m->op == Mod::PULL_ALL ) {
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+                    m->second.pushStartSize = startCount;
+                } else if ( m->second.op == Mod::PULL || m->second.op == Mod::PULL_ALL ) {
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
                     int count = 0;
                     while( i.moreWithEOO() ) {
@@ -240,10 +333,10 @@ namespace mongo {
                         if ( arrI.eoo() )
                             break;
                         bool allowed = true;
-                        if ( m->op == Mod::PULL ) {
-                            allowed = ( arrI.woCompare( m->elt, false ) != 0 );
+                        if ( m->second.op == Mod::PULL ) {
+                            allowed = ( arrI.woCompare( m->second.elt, false ) != 0 );
                         } else {
-                            BSONObjIterator j( m->elt.embeddedObject() );
+                            BSONObjIterator j( m->second.elt.embeddedObject() );
                             while( allowed && j.moreWithEOO() ) {
                                 BSONElement arrJ = j.next();
                                 if ( arrJ.eoo() )
@@ -260,11 +353,11 @@ namespace mongo {
                     }
                     arr.done();
                 }
-                else if ( m->op == Mod::POP ){
+                else if ( m->second.op == Mod::POP ){
                     int startCount = 0;
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->fieldName ) );
+                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
                     BSONObjIterator i( e.embeddedObject() );
-                    if ( m->elt.isNumber() && m->elt.number() < 0 ){
+                    if ( m->second.elt.isNumber() && m->second.elt.number() < 0 ){
                         if ( i.more() ) i.next();
                         int count = 0;
                         startCount++;
@@ -283,14 +376,14 @@ namespace mongo {
                         }
                     }
                     arr.done();
-                    m->pushStartSize = startCount;
+                    m->second.pushStartSize = startCount;
                 }
                 ++m;
                 ++p;
             } 
             else if ( cmp < 0 ) {
                 // $ modifier applied to missing field -- create field from scratch
-                appendNewFromMod( *m , b2 );
+                appendNewFromMod( m->second , b2 );
                 m++;
             } 
             else if ( cmp > 0 ) {
@@ -329,13 +422,11 @@ namespace mongo {
                 BSONElement f = jt.next();
                 Mod m;
                 m.op = op;
-                m.fieldName = f.fieldName();
+                m.setFieldName( f.fieldName() );
                 uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
                 uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
-                for ( vector<Mod>::iterator i = _mods.begin(); i != _mods.end(); i++ ) {
-                    uassert( "Field name duplication not allowed with modifiers",
-                             strcmp( m.fieldName, i->fieldName ) != 0 );
-                }
+                uassert( "Field name duplication not allowed with modifiers", ! haveModForField( m.fieldName ) );
+
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 m.elt = f;
@@ -353,7 +444,7 @@ namespace mongo {
                     m.nint = 0;
                     m.nlong = (long long *) f.value();
                 }
-                _mods.push_back( m );
+                _mods[m.fieldName] = m;
             }
         }
     }

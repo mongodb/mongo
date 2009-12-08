@@ -521,6 +521,28 @@ namespace UpdateTests {
 
     namespace ModSetTests {
         
+        class internal1 {
+        public:
+            void run(){
+                BSONObj b = BSON( "$inc" << BSON( "x" << 1 << "a.b" << 1 ) );
+                ModSet m;
+                m.getMods( b );
+
+                ASSERT( m.haveModForField( "x" ) );
+                ASSERT( m.haveModForField( "a.b" ) );
+                ASSERT( ! m.haveModForField( "y" ) );
+                ASSERT( ! m.haveModForField( "a.c" ) );
+                ASSERT( ! m.haveModForField( "a" ) );
+                
+                ASSERT( m.haveModForFieldOrSubfield( "x" ) );
+                ASSERT( m.haveModForFieldOrSubfield( "a" ) );
+                ASSERT( m.haveModForFieldOrSubfield( "a.b" ) );
+                ASSERT( ! m.haveModForFieldOrSubfield( "a.bc" ) );
+                ASSERT( ! m.haveModForFieldOrSubfield( "a.c" ) );
+                ASSERT( ! m.haveModForFieldOrSubfield( "a.a" ) );
+            }
+        };
+        
         class Base {
         public:
 
@@ -529,19 +551,43 @@ namespace UpdateTests {
             
             void test( BSONObj morig , BSONObj in , BSONObj wanted ){
                 
+                int its = 1000;
+                double o = _test( morig , in , wanted , false , its );
+                double n = _test( morig , in , wanted , true , its );
+                double r = o / n;
+                cout << " new is : " << r << " x faster" << endl;
+
                 BSONObj m = morig.copy();
                 ModSet set;
                 set.getMods( m );
                 
                 BSONObj out = set.createNewFromMods( in );
                 ASSERT_EQUALS( wanted , out );
-
-                m = morig.copy();
-                BSONObj outr = set.createNewFromMods_r( in );
-                cout << "out_l: " << out << endl;
-                cout << "out_r: " << outr << endl;
             }
             
+            unsigned long long _test( BSONObj morig , BSONObj in , BSONObj wanted , bool newVersion , int its ){
+                Timer t;
+                for ( int i=0; i<its; i++ ){
+                    BSONObj m = morig.copy();
+                    ModSet set;
+                    set.getMods( m );
+                    BSONObj out;
+                    if ( newVersion )
+                        out = set.createNewFromMods_r( in );
+                    else
+                        out = set.createNewFromMods_l( in );
+
+                    if ( wanted == out )
+                        continue;
+                    
+                    cout << "wanted: " << wanted << " got: " << out << " newVersion: " << newVersion << " mod: " << morig << endl;
+
+                    ASSERT_EQUALS( wanted , out );
+                }
+                return t.micros();
+            }
+            
+
         };
         
         class inc1 : public Base {
@@ -550,6 +596,7 @@ namespace UpdateTests {
                 BSONObj m = BSON( "$inc" << BSON( "x" << 1 ) );
                 test( m , BSON( "x" << 5 )  , BSON( "x" << 6 ) );
                 test( m , BSON( "a" << 5 )  , BSON( "a" << 5 << "x" << 1 ) );
+                test( m , BSON( "z" << 5 )  , BSON( "z" << 5 << "x" << 1 ) );
             }
         };
         
@@ -559,6 +606,10 @@ namespace UpdateTests {
                 BSONObj m = BSON( "$inc" << BSON( "a.b" << 1 ) );
                 test( m , BSONObj() , BSON( "a" << BSON( "b" << 1 ) ) );
                 test( m , BSON( "a" << BSON( "b" << 2 ) ) , BSON( "a" << BSON( "b" << 3 ) ) );
+
+                m = BSON( "$inc" << BSON( "a.b" << 1 << "a.c" << 1 ) );
+                test( m , BSONObj() , BSON( "a" << BSON( "b" << 1 << "c" << 1 ) ) );
+
                 
             }
         };
@@ -620,6 +671,7 @@ namespace UpdateTests {
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
 
+            add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();
             add< ModSetTests::inc2 >();
         }

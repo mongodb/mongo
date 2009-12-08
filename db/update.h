@@ -27,7 +27,8 @@ namespace mongo {
     struct Mod {
         enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
         const char *fieldName;
-
+        const char *shortFieldName;
+        
         // kind of lame; fix one day?
         double *ndouble;
         int *nint;
@@ -35,6 +36,15 @@ namespace mongo {
 
         BSONElement elt;
         int pushStartSize;
+
+        void setFieldName( const char * s ){
+            fieldName = s;
+            shortFieldName = rindex( fieldName , '.' );
+            if ( shortFieldName )
+                shortFieldName++;
+            else
+                shortFieldName = fieldName;
+        }
 
         /* [dm] why is this const? (or rather, why was setn const?)  i see why but think maybe clearer if were not.  */
         void inc(BSONElement& n) const { 
@@ -95,22 +105,18 @@ namespace mongo {
                 return true;
             return false;
         }
+
+        void apply( BSONObjBuilder& b , BSONElement in );
     };
 
     class ModSet {
-        vector< Mod > _mods;
+        typedef map<string,Mod> ModHolder;
+        ModHolder _mods;
         bool _sorted;
-        
-        void sortMods() {
-            if ( ! _sorted ){
-                sort( _mods.begin(), _mods.end() );
-                _sorted = true;
-            }
-        }
         
         static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
         
-        FieldCompareResult compare( const vector< Mod >::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
+        FieldCompareResult compare( const ModHolder::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
             bool mDone = ( m == _mods.end() );
             bool pDone = ( p == pEnd );
             assert( ! mDone );
@@ -123,8 +129,10 @@ namespace mongo {
             if ( pDone )
                 return LEFT_BEFORE;
 
-            return compareDottedFieldNames( m->fieldName, p->first.c_str() );
+            return compareDottedFieldNames( m->first, p->first.c_str() );
         }
+
+        void _appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen );
         
         void appendNewFromMod( Mod& m , EmbeddedBuilder& b ){
             if ( m.op == Mod::PUSH ) {
@@ -142,13 +150,38 @@ namespace mongo {
             }
         }
 
+     void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
+            if ( m.op == Mod::PUSH ) {
+                /*
+                BSONObjBuilder arr( b.subarrayStartAs( m.fieldName ) );
+                arr.appendAs( m.elt, "0" );
+                arr.done();
+                m.pushStartSize = -1;
+                */
+                uassert( "appendNewFromMod push not done" , 0 );
+            } 
+            else if ( m.op == Mod::PUSH_ALL ) {
+                //b.appendAs( m.elt, m.fieldName );
+                //m.pushStartSize = -1;
+                uassert( "appendNewFromMod push_all not done" , 0 );
+            } 
+            else if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL ) {
+            }
+            else if ( m.op == Mod::INC || m.op == Mod::SET ){
+                b.appendAs( m.elt, m.shortFieldName );
+            }
+            else {
+                uassert( "unknonw mod" , 0 );
+            }
+        }
+
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
                  left.length() > 0 && left[ left.length() - 1 ] != '.';
                  left += "." + EmbeddedBuilder::splitDot( right ) ) {
                 if ( existing.count( left ) > 0 && existing[ left ].type() != Object )
                     return false;
-                if ( modForField( left.c_str() ) )
+                if ( haveModForField( left.c_str() ) )
                     return false;
             }
             return true;
@@ -176,6 +209,9 @@ namespace mongo {
         BSONObj createNewFromMods_l( const BSONObj &obj );
 
         // new recursive version, will replace at some point
+        void createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj );
+
+        // new recursive version, will replace at some point
         BSONObj createNewFromMods_r( const BSONObj &obj );
 
         BSONObj createNewFromMods( const BSONObj &obj ){
@@ -187,8 +223,8 @@ namespace mongo {
          */
         int isIndexed( const set<string>& idxKeys ) const {
             int numIndexes = 0;
-            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ){
-                if ( i->isIndexed( idxKeys ) )
+            for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ){
+                if ( i->second.isIndexed( idxKeys ) )
                     numIndexes++;
             }
             return numIndexes;
@@ -196,44 +232,37 @@ namespace mongo {
 
         unsigned size() const { return _mods.size(); }
         bool haveModForField( const char *fieldName ) const {
-            // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-                if ( strlen( fieldName ) == strlen( i->fieldName ) && strcmp( fieldName, i->fieldName ) == 0 )
-                    return true;
+            return _mods.find( fieldName ) != _mods.end();
+        }
+        bool haveModForFieldOrSubfield( const string& fieldName ) const {
+            ModHolder::const_iterator start = _mods.lower_bound(fieldName);
+            for ( ; start != _mods.end(); start++ ){
+                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first );
+                switch ( r ){
+                case LEFT_SUBFIELD: assert(0); break;
+                case LEFT_BEFORE: continue;
+                case SAME: return true;
+                case RIGHT_BEFORE: continue;
+                case RIGHT_SUBFIELD: return true;
+                }
             }
             return false;
         }
-        bool haveModForFieldOrSubfield( const char *fieldName ) const {
-            // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-                const char *dot = strchr( i->fieldName, '.' );
-                size_t len = dot ? dot - i->fieldName : strlen( i->fieldName );
-                if ( len == strlen( fieldName ) && strncmp( fieldName, i->fieldName, len ) == 0 )
-                    return true;
-            }
-            return false;
-        }
-        const Mod *modForField( const char *fieldName ) const {
-            // Presumably the number of mods is small, so this loop isn't too expensive.
-            for( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-                if ( strcmp( fieldName, i->fieldName ) == 0 )
-                    return &*i;
-            }
-            return 0;
-        }
+
         bool haveArrayDepMod() const {
-            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                if ( i->arrayDep() )
+            for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
+                if ( i->second.arrayDep() )
                     return true;
             return false;
         }
         void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
-            for ( vector<Mod>::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
-                if ( i->arrayDep() ){
-                    if ( i->pushStartSize == -1 )
-                        b.appendNull( i->fieldName );
+            for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
+                const Mod& m = i->second;
+                if ( m.arrayDep() ){
+                    if ( m.pushStartSize == -1 )
+                        b.appendNull( m.fieldName );
                     else
-                        b << i->fieldName << BSON( "$size" << i->pushStartSize );
+                        b << m.fieldName << BSON( "$size" << m.pushStartSize );
                 }
             }
         }
