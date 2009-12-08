@@ -180,6 +180,9 @@ AddOption( "--boost-version",
            action="store",
            help="boost version for linking(1_38)" )
 
+# 
+# to use CPUPROFILE=/tmp/profile
+#
 AddOption( "--pg",
            dest="profile",
            type="string",
