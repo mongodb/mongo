@@ -516,21 +516,23 @@ namespace mongo {
                 as currently used that does not cause anything terrible to happen.
     */
     class NamespaceDetailsTransient : boost::noncopyable {
-        string ns;
+        string _ns;
         bool haveIndexKeys;
         set<string> allIndexKeys;
         void computeIndexKeys();
-        int writeCount_;
-        map< QueryPattern, pair< BSONObj, long long > > queryCache_;
+        int _writeCount;
+        map< QueryPattern, pair< BSONObj, long long > > _queryCache;
+
+        /* for collection-level logging -- see CmdLogCollection */ 
         string logNS_;
         bool logValid_;
     public:
-        NamespaceDetailsTransient(const char *_ns) : ns(_ns), haveIndexKeys(), writeCount_(), logValid_() {
+        NamespaceDetailsTransient(const char *ns) : _ns(ns),haveIndexKeys(), _writeCount(), logValid_() {
             haveIndexKeys=false; /*lazy load them*/
         }
 
         /* get set of index keys for this namespace.  handy to quickly check if a given
-           field is indexed (Note it might be a seconary component of a compound index.)
+           field is indexed (Note it might be a secondary component of a compound index.)
         */
         set<string>& indexKeys() {
             if ( !haveIndexKeys ) {
@@ -543,23 +545,23 @@ namespace mongo {
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
         void registerWriteOp() {
-            if ( queryCache_.empty() )
+            if ( _queryCache.empty() )
                 return;
-            if ( ++writeCount_ >= 100 )
+            if ( ++_writeCount >= 100 )
                 clearQueryCache();
         }
         void clearQueryCache() {
-            queryCache_.clear();
-            writeCount_ = 0;
+            _queryCache.clear();
+            _writeCount = 0;
         }
         BSONObj indexForPattern( const QueryPattern &pattern ) {
-            return queryCache_[ pattern ].first;
+            return _queryCache[ pattern ].first;
         }
         long long nScannedForPattern( const QueryPattern &pattern ) {
-            return queryCache_[ pattern ].second;
+            return _queryCache[ pattern ].second;
         }
         void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
-            queryCache_[ pattern ] = make_pair( indexKey, nScanned );
+            _queryCache[ pattern ] = make_pair( indexKey, nScanned );
         }
         
         void startLog( int logSizeMb = 128 );

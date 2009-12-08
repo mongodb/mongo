@@ -589,14 +589,14 @@ namespace mongo {
     
     void NamespaceDetailsTransient::computeIndexKeys() {
         allIndexKeys.clear();
-        NamespaceDetails *d = nsdetails(ns.c_str());
+        NamespaceDetails *d = nsdetails(_ns.c_str());
         NamespaceDetails::IndexIterator i = d->ii();
         while( i.more() )
             i.next().keyPattern().getFieldNames(allIndexKeys);
     }
     
     void NamespaceDetailsTransient::startLog( int logSizeMb ) {
-        logNS_ = "local.temp.oplog." + ns;
+        logNS_ = "local.temp.oplog." + _ns;
         logValid_ = true;
         stringstream spec;
         // 128MB
