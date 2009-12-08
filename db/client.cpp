@@ -32,7 +32,7 @@ namespace mongo {
     boost::thread_specific_ptr<Client> currentClient;
 
     Client::Client(const char *desc) : 
-      _op(new CurOp()),
+      _curOp(new CurOp()),
       _database(0), _ns("")/*, _nsstr("")*/ 
       ,_shutdown(false),
       _desc(desc),
@@ -45,7 +45,7 @@ namespace mongo {
     }
 
     Client::~Client() { 
-        delete _op;
+        delete _curOp;
         delete ai; 
         ai = 0;
         _god = 0;

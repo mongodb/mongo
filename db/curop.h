@@ -25,7 +25,7 @@ namespace mongo {
         int op;
         char ns[Namespace::MaxNsLen+2];
         char query[128];
-        char zero;
+        char zero; // what's this for?
         struct sockaddr_in client;
 
         CurOp() { 
@@ -38,6 +38,7 @@ namespace mongo {
             // without the db mutex.
             memset(ns, 0, sizeof(ns));
             memset(query, 0, sizeof(query));
+            zero = 0;
         }
 
         BSONObj info() { 

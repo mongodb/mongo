@@ -48,7 +48,7 @@ namespace mongo {
         };
 
     private:
-        CurOp *_op;
+        CurOp *_curOp;
         Database *_database;
         Namespace _ns;
         //NamespaceString _nsstr;
@@ -60,7 +60,7 @@ namespace mongo {
         AuthenticationInfo *ai;
         Top top;
 
-        CurOp* curop() { return _op; }
+        CurOp* curop() { return _curOp; }
         Database* database() { 
             return _database; 
         }
