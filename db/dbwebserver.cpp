@@ -33,7 +33,6 @@
 #undef assert
 #define assert xassert
 
-
 namespace mongo {
 
     extern string bind_ip;
