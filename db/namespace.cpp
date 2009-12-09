@@ -562,70 +562,71 @@ namespace mongo {
     
     /* ------------------------------------------------------------------------- */
 
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::map_;
+    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
         clearQueryCache();
-        haveIndexKeys = false;
+        _keysComputed = false;
     }
     
-    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
+/*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
         shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
         if ( t.get() == 0 )
             t.reset( new NamespaceDetailsTransient(ns) );
         return *t;
     }
-
-    void NamespaceDetailsTransient::drop(const char *prefix) {
+*/
+    void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         vector< string > found;
-        for( ouriter i = map_.begin(); i != map_.end(); ++i )
+        for( ouriter i = _map.begin(); i != _map.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            map_[ *i ].reset();
+            _map[ *i ].reset();
         }
     }
     
     void NamespaceDetailsTransient::computeIndexKeys() {
-        allIndexKeys.clear();
+        _keysComputed = true;
+        _indexKeys.clear();
         NamespaceDetails *d = nsdetails(_ns.c_str());
         NamespaceDetails::IndexIterator i = d->ii();
         while( i.more() )
-            i.next().keyPattern().getFieldNames(allIndexKeys);
+            i.next().keyPattern().getFieldNames(_indexKeys);
     }
     
     void NamespaceDetailsTransient::startLog( int logSizeMb ) {
-        logNS_ = "local.temp.oplog." + _ns;
-        logValid_ = true;
+        _logNS = "local.temp.oplog." + _ns;
+        _logValid = true;
         stringstream spec;
         // 128MB
         spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true,autoIndexId:false}";
-        setClient( logNS_.c_str() );
+        setClient( _logNS.c_str() );
         string err;
-        massert( "Could not create log ns", userCreateNS( logNS_.c_str(), fromjson( spec.str() ), err, false ) );
-        NamespaceDetails *d = nsdetails( logNS_.c_str() );
+        massert( "Could not create log ns", userCreateNS( _logNS.c_str(), fromjson( spec.str() ), err, false ) );
+        NamespaceDetails *d = nsdetails( _logNS.c_str() );
         d->cappedDisallowDelete();
     }
 
     void NamespaceDetailsTransient::invalidateLog() {
         dropLog();
-        logValid_ = false;
+        _logValid = false;
     }
     
     bool NamespaceDetailsTransient::validateCompleteLog() {
         dropLog();
-        bool ret = logValid_;
-        logValid_ = false;
-        logNS_ = "";
+        bool ret = _logValid;
+        _logValid = false;
+        _logNS = "";
         return ret;
     }
     
     void NamespaceDetailsTransient::dropLog() {
-        if ( !logValid_ )
+        if ( !_logValid )
             return;
-        setClient( logNS_.c_str() );
-        dropNS( logNS_ );
+        setClient( _logNS.c_str() );
+        dropNS( _logNS );
     }
 
     /* ------------------------------------------------------------------------- */
@@ -664,7 +665,7 @@ namespace mongo {
 		// index details across commands are in cursors and nsd
 		// transient (including query cache) so clear these.
 		ClientCursor::invalidate( from );
-		NamespaceDetailsTransient::drop( from );
+		NamespaceDetailsTransient::clearForPrefix( from );
 
 		NamespaceDetails *details = ni->details( from );
 		ni->add_ns( to, *details );

@@ -422,7 +422,7 @@ namespace mongo {
     /* cl - database name
        path - db directory
     */
-    void closeClient( const char *cl, const string& path ) {
+    void closeDatabase( const char *cl, const string& path ) {
         Database *database = cc().database();
         assert( database );
         assert( database->name == cl );
@@ -436,7 +436,7 @@ namespace mongo {
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
-        NamespaceDetailsTransient::drop( prefix.c_str() );
+        NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
         eraseDatabase( cl, path );
         delete database; // closes files

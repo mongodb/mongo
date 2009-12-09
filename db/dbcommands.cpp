@@ -753,7 +753,7 @@ namespace mongo {
             }
             for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
                 setClient( i->c_str() );
-                closeClient( i->c_str() );
+                closeDatabase( i->c_str() );
             }
 
             return true;

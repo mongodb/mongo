@@ -109,7 +109,7 @@ namespace mongo {
 
 // shared functionality for removing references to a database from this program instance
 // does not delete the files on disk
-    void closeClient( const char *cl, const string& path = dbpath );
+    void closeDatabase( const char *cl, const string& path = dbpath );
 
     /* remove database from the databases map */
     inline void eraseDatabase( const char *ns, const string& path=dbpath ) {
