@@ -216,7 +216,7 @@ namespace mongo {
 
                 if( strstr(from_name, ".system.") ) { 
                     /* system.users is cloned -- but nothing else from system. */
-                    if( strstr(from_name, ".system.users") == 0 ){
+                    if( legalClientSystemNS( from_name , true ) == 0 ){
                         log(2) << "\t\t not cloning because system collection" << endl;
                         continue;
                     }
