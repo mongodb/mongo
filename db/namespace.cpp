@@ -597,6 +597,7 @@ namespace mongo {
     }
     
     void NamespaceDetailsTransient::cllStart( int logSizeMb ) {
+        assertInWriteLock();
         _cll_ns = "local.temp.oplog." + _ns;
         _cll_enabled = true;
         stringstream spec;
@@ -610,11 +611,13 @@ namespace mongo {
     }
 
     void NamespaceDetailsTransient::cllInvalidate() {
+        assertInWriteLock();
         cllDrop();
         _cll_enabled = false;
     }
     
     bool NamespaceDetailsTransient::cllValidateComplete() {
+        assertInWriteLock();
         cllDrop();
         bool ret = _cll_enabled;
         _cll_enabled = false;
@@ -623,6 +626,7 @@ namespace mongo {
     }
     
     void NamespaceDetailsTransient::cllDrop() {
+        assertInWriteLock();
         if ( !_cll_enabled )
             return;
         setClient( _cll_ns.c_str() );

@@ -544,6 +544,7 @@ namespace mongo {
            field is indexed (Note it might be a secondary component of a compound index.)
         */
         set<string>& indexKeys() {
+            DEV assertInWriteLock();
             if ( !_keysComputed )
                 computeIndexKeys();
             return _indexKeys;
@@ -576,6 +577,7 @@ namespace mongo {
         }
 
         /* for collection-level logging -- see CmdLogCollection ----------------- */ 
+        /* assumed to be in write lock for this */
     private:
         string _cll_ns; // "local.temp.oplog." + _ns;
         bool _cll_enabled;
