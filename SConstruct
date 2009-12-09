@@ -277,7 +277,7 @@ if ( not ( usesm or usejvm or usev8 ) ):
 extraLibPlaces = []
 
 def addExtraLibs( s ):
-    for x in s:
+    for x in s.split(","):
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
         extraLibPlaces.append( x + "/lib" )
