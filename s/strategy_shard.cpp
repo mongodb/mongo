@@ -50,7 +50,7 @@ namespace mongo {
                     set<ServerAndQuery> buckets;
                     for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Chunk * s = *i;
-                        buckets.insert( ServerAndQuery( s->getShard() , s->getFilter() , s->getMinDotted() ) );
+                        buckets.insert( ServerAndQuery( s->getShard() , s->getFilter() , s->getMin() ) );
                     }
                     cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }
@@ -178,7 +178,7 @@ namespace mongo {
                 }
             }
             else {
-                Chunk& c = manager->findChunk( dotted2nested(chunkFinder) );
+                Chunk& c = manager->findChunk( chunkFinder );
                 doWrite( dbUpdate , r , c.getShard() );
                 c.splitIfShould( d.msg().data->dataLen() );
             }
