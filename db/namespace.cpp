@@ -520,7 +520,7 @@ namespace mongo {
 
         IndexDetails& id = idx(nIndexes);
         nIndexes++;
-        NamespaceDetailsTransient::get(thisns).addedIndex();
+        NamespaceDetailsTransient::get_w(thisns).addedIndex();
         return id;
     }
 
@@ -562,6 +562,7 @@ namespace mongo {
     
     /* ------------------------------------------------------------------------- */
 
+    boost::mutex NamespaceDetailsTransient::_qcMutex;
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
@@ -578,6 +579,7 @@ namespace mongo {
     }
 */
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
+        assertInWriteLock();
         vector< string > found;
         for( ouriter i = _map.begin(); i != _map.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )

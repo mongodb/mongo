@@ -568,7 +568,7 @@ namespace mongo {
                 
                 ModSet mods;
                 mods.getMods(updateobj);
-                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get(ns);
+                NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get_w(ns);
                 set<string>& idxKeys = ndt.indexKeys();
                 int isIndexed = mods.isIndexed( idxKeys );
                 

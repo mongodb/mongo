@@ -630,7 +630,7 @@ namespace mongo {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
         
         // clean up parent namespace index cache
-        NamespaceDetailsTransient::get( parentNS().c_str() ).deletedIndex();
+        NamespaceDetailsTransient::get_w( parentNS().c_str() ).deletedIndex();
 
         BSONObjBuilder b;
         b.append("name", indexName().c_str());
@@ -865,7 +865,7 @@ namespace mongo {
         unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
-        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
+        NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
@@ -968,7 +968,7 @@ namespace mongo {
             return insert(ns, objNew.objdata(), objNew.objsize(), false);
         }
 
-        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
+        NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         d->paddingFits();
 
         /* have any index keys changed? */
@@ -1487,7 +1487,7 @@ namespace mongo {
 
         // we don't bother clearing those stats for the god tables - also god is true when adidng a btree bucket
         if ( !god )
-            NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
+            NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
             int idxNo = tableToIndex->nIndexes;
