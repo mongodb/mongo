@@ -49,7 +49,7 @@ namespace ReplTests {
             try {
                 master = false;
                 deleteAll( ns() );
-                deleteAll( logNs() );
+                deleteAll( cllNS() );
             } catch ( ... ) {
                 FAIL( "Exception while cleaning up test" );
             }
@@ -58,7 +58,7 @@ namespace ReplTests {
         static const char *ns() {
             return "unittests.repltests";
         }
-        static const char *logNs() {
+        static const char *cllNS() {
             return "local.oplog.$main";
         }
         DBDirectClient *client() const { return &client_; }
@@ -83,7 +83,7 @@ namespace ReplTests {
             ASSERT( !expected.woCompare( got ) );
         }
         BSONObj oneOp() const { 
-            return client()->findOne( logNs(), BSONObj() );
+            return client()->findOne( cllNS(), BSONObj() );
         }
         int count() const {
             int count = 0;
@@ -97,9 +97,9 @@ namespace ReplTests {
         }
         static int opCount() {
             dblock lk;
-            setClient( logNs() );
+            setClient( cllNS() );
             int count = 0;
-            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( logNs() ); c->ok(); c->advance() )
+            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
                 ++count;
             return count;
         }
@@ -111,9 +111,9 @@ namespace ReplTests {
                 }
             };
             dblock lk;
-            setClient( logNs() );
+            setClient( cllNS() );
             vector< BSONObj > ops;
-            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( logNs() ); c->ok(); c->advance() )
+            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
                 ops.push_back( c->current() );
             setClient( ns() );
             for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i )

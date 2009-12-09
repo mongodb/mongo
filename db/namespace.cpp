@@ -596,37 +596,37 @@ namespace mongo {
             i.next().keyPattern().getFieldNames(_indexKeys);
     }
     
-    void NamespaceDetailsTransient::startLog( int logSizeMb ) {
-        _logNS = "local.temp.oplog." + _ns;
-        _logValid = true;
+    void NamespaceDetailsTransient::cllStart( int logSizeMb ) {
+        _cll_ns = "local.temp.oplog." + _ns;
+        _cll_enabled = true;
         stringstream spec;
         // 128MB
         spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true,autoIndexId:false}";
-        setClient( _logNS.c_str() );
+        setClient( _cll_ns.c_str() );
         string err;
-        massert( "Could not create log ns", userCreateNS( _logNS.c_str(), fromjson( spec.str() ), err, false ) );
-        NamespaceDetails *d = nsdetails( _logNS.c_str() );
+        massert( "Could not create log ns", userCreateNS( _cll_ns.c_str(), fromjson( spec.str() ), err, false ) );
+        NamespaceDetails *d = nsdetails( _cll_ns.c_str() );
         d->cappedDisallowDelete();
     }
 
-    void NamespaceDetailsTransient::invalidateLog() {
-        dropLog();
-        _logValid = false;
+    void NamespaceDetailsTransient::cllInvalidate() {
+        cllDrop();
+        _cll_enabled = false;
     }
     
-    bool NamespaceDetailsTransient::validateCompleteLog() {
-        dropLog();
-        bool ret = _logValid;
-        _logValid = false;
-        _logNS = "";
+    bool NamespaceDetailsTransient::cllValidateComplete() {
+        cllDrop();
+        bool ret = _cll_enabled;
+        _cll_enabled = false;
+        _cll_ns = "";
         return ret;
     }
     
-    void NamespaceDetailsTransient::dropLog() {
-        if ( !_logValid )
+    void NamespaceDetailsTransient::cllDrop() {
+        if ( !_cll_enabled )
             return;
-        setClient( _logNS.c_str() );
-        dropNS( _logNS );
+        setClient( _cll_ns.c_str() );
+        dropNS( _cll_ns );
     }
 
     /* ------------------------------------------------------------------------- */

@@ -524,7 +524,7 @@ namespace mongo {
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
-        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _logValid() { }
+        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _cll_enabled() { }
         static NamespaceDetailsTransient& get(const char *ns);
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
@@ -534,6 +534,7 @@ namespace mongo {
         static void clearForPrefix(const char *prefix);
 
         /* indexKeys() cache ---------------------------------------------------- */
+        /* assumed to be in write lock for this */
     private:
         bool _keysComputed;
         set<string> _indexKeys;
@@ -576,15 +577,15 @@ namespace mongo {
 
         /* for collection-level logging -- see CmdLogCollection ----------------- */ 
     private:
-        string _logNS;
-        bool _logValid;
-        void dropLog(); // drop _logNS
+        string _cll_ns; // "local.temp.oplog." + _ns;
+        bool _cll_enabled;
+        void cllDrop(); // drop _cll_ns
     public:
-        void startLog( int logSizeMb = 128 );
-        void invalidateLog();
-        bool validateCompleteLog();
-        string logNS() const { return _logNS; }
-        bool logValid() const { return _logValid; }
+        string cllNS() const { return _cll_ns; }
+        bool cllEnabled() const { return _cll_enabled; }
+        void cllStart( int logSizeMb = 128 ); // begin collection level logging
+        void cllInvalidate();
+        bool cllValidateComplete();
 
     }; /* NamespaceDetailsTransient */
 

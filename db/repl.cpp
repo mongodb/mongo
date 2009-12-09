@@ -1391,11 +1391,11 @@ namespace mongo {
             nsToClient( ns, cl );
         }
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
-        if ( t.logValid() ) {
+        if ( t.cllEnabled() ) {
             try {
-                _logOp(opstr, ns, t.logNS().c_str(), obj, patt, b, OpTime::now());
+                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
             } catch ( const DBException & ) {
-                t.invalidateLog();
+                t.cllInvalidate();
             }
         }
     }    
@@ -1735,22 +1735,22 @@ namespace mongo {
             int logSizeMb = cmdObj.getIntField( "logSizeMb" );
             NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
             if ( start ) {
-                if ( t.logNS().empty() ) {
+                if ( t.cllNS().empty() ) {
                     if ( logSizeMb == INT_MIN ) {
-                        t.startLog();
+                        t.cllStart();
                     } else {
-                        t.startLog( logSizeMb );
+                        t.cllStart( logSizeMb );
                     }
                 } else {
                     errmsg = "Log already started for ns: " + logCollection;
                     return false;
                 }
             } else {
-                if ( t.logNS().empty() ) {
+                if ( t.cllNS().empty() ) {
                     errmsg = "No log to validateComplete for ns: " + logCollection;
                     return false;
                 } else {
-                    if ( !t.validateCompleteLog() ) {
+                    if ( !t.cllValidateComplete() ) {
                         errmsg = "Oplog failure, insufficient space allocated";
                         return false;
                     }
