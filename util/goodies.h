@@ -220,6 +220,7 @@ namespace mongo {
     }
 
     struct Date_t {
+        // TODO: make signed (and look for related TODO's)
         unsigned long long millis;
         Date_t(): millis(0) {}
         Date_t(unsigned long long m): millis(m) {}
