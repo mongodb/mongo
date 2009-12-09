@@ -266,10 +266,13 @@ if ( usesm and usejvm ):
 if ( not ( usesm or usejvm or usev8 ) ):
     usesm = True
 
+extraLibPlaces = []
+
 if GetOption( "extrapath" ) is not None:
     for x in GetOption( "extrapath" ).split( "," ):
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
+        extraLibPlaces += [ x + "/lib" ]
     release = True
 
 if GetOption( "extralib" ) is not None:
@@ -706,6 +709,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             poss = [poss]
 
         allPlaces = [];
+        allPlaces += extraLibPlaces
         if nix and release:
             allPlaces += myenv["LIBPATH"]
             if not force64:
