@@ -149,7 +149,15 @@ AddOption( "--extrapath",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo" )
+           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+
+AddOption( "--extrapathdyn",
+           dest="extrapathdyn",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
+
 
 AddOption( "--extralib",
            dest="extralib",
@@ -266,11 +274,20 @@ if ( usesm and usejvm ):
 if ( not ( usesm or usejvm or usev8 ) ):
     usesm = True
 
-if GetOption( "extrapath" ) is not None:
-    for x in GetOption( "extrapath" ).split( "," ):
+extraLibPlaces = []
+
+def addExtraLibs( s ):
+    for x in s:
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
+        extraLibPlaces += [ x + "/lib" ]    
+
+if GetOption( "extrapath" ) is not None:
+    addExtraLibs( GetOption( "extrapath" ) )
     release = True
+
+if GetOption( "extrapathdyn" ) is not None:
+    addExtraLibs( GetOption( "extrapathdyn" ) )
 
 if GetOption( "extralib" ) is not None:
     for x in GetOption( "extralib" ).split( "," ):
@@ -706,6 +723,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             poss = [poss]
 
         allPlaces = [];
+        allPlaces += extraLibPlaces
         if nix and release:
             allPlaces += myenv["LIBPATH"]
             if not force64:

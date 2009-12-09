@@ -865,7 +865,7 @@ namespace mongo {
         unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
-        NamespaceDetailsTransient::get( ns ).registerWriteOp();
+        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
@@ -968,7 +968,7 @@ namespace mongo {
             return insert(ns, objNew.objdata(), objNew.objsize(), false);
         }
 
-        NamespaceDetailsTransient::get( ns ).registerWriteOp();
+        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
         d->paddingFits();
 
         /* have any index keys changed? */
@@ -1485,8 +1485,9 @@ namespace mongo {
         d->nrecords++;
         d->datasize += r->netLength();
 
+        // we don't bother clearing those stats for the god tables - also god is true when adidng a btree bucket
         if ( !god )
-            NamespaceDetailsTransient::get( ns ).registerWriteOp();
+            NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
             int idxNo = tableToIndex->nIndexes;
@@ -1600,7 +1601,7 @@ namespace mongo {
         log(1) << "dropDatabase " << cl << endl;
         assert( cc().database()->name == cl );
 
-        closeClient( cl );
+        closeDatabase( cl );
         _deleteDataFiles(cl);
     }
 
@@ -1728,7 +1729,7 @@ namespace mongo {
 
         bool res = cloneFrom(localhost.c_str(), errmsg, dbName, 
                              /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
-        closeClient( dbName, reservedPathString.c_str() );
+        closeDatabase( dbName, reservedPathString.c_str() );
 
         if ( !res ) {
             problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
@@ -1738,7 +1739,7 @@ namespace mongo {
         }
 
         assert( !setClient( dbName ) );
-        closeClient( dbName );
+        closeDatabase( dbName );
 
         if ( backupOriginalFiles )
             _renameForBackup( dbName, reservedPath );

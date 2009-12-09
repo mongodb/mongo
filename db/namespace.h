@@ -514,71 +514,87 @@ namespace mongo {
        CAUTION: Are you maintaining this properly on a collection drop()?  A dropdatabase()?  Be careful.
                 The current field "allIndexKeys" may have too many keys in it on such an occurrence;
                 as currently used that does not cause anything terrible to happen.
+
+       todo: cleanup code, need abstractions and separation
     */
     class NamespaceDetailsTransient : boost::noncopyable {
+        /* general ------------------------------------------------------------- */
+    private:
         string _ns;
-        bool haveIndexKeys;
-        set<string> allIndexKeys;
-        void computeIndexKeys();
-        int _writeCount;
-        map< QueryPattern, pair< BSONObj, long long > > _queryCache;
-
-        /* for collection-level logging -- see CmdLogCollection */ 
-        string logNS_;
-        bool logValid_;
+        void reset();
+        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
-        NamespaceDetailsTransient(const char *ns) : _ns(ns),haveIndexKeys(), _writeCount(), logValid_() {
-            haveIndexKeys=false; /*lazy load them*/
-        }
+        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _cll_enabled() { }
+        static NamespaceDetailsTransient& get(const char *ns);
+        void addedIndex() { reset(); }
+        void deletedIndex() { reset(); }
+        /* Drop cached information on all namespaces beginning with the specified prefix.
+           Can be useful as index namespaces share the same start as the regular collection. 
+           SLOW - sequential scan of all NamespaceDetailsTransient objects */
+        static void clearForPrefix(const char *prefix);
 
+        /* indexKeys() cache ---------------------------------------------------- */
+        /* assumed to be in write lock for this */
+    private:
+        bool _keysComputed;
+        set<string> _indexKeys;
+        void computeIndexKeys();
+    public:
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a secondary component of a compound index.)
         */
         set<string>& indexKeys() {
-            if ( !haveIndexKeys ) {
-                haveIndexKeys=true;
+            if ( !_keysComputed )
                 computeIndexKeys();
-            }
-            return allIndexKeys;
+            return _indexKeys;
         }
 
-        void addedIndex() { reset(); }
-        void deletedIndex() { reset(); }
-        void registerWriteOp() {
-            if ( _queryCache.empty() )
+        /* query cache (for query optimizer) ------------------------------------- */
+    private:
+        int _qcWriteCount;
+        map< QueryPattern, pair< BSONObj, long long > > _qcCache;
+    public:
+        void clearQueryCache() { // public for unit tests
+            _qcCache.clear();
+            _qcWriteCount = 0;
+        }
+        /* you must notify the cache if you are doing writes, as query plan optimality will change */
+        void notifyOfWriteOp() {
+            if ( _qcCache.empty() )
                 return;
-            if ( ++_writeCount >= 100 )
+            if ( ++_qcWriteCount >= 100 )
                 clearQueryCache();
         }
-        void clearQueryCache() {
-            _queryCache.clear();
-            _writeCount = 0;
-        }
         BSONObj indexForPattern( const QueryPattern &pattern ) {
-            return _queryCache[ pattern ].first;
+            return _qcCache[ pattern ].first;
         }
         long long nScannedForPattern( const QueryPattern &pattern ) {
-            return _queryCache[ pattern ].second;
+            return _qcCache[ pattern ].second;
         }
         void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
-            _queryCache[ pattern ] = make_pair( indexKey, nScanned );
+            _qcCache[ pattern ] = make_pair( indexKey, nScanned );
         }
-        
-        void startLog( int logSizeMb = 128 );
-        void invalidateLog();
-        bool validateCompleteLog();
-        string logNS() const { return logNS_; }
-        bool logValid() const { return logValid_; }
-        
+
+        /* for collection-level logging -- see CmdLogCollection ----------------- */ 
     private:
-        void reset();
-        void dropLog();
-        static std::map< string, shared_ptr< NamespaceDetailsTransient > > map_;
+        string _cll_ns; // "local.temp.oplog." + _ns;
+        bool _cll_enabled;
+        void cllDrop(); // drop _cll_ns
     public:
-        static NamespaceDetailsTransient& get(const char *ns);
-        // Drop cached information on all namespaces beginning with the specified prefix.
-        static void drop(const char *prefix);
-    };
+        string cllNS() const { return _cll_ns; }
+        bool cllEnabled() const { return _cll_enabled; }
+        void cllStart( int logSizeMb = 128 ); // begin collection level logging
+        void cllInvalidate();
+        bool cllValidateComplete();
+
+    }; /* NamespaceDetailsTransient */
+
+    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = _map[ ns ];
+        if ( t.get() == 0 )
+            t.reset( new NamespaceDetailsTransient(ns) );
+        return *t;
+    }
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
        if you will: at least the core parts.  (Additional info in system.* collections.)

@@ -797,7 +797,8 @@ namespace mongo {
 #else
         if ( JS_InstanceOf( c->_context , o, &js_DateClass , 0 ) ){
             jsdouble d = js_DateGetMsecSinceEpoch( c->_context , o );
-            b.appendDate( name.c_str() , Date_t(d) );
+            //TODO: make signed
+            b.appendDate( name.c_str() , Date_t((unsigned long long)d) );
             return true;
         }
 #endif

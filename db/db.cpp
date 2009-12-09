@@ -339,7 +339,7 @@ namespace mongo {
                     return;
                 }
             } else {
-                closeClient( dbName.c_str() );
+                closeDatabase( dbName.c_str() );
             }
         }
 

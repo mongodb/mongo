@@ -936,29 +936,25 @@ namespace mongo {
 
     /* makes a new BSONObj with the fields specified in pattern.
        fields returned in the order they appear in pattern.
-       if any field missing from the original object, that field
-       in the key will be null.
+       if any field missing or undefined in the original object, that field
+       in the output will be null.
 
        n^2 implementation bad if pattern and object have lots
        of fields - normally pattern doesn't so should be fine.
     */
-    BSONObj BSONObj::extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const {
-        nameWithinArray = "";
+    BSONObj BSONObj::extractFieldsDotted(BSONObj pattern) const {
+        BSONObjBuilder b;
         BSONObjIterator i(pattern);
-        while ( i.moreWithEOO() ) {
+        while (i.more()) {
             BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
             const char *name = e.fieldName();
-            BSONElement x = getFieldDottedOrArray( name );
-            if ( x.eoo() ) {
-                b.appendNull( "" );
-                continue;
-            } else if ( x.type() == Array ) {
-                // NOTE: Currently set based on last array discovered.
-                nameWithinArray = name;
+
+            BSONElement x = getFieldDotted( name );
+            if ( x.eoo() || x.type() == Undefined ) {
+                b.appendNull(name);
+            } else {
+                b.appendAs(x, name);
             }
-            b.appendAs(x, "");
         }
         return b.done();
     }
