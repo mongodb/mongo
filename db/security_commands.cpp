@@ -97,11 +97,17 @@ namespace mongo {
             stringstream digestBuilder;
 
             {
+                bool reject = false;
                 nonce *ln = lastNonce.release();
-                digestBuilder << hex << *ln;
-                
-                if( ln == 0 || digestBuilder.str() != received_nonce ) {
-                    log() << "auth: bad nonce received. could be a driver bug or a security attack. db:" << cc().database()->name << '\n';
+                if ( ln == 0 ) {
+                    reject = true;
+                } else {
+                    digestBuilder << hex << *ln;
+                    reject = digestBuilder.str() != received_nonce;
+                }
+                    
+                if ( reject ) {
+                    log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << cc().database()->name << '\n';
                     errmsg = "auth fails";
                     sleepmillis(30);
                     return false;
