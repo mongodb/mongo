@@ -71,7 +71,8 @@ namespace mongo {
             builder.appendNull( fieldName );
             break;
         case Date:
-            builder.appendDate( fieldName , Date_t(getNumber( scopeName )) );
+            // TODO: make signed
+            builder.appendDate( fieldName , Date_t((unsigned long long)getNumber( scopeName )) );
             break;
         default:
             stringstream temp;
