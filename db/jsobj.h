@@ -828,16 +828,14 @@ namespace mongo {
 
         /** makes a new BSONObj with the fields specified in pattern.
            fields returned in the order they appear in pattern.
-           if any field is missing from the object, that field in the
-           key will be null.
+           if any field is missing or undefined in the object, that field in the
+           output will be null.
 
-           sets element field names to empty string
+           sets output field names to match pattern field names.
            If an array is encountered while scanning the dotted names in pattern,
-           that array is added to the returned obj, rather than any subobjects
-           referenced within the array.  The variable nameWithinArray is set to the
-           name of the requested field within the returned array.
+           that field is treated as missing.
         */
-        BSONObj extractFieldsDotted(BSONObj pattern, BSONObjBuilder& b, const char *&nameWithinArray) const; // this version, builder owns the returned obj buffer
+        BSONObj extractFieldsDotted(BSONObj pattern) const;
         
         /**
            sets element field names to empty string
