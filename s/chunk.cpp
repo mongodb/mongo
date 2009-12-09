@@ -347,9 +347,7 @@ namespace mongo {
     
     void Chunk::_markModified(){
         _modified = true;
-
-        unsigned long long t = time(0);
-        t *= 1000;
+        // set to 0 so that the config server sets it
         _lastmod = 0;
     }
 
