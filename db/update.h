@@ -247,6 +247,26 @@ namespace mongo {
             }
             return false;
         }
+        bool haveConflictingMod( const string& fieldName ){
+            size_t idx = fieldName.find( '.' );
+            if ( idx == string::npos )
+                idx = fieldName.size();
+            
+            ModHolder::const_iterator start = _mods.lower_bound(fieldName.substr(0,idx));
+            for ( ; start != _mods.end(); start++ ){
+                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first );
+                switch ( r ){
+                case LEFT_SUBFIELD: return true;
+                case LEFT_BEFORE: return false;
+                case SAME: return true;
+                case RIGHT_BEFORE: return false;
+                case RIGHT_SUBFIELD: return true;
+                }
+            }
+            return false;
+
+            
+        }
 
         bool haveArrayDepMod() const {
             for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )

@@ -29,8 +29,12 @@ namespace mongo {
     void Mod::apply( BSONObjBuilder& b , BSONElement in ){
         switch ( op ){
         case INC:
+            // TODO: this is horrible
             inc( in );
-            b.appendAs( elt , shortFieldName ); // TODO: this is horrible
+            b.appendAs( elt , shortFieldName ); 
+            break;
+        case SET:
+            b.appendAs( elt , shortFieldName );
             break;
         default:
             stringstream ss;
@@ -169,8 +173,9 @@ namespace mongo {
             createNewFromMods( nr , bb , BSONObj() );
             bb.done();
         }
-        else
+        else {
             appendNewFromMod( m , b );
+        }
         
     }
     
@@ -189,7 +194,9 @@ namespace mongo {
             FieldCompareResult cmp = compareDottedFieldNames( m->second.fieldName , field );
 
             switch ( cmp ){
-            case LEFT_SUBFIELD: {
+                
+            case LEFT_SUBFIELD: { 
+                // this means the Mod is embeddeed under this element
                 uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object );
                 BSONObjBuilder bb ( b.subobjStart( e.fieldName() ) );
                 stringstream nr; nr << root << e.fieldName() << ".";
@@ -426,7 +433,7 @@ namespace mongo {
                 uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
                 uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
                 uassert( "Field name duplication not allowed with modifiers", ! haveModForField( m.fieldName ) );
-
+                uassert( "have conflict mod" , ! haveConflictingMod( m.fieldName ) );
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 m.elt = f;

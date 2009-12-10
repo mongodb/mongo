@@ -226,7 +226,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:{c:4}}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << "lllll" ) ) );
-            ASSERT( client().findOne( ns(), BSON( "a.b" << "lllll" ) ).woCompare( fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) ) == 0 );
+            ASSERT_EQUALS( client().findOne( ns(), BSON( "a.b" << "lllll" ) ) , fromjson( "{'_id':0,a:{b:'lllll',c:4}}" ) );
         }
     };
 
@@ -315,7 +315,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a" << 2 << "a.b" << 1 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0}" ) ) == 0 );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0}" ) );
         }
     };
 
@@ -534,12 +534,12 @@ namespace UpdateTests {
                 ASSERT( ! m.haveModForField( "a.c" ) );
                 ASSERT( ! m.haveModForField( "a" ) );
                 
-                ASSERT( m.haveModForFieldOrSubfield( "x" ) );
-                ASSERT( m.haveModForFieldOrSubfield( "a" ) );
-                ASSERT( m.haveModForFieldOrSubfield( "a.b" ) );
-                ASSERT( ! m.haveModForFieldOrSubfield( "a.bc" ) );
-                ASSERT( ! m.haveModForFieldOrSubfield( "a.c" ) );
-                ASSERT( ! m.haveModForFieldOrSubfield( "a.a" ) );
+                ASSERT( m.haveConflictingMod( "x" ) );
+                ASSERT( m.haveConflictingMod( "a" ) );
+                ASSERT( m.haveConflictingMod( "a.b" ) );
+                ASSERT( ! m.haveConflictingMod( "a.bc" ) );
+                ASSERT( ! m.haveConflictingMod( "a.c" ) );
+                ASSERT( ! m.haveConflictingMod( "a.a" ) );
             }
         };
         
@@ -613,7 +613,16 @@ namespace UpdateTests {
                 
             }
         };
-        
+
+        class set1 : public Base {
+        public:
+            void run(){
+                test( BSON( "$set" << BSON( "x" << 17 ) ) , BSONObj() , BSON( "x" << 17 ) );
+                test( BSON( "$set" << BSON( "x" << 17 ) ) , BSON( "x" << 5 ) , BSON( "x" << 17 ) );
+
+                test( BSON( "$set" << BSON( "x.a" << 17 ) ) , BSON( "z" << 5 ) , BSON( "z" << 5 << "x" << BSON( "a" << 17 ) ) );
+            }
+        };        
 
     };
     
@@ -674,6 +683,7 @@ namespace UpdateTests {
             add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();
             add< ModSetTests::inc2 >();
+            add< ModSetTests::set1 >();
         }
     } myall;
 
