@@ -862,6 +862,8 @@ def concatjs(target, source, env):
 
     fullSource = ""
 
+    first = True
+
     for s in source:
         f = open( str(s) , 'r' )
         for l in f:
@@ -869,8 +871,21 @@ def concatjs(target, source, env):
             if len ( l ) == 0:
                 continue
             
-            fullSource += l + "\n"
+            if l == "}":
+                fullSource += "}"
+                continue
+
+            if first:
+                first = False
+            else:
+                fullSource += "\n"
+
+            fullSource += l
+
+    fullSource += "\n"
     
+    fullSource = re.compile( r'/\*\*.*?\*/' , re.M | re.S ).sub( "" , fullSource )
+
     out = open( outFile , 'w' )
     out.write( fullSource )
 
