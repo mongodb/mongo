@@ -10,8 +10,10 @@ soonCount = function( m, count ) {
 
 doTest = function( signal ) {
 
-    ms1 = new ReplTest( "repl6tests-1" );
-    ms2 = new ReplTest( "repl6tests-2", ms1.ports[ 0 ] );
+    ports = allocatePorts( 3 );
+    
+    ms1 = new ReplTest( "repl6tests-1", [ ports[ 0 ], ports[ 1 ] ] );
+    ms2 = new ReplTest( "repl6tests-2", [ ports[ 0 ], ports[ 2 ] ] );
 
     m = ms1.start( true );
     s1 = ms1.start( false );

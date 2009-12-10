@@ -530,13 +530,9 @@ ToolTest.prototype.runTool = function(){
 }
 
 
-ReplTest = function( name, masterPort ){
+ReplTest = function( name, ports ){
     this.name = name;
-    if ( masterPort ) {
-        this.ports = [ masterPort, allocatePorts( 1 )[ 0 ] ]
-    } else {
-        this.ports = allocatePorts( 2 );
-    }
+    this.ports = ports || allocatePorts( 2 );
 }
 
 ReplTest.prototype.getPort = function( master ){
