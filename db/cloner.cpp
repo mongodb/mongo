@@ -110,7 +110,17 @@ namespace mongo {
 
             /* assure object is valid.  note this will slow us down a little. */
             if ( !tmp.valid() ) {
-                out() << "skipping corrupt object from " << from_collection << '\n';
+                stringstream ss;
+                ss << "skipping corrupt object from " << from_collection;
+                BSONElement e = tmp.firstElement();
+                try {
+                    e.validate();
+                    ss << " firstElement: " << e;
+                }
+                catch( ... ){
+                    ss << " firstElement corrupt";
+                }
+                out() << ss.str() << endl;
                 continue;
             }
 
