@@ -53,7 +53,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
     print("\tdb.foo.totalIndexSize() - size in bytes of all the indexes");
     print("\tdb.foo.totalSize() - storage allocated for all data and indexes");
-    print("\tdb.foo.update(query, object[, upsert_bool])");
+    print("\tdb.foo.update(query, object[, upsert_bool, multi_bool])");
     print("\tdb.foo.validate() - SLOW");
     print("\tdb.foo.getShardVersion() - only for use with sharding" );
 }
