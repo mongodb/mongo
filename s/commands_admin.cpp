@@ -213,6 +213,8 @@ namespace mongo {
                     errmsg = "already enabled";
                     return false;
                 }
+                
+                log() << "enabling sharding on: " << dbname << endl;
 
                 config->enableSharding();
                 config->save( true );
@@ -283,6 +285,8 @@ namespace mongo {
 
                     conn.done();
                 }
+                
+                log() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
                 config->save( true );
@@ -359,7 +363,7 @@ namespace mongo {
                         return false;
                     }
                 }
-
+                
                 ChunkManager * info = config->getChunkManager( ns );
                 Chunk& old = info->findChunk( find );
 
@@ -438,6 +442,8 @@ namespace mongo {
                     errmsg = "you have to specify where you want to move the chunk";
                     return false;
                 }
+                
+                log() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManager * info = config->getChunkManager( ns );
                 Chunk& c = info->findChunk( find );

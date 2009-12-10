@@ -107,7 +107,10 @@ namespace mongo {
         bool partOfShardKey(const string& key ) const {
             return patternfields.count( key ) > 0;
         }
-        
+
+        operator string() const {
+            return pattern.toString();
+        }
     private:
         BSONObj pattern;
         BSONObj gMin;

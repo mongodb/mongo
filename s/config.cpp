@@ -67,6 +67,7 @@ namespace mongo {
         if ( isSharded( ns ) )
             throw UserException( "already sharded" );
 
+        log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
 
         info = new ChunkManager( this , ns , fieldsAndOrder , unique );
@@ -173,7 +174,7 @@ namespace mongo {
          * 5) drop everywhere to clean up loose ends
          */
 
-        log(1) << "DBConfig::dropDatabase: " << _name << endl;
+        log() << "DBConfig::dropDatabase: " << _name << endl;
         
         // 1
         if ( ! configServer.allUp( errmsg ) ){
