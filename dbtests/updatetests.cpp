@@ -357,7 +357,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[1,5]}" ) ) == 0 );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,5]}" ) );
         }
     };
 
@@ -384,7 +384,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0}" ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "a" << 5 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:[5]}" ) ) == 0 );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[5]}" ) );
         }
     };
 
@@ -623,6 +623,13 @@ namespace UpdateTests {
                 test( BSON( "$set" << BSON( "x.a" << 17 ) ) , BSON( "z" << 5 ) , BSON( "z" << 5 << "x" << BSON( "a" << 17 ) ) );
             }
         };        
+        
+        class push1 : public Base {
+        public:
+            void run(){
+                test( BSON( "$push" << BSON( "a" << 5 ) ) , fromjson( "{a:[1]}" ) , fromjson( "{a:[1,5]}" ) );
+            }
+        };
 
     };
     
@@ -684,6 +691,7 @@ namespace UpdateTests {
             add< ModSetTests::inc1 >();
             add< ModSetTests::inc2 >();
             add< ModSetTests::set1 >();
+            add< ModSetTests::push1 >();
         }
     } myall;
 

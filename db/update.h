@@ -24,6 +24,7 @@ namespace mongo {
 
     /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
+        //        0    1    2     3         4     5          6   
         enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
         const char *fieldName;
         const char *shortFieldName;
@@ -149,31 +150,42 @@ namespace mongo {
             }
         }
 
-     void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
-            if ( m.op == Mod::PUSH ) {
-                /*
-                BSONObjBuilder arr( b.subarrayStartAs( m.fieldName ) );
+        void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
+            
+            switch ( m.op ){
+                
+            case Mod::PUSH: { 
+                BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
                 arr.appendAs( m.elt, "0" );
                 arr.done();
                 m.pushStartSize = -1;
-                */
-                uassert( "appendNewFromMod push not done" , 0 );
+                break;
             } 
-            else if ( m.op == Mod::PUSH_ALL ) {
-                //b.appendAs( m.elt, m.fieldName );
-                //m.pushStartSize = -1;
-                uassert( "appendNewFromMod push_all not done" , 0 );
-            } 
-            else if ( m.op == Mod::PULL || m.op == Mod::PULL_ALL ) {
-            }
-            else if ( m.op == Mod::INC || m.op == Mod::SET ){
+                
+            case Mod::PUSH_ALL: {
                 b.appendAs( m.elt, m.shortFieldName );
+                m.pushStartSize = -1;
+                break;
+            } 
+                
+            case Mod::PULL:
+            case Mod::PULL_ALL:
+                // no-op b/c pull of nothing does nothing
+                break;
+                
+            case Mod::INC:
+            case Mod::SET: {
+                b.appendAs( m.elt, m.shortFieldName );
+                break;
             }
-            else {
-                uassert( "unknonw mod" , 0 );
+            default: 
+                stringstream ss;
+                ss << "unknown mod in appendNewFromMod: " << m.op;
+                throw UserException( ss.str() );
             }
+         
         }
-
+        
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
                  left.length() > 0 && left[ left.length() - 1 ] != '.';

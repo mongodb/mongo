@@ -28,14 +28,96 @@ namespace mongo {
 
     void Mod::apply( BSONObjBuilder& b , BSONElement in ){
         switch ( op ){
-        case INC:
+        
+        case INC: {
             // TODO: this is horrible
             inc( in );
             b.appendAs( elt , shortFieldName ); 
             break;
-        case SET:
+        }
+            
+        case SET: {
             b.appendAs( elt , shortFieldName );
             break;
+        }
+
+        case PUSH: {
+            uassert( "$push can only be applied to an array" , in.type() == Array );
+            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjIterator i( in.embeddedObject() );
+            int n=0;
+            while ( i.more() ){
+                bb.append( i.next() );
+                n++;
+            }
+
+            pushStartSize = n;
+
+            bb.appendAs( elt ,  bb.numStr( n ) );
+            bb.done();
+            break;
+        }
+            
+        case PUSH_ALL: {
+            uassert( "$pushAll can only be applied to an array" , in.type() == Array );
+            uassert( "$pushAll has to be passed an array" , elt.type() );
+
+            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            
+            BSONObjIterator i( in.embeddedObject() );
+            int n=0;
+            while ( i.more() ){
+                bb.append( i.next() );
+                n++;
+            }
+
+            pushStartSize = n;
+
+            i = BSONObjIterator( elt.embeddedObject() );
+            while ( i.more() ){
+                bb.appendAs( i.next() , bb.numStr( n++ ) );
+            }
+
+            bb.done();
+            break;
+        }
+
+        case POP: {
+            uassert( "$pop can only be applied to an array" , in.type() == Array );
+            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+                        
+            int n = 0;
+
+            BSONObjIterator i( in.embeddedObject() );
+            if ( elt.isNumber() && elt.number() < 0 ){
+                // pop from front
+                if ( i.more() ){
+                    i.next();
+                    n++;
+                }
+
+                while( i.more() ) {
+                    bb.appendAs( i.next() , bb.numStr( n - 1 ).c_str() );
+                    n++;
+                }
+            }
+            else {
+                // pop from back
+                while( i.more() ) {
+                    n++;
+                    BSONElement arrI = i.next();
+                    if ( i.more() ){
+                        bb.append( arrI );
+                    }
+                }
+            }
+
+            pushStartSize = n;
+            assert( pushStartSize == in.embeddedObject().nFields() );
+            bb.done();
+            break;
+        }
+
         default:
             stringstream ss;
             ss << "Mod::apply can't handle type: " << op;

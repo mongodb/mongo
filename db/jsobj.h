@@ -1146,6 +1146,11 @@ namespace mongo {
             b.append((void *) e.value(), e.valuesize());
         }
 
+        void appendAs(const BSONElement& e, const string& as) {
+            appendAs( e , as.c_str() );
+        }
+
+
         /** add a subobject as a member */
         void append(const char *fieldName, BSONObj subObj) {
             b.append((char) Object);
