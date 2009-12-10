@@ -10,15 +10,9 @@
 		9302D9930F30AB8C00DFA4EF /* collection.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = collection.js; sourceTree = "<group>"; };
 		9302D9940F30AB8C00DFA4EF /* db.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = db.js; sourceTree = "<group>"; };
 		9302D9950F30AB8C00DFA4EF /* dbshell.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbshell.cpp; sourceTree = "<group>"; };
-		9302D9970F30AB8C00DFA4EF /* md5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = md5.js; sourceTree = "<group>"; };
 		9302D9980F30AB8C00DFA4EF /* mongo.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = mongo.js; sourceTree = "<group>"; };
 		9302D9990F30AB8C00DFA4EF /* mongo.jsall */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mongo.jsall; sourceTree = "<group>"; };
-		9302D99A0F30AB8C00DFA4EF /* mongo.jsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mongo.jsh; sourceTree = "<group>"; };
-		9302D99B0F30AB8C00DFA4EF /* MongoJS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MongoJS.cpp; sourceTree = "<group>"; };
-		9302D99C0F30AB8C00DFA4EF /* MongoJS.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MongoJS.h; sourceTree = "<group>"; };
 		9302D99E0F30AB8C00DFA4EF /* query.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = query.js; sourceTree = "<group>"; };
-		9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ShellUtils.cpp; sourceTree = "<group>"; };
-		9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ShellUtils.h; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
 		930B844D0FA10D1C00F22B4B /* optime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = optime.h; sourceTree = "<group>"; };
 		931183420F8277FD00A6DC44 /* repl7.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = repl7.js; sourceTree = "<group>"; };
@@ -209,6 +203,7 @@
 		93A6E10E0F24CFD300DA4EBF /* security.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = security.h; sourceTree = "<group>"; };
 		93A6E10F0F24CFEA00DA4EBF /* security_commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = security_commands.cpp; sourceTree = "<group>"; };
 		93A71D2D10D04D15003C9E90 /* auth2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth2.js; sourceTree = "<group>"; };
+		93A71DB610D06CAD003C9E90 /* mr.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = mr.js; sourceTree = "<group>"; };
 		93A8CD170F33B78D00C92B85 /* mmap_mm.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mmap_mm.cpp; path = util/mmap_mm.cpp; sourceTree = SOURCE_ROOT; };
 		93A8CD180F33B7A000C92B85 /* mmap_posix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mmap_posix.cpp; path = util/mmap_posix.cpp; sourceTree = SOURCE_ROOT; };
 		93A8CD190F33B7AF00C92B85 /* mmap_win.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mmap_win.cpp; path = util/mmap_win.cpp; sourceTree = SOURCE_ROOT; };
@@ -350,20 +345,15 @@
 		9302D9920F30AB8C00DFA4EF /* shell */ = {
 			isa = PBXGroup;
 			children = (
+				93A71DB610D06CAD003C9E90 /* mr.js */,
 				931979800FBC67FB001FE537 /* mongo_vstudio.cpp */,
 				931979810FBC67FB001FE537 /* utils.cpp */,
 				9302D9930F30AB8C00DFA4EF /* collection.js */,
 				9302D9940F30AB8C00DFA4EF /* db.js */,
 				9302D9950F30AB8C00DFA4EF /* dbshell.cpp */,
-				9302D9970F30AB8C00DFA4EF /* md5.js */,
 				9302D9980F30AB8C00DFA4EF /* mongo.js */,
 				9302D9990F30AB8C00DFA4EF /* mongo.jsall */,
-				9302D99A0F30AB8C00DFA4EF /* mongo.jsh */,
-				9302D99B0F30AB8C00DFA4EF /* MongoJS.cpp */,
-				9302D99C0F30AB8C00DFA4EF /* MongoJS.h */,
 				9302D99E0F30AB8C00DFA4EF /* query.js */,
-				9302D99F0F30AB8C00DFA4EF /* ShellUtils.cpp */,
-				9302D9A00F30AB8C00DFA4EF /* ShellUtils.h */,
 				9302D9A20F30AB8C00DFA4EF /* utils.js */,
 			);
 			path = shell;

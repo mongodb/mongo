@@ -439,6 +439,7 @@ ReplPair.prototype.master = function() { return this.master_; }
 ReplPair.prototype.slave = function() { return this.slave_; }
 ReplPair.prototype.right = function() { return this.rightC_; }
 ReplPair.prototype.left = function() { return this.leftC_; }
+ReplPair.prototype.arbiter = function() { return this.arbiterC_; }
 
 ReplPair.prototype.killNode = function( mongo, signal ) {
     signal = signal || 15;
@@ -449,6 +450,10 @@ ReplPair.prototype.killNode = function( mongo, signal ) {
     if ( this.rightC_ != null && this.rightC_.host == mongo.host ) {
         stopMongod( this.right_.port_ );
         this.rightC_ = null;
+    }
+    if ( this.arbiterC_ != null && this.arbiterC_.host == mongo.host ) {
+        stopMongod( this.arbiter_.port_ );
+        this.arbiterC_ = null;
     }
 }
 
@@ -525,9 +530,13 @@ ToolTest.prototype.runTool = function(){
 }
 
 
-ReplTest = function( name ){
+ReplTest = function( name, masterPort ){
     this.name = name;
-    this.ports = allocatePorts( 2 );
+    if ( masterPort ) {
+        this.ports = [ masterPort, allocatePorts( 1 )[ 0 ] ]
+    } else {
+        this.ports = allocatePorts( 2 );
+    }
 }
 
 ReplTest.prototype.getPort = function( master ){
@@ -552,7 +561,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
         extra = {};
 
     if ( ! extra.oplogSize )
-        extra.oplogSize = 10;
+        extra.oplogSize = "1";
         
     var a = []
     if ( putBinaryFirst )

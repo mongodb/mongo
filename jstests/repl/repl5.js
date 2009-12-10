@@ -1,7 +1,5 @@
 // Test auto reclone after failed initial clone
 
-var baseName = "jstests_repl5test";
-
 soonCountAtLeast = function( db, coll, count ) {
     assert.soon( function() { 
 //                print( "count: " + s.getDB( db )[ coll ].find().count() );
@@ -11,24 +9,23 @@ soonCountAtLeast = function( db, coll, count ) {
 
 doTest = function( signal ) {
 
-    ports = allocatePorts( 2 );
+    rt = new ReplTest( "repl5tests" );
     
-    m = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    m = rt.start( true );
     
     ma = m.getDB( "a" ).a;
     for( i = 0; i < 10000; ++i )
         ma.save( { i:i } );
     
-    s = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    s = rt.start( false );
     soonCountAtLeast( "a", "a", 1 );
-    stopMongod( ports[ 1 ], signal );
+    rt.stop( false, signal );
 
-    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    s = rt.start( false, null, true );
     sleep( 1000 );
     soonCountAtLeast( "a", "a", 10000 );
 
-    ports.forEach( function( x ) { stopMongod( x ); } );
-
+    rt.stop();
 }
 
 doTest( 15 ); // SIGTERM

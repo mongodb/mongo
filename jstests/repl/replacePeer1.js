@@ -1,4 +1,4 @@
-// test replace peer
+// test replace peer on master
 
 var baseName = "jstests_replacepeer1test";
 
@@ -32,51 +32,36 @@ doTest = function( signal ) {
 
     ports = allocatePorts( 4 );
 
-    // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    r = startMongod( "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    a = new MongodRunner( ports[ 0 ], "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( ports[ 1 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ] );
+    r = new MongodRunner( ports[ 3 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ] );
 
-    assert.soon( function() {
-                am = ismaster( a );
-                lm = ismaster( l );
-                rm = ismaster( r );
+    rp = new ReplPair( l, r, a );
+    rp.start();
+    rp.waitForSteadyState( [ 1, 0 ], rp.right().host );
+    
+    checkWrite( rp.master(), rp.slave() );
 
-                assert( am == 1 );
-                assert( lm == -1 || lm == 0 );
-                assert( rm == -1 || rm == 0 || rm == 1 );
+    rp.killNode( rp.slave(), signal );
 
-                return ( lm == 0 && rm == 1 );
-                } );
+    writeOne( rp.master() );
 
-    checkWrite( r, l );
+    assert.commandWorked( rp.master().getDB( "admin" ).runCommand( {replacepeer:1} ) );
 
-    stopMongod( ports[ 1 ], signal );
+    rp.killNode( rp.master(), signal );
+    rp.killNode( rp.arbiter(), signal );
+    
+    o = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ] );
+    r = new MongodRunner( ports[ 3 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
 
-    writeOne( r );
+    rp = new ReplPair( o, r, a );
+    resetDbpath( "/data/db/" + baseName + "-left" );
+    rp.start( true );
+    rp.waitForSteadyState( [ 1, 0 ], rp.right().host );
 
-    assert.eq( 1, r.getDB( "admin" ).runCommand( {replacepeer:1} ).ok );
-
-    stopMongod( ports[ 3 ], signal );
-
-    l = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    r = startMongoProgram( "mongod", "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 2 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-
-    assert.soon( function() {
-                am = ismaster( a );
-                lm = ismaster( l );
-                rm = ismaster( r );
-
-                assert( am == 1 );
-                assert( lm == -1 || lm == 0 );
-                assert( rm == -1 || rm == 0 || rm == 1 );
-
-                return ( lm == 0 && rm == 1 );
-                } );
-
-    checkWrite( r, l );
-    l.setSlaveOk();
-    assert.eq( 3, l.getDB( baseName ).z.find().toArray().length );
+    checkWrite( rp.master(), rp.slave() );
+    rp.slave().setSlaveOk();
+    assert.eq( 3, rp.slave().getDB( baseName ).z.find().toArray().length );
 
     ports.forEach( function( x ) { stopMongod( x ); } );
 

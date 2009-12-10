@@ -1,4 +1,4 @@
-// test replace peer
+// test replace peer on slave
 
 var baseName = "jstests_replacepeer2test";
 
@@ -32,54 +32,37 @@ doTest = function( signal ) {
 
     ports = allocatePorts( 4 );
 
-    // spec small oplog for fast startup on 64bit machines
-    a = startMongod( "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "-arbiter", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    l = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 3 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    r = startMongod( "--port", ports[ 3 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    a = new MongodRunner( ports[ 0 ], "/data/db/" + baseName + "-arbiter" );
+    l = new MongodRunner( ports[ 1 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ] );
+    r = new MongodRunner( ports[ 3 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ] );
+    
+    rp = new ReplPair( l, r, a );
+    rp.start();
+    rp.waitForSteadyState( [ 1, 0 ], rp.right().host );
 
-    assert.soon( function() {
-                am = ismaster( a );
-                lm = ismaster( l );
-                rm = ismaster( r );
-
-                assert( am == 1 );
-                assert( lm == -1 || lm == 0 );
-                assert( rm == -1 || rm == 0 || rm == 1 );
-
-                return ( lm == 0 && rm == 1 );
-                } );
-
-    checkWrite( r, l );
+    checkWrite( rp.master(), rp.slave() );
 
     // allow slave to finish initial sync
-    assert.soon( function() { return 1 == l.getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
+    assert.soon( function() { return 1 == rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
 
-    // Should not be saved to l.
-    writeOne( r );
+    // Should not be saved to slave.
+    writeOne( rp.master() );
     // Make sure there would be enough time to save to l if we hadn't called replacepeer.
     sleep( 10000 );
 
-    stopMongod( ports[ 3 ], signal );
-    stopMongod( ports[ 1 ], signal );
+    ports.forEach( function( x ) { stopMongod( x, signal ); } );
 
-    l = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-left", "--pairwith", "127.0.0.1:" + ports[ 2 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
-    r = startMongod( "--port", ports[ 2 ], "--dbpath", "/data/db/" + baseName + "-right", "--pairwith", "127.0.0.1:" + ports[ 1 ], "--arbiter", "127.0.0.1:" + ports[ 0 ], "--oplogSize", "1", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    l = new MongodRunner( ports[ 1 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
+    o = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ] );
 
-    assert.soon( function() {
-                am = ismaster( a );
-                lm = ismaster( l );
-                rm = ismaster( r );
-
-                assert( am == 1 );
-                assert( lm == -1 || lm == 0 || lm == 1 );
-                assert( rm == -1 || rm == 0 );
-
-                return ( lm == 1 && rm == 0 );
-                } );
-
-    checkWrite( l, r );
-    r.setSlaveOk();
-    assert.eq( 2, r.getDB( baseName ).z.find().toArray().length );
+    rp = new ReplPair( l, o, a );
+    resetDbpath( "/data/db/" + baseName + "-right" );
+    rp.start( true );
+    rp.waitForSteadyState( [ 1, 0 ], rp.left().host );
+    
+    checkWrite( rp.master(), rp.slave() );
+    rp.slave().setSlaveOk();
+    assert.eq( 2, rp.slave().getDB( baseName ).z.find().toArray().length );
 
     ports.forEach( function( x ) { stopMongod( x ); } );
 
