@@ -550,14 +550,6 @@ namespace UpdateTests {
 
             
             void test( BSONObj morig , BSONObj in , BSONObj wanted ){
-                if ( false ){
-                    int its = 1000;
-                    double o = _test( morig , in , wanted , false , its );
-                    double n = _test( morig , in , wanted , true , its );
-                    double r = o / n;
-                    cout << " new is : " << r << " x faster" << endl;
-                }
-
                 BSONObj m = morig.copy();
                 ModSet set;
                 set.getMods( m );
@@ -565,30 +557,6 @@ namespace UpdateTests {
                 BSONObj out = set.createNewFromMods( in );
                 ASSERT_EQUALS( wanted , out );
             }
-            
-            unsigned long long _test( BSONObj morig , BSONObj in , BSONObj wanted , bool newVersion , int its ){
-                Timer t;
-                for ( int i=0; i<its; i++ ){
-                    BSONObj m = morig.copy();
-                    ModSet set;
-                    set.getMods( m );
-                    BSONObj out;
-                    if ( newVersion )
-                        out = set.createNewFromMods_r( in );
-                    else
-                        out = set.createNewFromMods_l( in );
-
-                    if ( wanted == out )
-                        continue;
-                    
-                    cout << "wanted: " << wanted << " got: " << out << " newVersion: " << newVersion << " mod: " << morig << endl;
-
-                    ASSERT_EQUALS( wanted , out );
-                }
-                return t.micros();
-            }
-            
-
         };
         
         class inc1 : public Base {

@@ -112,7 +112,6 @@ namespace mongo {
     class ModSet {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
-        bool _sorted;
         
         static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
         
@@ -134,22 +133,6 @@ namespace mongo {
 
         void _appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen );
         
-        void appendNewFromMod( Mod& m , EmbeddedBuilder& b ){
-            if ( m.op == Mod::PUSH ) {
-                BSONObjBuilder arr( b.subarrayStartAs( m.fieldName ) );
-                arr.appendAs( m.elt, "0" );
-                arr.done();
-                m.pushStartSize = -1;
-            } 
-            else if ( m.op == Mod::PUSH_ALL ) {
-                b.appendAs( m.elt, m.fieldName );
-                m.pushStartSize = -1;
-            } 
-            else if ( m.op != Mod::PULL && m.op != Mod::PULL_ALL ) {
-                b.appendAs( m.elt, m.fieldName );
-            }
-        }
-
         void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
             
             switch ( m.op ){
@@ -206,7 +189,6 @@ namespace mongo {
             return Mod::INC;
         }
     public:
-        ModSet() : _sorted(false){}
 
         void getMods( const BSONObj &from );
         /**
@@ -216,18 +198,10 @@ namespace mongo {
         bool canApplyInPlaceAndVerify( const BSONObj &obj ) const;
         void applyModsInPlace( const BSONObj &obj ) const;
 
-        // old linear version
-        BSONObj createNewFromMods_l( const BSONObj &obj );
-
         // new recursive version, will replace at some point
         void createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj );
 
-        // new recursive version, will replace at some point
-        BSONObj createNewFromMods_r( const BSONObj &obj );
-
-        BSONObj createNewFromMods( const BSONObj &obj ){
-            return createNewFromMods_r( obj );
-        }
+        BSONObj createNewFromMods( const BSONObj &obj );
 
         /**
          *
@@ -242,23 +216,11 @@ namespace mongo {
         }
 
         unsigned size() const { return _mods.size(); }
+
         bool haveModForField( const char *fieldName ) const {
             return _mods.find( fieldName ) != _mods.end();
         }
-        bool haveModForFieldOrSubfield( const string& fieldName ) const {
-            ModHolder::const_iterator start = _mods.lower_bound(fieldName);
-            for ( ; start != _mods.end(); start++ ){
-                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first );
-                switch ( r ){
-                case LEFT_SUBFIELD: assert(0); break;
-                case LEFT_BEFORE: continue;
-                case SAME: return true;
-                case RIGHT_BEFORE: continue;
-                case RIGHT_SUBFIELD: return true;
-                }
-            }
-            return false;
-        }
+
         bool haveConflictingMod( const string& fieldName ){
             size_t idx = fieldName.find( '.' );
             if ( idx == string::npos )
@@ -286,6 +248,7 @@ namespace mongo {
                     return true;
             return false;
         }
+
         void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
             for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 const Mod& m = i->second;

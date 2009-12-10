@@ -353,168 +353,12 @@ namespace mongo {
         }
     }
             
-    BSONObj ModSet::createNewFromMods_r( const BSONObj &obj ) {
-        BSONObjBuilder b;
+    BSONObj ModSet::createNewFromMods( const BSONObj &obj ) {
+        BSONObjBuilder b( (int)(obj.objsize() * 1.1) );
         createNewFromMods( "" , b , obj );
         return b.obj();
     }
 
-    BSONObj ModSet::createNewFromMods_l( const BSONObj &obj ) {
-        map< string, BSONElement > existing;
-        
-        BSONObjBuilder b;
-        BSONObjIterator i( obj );
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if ( ! haveModForFieldOrSubfield( e.fieldName() ) ) {
-                b.append( e );
-            } 
-            else {
-                extractFields( existing, e, "" );
-            }
-        }
-            
-        EmbeddedBuilder b2( &b );
-        ModHolder::iterator m = _mods.begin();
-        map< string, BSONElement >::iterator p = existing.begin();
-        while( m != _mods.end() || p != existing.end() ) {
-
-            if ( m == _mods.end() ){
-                // no more mods, just regular elements
-                assert( p != existing.end() );
-                if ( mayAddEmbedded( existing, p->first ) )
-                    b2.appendAs( p->second, p->first ); 
-                p++;
-                continue;
-            }
-            
-            if ( p == existing.end() ){
-                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
-                         " or is referenced in another $set clause",
-                         mayAddEmbedded( existing, m->second.fieldName ) );                
-                // $ modifier applied to missing field -- create field from scratch
-                appendNewFromMod( m->second , b2 );
-                m++;
-                continue;
-            }
-
-            FieldCompareResult cmp = compareDottedFieldNames( m->second.fieldName , p->first );
-            if ( cmp <= 0 )
-                uassert( "Modifier spec implies existence of an encapsulating object with a name that already represents a non-object,"
-                         " or is referenced in another $set clause",
-                         mayAddEmbedded( existing, m->second.fieldName ) );                
-            if ( cmp == 0 ) {
-                BSONElement e = p->second;
-                if ( m->second.op == Mod::INC ) {
-                    m->second.inc(e);
-                    //m->setn( m->getn() + e.number() );
-                    b2.appendAs( m->second.elt, m->second.fieldName );
-                } else if ( m->second.op == Mod::SET ) {
-                    b2.appendAs( m->second.elt, m->second.fieldName );
-                } else if ( m->second.op == Mod::PUSH || m->second.op == Mod::PUSH_ALL ) {
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
-                    BSONObjIterator i( e.embeddedObject() );
-                    int startCount = 0;
-                    while( i.moreWithEOO() ) {
-                        BSONElement arrI = i.next();
-                        if ( arrI.eoo() )
-                            break;
-                        arr.append( arrI );
-                        ++startCount;
-                    }
-                    if ( m->second.op == Mod::PUSH ) {
-                        stringstream ss;
-                        ss << startCount;
-                        string nextIndex = ss.str();
-                        arr.appendAs( m->second.elt, nextIndex.c_str() );
-                    } else {
-                        BSONObjIterator i( m->second.elt.embeddedObject() );
-                        int count = startCount;
-                        while( i.moreWithEOO() ) {
-                            BSONElement arrI = i.next();
-                            if ( arrI.eoo() )
-                                break;
-                            stringstream ss;
-                            ss << count++;
-                            string nextIndex = ss.str();
-                            arr.appendAs( arrI, nextIndex.c_str() );
-                        }
-                    }
-                    arr.done();
-                    m->second.pushStartSize = startCount;
-                } else if ( m->second.op == Mod::PULL || m->second.op == Mod::PULL_ALL ) {
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
-                    BSONObjIterator i( e.embeddedObject() );
-                    int count = 0;
-                    while( i.moreWithEOO() ) {
-                        BSONElement arrI = i.next();
-                        if ( arrI.eoo() )
-                            break;
-                        bool allowed = true;
-                        if ( m->second.op == Mod::PULL ) {
-                            allowed = ( arrI.woCompare( m->second.elt, false ) != 0 );
-                        } else {
-                            BSONObjIterator j( m->second.elt.embeddedObject() );
-                            while( allowed && j.moreWithEOO() ) {
-                                BSONElement arrJ = j.next();
-                                if ( arrJ.eoo() )
-                                    break;
-                                allowed = ( arrI.woCompare( arrJ, false ) != 0 );
-                            }
-                        }
-                        if ( allowed ) {
-                            stringstream ss;
-                            ss << count++;
-                            string index = ss.str();
-                            arr.appendAs( arrI, index.c_str() );
-                        }
-                    }
-                    arr.done();
-                }
-                else if ( m->second.op == Mod::POP ){
-                    int startCount = 0;
-                    BSONObjBuilder arr( b2.subarrayStartAs( m->second.fieldName ) );
-                    BSONObjIterator i( e.embeddedObject() );
-                    if ( m->second.elt.isNumber() && m->second.elt.number() < 0 ){
-                        if ( i.more() ) i.next();
-                        int count = 0;
-                        startCount++;
-                        while( i.more() ) {
-                            arr.appendAs( i.next() , arr.numStr( count++ ).c_str() );
-                            startCount++;
-                        }
-                    }
-                    else {
-                        while( i.more() ) {
-                            startCount++;
-                            BSONElement arrI = i.next();
-                            if ( i.more() ){
-                                arr.append( arrI );
-                            }
-                        }
-                    }
-                    arr.done();
-                    m->second.pushStartSize = startCount;
-                }
-                ++m;
-                ++p;
-            } 
-            else if ( cmp < 0 ) {
-                // $ modifier applied to missing field -- create field from scratch
-                appendNewFromMod( m->second , b2 );
-                m++;
-            } 
-            else if ( cmp > 0 ) {
-                // No $ modifier
-                if ( mayAddEmbedded( existing, p->first ) )
-                    b2.appendAs( p->second, p->first ); 
-                ++p;
-            }
-        }
-        b2.done();
-        return b.obj();
-    }
-    
     /* get special operations like $inc
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
@@ -525,7 +369,6 @@ namespace mongo {
        NOTE: MODIFIES source from object!
     */
     void ModSet::getMods(const BSONObj &from) {
-        _sorted = false;
         BSONObjIterator it(from);
         while ( it.more() ) {
             BSONElement e = it.next();
