@@ -321,16 +321,16 @@ namespace mongo {
                 int op = f.getGtLtOp();
                 switch( op ) { 
                     case BSONObj::LT:
-                        if( compareValues(f, LE) <= 0 )
+                        if( f.woCompare(LE, false) <= 0 )
                             return false;
                         break;
                     case BSONObj::LTE:
-                        if( compareValues(f, LE) < 0 )
+                        if( f.woCompare(LE, false) < 0 )
                             return false;
                         break;
                     case BSONObj::GT:
                     case BSONObj::GTE:
-                        if( compareValues(f, RE) >= 0 )
+                        if( f.woCompare(RE, false) >= 0 )
                             return false;
                         break;
                     case BSONObj::opIN:

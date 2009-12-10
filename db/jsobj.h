@@ -639,16 +639,6 @@ namespace mongo {
     
     int getGtLtOp(const BSONElement& e);
 
-    /* compare values with type check. 
-       note: as is now, not smart about int/double comingling. TODO 
-    */
-    inline int compareValues(const BSONElement& l, const BSONElement& r)
-    {
-        int x = (int) l.type() - (int) r.type();
-        if( x ) return x;
-        return compareElementValues(l,r);
-    }
-
     struct BSONElementCmpWithoutField {
         bool operator()( const BSONElement &l, const BSONElement &r ) const {
             return l.woCompare( r, false );
