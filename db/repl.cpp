@@ -1756,6 +1756,7 @@ namespace mongo {
                     }
                 }
             }
+            log() << "started logCollection with cmd obj: " << cmdObj << endl;
             return true;
         }
     } cmdlogcollection;
