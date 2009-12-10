@@ -294,7 +294,7 @@ namespace mongo {
         }
         
     }
-    
+
     void ModSet::createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj ){
         BSONObjIterator es( obj );
         BSONElement e = es.next();
@@ -303,15 +303,14 @@ namespace mongo {
         ModHolder::iterator mend = _mods.lower_bound( root + "{" );
 
         set<string> onedownseen;
-
+        
         while ( e.type() && m != mend ){
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.fieldName , field );
 
             switch ( cmp ){
                 
-            case LEFT_SUBFIELD: { 
-                // this means the Mod is embeddeed under this element
+            case LEFT_SUBFIELD: { // Mod is embeddeed under this element
                 uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object );
                 BSONObjBuilder bb ( b.subobjStart( e.fieldName() ) );
                 stringstream nr; nr << root << e.fieldName() << ".";
@@ -322,7 +321,7 @@ namespace mongo {
                 m++;
                 continue;
             }
-            case LEFT_BEFORE: 
+            case LEFT_BEFORE: // Mod on a field that doesn't exist
                 _appendNewFromMods( root , m->second , b , onedownseen );
                 m++;
                 continue;
@@ -331,7 +330,7 @@ namespace mongo {
                 e = es.next();
                 m++;
                 continue;
-            case RIGHT_BEFORE:
+            case RIGHT_BEFORE: // field that doesn't have a MOD
                 b.append( e );
                 e = es.next();
                 continue;
@@ -343,11 +342,13 @@ namespace mongo {
             }
         }
         
+        // finished looping the mods, just adding the rest of the elements
         while ( e.type() ){
             b.append( e );
             e = es.next();
         }
         
+        // do mods that don't have fields already
         for ( ; m != mend; m++ ){
             _appendNewFromMods( root , m->second , b , onedownseen );
         }
