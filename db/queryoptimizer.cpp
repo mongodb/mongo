@@ -205,8 +205,10 @@ namespace mongo {
     }
     
     void QueryPlan::registerSelf( long long nScanned ) const {
-        if ( fbs_.matchPossible() )
-            NamespaceDetailsTransient::get( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
+        if ( fbs_.matchPossible() ) {
+            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
+        }
     }
     
     QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
@@ -297,11 +299,13 @@ namespace mongo {
         }
         
         if ( honorRecordedPlan_ ) {
-            BSONObj bestIndex = NamespaceDetailsTransient::get( ns ).indexForPattern( fbs_.pattern( order_ ) );
+            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
+            BSONObj bestIndex = nsd.indexForPattern( fbs_.pattern( order_ ) );
             if ( !bestIndex.isEmpty() ) {
                 usingPrerecordedPlan_ = true;
                 mayRecordPlan_ = false;
-                oldNScanned_ = NamespaceDetailsTransient::get( ns ).nScannedForPattern( fbs_.pattern( order_ ) );
+                oldNScanned_ = nsd.nScannedForPattern( fbs_.pattern( order_ ) );
                 if ( !strcmp( bestIndex.firstElement().fieldName(), "$natural" ) ) {
                     // Table scan plan
                     plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
@@ -362,7 +366,10 @@ namespace mongo {
             // plans_.size() > 1 if addOtherPlans was called in Runner::run().
             if ( res->complete() || plans_.size() > 1 )
                 return res;
-            NamespaceDetailsTransient::get( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
+            {
+                boostlock lk(NamespaceDetailsTransient::_qcMutex);
+                NamespaceDetailsTransient::get_inlock( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
+            }
             init();
         }
         Runner r( *this, op );

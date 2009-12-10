@@ -525,7 +525,13 @@ namespace mongo {
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _cll_enabled() { }
-        static NamespaceDetailsTransient& get(const char *ns);
+        /* _get() is not threadsafe */
+        static NamespaceDetailsTransient& _get(const char *ns);
+        /* use get_w() when doing write operations */
+        static NamespaceDetailsTransient& get_w(const char *ns) { 
+            DEV assertInWriteLock();
+            return _get(ns);
+        }
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
         /* Drop cached information on all namespaces beginning with the specified prefix.
@@ -555,6 +561,11 @@ namespace mongo {
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
+        static boost::mutex _qcMutex;
+        /* you must be in the qcMutex when calling this (and using the returned val): */
+        static NamespaceDetailsTransient& get_inlock(const char *ns) {
+            return _get(ns);
+        }
         void clearQueryCache() { // public for unit tests
             _qcCache.clear();
             _qcWriteCount = 0;
@@ -591,7 +602,7 @@ namespace mongo {
 
     }; /* NamespaceDetailsTransient */
 
-    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
+    inline NamespaceDetailsTransient& NamespaceDetailsTransient::_get(const char *ns) {
         shared_ptr< NamespaceDetailsTransient > &t = _map[ ns ];
         if ( t.get() == 0 )
             t.reset( new NamespaceDetailsTransient(ns) );

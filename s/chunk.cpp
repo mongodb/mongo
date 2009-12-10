@@ -63,7 +63,7 @@ namespace mongo {
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
             else {
-                BSONObj k = _manager->getShardKey().keyDotted();
+                BSONObj k = _manager->getShardKey().key();
                 BSONObjBuilder r;
                 
                 BSONObjIterator i(k);
@@ -85,9 +85,9 @@ namespace mongo {
         ScopedDbConnection conn( getShard() );
         BSONObj result;
         if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
-                                                 << "keyPattern" << _manager->getShardKey().keyDotted() 
-                                                 << "min" << getMinDotted() 
-                                                 << "max" << getMaxDotted() 
+                                                 << "keyPattern" << _manager->getShardKey().key()
+                                                 << "min" << getMin()
+                                                 << "max" << getMax()
                                                  ) , result ) ){
             stringstream ss;
             ss << "medianKey command failed: " << result;
@@ -110,12 +110,10 @@ namespace mongo {
 
         uassert( "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
 
-        BSONObj nested = dotted2nested(m);
-
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
         s->_shard = _shard;
-        s->setMin(nested.getOwned());
+        s->setMin(m.getOwned());
         s->setMax(_max);
         
         s->_markModified();
@@ -123,7 +121,7 @@ namespace mongo {
         
         _manager->_chunks.push_back( s );
         
-        setMax(nested.getOwned());
+        setMax(m.getOwned());
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
@@ -318,20 +316,24 @@ namespace mongo {
 
         to << "ns" << _ns;
         to << "min" << _min;
-        to << "minDotted" << _minDotted;
         to << "max" << _max;
-        to << "maxDotted" << _maxDotted;
         to << "shard" << _shard;
     }
     
     void Chunk::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
-        _min = from.getObjectField( "min" ).getOwned();
-        _minDotted = from.getObjectField( "minDotted" ).getOwned();
-        _max = from.getObjectField( "max" ).getOwned();
-        _maxDotted = from.getObjectField( "maxDotted" ).getOwned();
         _shard = from.getStringField( "shard" );
         _lastmod = from.hasField( "lastmod" ) ? from["lastmod"]._numberLong() : 0;
+
+        BSONElement e = from["minDotted"];
+        cout << from << endl;
+        if (e.eoo()){
+            _min = from.getObjectField( "min" ).getOwned();
+            _max = from.getObjectField( "max" ).getOwned();
+        } else { // TODO delete this case after giving people a chance to migrate
+            _min = e.embeddedObject().getOwned();
+            _max = from.getObjectField( "maxDotted" ).getOwned();
+        }
         
         uassert( "Chunk needs a ns" , ! _ns.empty() );
         uassert( "Chunk needs a server" , ! _ns.empty() );
@@ -370,13 +372,13 @@ namespace mongo {
     
     void Chunk::ensureIndex(){
         ScopedDbConnection conn( getShard() );
-        conn->ensureIndex( _ns , _manager->getShardKey().keyDotted() , _manager->_unique );
+        conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
         conn.done();
     }
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _minDotted << " max: " << _maxDotted;
+        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _min << " max: " << _max;
         return ss.str();
     }
     

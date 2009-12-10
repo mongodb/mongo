@@ -49,20 +49,16 @@ namespace mongo {
         }
     }
 
-    ShardKeyPattern::ShardKeyPattern( BSONObj p ) : patternDotted( p.getOwned() ) {
-        //TODO: this will not preserve ordering on compound keys
-        pattern = dotted2nested(patternDotted);
-        patternDotted.getFieldNames(patternfields);
+    ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
+        pattern.getFieldNames(patternfields);
 
         BSONObjBuilder min;
         minForPat(min, pattern);
         gMin = min.obj();
-        gMinDotted = nested2dotted(gMin);
 
         BSONObjBuilder max;
         maxForPat(max, pattern);
         gMax = max.obj();
-        gMaxDotted = nested2dotted(gMax);
     }
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) {
@@ -370,8 +366,8 @@ normal:
     void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
         massert("not done for compound patterns", patternfields.size() == 1);
         BSONObjBuilder temp;
-        temp.appendAs( nested2dotted(extractKey(min)).firstElement(), "$gte" );
-        temp.appendAs( nested2dotted(extractKey(max)).firstElement(), "$lt" ); 
+        temp.appendAs( extractKey(min).firstElement(), "$gte" );
+        temp.appendAs( extractKey(max).firstElement(), "$lt" );
 
         b.append( patternfields.begin()->c_str(), temp.obj() );
     }    
@@ -396,7 +392,7 @@ normal:
         int dir = 0;
 
         BSONObjIterator s(sort);
-        BSONObjIterator p(patternDotted);
+        BSONObjIterator p(pattern);
         while( 1 ) {
             BSONElement e = s.next();
             if( e.eoo() )

@@ -1390,7 +1390,7 @@ namespace mongo {
             char cl[ 256 ];
             nsToClient( ns, cl );
         }
-        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( ns );
+        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {
             try {
                 _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
@@ -1733,7 +1733,7 @@ namespace mongo {
                 return false;
             }
             int logSizeMb = cmdObj.getIntField( "logSizeMb" );
-            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get( logCollection.c_str() );
+            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( logCollection.c_str() );
             if ( start ) {
                 if ( t.cllNS().empty() ) {
                     if ( logSizeMb == INT_MIN ) {
