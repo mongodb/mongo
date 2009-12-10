@@ -550,17 +550,18 @@ namespace UpdateTests {
 
             
             void test( BSONObj morig , BSONObj in , BSONObj wanted ){
-                
-                int its = 1000;
-                double o = _test( morig , in , wanted , false , its );
-                double n = _test( morig , in , wanted , true , its );
-                double r = o / n;
-                cout << " new is : " << r << " x faster" << endl;
+                if ( false ){
+                    int its = 1000;
+                    double o = _test( morig , in , wanted , false , its );
+                    double n = _test( morig , in , wanted , true , its );
+                    double r = o / n;
+                    cout << " new is : " << r << " x faster" << endl;
+                }
 
                 BSONObj m = morig.copy();
                 ModSet set;
                 set.getMods( m );
-                
+
                 BSONObj out = set.createNewFromMods( in );
                 ASSERT_EQUALS( wanted , out );
             }
@@ -596,7 +597,7 @@ namespace UpdateTests {
                 BSONObj m = BSON( "$inc" << BSON( "x" << 1 ) );
                 test( m , BSON( "x" << 5 )  , BSON( "x" << 6 ) );
                 test( m , BSON( "a" << 5 )  , BSON( "a" << 5 << "x" << 1 ) );
-                test( m , BSON( "z" << 5 )  , BSON( "z" << 5 << "x" << 1 ) );
+                test( m , BSON( "z" << 5 )  , BSON( "x" << 1 << "z" << 5 ) );
             }
         };
         
@@ -620,7 +621,7 @@ namespace UpdateTests {
                 test( BSON( "$set" << BSON( "x" << 17 ) ) , BSONObj() , BSON( "x" << 17 ) );
                 test( BSON( "$set" << BSON( "x" << 17 ) ) , BSON( "x" << 5 ) , BSON( "x" << 17 ) );
 
-                test( BSON( "$set" << BSON( "x.a" << 17 ) ) , BSON( "z" << 5 ) , BSON( "z" << 5 << "x" << BSON( "a" << 17 ) ) );
+                test( BSON( "$set" << BSON( "x.a" << 17 ) ) , BSON( "z" << 5 ) , BSON( "x" << BSON( "a" << 17 )<< "z" << 5 ) );
             }
         };        
         

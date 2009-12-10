@@ -81,6 +81,40 @@ namespace mongo {
             bb.done();
             break;
         }
+            
+        case PULL:
+        case PULL_ALL: {
+            uassert( "$pull/$pullAll can only be applied to an array" , in.type() == Array );
+            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+                        
+            int n = 0;
+
+            BSONObjIterator i( in.embeddedObject() );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                bool allowed = true;
+
+                if ( op == PULL ){
+                    allowed = e.woCompare( elt , false ) != 0;
+                }
+                else {
+                    BSONObjIterator j( elt.embeddedObject() );
+                    while( j.more() ) {
+                        BSONElement arrJ = j.next();
+                        if ( e.woCompare( arrJ, false ) == 0 ){
+                            allowed = false;
+                            break;
+                        }
+                    }
+                }
+
+                if ( allowed )
+                    bb.appendAs( e , bb.numStr( n++ ) );
+            }
+            
+            bb.done();
+            break;
+        }
 
         case POP: {
             uassert( "$pop can only be applied to an array" , in.type() == Array );
@@ -117,7 +151,7 @@ namespace mongo {
             bb.done();
             break;
         }
-
+            
         default:
             stringstream ss;
             ss << "Mod::apply can't handle type: " << op;
@@ -269,7 +303,6 @@ namespace mongo {
         ModHolder::iterator mend = _mods.lower_bound( root + "{" );
 
         set<string> onedownseen;
-        list<Mod*> toadd; // TODO: remove.  this is a hack to make new and old impls. identical.  when testing is complete, we should remove
 
         while ( e.type() && m != mend ){
             string field = root + e.fieldName();
@@ -290,7 +323,7 @@ namespace mongo {
                 continue;
             }
             case LEFT_BEFORE: 
-                toadd.push_back( &(m->second) );
+                _appendNewFromMods( root , m->second , b , onedownseen );
                 m++;
                 continue;
             case SAME:
@@ -315,10 +348,6 @@ namespace mongo {
             e = es.next();
         }
         
-        for ( list<Mod*>::iterator i=toadd.begin(); i!=toadd.end(); i++ )
-            _appendNewFromMods( root , **i , b , onedownseen );
-
-
         for ( ; m != mend; m++ ){
             _appendNewFromMods( root , m->second , b , onedownseen );
         }

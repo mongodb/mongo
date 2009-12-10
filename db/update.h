@@ -226,7 +226,7 @@ namespace mongo {
         BSONObj createNewFromMods_r( const BSONObj &obj );
 
         BSONObj createNewFromMods( const BSONObj &obj ){
-            return createNewFromMods_l( obj );
+            return createNewFromMods_r( obj );
         }
 
         /**
