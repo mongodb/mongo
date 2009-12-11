@@ -138,24 +138,26 @@ namespace mongo {
         public:
             SavedContext() {
                 _save = dbMutex.atLeastReadLocked();
+
+                Client *c = currentClient.get();
+                oldAuth = c->ai;
+                // careful, don't want to free this:
+                c->ai = &always;
+
                 /* it only makes sense to manipulate a pointer - c->database() - if locked. 
                    thus the _saved flag.
                 */
                 if( _save ) {
-                    Client *c = currentClient.get();
                     if ( c->database() ) {
                         dbMutex.assertAtLeastReadLocked();
                         _oldName = c->database()->name;
                     }
-                    oldAuth = c->ai;
-                    // careful, don't want to free this:
-                    c->ai = &always;
                 }
             }
             ~SavedContext() {
+                Client *c = currentClient.get();
+                c->ai = oldAuth;
                 if( _save ) {
-                    Client *c = currentClient.get();
-                    c->ai = oldAuth;
                     if ( !_oldName.empty() ) {
                         dbMutex.assertAtLeastReadLocked();
                         setClient( _oldName.c_str() );
