@@ -26,6 +26,22 @@
 
 namespace mongo {
 
+    bool Mod::_pullElementMatch( BSONElement& toMatch ) const {
+        
+        if ( elt.type() != Object ){
+            // if elt isn't an object, then comparison will work
+            return toMatch.woCompare( elt , false ) == 0;
+        }
+
+        if ( toMatch.type() != Object ){
+            // looking for an object, so this can't match
+            return false;
+        }
+        
+        // now we have an object on both sides
+        return matcher->matches( toMatch.embeddedObject() );
+    }
+
     void Mod::apply( BSONObjBuilder& b , BSONElement in ){
         switch ( op ){
         
@@ -95,7 +111,7 @@ namespace mongo {
                 bool allowed = true;
 
                 if ( op == PULL ){
-                    allowed = e.woCompare( elt , false ) != 0;
+                    allowed = ! _pullElementMatch( e );
                 }
                 else {
                     BSONObjIterator j( elt.embeddedObject() );
@@ -194,9 +210,8 @@ namespace mongo {
                     while( inPlacePossible && i.more() ) {
                         BSONElement arrI = i.next();
                         if ( m.op == Mod::PULL ) {
-                            if ( arrI.woCompare( m.elt, false ) == 0 ) {
+                            if ( m._pullElementMatch( arrI ) )
                                 inPlacePossible = false;
-                            }
                         } 
                         else if ( m.op == Mod::PULL_ALL ) {
                             BSONObjIterator j( m.elt.embeddedObject() );
@@ -359,7 +374,7 @@ namespace mongo {
         createNewFromMods( "" , b , obj );
         return b.obj();
     }
-
+    
     /* get special operations like $inc
        { $inc: { a:1, b:1 } }
        { $set: { a:77 } }
@@ -382,16 +397,19 @@ namespace mongo {
                 strcpy((char *) fn, "$set"); // rewrite for op log
             while ( jt.more() ) {
                 BSONElement f = jt.next();
-                Mod m;
-                m.op = op;
-                m.setFieldName( f.fieldName() );
-                uassert( "Mod on _id not allowed", strcmp( m.fieldName, "_id" ) != 0 );
-                uassert( "Invalid mod field name, may not end in a period", m.fieldName[ strlen( m.fieldName ) - 1 ] != '.' );
-                uassert( "Field name duplication not allowed with modifiers", ! haveModForField( m.fieldName ) );
-                uassert( "have conflict mod" , ! haveConflictingMod( m.fieldName ) );
+
+                const char * fieldName = f.fieldName();
+
+                uassert( "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
+                uassert( "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
+                uassert( "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
+                uassert( "have conflict mod" , ! haveConflictingMod( fieldName ) );
                 uassert( "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
-                m.elt = f;
+
+                Mod m;
+                m.init( op , f );
+                m.setFieldName( f.fieldName() );
 
                 // horrible - to be cleaned up
                 if ( f.type() == NumberDouble ) {
@@ -406,11 +424,12 @@ namespace mongo {
                     m.nint = 0;
                     m.nlong = (long long *) f.value();
                 }
+
                 _mods[m.fieldName] = m;
             }
         }
     }
-
+    
     void checkNoMods( BSONObj o ) {
         BSONObjIterator i( o );
         while( i.moreWithEOO() ) {
