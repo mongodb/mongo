@@ -57,6 +57,11 @@ namespace mongo {
             break;
         }
 
+        case UNSET: {
+            //Explicit NOOP
+            break;
+        }
+
         case PUSH: {
             uassert( "$push can only be applied to an array" , in.type() == Array );
             BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
@@ -184,7 +189,7 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             if ( e.eoo() ) {
-                inPlacePossible = false;
+                inPlacePossible = (m.op == Mod::UNSET);
             } 
             else {
                 switch( m.op ) {
@@ -248,6 +253,7 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             switch ( m.op ){
+            case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
                 break;

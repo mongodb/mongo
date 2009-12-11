@@ -25,8 +25,9 @@ namespace mongo {
 
     /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
-        //        0    1    2     3         4     5          6   
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
+        // See opFromStr below
+        //        0    1    2     3         4     5          6    7
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET} op;
         const char *fieldName;
         const char *shortFieldName;
         
@@ -165,9 +166,10 @@ namespace mongo {
                 break;
             } 
                 
+            case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
-                // no-op b/c pull of nothing does nothing
+                // no-op b/c unset/pull of nothing does nothing
                 break;
                 
             case Mod::INC:
@@ -195,8 +197,8 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop" };
-            for( int i = 0; i < 7; ++i )
+            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" };
+            for( int i = 0; i < (sizeof(valid) / sizeof(*valid)); ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
             uassert( "Invalid modifier specified " + string( fn ), false );
