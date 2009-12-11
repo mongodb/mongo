@@ -105,6 +105,11 @@ namespace mongo {
         }
     }
 
+// PRINT(2+2);  prints "2+2: 4"
+#define PRINT(x) cout << #x ": " << (x) << endl
+// PRINTFL; prints file:line
+#define PRINTFL cout << __FILE__ ":" << __LINE__ << endl
+
 #undef yassert
 
 #undef assert
