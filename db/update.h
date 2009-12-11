@@ -19,6 +19,7 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "../util/embedded_builder.h"
+#include "matcher.h"
 
 namespace mongo {
 
@@ -36,6 +37,14 @@ namespace mongo {
 
         BSONElement elt;
         int pushStartSize;
+        boost::shared_ptr<JSMatcher> matcher;
+
+        void init( Op o , BSONElement& e ){
+            op = o;
+            elt = e;
+            if ( op == PULL && e.type() == Object )
+                matcher.reset( new JSMatcher( e.embeddedObject() ) );
+        }
 
         void setFieldName( const char * s ){
             fieldName = s;
@@ -107,6 +116,11 @@ namespace mongo {
         }
 
         void apply( BSONObjBuilder& b , BSONElement in );
+
+        /**
+         * @return true iff toMatch should be removed from the array
+         */
+        bool _pullElementMatch( BSONElement& toMatch ) const;
     };
 
     class ModSet {
@@ -188,6 +202,7 @@ namespace mongo {
             uassert( "Invalid modifier specified " + string( fn ), false );
             return Mod::INC;
         }
+        
     public:
 
         void getMods( const BSONObj &from );
