@@ -596,7 +596,7 @@ namespace mongo {
     public:
         string cllNS() const { return _cll_ns; }
         bool cllEnabled() const { return _cll_enabled; }
-        void cllStart( int logSizeMb = 128 ); // begin collection level logging
+        void cllStart( int logSizeMb = 256 ); // begin collection level logging
         void cllInvalidate();
         bool cllValidateComplete();
 
