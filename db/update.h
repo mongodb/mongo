@@ -19,13 +19,15 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "../util/embedded_builder.h"
+#include "matcher.h"
 
 namespace mongo {
 
     /* Used for modifiers such as $inc, $set, ... */
     struct Mod {
-        //        0    1    2     3         4     5          6   
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP } op;
+        // See opFromStr below
+        //        0    1    2     3         4     5          6    7
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET} op;
         const char *fieldName;
         const char *shortFieldName;
         
@@ -36,6 +38,14 @@ namespace mongo {
 
         BSONElement elt;
         int pushStartSize;
+        boost::shared_ptr<JSMatcher> matcher;
+
+        void init( Op o , BSONElement& e ){
+            op = o;
+            elt = e;
+            if ( op == PULL && e.type() == Object )
+                matcher.reset( new JSMatcher( e.embeddedObject() ) );
+        }
 
         void setFieldName( const char * s ){
             fieldName = s;
@@ -107,6 +117,11 @@ namespace mongo {
         }
 
         void apply( BSONObjBuilder& b , BSONElement in );
+
+        /**
+         * @return true iff toMatch should be removed from the array
+         */
+        bool _pullElementMatch( BSONElement& toMatch ) const;
     };
 
     class ModSet {
@@ -151,9 +166,10 @@ namespace mongo {
                 break;
             } 
                 
+            case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
-                // no-op b/c pull of nothing does nothing
+                // no-op b/c unset/pull of nothing does nothing
                 break;
                 
             case Mod::INC:
@@ -181,13 +197,14 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop" };
-            for( int i = 0; i < 7; ++i )
+            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" };
+            for( int i = 0; i < (sizeof(valid) / sizeof(*valid)); ++i )
                 if ( strcmp( fn, valid[ i ] ) == 0 )
                     return Mod::Op( i );
             uassert( "Invalid modifier specified " + string( fn ), false );
             return Mod::INC;
         }
+        
     public:
 
         void getMods( const BSONObj &from );

@@ -366,8 +366,10 @@ namespace mongo {
         vector< string > toDelete;
         DBDirectClient cli;
         auto_ptr< DBClientCursor > c = cli.query( "local.system.namespaces", Query( fromjson( "{name:/^local.temp./}" ) ) );
-        while( c->more() )
-            toDelete.push_back( c->next().getStringField( "name" ) );
+        while( c->more() ) {
+            BSONObj o = c->next();
+            toDelete.push_back( o.getStringField( "name" ) );
+        }
         for( vector< string >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
             log() << "Dropping old temporary collection: " << *i << endl;
             cli.dropCollection( *i );
