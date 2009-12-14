@@ -116,6 +116,13 @@ AddOption('--usejvm',
           action="store",
           help="use java for javascript" )
 
+AddOption('--asio',
+          dest='asio',
+          type="string",
+          nargs=0,
+          action="store",
+          help="Use Asynchronous IO (NOT READY YET)" )
+
 AddOption( "--d",
            dest="debugBuild",
            type="string",
@@ -241,6 +248,8 @@ nojni = not GetOption( "nojni" ) is None
 usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
 usejvm = not GetOption( "usejvm" ) is None
+
+asio = not GetOption( "asio" ) is None
 
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
@@ -763,9 +772,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         else:
             Exit(1)
 
-    if conf.CheckCXXHeader( "boost/asio.hpp" ):
-        # TODO: turn this back on when ASIO working
-        myenv.Append( CPPDEFINES=[ "USE_ASIO_OFF" ] )
+    if asio and conf.CheckCXXHeader( "boost/asio.hpp" ):
+        myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
     else:
         print( "WARNING: old version of boost - you should consider upgrading" )
 
