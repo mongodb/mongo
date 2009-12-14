@@ -133,10 +133,11 @@ namespace mongo {
 
     class AsyncMessageServer : public MessageServer {
     public:
-        AsyncMessageServer( int port , MessageHandler * handler ) : 
-            MessageServer( port , handler ) , 
-            _endpoint( tcp::v4() , port ) , 
-            _acceptor( _ioservice , _endpoint ){
+        AsyncMessageServer( int port , MessageHandler * handler )
+            : MessageServer( port , handler )
+            , _endpoint( tcp::v4() , port )
+            , _acceptor( _ioservice , _endpoint )
+        {
             _accept();
         }
         virtual ~AsyncMessageServer(){
