@@ -694,33 +694,57 @@ namespace mongo {
     }
     
     boost::mutex &exitMutex( *( new boost::mutex ) );
-    bool firstExit = true;
+    int numExitCalls = 0;
     void shutdown();
 
     bool inShutdown(){
-        return ! firstExit;
+        return numExitCalls == 0;
+    }
+
+    void tryToOutputFatal( const string& s ){
+        try {
+            rawOut( s );
+            return;
+        }
+        catch ( ... ){}
+
+        try {
+            cerr << s << endl;
+            return;
+        }
+        catch ( ... ){}
+        
+        // uh - oh, not sure there is anything else we can do...
     }
 
     /* not using log() herein in case we are already locked */
     void dbexit( ExitCode rc, const char *why) {        
         {
             boostlock lk( exitMutex );
-            if ( !firstExit ) {
+            if ( numExitCalls++ > 0 ) {
+                if ( numExitCalls > 5 ){
+                    // this means something horrible has happened
+                    ::_exit( rc );
+                }
                 stringstream ss;
                 ss << "dbexit: " << why << "; exiting immediately" << endl;
-                rawOut( ss.str() );
+                tryToOutputFatal( ss.str() );
                 ::exit( rc );                
             }
-            firstExit = false;
         }
-            
+        
         stringstream ss;
         ss << "dbexit: " << why << endl;
-        rawOut( ss.str() );
-
-		shutdown(); // gracefully shutdown instance
-
-        rawOut( "dbexit: really exiting now\n" );
+        tryToOutputFatal( ss.str() );
+        
+        try {
+            shutdown(); // gracefully shutdown instance
+        }
+        catch ( ... ){
+            tryToOutputFatal( "shutdown failed with exception" );
+        }
+        
+        tryToOutputFatal( "dbexit: really exiting now\n" );
         ::exit(rc);
     }
     
