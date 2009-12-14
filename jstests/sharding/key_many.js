@@ -7,6 +7,7 @@ types =
       { name : "string_id" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "_id" },
       { name : "embedded" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b" } ,
       { name : "embedded 2" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b.c" } ,
+      { name : "object" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" } ,
     ]
 
 s = new ShardingTest( "key_many" , 2 );
