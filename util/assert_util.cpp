@@ -140,7 +140,6 @@ namespace mongo {
         
             _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
             if ( ! _file ){
-                stdout = stderr;
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
                 dbexit( EXIT_BADOPTIONS );
                 assert(0);

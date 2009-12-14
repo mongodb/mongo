@@ -151,8 +151,8 @@ int main(int argc, char* argv[], char *envp[] ) {
         }
     }
     
-    UnitTest::runTests();
     if ( justTests ){
+        UnitTest::runTests();
         cout << "tests passed" << endl;
         return 0;
     }
