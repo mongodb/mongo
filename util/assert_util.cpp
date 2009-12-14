@@ -101,6 +101,15 @@ namespace mongo {
         
         void start( const string& lp , bool append ){
             uassert( "LoggingManager already started" , ! _enabled );
+
+            // test path
+            FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
+            if ( ! test ){
+                cout << "can't open [" << lp << "] for log file" << endl;
+                dbexit( EXIT_BADOPTIONS );
+                assert( 0 );
+            }
+            
             _path = lp;
             _append = append;
             _enabled = 1;
@@ -115,7 +124,7 @@ namespace mongo {
 
             if ( _file ){
 #ifdef _WIN32
-                cout << "log rotationd doesn't work on windows" << endl;
+                cout << "log rotation doesn't work on windows" << endl;
                 return;
 #else
                 struct tm t;
@@ -130,6 +139,12 @@ namespace mongo {
             }
         
             _file = freopen( _path.c_str() , _append ? "a" : "w"  , stdout );
+            if ( ! _file ){
+                stdout = stderr;
+                cerr << "can't open: " << _path.c_str() << " for log file" << endl;
+                dbexit( EXIT_BADOPTIONS );
+                assert(0);
+            }
             _opened = time(0);
         }
         
