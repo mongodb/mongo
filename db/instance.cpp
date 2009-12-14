@@ -698,7 +698,7 @@ namespace mongo {
     void shutdown();
 
     bool inShutdown(){
-        return numExitCalls == 0;
+        return numExitCalls > 0;
     }
 
     void tryToOutputFatal( const string& s ){
