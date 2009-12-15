@@ -29,7 +29,27 @@ namespace mongo {
 
 #define DDD(x)
 
-    Local<v8::Object> mongoToV8( const BSONObj& m , bool array ){
+    Handle<Value> NamedReadOnlySet( Local<v8::String> property, Local<Value> value, const AccessorInfo& info ) {
+        cout << "cannot write to read-only object" << endl;
+        return value;
+    }
+
+    Handle<Boolean> NamedReadOnlyDelete( Local<v8::String> property, const AccessorInfo& info ) {
+        cout << "cannot delete from read-only object" << endl;
+        return Boolean::New( false );
+    }
+    
+    Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
+        cout << "cannot write to read-only array" << endl;
+        return value;
+    }
+    
+    Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
+        cout << "cannot delete from read-only array" << endl;
+        return Boolean::New( false );
+    }
+    
+    Local<v8::Object> mongoToV8( const BSONObj& m , bool array, bool readOnly ){
 
         // handle DBRef. needs to come first. isn't it? (metagoto)
         static string ref = "$ref";
@@ -44,11 +64,32 @@ namespace mongo {
             }
         }
 
+        Local< v8::ObjectTemplate > readOnlyObjects;
         Local<v8::Object> o;
-        if ( array )
-            o = v8::Array::New();
-        else 
-            o = v8::Object::New();
+        if ( !readOnly ) {
+            // probably unnecessary
+//            if ( array )
+//                o = v8::Array::New();
+//            else 
+                o = v8::Object::New();
+        } else {
+            // NOTE Our readOnly implemention relies on undocumented ObjectTemplate
+            // functionality that may be fragile, but it still seems like the best option
+            // for now -- fwiw, the v8 docs are pretty sparse.  I've determined experimentally
+            // that when property handlers are set for an object template, they will attach
+            // to objects previously created by that template.  To get this to work, though,
+            // it is necessary to initialize the template's property handlers before
+            // creating objects from the template (as I have in the following few lines
+            // of code).
+            // NOTE In my first attempt, I configured the permanent property handlers before
+            // constructiong the object and replaced the Set() calls below with ForceSet().
+            // However, it turns out that ForceSet() only bypasses handlers for named
+            // properties and not for indexed properties.
+            readOnlyObjects = v8::ObjectTemplate::New();
+            readOnlyObjects->SetNamedPropertyHandler( 0 );
+            readOnlyObjects->SetIndexedPropertyHandler( 0 );
+            o = readOnlyObjects->NewInstance();
+        }
 
         mongo::BSONObj sub;
 
@@ -70,7 +111,7 @@ namespace mongo {
                 v8::Handle<v8::Value> argv[1];
                 argv[0] = v8::String::New( f.__oid().str().c_str() );
                 o->Set( v8::String::New( f.fieldName() ) , 
-                        idCons->NewInstance( 1 , argv ) );
+                            idCons->NewInstance( 1 , argv ) );
                 break;
             }
             
@@ -82,7 +123,7 @@ namespace mongo {
             case mongo::Array:
             case mongo::Object:
                 sub = f.embeddedObject();
-                o->Set( v8::String::New( f.fieldName() ) , mongoToV8( sub , f.type() == mongo::Array ) );
+                o->Set( v8::String::New( f.fieldName() ) , mongoToV8( sub , f.type() == mongo::Array, readOnly ) );
                 break;
             
             case mongo::Date:
@@ -109,7 +150,7 @@ namespace mongo {
             }
             
             case mongo::BinData: {
-                Local<v8::Object> b = v8::Object::New();
+                Local<v8::Object> b = readOnly ? readOnlyObjects->NewInstance() : v8::Object::New();
 
                 int len;
                 f.binData( len );
@@ -122,8 +163,8 @@ namespace mongo {
             };
             
             case mongo::Timestamp: {
-                Local<v8::Object> sub = v8::Object::New();            
-
+                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : v8::Object::New();
+                
                 sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
                 sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
             
@@ -151,6 +192,12 @@ namespace mongo {
         
         }
 
+        if ( readOnly ) {
+            data = v8::Number::New( 100 );
+            readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
+            readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );            
+        }
+        
         return o;
     }
 

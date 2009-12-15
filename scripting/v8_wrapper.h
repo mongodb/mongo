@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 );
+    v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
     mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o );
 
     void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , 

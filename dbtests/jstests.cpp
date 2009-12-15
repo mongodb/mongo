@@ -255,9 +255,13 @@ namespace JSTests {
             
             BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" << "zz" << BSONObj() );
             s->setObject( "blah" , o , true );
-            
-            s->invoke( "blah.a = 19;" , BSONObj() );
+
+            s->invoke( "blah.y = 'e'", BSONObj() );
             BSONObj out = s->getObject( "blah" );
+            ASSERT( strlen( out["y"].valuestr() ) > 1 );
+
+            s->invoke( "blah.a = 19;" , BSONObj() );
+            out = s->getObject( "blah" );
             ASSERT( out["a"].eoo() );
 
             s->invoke( "blah.zz.a = 19;" , BSONObj() );
@@ -267,7 +271,26 @@ namespace JSTests {
             s->setObject( "blah.zz", BSON( "a" << 19 ) );
             out = s->getObject( "blah" );
             ASSERT( out["zz"].embeddedObject()["a"].eoo() );
-
+            
+            s->invoke( "delete blah['x']" , BSONObj() );
+            out = s->getObject( "blah" );
+            ASSERT( !out["x"].eoo() );
+            
+            // read-only object itself can be overwritten
+            s->invoke( "blah = {}", BSONObj() );
+            out = s->getObject( "blah" );
+            ASSERT( out.isEmpty() );
+            
+            // test array
+            o = fromjson( "{a:[1,2,3]}" );
+            s->setObject( "blah", o, true );
+            out = s->getObject( "blah" );
+            s->invoke( "blah.a[ 0 ] = 4;", BSONObj() );
+            s->invoke( "delete blah['a'][ 2 ];", BSONObj() );
+            out = s->getObject( "blah" );
+            ASSERT_EQUALS( 1.0, out[ "a" ].embeddedObject()[ 0 ].number() );
+            ASSERT_EQUALS( 3.0, out[ "a" ].embeddedObject()[ 2 ].number() );
+            
             delete s;
         }
     };
