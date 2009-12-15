@@ -227,17 +227,46 @@ namespace JSTests {
         }
     };
 
-    class ObjectModTests {
+    class SetImplicit {
+    public:
+        void run() {
+            Scope *s = globalScriptEngine->createScope();
+
+            BSONObj o = BSON( "foo" << "bar" );
+            s->setObject( "a.b", o );
+            ASSERT( s->getObject( "a" ).isEmpty() );
+
+            BSONObj o2 = BSONObj();
+            s->setObject( "a", o2 );
+            s->setObject( "a.b", o );
+            ASSERT( s->getObject( "a" ).isEmpty() );
+
+            o2 = fromjson( "{b:{}}" );
+            s->setObject( "a", o2 );
+            s->setObject( "a.b", o );
+            ASSERT( !s->getObject( "a" ).isEmpty() );
+        }
+    };
+
+    class ObjectModReadonlyTests {
     public:
         void run(){
             Scope * s = globalScriptEngine->createScope();
             
-            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
+            BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" << "zz" << BSONObj() );
             s->setObject( "blah" , o , true );
             
             s->invoke( "blah.a = 19;" , BSONObj() );
             BSONObj out = s->getObject( "blah" );
             ASSERT( out["a"].eoo() );
+
+            s->invoke( "blah.zz.a = 19;" , BSONObj() );
+            out = s->getObject( "blah" );
+            ASSERT( out["zz"].embeddedObject()["a"].eoo() );
+
+            s->setObject( "blah.zz", BSON( "a" << 19 ) );
+            out = s->getObject( "blah" );
+            ASSERT( out["zz"].embeddedObject()["a"].eoo() );
 
             delete s;
         }
@@ -632,7 +661,8 @@ namespace JSTests {
             add< ObjectMapping >();
             add< ObjectDecoding >();
             add< JSOIDTests >();
-            add< ObjectModTests >();
+            add< SetImplicit >();
+            add< ObjectModReadonlyTests >();
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
