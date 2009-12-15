@@ -193,7 +193,6 @@ namespace mongo {
         }
 
         if ( readOnly ) {
-            data = v8::Number::New( 100 );
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );            
         }
