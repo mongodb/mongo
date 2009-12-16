@@ -346,6 +346,14 @@ namespace JSTests {
 
             }
             
+            // array
+            {
+                BSONObj o = fromjson( "{r:[1,2,3]}" );
+                s->setObject( "x", o );                
+                BSONObj out = s->getObject( "x" );
+                ASSERT_EQUALS( Array, out.firstElement().type() );
+            }
+            
             delete s;
         }
     };
