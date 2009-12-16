@@ -18,6 +18,7 @@
  */
 
 #include "stdafx.h"
+#include "util/mvar.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
@@ -72,6 +73,27 @@ namespace ThreadedTests {
         }
     };
 
+    class MVarTest : public ThreadedTest<> {
+        static const int iterations = 10000;
+        MVar<int> target;
+
+        public:
+        MVarTest() : target(0) {}
+        void subthread(){
+            for(int i=0; i < iterations; i++){
+                int val = target.take();
+#if BOOST_VERSION >= 103500
+                //increase chances of catching failure
+                boost::this_thread::yield();
+#endif
+                target.put(val+1);
+            }
+        }
+        void validate(){
+            ASSERT_EQUALS(target.take() , nthreads * iterations);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ){
@@ -79,6 +101,7 @@ namespace ThreadedTests {
 
         void setupTests(){
             add< IsWrappingIntAtomic >();
+            add< MVarTest >();
         }
     } myall;
 }
