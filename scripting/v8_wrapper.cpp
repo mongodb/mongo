@@ -65,6 +65,7 @@ namespace mongo {
         }
 
         Local< v8::ObjectTemplate > readOnlyObjects;
+        // Hoping template construction is fast...
         Local< v8::ObjectTemplate > internalFieldObjects = v8::ObjectTemplate::New();
         internalFieldObjects->SetInternalFieldCount( 1 );
 
@@ -324,7 +325,10 @@ namespace mongo {
         }
     
         if ( value->IsNumber() ){
-            b.append( sname.c_str() , value->ToNumber()->Value() );
+            if ( value->IsInt32() )
+                b.append( sname.c_str(), int( value->ToInt32()->Value() ) );
+            else
+                b.append( sname.c_str() , value->ToNumber()->Value() );
             return;
         }
     
