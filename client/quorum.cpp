@@ -66,9 +66,15 @@ namespace mongo {
     auto_ptr<DBClientCursor> QuorumConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                      const BSONObj *fieldsToReturn, int queryOptions){ 
         assert(0); 
+        auto_ptr<DBClientCursor> c;
+        return c;
     }
     
-    auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){ assert(0); }
+    auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){ 
+        assert(0); 
+        auto_ptr<DBClientCursor> c;
+        return c;
+    }
     
     void QuorumConnection::insert( const string &ns, BSONObj obj ){ 
         string errmsg;
