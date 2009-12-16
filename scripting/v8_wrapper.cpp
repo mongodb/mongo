@@ -86,11 +86,11 @@ namespace mongo {
         internalFieldObjects->SetInternalFieldCount( 1 );
 
         Local<v8::Object> o;
-        if ( !readOnly ) {
-            if ( array )
-                o = internalFieldObjects->NewInstance();
-            else 
-                o = v8::Object::New();
+        if ( array ) {
+            // NOTE Looks like it's impossible to add interceptors to non array objects in v8.
+            o = v8::Array::New();
+        } else if ( !readOnly ) {
+            o = v8::Object::New();
         } else {
             // NOTE Our readOnly implemention relies on undocumented ObjectTemplate
             // functionality that may be fragile, but it still seems like the best option
@@ -115,9 +115,6 @@ namespace mongo {
             o = readOnlyObjects->NewInstance();
         }
         
-        if ( array )
-            o->SetInternalField( 0, v8::Uint32::New( mongo::Array ) );
-
         mongo::BSONObj sub;
 
         for ( BSONObjIterator i(m); i.more(); ) {
@@ -244,7 +241,7 @@ namespace mongo {
         
         }
 
-        if ( readOnly ) {
+        if ( !array && readOnly ) {
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );            
         }
@@ -412,9 +409,6 @@ namespace mongo {
                         return;
                     case MaxKey:
                         b.appendMaxKey( sname.c_str() );
-                        return;
-                    case Array:
-                        b.appendArray( sname.c_str() , v8ToMongo( value->ToObject() ) );
                         return;
                     case BinData: {
                         int len = obj->Get( v8::String::New( "length" ) )->ToInt32()->Value();
