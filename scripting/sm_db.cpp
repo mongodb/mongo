@@ -17,6 +17,8 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
+#include "../client/quorum.h"
+
 namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns );
@@ -50,14 +52,14 @@ namespace mongo {
 
     class CursorHolder {
     public:
-        CursorHolder( auto_ptr< DBClientCursor > &cursor, const shared_ptr< DBClientBase > &connection ) :
+        CursorHolder( auto_ptr< DBClientCursor > &cursor, const shared_ptr< DBClientWithCommands > &connection ) :
         connection_( connection ),
         cursor_( cursor ) {
             assert( cursor_.get() );
         }
         DBClientCursor *get() const { return cursor_.get(); }
     private:
-        shared_ptr< DBClientBase > connection_;
+        shared_ptr< DBClientWithCommands > connection_;
         auto_ptr< DBClientCursor > cursor_;
     };
     
@@ -125,8 +127,8 @@ namespace mongo {
     JSBool mongo_local_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
 
-        shared_ptr< DBClientBase > client( createDirectClient() );
-        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( client ) ) ) );
+        shared_ptr< DBClientWithCommands > client( createDirectClient() );
+        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( client ) ) ) );
 
         jsval host = c.toval( "EMBEDDED" );
         assert( JS_SetProperty( cx , obj , "host" , &host ) );
@@ -143,7 +145,7 @@ namespace mongo {
         if ( argc > 0 )
             host = c.toString( argv[0] );
 
-        shared_ptr< DBClientBase > conn;
+        shared_ptr< DBClientWithCommands > conn;
         
         string errmsg;
         if ( host.find( "," ) == string::npos ){
@@ -155,30 +157,46 @@ namespace mongo {
             }
         }
         else { // paired
-            DBClientPaired * c = new DBClientPaired();
-            conn.reset( c );
-            if ( ! c->connect( host ) ){
-                JS_ReportError( cx , "couldn't connect to pair" );
+            int numCommas = 0;
+            for ( uint i=0; i<host.size(); i++ )
+                if ( host[i] == ',' )
+                    numCommas++;
+            
+            assert( numCommas > 0 );
+
+            if ( numCommas == 1 ){
+                DBClientPaired * c = new DBClientPaired();
+                conn.reset( c );
+                if ( ! c->connect( host ) ){
+                    JS_ReportError( cx , "couldn't connect to pair" );
+                    return JS_FALSE;
+                }
+            }
+            else if ( numCommas == 2 ){
+                conn.reset( new QuorumConnection( host ) );
+            }
+            else {
+                JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
                 return JS_FALSE;
             }
         }
         
         
-        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientBase >( conn ) ) ) );
+        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
         assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
 
     }
 
-    DBClientBase *getConnection( JSContext *cx, JSObject *obj ) {
-        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+    DBClientWithCommands *getConnection( JSContext *cx, JSObject *obj ) {
+        shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         uassert( "no connection!" , connHolder && connHolder->get() );
         return connHolder->get();
     }
     
     void mongo_finalize( JSContext * cx , JSObject * obj ){
-        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+        shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         if ( connHolder ){
             delete connHolder;
             assert( JS_SetPrivate( cx , obj , 0 ) );
@@ -194,9 +212,9 @@ namespace mongo {
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
         uassert( "mongo_find neesd 5 args" , argc == 5 );
-        shared_ptr< DBClientBase > * connHolder = (shared_ptr< DBClientBase >*)JS_GetPrivate( cx , obj );
+        shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         uassert( "no connection!" , connHolder && connHolder->get() );
-        DBClientBase *conn = connHolder->get();
+        DBClientWithCommands *conn = connHolder->get();
                       
         Convertor c( cx );
 
@@ -238,7 +256,7 @@ namespace mongo {
             return JS_FALSE;
         }
 
-        DBClientBase * conn = getConnection( cx, obj );
+        DBClientWithCommands * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
 
         string ns = c.toString( argv[0] );
@@ -266,7 +284,7 @@ namespace mongo {
             return JS_FALSE;
         }
         
-        DBClientBase * conn = getConnection( cx, obj );
+        DBClientWithCommands * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
         
         
@@ -278,6 +296,13 @@ namespace mongo {
         try {
             conn->insert( ns , o );
             return JS_TRUE;
+        }
+        catch ( std::exception& e ){
+            stringstream ss;
+            ss << "error doing insert:" << e.what();
+            string s = ss.str();
+            JS_ReportError( cx , s.c_str() );
+            return JS_FALSE;
         }
         catch ( ... ){
             JS_ReportError( cx , "error doing insert" );
@@ -295,7 +320,7 @@ namespace mongo {
             return JS_FALSE;
         }
 
-        DBClientBase * conn = getConnection( cx, obj );
+        DBClientWithCommands * conn = getConnection( cx, obj );
         uassert( "no connection!" , conn );
         
         string ns = c.toString( argv[0] );
