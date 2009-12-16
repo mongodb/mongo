@@ -10,11 +10,11 @@ btree/bt_debug.c
 btree/bt_desc.c
 btree/bt_dump.c
 btree/bt_key.c
-btree/bt_recno.c
 btree/bt_misc.c
 btree/bt_open.c
 btree/bt_ovfl.c
 btree/bt_page.c
+btree/bt_recno.c
 btree/bt_ret.c
 btree/bt_stat.c
 btree/bt_sync.c
@@ -50,6 +50,7 @@ support/cksum.c
 support/err.c
 support/prime.c
 support/progress.c
+support/serial.c
 support/stat.c
 support/strerror.c
 support/version.c
