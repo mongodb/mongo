@@ -78,9 +78,12 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_HIT		    5
 #define	WT_STAT_DB_CACHE_MISS		    6
 #define	WT_STAT_DB_READ_BY_KEY		    7
-#define	WT_STAT_DB_READ_BY_RECNO	    8
-#define	WT_STAT_DB_WRITE_BY_KEY		    9
-#define	WT_STAT_IDB_STATS_TOTAL		   10
+#define	WT_STAT_DB_READ_BY_KEY_RESTART	    8
+#define	WT_STAT_DB_READ_BY_RECNO	    9
+#define	WT_STAT_DB_READ_BY_RECNO_RESTART	   10
+#define	WT_STAT_DB_WRITE_BY_KEY		   11
+#define	WT_STAT_DB_WRITE_BY_KEY_RESTART	   12
+#define	WT_STAT_IDB_STATS_TOTAL		   13
 
 /*
  * Statistics entries for IENV_STATS
@@ -101,9 +104,10 @@ struct __wt_stats {
 #define	WT_STAT_TOTAL_READ_IO		   13
 #define	WT_STAT_TOTAL_WRITE_IO		   14
 #define	WT_STAT_WORKQ_PASSES		   15
-#define	WT_STAT_WORKQ_SLEEP		   16
-#define	WT_STAT_WORKQ_YIELD		   17
-#define	WT_STAT_IENV_STATS_TOTAL	   18
+#define	WT_STAT_WORKQ_RESTARTS		   16
+#define	WT_STAT_WORKQ_SLEEP		   17
+#define	WT_STAT_WORKQ_YIELD		   18
+#define	WT_STAT_IENV_STATS_TOTAL	   19
 
 /* Statistics section: END */
 

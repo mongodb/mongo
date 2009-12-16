@@ -102,9 +102,15 @@ __wt_stat_alloc_idb_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
 	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
+	stats[WT_STAT_DB_READ_BY_KEY_RESTART].desc =
+	    "database read-by-key operation restarted";
 	stats[WT_STAT_DB_READ_BY_RECNO].desc =
 	    "database read-by-recno operations";
+	stats[WT_STAT_DB_READ_BY_RECNO_RESTART].desc =
+	    "database read-by-recno operation restarted";
 	stats[WT_STAT_DB_WRITE_BY_KEY].desc = "database put-by-key operations";
+	stats[WT_STAT_DB_WRITE_BY_KEY_RESTART].desc =
+	    "database write-by-key operation restarted";
 
 	*statsp = stats;
 	return (0);
@@ -121,8 +127,11 @@ __wt_stat_clear_idb_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
 	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
+	stats[WT_STAT_DB_READ_BY_KEY_RESTART].v = 0;
 	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
+	stats[WT_STAT_DB_READ_BY_RECNO_RESTART].v = 0;
 	stats[WT_STAT_DB_WRITE_BY_KEY].v = 0;
+	stats[WT_STAT_DB_WRITE_BY_KEY_RESTART].v = 0;
 }
 
 int
@@ -152,6 +161,8 @@ __wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_TOTAL_READ_IO].desc = "total read I/Os";
 	stats[WT_STAT_TOTAL_WRITE_IO].desc = "total write I/Os";
 	stats[WT_STAT_WORKQ_PASSES].desc = "workQ queue passes";
+	stats[WT_STAT_WORKQ_RESTARTS].desc =
+	    "workQ modify restarted operation";
 	stats[WT_STAT_WORKQ_SLEEP].desc = "workQ sleeps";
 	stats[WT_STAT_WORKQ_YIELD].desc = "workQ yields";
 
@@ -178,6 +189,7 @@ __wt_stat_clear_ienv_stats(WT_STATS *stats)
 	stats[WT_STAT_TOTAL_READ_IO].v = 0;
 	stats[WT_STAT_TOTAL_WRITE_IO].v = 0;
 	stats[WT_STAT_WORKQ_PASSES].v = 0;
+	stats[WT_STAT_WORKQ_RESTARTS].v = 0;
 	stats[WT_STAT_WORKQ_SLEEP].v = 0;
 	stats[WT_STAT_WORKQ_YIELD].v = 0;
 }

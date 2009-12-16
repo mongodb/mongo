@@ -37,9 +37,6 @@ int
 __wt_db_put(
     DB *db, WT_TOC *toc, DBT *key, DBT *data, u_int32_t flags);
 int
-__wt_db_get_recno(DB *db, WT_TOC *toc,
-    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
-int
 __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
@@ -79,6 +76,9 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_page_inmem_append(DB *db,
     WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
+int
+__wt_db_get_recno(DB *db, WT_TOC *toc,
+    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags);
 int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return);
@@ -244,6 +244,11 @@ u_int32_t
 __wt_prime(u_int32_t n);
 void
 __wt_progress(const char *s, u_int64_t v);
+void
+__wt_toc_serialize_request(
+    WT_TOC *toc, int (*serial)(WT_TOC *), void *args, WT_SERIAL *serial_private);
+void
+__wt_toc_serialize_wait(WT_TOC *toc, WT_SERIAL *serial_private);
 int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 void
