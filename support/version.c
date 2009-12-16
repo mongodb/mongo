@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * wt_version --
+ * wiredtiger_version --
  *	Return library version information.
  */
 char *
-wt_version(int *majorp, int *minorp, int *patchp)
+wiredtiger_version(int *majorp, int *minorp, int *patchp)
 {
 	if (majorp != NULL)
 		*majorp = WIREDTIGER_VERSION_MAJOR;
