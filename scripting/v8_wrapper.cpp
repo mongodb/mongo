@@ -185,17 +185,19 @@ namespace mongo {
             }
             
             case mongo::BinData: {
-                Local<v8::Object> b = readOnly ? readOnlyObjects->NewInstance() : v8::Object::New();
+                Local<v8::Object> b = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
 
                 int len;
-                f.binData( len );
+                const char *data = f.binData( len );
             
                 b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
                 b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
-            
+                b->Set( v8::String::New( "data" ) , v8::String::New( data, len ) );
+                b->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+                
                 o->Set( v8::String::New( f.fieldName() ) , b );
                 break;
-            };
+            }
             
             case mongo::Timestamp: {
                 Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
@@ -300,13 +302,15 @@ namespace mongo {
         }
             
         case mongo::BinData: {
-            Local<v8::Object> b = v8::Object::New();
+            Local<v8::Object> b = internalFieldObjects->NewInstance();
             
             int len;
-            f.binData( len );
+            const char *data = f.binData( len );
             
             b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
             b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
+            b->Set( v8::String::New( "data" ) , v8::String::New( data, len ) );
+            b->SetInternalField( 0, v8::Uint32::New( f.type() ) );
             
             return b;
         };
@@ -392,6 +396,9 @@ namespace mongo {
         }
     
         if ( value->IsObject() ){
+            // The user could potentially modify the fields of these special objects,
+            // wreaking havoc when we attempt to reinterpret them.  Not doing any validation
+            // for now...
             Local< v8::Object > obj = value->ToObject();
             if ( obj->InternalFieldCount() && obj->GetInternalField( 0 )->IsNumber() ) {
                 switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
@@ -409,6 +416,17 @@ namespace mongo {
                     case Array:
                         b.appendArray( sname.c_str() , v8ToMongo( value->ToObject() ) );
                         return;
+                    case BinData: {
+                        int len = obj->Get( v8::String::New( "length" ) )->ToInt32()->Value();
+                        v8::String::Utf8Value data( obj->Get( v8::String::New( "data" ) ) );
+                        const char *dataArray = *data;
+                        assert( data.length() == len );
+                        b.appendBinData( sname.c_str(),
+                                        len,
+                                        mongo::BinDataType( obj->Get( v8::String::New( "subtype" ) )->ToInt32()->Value() ),
+                                        dataArray );
+                        return;
+                    }
                     default:
                         assert( "invalid internal field" == 0 );
                 }
