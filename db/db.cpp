@@ -283,7 +283,7 @@ namespace mongo {
     bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
         static DBDirectClient db;
         
-        if ( h->version == 4 && h->versionMinor == 4 ){
+        if ( forceRepair == false && h->version == 4 && h->versionMinor == 4 ){
             assert( VERSION == 4 );
             assert( VERSION_MINOR == 5 );
             
