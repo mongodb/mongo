@@ -56,7 +56,7 @@ main(int argc, char *argv[])
 			text_input = 1;
 			break;
 		case 'V':			/* version */
-			printf("%s\n", wt_version(NULL, NULL, NULL));
+			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
 		case 'v':
 			verbose = 1;
@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 
 		if ((ret = db->open(db, *argv, 0600, WT_CREATE)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
-			    progname, *argv, wt_strerror(ret));
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
 
@@ -98,7 +98,7 @@ main(int argc, char *argv[])
 		    WT_DUPLICATES | WT_SORTED_INPUT,
 		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
 			fprintf(stderr, "%s: Db.bulk_load: %s\n",
-			    progname, wt_strerror(ret));
+			    progname, wiredtiger_strerror(ret));
 			goto err;
 		}
 	}

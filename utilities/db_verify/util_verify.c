@@ -30,7 +30,7 @@ main(int argc, char *argv[])
 			verbose = 1;
 			break;
 		case 'V':			/* version */
-			printf("%s\n", wt_version(NULL, NULL, NULL));
+			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
 		case '?':
 		default:
@@ -46,13 +46,13 @@ main(int argc, char *argv[])
 	if ((ret = wiredtiger_simple_setup(progname, &db)) == 0) {
 		if ((ret = db->open(db, *argv, 0, 0)) != 0) {
 			fprintf(stderr, "%s: Db.open: %s: %s\n",
-			    progname, *argv, wt_strerror(ret));
+			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
 		if ((ret =
 		    db->verify(db, verbose ? __wt_progress : NULL, 0)) != 0) {
 			fprintf(stderr, "%s: Db.verify: %s\n",
-			    progname, wt_strerror(ret));
+			    progname, wiredtiger_strerror(ret));
 			goto err;
 		}
 	}

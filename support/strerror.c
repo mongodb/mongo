@@ -3,11 +3,11 @@
 #include "wt_internal.h"
 
 /*
- * wt_strerror --
+ * wiredtiger_strerror --
  *	Return a string for any error value.
  */
 char *
-wt_strerror(int error)
+wiredtiger_strerror(int error)
 {
 	static char errbuf[64];
 	char *p;

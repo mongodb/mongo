@@ -45,8 +45,8 @@ __wt_msg_call(void *cb, void *handle,
 	if (len < sizeof(s) - 1)
 		len += (size_t)vsnprintf(s + len, sizeof(s) - len, fmt, ap);
 	if (error != 0 && len < sizeof(s) - 1)
-		(void)snprintf(
-		    s + len, sizeof(s) - len, ": %s", wt_strerror(error));
+		(void)snprintf(s + len,
+		    sizeof(s) - len, ": %s", wiredtiger_strerror(error));
 
 	/*lint -e611
 	 *
@@ -72,7 +72,7 @@ __wt_msg_stream(FILE *fp,
 		(void)fprintf(fp, "%s: ", pfx2);
 	(void)vfprintf(fp, fmt, ap);
 	if (error != 0)
-		(void)fprintf(fp, ": %s", wt_strerror(error));
+		(void)fprintf(fp, ": %s", wiredtiger_strerror(error));
 	(void)fprintf(fp, "\n");
 	(void)fflush(fp);
 }

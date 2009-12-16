@@ -46,17 +46,17 @@ for line in open('../inc_posix/wiredtiger.in', 'r'):
 tfile.close()
 compare_srcfile(tmp_file, '../inc_posix/wiredtiger.in')
 
-# Output the wt_strerror code.
+# Output the wiredtiger_strerror code.
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api_err.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 tfile.write('/*\n')
-tfile.write(' * wt_strerror --\n')
+tfile.write(' * wiredtiger_strerror --\n')
 tfile.write(' *\tReturn a string for any error value.\n')
 tfile.write(' */\n')
 tfile.write('char *\n')
-tfile.write('wt_strerror(int error)\n')
+tfile.write('wiredtiger_strerror(int error)\n')
 tfile.write('{\n')
 tfile.write('\tstatic char errbuf[64];\n')
 tfile.write('\tchar *p;\n\n')

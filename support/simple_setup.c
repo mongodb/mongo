@@ -7,7 +7,9 @@
  * $Id$
  */
 
-#include "wt_internal.h"
+#include <stdlib.h>
+
+#include "wiredtiger.h"
 
 extern const char *progname;
 
@@ -29,18 +31,19 @@ wiredtiger_simple_setup(const char *progname, DB **dbp)
 	if ((ret = wiredtiger_env_init(&env, 0)) != 0) {
 		fprintf(stderr,
 		    "%s: wiredtiger_env_init: %s\n",
-		    progname, wt_strerror(ret));
+		    progname, wiredtiger_strerror(ret));
 		return (ret);
 	}
 	__env = env;
 
 	if ((ret = env->open(env, NULL, 0, 0)) != 0) {
 		fprintf(stderr,
-		    "%s: Env.open: %s\n", progname, wt_strerror(ret));
+		    "%s: Env.open: %s\n", progname, wiredtiger_strerror(ret));
 		goto err;
 	}
 	if ((ret = env->db(env, 0, &db)) != 0) {
-		fprintf(stderr, "%s: Env.db: %s\n", progname, wt_strerror(ret));
+		fprintf(stderr, "%s: Env.db: %s\n",
+		    progname, wiredtiger_strerror(ret));
 err:		wiredtiger_simple_teardown(progname, db);
 		return (ret);
 	}
@@ -61,15 +64,15 @@ wiredtiger_simple_teardown(const char *progname, DB *db)
 	ret = 0;
 	if (db != NULL && (tret = db->close(db, 0)) != 0) {
 		fprintf(stderr,
-		    "%s: Db.close: %s\n", progname, wt_strerror(ret));
+		    "%s: Db.close: %s\n", progname, wiredtiger_strerror(ret));
 		if (ret == 0)
 			ret = tret;
 	}
 
 	if (__env != NULL) {
 		if ((tret = __env->close(__env, 0)) != 0) {
-			fprintf(stderr,
-			    "%s: Env.close: %s\n", progname, wt_strerror(ret));
+			fprintf(stderr, "%s: Env.close: %s\n",
+			    progname, wiredtiger_strerror(ret));
 			if (ret == 0)
 				ret = tret;
 		}
