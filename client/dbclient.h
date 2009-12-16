@@ -298,8 +298,6 @@ namespace mongo {
 
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
         
-        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0) = 0;
-
         virtual void insert( const string &ns, BSONObj obj ) = 0;
         
         virtual void insert( const string &ns, const vector< BSONObj >& v ) = 0;
@@ -309,6 +307,14 @@ namespace mongo {
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) = 0;
 
         virtual ~DBClientInterface() { }
+
+        /**
+           @return a single object that matches the query.  if none do, then the object is empty
+           @throws AssertionException
+        */
+        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
+
     };
 
     /**
@@ -641,12 +647,6 @@ namespace mongo {
             @throws AssertionException
          */
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn = 0, int options = 0 );
-        
-        /**
-           @return a single object that matches the query.  if none do, then the object is empty
-           @throws AssertionException
-        */
-        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         
         /**
            insert an object into the database
