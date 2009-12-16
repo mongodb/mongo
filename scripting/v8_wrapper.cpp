@@ -71,10 +71,9 @@ namespace mongo {
 
         Local<v8::Object> o;
         if ( !readOnly ) {
-            // probably unnecessary
-//            if ( array )
-//                o = v8::Array::New();
-//            else 
+            if ( array )
+                o = internalFieldObjects->NewInstance();
+            else 
                 o = v8::Object::New();
         } else {
             // NOTE Our readOnly implemention relies on undocumented ObjectTemplate
@@ -90,11 +89,18 @@ namespace mongo {
             // However, it turns out that ForceSet() only bypasses handlers for named
             // properties and not for indexed properties.
             readOnlyObjects = v8::ObjectTemplate::New();
+            // NOTE This internal field will store type info for special db types.  For
+            // regular objects the field is unnecessary - for simplicity I'm creating just
+            // one readOnlyObjects template for objects where the field is & isn't necessary,
+            // assuming that the overhead of an internal field is slight.
             readOnlyObjects->SetInternalFieldCount( 1 );
             readOnlyObjects->SetNamedPropertyHandler( 0 );
             readOnlyObjects->SetIndexedPropertyHandler( 0 );
             o = readOnlyObjects->NewInstance();
         }
+        
+        if ( array )
+            o->SetInternalField( 0, v8::Uint32::New( mongo::Array ) );
 
         mongo::BSONObj sub;
 
@@ -357,6 +363,9 @@ namespace mongo {
                         return;
                     case MaxKey:
                         b.appendMaxKey( sname.c_str() );
+                        return;
+                    case Array:
+                        b.appendArray( sname.c_str() , v8ToMongo( value->ToObject() ) );
                         return;
                     default:
                         assert( "invalid internal field" == 0 );
