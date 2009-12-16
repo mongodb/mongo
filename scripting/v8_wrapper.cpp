@@ -49,6 +49,15 @@ namespace mongo {
         return Boolean::New( false );
     }
     
+    Local< v8::Value > newFunction( const char *code ) {
+        stringstream codeSS;
+        codeSS << "____MontoToV8_newFunction_temp = " << code;
+        string codeStr = codeSS.str();
+        Local< Script > compiled = Script::New( v8::String::New( codeStr.c_str() ) );
+        Local< Value > ret = compiled->Run();
+        return ret;
+    }
+    
     Local<v8::Object> mongoToV8( const BSONObj& m , bool array, bool readOnly ){
 
         // handle DBRef. needs to come first. isn't it? (metagoto)
@@ -112,7 +121,15 @@ namespace mongo {
             switch ( f.type() ){
 
             case mongo::Code:
-                cout << "warning, code saved in database just turned into string right now" << endl;
+                o->Set( v8::String::New( f.fieldName() ), newFunction( f.valuestr() ) );
+                break;
+
+            case CodeWScope:
+                if ( f.codeWScopeObject().isEmpty() )
+                    log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
+                o->Set( v8::String::New( f.fieldName() ), newFunction( f.codeWScopeCode() ) );
+                break;
+            
             case mongo::String: 
                 o->Set( v8::String::New( f.fieldName() ) , v8::String::New( f.valuestr() ) );
                 break;
@@ -225,7 +242,13 @@ namespace mongo {
         switch ( f.type() ){
 
         case mongo::Code:
-            cout << "warning, code saved in database just turned into string right now" << endl;
+            return newFunction( f.valuestr() );
+                
+        case CodeWScope:
+            if ( f.codeWScopeObject().isEmpty() )
+                log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
+            return newFunction( f.codeWScopeCode() );
+                
         case mongo::String: 
             return v8::String::New( f.valuestr() );
             
