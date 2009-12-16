@@ -65,6 +65,9 @@ namespace mongo {
         }
 
         Local< v8::ObjectTemplate > readOnlyObjects;
+        Local< v8::ObjectTemplate > internalFieldObjects = v8::ObjectTemplate::New();
+        internalFieldObjects->SetInternalFieldCount( 1 );
+
         Local<v8::Object> o;
         if ( !readOnly ) {
             // probably unnecessary
@@ -86,6 +89,7 @@ namespace mongo {
             // However, it turns out that ForceSet() only bypasses handlers for named
             // properties and not for indexed properties.
             readOnlyObjects = v8::ObjectTemplate::New();
+            readOnlyObjects->SetInternalFieldCount( 1 );
             readOnlyObjects->SetNamedPropertyHandler( 0 );
             readOnlyObjects->SetIndexedPropertyHandler( 0 );
             o = readOnlyObjects->NewInstance();
@@ -163,25 +167,32 @@ namespace mongo {
             };
             
             case mongo::Timestamp: {
-                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : v8::Object::New();
+                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
                 
                 sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
                 sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
-            
+                sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+                
                 o->Set( v8::String::New( f.fieldName() ) , sub );
                 break;
             }
             
-            case mongo::MinKey:
-                // TODO: make a special type
-                o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MinKey" ) );
+            case mongo::MinKey: {
+                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+                sub->Set( v8::String::New( "$MinKey" ), v8::Boolean::New( true ) );
+                sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+                o->Set( v8::String::New( f.fieldName() ) , sub );
                 break;
-
-            case mongo::MaxKey:
-                // TODO: make a special type
-                o->Set( v8::String::New( f.fieldName() ) , v8::String::New( "MaxKey" ) );
+            }
+                    
+            case mongo::MaxKey: {
+                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+                sub->Set( v8::String::New( "$MaxKey" ), v8::Boolean::New( true ) );
+                sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+                o->Set( v8::String::New( f.fieldName() ) , sub );
                 break;
-            
+            }
+                    
             default:
                 cout << "can't handle type: ";
                 cout  << f.type() << " ";
@@ -201,6 +212,9 @@ namespace mongo {
     }
 
     Handle<v8::Value> mongoToV8Element( const BSONElement &f ) {
+        Local< v8::ObjectTemplate > internalFieldObjects = v8::ObjectTemplate::New();
+        internalFieldObjects->SetInternalFieldCount( 1 );
+
         switch ( f.type() ){
 
         case mongo::Code:
@@ -257,22 +271,29 @@ namespace mongo {
         };
             
         case mongo::Timestamp: {
-            Local<v8::Object> sub = v8::Object::New();            
+            Local<v8::Object> sub = internalFieldObjects->NewInstance();
             
             sub->Set( v8::String::New( "time" ) , v8::Date::New( f.timestampTime() ) );
             sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
-            
+            sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+
             return sub;
         }
             
-        case mongo::MinKey:
-            // TODO: make a special type
-            return v8::String::New( "MinKey" );
+        case mongo::MinKey: {
+            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+            sub->Set( v8::String::New( "$MinKey" ), v8::Boolean::New( true ) );
+            sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+            return sub;
+        }
             
-        case mongo::MaxKey:
-            // TODO: make a special type
-            return v8::String::New( "MaxKey" );
-            
+        case mongo::MaxKey: {
+            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+            sub->Set( v8::String::New( "$MaxKey" ), v8::Boolean::New( true ) );
+            sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
+            return sub;
+        }
+                
         case mongo::Undefined:
             return v8::Undefined();
             
@@ -319,6 +340,24 @@ namespace mongo {
         }
     
         if ( value->IsObject() ){
+            Local< v8::Object > obj = value->ToObject();
+            if ( obj->InternalFieldCount() && obj->GetInternalField( 0 )->IsNumber() ) {
+                switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
+                    case Timestamp:
+                        b.appendTimestamp( sname.c_str(),
+                                          Date_t( v8::Date::Cast( *obj->Get( v8::String::New( "time" ) ) )->NumberValue() ),
+                                          obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
+                        return;
+                    case MinKey:
+                        b.appendMinKey( sname.c_str() );
+                        return;
+                    case MaxKey:
+                        b.appendMaxKey( sname.c_str() );
+                        return;
+                    default:
+                        assert( "invalid internal field" == 0 );
+                }
+            }
             string s = toSTLString( value );
             if ( s.size() && s[0] == '/' ){
                 s = s.substr( 1 );
