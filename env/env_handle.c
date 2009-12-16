@@ -75,8 +75,7 @@ __wt_ienv_config_default(ENV *env)
 
 	WT_RET(__wt_mtx_init(&ienv->mtx));	/* Global mutex */
 
-						/* API generation */
-	ienv->api_gen = WT_TOC_GEN_IGNORE + 1;
+	ienv->api_gen = WT_TOC_GEN_MIN;		/* API generation */
 
 	TAILQ_INIT(&ienv->tocqh);		/* WT_TOC list */
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
