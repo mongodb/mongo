@@ -474,6 +474,8 @@ namespace JSTests {
             // Commenting so that v8 tests will work
 //            ASSERT_EQUALS( NumberDouble , out["a"].embeddedObjectUserCheck()["1"].type() ); // TODO: this is technically bad, but here to make sure that i understand the behavior
 
+
+            // Eliot says I don't have to worry about this case
             
 //            // -- D --
 //            
@@ -599,6 +601,7 @@ namespace JSTests {
             ASSERT_EQUALS( 11 , out["b"].number() );
             ASSERT_EQUALS( 12 , out["c"].number() );
 
+            // Guess we don't care about this
             //s->invokeSafe( "foo.d() " , BSONObj() );
             //out = s->getObject( "out" );
             //ASSERT_EQUALS( 18 , out["d"].number() );
