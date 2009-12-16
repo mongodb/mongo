@@ -14,7 +14,7 @@
 		(prog) = (argv)[0];					\
 	else								\
 		++(prog);						\
-	(void)wt_version(&__major, &__minor, NULL);			\
+	(void)wiredtiger_version(&__major, &__minor, NULL);		\
 	if (__major != WIREDTIGER_VERSION_MAJOR ||			\
 	    __minor != WIREDTIGER_VERSION_MINOR) {			\
 		fprintf(stderr,						\
