@@ -58,6 +58,13 @@ namespace mongo {
         return ret;
     }
     
+    Local< v8::Value > newId( const OID &id ) {
+        v8::Function * idCons = getObjectIdCons();
+        v8::Handle<v8::Value> argv[1];
+        argv[0] = v8::String::New( id.str().c_str() );
+        return idCons->NewInstance( 1 , argv );        
+    }
+    
     Local<v8::Object> mongoToV8( const BSONObj& m , bool array, bool readOnly ){
 
         // handle DBRef. needs to come first. isn't it? (metagoto)
@@ -216,6 +223,14 @@ namespace mongo {
                 o->Set( v8::String::New( f.fieldName() ) , sub );
                 break;
             }
+
+            case mongo::DBRef: {
+                v8::Function* dbRef = getNamedCons( "DBRef" );
+                v8::Handle<v8::Value> argv[2];
+                argv[0] = v8::String::New( f.dbrefNS() );
+                argv[1] = newId( f.dbrefOID() );
+                o->Set( v8::String::New( f.fieldName() ), dbRef->NewInstance(2, argv) );
+            }
                     
             default:
                 cout << "can't handle type: ";
@@ -252,12 +267,8 @@ namespace mongo {
         case mongo::String: 
             return v8::String::New( f.valuestr() );
             
-        case mongo::jstOID: {
-            v8::Function * idCons = getObjectIdCons();
-            v8::Handle<v8::Value> argv[1];
-            argv[0] = v8::String::New( f.__oid().str().c_str() );
-            return idCons->NewInstance( 1 , argv );
-        }
+        case mongo::jstOID:
+            return newId( f.__oid() );
             
         case mongo::NumberDouble:
         case mongo::NumberInt:
@@ -326,7 +337,15 @@ namespace mongo {
                 
         case mongo::Undefined:
             return v8::Undefined();
-            
+
+        case mongo::DBRef: {
+            v8::Function* dbRef = getNamedCons( "DBRef" );
+            v8::Handle<v8::Value> argv[2];
+            argv[0] = v8::String::New( f.dbrefNS() );
+            argv[1] = newId( f.dbrefOID() );
+            return dbRef->NewInstance(2, argv);
+        }
+                       
         default:
             cout << "can't handle type: ";
 			cout  << f.type() << " ";
