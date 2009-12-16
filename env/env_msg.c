@@ -25,10 +25,10 @@
 	}								\
 									\
 	/* Application-specified callback function. */			\
-	if (env->msgcall != NULL) {					\
+	if ((env)->msgcall != NULL) {					\
 		va_start(__ap, fmt);					\
-		__wt_msg_call(						\
-		    env->msgcall, env, NULL, NULL, 0, fmt, __ap);	\
+		__wt_msg_call((void *)((env)->msgcall),			\
+		    (void *)env, NULL, NULL, 0, fmt, __ap);		\
 		va_end(__ap);						\
 	}								\
 									\
@@ -36,11 +36,11 @@
 	 * If the application set an message callback function but not a\
 	 * message stream, we're done.  Otherwise, write the stream.	\
 	 */								\
-	if (env->msgcall != NULL && env->msgfile == NULL)		\
+	if ((env)->msgcall != NULL && (env)->msgfile == NULL)		\
 			return;						\
 									\
 	va_start(__ap, fmt);						\
-	__wt_msg_stream(env->msgfile, NULL, NULL, 0, fmt, __ap);	\
+	__wt_msg_stream((env)->msgfile, NULL, NULL, 0, fmt, __ap);	\
 	va_end(__ap);							\
 }
 

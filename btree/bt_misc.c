@@ -111,7 +111,7 @@ void
 __wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr)
 {
 	page->first_free = addr;
-	page->space_avail = page->bytes - (addr - (u_int8_t *)page->hdr);
+	page->space_avail = page->bytes - (u_int)(addr - (u_int8_t *)page->hdr);
 }
 
 /*

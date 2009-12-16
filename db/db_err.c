@@ -15,7 +15,8 @@
 	/* Application-specified callback function. */			\
 	va_start(__ap, fmt);						\
 	if ((db)->errcall != NULL)					\
-		__wt_msg_call((db)->errcall, (db), (db)->errpfx,	\
+		__wt_msg_call((void *)((db)->errcall),			\
+		    (void *)(db), (db)->errpfx,				\
 		    (db)->idb == NULL ? NULL : (db)->idb->dbname,	\
 		    error, fmt, __ap);					\
 	va_end(__ap);							\
