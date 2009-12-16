@@ -919,7 +919,7 @@ namespace mongo {
             is assured regardless.
             @return true if found
 		*/
-		bool getObjectID(BSONElement& e);
+		bool getObjectID(BSONElement& e) const;
 
         /** makes a copy of the object. 
         */
@@ -1725,7 +1725,7 @@ namespace mongo {
         return objsize() > 0 && objsize() <= 1024 * 1024 * 8;
     }
 
-    inline bool BSONObj::getObjectID(BSONElement& e) { 
+    inline bool BSONObj::getObjectID(BSONElement& e) const { 
         BSONElement f = findElement("_id");
         if( !f.eoo() ) { 
             e = f;
