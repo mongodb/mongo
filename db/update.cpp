@@ -389,12 +389,14 @@ namespace mongo {
             BSONObjIterator i( query );
             while ( i.more() ){
                 BSONElement e = i.next();
-                uassert( "upsert with foo.bar type queries not supported yet" , strchr( e.fieldName() , '.' ) == 0 );
 
                 if ( e.type() == Object && e.embeddedObject().firstElement().fieldName()[0] == '$' ){
                     // this means this is a $gt type filter, so don't make part of the new object
                     continue;
                 }
+
+                uassert( "upsert with foo.bar type queries not supported yet" , strchr( e.fieldName() , '.' ) == 0 );
+
 
                 bb.append( e );
             }
