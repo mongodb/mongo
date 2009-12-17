@@ -158,8 +158,6 @@ namespace mongo {
             return Code;
         if ( v->IsArray() )
             return Array;
-        if ( v->IsObject() )
-            return Object;
         if ( v->IsBoolean() )
             return Bool;
         if ( v->IsInt32() )
@@ -172,6 +170,8 @@ namespace mongo {
         }
         if ( v->IsDate() )
             return Date;
+        if ( v->IsObject() )
+            return Object;
 
         throw UserException( (string)"don't know what this is: " + field );
     }
