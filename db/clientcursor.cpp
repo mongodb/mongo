@@ -135,13 +135,15 @@ namespace mongo {
         }
 
         wassert( toAdvance.size() < 5000 );
+        
+        for ( vector<ClientCursor*>::iterator i = toAdvance.begin(); i != toAdvance.end(); ++i ){
+            ClientCursor* cc = *i;
+            
+            if ( cc->_doingDeletes ) continue;
 
-        for ( vector<ClientCursor*>::iterator i = toAdvance.begin();
-                i != toAdvance.end(); ++i )
-        {
-            Cursor *c = (*i)->c.get();
+            Cursor *c = cc->c.get();
             if ( c->capped() ){
-                delete *i;
+                delete cc;
                 continue;
             }
             
@@ -154,11 +156,11 @@ namespace mongo {
             c->advance();
             if ( c->eof() ) {
                 // advanced to end -- delete cursor
-                delete *i;
+                delete cc;
             }
             else {
                 wassert( c->refLoc() != dl );
-                (*i)->updateLocation();
+                cc->updateLocation();
             }
         }
     }

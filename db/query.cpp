@@ -132,29 +132,43 @@ namespace mongo {
         int best = 0;
         DeleteOp original( justOne, best );
         shared_ptr< DeleteOp > bestOp = s.runOp( original );
-        auto_ptr< Cursor > c = bestOp->newCursor();
+        auto_ptr< Cursor > creal = bestOp->newCursor();
         
-        if( !c->ok() )
+        if( !creal->ok() )
             return nDeleted;
 
-        KeyValJSMatcher matcher(pattern, c->indexKeyPattern());
+        KeyValJSMatcher matcher(pattern, creal->indexKeyPattern());
 
+        ClientCursor cc;
+        cc.c = creal;
+        cc.ns = ns;
+        cc.liveForever();
+        cc.setDoingDeletes( true );
         do {
-            DiskLoc rloc = c->currLoc();
-            BSONObj key = c->currKey();
             
-            c->advance();
+            if ( nDeleted % 100 == 99 ){
+                cc.updateLocation();
+                cc.setDoingDeletes( false );
+                dbtemprelease unlock;
+            }
+            cc.setDoingDeletes( true );
+            
+            DiskLoc rloc = cc.c->currLoc();
+            BSONObj key = cc.c->currKey();
+            
+            cc.c->advance();
+            cc.updateLocation();
             
             if ( ! matcher.matches( key , rloc ) )
                 continue;
 
-            assert( !c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+            assert( !cc.c->getsetdup(rloc) ); // can't be a dup, we deleted it!
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
                    blocks.  here we might call millions of times which would be bad.
                 */
-                c->noteLocation();
+                cc.c->noteLocation();
             }
             
             if ( logop ) {
@@ -168,12 +182,14 @@ namespace mongo {
                     problem() << "deleted object without id, not logging" << endl;
                 }
             }
+
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;
             if ( justOne )
                 break;
-            c->checkLocation();
-        } while ( c->ok() );
+            cc.c->checkLocation();
+            
+        } while ( cc.c->ok() );
 
         return nDeleted;
     }

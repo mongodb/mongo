@@ -51,11 +51,12 @@ namespace mongo {
         DiskLoc _lastLoc;                        // use getter and setter not this (important)
         unsigned _idleAgeMillis;                 // how long has the cursor been around, relative to server idle time
         bool _liveForever;                       // if true, never time out cursor
-        
+        bool _doingDeletes;
+
         static CCById clientCursorsById;
         static CCByLoc byLoc;
         static boost::recursive_mutex ccmutex;   // must use this for all statics above!
-
+        
         static CursorId allocCursorId_inlock();
 
     public:
@@ -66,7 +67,7 @@ namespace mongo {
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
 
-        ClientCursor() : _idleAgeMillis(0), _liveForever(false), pos(0) {
+        ClientCursor() : _idleAgeMillis(0), _liveForever(false), _doingDeletes(false), pos(0) {
             recursive_boostlock lock(ccmutex);
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );
@@ -145,6 +146,10 @@ namespace mongo {
 
         void liveForever() {
             _liveForever = true;
+        }
+
+        void setDoingDeletes( bool doingDeletes ){
+            _doingDeletes = doingDeletes;
         }
 
         static unsigned byLocSize();        // just for diagnostics
