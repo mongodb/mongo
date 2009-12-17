@@ -776,15 +776,15 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     else:
         print( "WARNING: old version of boost - you should consider upgrading" )
 
+    # this will add it iff it exists and works
+    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
+                  "boost_system" + boostCompiler + boostVersion ] )
+
     for b in boostLibs:
         l = "boost_" + b
         myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
                       l + boostCompiler + boostVersion ] ,
                     release or not shell)
-
-    # this will add it iff it exists and works
-    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                  "boost_system" + boostCompiler + boostVersion ] )
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
