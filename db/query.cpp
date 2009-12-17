@@ -148,9 +148,10 @@ namespace mongo {
 
         CursorId id = cc->cursorid;
         
+        unsigned long long nScanned = 0;
         do {
             
-            if ( nDeleted % 100 == 99 ){
+            if ( ++nScanned % 100 == 0 ){
                 cc->updateLocation();
                 cc->setDoingDeletes( false );
                 {
