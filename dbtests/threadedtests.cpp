@@ -18,7 +18,7 @@
  */
 
 #include "stdafx.h"
-#include "util/mvar.h"
+#include "../util/mvar.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
