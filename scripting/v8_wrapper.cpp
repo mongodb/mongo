@@ -438,9 +438,11 @@ namespace mongo {
                 OID oid;
                 oid.init( toSTLString( value ) );
                 b.appendOID( sname.c_str() , &oid );
-            } else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__DBPointer" ) ).IsEmpty() ) {
-                // TODO might be nice to speed this up with an indexed internal field, but
-                // I don't yet know how to use an ObjectTemplate with a constructor.
+            }
+            else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__DBPointer" ) ).IsEmpty() ) {
+                // TODO might be nice to potentially speed this up with an indexed internal
+                // field, but I don't yet know how to use an ObjectTemplate with a
+                // constructor.
                 OID oid;
                 oid.init( toSTLString( value->ToObject()->Get( v8::String::New( "id" ) ) ) );
                 string ns = toSTLString( value->ToObject()->Get( v8::String::New( "ns" ) ) );
