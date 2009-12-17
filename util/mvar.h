@@ -27,14 +27,16 @@ namespace mongo {
     template <typename T>
     class MVar {
     public:
+        enum State {EMPTY=0, FULL};
+
         // create an empty MVar
         MVar()
-          : _full(false)
+          : _state(EMPTY)
         {}
 
         // creates a full MVar
         MVar(const T& val)
-          : _full(true)
+          : _state(FULL)
           , _value(val)
         {}
 
@@ -43,12 +45,12 @@ namespace mongo {
         void put(const T& val){
             boost::mutex::scoped_lock lock(_mutex);
 
-            while (_full){
+            while (_state == FULL){
                  // unlocks lock while waiting and relocks before returning
                 _condition.wait(lock);
             } 
 
-            _full = true;
+            _state = FULL;
             _value = val;
 
             // unblock threads waiting to 'take'
@@ -60,12 +62,12 @@ namespace mongo {
         T take(){
             boost::mutex::scoped_lock lock(_mutex);
 
-            while (!_full){
+            while (_state == EMPTY){
                  // unlocks lock while waiting and relocks before returning
                 _condition.wait(lock);
             } 
 
-            _full = false;
+            _state = EMPTY;
 
             // unblock threads waiting to 'put'
             _condition.notify_all();
@@ -73,9 +75,14 @@ namespace mongo {
             return _value;
         }
 
+        // Note: this is fast because there is no locking, but state could
+        // change before you get a chance to act on it.
+        // Mainly useful for sanity checks / asserts.
+        State getState(){ return _state; }
+
 
     private:
-        bool _full;
+        State _state;
         T _value;
         boost::mutex _mutex;
         boost::condition _condition;
