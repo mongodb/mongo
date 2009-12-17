@@ -145,12 +145,21 @@ namespace mongo {
         cc->ns = ns;
         cc->liveForever();
         cc->setDoingDeletes( true );
+
+        CursorId id = cc->cursorid;
+        
         do {
             
             if ( nDeleted % 100 == 99 ){
                 cc->updateLocation();
                 cc->setDoingDeletes( false );
-                dbtemprelease unlock;
+                {
+                    dbtemprelease unlock;
+                }
+                if ( ClientCursor::find( id , false ) == 0 ){
+                    cc.reset( 0 );
+                    break;
+                }
             }
             cc->setDoingDeletes( true );
             
@@ -190,6 +199,10 @@ namespace mongo {
             cc->c->checkLocation();
             
         } while ( cc->c->ok() );
+
+        if ( ClientCursor::find( id , false ) == 0 ){
+            cc.reset( 0 );
+        }
 
         return nDeleted;
     }
