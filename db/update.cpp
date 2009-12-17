@@ -380,6 +380,35 @@ namespace mongo {
         createNewFromMods( "" , b , obj );
         return b.obj();
     }
+
+    BSONObj ModSet::createNewFromQuery( const BSONObj& query ){
+        BSONObj newObj;
+
+        {
+            BSONObjBuilder bb;
+            BSONObjIterator i( query );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                uassert( "upsert with foo.bar type queries not supported yet" , strchr( e.fieldName() , '.' ) == 0 );
+
+                if ( e.type() == Object && e.embeddedObject().firstElement().fieldName()[0] == '$' ){
+                    // this means this is a $gt type filter, so don't make part of the new object
+                    continue;
+                }
+
+                bb.append( e );
+            }
+            newObj = bb.obj();
+        }
+        
+        cout << "yo ho ho" << endl;
+        if ( canApplyInPlaceAndVerify( newObj ) )
+            applyModsInPlace( newObj );
+        else
+            newObj = createNewFromMods( newObj );
+        
+        return newObj;
+    }
     
     /* get special operations like $inc
        { $inc: { a:1, b:1 } }
@@ -442,7 +471,7 @@ namespace mongo {
             BSONElement e = i.next();
             if ( e.eoo() )
                 break;
-            massert( "Modifiers and non-modifiers cannot be mixed", e.fieldName()[ 0 ] != '$' );
+            uassert( "Modifiers and non-modifiers cannot be mixed", e.fieldName()[ 0 ] != '$' );
         }
     }
     
@@ -625,11 +654,7 @@ namespace mongo {
                 ModSet mods;
                 mods.getMods(updateobjOrig);
                  
-                BSONObj newObj = patternOrig.copy();
-                if ( mods.canApplyInPlaceAndVerify( newObj ) )
-                    mods.applyModsInPlace( newObj );
-                else
-                    newObj = mods.createNewFromMods( newObj );
+                BSONObj newObj = mods.createNewFromQuery( patternOrig );
 
                 if ( profile )
                     ss << " fastmodinsert ";

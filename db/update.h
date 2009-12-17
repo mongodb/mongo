@@ -220,6 +220,8 @@ namespace mongo {
 
         BSONObj createNewFromMods( const BSONObj &obj );
 
+        BSONObj createNewFromQuery( const BSONObj& query );
+
         /**
          *
          */
