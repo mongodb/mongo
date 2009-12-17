@@ -151,7 +151,7 @@ namespace mongo {
         unsigned long long nScanned = 0;
         do {
             
-            if ( ++nScanned % 100 == 0 ){
+            if ( ++nScanned % 128 == 0 ){
                 cc->updateLocation();
                 cc->setDoingDeletes( false );
                 {
