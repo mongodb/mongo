@@ -59,6 +59,7 @@ namespace mongo {
         virtual DiskLoc currLoc() = 0;
         virtual bool advance() = 0; /*true=ok*/
         virtual BSONObj currKey() const { return BSONObj(); }
+
         // DiskLoc the cursor requires for continued operation.  Before this
         // DiskLoc is deleted, the cursor must be incremented or destroyed.
         virtual DiskLoc refLoc() = 0;
