@@ -693,6 +693,10 @@ namespace JSTests {
             //blah( "out" , out["c"] );
             ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );
 
+            // check that BinData js class is utilized
+            s->invokeSafe( "q = tojson( x.b );", BSONObj() );
+            ASSERT_EQUALS( "BinData", s->getString( "q" ).substr( 0, 7 ) );
+            
             delete s;
         }
     };
