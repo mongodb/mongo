@@ -392,7 +392,10 @@ namespace mongo {
             b.appendDate( sname.c_str() , Date_t(v8::Date::Cast( *value )->NumberValue()) );
             return;
         }
-    
+
+        if ( value->IsExternal() )
+            return;
+        
         if ( value->IsObject() ){
             // The user could potentially modify the fields of these special objects,
             // wreaking havoc when we attempt to reinterpret them.  Not doing any validation
