@@ -1,10 +1,9 @@
 // quorum.cpp
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "quorum.h"
 
 namespace mongo {
-
     
     QuorumConnection::QuorumConnection( string commaSeperated ){
         string::size_type idx;
