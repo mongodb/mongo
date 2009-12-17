@@ -142,7 +142,7 @@ namespace mongo {
         ClientCursor cc;
         cc.c = creal;
         cc.ns = ns;
-        cc.liveForever();
+        cc.noTimeout();
         cc.setDoingDeletes( true );
         do {
             
@@ -827,7 +827,7 @@ namespace mongo {
                 if ( dqo.saveClientCursor() ) {
                     ClientCursor *cc = new ClientCursor();
                     if ( queryOptions & Option_NoCursorTimeout )
-                        cc->liveForever();
+                        cc->noTimeout();
                     cc->c = c;
                     cursorid = cc->cursorid;
                     cc->query = jsobj.getOwned();
