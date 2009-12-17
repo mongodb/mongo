@@ -139,36 +139,36 @@ namespace mongo {
 
         KeyValJSMatcher matcher(pattern, creal->indexKeyPattern());
 
-        ClientCursor cc;
-        cc.c = creal;
-        cc.ns = ns;
-        cc.noTimeout();
-        cc.setDoingDeletes( true );
+        auto_ptr<ClientCursor> cc;
+        cc.reset( new ClientCursor() );
+        cc->c = creal;
+        cc->ns = ns;
+        cc->noTimeout();
+        cc->setDoingDeletes( true );
         do {
             
             if ( nDeleted % 100 == 99 ){
-                cc.updateLocation();
-                cc.setDoingDeletes( false );
+                cc->updateLocation();
+                cc->setDoingDeletes( false );
                 dbtemprelease unlock;
             }
-            cc.setDoingDeletes( true );
+            cc->setDoingDeletes( true );
             
-            DiskLoc rloc = cc.c->currLoc();
-            BSONObj key = cc.c->currKey();
+            DiskLoc rloc = cc->c->currLoc();
+            BSONObj key = cc->c->currKey();
             
-            cc.c->advance();
-            cc.updateLocation();
+            cc->c->advance();
             
             if ( ! matcher.matches( key , rloc ) )
                 continue;
-
-            assert( !cc.c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+            
+            assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
                    blocks.  here we might call millions of times which would be bad.
                 */
-                cc.c->noteLocation();
+                cc->c->noteLocation();
             }
             
             if ( logop ) {
@@ -187,9 +187,9 @@ namespace mongo {
             nDeleted++;
             if ( justOne )
                 break;
-            cc.c->checkLocation();
+            cc->c->checkLocation();
             
-        } while ( cc.c->ok() );
+        } while ( cc->c->ok() );
 
         return nDeleted;
     }
