@@ -40,40 +40,64 @@ namespace mongo {
           , _value(val)
         {}
 
-        // puts val into the MVar
-        // will block if the MVar is already full
-        void put(const T& val){
-            boost::mutex::scoped_lock lock(_mutex);
-
-            while (_state == FULL){
-                 // unlocks lock while waiting and relocks before returning
-                _condition.wait(lock);
-            } 
+        // puts val into the MVar and returns true or returns false if full
+        // never blocks
+        bool tryPut(const T& val){
+            // intentionally repeat test before and after lock
+            if (_state == FULL) return false;
+            Mutex::scoped_lock lock(_mutex);
+            if (_state == FULL) return false;
 
             _state = FULL;
             _value = val;
 
             // unblock threads waiting to 'take'
             _condition.notify_all();
+
+            return true;
+        }
+
+        // puts val into the MVar
+        // will block if the MVar is already full
+        void put(const T& val){
+            while (!tryPut(val)){
+                 // unlocks lock while waiting and relocks before returning
+                Mutex::scoped_lock lock(_mutex);
+                _condition.wait(lock);
+            } 
+        }
+
+        // takes val out of the MVar and returns true or returns false if empty
+        // never blocks
+        bool tryTake(T& out){
+            // intentionally repeat test before and after lock
+            if (_state == EMPTY) return false;
+            Mutex::scoped_lock lock(_mutex);
+            if (_state == EMPTY) return false;
+
+            _state = EMPTY;
+            out = _value;
+
+            // unblock threads waiting to 'put'
+            _condition.notify_all();
+
+            return true;
         }
 
         // takes val out of the MVar
         // will block if the MVar is empty
         T take(){
-            boost::mutex::scoped_lock lock(_mutex);
+            T ret = T();
 
-            while (_state == EMPTY){
+            Mutex::scoped_lock lock(_mutex);
+            while (!tryTake(ret)){
                  // unlocks lock while waiting and relocks before returning
                 _condition.wait(lock);
             } 
 
-            _state = EMPTY;
-
-            // unblock threads waiting to 'put'
-            _condition.notify_all();
-
-            return _value;
+            return ret;
         }
+
 
         // Note: this is fast because there is no locking, but state could
         // change before you get a chance to act on it.
@@ -84,7 +108,8 @@ namespace mongo {
     private:
         State _state;
         T _value;
-        boost::mutex _mutex;
+        typedef boost::recursive_mutex Mutex;
+        Mutex _mutex;
         boost::condition _condition;
     };
 
