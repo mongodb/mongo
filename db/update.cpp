@@ -401,7 +401,6 @@ namespace mongo {
             newObj = bb.obj();
         }
         
-        cout << "yo ho ho" << endl;
         if ( canApplyInPlaceAndVerify( newObj ) )
             applyModsInPlace( newObj );
         else
