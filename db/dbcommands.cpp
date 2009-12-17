@@ -143,6 +143,12 @@ namespace mongo {
                 LastError::noError.appendSelf( result );
             else
                 le->appendSelf( result );
+            
+            if ( cmdObj["fsync"].trueValue() ){
+                log() << "fsync from getlasterror" << endl;
+                result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
+            }
+            
             return true;
         }
     } cmdGetLastError;
