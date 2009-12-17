@@ -37,6 +37,50 @@
 		93278F670F72D39400844664 /* strategy_shard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = strategy_shard.cpp; sourceTree = "<group>"; };
 		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
 		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
+		932B987310D9A05800BFE0E7 /* all2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = all2.js; sourceTree = "<group>"; };
+		932B987410D9A05800BFE0E7 /* array1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = array1.js; sourceTree = "<group>"; };
+		932B987510D9A05800BFE0E7 /* array3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = array3.js; sourceTree = "<group>"; };
+		932B987610D9A05800BFE0E7 /* auth1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth1.js; sourceTree = "<group>"; };
+		932B987710D9A05800BFE0E7 /* basic8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic8.js; sourceTree = "<group>"; };
+		932B987810D9A05800BFE0E7 /* basic9.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic9.js; sourceTree = "<group>"; };
+		932B987910D9A05800BFE0E7 /* basica.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basica.js; sourceTree = "<group>"; };
+		932B987A10D9A05800BFE0E7 /* basicb.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basicb.js; sourceTree = "<group>"; };
+		932B987B10D9A05800BFE0E7 /* capped1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped1.js; sourceTree = "<group>"; };
+		932B987C10D9A05800BFE0E7 /* copydb.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = copydb.js; sourceTree = "<group>"; };
+		932B987D10D9A05800BFE0E7 /* count2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count2.js; sourceTree = "<group>"; };
+		932B987E10D9A05800BFE0E7 /* count3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count3.js; sourceTree = "<group>"; };
+		932B987F10D9A05800BFE0E7 /* count4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count4.js; sourceTree = "<group>"; };
+		932B988010D9A05800BFE0E7 /* count5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = count5.js; sourceTree = "<group>"; };
+		932B988110D9A05800BFE0E7 /* cursor1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = cursor1.js; sourceTree = "<group>"; };
+		932B988210D9A05800BFE0E7 /* date1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = date1.js; sourceTree = "<group>"; };
+		932B988310D9A05800BFE0E7 /* dbref1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dbref1.js; sourceTree = "<group>"; };
+		932B988410D9A05800BFE0E7 /* dbref2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dbref2.js; sourceTree = "<group>"; };
+		932B988510D9A05800BFE0E7 /* distinct1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = distinct1.js; sourceTree = "<group>"; };
+		932B988610D9A05800BFE0E7 /* distinct2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = distinct2.js; sourceTree = "<group>"; };
+		932B988710D9A05800BFE0E7 /* error3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = error3.js; sourceTree = "<group>"; };
+		932B988810D9A05800BFE0E7 /* eval0.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval0.js; sourceTree = "<group>"; };
+		932B988910D9A05800BFE0E7 /* eval3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval3.js; sourceTree = "<group>"; };
+		932B988A10D9A05800BFE0E7 /* eval4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval4.js; sourceTree = "<group>"; };
+		932B988B10D9A05800BFE0E7 /* eval5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval5.js; sourceTree = "<group>"; };
+		932B988C10D9A05800BFE0E7 /* eval6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval6.js; sourceTree = "<group>"; };
+		932B988D10D9A05800BFE0E7 /* eval7.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval7.js; sourceTree = "<group>"; };
+		932B988E10D9A05800BFE0E7 /* eval8.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval8.js; sourceTree = "<group>"; };
+		932B988F10D9A05800BFE0E7 /* eval9.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = eval9.js; sourceTree = "<group>"; };
+		932B989010D9A05800BFE0E7 /* evala.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = evala.js; sourceTree = "<group>"; };
+		932B989110D9A05800BFE0E7 /* evalb.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = evalb.js; sourceTree = "<group>"; };
+		932B989210D9A05800BFE0E7 /* exists.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = exists.js; sourceTree = "<group>"; };
+		932B989310D9A05800BFE0E7 /* explain1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = explain1.js; sourceTree = "<group>"; };
+		932B989410D9A05800BFE0E7 /* find4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find4.js; sourceTree = "<group>"; };
+		932B989510D9A05800BFE0E7 /* find5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find5.js; sourceTree = "<group>"; };
+		932B989610D9A05800BFE0E7 /* find6.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find6.js; sourceTree = "<group>"; };
+		932B989710D9A05800BFE0E7 /* fm1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fm1.js; sourceTree = "<group>"; };
+		932B989810D9A05800BFE0E7 /* fm2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fm2.js; sourceTree = "<group>"; };
+		932B989910D9A05800BFE0E7 /* fm3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fm3.js; sourceTree = "<group>"; };
+		932B989A10D9A05800BFE0E7 /* group1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = group1.js; sourceTree = "<group>"; };
+		932B989B10D9A05800BFE0E7 /* group2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = group2.js; sourceTree = "<group>"; };
+		932B989C10D9A05800BFE0E7 /* group3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = group3.js; sourceTree = "<group>"; };
+		932B989D10D9A05800BFE0E7 /* group4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = group4.js; sourceTree = "<group>"; };
+		932B989E10D9A05800BFE0E7 /* group5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = group5.js; sourceTree = "<group>"; };
 		9339D4470F8B9D290063DBEF /* multi.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = multi.js; sourceTree = "<group>"; };
 		933A4D130F55A68600145C4B /* authTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = authTest.cpp; sourceTree = "<group>"; };
 		933A4D150F55A68600145C4B /* clientTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = clientTest.cpp; sourceTree = "<group>"; };
@@ -650,6 +694,50 @@
 		93A8D1D10F37544800C92B85 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				932B987310D9A05800BFE0E7 /* all2.js */,
+				932B987410D9A05800BFE0E7 /* array1.js */,
+				932B987510D9A05800BFE0E7 /* array3.js */,
+				932B987610D9A05800BFE0E7 /* auth1.js */,
+				932B987710D9A05800BFE0E7 /* basic8.js */,
+				932B987810D9A05800BFE0E7 /* basic9.js */,
+				932B987910D9A05800BFE0E7 /* basica.js */,
+				932B987A10D9A05800BFE0E7 /* basicb.js */,
+				932B987B10D9A05800BFE0E7 /* capped1.js */,
+				932B987C10D9A05800BFE0E7 /* copydb.js */,
+				932B987D10D9A05800BFE0E7 /* count2.js */,
+				932B987E10D9A05800BFE0E7 /* count3.js */,
+				932B987F10D9A05800BFE0E7 /* count4.js */,
+				932B988010D9A05800BFE0E7 /* count5.js */,
+				932B988110D9A05800BFE0E7 /* cursor1.js */,
+				932B988210D9A05800BFE0E7 /* date1.js */,
+				932B988310D9A05800BFE0E7 /* dbref1.js */,
+				932B988410D9A05800BFE0E7 /* dbref2.js */,
+				932B988510D9A05800BFE0E7 /* distinct1.js */,
+				932B988610D9A05800BFE0E7 /* distinct2.js */,
+				932B988710D9A05800BFE0E7 /* error3.js */,
+				932B988810D9A05800BFE0E7 /* eval0.js */,
+				932B988910D9A05800BFE0E7 /* eval3.js */,
+				932B988A10D9A05800BFE0E7 /* eval4.js */,
+				932B988B10D9A05800BFE0E7 /* eval5.js */,
+				932B988C10D9A05800BFE0E7 /* eval6.js */,
+				932B988D10D9A05800BFE0E7 /* eval7.js */,
+				932B988E10D9A05800BFE0E7 /* eval8.js */,
+				932B988F10D9A05800BFE0E7 /* eval9.js */,
+				932B989010D9A05800BFE0E7 /* evala.js */,
+				932B989110D9A05800BFE0E7 /* evalb.js */,
+				932B989210D9A05800BFE0E7 /* exists.js */,
+				932B989310D9A05800BFE0E7 /* explain1.js */,
+				932B989410D9A05800BFE0E7 /* find4.js */,
+				932B989510D9A05800BFE0E7 /* find5.js */,
+				932B989610D9A05800BFE0E7 /* find6.js */,
+				932B989710D9A05800BFE0E7 /* fm1.js */,
+				932B989810D9A05800BFE0E7 /* fm2.js */,
+				932B989910D9A05800BFE0E7 /* fm3.js */,
+				932B989A10D9A05800BFE0E7 /* group1.js */,
+				932B989B10D9A05800BFE0E7 /* group2.js */,
+				932B989C10D9A05800BFE0E7 /* group3.js */,
+				932B989D10D9A05800BFE0E7 /* group4.js */,
+				932B989E10D9A05800BFE0E7 /* group5.js */,
 				93A71D2D10D04D15003C9E90 /* auth2.js */,
 				935E7B8A0FCF37D40024B2E5 /* sharding */,
 				936D937F0FCC67C700004410 /* index9.js */,

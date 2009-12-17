@@ -55,6 +55,7 @@ namespace mongo {
     v8::Handle<v8::Value> objectIdInit( const v8::Arguments& args );
 
     v8::Handle<v8::Value> dbRefInit( const v8::Arguments& args );
+    v8::Handle<v8::Value> dbPointerInit( const v8::Arguments& args );
     
     v8::Handle<v8::Value> dbQueryInit( const v8::Arguments& args );
     v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info );

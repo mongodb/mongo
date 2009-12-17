@@ -636,6 +636,15 @@ namespace JSTests {
             }
             
             ASSERT( client.eval( "unittest" , "x = db.dbref.b.findOne(); assert.eq( 17 , x.c.fetch().a , 'ref working' );" ) );
+            
+            // BSON DBRef <=> JS DBPointer
+            ASSERT( client.eval( "unittest", "x = db.dbref.b.findOne(); db.dbref.b.drop(); x.c = new DBPointer( x.c.ns, x.c.id ); db.dbref.b.insert( x );" ) );
+            ASSERT_EQUALS( DBRef, client.findOne( "unittest.dbref.b", "" )[ "c" ].type() );
+            
+            // BSON Object <=> JS DBRef
+            ASSERT( client.eval( "unittest", "x = db.dbref.b.findOne(); db.dbref.b.drop(); x.c = new DBRef( x.c.ns, x.c.id ); db.dbref.b.insert( x );" ) );
+            ASSERT_EQUALS( Object, client.findOne( "unittest.dbref.b", "" )[ "c" ].type() );
+            ASSERT_EQUALS( string( "dbref.a" ), client.findOne( "unittest.dbref.b", "" )[ "c" ].embeddedObject().getStringField( "$ref" ) );
         }
         
         void reset(){

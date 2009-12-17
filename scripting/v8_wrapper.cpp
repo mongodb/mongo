@@ -224,11 +224,12 @@ namespace mongo {
             }
 
             case mongo::DBRef: {
-                v8::Function* dbRef = getNamedCons( "DBRef" );
+                v8::Function* dbPointer = getNamedCons( "DBPointer" );
                 v8::Handle<v8::Value> argv[2];
                 argv[0] = v8::String::New( f.dbrefNS() );
                 argv[1] = newId( f.dbrefOID() );
-                o->Set( v8::String::New( f.fieldName() ), dbRef->NewInstance(2, argv) );
+                o->Set( v8::String::New( f.fieldName() ), dbPointer->NewInstance(2, argv) );
+                break;
             }
                     
             default:
@@ -340,11 +341,11 @@ namespace mongo {
             return v8::Undefined();
 
         case mongo::DBRef: {
-            v8::Function* dbRef = getNamedCons( "DBRef" );
+            v8::Function* dbPointer = getNamedCons( "DBPointer" );
             v8::Handle<v8::Value> argv[2];
             argv[0] = v8::String::New( f.dbrefNS() );
             argv[1] = newId( f.dbrefOID() );
-            return dbRef->NewInstance(2, argv);
+            return dbPointer->NewInstance(2, argv);
         }
                        
         default:
@@ -437,8 +438,14 @@ namespace mongo {
                 OID oid;
                 oid.init( toSTLString( value ) );
                 b.appendOID( sname.c_str() , &oid );
-            }
-            else {
+            } else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__DBPointer" ) ).IsEmpty() ) {
+                // TODO might be nice to speed this up with an indexed internal field, but
+                // I don't yet know how to use an ObjectTemplate with a constructor.
+                OID oid;
+                oid.init( toSTLString( value->ToObject()->Get( v8::String::New( "id" ) ) ) );
+                string ns = toSTLString( value->ToObject()->Get( v8::String::New( "ns" ) ) );
+                b.appendDBRef( sname.c_str(), ns.c_str(), oid );                
+            } else {
                 BSONObj sub = v8ToMongo( value->ToObject() );
                 b.append( sname.c_str() , sub );
             }
