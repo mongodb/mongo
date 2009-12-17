@@ -47,6 +47,8 @@ namespace mongo {
         virtual string toString();
     private:
         
+        void _checkLast();
+        
         void _connect( string host );
         vector<DBClientConnection*> _conns;
     };
