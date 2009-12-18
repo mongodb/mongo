@@ -49,6 +49,10 @@ namespace mongo {
         // May be called if file exists. If file exists, or its allocation has
         // been requested, size is updated to match existing file size.
         void requestAllocation( const string &name, long &size ) {
+            /* Some of the system calls in the file allocator don't work in win, 
+               so no win support - 32 or 64 bit.  Plus we don't seem to need preallocation 
+               on windows anyway as we don't have to pre-zero the file there.
+            */
 #if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
             long oldSize = prevSize( name );
