@@ -154,14 +154,39 @@ namespace mongo {
             if ( ++nScanned % 128 == 0 ){
                 cc->updateLocation();
                 cc->setDoingDeletes( false );
+
+                /* a quick test that our temprelease is safe. 
+                   todo: make a YieldingCursor class 
+                   and then make the following code part of a unit test.
+                   */
+                const int test = 0;
+                static bool inEmpty = false;
+                if( test && !inEmpty ) { 
+                    inEmpty = true;
+                    log() << "TEST: manipulate collection during remove" << endl;
+                    if( test == 1 ) 
+                        Helpers::emptyCollection(ns);
+                    else if( test == 2 ) {
+                        BSONObjBuilder b; string m;
+                        dropCollection(ns, m, b);
+                    }
+                    else { 
+                        dropDatabase(ns);
+                    }
+                }
+
+                /* yield */
                 {
                     dbtemprelease unlock;
                 }
                 if ( ClientCursor::find( id , false ) == 0 ){
-                    cc.reset( 0 );
+                    cc.release(); // has already been deleted elsewhere
                     break;
                 }
             }
+
+            // this way we can avoid calling updateLocation() every time (expensive)
+            // as well as some other nuances handled
             cc->setDoingDeletes( true );
             
             DiskLoc rloc = cc->c->currLoc();
