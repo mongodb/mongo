@@ -86,6 +86,12 @@ namespace mongo {
         */
         static void invalidate(const char *nsPrefix);
 
+        /**
+         * do a dbtemprelease 
+         * @return if the cursor is still valid. 
+         *         if false is returned, then this ClientCursor should be considered deleted
+         */
+        bool yield();
     private:
         void setLastLoc_inlock(DiskLoc);
 

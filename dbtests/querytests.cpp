@@ -852,6 +852,21 @@ namespace QueryTests {
         }
     };
 
+    class ClientCursorTest : public CollectionBase{
+        ClientCursorTest() : CollectionBase( "clientcursortest" ){
+        }
+
+        void run(){
+            writelock lk("");
+            setClient( "unittests" );
+            
+            for ( int i=0; i<1000; i++ ){
+                insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
+            }
+
+            
+        }
+    };
 
     class All : public Suite {
     public:

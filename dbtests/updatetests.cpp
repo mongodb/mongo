@@ -297,7 +297,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,z:[4,'b']}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "z.0" << "a" ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,z:[4,'b']}" ) ) == 0 );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,z:['a','b']}" ) );
         }
     };
 

@@ -198,6 +198,50 @@ namespace mongo {
             c->noteLocation();
         }
     }
+    
+    bool ClientCursor::yield(){
+        // need to store on the stack in case this gets deleted
+        CursorId id = cursorid;
+
+        bool doingDeletes = _doingDeletes;
+        _doingDeletes = false;
+
+        updateLocation();
+
+        {
+            /* a quick test that our temprelease is safe. 
+               todo: make a YieldingCursor class 
+               and then make the following code part of a unit test.
+            */
+            const int test = 0;
+            static bool inEmpty = false;
+            if( test && !inEmpty ) { 
+                inEmpty = true;
+                log() << "TEST: manipulate collection during remove" << endl;
+                if( test == 1 ) 
+                    Helpers::emptyCollection(ns.c_str());
+                else if( test == 2 ) {
+                    BSONObjBuilder b; string m;
+                    dropCollection(ns.c_str(), m, b);
+                }
+                else { 
+                    dropDatabase(ns.c_str());
+                }
+            }
+        }
+            
+        {
+            dbtempreleasecond unlock;
+        }
+
+        if ( ClientCursor::find( id , false ) == 0 ){
+            // i was deleted
+            return false;
+        }
+
+        _doingDeletes = doingDeletes;
+        return true;
+    }
 
     int ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {

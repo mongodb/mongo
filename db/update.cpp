@@ -332,8 +332,8 @@ namespace mongo {
             switch ( cmp ){
                 
             case LEFT_SUBFIELD: { // Mod is embeddeed under this element
-                uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object );
-                BSONObjBuilder bb ( b.subobjStart( e.fieldName() ) );
+                uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object || e.type() == Array );
+                BSONObjBuilder bb ( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
                 stringstream nr; nr << root << e.fieldName() << ".";
                 createNewFromMods( nr.str() , bb , e.embeddedObject() );
                 bb.done();
