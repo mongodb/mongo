@@ -912,7 +912,7 @@ def jsToH(target, source, env):
     if len( source ) != 1:
         raise Exception( "wrong" )
 
-    h = "const char * jsconcatcode = \n"
+    h = "const char * jsconcatcode" + outFile.split( "mongo" )[-1].replace( "-" , "_").split( ".cpp")[0] + " = \n"
 
     for l in open( str(source[0]) , 'r' ):
         l = l.strip()
@@ -1005,8 +1005,12 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-env.JSConcat( "shell/mongo.jsall"  , Glob( "shell/*.js" ) )
+env.JSConcat( "shell/mongo.jsall"  , ["shell/utils.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 env.JSHeader( "shell/mongo.jsall" )
+
+env.JSConcat( "shell/mongo-server.jsall"  , [ "shell/servers.js"] )
+env.JSHeader( "shell/mongo-server.jsall" )
+
 
 shellEnv = env.Clone();
 
@@ -1040,7 +1044,7 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
-    coreShellFiles = [ "shell/dbshell.cpp" , "shell/utils.cpp" ]
+    coreShellFiles = [ "shell/dbshell.cpp" , "shell/utils.cpp" , "shell/mongo-server.cpp" ]
 
     if weird:
         shell32BitFiles = coreShellFiles
@@ -1060,6 +1064,7 @@ elif not onlyServer:
 
     if weird:
         Depends( "32bit/shell/mongo.cpp" , "shell/mongo.cpp" )
+        Depends( "32bit/shell/mongo-server.cpp" , "shell/mongo-server.cpp" )
 
 
 #  ---- RUNNING TESTS ----

@@ -28,6 +28,7 @@
 *#
 .#*
 shell/mongo.cpp
+shell/mongo-server.cpp
 
 db/Debug
 db/oplog*
