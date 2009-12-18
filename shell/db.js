@@ -468,6 +468,8 @@ DB.prototype.getLastErrorObj = function(){
         throw "getlasterror failed: " + tojson( res );
     return res;
 }
+DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
+
 
 /* Return the last error which has occurred, even if not the very last error.
 
