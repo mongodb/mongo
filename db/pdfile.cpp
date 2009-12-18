@@ -99,7 +99,8 @@ namespace mongo {
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
         */
-        if( strstr(ns, ".$freelist") == 0 )
+        bool isFreeList = strstr(ns, ".$freelist") != 0;
+        if( !isFreeList )
             addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
         long long size = initialExtentSize(128);
@@ -131,16 +132,18 @@ namespace mongo {
         if ( nExtents > 0 ) {
             assert( size <= 0x7fffffff );
             for ( int i = 0; i < nExtents; ++i ) {
-                database->suitableFile((int) size)->allocExtent( ns, (int) size, newCapped );
+                assert( size <= 0x7fffffff );
+                database->allocExtent( ns, (int) size, newCapped );
             }
         } else {
             while ( size > 0 ) {
                 int max = MongoDataFile::maxSize() - MDFHeader::headerSize();
                 int desiredExtentSize = (int) (size > max ? max : size);
-                Extent *e = database->suitableFile( desiredExtentSize )->allocExtent( ns, desiredExtentSize, newCapped );
+                Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
             }
             if ( !newCapped ) {
+                // check if it's time to preallocate a new file, and if so queue that job for a bg thread
                 // ok to call this multiple times
                 database->preallocateAFile();
             }
@@ -320,7 +323,7 @@ namespace mongo {
         return e;
     }
 
-    Extent* MongoDataFile::allocExtent(const char *ns, int approxSize, bool capped) { 
+    Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) { 
         string s = cc().database()->name + ".$freelist";
         NamespaceDetails *f = nsdetails(s.c_str());
         if( f ) {
@@ -378,7 +381,8 @@ namespace mongo {
             }
         }
 
-        return createExtent(ns, approxSize, capped);
+        return 0;
+        //        return createExtent(ns, approxSize, capped);
     }
 
     /*---------------------------------------------------------------------*/
@@ -550,6 +554,24 @@ namespace mongo {
         } else {
             return auto_ptr< Cursor >( new ReverseCappedCursor( d, startLoc ) );
         }
+    }
+
+    void printFreeList() { 
+        string s = cc().database()->name + ".$freelist";
+        log() << "dump freelist " << s << '\n';
+        NamespaceDetails *freeExtents = nsdetails(s.c_str());
+        if( freeExtents == 0 ) { 
+            log() << "  freeExtents==0" << endl;
+            return;
+        }
+        DiskLoc a = freeExtents->firstExtent;
+        while( !a.isNull() ) { 
+            Extent *e = a.ext();
+            log() << "  " << a.toString() << " len:" << e->length << " prev:" << e->xprev.toString() << '\n';
+            a = e->xnext;
+        }
+
+        log() << "  end freelist" << endl;
     }
 
     /* drop a collection/namespace */
@@ -1336,7 +1358,7 @@ namespace mongo {
                also if this is an addIndex, those checks should happen before this!
             */
             // This creates first file in the database.
-            cc().database()->newestFile()->allocExtent(ns, initialExtentSize(len));
+            cc().database()->newestFile()->createExtent(ns, initialExtentSize(len));
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);
@@ -1436,13 +1458,13 @@ namespace mongo {
             // out of space
             if ( d->capped == 0 ) { // size capped doesn't grow
                 log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
-                cc().database()->newestFile()->allocExtent(ns, followupExtentSize(lenWHdr, d->lastExtentSize));
+                cc().database()->allocExtent(ns, followupExtentSize(lenWHdr, d->lastExtentSize), false);
                 loc = d->alloc(ns, lenWHdr, extentLoc);
                 if ( loc.isNull() ){
                     log() << "WARNING: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
                     for ( int zzz=0; zzz<10 && lenWHdr > d->lastExtentSize; zzz++ ){
                         log() << "try #" << zzz << endl;
-                        cc().database()->newestFile()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize));
+                        cc().database()->allocExtent(ns, followupExtentSize(len, d->lastExtentSize), false);
                         loc = d->alloc(ns, lenWHdr, extentLoc);
                         if ( ! loc.isNull() )
                             break;

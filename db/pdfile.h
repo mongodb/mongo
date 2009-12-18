@@ -70,11 +70,6 @@ namespace mongo {
         */
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
-        /* see if we can find an extent of the right size in the freelist.  if not, 
-           createExtent.
-        */
-        Extent* allocExtent(const char *ns, int approxSize, bool capped = false);
-
         MDFHeader *getHeader() {
             return header;
         }
@@ -98,6 +93,9 @@ namespace mongo {
         friend class BasicCursor;
     public:
         void init(const string& path );
+
+        /* see if we can find an extent of the right size in the freelist. */
+        static Extent* allocFromFreeList(const char *ns, int approxSize, bool capped = false);
 
         /** @return DiskLoc where item ends up */
         const DiskLoc update(

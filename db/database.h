@@ -153,6 +153,12 @@ namespace mongo {
             return f;
         }
 
+        Extent* allocExtent( const char *ns, int size, bool capped ) { 
+            Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
+            if( e ) return e;
+            return suitableFile( size )->createExtent( ns, size, capped );
+        }
+
         MongoDataFile* newestFile() {
             int n = (int) files.size();
             if ( n > 0 ) n--;
