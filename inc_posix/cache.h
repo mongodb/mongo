@@ -36,17 +36,20 @@ extern "C" {
  * Internal forward declarations.
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
+struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
 struct __wt_hb;			typedef struct __wt_hb WT_HB;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
+struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
+struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 
 /*******************************************
@@ -73,10 +76,14 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
  * a bulk load call will increment the generation number on every loop, when it
  * is no longer pinning any pages.
  */
-#define	WT_TOC_API_IGNORE(toc)						\
-	(toc)->api_gen = WT_TOC_GEN_IGNORE
-#define	WT_TOC_API_RESET(toc)						\
-	(toc)->api_gen = (toc)->env->ienv->api_gen
+#define	WT_TOC_API_IGNORE(toc) do {					\
+	(toc)->api_gen = WT_TOC_GEN_IGNORE;				\
+	WT_MEMORY_FLUSH;						\
+} while (0)
+#define	WT_TOC_API_RESET(toc) do {					\
+	(toc)->api_gen = (toc)->env->ienv->api_gen;			\
+	WT_MEMORY_FLUSH;						\
+} while (0)
 #define	WT_TOC_DB_INIT(toc, _db, _name) do {				\
 	WT_TOC_API_RESET(toc);						\
 	(toc)->db = (_db);						\
@@ -131,16 +138,6 @@ struct __wt_cache {
 	u_int64_t bytes_alloc;		/* Allocated bytes */
 
 	/*
-	 * !!!
-	 * The "private" field needs to be written atomically, and without
-	 * overlap, that is, updating it shouldn't cause a read-write-cycle
-	 * of the shared field.  Assume a u_int is the correct size for a
-	 * single memory bus cycle.
-	 */
-	u_int private;		/* Cache currently private */
-	u_int shared;		/* Cache currently in use (count) */
-
-	/*
 	 * Each in-memory page is in a hash bucket based on its "address".
 	 *
 	 * Our hash buckets are very simple list structures.   We depend on
@@ -172,7 +169,7 @@ struct __ienv {
 	pthread_t workq_tid;		/* workQ thread ID */
 
 	pthread_t cache_tid;		/* Cache thread ID */
-	u_int32_t cache_lockout;	/* Cache method lockout */
+	WT_SERIAL cache_lockout;	/* Cache lockout */
 
 	TAILQ_HEAD(			/* Locked: TOC list */
 	    __wt_toc_qh, __wt_toc) tocqh;

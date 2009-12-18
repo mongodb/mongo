@@ -57,11 +57,7 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
-struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
-struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
-struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
-struct __wt_serial;		typedef struct __wt_serial WT_SERIAL;
 
 /*******************************************
  * Exported types
@@ -86,10 +82,10 @@ struct __dbt {
 /*******************************************
  * Private serialization point
  *******************************************/
-struct __wt_serial {
-	u_int32_t api_gen;		/* API generation */
+typedef struct {
+	u_int32_t volatile api_gen;	/* API generation */
 	u_int32_t mod_gen;		/* Data modification generation */
-};
+} WT_SERIAL;
 
 /*******************************************
  * Application thread-of-control information
@@ -110,17 +106,18 @@ struct __wt_toc {
 		struct __wt_toc **tqe_prev;
 	} q;				/* Environment's list of WT_TOCs */
 
-	u_int32_t api_gen;		/* API generation */
-
 	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
 
-	int	 (*serial)(WT_TOC *);	/* Serialization function */
-	void	  *serial_args;		/* Serialization function argument */
-	int	   serial_ret;		/* Serialization function return */
+	u_int32_t api_gen;		/* API generation */
+
+	int (*
+	    volatile serial)(WT_TOC *);	/* Serialization function */
+	void	 *serial_args;		/* Serialization function argument */
+	int	  serial_ret;		/* Serialization function return */
 
 	WT_SERIAL *serial_private;	/* Private serialization reference */
-	u_int32_t  serial_mod;		/* Data modification generation */
+	u_int32_t  mod_gen;		/* Private serialization generation */
 
 	u_int32_t flags;
 
@@ -386,9 +383,11 @@ struct __env {
 /*******************************************
  * Prototypes.
  *******************************************/
-int	 wt_env_create(u_int32_t, ENV **);
-char	*wt_strerror(int);
-char	*wt_version(int *, int *, int *);
+int	 wiredtiger_env_init(ENV **, u_int32_t);
+int	 wiredtiger_simple_setup(const char *, DB **);
+int	 wiredtiger_simple_teardown(const char *, DB *);
+char	*wiredtiger_strerror(int);
+char	*wiredtiger_version(int *, int *, int *);
 
 /*******************************************
  * API flags

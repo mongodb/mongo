@@ -9,7 +9,6 @@
 
 #include "wt_internal.h"
 
-static int  __wt_cache_clean(WT_TOC *, u_int64_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
 static int  __wt_cache_discard_serial_func(WT_TOC *);
@@ -32,8 +31,8 @@ typedef struct {
 	_args.page = _page;						\
 	_args.addr = _addr;						\
 	_args.bytes = _bytes;						\
-	WT_TOC_SERIALIZE_REQUEST(toc,					\
-	    __wt_cache_in_serial_func, NULL, &_args);			\
+	__wt_toc_serialize_request(toc,					\
+	    __wt_cache_in_serial_func, &_args, NULL);			\
 } while (0);
 #define	__wt_cache_in_unpack(toc, _page, _addr, _bytes) do {		\
 	_page =	((__wt_in_args *)(toc)->serial_args)->page;		\
@@ -47,11 +46,11 @@ typedef struct {
 typedef struct {
 	WT_PAGE  *page;				/* Allocated page */
 } __wt_discard_args;
-#define	__wt_cache_discard_serial(toc, _serial, _page) do {		\
+#define	__wt_cache_discard_serial(toc, _page, _serial) do {		\
 	__wt_discard_args _args;					\
 	_args.page = _page;						\
-	WT_TOC_SERIALIZE_REQUEST(toc,					\
-	    __wt_cache_discard_serial_func, _serial, &_args);		\
+	__wt_toc_serialize_request(toc,					\
+	    __wt_cache_discard_serial_func, &_args, _serial);		\
 } while (0)
 #define	__wt_cache_discard_unpack(toc, _page) do {			\
 	_page = ((__wt_discard_args *)(toc)->serial_args)->page;	\
@@ -172,7 +171,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	 */
 	for (i = 0, fcnt = 0; i < cache->hashsize; ++i) {
 		hb = &cache->hb[i];
-		WT_TOC_SERIALIZE_WAIT(toc, &hb->serial_private);
+		__wt_toc_serialize_wait(toc, &hb->serial_private);
 		for (page = hb->list; page != NULL; page = page->next) {
 			if (page->db != db ||
 			    !F_ISSET(page, WT_MODIFIED | WT_PINNED))
@@ -213,8 +212,11 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	 * If the cache is too big, and we can restart the operation, return
 	 * that error.
 	 */
-	if (F_ISSET(toc, WT_CACHE_LOCK_RESTART) && ienv->cache_lockout)
+	if (ienv->cache_lockout.api_gen != 0 &&
+	    F_ISSET(toc, WT_CACHE_LOCK_RESTART)) {
+		toc->serial_private = &ienv->cache_lockout;
 		return (WT_RESTART);
+	}
 
 	WT_STAT_INCR(
 	    env->ienv->stats, CACHE_ALLOC, "pages allocated in the cache");
@@ -282,7 +284,7 @@ __wt_cache_in(WT_TOC *toc,
 	 * wait until it clears.
 	 */
 	hb = &cache->hb[WT_HASH(cache, addr)];
-	WT_TOC_SERIALIZE_WAIT(toc, &hb->serial_private);
+	__wt_toc_serialize_wait(toc, &hb->serial_private);
 
 	/* Search for the page in the cache. */
 	for (bucket_cnt = 0,
@@ -314,8 +316,11 @@ __wt_cache_in(WT_TOC *toc,
 	 * If the cache is too big, and we can restart the operation, return
 	 * that error.
 	 */
-	if (F_ISSET(toc, WT_CACHE_LOCK_RESTART) && ienv->cache_lockout)
+	if (ienv->cache_lockout.api_gen != 0 &&
+	    F_ISSET(toc, WT_CACHE_LOCK_RESTART)) {
+		toc->serial_private = &ienv->cache_lockout;
 		return (WT_RESTART);
+	}
 
 	/*
 	 * Allocate memory for the in-memory page information and for the page
@@ -399,6 +404,11 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	 * BUG!!!
 	 * Somebody else may have read the same page, check the hash
 	 * buckets.
+	 *
+	 * BUG!!!
+	 * The allocation function didn't check the hash bucket to see if it
+	 * was OK to proceed, the cache server might be trying to discard a
+	 * page.
 	 */
 
 	/* Insert as the head of the linked list. */
@@ -477,7 +487,7 @@ __wt_cache_srvr(void *arg)
 		 * cache_lockout field because the workQ wants us to be more
 		 * agressive about cleaning up than we would normally be.
 		 */
-		if (ienv->cache_lockout == 0 &&
+		if (ienv->cache_lockout.api_gen == 0 &&
 		    cache->bytes_alloc <= cache->bytes_max) {
 			F_SET(cache, WT_SERVER_SLEEPING);
 			WT_MEMORY_FLUSH;
@@ -537,7 +547,7 @@ __wt_cache_srvr(void *arg)
 		 * bucket so we know no thread is reading any page in the hash
 		 * bucket.
 		 */
-		__wt_cache_discard_serial(toc, &hb->serial_private, page);
+		__wt_cache_discard_serial(toc, page, &hb->serial_private);
 		if (toc->serial_ret == 0)
 			__wt_bt_page_recycle(env, page);
 	}
@@ -562,6 +572,9 @@ __wt_cache_discard_serial_func(WT_TOC *toc)
 	 * If the page was modified or pinned while we waited for serialized
 	 * access, or another thread is waiting on serialized access, return
 	 * with a failed status.
+	 *
+	 * Don't set the WT_TOC's serial_private field, our caller doesn't
+	 * care about waiting, it just goes and looks for a new page.
 	 */
 	if (F_ISSET(page, WT_MODIFIED | WT_PINNED))
 		return (WT_RESTART);

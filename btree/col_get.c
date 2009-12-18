@@ -20,7 +20,6 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
     u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
 {
 	IDB *idb;
-	IENV *ienv;
 	WT_INDX *indx;
 	WT_PAGE *page;
 	u_int32_t type;
@@ -29,7 +28,6 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
 
 	idb = db->idb;
-	ienv = db->env->ienv;
 
 	WT_STAT_INCR(idb->stats,
 	    DB_READ_BY_RECNO, "database read-by-recno operations");
@@ -47,8 +45,11 @@ __wt_db_get_recno(DB *db, WT_TOC *toc,
 	/* Search the primary btree for the key. */
 	F_SET(toc, WT_CACHE_LOCK_RESTART);
 	while ((ret =
-	    __wt_bt_search_recno(toc, recno, &page, &indx)) == WT_RESTART)
-		WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+	    __wt_bt_search_recno(toc, recno, &page, &indx)) == WT_RESTART) {
+		WT_STAT_INCR(idb->stats, DB_READ_BY_RECNO_RESTART,
+		    "database read-by-recno operation restarted");
+		__wt_toc_serialize_wait(toc, NULL);
+	}
 	F_CLR(toc, WT_CACHE_LOCK_RESTART);
 	if (ret != 0)
 		goto err;

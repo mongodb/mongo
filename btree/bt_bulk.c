@@ -257,9 +257,9 @@ skip_read:
 			 * Pinning the page is safe -- this is a bulk load,
 			 * nobody else better be looking at this page.
 			 */
-			if (ienv->cache_lockout) {
+			if (ienv->cache_lockout.api_gen) {
 				F_SET(page, WT_PINNED);
-				WT_TOC_SERIALIZE_VALUE(
+				__wt_toc_serialize_wait(
 				    toc, &ienv->cache_lockout);
 				F_CLR(page, WT_PINNED);
 			}

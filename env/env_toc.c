@@ -97,19 +97,20 @@ __wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
 
 	fprintf(fp, "%s\n", ienv->sep);
 	TAILQ_FOREACH(toc, &ienv->tocqh, q) {
-		fprintf(fp, "toc: %lx {\n\tapi_gen: %lu, serial: ",
-		    WT_ADDR_TO_ULONG(toc), toc->api_gen);
+		fprintf(fp,
+		    "toc: %#lx {\n\tapi_gen: %lu, api_mod: %lu\n\tserial: ",
+		    WT_ADDR_TO_ULONG(toc), toc->api_gen, toc->mod_gen);
 		if (toc->serial == NULL) {
 			fprintf(fp, "none");
 			if (F_ISSET(toc, WT_WAITING))
 				fprintf(fp, " (wait)");
-		} else {
-			fprintf(fp, "%lx", WT_ADDR_TO_ULONG(toc->serial));
-			if (toc->serial_private != NULL)
-				fprintf(fp, " (private: %lu/%lu)",
-				    (u_long)toc->serial_private->api_gen,
-				    (u_long)toc->serial_private->mod_gen);
-		}
+		} else
+			fprintf(fp, "%#lx", WT_ADDR_TO_ULONG(toc->serial));
+		if (toc->serial_private != NULL)
+			fprintf(fp, ", private: %#lx: %lu/%lu",
+			    WT_ADDR_TO_ULONG(toc->serial_private),
+			    (u_long)toc->serial_private->api_gen,
+			    (u_long)toc->serial_private->mod_gen);
 		fprintf(fp, "\n}");
 		if (toc->name != NULL)
 			fprintf(fp, " %s", toc->name);

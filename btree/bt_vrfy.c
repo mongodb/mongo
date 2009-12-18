@@ -310,9 +310,9 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		 * and the only risk is if there were somehow to be two threads
 		 * verifying the same database at the same time.
 		 */
-		if (ienv->cache_lockout) {
+		if (ienv->cache_lockout.api_gen) {
 			F_SET(page, WT_PINNED);
-			WT_TOC_SERIALIZE_VALUE(toc, &ienv->cache_lockout);
+			__wt_toc_serialize_wait(toc, &ienv->cache_lockout);
 			F_CLR(page, WT_PINNED);
 		}
 	}

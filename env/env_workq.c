@@ -25,15 +25,12 @@ __wt_workq_srvr(void *arg)
 	u_int32_t low_api_gen;
 	int flush, notfound;
 
-	env = arg;
+	env = (ENV *)arg;
 	ienv = env->ienv;
 
 	flush = 0;
 	notfound = 1;
 	while (F_ISSET(ienv, WT_WORKQ_RUN)) {
-		/* Update everything, let's see what we can see. */
-		WT_MEMORY_FLUSH;
-
 		/*
 		 * Walk the WT_TOC queue and: execute non-private serialization
 		 * requests, see if any new private seialization requests have
@@ -84,7 +81,7 @@ __wt_workq_srvr(void *arg)
 			 */
 			if (toc->serial_private != NULL) {
 				if (toc->serial_private->api_gen == 0) {
-					toc->serial_mod =
+					toc->mod_gen =
 					    toc->serial_private->mod_gen;
 					toc->serial_private->api_gen =
 					    ienv->api_gen + 1;
@@ -104,15 +101,11 @@ __wt_workq_srvr(void *arg)
 			 */
 			toc->serial_ret = toc->serial(toc);
 			toc->serial = NULL;
-
 			flush = 1;
 			notfound = 0;
 		}
 
-		/*
-		 * Flush out changes.  There's no technical requirement for
-		 * this flush, but it keeps other threads up-to-date.
-		 */
+		/* Flush out changes so other threads can proceed. */
 		if (flush) {
 			flush = 0;
 			WT_MEMORY_FLUSH;
@@ -155,27 +148,25 @@ __wt_workq_srvr(void *arg)
 				 * Reject private requests where data has been
 				 * modified since the request was scheduled.
 				 */
-				if (toc->serial_mod ==
+				if (toc->mod_gen ==
 				    toc->serial_private->mod_gen) {
 					toc->serial_ret = toc->serial(toc);
-					++toc->serial_private->mod_gen;
-				} else
+					toc->serial_private->api_gen = 0;
+					toc->serial_private->mod_gen++;
+				} else {
 					toc->serial_ret = WT_RESTART;
-
-				/* Allow waiting threads to proceed. */
-				toc->serial_private->api_gen = 0;
+					WT_STAT_INCR(
+					    ienv->stats, WORKQ_RESTARTS,
+					    "workQ modify restarted operation");
+				}
 				toc->serial_private = NULL;
 			}
 			toc->serial = NULL;
-
 			flush = 1;
 			notfound = 0;
 		}
 
-		/*
-		 * Flush out changes.  There's no technical requirement for
-		 * this flush, but it keeps other threads up-to-date.
-		 */
+		/* Flush out changes so other threads can proceed. */
 		if (flush) {
 			flush = 0;
 			WT_MEMORY_FLUSH;
@@ -262,15 +253,15 @@ __wt_queue_cache_check(ENV *env)
 	 * drain to at least 5% under the maximum cache.
 	 */
 	if (cache->bytes_alloc > cache->bytes_max + (cache->bytes_max / 10)) {
-		if (ienv->cache_lockout == 0) {
+		if (ienv->cache_lockout.api_gen != 0) {
 			WT_STAT_INCR(
 			    ienv->stats, CACHE_LOCKOUT, "API cache lockout");
-			ienv->cache_lockout = 1;
+			ienv->cache_lockout.api_gen = WT_TOC_GEN_BLOCK;
 			WT_MEMORY_FLUSH;
 		}
-	} else if (ienv->cache_lockout &&
+	} else if (ienv->cache_lockout.api_gen != 0 &&
 	    cache->bytes_alloc <= cache->bytes_max - (cache->bytes_max / 20)) {
-		ienv->cache_lockout = 0;
+		ienv->cache_lockout.api_gen = 0;
 		WT_MEMORY_FLUSH;
 	}
 }
