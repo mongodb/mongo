@@ -1203,7 +1203,6 @@ namespace mongo {
 			n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
 		}
         log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
-        NamespaceDetailsTransient::get_w( ns.c_str() ).clearQueryCache();
     }
 
     /* add keys to indexes for a new record */
