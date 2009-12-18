@@ -177,7 +177,7 @@ namespace mongo {
 
                 /* yield */
                 {
-                    dbtemprelease unlock;
+                    dbtempreleasecond unlock;
                 }
                 if ( ClientCursor::find( id , false ) == 0 ){
                     cc.release(); // has already been deleted elsewhere

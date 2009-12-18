@@ -156,6 +156,29 @@ namespace mongo {
         }
     };
 
+    /**
+       only does a temp release if we're not nested and have a lock
+     */
+    struct dbtempreleasecond {
+        dbtemprelease * real;
+        int locktype;
+        
+        dbtempreleasecond(){
+            real = 0;
+            locktype = dbMutex.getState();
+            if ( locktype == 1 || locktype == -1 )
+                real = new dbtemprelease();
+        }
+        
+        ~dbtempreleasecond(){
+            if ( real ){
+                delete real;
+                real = 0;
+            }
+        }
+        
+    };
+
 } // namespace mongo
 
 #include "dbinfo.h"
