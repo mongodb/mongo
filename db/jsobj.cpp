@@ -1627,4 +1627,27 @@ namespace mongo {
 
     }
 
+
+    int BSONElementFieldSorter( const void * a , const void * b ){
+        const char * x = *((const char**)a);
+        const char * y = *((const char**)b);
+        x++; y++;
+        return strcmp( x , y );
+    }
+    
+    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ){
+        _nfields = o.nFields();
+        _fields = new const char*[_nfields];
+        int x = 0;
+        BSONObjIterator i( o );
+        while ( i.more() ){
+            _fields[x++] = i.next().rawdata();
+            assert( _fields[x-1] );
+        }
+        assert( x == _nfields );
+        qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
+        _cur = 0;
+    }
+
+
 } // namespace mongo

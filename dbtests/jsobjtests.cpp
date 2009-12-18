@@ -1193,6 +1193,31 @@ namespace JsobjTests {
             ASSERT_EQUALS( a.obj() , b.obj() );
         }
     };
+    
+    class bson2settest {
+    public:
+        void run(){
+            BSONObj o = BSON( "z" << 1 << "a" << 2 << "m" << 3 << "c" << 4 );
+            BSONObjIteratorSorted i( o );
+            stringstream ss;
+            while ( i.more() )
+                ss << i.next().fieldName();
+            ASSERT_EQUALS( "acmz" , ss.str() );
+
+            {
+                Timer t;
+                for ( int i=0; i<10000; i++ ){
+                    BSONObjIteratorSorted j( o );
+                    int l = 0;
+                    while ( j.more() )
+                        l += strlen( j.next().fieldName() );
+                }
+                unsigned long long tm = t.micros();
+                cout << "time: " << tm << endl;
+            }
+        }
+
+    };
 
     class All : public Suite {
     public:
@@ -1279,6 +1304,7 @@ namespace JsobjTests {
             add< BSONArrayBuilderTest >();
             add< ArrayMacroTest >();
             add< NumberParsing >();
+            add< bson2settest >();
         }
     } myall;
     

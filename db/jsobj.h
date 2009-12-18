@@ -611,7 +611,6 @@ namespace mongo {
             return compareElementValues(*this,other) < 0;
         }
         
-    protected:
         // If maxLen is specified, don't scan more than maxLen bytes.
         BSONElement(const char *d, int maxLen = -1) : data(d) {
             fieldNameSize_ = -1;
@@ -1820,5 +1819,47 @@ namespace mongo {
         return m;
     }
 
+    struct BSONElementFieldNameCmp {
+        bool operator()( const BSONElement &l, const BSONElement &r ) const {
+            return strcmp( l.fieldName() , r.fieldName() ) <= 0;
+        }
+    };
+
+
+    typedef set<BSONElement, BSONElementFieldNameCmp> BSONSortedElements;
+    inline BSONSortedElements bson2set( const BSONObj& obj ){
+        BSONSortedElements s;
+        BSONObjIterator it(obj);
+        while ( it.more() )
+            s.insert( it.next() );
+        return s;
+    }
+    
+    class BSONObjIteratorSorted {
+    public:
+        BSONObjIteratorSorted( const BSONObj& o );
         
+        ~BSONObjIteratorSorted(){
+            assert( _fields );
+            delete _fields;
+            _fields = 0;
+        }
+
+        bool more(){
+            return _cur < _nfields;
+        }
+        
+        BSONElement next(){
+            assert( _fields );
+            if ( _cur < _nfields )
+                return BSONElement( _fields[_cur++] );
+            return BSONElement();
+        }
+
+    private:
+        const char ** _fields;
+        int _nfields;
+        int _cur;
+    };
+
 } // namespace mongo
