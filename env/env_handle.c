@@ -43,7 +43,7 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	*envp = env;
 	return (0);
 
-err:	(void)__wt_env_close(env, 0);
+err:	(void)__wt_env_close(env);
 	return (ret);
 }
 

@@ -17,7 +17,7 @@ static int  __wt_idb_config_default(DB *);
  *	DB constructor.
  */
 int
-__wt_env_db(ENV *env, u_int32_t flags, DB **dbp)
+__wt_env_db(ENV *env, DB **dbp)
 {
 	DB *db;
 	IDB *idb;
@@ -44,7 +44,7 @@ __wt_env_db(ENV *env, u_int32_t flags, DB **dbp)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_close(db, 0);
+err:	(void)__wt_db_close(db);
 	return (ret);
 }
 
@@ -101,7 +101,7 @@ __wt_idb_config_default(DB *db)
  *	Db.close method (DB close & handle destructor).
  */
 int
-__wt_db_close(DB *db, u_int32_t flags)
+__wt_db_close(DB *db)
 {
 	ENV *env;
 	int ret;

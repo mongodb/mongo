@@ -14,7 +14,7 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_db_stat_print(DB *db, FILE *stream, u_int32_t flags)
+__wt_db_stat_print(DB *db, FILE *stream)
 {
 	ENV *env;
 	IDB *idb;
@@ -48,7 +48,7 @@ __wt_db_stat_print(DB *db, FILE *stream, u_int32_t flags)
  *	Clear DB handle statistics.
  */
 int
-__wt_db_stat_clear(DB *db, u_int32_t flags)
+__wt_db_stat_clear(DB *db)
 {
 	IDB *idb;
 

@@ -18,8 +18,7 @@ static int __wt_put_serial_func(WT_TOC *);
  *	Db.get method.
  */
 int
-__wt_db_get(
-    DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+__wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 {
 	IDB *idb;
 	WT_INDX *ip;
@@ -77,8 +76,7 @@ err:	WT_TOC_DB_CLEAR(toc);
  *	Db.put method.
  */
 int
-__wt_db_put(
-    DB *db, WT_TOC *toc, DBT *key, DBT *data, u_int32_t flags)
+__wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data)
 {
 	IDB *idb;
 	WT_INDX *ip;

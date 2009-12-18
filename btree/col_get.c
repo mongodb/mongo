@@ -16,8 +16,8 @@ static int __wt_bt_search_recno(WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
  *	Db.get_recno method.
  */
 int
-__wt_db_get_recno(DB *db, WT_TOC *toc,
-    u_int64_t recno, DBT *key, DBT *pkey, DBT *data, u_int32_t flags)
+__wt_db_get_recno(
+    DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data)
 {
 	IDB *idb;
 	WT_INDX *indx;

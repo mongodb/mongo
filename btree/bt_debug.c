@@ -56,7 +56,7 @@ __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_db_verify_int(db, NULL, fp, 0);
+	ret = __wt_db_verify_int(db, NULL, fp);
 
 	if (do_close)
 		(void)fclose(fp);

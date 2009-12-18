@@ -14,7 +14,7 @@
  *	Print ENV handle statistics to a stream.
  */
 int
-__wt_env_stat_print(ENV *env, FILE *stream, u_int32_t flags)
+__wt_env_stat_print(ENV *env, FILE *stream)
 {
 	IDB *idb;
 	IENV *ienv;
@@ -25,7 +25,7 @@ __wt_env_stat_print(ENV *env, FILE *stream, u_int32_t flags)
 	__wt_stat_print(env, ienv->stats, stream);
 
 	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_RET(idb->db->stat_print(idb->db, stream, flags));
+		WT_RET(__wt_db_stat_print(idb->db, stream));
 	return (0);
 }
 
@@ -34,9 +34,8 @@ __wt_env_stat_print(ENV *env, FILE *stream, u_int32_t flags)
  *	Clear ENV handle statistics.
  */
 int
-__wt_env_stat_clear(ENV *env, u_int32_t flags)
+__wt_env_stat_clear(ENV *env)
 {
-	DB *db;
 	IDB *idb;
 	IENV *ienv;
 	int ret;
@@ -44,10 +43,8 @@ __wt_env_stat_clear(ENV *env, u_int32_t flags)
 	ienv = env->ienv;
 	ret = 0;
 
-	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
-		db = idb->db;
-		WT_TRET(db->stat_clear(db, flags));
-	}
+	TAILQ_FOREACH(idb, &ienv->dbqh, q)
+		WT_TRET(__wt_db_stat_clear(idb->db));
 
 	__wt_stat_clear_ienv_stats(ienv->stats);
 	return (ret);

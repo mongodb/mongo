@@ -14,7 +14,7 @@
  *	Open a Env handle.
  */
 int
-__wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
+__wt_env_open(ENV *env, const char *home, mode_t mode)
 {
 	IENV *ienv;
 	int ret;
@@ -37,7 +37,7 @@ __wt_env_open(ENV *env, const char *home, mode_t mode, u_int32_t flags)
 
 	return (0);
 
-err:	(void)__wt_env_close(env, 0);
+err:	(void)__wt_env_close(env);
 	return (ret);
 }
 
@@ -46,7 +46,7 @@ err:	(void)__wt_env_close(env, 0);
  *	Close an Env handle.
  */
 int
-__wt_env_close(ENV *env, u_int32_t flags)
+__wt_env_close(ENV *env)
 {
 	IDB *idb;
 	IENV *ienv;

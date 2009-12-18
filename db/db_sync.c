@@ -14,7 +14,7 @@
  *	Flush a database to the backing file.
  */
 int
-__wt_db_sync(DB *db, void (*f)(const char *, u_int64_t), u_int32_t flags)
+__wt_db_sync(DB *db, void (*f)(const char *, u_int64_t))
 {
 	/* Flush the underlying Btree. */
 	return (__wt_bt_sync(db, f));

@@ -16,7 +16,7 @@ static void __wt_toc_link_op(ENV *, WT_TOC *, int);
  *	WT_TOC constructor.
  */
 int
-__wt_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp)
+__wt_env_toc(ENV *env, WT_TOC **tocp)
 {
 	WT_TOC *toc;
 
@@ -40,7 +40,7 @@ __wt_env_toc(ENV *env, u_int32_t flags, WT_TOC **tocp)
  *	toc.close method (WT_TOC close + destructor).
  */
 int
-__wt_wt_toc_close(WT_TOC *toc, u_int32_t flags)
+__wt_wt_toc_close(WT_TOC *toc)
 {
 	ENV *env;
 	int ret;

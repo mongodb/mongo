@@ -265,7 +265,7 @@ static int __wt_api_db_close(
 
 	WT_ENV_FCHK(env, "DB.close", flags, WT_APIMASK_DB_CLOSE);
 
-	return (__wt_db_close(db, flags));
+	return (__wt_db_close(db));
 }
 
 static int __wt_api_db_dump(
@@ -409,7 +409,7 @@ static int __wt_api_db_get(
 
 	WT_ENV_FCHK(env, "DB.get", flags, WT_APIMASK_DB_GET);
 
-	return (__wt_db_get(db, toc, key, pkey, data, flags));
+	return (__wt_db_get(db, toc, key, pkey, data));
 }
 
 static int __wt_api_db_get_recno(
@@ -435,7 +435,7 @@ static int __wt_api_db_get_recno(
 
 	WT_ENV_FCHK(env, "DB.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
 
-	return (__wt_db_get_recno(db, toc, recno, key, pkey, data, flags));
+	return (__wt_db_get_recno(db, toc, recno, key, pkey, data));
 }
 
 static int __wt_api_db_open(
@@ -477,7 +477,7 @@ static int __wt_api_db_put(
 
 	WT_ENV_FCHK(env, "DB.put", flags, WT_APIMASK_DB_PUT);
 
-	return (__wt_db_put(db, toc, key, data, flags));
+	return (__wt_db_put(db, toc, key, data));
 }
 
 static int __wt_api_db_stat_clear(
@@ -493,7 +493,7 @@ static int __wt_api_db_stat_clear(
 
 	WT_ENV_FCHK(env, "DB.stat_clear", flags, WT_APIMASK_DB_STAT_CLEAR);
 
-	return (__wt_db_stat_clear(db, flags));
+	return (__wt_db_stat_clear(db));
 }
 
 static int __wt_api_db_stat_print(
@@ -511,7 +511,7 @@ static int __wt_api_db_stat_print(
 
 	WT_ENV_FCHK(env, "DB.stat_print", flags, WT_APIMASK_DB_STAT_PRINT);
 
-	return (__wt_db_stat_print(db, stream, flags));
+	return (__wt_db_stat_print(db, stream));
 }
 
 static int __wt_api_db_sync(
@@ -529,7 +529,7 @@ static int __wt_api_db_sync(
 
 	WT_ENV_FCHK(env, "DB.sync", flags, WT_APIMASK_DB_SYNC);
 
-	return (__wt_db_sync(db, progress, flags));
+	return (__wt_db_sync(db, progress));
 }
 
 static int __wt_api_db_verify(
@@ -547,7 +547,7 @@ static int __wt_api_db_verify(
 
 	WT_ENV_FCHK(env, "DB.verify", flags, WT_APIMASK_DB_VERIFY);
 
-	return (__wt_db_verify(db, progress, flags));
+	return (__wt_db_verify(db, progress));
 }
 
 static int __wt_api_env_cachesize_get(
@@ -585,7 +585,7 @@ static int __wt_api_env_close(
 {
 	WT_ENV_FCHK(env, "ENV.close", flags, WT_APIMASK_ENV_CLOSE);
 
-	return (__wt_env_close(env, flags));
+	return (__wt_env_close(env));
 }
 
 static int __wt_api_env_db(
@@ -599,7 +599,7 @@ static int __wt_api_env_db(
 {
 	WT_ENV_FCHK(env, "ENV.db", flags, WT_APIMASK_ENV_DB);
 
-	return (__wt_env_db(env, flags, dbp));
+	return (__wt_env_db(env, dbp));
 }
 
 static int __wt_api_env_errcall_get(
@@ -745,7 +745,7 @@ static int __wt_api_env_open(
 {
 	WT_ENV_FCHK(env, "ENV.open", flags, WT_APIMASK_ENV_OPEN);
 
-	return (__wt_env_open(env, home, mode, flags));
+	return (__wt_env_open(env, home, mode));
 }
 
 static int __wt_api_env_stat_clear(
@@ -757,7 +757,7 @@ static int __wt_api_env_stat_clear(
 {
 	WT_ENV_FCHK(env, "ENV.stat_clear", flags, WT_APIMASK_ENV_STAT_CLEAR);
 
-	return (__wt_env_stat_clear(env, flags));
+	return (__wt_env_stat_clear(env));
 }
 
 static int __wt_api_env_stat_print(
@@ -771,7 +771,7 @@ static int __wt_api_env_stat_print(
 {
 	WT_ENV_FCHK(env, "ENV.stat_print", flags, WT_APIMASK_ENV_STAT_PRINT);
 
-	return (__wt_env_stat_print(env, stream, flags));
+	return (__wt_env_stat_print(env, stream));
 }
 
 static int __wt_api_env_toc(
@@ -785,7 +785,7 @@ static int __wt_api_env_toc(
 {
 	WT_ENV_FCHK(env, "ENV.toc", flags, WT_APIMASK_ENV_TOC);
 
-	return (__wt_env_toc(env, flags, tocp));
+	return (__wt_env_toc(env, tocp));
 }
 
 static int __wt_api_env_verbose_get(
@@ -827,7 +827,7 @@ static int __wt_api_wt_toc_close(
 
 	WT_ENV_FCHK(env, "WT_TOC.close", flags, WT_APIMASK_WT_TOC_CLOSE);
 
-	return (__wt_wt_toc_close(wt_toc, flags));
+	return (__wt_wt_toc_close(wt_toc));
 }
 
 void

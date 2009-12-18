@@ -34,9 +34,9 @@ static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, VSTUFF *);
  *	Verify a Btree.
  */
 int
-__wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t), u_int32_t flags)
+__wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
 {
-	return (__wt_db_verify_int(db, f, NULL, flags));
+	return (__wt_db_verify_int(db, f, NULL));
 }
 
 /*
@@ -44,8 +44,7 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t), u_int32_t flags)
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_db_verify_int(DB *db,
-    void (*f)(const char *s, u_int64_t), FILE *fp, u_int32_t flags)
+__wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp)
 {
 	ENV *env;
 	IDB *idb;
@@ -61,8 +60,6 @@ __wt_db_verify_int(DB *db,
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.f = f;
 	vstuff.fp = fp;
-
-	WT_DB_FCHK(db, "Db.verify", flags, WT_APIMASK_DB_VERIFY);
 
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.verify");

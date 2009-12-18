@@ -182,10 +182,14 @@ def func_method_getset(a, f):
 	f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
 	if config.count('getter'):
 		for l in args:
+			if l.count('flags/') and flags[a.key][0] == '__NONE__':
+				continue
 			f.write('\t*(' + l.split('/')[0] + ')' + ' = ' +
 			    handle + '->' + l.split('/')[0] + ';\n')
 	else:
 		for l in args:
+			if l.count('flags/') and flags[a.key][0] == '__NONE__':
+				continue
 			f.write('\t' + handle + '->' +
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 	f.write('\t__wt_unlock(&env->ienv->mtx);\n')
@@ -217,6 +221,8 @@ def func_method(a, f):
 
 	f.write('\treturn (__wt_' + handle + '_' + method + '(' + handle)
 	for l in args:
+		if l.count('flags/') and flags[a.key][0] == '__NONE__':
+			continue
 		f.write(', ' + l.split('/')[0])
 	f.write('));\n}\n\n')
 
@@ -225,6 +231,7 @@ def func_method(a, f):
 #####################################################################
 import api_class
 api = api_class.methods
+flags = api_class.flags
 
 #####################################################################
 # Update api.h, the API header file.

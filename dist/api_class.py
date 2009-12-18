@@ -40,13 +40,14 @@ flags = {}
 methods = {}
 
 class Api:
-	def __init__(self, method, config, args, f, on, off):
-		self.handle = method.split('.')[0]
-		self.method = method.split('.')[1]
+	def __init__(self, key, config, args, f, on, off):
+		self.key = key
+		self.handle = key.split('.')[0]
+		self.method = key.split('.')[1]
 		self.config = config
 		self.args = args
 		if f:
-			flags[method] = f
+			flags[key] = f
 		self.on = on
 		self.off = off
 
