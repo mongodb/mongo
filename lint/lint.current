@@ -3,25 +3,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_bulk.c (C)
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  118  Warning 530: Symbol 'dup_data' (line 30) not
+../btree/bt_bulk.c  122  Warning 530: Symbol 'dup_data' (line 30) not
     initialized
 ../btree/bt_bulk.c  30  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  204  Warning 530: Symbol 'dup_key' (line 30) not
+../btree/bt_bulk.c  208  Warning 530: Symbol 'dup_key' (line 30) not
     initialized
 ../btree/bt_bulk.c  30  Info 830: Location cited in prior message
                                        _
 	WT_64_CAST(offpage_item.records) = dup_count,
-../btree/bt_bulk.c  558  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  562  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 	WT_64_CAST(offp.records) = page->records;
-../btree/bt_bulk.c  775  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  779  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                        _
 			WT_64_CAST(parent_offp->records) += increment;
-../btree/bt_bulk.c  818  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  822  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -29,6 +29,20 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_cmp.c (C)
 
 --- Module:   ../btree/bt_debug.c (C)
+                                                          _
+				__wt_bt_dump_dbt((DBT *)ip, fp);
+../btree/bt_debug.c  194  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                                                                _
+		    (u_long)offp->addr, WT_64_CAST(offp->records));
+../btree/bt_debug.c  273  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+
+    --- Wrap-up for Module: ../btree/bt_debug.c
+
+Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
+    struct __sFILE *)' (line 72, file ../btree/bt_debug.c) not referenced
+../btree/bt_debug.c  72  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_desc.c (C)
 
@@ -37,34 +51,26 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_key.c (C)
 _
 }
-../btree/bt_key.c  73  Info 715: Symbol 'pkey' (line 22) not referenced
-../btree/bt_key.c  22  Info 830: Location cited in prior message
-_
-}
 ../btree/bt_key.c  73  Info 715: Symbol 'flags' (line 22) not referenced
 ../btree/bt_key.c  22  Info 830: Location cited in prior message
 _
 }
 ../btree/bt_key.c  127  Info 715: Symbol 'flags' (line 81) not referenced
 ../btree/bt_key.c  81  Info 830: Location cited in prior message
-_
-}
-../btree/bt_key.c  206  Warning 550: Symbol 'psize' (line 167) not accessed
-../btree/bt_key.c  167  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_key.c  283  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_key.c  281  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp == 0) {
-../btree/bt_key.c  300  Warning 644: Variable 'cmp' (line 243) may not have
+../btree/bt_key.c  298  Warning 644: Variable 'cmp' (line 241) may not have
     been initialized
-../btree/bt_key.c  243  Info 830: Location cited in prior message
+../btree/bt_key.c  241  Info 830: Location cited in prior message
                                          _
 				*ipp = ip;
-../btree/bt_key.c  303  Info 771: Symbol 'ip' (line 240) conceivably not
+../btree/bt_key.c  301  Info 771: Symbol 'ip' (line 238) conceivably not
     initialized
-../btree/bt_key.c  240  Info 830: Location cited in prior message
+../btree/bt_key.c  238  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_misc.c (C)
 
@@ -79,10 +85,6 @@ _
     types)
 
 --- Module:   ../btree/bt_recno.c (C)
-_
-}
-../btree/bt_recno.c  76  Info 715: Symbol 'pkey' (line 20) not referenced
-../btree/bt_recno.c  20  Info 830: Location cited in prior message
 _
 }
 ../btree/bt_recno.c  76  Info 715: Symbol 'flags' (line 20) not referenced
@@ -261,38 +263,6 @@ _
 ../db/db_sync.c  17  Info 830: Location cited in prior message
 
 --- Module:   ../env/engine.c (C)
-                _
-		WT_MEMORY_FLUSH;
-../env/engine.c  35  Warning 522: Expected void type, assignment, increment or
-    decrement
-                                        _
-					WT_MEMORY_FLUSH;
-../env/engine.c  91  Warning 522: Expected void type, assignment, increment or
-    decrement
-                                        _
-					WT_MEMORY_FLUSH;
-../env/engine.c  93  Warning 522: Expected void type, assignment, increment or
-    decrement
-                        _
-			WT_MEMORY_FLUSH;
-../env/engine.c  118  Warning 522: Expected void type, assignment, increment or
-    decrement
-                        _
-			WT_MEMORY_FLUSH;
-../env/engine.c  183  Warning 522: Expected void type, assignment, increment or
-    decrement
-                _
-		WT_MEMORY_FLUSH;
-../env/engine.c  258  Warning 522: Expected void type, assignment, increment or
-    decrement
-                        _
-			WT_MEMORY_FLUSH;
-../env/engine.c  271  Warning 522: Expected void type, assignment, increment or
-    decrement
-                _
-		WT_MEMORY_FLUSH;
-../env/engine.c  276  Warning 522: Expected void type, assignment, increment or
-    decrement
 
 --- Module:   ../env/env_cache.c (C)
                                             _
@@ -300,22 +270,24 @@ _
 ../env/env_cache.c  75  Warning 647: Suspicious truncation
                                                _
 	if ((review_max = cache->hashsize / 100) < 10)
-../env/env_cache.c  475  Info 713: Loss of precision (assignment) (unsigned int
+../env/env_cache.c  480  Info 713: Loss of precision (assignment) (unsigned int
     to int)
-                        _
-			WT_MEMORY_FLUSH;
-../env/env_cache.c  488  Warning 522: Expected void type, assignment, increment
-    or decrement
                               _
 		hb = chosen_hb;
-../env/env_cache.c  515  Warning 644: Variable 'chosen_hb' (line 456) may not
+../env/env_cache.c  520  Warning 644: Variable 'chosen_hb' (line 461) may not
     have been initialized
-../env/env_cache.c  456  Info 830: Location cited in prior message
+../env/env_cache.c  461  Info 830: Location cited in prior message
                                   _
 		page = chosen_page;
-../env/env_cache.c  516  Warning 644: Variable 'chosen_page' (line 457) may not
+../env/env_cache.c  521  Warning 644: Variable 'chosen_page' (line 462) may not
     have been initialized
-../env/env_cache.c  457  Info 830: Location cited in prior message
+../env/env_cache.c  462  Info 830: Location cited in prior message
+
+    --- Wrap-up for Module: ../env/env_cache.c
+
+Warning 528: Symbol '__wt_cache_dump(struct __env *, const char *, struct
+    __sFILE *)' (line 649, file ../env/env_cache.c) not referenced
+../env/env_cache.c  649  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_err.c (C)
                                   _
@@ -346,10 +318,6 @@ _
 ../env/env_msg.c  54  Warning 611: Suspicious cast
 
 --- Module:   ../env/env_open.c (C)
-        _
-	WT_MEMORY_FLUSH;
-../env/env_open.c  33  Warning 522: Expected void type, assignment, increment
-    or decrement
 _
 }
 ../env/env_open.c  42  Info 715: Symbol 'mode' (line 17) not referenced
@@ -362,14 +330,6 @@ _
 }
 ../env/env_open.c  42  Info 715: Symbol 'flags' (line 17) not referenced
 ../env/env_open.c  17  Info 830: Location cited in prior message
-        _
-	WT_MEMORY_FLUSH;
-../env/env_open.c  83  Warning 522: Expected void type, assignment, increment
-    or decrement
-        _
-	WT_MEMORY_FLUSH;
-../env/env_open.c  94  Warning 522: Expected void type, assignment, increment
-    or decrement
 _
 }
 ../env/env_open.c  112  Info 715: Symbol 'flags' (line 49) not referenced
@@ -386,10 +346,6 @@ _
 }
 ../env/toc.c  57  Info 715: Symbol 'flags' (line 43) not referenced
 ../env/toc.c  43  Info 830: Location cited in prior message
-        _
-	WT_MEMORY_FLUSH;
-../env/toc.c  83  Warning 522: Expected void type, assignment, increment or
-    decrement
 
 --- Module:   ../os_posix/os_abort.c (C)
 
