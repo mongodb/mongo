@@ -317,7 +317,7 @@ namespace mongo {
     }
 
     void ModSet::createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj ){
-        BSONObjIterator es( obj );
+        BSONObjIteratorSorted es( obj );
         BSONElement e = es.next();
 
         ModHolder::iterator m = _mods.lower_bound( root );
