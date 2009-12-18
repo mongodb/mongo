@@ -28,7 +28,9 @@
  */
 extern void *__wt_addr;
 
-#if defined(sun)
+#if defined(_lint)
+#define	WT_MEMORY_FLUSH
+#elif defined(sun)
 #include <atomic.h>
 #define WT_MEMORY_FLUSH							\
 	membar_enter()
