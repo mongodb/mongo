@@ -155,7 +155,7 @@ namespace mongo {
                 cc->updateLocation();
                 cc->setDoingDeletes( false );
                 {
-                    dbtemprelease unlock;
+                    dbtempreleasecond unlock;
                 }
                 if ( ClientCursor::find( id , false ) == 0 ){
                     cc.reset( 0 );
