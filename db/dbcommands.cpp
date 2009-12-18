@@ -446,9 +446,9 @@ namespace mongo {
     } dbc_unittest;
 
     bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
-
+        
         d->aboutToDeleteAnIndex();
-
+        
         /* there may be pointers pointing at keys in the btree(s).  kill them. */
         ClientCursor::invalidate(ns);
 
@@ -502,6 +502,7 @@ namespace mongo {
                 return false;
             }
         }
+        NamespaceDetailsTransient::get_w( ns ).clearQueryCache();
         return true;
     }
 
