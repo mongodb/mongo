@@ -1,5 +1,5 @@
 WT=	../build_posix
-LIB=	${WT}/libwiredtiger.a -lpthread
+LIB=	${WT}/libwiredtiger.a #-lpthread
 CFLAGS=-g -I${WT}
 
 all: t

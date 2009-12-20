@@ -55,7 +55,9 @@ main(int argc, char *argv[])
 	int rand_cache, rand_keys, rand_leaf, rand_node;
 
 	ret = 0;
+#if 0
 	_malloc_options = "AJZ";
+#endif
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -152,7 +154,7 @@ main(int argc, char *argv[])
 				nodesize *= 2;
 
 		(void)printf(
-		    "%s: %4d { -c %2d -k %7d -l %6d -n %6d -R %#010lx }\n\t",
+		    "%s: %4d { -c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
 		    progname, run_cnt, cachesize, keys, leafsize, nodesize,
 		    r);
 		(void)fflush(stdout);
@@ -470,7 +472,7 @@ progress(const char *s, u_int64_t i)
 	else if (i == 0)
 		len = snprintf(msg, sizeof(msg), "%s", s);
 	else
-		len = snprintf(msg, sizeof(msg), "%s %lu", s, (u_int32_t)i);
+		len = snprintf(msg, sizeof(msg), "%s %llu", s, i);
 
 	for (p = msg + len; len < lastlen; ++len)
 		*p++ = ' ';
