@@ -103,7 +103,7 @@ namespace mongo {
     /* must call when a btree bucket going away.
        note this is potentially slow
     */
-    inline void ClientCursor::informAboutToDeleteBucket(const DiskLoc& b) {
+    void ClientCursor::informAboutToDeleteBucket(const DiskLoc& b) {
         recursive_boostlock lock(ccmutex);
         RARELY if ( byLoc.size() > 70 ) {
             log() << "perf warning: byLoc.size=" << byLoc.size() << " in aboutToDeleteBucket\n";
