@@ -99,7 +99,8 @@ __wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
 	TAILQ_FOREACH(toc, &ienv->tocqh, q) {
 		fprintf(fp,
 		    "toc: %#lx {\n\tapi_gen: %lu, api_mod: %lu\n\tserial: ",
-		    WT_ADDR_TO_ULONG(toc), toc->api_gen, toc->mod_gen);
+		    WT_ADDR_TO_ULONG(toc),
+		    (u_long)toc->api_gen, (u_long)toc->mod_gen);
 		if (toc->serial == NULL) {
 			fprintf(fp, "none");
 			if (F_ISSET(toc, WT_WAITING))
