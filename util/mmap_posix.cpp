@@ -56,7 +56,7 @@ namespace mongo {
         
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
-            out() << "couldn't open " << filename << ' ' << errno << endl;
+            out() << "couldn't open " << filename << " errno:" << errno << endl;
             return 0;
         }
 
