@@ -258,16 +258,16 @@ namespace mongo {
         c.clearns();
 
         stringstream ss;
-        char buf[64];
         time_t now = time(0);
 
         CurOp& currentOp = *c.curop();
         currentOp.reset(now, client);
         currentOp.setOp(op);
 
-        time_t_to_String(now, buf);
-        buf[20] = 0; // don't want the year
-        ss << buf;
+//        char buf[64];
+//        time_t_to_String(now, buf);
+//        buf[20] = 0; // don't want the year
+//        ss << buf;
 
         Timer t;
 
@@ -388,7 +388,7 @@ namespace mongo {
         DEV log = true;
         if ( log || ms > logThreshold ) {
             ss << ' ' << t.millis() << "ms";
-            out() << ss.str().c_str() << endl;
+            mongo::log() << ss.str() << endl;
         }
         Database *database = cc().database();
         if ( database && database->profile >= 1 ) {
@@ -401,7 +401,7 @@ namespace mongo {
                     string old_ns = cc().ns();
                     lk.releaseAndWriteLock();
                     resetClient(old_ns.c_str());
-                    profile(ss.str().c_str()+20/*skip ts*/, ms);
+                    profile(ss.str().c_str(), ms);
                 }
             }
         }
