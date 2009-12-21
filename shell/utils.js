@@ -273,7 +273,13 @@ Array.stdDev = function( arr ){
 }
 
 Object.keySet = function( o ) {
-    return [i for (i in o) if ( !( i in o.__proto__ && o[ i ] === o.__proto__[ i ] ) )];
+    var ret = new Array();
+    for( i in o ) {
+        if ( !( i in o.__proto__ && o[ i ] === o.__proto__[ i ] ) ) {
+            ret.push( i );
+        }
+    }
+    return ret;
 }
 
 if ( ! ObjectId.prototype )
