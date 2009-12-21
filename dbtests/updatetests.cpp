@@ -601,6 +601,47 @@ namespace UpdateTests {
         };
 
     };
+
+    namespace basic {
+        class Base : public ClientBase {
+            virtual BSONObj initial() = 0;
+            virtual BSONObj mod() = 0;
+            virtual BSONObj after() = 0;
+            virtual const char * ns() = 0;
+
+        public:
+            
+            Base(){}
+            virtual ~Base(){}
+
+            void run(){
+                client().dropCollection( ns() );
+                
+                client().insert( ns() , initial() );
+                client().update( ns() , BSONObj() , mod() );
+                ASSERT_EQUALS( after() , client().findOne( ns(), BSONObj() ));
+
+                client().dropCollection( ns() );
+            }
+        };
+        
+        class inc1 : public Base {
+            virtual BSONObj initial(){
+                return BSON( "_id" << 1 << "x" << 1 );
+            }
+            virtual BSONObj mod(){
+                return BSON( "$inc" << BSON( "x" << 2 ) );
+            }
+            virtual BSONObj after(){
+                return BSON( "_id" << 1 << "x" << 3 );
+            }
+            virtual const char * ns(){
+                return "unittests.inc1";
+            }
+
+        };
+            
+    };
     
     class All : public Suite {
     public:
@@ -655,12 +696,14 @@ namespace UpdateTests {
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
-
+            
             add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();
             add< ModSetTests::inc2 >();
             add< ModSetTests::set1 >();
             add< ModSetTests::push1 >();
+
+            add< basic::inc1 >();
         }
     } myall;
 
