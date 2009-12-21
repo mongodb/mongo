@@ -69,6 +69,7 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit ) );
+        
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -92,6 +93,14 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit )->GetFunction() );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit )->GetFunction() );
+
+        BSONObjBuilder b;
+        b.appendMaxKey( "" );
+        b.appendMinKey( "" );
+        BSONObj o = b.obj();
+        BSONObjIterator i( o );
+        global->Set( v8::String::New("MaxKey"), mongoToV8Element( i.next() ) );
+        global->Set( v8::String::New("MinKey"), mongoToV8Element( i.next() ) );
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
