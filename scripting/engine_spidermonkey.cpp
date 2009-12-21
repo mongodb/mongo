@@ -734,7 +734,7 @@ namespace mongo {
     }
 
     JSFunctionSpec bson_functions[] = {
-        { "bsonsize" , bson_get_size , 0 , 0 , JSPROP_READONLY | JSPROP_PERMANENT } , 
+        { "bsonsize" , bson_get_size , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } , 
         { 0 }
     };
     
