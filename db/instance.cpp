@@ -106,7 +106,7 @@ namespace mongo {
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     CurOp& co = *(c->curop());
-                    if( co.active )
+                    if( co.active() )
                         vals.push_back( co.infoNoauth() );
                 }
             }
@@ -130,8 +130,8 @@ namespace mongo {
         }
         replyToQuery(0, m, dbresponse, obj);
     }
-    
-    bool receivedQuery(DbResponse& dbresponse, Message& m, 
+
+    static bool receivedQuery(DbResponse& dbresponse, Message& m, 
                        stringstream& ss, bool logit, 
                        mongolock& lock
       ) {
@@ -160,7 +160,7 @@ namespace mongo {
             setClient( q.ns, dbpath, &lock );
             Client& client = cc();
             client.top.setRead();
-            strncpy(client.curop()->ns, q.ns, Namespace::MaxNsLen);
+            client.curop()->setNS(q.ns);
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {
@@ -252,24 +252,26 @@ namespace mongo {
 
         mongolock lk(writeLock);
 
+        Client& c = cc();
+        c.clearns();
+
         stringstream ss;
         char buf[64];
         time_t now = time(0);
-        CurOp& currentOp = *cc().curop();
+
+        CurOp& currentOp = *c.curop();
         currentOp.reset(now, client);
+        currentOp.setOp(op);
 
         time_t_to_String(now, buf);
         buf[20] = 0; // don't want the year
         ss << buf;
 
         Timer t;
-        Client& c = cc();
-        c.clearns();
 
         int logThreshold = 100;
         int ms;
         bool log = logLevel >= 1;
-        c.curop()->op = op;
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -319,7 +321,7 @@ namespace mongo {
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToClient(ns, cl);
-            strncpy(currentOp.ns, ns, Namespace::MaxNsLen);
+            currentOp.setNS(ns);
             AuthenticationInfo *ai = currentClient.get()->ai;
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
@@ -375,7 +377,7 @@ namespace mongo {
             }
             else {
                 out() << "    operation isn't supported: " << op << endl;
-                currentOp.active = false;
+                currentOp.setActive(false);
                 assert(false);
             }
         }
@@ -402,7 +404,7 @@ namespace mongo {
             }
         }
 
-        currentOp.active = false;
+        currentOp.setActive(false);
         return true;
     }
 
@@ -468,7 +470,7 @@ namespace mongo {
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
             ss << " query: " << s;
             CurOp& currentOp = *client.curop();
-            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
+            currentOp.setQuery(query);
         }        
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, ss, true);
         /* TODO FIX: recordUpdate should take a long int for parm #2 */
@@ -491,16 +493,13 @@ namespace mongo {
             string s = pattern.toString();
             ss << " query: " << s;
             CurOp& currentOp = *client.curop();
-            strncpy(currentOp.query, s.c_str(), sizeof(currentOp.query)-2);
+            currentOp.setQuery(pattern);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
     }
 
-    /**
-     * @return if this was successful
-     */
-    bool receivedQuery(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
+    static bool receivedQuery2NotUsed(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss, bool logit) {
         bool ok = true;
         MSGID responseTo = m.data->id;
 
@@ -526,7 +525,7 @@ namespace mongo {
             setClient( q.ns );
             Client& client = cc();
             client.top.setRead();
-            strncpy(client.curop()->ns, q.ns, Namespace::MaxNsLen);
+            client.curop()->setNS(q.ns);
             msgdata = runQuery(m, ss ).release();
         }
         catch ( AssertionException& e ) {
@@ -574,7 +573,7 @@ namespace mongo {
         }
         
         return ok;
-    }
+    }/*receivedQuery2NotUsed*/
     
     QueryResult* emptyMoreResult(long long);
 

@@ -29,6 +29,7 @@
 namespace NamespaceTests {
     namespace IndexDetailsTests {
         class Base {
+            dblock lk;
         public:
             Base() {
                 setClient( ns() );
@@ -569,6 +570,7 @@ namespace NamespaceTests {
     namespace NamespaceDetailsTests {
 
         class Base {
+            dblock lk;
         public:
             Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) {}
             virtual ~Base() {

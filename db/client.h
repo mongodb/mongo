@@ -33,7 +33,7 @@ namespace mongo {
 
     class AuthenticationInfo;
     class Database;
-    struct CurOp;
+    class CurOp;
 
     class Client : boost::noncopyable { 
     public:
@@ -48,7 +48,7 @@ namespace mongo {
         };
 
     private:
-        CurOp *_curOp;
+        CurOp * const _curOp;
         Database *_database;
         Namespace _ns;
         //NamespaceString _nsstr;

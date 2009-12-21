@@ -30,6 +30,7 @@
 namespace QueryTests {
 
     class Base {
+        dblock lk;
     public:
         Base() {
             dblock lk;
