@@ -272,6 +272,10 @@ Array.stdDev = function( arr ){
     return Math.sqrt( sum / arr.length );
 }
 
+Object.keySet = function( o ) {
+    return [i for (i in o) if ( !( i in o.__proto__ && o[ i ] === o.__proto__[ i ] ) )];
+}
+
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 

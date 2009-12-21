@@ -391,7 +391,7 @@ DB.prototype.groupeval = function(parmsObj) {
 	var parms = args[0];
     	var c = db[parms.ns].find(parms.cond||{});
     	var map = new Map();
-        var pks = parms.key ? parms.key.keySet() : null;
+        var pks = parms.key ? Object.keySet( parms.key ) : null;
         var pkl = pks ? pks.length : 0;
         var key = {};
         

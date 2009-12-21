@@ -6,11 +6,11 @@ t.save( { a : 1 , b : { c : 1 , d : 1 } } );
 
 t.update( { a : 1 } , { $inc : { "b.c" : 1 } } );
 assert.eq( 2 , t.findOne().b.c , "A" );
-assert.eq( "c,d" , t.findOne().b.keySet().toString() , "B" );
+assert.eq( "c,d" , Object.keySet( t.findOne().b ).toString() , "B" );
 
 t.update( { a : 1 } , { $inc : { "b.0e" : 1 } } );
 assert.eq( 1 , t.findOne().b["0e"] , "C" );
-assert.eq( "0e,c,d" , t.findOne().b.keySet().toString() , "D" );
+assert.eq( "0e,c,d" , Object.keySet( t.findOne().b ).toString() , "D" );
 
 // -----
 
@@ -23,9 +23,9 @@ t.save( {"_id" : 2 ,
       );
 
 
-assert.eq( 4 , t.find({_id:2},{b3:1})[0].b3.keySet().length , "test 1 : ks before" );
+assert.eq( 4 , Object.keySet( t.find({_id:2},{b3:1})[0].b3 ).length , "test 1 : ks before" );
 t.update({_id:2},{$inc: { 'b3.0719' : 1}},true)
-assert.eq( 5 , t.find({_id:2},{b3:1})[0].b3.keySet().length , "test 1 : ks after" );
+assert.eq( 5 , Object.keySet( t.find({_id:2},{b3:1})[0].b3 ).length , "test 1 : ks after" );
 
 
 // -----
@@ -39,8 +39,8 @@ t.save( {"_id" : 2 ,
       );
 
 
-assert.eq( 4 , t.find({_id:2},{b3:1})[0].b3.keySet().length , "test 2 : ks before" );
+assert.eq( 4 , Object.keySet( t.find({_id:2},{b3:1})[0].b3 ).length , "test 2 : ks before" );
 printjson( t.find({_id:2},{b3:1})[0].b3 )
 t.update({_id:2},{$inc: { 'b3.0719' : 1}} )
 printjson( t.find({_id:2},{b3:1})[0].b3 )
-assert.eq( 5 , t.find({_id:2},{b3:1})[0].b3.keySet().length , "test 2 : ks after" );
+assert.eq( 5 , Object.keySet( t.find({_id:2},{b3:1})[0].b3 ).length , "test 2 : ks after" );

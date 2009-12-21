@@ -29,7 +29,7 @@ res = t.mapReduce( m , r , { scope : { xx : 1 } } );
 res.find().forEach( printjson )
 
 z = res.convertToSingleObject()
-assert.eq( 2 , z.keySet().length , "A" )
+assert.eq( 2 , Object.keySet( z ).length , "A" )
 assert.eq( [ 9 , 11 , 30 ] , z["1"].stats , "B" )
 assert.eq( [ 9 , 41 , 41 ] , z["2"].stats , "B" )
 

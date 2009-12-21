@@ -947,29 +947,6 @@ namespace mongo {
     }
 
 
-    // ------ special helpers -------
-
-    JSBool object_keyset(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-
-        JSIdArray * properties = JS_Enumerate( cx , obj );
-        assert( properties );
-
-        JSObject * array = JS_NewArrayObject( cx , properties->length , 0 );
-        assert( array );
-
-        for ( jsint i=0; i<properties->length; i++ ){
-            jsid id = properties->vector[i];
-            jsval idval;
-            assert( JS_IdToValue( cx , id , &idval ) );
-            assert( JS_SetElement( cx , array , i ,  &idval ) );
-        }
-
-        JS_DestroyIdArray( cx , properties );
-
-        *rval = OBJECT_TO_JSVAL( array );
-        return JS_TRUE;
-    }
-
     // ------ scope ------
 
 
@@ -1001,11 +978,6 @@ namespace mongo {
             JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
 
             JS_DefineFunctions( _context , _global , globalHelpers );
-
-            // install my special helpers
-
-            assert( JS_DefineFunction( _context , _convertor->getGlobalPrototype( "Object" ) ,
-                                       "keySet" , object_keyset , 0 , JSPROP_READONLY ) );
 
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
 

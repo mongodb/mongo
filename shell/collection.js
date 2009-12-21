@@ -173,11 +173,14 @@ DBCollection.prototype.save = function( obj ){
 DBCollection.prototype._genIndexName = function( keys ){
     var name = "";
     for ( var k in keys ){
+        var v = keys[k];
+        if ( typeof v == "function" )
+            continue;
+        
         if ( name.length > 0 )
             name += "_";
         name += k + "_";
 
-        var v = keys[k];
         if ( typeof v == "number" )
             name += v;
     }
@@ -490,7 +493,7 @@ DBCollection.prototype.groupcmd = function( params ){
 MapReduceResult = function( db , o ){
     Object.extend( this , o );
     this._o = o;
-    this._keys = o.keySet();
+    this._keys = Object.keySet( o );
     this._db = db;
     this._coll = this._db.getCollection( this.result );
 }
