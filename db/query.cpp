@@ -477,9 +477,9 @@ namespace mongo {
     }
 
     // Implements database 'query' requests using the query optimizer's QueryOp interface
-    class DoQueryOp : public QueryOp {
+    class UserQueryOp : public QueryOp {
     public:
-        DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
+        UserQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
                    bool explain, FieldMatcher *filter, int queryOptions ) :
             b_( 32768 ),
             ntoskip_( ntoskip ),
@@ -639,7 +639,7 @@ namespace mongo {
         }
         virtual bool mayRecordPlan() const { return ntoreturn_ != 1; }
         virtual QueryOp *clone() const {
-            return new DoQueryOp( ntoskip_, ntoreturn_, order_, wantMore_, explain_, filter_, queryOptions_ );
+            return new UserQueryOp( ntoskip_, ntoreturn_, order_, wantMore_, explain_, filter_, queryOptions_ );
         }
         BufBuilder &builder() { return b_; }
         bool scanAndOrderRequired() const { return ordering_; }
@@ -830,9 +830,9 @@ namespace mongo {
                         oldPlan = qps.explain();
                 }
                 QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
-                DoQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
-                shared_ptr< DoQueryOp > o = qps.runOp( original );
-                DoQueryOp &dqo = *o;
+                UserQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
+                shared_ptr< UserQueryOp > o = qps.runOp( original );
+                UserQueryOp &dqo = *o;
                 massert( dqo.exceptionMessage(), dqo.complete() );
                 n = dqo.n();
                 nscanned = dqo.nscanned();
