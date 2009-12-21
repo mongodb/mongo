@@ -614,13 +614,12 @@ namespace mongo {
                 }
 
                 if ( logop ) {
-                    if ( mods.size() ) {
-                        if ( mods.haveArrayDepMod() ) {
-                            BSONObjBuilder patternBuilder;
-                            patternBuilder.appendElements( pattern );
-                            mods.appendSizeSpecForArrayDepMods( patternBuilder );
-                            pattern = patternBuilder.obj();                        
-                        }
+                    assert( mods.size() );
+                    if ( mods.haveArrayDepMod() ) {
+                        BSONObjBuilder patternBuilder;
+                        patternBuilder.appendElements( pattern );
+                        mods.appendSizeSpecForArrayDepMods( patternBuilder );
+                        pattern = patternBuilder.obj();                        
                     }
                     logOp("u", ns, updateobj, &pattern );
                 }
