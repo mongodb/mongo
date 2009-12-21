@@ -944,6 +944,19 @@
 			passBuildSettingsInEnvironment = 1;
 			productName = "scons db";
 		};
+		934BEB2E10DFED2700178102 /* scons debug test v8 */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "-j2 --d --usev8 test";
+			buildConfigurationList = 934BEB2F10DFED2700178102 /* Build configuration list for PBXLegacyTarget "scons debug test v8" */;
+			buildPhases = (
+			);
+			buildToolPath = /opt/local/bin/scons;
+			dependencies = (
+			);
+			name = "scons debug test v8";
+			passBuildSettingsInEnvironment = 1;
+			productName = "scons test";
+		};
 		93A47B070FAF46EB00E760DD /* scons debug all */ = {
 			isa = PBXLegacyTarget;
 			buildArgumentsString = "-j2 --d .";
@@ -1016,6 +1029,7 @@
 				9302D7520F2E6E4600DFA4EF /* scons test 64 */,
 				93A8D0700F36AE0200C92B85 /* scons debug test */,
 				93A47B070FAF46EB00E760DD /* scons debug all */,
+				934BEB2E10DFED2700178102 /* scons debug test v8 */,
 			);
 		};
 /* End PBXProject section */
@@ -1125,6 +1139,27 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				PRODUCT_NAME = "scons db";
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
+		934BEB3010DFED2700178102 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = "scons debug test";
+			};
+			name = Debug;
+		};
+		934BEB3110DFED2700178102 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = "scons test";
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -1257,6 +1292,15 @@
 			buildConfigurations = (
 				932F1DCD0F213B06008FA2E7 /* Debug */,
 				932F1DCE0F213B06008FA2E7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		934BEB2F10DFED2700178102 /* Build configuration list for PBXLegacyTarget "scons debug test v8" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				934BEB3010DFED2700178102 /* Debug */,
+				934BEB3110DFED2700178102 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
