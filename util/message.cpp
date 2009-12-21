@@ -50,20 +50,18 @@ namespace mongo {
             me = SockAddr( ip.c_str(), port );
         sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: listen(): invalid socket? " << errno << endl;
+            log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
         prebindOptions( sock );
         if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
-            log() << "listen(): bind() failed errno:" << errno << endl;
-            if ( errno == 98 )
-                log() << "98 == addr already in use" << endl;
+            log() << "listen(): bind() failed " << OUTPUT_ERRNO << endl;
             closesocket(sock);
             return false;
         }
 
         if ( ::listen(sock, 128) != 0 ) {
-            log() << "listen(): listen() failed " << errno << endl;
+            log() << "listen(): listen() failed " << OUTPUT_ERRNO << endl;
             closesocket(sock);
             return false;
         }
@@ -81,7 +79,7 @@ namespace mongo {
                     log() << "Listener on port " << port << " aborted" << endl;
                     return;
                 }
-                log() << "Listener: accept() returns " << s << " errno:" << errno << ", strerror: " << strerror( errno ) << endl;
+                log() << "Listener: accept() returns " << s << OUTPUT_ERRNO << endl;
                 continue;
             }
             disableNagle(s);
@@ -205,7 +203,7 @@ namespace mongo {
 
         sock = socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: connect(): invalid socket? " << errno << endl;
+            log() << "ERROR: connect(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
 
@@ -218,7 +216,6 @@ namespace mongo {
         int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
         if ( res ) {
             if ( errno == EINPROGRESS )
-                //log() << "connect(): failed errno:" << errno << ' ' << farEnd.getPort() << endl;
                 closesocket(sock);
             sock = -1;
             return false;
@@ -273,7 +270,7 @@ again:
                 return false;
             }
             if ( x < 0 ) {
-                log() << "MessagingPort recv() error \"" << strerror( errno ) << "\" (" << errno << ") " << farEnd.toString()<<endl;
+                log() << "MessagingPort recv() " << OUTPUT_ERRNO << " " << farEnd.toString()<<endl;
                 m.reset();
                 return false;
             }
@@ -291,7 +288,7 @@ again:
                 unsigned foo = 0x10203040;
                 int x = ::send(sock, (char *) &foo, 4,  portSendFlags );
                 if ( x <= 0 ) {
-                    log() << "MessagingPort endian send() error " << errno << ' ' << farEnd.toString() << endl;
+                    log() << "MessagingPort endian send() " << OUTPUT_ERRNO << ' ' << farEnd.toString() << endl;
                     return false;
                 }
                 goto again;
@@ -320,7 +317,7 @@ again:
                 return false;
             }
             if ( x < 0 ) {
-                log() << "MessagingPort recv() error " << errno << ' ' << farEnd.toString() << endl;
+                log() << "MessagingPort recv() " << OUTPUT_ERRNO << ' ' << farEnd.toString() << endl;
                 m.reset();
                 return false;
             }
@@ -390,7 +387,7 @@ again:
             x = ::send(sock, (char*)toSend.data, toSend.data->len , portSendFlags );
         
         if ( x <= 0 ) {
-            log() << "MessagingPort say send() error " << errno << ' ' << farEnd.toString() << endl;
+            log() << "MessagingPort say send() " << OUTPUT_ERRNO << ' ' << farEnd.toString() << endl;
             throw SocketException();
         }
 

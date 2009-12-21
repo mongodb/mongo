@@ -35,20 +35,20 @@ namespace mongo {
             me = SockAddr( ip.c_str(), port );
         sock = ::socket(AF_INET, SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: MiniWebServer listen(): invalid socket? " << errno << endl;
+            log() << "ERROR: MiniWebServer listen(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
         prebindOptions( sock );
         if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
-            log() << "MiniWebServer: bind() failed port:" << port << " errno:" << errno << endl;
-            if ( errno == 98 )
-                log() << "98 == addr already in use" << endl;
+            log() << "MiniWebServer: bind() failed port:" << port << " " << OUTPUT_ERRNO << endl;
+            if ( errno == EADDRINUSE )
+                log() << "  addr already in use" << endl;
             closesocket(sock);
             return false;
         }
 
         if ( ::listen(sock, 16) != 0 ) {
-            log() << "MiniWebServer: listen() failed " << errno << endl;
+            log() << "MiniWebServer: listen() failed " << OUTPUT_ERRNO << endl;
             closesocket(sock);
             return false;
         }
@@ -198,7 +198,7 @@ namespace mongo {
                     log() << "Listener on port " << port << " aborted." << endl;
                     return;
                 }
-                log() << "MiniWebServer: accept() returns " << s << " errno:" << errno << endl;
+                log() << "MiniWebServer: accept() returns " << s << " " << OUTPUT_ERRNO << endl;
                 sleepmillis(200);
                 continue;
             }

@@ -56,7 +56,7 @@ namespace mongo {
         
         fd = open(filename, O_RDWR | O_NOATIME);
         if ( fd <= 0 ) {
-            out() << "couldn't open " << filename << ' ' << errno << endl;
+            out() << "couldn't open " << filename << ' ' << OUTPUT_ERRNO << endl;
             return 0;
         }
 
@@ -70,7 +70,7 @@ namespace mongo {
         
         view = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( view == MAP_FAILED ) {
-            out() << "  mmap() failed for " << filename << " len:" << length << " errno:" << errno << endl;
+            out() << "  mmap() failed for " << filename << " len:" << length << " " << OUTPUT_ERRNO << endl;
             if ( errno == ENOMEM ){
                 out() << "     mmap failed with out of memory, if you're using 32-bits, then you probably need to upgrade to 64" << endl;
             }
@@ -83,7 +83,7 @@ namespace mongo {
         if ( view == 0 || fd == 0 )
             return;
         if ( msync(view, len, sync ? MS_SYNC : MS_ASYNC) )
-            problem() << "msync error " << errno << endl;
+            problem() << "msync " << OUTPUT_ERRNO << endl;
     }
     
 

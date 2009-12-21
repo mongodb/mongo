@@ -86,7 +86,7 @@ namespace mongo {
 
         view = MapViewOfFile(maphandle, FILE_MAP_ALL_ACCESS, 0, 0, 0);
         if ( view == 0 ) {
-            out() << "MapViewOfFile failed " << filename << " errno:";
+            out() << "MapViewOfFile failed " << filename << " " << OUTPUT_ERRNO << " ";
             out() << GetLastError();
             out() << endl;
         }

@@ -63,10 +63,7 @@ namespace mongo {
     }
     const int INVALID_SOCKET = -1;
     typedef int SOCKET;
-//#define h_errno errno
-    inline int getLastError() {
-        return errno;
-    }
+
     inline void disableNagle(int sock) {
         int x = 1;
 
@@ -97,7 +94,7 @@ namespace mongo {
         tv.tv_usec = 1000;
         int rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv));
         if ( rc ) {
-            out() << "ERROR: setsockopt RCVTIMEO failed rc:" << rc << " errno:" << getLastError() << " secs:" << secs << " sock:" << sock << endl;
+            out() << "ERROR: setsockopt RCVTIMEO failed rc:" << rc << " " << OUTPUT_ERRNO << " secs:" << secs << " sock:" << sock << endl;
         }
     }
 
@@ -194,7 +191,7 @@ namespace mongo {
     inline bool UDPConnection::init(const SockAddr& myAddr) {
         sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if ( sock == INVALID_SOCKET ) {
-            out() << "invalid socket? " << errno << endl;
+            out() << "invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
         //out() << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
@@ -236,7 +233,7 @@ namespace mongo {
         char buf[256];
         int ec = gethostname(buf, 127);
         if ( ec || *buf == 0 ) {
-            log() << "can't get this server's hostname errno:" << ec << endl;
+            log() << "can't get this server's hostname " << OUTPUT_ERRNO << endl;
             return "";
         }
         return buf;

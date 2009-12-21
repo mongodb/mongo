@@ -118,7 +118,7 @@ class File : public FileInterface {
     void err(bool ok) {
         if( !ok && !_bad ) { 
             _bad = true;
-            log() << "File I/O error " << errno << '\n';
+            log() << "File I/O " << OUTPUT_ERRNO << '\n';
         }
     }
 public:
@@ -139,7 +139,7 @@ public:
     void open(const char *filename) {
         fd = ::open(filename, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
         if ( fd <= 0 ) {
-            out() << "couldn't open " << filename << ' ' << errno << endl;
+            out() << "couldn't open " << filename << ' ' << OUTPUT_ERRNO << endl;
             return;
         }
         _bad = false;

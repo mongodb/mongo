@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <string.h>
+
 namespace mongo {
 
     using boost::shared_ptr;
@@ -238,5 +240,8 @@ namespace mongo {
      */
     void initLogging( const string& logpath , bool append );
     void rotateLogs( int signal = 0 );
+
+#define OUTPUT_ERRNOX(x) "errno:" << x << " " << strerror(x) 
+#define OUTPUT_ERRNO OUTPUT_ERRNOX(errno)
 
 } // namespace mongo

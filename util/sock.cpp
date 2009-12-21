@@ -50,7 +50,7 @@ namespace mongo {
         if ( c.init(me) ) {
             char buf[256];
             out() << "sendto: ";
-            out() << c.sendto(buf, sizeof(buf), dest) << " errno:" << h_errno << endl;
+            out() << c.sendto(buf, sizeof(buf), dest) << " " << OUTPUT_ERRNO << endl;
         }
         out() << "end\n";
     }
@@ -63,7 +63,7 @@ namespace mongo {
         if ( c.init(me) ) {
             char buf[256];
             out() << "recvfrom: ";
-            out() << c.recvfrom(buf, sizeof(buf), sender) << " errno:" << h_errno << endl;
+            out() << c.recvfrom(buf, sizeof(buf), sender) << " " << OUTPUT_ERRNO << endl;
         }
         out() << "end listentest\n";
     }
@@ -74,8 +74,8 @@ namespace mongo {
 #if defined(_WIN32)
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                out() << "ERROR: wsastartup failed " << errno << endl;
-                problem() << "ERROR: wsastartup failed " << errno << endl;
+                out() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
+                problem() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
                 dbexit( EXIT_NTSERVICE_ERROR );
             }
 #endif
