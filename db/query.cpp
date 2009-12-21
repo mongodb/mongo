@@ -687,10 +687,7 @@ namespace mongo {
             wantMore = false;
         }
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
-        {
-            string s = jsobj.toString();
-            strncpy(cc().curop()->query, s.c_str(), sizeof(cc().curop()->query)-2);
-        }
+        cc().curop()->setQuery(jsobj);
         
         BufBuilder bb;
         BSONObjBuilder cmdResBuf;
