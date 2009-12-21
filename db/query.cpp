@@ -670,9 +670,7 @@ namespace mongo {
         ClientCursor * findingStartCursor_;
     };
     
-    auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss ) {
-        DbMessage d( m );
-        QueryMessage q( d );
+    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, stringstream& ss ) {
         const char *ns = q.ns;
         int ntoskip = q.ntoskip;
         int _ntoreturn = q.ntoreturn;
@@ -682,7 +680,8 @@ namespace mongo {
         BSONObj snapshotHint;
         
         Timer t;
-        log(2) << "runQuery: " << ns << jsobj << endl;
+        if( logLevel >= 2 )
+            log() << "runQuery: " << ns << jsobj << endl;
         
         long long nscanned = 0;
         bool wantMore = true;

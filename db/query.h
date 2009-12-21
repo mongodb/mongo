@@ -108,7 +108,7 @@ namespace mongo {
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     
-    auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
+    //auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
     
 } // namespace mongo
 
