@@ -272,13 +272,13 @@ namespace mongo {
         
         TryCatch try_catch;        
         int nargs = argsObject.nFields();
-        auto_ptr< Handle<Value> > args;
+        scoped_array< Handle<Value> > args;
         if ( nargs ){
             args.reset( new Handle<Value>[nargs] );
             BSONObjIterator it( argsObject );
             for ( int i=0; i<nargs; i++ ){
                 BSONElement next = it.next();
-                args.get()[i] = mongoToV8Element( next );
+                args[i] = mongoToV8Element( next );
             }
         }
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( _this , nargs , args.get() );
