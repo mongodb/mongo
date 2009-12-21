@@ -197,6 +197,7 @@ AddOption( "--boost-version",
 
 # 
 # to use CPUPROFILE=/tmp/profile
+# to view pprof -gv mongod /tmp/profile
 #
 AddOption( "--pg",
            dest="profile",
