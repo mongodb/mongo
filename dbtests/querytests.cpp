@@ -846,7 +846,7 @@ namespace QueryTests {
             BSONObj res;            
             for ( int i=0; i<1000; i++ ){
                 bool found = Helpers::findById( ns() , BSON( "_id" << i ) , res );
-                ASSERT_EQUALS( i % 2 , found );
+                ASSERT_EQUALS( i % 2 , int(found) );
             }
 
         }
