@@ -205,6 +205,7 @@ namespace mongo {
     BSONObjExternalSorter::FileIterator::FileIterator( string file ){
         long length;
         _buf = (char*)_file.map( file.c_str() , length );
+        massert( "mmap failed" , _buf );
         assert( (unsigned long)length == file_size( file ) );
         _end = _buf + length;
     }
