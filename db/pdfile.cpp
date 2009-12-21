@@ -144,7 +144,7 @@ namespace mongo {
             }
             if ( !newCapped ) {
                 // check if it's time to preallocate a new file, and if so queue that job for a bg thread
-                // ok to call this multiple times
+                // safe to call this multiple times - the implementation will only preallocate one file
                 database->preallocateAFile();
             }
         }

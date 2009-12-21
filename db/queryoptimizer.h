@@ -72,6 +72,8 @@ namespace mongo {
     };
 
     // Inherit from this interface to implement a new query operation.
+    // The query optimizer will clone the QueryOp that is provided, giving
+    // each clone its own query plan.
     class QueryOp {
     public:
         QueryOp() : complete_(), qp_(), error_() {}
