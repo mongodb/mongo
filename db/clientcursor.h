@@ -62,7 +62,7 @@ namespace mongo {
     public:
         /*const*/ CursorId cursorid;
         string ns;
-        auto_ptr<KeyValJSMatcher> matcher;
+        auto_ptr<CoveredIndexMatcher> matcher;
         auto_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
@@ -88,6 +88,9 @@ namespace mongo {
 
         /**
          * do a dbtemprelease 
+         * note: caller should check matcher.docMatcher().atomic() first and not yield if atomic - 
+         *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
+         *       (ie not set for remote/update)
          * @return if the cursor is still valid. 
          *         if false is returned, then this ClientCursor should be considered deleted
          */

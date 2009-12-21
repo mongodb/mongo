@@ -485,7 +485,7 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new KeyValJSMatcher( pattern, qp().indexKey() ) );
+                matcher_.reset( new CoveredIndexMatcher( pattern, qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -511,7 +511,7 @@ namespace mongo {
     private:
         shared_ptr< Cursor > c_;
         long long nscanned_;
-        auto_ptr< KeyValJSMatcher > matcher_;
+        auto_ptr< CoveredIndexMatcher > matcher_;
     };
 
     

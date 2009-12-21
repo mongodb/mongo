@@ -59,7 +59,7 @@ namespace mongo {
         }
         virtual void init() {
             c_ = qp().newCursor();
-            matcher_.reset( new KeyValJSMatcher( qp().query(), qp().indexKey() ) );
+            matcher_.reset( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -97,7 +97,7 @@ namespace mongo {
         int &bestCount_;
         long long nScanned_;
         auto_ptr< Cursor > c_;
-        auto_ptr< KeyValJSMatcher > matcher_;
+        auto_ptr< CoveredIndexMatcher > matcher_;
     };
     
     /* ns:      namespace, e.g. <database>.<collection>
@@ -137,7 +137,7 @@ namespace mongo {
         if( !creal->ok() )
             return nDeleted;
 
-        KeyValJSMatcher matcher(pattern, creal->indexKeyPattern());
+        CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
         auto_ptr<ClientCursor> cc;
         cc.reset( new ClientCursor() );
@@ -150,7 +150,7 @@ namespace mongo {
         
         unsigned long long nScanned = 0;
         do {
-            if ( ++nScanned % 128 == 0 ){
+            if ( ++nScanned % 128 == 0 && !matcher.docMatcher().atomic() ) {
                 if ( ! cc->yield() ){
                     cc.release(); // has already been deleted elsewhere
                     break;
@@ -365,7 +365,7 @@ namespace mongo {
         virtual void init() {
             query_ = spec_.getObjectField( "query" );
             c_ = qp().newCursor();
-            matcher_.reset( new KeyValJSMatcher( query_, c_->indexKeyPattern() ) );
+            matcher_.reset( new CoveredIndexMatcher( query_, c_->indexKeyPattern() ) );
             if ( qp().exactKeyMatch() && ! matcher_->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
@@ -434,7 +434,7 @@ namespace mongo {
         auto_ptr< Cursor > c_;
         BSONObj query_;
         BtreeCursor *bc_;
-        auto_ptr< KeyValJSMatcher > matcher_;
+        auto_ptr< CoveredIndexMatcher > matcher_;
         BSONObj firstMatch_;
     };
     
@@ -521,7 +521,7 @@ namespace mongo {
                 c_ = qp().newCursor();
             }
             
-            matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
+            matcher_.reset(new CoveredIndexMatcher(qp().query(), qp().indexKey()));
             
             if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;
@@ -644,7 +644,7 @@ namespace mongo {
         BufBuilder &builder() { return b_; }
         bool scanAndOrderRequired() const { return ordering_; }
         auto_ptr< Cursor > cursor() { return c_; }
-        auto_ptr< KeyValJSMatcher > matcher() { return matcher_; }
+        auto_ptr< CoveredIndexMatcher > matcher() { return matcher_; }
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
@@ -661,7 +661,7 @@ namespace mongo {
         auto_ptr< Cursor > c_;
         long long nscanned_;
         int queryOptions_;
-        auto_ptr< KeyValJSMatcher > matcher_;
+        auto_ptr< CoveredIndexMatcher > matcher_;
         int n_;
         int soSize_;
         bool saveClientCursor_;

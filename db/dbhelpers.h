@@ -30,7 +30,7 @@
 namespace mongo {
 
     class Cursor;
-    class KeyValJSMatcher;
+    class CoveredIndexMatcher;
 
     class CursorIterator {
     public:
@@ -42,7 +42,7 @@ namespace mongo {
         void _advance();
 
         auto_ptr<Cursor> _cursor;
-        auto_ptr<KeyValJSMatcher> _matcher;
+        auto_ptr<CoveredIndexMatcher> _matcher;
         BSONObj _o;
     };
 

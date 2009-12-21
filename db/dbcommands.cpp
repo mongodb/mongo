@@ -1018,7 +1018,7 @@ namespace mongo {
                 ClientCursor *cc = new ClientCursor();
                 cc->c = c;
                 cc->ns = fromNs;
-                cc->matcher.reset( new KeyValJSMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
+                cc->matcher.reset( new CoveredIndexMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
                 id = cc->cursorid;
             }
 

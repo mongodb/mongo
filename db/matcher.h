@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    class KeyValJSMatcher;
+    class CoveredIndexMatcher;
     
     class RegexMatcher {
     public:
@@ -101,13 +101,12 @@ namespace mongo {
        e.g.
            db.foo.find( { a : 3 } );
 
-       { a : 3 } is the pattern object.
+       { a : 3 } is the pattern object.  See wiki documentation for full info.
 
        GT/LT:
-       { a : { $gt : 3 } }
-
+         { a : { $gt : 3 } }
        Not equal:
-       { a : { $ne : 3 } }
+         { a : { $ne : 3 } }
 
        TODO: we should rewrite the matcher to be more an AST style.
     */
@@ -136,6 +135,9 @@ namespace mongo {
         bool matches(const BSONObj& j);
         
         bool keyMatch() const { return !all && !haveSize && !hasArray; }
+
+        bool atomic() const { return _atomic; }
+
     private:
         void addBasic(const BSONElement &e, int c) {
             // TODO May want to selectively ignore these element types based on op type.
@@ -149,32 +151,39 @@ namespace mongo {
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;
-        
         vector<BasicMatcher> basics;
 //        int n;                           // # of basicmatcher items
         bool haveSize;
         bool all;
         bool hasArray;
 
+        /* $atomic - if true, a multi document operation (some removes, updates)
+                     should be done atomically.  in that case, we do not yield - 
+                     i.e. we stay locked the whole time.
+        */
+        bool _atomic;
+
         RegexMatcher regexs[4];
         int nRegex;
 
         // so we delete the mem when we're done:
-        vector< shared_ptr< BSONObjBuilder > > builders_;
+        vector< shared_ptr< BSONObjBuilder > > _builders;
 
-        friend class KeyValJSMatcher;
+        friend class CoveredIndexMatcher;
     };
     
-    // If match succeeds on index key, then attempt to match full record.
-    class KeyValJSMatcher : boost::noncopyable {
+    // If match succeeds on index key, then attempt to match full document.
+    class CoveredIndexMatcher : boost::noncopyable {
     public:
-        KeyValJSMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matches(const BSONObj &o){ return _recordMatcher.matches( o ); }
+        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
+        bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc);
         bool needRecord(){ return _needRecord; }
+
+        JSMatcher& docMatcher() { return _docMatcher; }
     private:
         JSMatcher _keyMatcher;
-        JSMatcher _recordMatcher;
+        JSMatcher _docMatcher;
         bool _needRecord;
     };
     

@@ -4,8 +4,6 @@
 t = db.removetest2;
 
 function f() {
-    t.ensureIndex({x:1});
-
     t.save( { x:[3,3,3,3,3,3,3,3,4,5,6], z:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
     t.save( { x: 9 } );
     t.save( { x: 1 } );
@@ -16,13 +14,13 @@ function f() {
     assert( t.validate().valid );
 }
 
-function g() {
-    t.ensureIndex({x:1});
+x = 0;
 
-    //  t.save( { x:[3,4,5,6], z:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
+function g() {
+    t.save( { x:[3,4,5,6], z:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
     t.save( { x:[7,8,9], z:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } );
 
-    t.remove( {x : {$gte:3} } );
+    t.remove( {x : {$gte:3}, $atomic:x++ } );
 
     assert( t.findOne({x:3}) == null );
     assert( t.findOne({x:8}) == null );
@@ -30,6 +28,14 @@ function g() {
 }
 
 t.drop();
-//f();
-//g();
+f();
+t.drop();
+g();
+
+t.ensureIndex({x:1});
+t.remove({});
+f();
+t.drop();
+t.ensureIndex({x:1});
+g();
 
