@@ -26,7 +26,7 @@ r = function( key , values ){
 res = t.mapReduce( m , r , { scope : { xx : 1 } } );
 z = res.convertToSingleObject()
 
-assert.eq( 3 , z.keySet().length , "A1" );
+assert.eq( 3 , Object.keySet( z ).length , "A1" );
 assert.eq( 2 , z.a.count , "A2" );
 assert.eq( 3 , z.b.count , "A3" );
 assert.eq( 3 , z.c.count , "A4" );
@@ -37,7 +37,7 @@ res.drop();
 res = t.mapReduce( m , r , { scope : { xx : 2 } } );
 z = res.convertToSingleObject()
 
-assert.eq( 3 , z.keySet().length , "A1" );
+assert.eq( 3 , Object.keySet( z ).length , "A1" );
 assert.eq( 4 , z.a.count , "A2" );
 assert.eq( 6 , z.b.count , "A3" );
 assert.eq( 6 , z.c.count , "A4" );

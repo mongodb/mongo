@@ -60,7 +60,7 @@ x.find().forEach( d );
 z = {};
 x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );
 d( z );
-assert.eq( 3 , z.keySet().length , "C" );
+assert.eq( 3 , Object.keySet( z ).length , "C" );
 assert.eq( 2 , z.a , "D" );
 assert.eq( 3 , z.b , "E" );
 assert.eq( 3 , z.c , "F" );

@@ -95,7 +95,7 @@ doMR = function( n ){
     
     var z = {};
     x.find().forEach( function(a){ z[a._id] = a.value.count; } );
-    assert.eq( 3 , z.keySet().length , "MR T2 " + n );
+    assert.eq( 3 , Object.keySet( z ).length , "MR T2 " + n );
     assert.eq( 2 , z.a , "MR T2 " + n );
     assert.eq( 3 , z.b , "MR T2 " + n );
     assert.eq( 3 , z.c , "MR T2 " + n );
