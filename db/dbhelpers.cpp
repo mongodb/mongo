@@ -30,7 +30,7 @@ namespace mongo {
     CursorIterator::CursorIterator( auto_ptr<Cursor> c , BSONObj filter )
         : _cursor( c ){
             if ( ! filter.isEmpty() )
-                _matcher.reset( new KeyValJSMatcher( filter , BSONObj() ) );
+                _matcher.reset( new CoveredIndexMatcher( filter , BSONObj() ) );
             _advance();
     }
 
@@ -100,7 +100,7 @@ namespace mongo {
             if ( !c_->ok() )
                 setComplete();
             else
-                matcher_.reset( new KeyValJSMatcher( qp().query(), qp().indexKey() ) );
+                matcher_.reset( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
             if ( !c_->ok() ) {
@@ -120,7 +120,7 @@ namespace mongo {
     private:
         bool requireIndex_;
         auto_ptr< Cursor > c_;
-        auto_ptr< KeyValJSMatcher > matcher_;
+        auto_ptr< CoveredIndexMatcher > matcher_;
         BSONObj one_;
     };
     

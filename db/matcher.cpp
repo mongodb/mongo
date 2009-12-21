@@ -88,16 +88,18 @@ namespace {
 
 namespace mongo {
     
-    KeyValJSMatcher::KeyValJSMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
-        _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), indexKeyPattern),
-        _recordMatcher(jsobj) {
+    CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
+        _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), 
+        indexKeyPattern),
+        _docMatcher(jsobj) 
+    {
         _needRecord = ! ( 
-                         _recordMatcher.keyMatch() && 
-                         _keyMatcher.jsobj.nFields() == _recordMatcher.jsobj.nFields()
+                         _docMatcher.keyMatch() && 
+                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields()
                           );
     }
     
-    bool KeyValJSMatcher::matches(const BSONObj &key, const DiskLoc &recLoc ) {
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc ) {
         if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key) ) {
                 return false;
@@ -108,14 +110,14 @@ namespace mongo {
             return true;
         }
 
-        return _recordMatcher.matches(recLoc.rec());
+        return _docMatcher.matches(recLoc.rec());
     }
     
     
     /* _jsobj          - the query pattern
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), nRegex(0){
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), _atomic(false), nRegex(0){
 
         BSONObjIterator i(jsobj);
         while ( i.moreWithEOO() ) {
@@ -126,9 +128,8 @@ namespace mongo {
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
                 uassert( "$where occurs twice?", where == 0 );
-                where = new Where();
                 uassert( "$where query, but no script engine", globalScriptEngine );
-
+                where = new Where();
                 where->scope = globalScriptEngine->getPooledScope( cc().ns() );
                 where->scope->localConnect( cc().database()->name.c_str() );
 
@@ -193,7 +194,7 @@ namespace mongo {
                         case BSONObj::LT:
                         case BSONObj::LTE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                            builders_.push_back( b );
+                            _builders.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), op);
                             isOperator = true;
@@ -201,7 +202,7 @@ namespace mongo {
                         }
                         case BSONObj::NE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                            builders_.push_back( b );
+                            _builders.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::NE);
                             break;
@@ -218,7 +219,7 @@ namespace mongo {
                             break;
                         case BSONObj::opSIZE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                            builders_.push_back( b );
+                            _builders.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::opSIZE);    
                             haveSize = true;
@@ -226,7 +227,7 @@ namespace mongo {
                         }
                         case BSONObj::opEXISTS:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                            builders_.push_back( b );
+                            _builders.push_back( b );
                             b->appendAs(fe, e.fieldName());
                             addBasic(b->done().firstElement(), BSONObj::opEXISTS);
                             break;
@@ -265,6 +266,10 @@ namespace mongo {
 
             if ( e.type() == Array ){
                 hasArray = true;
+            }
+            else if( strcmp(e.fieldName(), "$atomic") == 0 ) {
+                _atomic = e.trueValue();
+                continue;
             }
             
             // normal, simple case e.g. { a : "foo" }
