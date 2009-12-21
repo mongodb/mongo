@@ -48,10 +48,10 @@ typedef struct __wt_huffman_obj {
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
 	 * This contains the frequency table (tree) used to produce optimal
-	 * results.  This version of the encoder supports muilti-byte patterns.
+	 * results.  This version of the encoder supports 8- and 16-bit symbols.
 	 */
 	u_int32_t numSymbols;
-	u_int8_t  numBytes;
+	u_int8_t  numBytes;	/* 1 or 2 */
 				/* The tree in static array reprentation */
 	WT_STATIC_HUFFMAN_NODE *nodes;
 	u_int16_t max_depth;
