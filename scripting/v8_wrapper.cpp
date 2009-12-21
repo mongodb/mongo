@@ -223,6 +223,10 @@ namespace mongo {
                 break;
             }
 
+            case mongo::Undefined:
+                o->Set( v8::String::New( f.fieldName() ), v8::Undefined() );
+                break;
+
             case mongo::DBRef: {
                 v8::Function* dbPointer = getNamedCons( "DBPointer" );
                 v8::Handle<v8::Value> argv[2];
@@ -460,6 +464,7 @@ namespace mongo {
         }
     
         else if ( value->IsUndefined() ){
+            b.appendUndefined( sname.c_str() );
             return;
         }
     
