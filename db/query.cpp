@@ -475,7 +475,8 @@ namespace mongo {
         }
         return res->count();
     }
-        
+
+    // Implements database 'query' requests using the query optimizer's QueryOp interface
     class DoQueryOp : public QueryOp {
     public:
         DoQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
@@ -502,6 +503,14 @@ namespace mongo {
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
+            // findingStart mode is used to find the first operation of interest when
+            // we are scanning through a repl log.  For efficiency in the common case,
+            // where the first operation of interest is closer to the tail than the head,
+            // we start from the tail of the log and work backwards until we find the
+            // first operation of interest.  Then we scan forward from that first operation,
+            // actually returning results to the client.  During the findingStart phase,
+            // we release the db mutex occasionally to avoid blocking the db process for
+            // an extended period of time.
             if ( findingStart_ ) {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).

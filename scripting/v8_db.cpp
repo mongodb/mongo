@@ -67,6 +67,8 @@ namespace mongo {
         global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit ) );
 
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
+
+        global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit ) );
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -88,6 +90,8 @@ namespace mongo {
         global->Set( v8::String::New("DBRef") , FunctionTemplate::New( dbRefInit )->GetFunction() );
         
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit )->GetFunction() );
+
+        global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit )->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
@@ -464,6 +468,27 @@ namespace mongo {
         it->Set( v8::String::New( "ns" ) , args[0] );
         it->Set( v8::String::New( "id" ) , args[1] );
         it->SetHiddenValue( v8::String::New( "__DBPointer" ), v8::Number::New( 1 ) );
+        
+        return it;
+    }
+
+    v8::Handle<v8::Value> binDataInit( const v8::Arguments& args ) {
+        
+        if (args.Length() != 3) {
+            return v8::ThrowException( v8::String::New( "BinData needs 3 arguments" ) );
+        }
+        
+        v8::Handle<v8::Object> it = args.This();
+        
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ){
+            v8::Function* f = getNamedCons( "BinData" );
+            it = f->NewInstance();
+        }
+        
+        it->Set( v8::String::New( "len" ) , args[0] );
+        it->Set( v8::String::New( "type" ) , args[1] );
+        it->Set( v8::String::New( "data" ), args[2] );
+        it->SetHiddenValue( v8::String::New( "__BinData" ), v8::Number::New( 1 ) );
         
         return it;
     }

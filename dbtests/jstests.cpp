@@ -672,14 +672,14 @@ namespace JSTests {
         void run(){
             Scope * s = globalScriptEngine->createScope();
             s->localConnect( "asd" );
-            const char * foo = "asdasdasdasd";
+            const char * foo = "asdas\0asdasd";
 
             
             BSONObj in;
             {
                 BSONObjBuilder b;
                 b.append( "a" , 7 );
-                b.appendBinData( "b" , strlen( foo ) , ByteArray , foo );
+                b.appendBinData( "b" , 12 , ByteArray , foo );
                 in = b.obj();
                 s->setObject( "x" , in );
             }

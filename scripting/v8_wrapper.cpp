@@ -187,12 +187,12 @@ namespace mongo {
                 int len;
                 const char *data = f.binData( len );
             
-                b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
-                b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
-                b->Set( v8::String::New( "data" ) , v8::String::New( data, len ) );
-                b->SetInternalField( 0, v8::Uint32::New( f.type() ) );
-                
-                o->Set( v8::String::New( f.fieldName() ) , b );
+                v8::Function* binData = getNamedCons( "BinData" );
+                v8::Handle<v8::Value> argv[3];
+                argv[0] = v8::Number::New( len );
+                argv[1] = v8::Number::New( f.binDataType() );
+                argv[2] = v8::String::New( data, len );
+                o->Set( v8::String::New( f.fieldName() ), binData->NewInstance(3, argv) );
                 break;
             }
             
@@ -300,17 +300,15 @@ namespace mongo {
         }
             
         case mongo::BinData: {
-            Local<v8::Object> b = internalFieldObjects->NewInstance();
-            
             int len;
             const char *data = f.binData( len );
             
-            b->Set( v8::String::New( "subtype" ) , v8::Number::New( f.binDataType() ) );
-            b->Set( v8::String::New( "length" ) , v8::Number::New( len ) );
-            b->Set( v8::String::New( "data" ) , v8::String::New( data, len ) );
-            b->SetInternalField( 0, v8::Uint32::New( f.type() ) );
-            
-            return b;
+            v8::Function* binData = getNamedCons( "BinData" );
+            v8::Handle<v8::Value> argv[3];
+            argv[0] = v8::Number::New( len );
+            argv[1] = v8::Number::New( f.binDataType() );
+            argv[2] = v8::String::New( data, len );
+            return binData->NewInstance( 3, argv );
         };
             
         case mongo::Timestamp: {
@@ -414,17 +412,6 @@ namespace mongo {
                     case MaxKey:
                         b.appendMaxKey( sname.c_str() );
                         return;
-                    case BinData: {
-                        int len = obj->Get( v8::String::New( "length" ) )->ToInt32()->Value();
-                        v8::String::Utf8Value data( obj->Get( v8::String::New( "data" ) ) );
-                        const char *dataArray = *data;
-                        assert( data.length() == len );
-                        b.appendBinData( sname.c_str(),
-                                        len,
-                                        mongo::BinDataType( obj->Get( v8::String::New( "subtype" ) )->ToInt32()->Value() ),
-                                        dataArray );
-                        return;
-                    }
                     default:
                         assert( "invalid internal field" == 0 );
                 }
@@ -450,6 +437,16 @@ namespace mongo {
                 oid.init( toSTLString( value->ToObject()->Get( v8::String::New( "id" ) ) ) );
                 string ns = toSTLString( value->ToObject()->Get( v8::String::New( "ns" ) ) );
                 b.appendDBRef( sname.c_str(), ns.c_str(), oid );                
+            }
+            else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__BinData" ) ).IsEmpty() ) {
+                int len = obj->Get( v8::String::New( "len" ) )->ToInt32()->Value();
+                v8::String::Utf8Value data( obj->Get( v8::String::New( "data" ) ) );
+                const char *dataArray = *data;
+                assert( data.length() == len );
+                b.appendBinData( sname.c_str(),
+                                len,
+                                mongo::BinDataType( obj->Get( v8::String::New( "type" ) )->ToInt32()->Value() ),
+                                dataArray );
             } else {
                 BSONObj sub = v8ToMongo( value->ToObject() );
                 b.append( sname.c_str() , sub );

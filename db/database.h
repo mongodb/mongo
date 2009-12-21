@@ -135,7 +135,7 @@ namespace mongo {
             return ret;
         }
         
-        // ok to call multiple times
+        // safe to call this multiple times - the implementation will only preallocate one file
         void preallocateAFile() {
             int n = (int) files.size();
             getFile( n, 0, true );            
