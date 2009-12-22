@@ -364,6 +364,7 @@ namespace mongo {
         exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
         _localDBName = dbName;
+        loadStored();
     }
     
     void V8Scope::externalSetup(){

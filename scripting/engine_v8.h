@@ -91,7 +91,6 @@ namespace mongo {
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
-        string _localDBName;
     };
     
     class V8ScriptEngine : public ScriptEngine {
