@@ -14,6 +14,20 @@
 		9302D9990F30AB8C00DFA4EF /* mongo.jsall */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = mongo.jsall; sourceTree = "<group>"; };
 		9302D99E0F30AB8C00DFA4EF /* query.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = query.js; sourceTree = "<group>"; };
 		9302D9A20F30AB8C00DFA4EF /* utils.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = utils.js; sourceTree = "<group>"; };
+		9303D1AB10E1415C00294FAC /* client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = client.cpp; sourceTree = "<group>"; };
+		9303D1AC10E1415C00294FAC /* client.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = client.h; sourceTree = "<group>"; };
+		9303D1AD10E1415C00294FAC /* cmdline.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cmdline.h; sourceTree = "<group>"; };
+		9303D1AE10E1415C00294FAC /* curop.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = curop.h; sourceTree = "<group>"; };
+		9303D1AF10E1415C00294FAC /* extsort.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = extsort.cpp; sourceTree = "<group>"; };
+		9303D1B010E1415C00294FAC /* extsort.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = extsort.h; sourceTree = "<group>"; };
+		9303D1B110E1415C00294FAC /* filever.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = filever.h; sourceTree = "<group>"; };
+		9303D1B210E1415C00294FAC /* module.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = module.cpp; sourceTree = "<group>"; };
+		9303D1B310E1415C00294FAC /* module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = module.h; sourceTree = "<group>"; };
+		9303D1B510E1415C00294FAC /* mms.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = mms.cpp; sourceTree = "<group>"; };
+		9303D1B610E1415C00294FAC /* mms.o */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.objfile"; path = mms.o; sourceTree = "<group>"; };
+		9303D1B710E1415C00294FAC /* mr.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = mr.cpp; sourceTree = "<group>"; };
+		9303D1B810E1415C00294FAC /* update.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = update.cpp; sourceTree = "<group>"; };
+		9303D1B910E1415C00294FAC /* update.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = update.h; sourceTree = "<group>"; };
 		930B844D0FA10D1C00F22B4B /* optime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = optime.h; sourceTree = "<group>"; };
 		931184DC0F83C95800A6DC44 /* message_server_port.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message_server_port.cpp; sourceTree = "<group>"; };
 		931186FB0F8535FF00A6DC44 /* bridge.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bridge.cpp; sourceTree = "<group>"; };
@@ -521,6 +535,15 @@
 			path = shell;
 			sourceTree = "<group>";
 		};
+		9303D1B410E1415C00294FAC /* modules */ = {
+			isa = PBXGroup;
+			children = (
+				9303D1B510E1415C00294FAC /* mms.cpp */,
+				9303D1B610E1415C00294FAC /* mms.o */,
+			);
+			path = modules;
+			sourceTree = "<group>";
+		};
 		933A4D120F55A68600145C4B /* examples */ = {
 			isa = PBXGroup;
 			children = (
@@ -588,6 +611,19 @@
 		9342238F0EF16DB400608550 /* db */ = {
 			isa = PBXGroup;
 			children = (
+				9303D1AB10E1415C00294FAC /* client.cpp */,
+				9303D1AC10E1415C00294FAC /* client.h */,
+				9303D1AD10E1415C00294FAC /* cmdline.h */,
+				9303D1AE10E1415C00294FAC /* curop.h */,
+				9303D1AF10E1415C00294FAC /* extsort.cpp */,
+				9303D1B010E1415C00294FAC /* extsort.h */,
+				9303D1B110E1415C00294FAC /* filever.h */,
+				9303D1B210E1415C00294FAC /* module.cpp */,
+				9303D1B310E1415C00294FAC /* module.h */,
+				9303D1B410E1415C00294FAC /* modules */,
+				9303D1B710E1415C00294FAC /* mr.cpp */,
+				9303D1B810E1415C00294FAC /* update.cpp */,
+				9303D1B910E1415C00294FAC /* update.h */,
 				931A027A0F58AA4400147C0E /* jsobjmanipulator.h */,
 				938A7A430F54873600FB7A07 /* concurrency.h */,
 				938A7A440F54873600FB7A07 /* queryutil.cpp */,
