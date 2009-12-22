@@ -98,8 +98,11 @@ class Import : public Tool {
                 data = string( line , end - line );
             }
             
-            if ( _headerLine )
+            if ( _headerLine ){
+                while ( isspace( data[0] ) )
+                    data = data.substr( 1 );
                 _fields.push_back( data );
+            }
             else
                 _append( b , name , data );
             
