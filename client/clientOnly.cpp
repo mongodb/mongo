@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "../client/dbclient.h"
 #include "../db/dbinfo.h"
 #include "../db/dbhelpers.h"
@@ -49,10 +49,10 @@ namespace mongo {
     bool haveLocalShardingInfo( const string& ns ){
         return false;
     }
-
+/*
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
         uassert( "Helpers::find can't be used in client" , 0 );
-        auto_ptr<CursorIterator> i;
-        return i;
+        return auto_ptr<CursorIterator>(0);
     }
+*/
 }

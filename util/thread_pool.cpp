@@ -16,16 +16,17 @@
  *    limitations under the License.
  */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "thread_pool.h"
-#include "util/mvar.h"
+#include "mvar.h"
 
 
 namespace mongo{
 namespace threadpool{
 
 // Worker thread
-struct Worker : boost::noncopyable{
+class Worker : boost::noncopyable {
+public:
     explicit Worker(ThreadPool& owner)
         : _owner(owner)
         , _is_done(true)
