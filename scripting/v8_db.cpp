@@ -70,7 +70,7 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit ) );
-        
+
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -102,6 +102,8 @@ namespace mongo {
         BSONObjIterator i( o );
         global->Set( v8::String::New("MaxKey"), mongoToV8Element( i.next() ) );
         global->Set( v8::String::New("MinKey"), mongoToV8Element( i.next() ) );
+        
+        global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , FunctionTemplate::New( bsonsize )->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
@@ -511,4 +513,12 @@ namespace mongo {
         return it;
     }
     
+    v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
+        
+        if (args.Length() != 1 || !args[ 0 ]->IsObject()) {
+            return v8::ThrowException( v8::String::New( "bonsisze needs 1 object" ) );
+        }
+
+        return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
+    }
 }
