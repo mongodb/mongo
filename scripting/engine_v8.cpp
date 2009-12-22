@@ -212,6 +212,7 @@ namespace mongo {
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
         
+        for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
             if ( code.find( "\n" ) == string::npos && 
