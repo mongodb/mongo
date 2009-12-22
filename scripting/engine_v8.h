@@ -67,7 +67,7 @@ namespace mongo {
             _global->Set( v8::String::New( field ), f->GetFunction() );
         }
 
-        void gc(){} // no-op in v8
+        void gc();
 
     private:
         void _startCall();

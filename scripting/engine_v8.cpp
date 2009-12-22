@@ -346,6 +346,10 @@ namespace mongo {
         
         return true;
     }
+    
+    void V8Scope::gc() {
+        while( V8::IdleNotification() );
+    }
 
     // ----- db access -----
 
