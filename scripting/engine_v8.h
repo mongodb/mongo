@@ -104,6 +104,12 @@ namespace mongo {
 
         bool utf8Ok() const { return true; }
 
+        class V8Unlocker : public Unlocker {
+            v8::Unlocker u_;
+        };
+        
+        virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8Unlocker ); }
+        
     private:
         //HandleScope _handleScope;
         //Handle<ObjectTemplate> _globalTemplate;

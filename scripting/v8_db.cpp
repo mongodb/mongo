@@ -206,7 +206,10 @@ namespace mongo {
             auto_ptr<mongo::DBClientCursor> cursor;
             int nToReturn = (int)(args[3]->ToNumber()->Value());
             int nToSkip = (int)(args[4]->ToNumber()->Value());
-            cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+            {
+                v8::Unlocker u;
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+            }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
             Local<v8::Object> c = cons->NewInstance();
@@ -238,6 +241,7 @@ namespace mongo {
 
         DDD( "want to save : " << o.jsonString() );
         try {
+            v8::Unlocker u;
             conn->insert( ns , o );
         }
         catch ( ... ){
@@ -259,6 +263,7 @@ namespace mongo {
     
         DDD( "want to remove : " << o.jsonString() );
         try {
+            v8::Unlocker u;
             conn->remove( ns , o );
         }
         catch ( ... ){
@@ -283,6 +288,7 @@ namespace mongo {
         bool multi = args.Length() > 4 && args[4]->IsBoolean() && args[4]->ToBoolean()->Value();        
         
         try {
+            v8::Unlocker u;
             conn->update( ns , v8ToMongo( q ) , v8ToMongo( o ) , upsert, multi );
         }
         catch ( ... ){
@@ -311,7 +317,11 @@ namespace mongo {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return v8::Undefined();
-        BSONObj o = cursor->next();
+        BSONObj o;
+        {
+            v8::Unlocker u;
+            o = cursor->next();
+        }
         return mongoToV8( o );
     }
 
@@ -319,7 +329,12 @@ namespace mongo {
         mongo::DBClientCursor * cursor = getCursor( args );
         if ( ! cursor )
             return Boolean::New( false );
-        return Boolean::New( cursor->more() );
+        bool ret;
+        {
+            v8::Unlocker u;
+            ret = cursor->more();
+        }
+        return Boolean::New( ret );
     }
 
 

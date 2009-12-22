@@ -61,7 +61,10 @@ namespace mongo {
             assert( args.nFields() == 1 );
             assert( args.firstElement().isNumber() );
             int ms = int( args.firstElement().number() );
-            sleepms( ms );
+            {
+                auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
+                sleepms( ms );
+            }
             return undefined_;
         }
 

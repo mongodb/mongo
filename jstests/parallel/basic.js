@@ -6,3 +6,4 @@ t = db.jstests_parallel_basic;
 expTimeout = function( mean ) {
     return -Math.log( Math.random() ) * mean;
 }
+

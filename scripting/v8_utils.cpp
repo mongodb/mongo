@@ -143,7 +143,6 @@ namespace mongo {
     }
     
     v8::Handle< v8::Context > baseContext_;
-    v8::Locker *locker_;
     
     class JSThreadConfig {
     public:
@@ -250,7 +249,6 @@ namespace mongo {
     }
 
     void installFork( Handle<v8::Object>& global, Handle<v8::Context> &context ) {
-        locker_ = new v8::Locker;
         baseContext_ = context; // only expect to use  this in shell
         global->Set( v8::String::New( "_threadInject" ), FunctionTemplate::New( ThreadInject )->GetFunction() );
     }
