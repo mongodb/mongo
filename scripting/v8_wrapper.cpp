@@ -149,6 +149,7 @@ namespace mongo {
             
             case mongo::NumberDouble:
             case mongo::NumberInt:
+            case mongo::NumberLong: // may lose information here - just copying sm engine behavior
                 o->Set( v8::String::New( f.fieldName() ) , v8::Number::New( f.number() ) );
                 break;
             
