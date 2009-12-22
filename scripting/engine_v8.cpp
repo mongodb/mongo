@@ -212,6 +212,7 @@ namespace mongo {
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
         
+        for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
             if ( code.find( "\n" ) == string::npos && 
@@ -364,6 +365,7 @@ namespace mongo {
         exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
         _localDBName = dbName;
+        loadStored();
     }
     
     void V8Scope::externalSetup(){

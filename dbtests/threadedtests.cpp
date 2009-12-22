@@ -19,6 +19,7 @@
 
 #include "stdafx.h"
 #include "../util/mvar.h"
+#include "../util/thread_pool.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
@@ -94,6 +95,32 @@ namespace ThreadedTests {
         }
     };
 
+    class ThreadPoolTest{
+        static const int iterations = 10000;
+        static const int nThreads = 8;
+
+        WrappingInt counter;
+        void increment(int n){
+            for (int i=0; i<n; i++){
+                counter.atomicIncrement();
+            }
+        }
+
+        public:
+        void run(){
+            ThreadPool tp(nThreads);
+
+            for (int i=0; i < iterations; i++){
+                tp.schedule(&WrappingInt::atomicIncrement, &counter);
+                tp.schedule(&ThreadPoolTest::increment, this, 2);
+            }
+            
+            tp.join();
+
+            ASSERT(counter == (unsigned)(iterations * 3));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ){
@@ -102,6 +129,7 @@ namespace ThreadedTests {
         void setupTests(){
             add< IsWrappingIntAtomic >();
             add< MVarTest >();
+            add< ThreadPoolTest >();
         }
     } myall;
 }
