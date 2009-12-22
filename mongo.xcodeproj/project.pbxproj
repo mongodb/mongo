@@ -478,6 +478,7 @@
 		93E5B88F10D7FF890044F9E4 /* v8_wrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = v8_wrapper.h; sourceTree = "<group>"; };
 		93E727090F4B5B5B004F9B5D /* shardkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shardkey.cpp; sourceTree = "<group>"; };
 		93E7270A0F4B5B5B004F9B5D /* shardkey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shardkey.h; sourceTree = "<group>"; };
+		93F0957010E165E50053380C /* basic.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -700,6 +701,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93F0956F10E165E50053380C /* parallel */,
 				934BEB9B10DFFA9600178102 /* _lodeRunner.js */,
 				934BEB9C10DFFA9600178102 /* _runner.js */,
 				934BEB9D10DFFA9600178102 /* _runner_leak.js */,
@@ -1127,6 +1129,14 @@
 				93A479FA0FAF2A5000E760DD /* engine_spidermonkey.cpp */,
 			);
 			path = scripting;
+			sourceTree = "<group>";
+		};
+		93F0956F10E165E50053380C /* parallel */ = {
+			isa = PBXGroup;
+			children = (
+				93F0957010E165E50053380C /* basic.js */,
+			);
+			path = parallel;
 			sourceTree = "<group>";
 		};
 		C6859E8C029090F304C91782 /* Documentation */ = {
