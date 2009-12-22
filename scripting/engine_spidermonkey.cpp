@@ -716,17 +716,6 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
-    JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        BSONHolder * o = GETHOLDER( cx , obj );
-        double size = 0;
-        if ( o ){
-            size = o->_obj.objsize();
-        }
-        Convertor c(cx);
-        *rval = c.toval( size );
-        return JS_TRUE;
-    }
-    
     JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         cerr << "bson_cons : shouldn't be here!" << endl;
         JS_ReportError( cx , "can't construct bson object" );
@@ -734,7 +723,6 @@ namespace mongo {
     }
 
     JSFunctionSpec bson_functions[] = {
-        { "bsonsize" , bson_get_size , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } , 
         { 0 }
     };
     
@@ -842,12 +830,35 @@ namespace mongo {
         { "nativeHelper" , &native_helper , 1 , 0 , 0 } ,
         { "load" , &native_load , 1 , 0 , 0 } ,
         { "gc" , &native_gc , 1 , 0 , 0 } ,
-
         { 0 , 0 , 0 , 0 , 0 }
     };
 
     // ----END global helpers ----
 
+    // Object helpers
+    
+    JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
+        if ( argc != 1 || !JSVAL_IS_OBJECT( argv[ 0 ] ) ) {
+            JS_ReportError( cx , "bsonsize requires one valid object" );
+            return JS_FALSE;
+        }
+        
+        BSONHolder * o = GETHOLDER( cx , JSVAL_TO_OBJECT( argv[ 0 ] ) );
+        double size = 0;
+        if ( o ){
+            size = o->_obj.objsize();
+        }
+        Convertor c(cx);
+        *rval = c.toval( size );
+        return JS_TRUE;
+    }
+    
+    JSFunctionSpec objectHelpers[] = {
+    { "bsonsize" , &bson_get_size , 1 , 0 , 0 } ,
+    { 0 , 0 , 0 , 0 , 0 }
+    };
+    
+    // end Object helpers
 
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ){
         assert( JS_EnterLocalRootScope( cx ) );
@@ -978,6 +989,8 @@ namespace mongo {
             JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
 
             JS_DefineFunctions( _context , _global , globalHelpers );
+            
+            JS_DefineFunctions( _context , _convertor->getGlobalObject( "Object" ), objectHelpers );
 
             //JS_SetGCCallback( _context , no_gc ); // this is useful for seeing if something is a gc problem
 
