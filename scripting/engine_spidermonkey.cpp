@@ -1269,12 +1269,11 @@ namespace mongo {
             assert( JS_EnterLocalRootScope( _context ) );
                 
             int nargs = args.nFields();
-            auto_ptr<jsval> smargsPtr( new jsval[nargs] );
-            jsval* smargs = smargsPtr.get();
+            scoped_array<jsval> smargsPtr( new jsval[nargs] );
             if ( nargs ){
                 BSONObjIterator it( args );
                 for ( int i=0; i<nargs; i++ ){
-                    smargs[i] = _convertor->toval( it.next() );
+                    smargsPtr[i] = _convertor->toval( it.next() );
                 }
             }
 
@@ -1289,7 +1288,7 @@ namespace mongo {
 
             installCheckTimeout( timeoutMs );
             jsval rval;
-            JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargs , &rval );
+            JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargsPtr.get() , &rval );
             uninstallCheckTimeout( timeoutMs );
 
             if ( !ret ) {
