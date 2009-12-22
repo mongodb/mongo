@@ -349,6 +349,27 @@
 		934BEC9A10DFFA9700178102 /* updatea.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = updatea.js; sourceTree = "<group>"; };
 		934BEC9B10DFFA9700178102 /* where1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = where1.js; sourceTree = "<group>"; };
 		934BEC9C10DFFA9700178102 /* where2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = where2.js; sourceTree = "<group>"; };
+		934BEE8C10E050A500178102 /* allocator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = allocator.h; sourceTree = "<group>"; };
+		934BEE8D10E050A500178102 /* assert_util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = assert_util.cpp; sourceTree = "<group>"; };
+		934BEE8E10E050A500178102 /* assert_util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = assert_util.h; sourceTree = "<group>"; };
+		934BEE8F10E050A500178102 /* base64.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = base64.cpp; sourceTree = "<group>"; };
+		934BEE9010E050A500178102 /* base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
+		934BEE9110E050A500178102 /* debug_util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = debug_util.cpp; sourceTree = "<group>"; };
+		934BEE9210E050A500178102 /* debug_util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = debug_util.h; sourceTree = "<group>"; };
+		934BEE9310E050A500178102 /* embedded_builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = embedded_builder.h; sourceTree = "<group>"; };
+		934BEE9410E050A500178102 /* httpclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = httpclient.cpp; sourceTree = "<group>"; };
+		934BEE9510E050A500178102 /* httpclient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = httpclient.h; sourceTree = "<group>"; };
+		934BEE9610E050A500178102 /* md5main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = md5main.cpp; sourceTree = "<group>"; };
+		934BEE9710E050A500178102 /* message_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = message_server.h; sourceTree = "<group>"; };
+		934BEE9810E050A500178102 /* message_server_asio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message_server_asio.cpp; sourceTree = "<group>"; };
+		934BEE9910E050A500178102 /* mvar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mvar.h; sourceTree = "<group>"; };
+		934BEE9A10E050A500178102 /* ntservice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ntservice.cpp; sourceTree = "<group>"; };
+		934BEE9B10E050A500178102 /* ntservice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ntservice.h; sourceTree = "<group>"; };
+		934BEE9C10E050A500178102 /* processinfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = processinfo.h; sourceTree = "<group>"; };
+		934BEE9D10E050A500178102 /* processinfo_darwin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = processinfo_darwin.cpp; sourceTree = "<group>"; };
+		934BEE9E10E050A500178102 /* processinfo_linux2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = processinfo_linux2.cpp; sourceTree = "<group>"; };
+		934BEE9F10E050A500178102 /* processinfo_none.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = processinfo_none.cpp; sourceTree = "<group>"; };
+		934BEEA010E050A500178102 /* queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = queue.h; sourceTree = "<group>"; };
 		934DD87C0EFAD23B00459CC1 /* background.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = background.cpp; sourceTree = "<group>"; };
 		934DD87D0EFAD23B00459CC1 /* background.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = background.h; sourceTree = "<group>"; };
 		934DD87F0EFAD23B00459CC1 /* builder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = builder.h; sourceTree = "<group>"; };
@@ -957,6 +978,27 @@
 		934DD87B0EFAD23B00459CC1 /* util */ = {
 			isa = PBXGroup;
 			children = (
+				934BEE8C10E050A500178102 /* allocator.h */,
+				934BEE8D10E050A500178102 /* assert_util.cpp */,
+				934BEE8E10E050A500178102 /* assert_util.h */,
+				934BEE8F10E050A500178102 /* base64.cpp */,
+				934BEE9010E050A500178102 /* base64.h */,
+				934BEE9110E050A500178102 /* debug_util.cpp */,
+				934BEE9210E050A500178102 /* debug_util.h */,
+				934BEE9310E050A500178102 /* embedded_builder.h */,
+				934BEE9410E050A500178102 /* httpclient.cpp */,
+				934BEE9510E050A500178102 /* httpclient.h */,
+				934BEE9610E050A500178102 /* md5main.cpp */,
+				934BEE9710E050A500178102 /* message_server.h */,
+				934BEE9810E050A500178102 /* message_server_asio.cpp */,
+				934BEE9910E050A500178102 /* mvar.h */,
+				934BEE9A10E050A500178102 /* ntservice.cpp */,
+				934BEE9B10E050A500178102 /* ntservice.h */,
+				934BEE9C10E050A500178102 /* processinfo.h */,
+				934BEE9D10E050A500178102 /* processinfo_darwin.cpp */,
+				934BEE9E10E050A500178102 /* processinfo_linux2.cpp */,
+				934BEE9F10E050A500178102 /* processinfo_none.cpp */,
+				934BEEA010E050A500178102 /* queue.h */,
 				930B844D0FA10D1C00F22B4B /* optime.h */,
 				93DCDBD30F9515AF005349BC /* file_allocator.h */,
 				931184DC0F83C95800A6DC44 /* message_server_port.cpp */,

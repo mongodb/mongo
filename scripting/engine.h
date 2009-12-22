@@ -103,6 +103,8 @@ namespace mongo {
             return _numScopes;
         }
         
+        static void validateObjectIdString( const string &str );
+        
     protected:
 
         virtual ScriptingFunction _createFunction( const char * code ) = 0;

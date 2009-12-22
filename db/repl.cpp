@@ -860,7 +860,7 @@ namespace mongo {
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
-            log() << "replAllDead, throwing SyncException\n";
+            log() << "replAllDead, throwing SyncException: " << replAllDead << endl;
             throw SyncException();
         }
         

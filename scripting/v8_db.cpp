@@ -18,6 +18,7 @@
 #include "v8_wrapper.h"
 #include "v8_utils.h"
 #include "v8_db.h"
+#include "engine.h"
 
 #include <iostream>
 
@@ -69,7 +70,7 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit ) );
-        
+
     }
 
     void installDBTypes( Handle<v8::Object>& global ){
@@ -101,6 +102,8 @@ namespace mongo {
         BSONObjIterator i( o );
         global->Set( v8::String::New("MaxKey"), mongoToV8Element( i.next() ) );
         global->Set( v8::String::New("MinKey"), mongoToV8Element( i.next() ) );
+        
+        global->Get( v8::String::New( "Object" ) )->ToObject()->Set( v8::String::New("bsonsize") , FunctionTemplate::New( bsonsize )->GetFunction() );
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
@@ -132,6 +135,7 @@ namespace mongo {
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( v8::String::New( "host" ) , v8::String::New( host ) );
     
         return v8::Undefined();
     }
@@ -149,6 +153,7 @@ namespace mongo {
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( v8::String::New( "host" ) , v8::String::New( "EMBEDDED" ) );
         
         return v8::Undefined();
     }
@@ -434,6 +439,12 @@ namespace mongo {
         }
         else {
             string s = toSTLString( args[0] );
+            try {
+                Scope::validateObjectIdString( s );
+            } catch ( const MsgAssertionException &m ) {
+                string error = m.toString();
+                return v8::ThrowException( v8::String::New( error.c_str() ) );
+            }            
             oid.init( s );
         } 
 
@@ -502,4 +513,12 @@ namespace mongo {
         return it;
     }
     
+    v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
+        
+        if (args.Length() != 1 || !args[ 0 ]->IsObject()) {
+            return v8::ThrowException( v8::String::New( "bonsisze needs 1 object" ) );
+        }
+
+        return v8::Number::New( v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
+    }
 }

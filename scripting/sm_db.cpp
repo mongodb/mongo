@@ -487,19 +487,11 @@ namespace mongo {
             uassert( "object_id_constructor can't take more than 1 param" , argc == 1 );
             string s = c.toString( argv[0] );
 
-            if ( s.size() != 24 ){
-                JS_ReportError( cx , "invalid object id: length" );
-                return JS_FALSE;
-            }
-
-            for ( string::size_type i=0; i<s.size(); i++ ){
-                char c = s[i];
-                if ( ( c >= '0' && c <= '9' ) ||
-                     ( c >= 'a' && c <= 'f' ) ||
-                     ( c >= 'A' && c <= 'F' ) ){
-                    continue;
-                }
-                JS_ReportError( cx , "invalid object id: not hex" );
+            try {
+                Scope::validateObjectIdString( s );
+            } catch ( const MsgAssertionException &m ) {
+                static string error = m.toString();
+                JS_ReportError( cx, error.c_str() );
                 return JS_FALSE;
             }
             oid.init( s );
