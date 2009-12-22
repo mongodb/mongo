@@ -280,6 +280,9 @@ namespace mongo {
                 BSONElement next = it.next();
                 args[i] = mongoToV8Element( next );
             }
+            setObject( "args", argsObject, true ); // for backwards compatibility
+        } else {
+            _global->Set( v8::String::New( "args" ), v8::Undefined() );
         }
         Local<Value> result = ((v8::Function*)(*funcValue))->Call( _this , nargs , args.get() );
                 
