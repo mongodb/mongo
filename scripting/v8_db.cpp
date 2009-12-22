@@ -18,6 +18,7 @@
 #include "v8_wrapper.h"
 #include "v8_utils.h"
 #include "v8_db.h"
+#include "engine.h"
 
 #include <iostream>
 
@@ -434,6 +435,12 @@ namespace mongo {
         }
         else {
             string s = toSTLString( args[0] );
+            try {
+                Scope::validateObjectIdString( s );
+            } catch ( const MsgAssertionException &m ) {
+                string error = m.toString();
+                return v8::ThrowException( v8::String::New( error.c_str() ) );
+            }            
             oid.init( s );
         } 
 
