@@ -1,5 +1,5 @@
 
-t = db.getCollection( "where1" );
+t = db.getCollection( "where2" );
 t.drop();
 
 t.save( { a : 1 } );

@@ -67,7 +67,7 @@ namespace mongo {
             _global->Set( v8::String::New( field ), f->GetFunction() );
         }
 
-        void gc(){} // no-op in v8
+        void gc();
 
     private:
         void _startCall();
@@ -91,7 +91,6 @@ namespace mongo {
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
-        string _localDBName;
     };
     
     class V8ScriptEngine : public ScriptEngine {

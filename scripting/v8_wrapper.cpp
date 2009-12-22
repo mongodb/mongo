@@ -365,10 +365,7 @@ namespace mongo {
     void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value ){
         
         if ( value->IsString() ){
-            if ( sname == "$where" )
-                b.appendCode( sname.c_str() , toSTLString( value ).c_str() );
-            else
-                b.append( sname.c_str() , toSTLString( value ).c_str() );
+            b.append( sname.c_str() , toSTLString( value ).c_str() );
             return;
         }
         
