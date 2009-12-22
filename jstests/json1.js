@@ -12,8 +12,8 @@ x = {"x" : [], "y" : {}};
 assert.eq(tojson(x,"",false), '{\n\t"x" : [\n\t\t\n\t],\n\t"y" : {\n\t\t\n\t}\n}' , "D" );
 
 // nested
-x = {"x" : [{"x" : [1,2,[]], "4" : "ok", "y" : [[]]}, {"foo" : "bar"}], "y" : null};
-assert.eq(tojson(x), '{\n\t"x" : [\n\t\t{\n\t\t\t"x" : [\n\t\t\t\t1,\n\t\t\t\t2,\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t],\n\t\t\t"4" : "ok",\n\t\t\t"y" : [\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t]\n\t\t},\n\t\t{\n\t\t\t"foo" : "bar"\n\t\t}\n\t],\n\t"y" : null\n}' , "E" );
+x = {"x" : [{"x" : [1,2,[]], "z" : "ok", "y" : [[]]}, {"foo" : "bar"}], "y" : null};
+assert.eq(tojson(x), '{\n\t"x" : [\n\t\t{\n\t\t\t"x" : [\n\t\t\t\t1,\n\t\t\t\t2,\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t],\n\t\t\t"z" : "ok",\n\t\t\t"y" : [\n\t\t\t\t[\n\t\t\t\t\t\n\t\t\t\t]\n\t\t\t]\n\t\t},\n\t\t{\n\t\t\t"foo" : "bar"\n\t\t}\n\t],\n\t"y" : null\n}' , "E" );
 
 // special types
 x = {"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),  'z' : /xd?/ig};
