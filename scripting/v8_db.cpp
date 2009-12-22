@@ -133,6 +133,7 @@ namespace mongo {
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( v8::String::New( "host" ) , v8::String::New( host ) );
     
         return v8::Undefined();
     }
@@ -150,6 +151,7 @@ namespace mongo {
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );
+        args.This()->Set( v8::String::New( "host" ) , v8::String::New( "EMBEDDED" ) );
         
         return v8::Undefined();
     }
