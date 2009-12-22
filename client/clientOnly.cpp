@@ -16,12 +16,15 @@
  */
 
 #include "../stdafx.h"
+#include "../db/cmdline.h"
 
 namespace mongo {
 
     const char * curNs = "in client mode";
 
     bool quiet = false;
+
+    CmdLine cmdLine;
 
     //    Database* database = 0;
     
