@@ -59,8 +59,7 @@ namespace mongo {
     
     /* we use new here so we don't have to worry about destructor orders at program shutdown */
     MongoMutex &dbMutex( *(new MongoMutex) );
-    MutexInfo dbMutexInfo;
-
+//    MutexInfo dbMutexInfo;
 
     string dbExecCommand;
 
@@ -85,11 +84,7 @@ namespace mongo {
 
     int ctr = 0;
 
-    /* 0 = ok
-       1 = kill current operation and reset this to 0
-       future: maybe use this as a "going away" thing on process termination with a higher flag value 
-    */
-    int killCurrentOp = 0;
+    KillCurrentOp killCurrentOp;
     
     int lockFile = 0;
 
@@ -124,11 +119,20 @@ namespace mongo {
         if( !ai->isAuthorized("admin") ) { 
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
-        else if( !dbMutexInfo.isLocked() ) 
+        /*else if( !dbMutexInfo.isLocked() ) 
             obj = fromjson("{\"info\":\"no op in progress/not locked\"}");
+            */
         else {
-            killCurrentOp = 1;
-            obj = fromjson("{\"info\":\"attempting to kill op\"}");
+            DbMessage d(m);
+            QueryMessage q(d);
+            BSONElement e = q.query.getField("op");
+            if( !e.isNumber() ) { 
+                obj = fromjson("{\"err\":\"no op number field specified?\"}");
+            }
+            else { 
+                obj = fromjson("{\"info\":\"attempting to kill op\"}");
+                killCurrentOp.kill( (unsigned) e.number() );
+            }
         }
         replyToQuery(0, m, dbresponse, obj);
     }

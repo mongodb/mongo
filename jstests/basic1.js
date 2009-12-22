@@ -15,3 +15,7 @@ t.save( o );
 assert.eq( 2 , t.findOne().a , "second" );
 
 assert(t.validate().valid);
+
+// not a very good test of currentOp, but tests that it at least 
+// is sort of there:
+assert( db.currentOp().inprog != null );

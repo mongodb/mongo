@@ -11,12 +11,13 @@ namespace mongo {
 class RecStoreInterface {
 public:
     virtual ~RecStoreInterface() {}
+
     /* Get a pointer to the data at diskloc d.  Pointer guaranteed to stay in
        scope through the current database operation's life.
     */
     virtual char* get(DiskLoc d, unsigned len) = 0;
 
-    /* indicate that the diskloc specified has been updated. note that as-is today,tl he modification may come AFTER this 
+    /* indicate that the diskloc specified has been updated. note that as-is today, the modification may come AFTER this 
        call -- we handle that currently -- until the dblock finishes.
     */
     virtual void modified(DiskLoc d) = 0;
