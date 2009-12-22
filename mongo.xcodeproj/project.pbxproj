@@ -479,6 +479,7 @@
 		93E727090F4B5B5B004F9B5D /* shardkey.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = shardkey.cpp; sourceTree = "<group>"; };
 		93E7270A0F4B5B5B004F9B5D /* shardkey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shardkey.h; sourceTree = "<group>"; };
 		93F0957010E165E50053380C /* basic.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic.js; sourceTree = "<group>"; };
+		93F095CC10E16FF70053380C /* shellfork.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shellfork.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1134,6 +1135,7 @@
 		93F0956F10E165E50053380C /* parallel */ = {
 			isa = PBXGroup;
 			children = (
+				93F095CC10E16FF70053380C /* shellfork.js */,
 				93F0957010E165E50053380C /* basic.js */,
 			);
 			path = parallel;

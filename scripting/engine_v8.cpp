@@ -69,6 +69,7 @@ namespace mongo {
         _wrapper = getObjectWrapperTemplate()->GetFunction();
         
         installDBTypes( _global );
+        installFork( _global, _context );
     }
 
     V8Scope::~V8Scope(){
