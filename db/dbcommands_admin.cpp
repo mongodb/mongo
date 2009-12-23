@@ -249,7 +249,8 @@ namespace mongo {
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }
         
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
             log() << "CMD fsync:  sync:" << sync << endl;
             result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
