@@ -142,15 +142,15 @@ namespace mongo {
         cout << try_catch << endl;
     }
     
-    v8::Handle< v8::Context > baseContext_;
+    Handle< Context > baseContext_;
     
     class JSThreadConfig {
     public:
         JSThreadConfig( const Arguments &args ) : started_(), done_() {
             jsassert( args.Length() > 0, "need at least one argument" );
             jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
-            Local< Function > f = Function::Cast( *args[ 0 ] );
-            f_ = Persistent< Function >::New( f );
+            Local< v8::Function > f = v8::Function::Cast( *args[ 0 ] );
+            f_ = Persistent< v8::Function >::New( f );
             for( int i = 1; i < args.Length(); ++i )
                 args_.push_back( Persistent< Value >::New( args[ i ] ) );
         }
@@ -199,35 +199,35 @@ namespace mongo {
         
         bool started_;
         bool done_;
-        Persistent< Function > f_;
+        Persistent< v8::Function > f_;
         vector< Persistent< Value > > args_;
         auto_ptr< boost::thread > thread_;
         Persistent< Value > returnData_;
     };
     
     Handle< Value > ThreadInit( const Arguments &args ) {
-        Handle<Object> it = args.This();
+        Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->Set( String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
-        return Undefined();
+        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
+        return v8::Undefined();
     }
     
     JSThreadConfig *thisConfig( const Arguments &args ) {
-        Local< External > c = External::Cast( *(args.This()->Get( String::New( "_JSThreadConfig" ) ) ) );
+        Local< External > c = External::Cast( *(args.This()->Get( v8::String::New( "_JSThreadConfig" ) ) ) );
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
         return config;
     }
     
     Handle< Value > ThreadStart( const Arguments &args ) {
         thisConfig( args )->start();
-        return Undefined();
+        return v8::Undefined();
     }
     
     Handle< Value > ThreadJoin( const Arguments &args ) {
         thisConfig( args )->join();
-        return Undefined();
+        return v8::Undefined();
     }
     
     Handle< Value > ThreadReturnData( const Arguments &args ) {
@@ -240,16 +240,16 @@ namespace mongo {
         
         Local<v8::Object> o = args[0]->ToObject();
         
-        o->Set( String::New( "init" ) , FunctionTemplate::New( ThreadInit )->GetFunction() );
-        o->Set( String::New( "start" ) , FunctionTemplate::New( ThreadStart )->GetFunction() );
-        o->Set( String::New( "join" ) , FunctionTemplate::New( ThreadJoin )->GetFunction() );
-        o->Set( String::New( "returnData" ) , FunctionTemplate::New( ThreadReturnData )->GetFunction() );
+        o->Set( v8::String::New( "init" ) , FunctionTemplate::New( ThreadInit )->GetFunction() );
+        o->Set( v8::String::New( "start" ) , FunctionTemplate::New( ThreadStart )->GetFunction() );
+        o->Set( v8::String::New( "join" ) , FunctionTemplate::New( ThreadJoin )->GetFunction() );
+        o->Set( v8::String::New( "returnData" ) , FunctionTemplate::New( ThreadReturnData )->GetFunction() );
         
         return v8::Undefined();    
     }
 
-    void installFork( Handle<v8::Object>& global, Handle<v8::Context> &context ) {
-        baseContext_ = context; // only expect to use  this in shell
+    void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
+        baseContext_ = context;
         global->Set( v8::String::New( "_threadInject" ), FunctionTemplate::New( ThreadInject )->GetFunction() );
     }
 

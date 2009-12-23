@@ -288,8 +288,10 @@ namespace mongo {
         bool multi = args.Length() > 4 && args[4]->IsBoolean() && args[4]->ToBoolean()->Value();        
         
         try {
+            BSONObj q1 = v8ToMongo( q );
+            BSONObj o1 = v8ToMongo( o );
             v8::Unlocker u;
-            conn->update( ns , v8ToMongo( q ) , v8ToMongo( o ) , upsert, multi );
+            conn->update( ns , q1 , o1 , upsert, multi );
         }
         catch ( ... ){
             return v8::ThrowException( v8::String::New( "socket error on remove" ) );

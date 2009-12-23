@@ -133,7 +133,7 @@ namespace mongo {
         auto_ptr<Scope> getPooledScope( const string& pool );
         void threadDone();
         
-        class Unlocker {};
+        struct Unlocker { virtual ~Unlocker() {} };
         
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new Unlocker ); }
     };

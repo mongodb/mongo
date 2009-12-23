@@ -69,12 +69,18 @@ namespace mongo {
 
         void gc();
 
+        Handle< Context > context() const { return _context; }
+        
     private:
         void _startCall();
         
         static Handle< Value > nativeCallback( const Arguments &args );
 
         static Handle< Value > loadCallback( const Arguments &args );
+        
+        // doesn't matter how many lockers exist globally for the main thread
+        // we rely on Unlocker objects to release the v8 lock.
+        v8::Locker _locker;
         
         V8ScriptEngine * _engine;
 
