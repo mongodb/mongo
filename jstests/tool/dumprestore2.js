@@ -15,6 +15,8 @@ assert.eq( 0 , listFiles( t.dbpath ).length , "clear" );
 
 t.runTool( "restore" , "--dbpath" , t.dbpath , "--dir" , t.ext );
 
+listFiles( t.dbpath ).forEach( printjson )
+
 c = t.startDB( "foo" );
 assert.soon( "c.findOne()" , "no data after startup" );
 assert.eq( 1 , c.count() , "after restore 2" );
