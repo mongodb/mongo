@@ -259,7 +259,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingLevel()");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this onew");
-    print("\tdb.killOp() kills the current operation in the db" );
+    print("\tdb.killOp(opid) kills the current operation in the db" );
     print("\tdb.printCollectionStats()" );
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
@@ -513,8 +513,10 @@ DB.prototype.currentOp = function(){
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
-DB.prototype.killOp = function(){
-    return db.$cmd.sys.killop.findOne();
+DB.prototype.killOp = function(op) {
+    if( !op ) 
+        throw "no opNum to kill specified";
+    return db.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
 

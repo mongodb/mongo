@@ -69,6 +69,7 @@ namespace mongo {
         _wrapper = getObjectWrapperTemplate()->GetFunction();
         
         installDBTypes( _global );
+        installFork( _global, _context );
     }
 
     V8Scope::~V8Scope(){
@@ -212,6 +213,7 @@ namespace mongo {
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
         
+        for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
             if ( code.find( "\n" ) == string::npos && 
@@ -345,6 +347,10 @@ namespace mongo {
         
         return true;
     }
+    
+    void V8Scope::gc() {
+        while( V8::IdleNotification() );
+    }
 
     // ----- db access -----
 
@@ -364,6 +370,7 @@ namespace mongo {
         exec( (string)"db = _mongo.getDB(\"" + dbName + "\");" , "local connect 3" , false , true , true , 0 );
         _connectState = LOCAL;
         _localDBName = dbName;
+        loadStored();
     }
     
     void V8Scope::externalSetup(){

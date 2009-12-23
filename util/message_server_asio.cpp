@@ -27,6 +27,7 @@
 
 #include "message.h"
 #include "message_server.h"
+#include "../util/thread_pool.h"
 
 using namespace boost;
 using namespace boost::asio;
@@ -34,6 +35,9 @@ using namespace boost::asio::ip;
 //using namespace std;
 
 namespace mongo {
+    namespace {
+        ThreadPool tp;
+    }
 
     class MessageServerSession : public boost::enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
     public:
@@ -71,17 +75,23 @@ namespace mongo {
             uassert( "_cur not empty! pipelining requests not supported" , ! _cur.data );
 
             _cur.setData( data , true );
-            async_read( _socket , 
+            async_read( _socket ,
                         buffer( raw + sizeof( _inHeader ) , _inHeader.len - sizeof( _inHeader ) ) ,
                         boost::bind( &MessageServerSession::handleReadBody , shared_from_this() , boost::asio::placeholders::error ) );
         }
         
         void handleReadBody( const boost::system::error_code& error ){
-            _replyCalled = false;
-            
+            tp.schedule(&MessageServerSession::process, shared_from_this());
+        }
+
+        void process(){
             _handler->process( _cur , this );
 
-            if ( ! _replyCalled ){
+            if (_reply.data){
+                async_write( _socket ,
+                             buffer( (char*)_reply.data , _reply.data->len ) ,
+                             boost::bind( &MessageServerSession::handleWriteDone , shared_from_this() , boost::asio::placeholders::error ) );
+            } else {
                 _cur.reset();
                 _startHeaderRead();
             }
@@ -89,7 +99,7 @@ namespace mongo {
         
         void handleWriteDone( const boost::system::error_code& error ){
             _cur.reset();
-            _replyCalled = false;
+            _reply.reset();
             _startHeaderRead();
         }
         
@@ -98,14 +108,11 @@ namespace mongo {
         }
         
         virtual void reply( Message& query , Message& toSend, MSGID responseTo ){
-            _replyCalled = true;
+            _reply = toSend;
 
-            toSend.data->id = nextMessageId();
-            toSend.data->responseTo = responseTo;
+            _reply.data->id = nextMessageId();
+            _reply.data->responseTo = responseTo;
             uassert( "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
-            async_write( _socket , 
-                         buffer( (char*)toSend.data , toSend.data->len ) , 
-                         boost::bind( &MessageServerSession::handleWriteDone , shared_from_this() , boost::asio::placeholders::error ) );
         }
 
         
@@ -126,8 +133,7 @@ namespace mongo {
         tcp::socket _socket;
         MsgData _inHeader;
         Message _cur;
-
-        bool _replyCalled;
+        Message _reply;
     };
     
 

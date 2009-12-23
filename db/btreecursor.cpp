@@ -20,6 +20,7 @@
 #include "btree.h"
 #include "pdfile.h"
 #include "jsobj.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -125,7 +126,7 @@ namespace mongo {
     }
 
     bool BtreeCursor::advance() {
-        checkForInterrupt();
+        killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
         bucket = bucket.btree()->advance(bucket, keyOfs, direction, "BtreeCursor::advance");

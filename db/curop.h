@@ -11,12 +11,13 @@ namespace mongo {
     /* Current operation (for the current Client).
        an embedded member of Client class, and typically used from within the mutex there. */
     class CurOp {
+        static WrappingInt _nextOpNum;
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
         bool _active;
-        //        unsigned opNum;
         time_t startTime;
         int _op;
+        WrappingInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
         struct sockaddr_in client;
 
@@ -34,14 +35,14 @@ namespace mongo {
     public:
         void reset(time_t now, const sockaddr_in &_client) { 
             _active = true;
-//            opNum++;
+            _opNum = _nextOpNum.atomicIncrement();
             startTime = now;
             _ns[0] = '?'; // just in case not set later
             resetQuery();
-            killCurrentOp = 0;
             client = _client;
         }
 
+        WrappingInt opNum() const { return _opNum; }
         bool active() const { return _active; }
 
         void setActive(bool active) { _active = active; }
@@ -81,7 +82,7 @@ namespace mongo {
         
         BSONObj infoNoauth() {
             BSONObjBuilder b;
-//            b.append("opid", opNum);
+            b.append("opid", _opNum);
             b.append("active", _active);
             if( _active ) 
                 b.append("secs_running", (int) (time(0)-startTime));
@@ -110,4 +111,26 @@ namespace mongo {
         }
     };
 
+    /* 0 = ok
+       1 = kill current operation and reset this to 0
+       future: maybe use this as a "going away" thing on process termination with a higher flag value 
+    */
+    extern class KillCurrentOp { 
+         enum { Off, On, All } state;
+        WrappingInt toKill;
+    public:
+        void killAll() { state = All; }
+        void kill(WrappingInt i) { toKill = i; state = On; }
+
+        void checkForInterrupt() { 
+            if( state != Off ) { 
+                if( state == All ) 
+                    uasserted("interrupted at shutdown");
+                if( cc().curop()->opNum() == toKill ) { 
+                    state = Off;
+                    uasserted("interrupted");
+                }
+            }
+        }
+    } killCurrentOp;
 }

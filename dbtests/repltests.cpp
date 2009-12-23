@@ -80,7 +80,7 @@ namespace ReplTests {
                 out() << "expected: " << expected.toString()
                     << ", got: " << got.toString() << endl;
             }
-            ASSERT( !expected.woCompare( got ) );
+            ASSERT_EQUALS( expected , got );
         }
         BSONObj oneOp() const { 
             return client()->findOne( cllNS(), BSONObj() );
@@ -843,6 +843,24 @@ namespace ReplTests {
             }            
         };
 
+        class BitOp : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$bit:{x:{and:2,or:8}}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "a" << ( ( 3 & 2 ) | 8 ) ) , one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:3}" ) );
+            }            
+        };
+
+        
+
     } // namespace Idempotence
     
     class DeleteOpIsIdBased : public Base {
@@ -1020,6 +1038,7 @@ namespace ReplTests {
             add< Idempotence::PullAll >();
             add< Idempotence::Pop >();
             add< Idempotence::PopReverse >();
+            //add< Idempotence::BitOp >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();

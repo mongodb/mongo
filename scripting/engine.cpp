@@ -108,7 +108,7 @@ namespace mongo {
         }
         
         File f;
-        f.open( filename.c_str() );
+        f.open( filename.c_str() , true );
 
         fileofs L = f.len();
         assert( L <= 0x7ffffffe );

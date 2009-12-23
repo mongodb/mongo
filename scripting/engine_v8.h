@@ -67,14 +67,20 @@ namespace mongo {
             _global->Set( v8::String::New( field ), f->GetFunction() );
         }
 
-        void gc(){} // no-op in v8
+        void gc();
 
+        Handle< Context > context() const { return _context; }
+        
     private:
         void _startCall();
         
         static Handle< Value > nativeCallback( const Arguments &args );
 
         static Handle< Value > loadCallback( const Arguments &args );
+        
+        // doesn't matter how many lockers exist globally for the main thread
+        // we rely on Unlocker objects to release the v8 lock.
+        v8::Locker _locker;
         
         V8ScriptEngine * _engine;
 
@@ -91,7 +97,6 @@ namespace mongo {
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
-        string _localDBName;
     };
     
     class V8ScriptEngine : public ScriptEngine {
@@ -105,6 +110,12 @@ namespace mongo {
 
         bool utf8Ok() const { return true; }
 
+        class V8Unlocker : public Unlocker {
+            v8::Unlocker u_;
+        };
+        
+        virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8Unlocker ); }
+        
     private:
         //HandleScope _handleScope;
         //Handle<ObjectTemplate> _globalTemplate;

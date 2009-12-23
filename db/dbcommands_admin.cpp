@@ -29,6 +29,7 @@
 #include "commands.h"
 #include "cmdline.h"
 #include "btree.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -111,7 +112,7 @@ namespace mongo {
                     e->assertOk();
                     el = e->xnext;
                     ne++;
-                    checkForInterrupt();
+                    killCurrentOp.checkForInterrupt();
                 }
                 ss << "  # extents:" << ne << '\n';
             } catch (...) {
@@ -200,7 +201,7 @@ namespace mongo {
                             delSize += d->lengthWithHeaders;
                             loc = d->nextDeleted;
                             k++;
-                            checkForInterrupt();
+                            killCurrentOp.checkForInterrupt();
                         }
                     } catch (...) {
                         ss <<"    ?exception in deleted chain for bucket " << i << endl;
@@ -248,7 +249,8 @@ namespace mongo {
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }
         
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
             log() << "CMD fsync:  sync:" << sync << endl;
             result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );

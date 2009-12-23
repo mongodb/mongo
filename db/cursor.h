@@ -25,22 +25,6 @@ namespace mongo {
     
     class Record;
 
-    /* 0 = ok
-       1 = kill current operation and reset this to 0
-       future: maybe use this as a "going away" thing on process termination with a higher flag value 
-    */
-    extern int killCurrentOp;
-
-    inline void checkForInterrupt() {
-        if( killCurrentOp ) { 
-            if( !goingAway ) {
-                // if we are shutting down, we leave this on so potentially we can stop multiple operations
-                killCurrentOp = 0;
-            }
-            uasserted("interrupted");
-        }
-    }
-
     /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
        concept and is for the user's cursor.
 
@@ -154,20 +138,7 @@ namespace mongo {
             return curr.isNull() ? last : curr;
         }
         
-        bool advance() {
-            checkForInterrupt();
-            if ( eof() ) {
-                if ( tailable_ && !last.isNull() ) {
-                    curr = s->next( last );                    
-                } else {
-                    return false;
-                }
-            } else {
-                last = curr;
-                curr = s->next( curr );
-            }
-            return ok();
-        }
+        bool advance();
 
         BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ) {
             init();

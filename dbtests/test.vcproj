@@ -1764,6 +1764,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\thread_pool.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\util.cpp"
 					>
 				</File>

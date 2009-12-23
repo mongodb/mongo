@@ -352,6 +352,22 @@ else {
     print( "warning: no BinData" );
 }
 
+if ( typeof _threadInject != "undefined" ){
+    print( "fork() available!" );
+    
+    Thread = function(){
+        this.init.apply( this, arguments );
+    }
+    
+    _threadInject( Thread.prototype );
+    
+    fork = function() {
+        var t = new Thread( function() {} );
+        Thread.apply( t, arguments );
+        return t;
+    }    
+}
+
 tojson = function( x, indent , nolint ){
     if ( x == null )
         return "null";

@@ -2,7 +2,7 @@
 t = db.type1;
 t.drop();
 
-t.save( { x : 1 } );
+t.save( { x : 1.1 } );
 t.save( { x : "3" } );
 t.save( { x : "asd" } );
 t.save( { x : "foo" } );
