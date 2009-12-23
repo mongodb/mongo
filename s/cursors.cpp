@@ -20,6 +20,7 @@ namespace mongo {
         _done = false;
 
         do {
+            // TODO: only create _id when needed
             _id = security.getNonce();
         } while ( _id == 0 );
 
