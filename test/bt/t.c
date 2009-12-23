@@ -15,6 +15,7 @@
 #define	MYPRINT	"a.print"
 
 int cachesize = 0;				/* Cache size */
+int huffman = 0;				/* Compress */
 int keys = 0;					/* Keys */
 int keys_cnt = 0;				/* Count of keys loaded */
 int leafsize = 0;				/* Leaf page size */
@@ -66,7 +67,7 @@ main(int argc, char *argv[])
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
 	rand_cache = rand_keys = rand_leaf = rand_node =  1;
-	while ((ch = getopt(argc, argv, "a:c:k:L:l:n:R:r:v")) != EOF)
+	while ((ch = getopt(argc, argv, "a:c:hk:L:l:n:R:r:v")) != EOF)
 		switch (ch) {
 		case 'a':
 			switch (optarg[0]) {
@@ -87,6 +88,9 @@ main(int argc, char *argv[])
 		case 'c':
 			rand_cache = 0;
 			cachesize = atoi(optarg);
+			break;
+		case 'h':
+			huffman = 1;
 			break;
 		case 'k':
 			rand_keys = 0;
@@ -204,6 +208,9 @@ setup()
 	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
 	assert(db->btree_pagesize_set(
 	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
+	if (huffman)
+		assert(db->huffman_set(db,
+		    NULL, 0, WT_ENGLISH|WT_HUFFMAN_DATA|WT_HUFFMAN_KEY) == 0);
 	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 }
 
@@ -488,7 +495,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dv] [-a d|r|s|v] [-c cachesize] [-k keys] "
+	    "usage: %s [-dhv] [-a d|r|s|v] [-c cachesize] [-k keys] "
 	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n",
 	    progname);
 	exit(1);
