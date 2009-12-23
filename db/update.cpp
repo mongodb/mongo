@@ -473,7 +473,7 @@ namespace mongo {
             if ( op == Mod::INC )
                 strcpy((char *) fn, "$set"); // rewrite for op log
             while ( jt.more() ) {
-                BSONElement f = jt.next();
+                BSONElement f = jt.next(); // x:44
 
                 const char * fieldName = f.fieldName();
 
