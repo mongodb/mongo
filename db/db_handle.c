@@ -143,6 +143,15 @@ __wt_idb_close(DB *db, int refresh)
 	if (idb == NULL)
 		return (0);
 
+	if (idb->huffman_data != NULL) {
+		__wt_huffman_close(env, idb->huffman_data);
+		idb->huffman_data = NULL;
+	}
+	if (idb->huffman_key != NULL) {
+		__wt_huffman_close(env, idb->huffman_key);
+		idb->huffman_key = NULL;
+	}
+
 	/* Free any allocated memory. */
 	WT_FREE_AND_CLEAR(env, idb->dbname);
 

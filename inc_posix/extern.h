@@ -107,6 +107,9 @@ __wt_db_lockout_err(DB *db);
 int
 __wt_db_lockout_open(DB *db);
 int
+__wt_db_huffman_set(DB *db,
+    u_int8_t const *huffman_table, int huffman_table_size, u_int32_t flags);
+int
 __wt_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags);
 int
 __wt_db_stat_print(DB *db, FILE *stream);
@@ -237,6 +240,21 @@ int
 __wt_db_lockout(DB *db);
 int
 __wt_env_lockout(ENV *env);
+int
+__wt_huffman_open(ENV *env,
+    const u_int8_t *byte_frequency_array, u_int nbytes, void *retp);
+void
+__wt_huffman_close(ENV *env, void *huffman_arg);
+int
+__wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol);
+int
+__wt_huffman_encode(void *huffman_arg,
+    u_int8_t *from, u_int32_t len_from,
+    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used);
+int
+__wt_huffman_decode(void *huffman_arg,
+    u_int8_t *from, u_int16_t len_from,
+    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used);
 u_int32_t
 __wt_prime(u_int32_t n);
 void

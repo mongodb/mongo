@@ -14,7 +14,7 @@ static int __wt_api_db_btree_compare_dup_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(btree_compare_dup) = db->btree_compare_dup;
+	*btree_compare_dup = db->btree_compare_dup;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -48,7 +48,7 @@ static int __wt_api_db_btree_compare_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(btree_compare) = db->btree_compare;
+	*btree_compare = db->btree_compare;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -65,7 +65,7 @@ static int __wt_api_db_btree_compare_int_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(btree_compare_int) = db->btree_compare_int;
+	*btree_compare_int = db->btree_compare_int;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -118,7 +118,7 @@ static int __wt_api_db_btree_dup_offpage_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(btree_dup_offpage) = db->btree_dup_offpage;
+	*btree_dup_offpage = db->btree_dup_offpage;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -154,8 +154,8 @@ static int __wt_api_db_btree_itemsize_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(intlitemsize) = db->intlitemsize;
-	*(leafitemsize) = db->leafitemsize;
+	*intlitemsize = db->intlitemsize;
+	*leafitemsize = db->leafitemsize;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -198,10 +198,10 @@ static int __wt_api_db_btree_pagesize_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(allocsize) = db->allocsize;
-	*(intlsize) = db->intlsize;
-	*(leafsize) = db->leafsize;
-	*(extsize) = db->extsize;
+	*allocsize = db->allocsize;
+	*intlsize = db->intlsize;
+	*leafsize = db->leafsize;
+	*extsize = db->extsize;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -298,7 +298,7 @@ static int __wt_api_db_errcall_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(errcall) = db->errcall;
+	*errcall = db->errcall;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -332,7 +332,7 @@ static int __wt_api_db_errfile_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(errfile) = db->errfile;
+	*errfile = db->errfile;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -366,7 +366,7 @@ static int __wt_api_db_errpfx_get(
 	env = db->env;
 
 	__wt_lock(env, &env->ienv->mtx);
-	*(errpfx) = db->errpfx;
+	*errpfx = db->errpfx;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -436,6 +436,32 @@ static int __wt_api_db_get_recno(
 	WT_ENV_FCHK(env, "DB.get_recno", flags, WT_APIMASK_DB_GET_RECNO);
 
 	return (__wt_db_get_recno(db, toc, recno, key, pkey, data));
+}
+
+static int __wt_api_db_huffman_set(
+	DB *db,
+	u_int8_t const *huffman_table,
+	int huffman_table_size,
+	u_int32_t huffman_flags);
+static int __wt_api_db_huffman_set(
+	DB *db,
+	u_int8_t const *huffman_table,
+	int huffman_table_size,
+	u_int32_t huffman_flags)
+{
+	ENV *env;
+	int ret;
+
+	env = db->env;
+
+	WT_ENV_FCHK(env, "DB.huffman_set",
+	    huffman_flags, WT_APIMASK_DB_HUFFMAN_SET);
+
+	__wt_lock(env, &env->ienv->mtx);
+	ret = __wt_db_huffman_set(
+	    db, huffman_table, huffman_table_size, huffman_flags);
+	__wt_unlock(&env->ienv->mtx);
+	return (ret);
 }
 
 static int __wt_api_db_open(
@@ -558,7 +584,7 @@ static int __wt_api_env_cachesize_get(
 	u_int32_t *cachesize)
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(cachesize) = env->cachesize;
+	*cachesize = env->cachesize;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -610,7 +636,7 @@ static int __wt_api_env_errcall_get(
 	void (**errcall)(const ENV *, const char *))
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(errcall) = env->errcall;
+	*errcall = env->errcall;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -636,7 +662,7 @@ static int __wt_api_env_errfile_get(
 	FILE **errfile)
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(errfile) = env->errfile;
+	*errfile = env->errfile;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -662,7 +688,7 @@ static int __wt_api_env_errpfx_get(
 	const char **errpfx)
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(errpfx) = env->errpfx;
+	*errpfx = env->errpfx;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -688,7 +714,7 @@ static int __wt_api_env_msgcall_get(
 	void (**msgcall)(const ENV *, const char *))
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(msgcall) = env->msgcall;
+	*msgcall = env->msgcall;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -714,7 +740,7 @@ static int __wt_api_env_msgfile_get(
 	FILE **msgfile)
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(msgfile) = env->msgfile;
+	*msgfile = env->msgfile;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -796,7 +822,7 @@ static int __wt_api_env_verbose_get(
 	u_int32_t *verbose)
 {
 	__wt_lock(env, &env->ienv->mtx);
-	*(verbose) = env->verbose;
+	*verbose = env->verbose;
 	__wt_unlock(&env->ienv->mtx);
 	return (0);
 }
@@ -899,6 +925,9 @@ __wt_methods_db_lockout(DB *db)
 	db->get_recno = (int (*)
 	    (DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
+	db->huffman_set = (int (*)
+	    (DB *, u_int8_t const *, int , u_int32_t ))
+	    __wt_db_lockout;
 	db->open = (int (*)
 	    (DB *, const char *, mode_t , u_int32_t ))
 	    __wt_db_lockout;
@@ -941,6 +970,7 @@ __wt_methods_db_init_transition(DB *db)
 	db->errfile_set = __wt_api_db_errfile_set;
 	db->errpfx_get = __wt_api_db_errpfx_get;
 	db->errpfx_set = __wt_api_db_errpfx_set;
+	db->huffman_set = __wt_api_db_huffman_set;
 	db->open = __wt_api_db_open;
 }
 
@@ -964,6 +994,9 @@ __wt_methods_db_open_transition(DB *db)
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
 	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    __wt_db_lockout;
+	db->huffman_set = (int (*)
+	    (DB *, u_int8_t const *, int , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
 	db->dump = __wt_api_db_dump;

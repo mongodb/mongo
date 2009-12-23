@@ -22,6 +22,8 @@ wiredtiger_strerror(int error)
 		return ("WT_NOTFOUND: database item not found");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
+	case WT_TOOSMALL:
+		return ("WT_TOOSMALL: buffer too small");
 	default:
 		if (error > 0 && (p = strerror(error)) != NULL)
 			return (p);

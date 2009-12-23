@@ -22,6 +22,7 @@ btree/bt_vrfy.c
 db/db_err.c
 db/db_getset.c
 db/db_handle.c
+db/db_huffman.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
@@ -48,6 +49,7 @@ os_posix/os_yield.c
 support/api.c
 support/cksum.c
 support/err.c
+support/huffman.c
 support/prime.c
 support/progress.c
 support/serial.c

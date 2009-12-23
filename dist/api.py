@@ -111,7 +111,8 @@ def func_struct(a, f):
 def func_struct_variable_all(handle, f):
 	for i in sorted(filter(lambda _i:
 	    _i[1].handle.count(handle) and
-	    _i[1].config.count('setter'), api.iteritems())):
+	    _i[1].config.count('setter') and not
+	    _i[1].config.count('handcode'), api.iteritems())):
 		func_struct_variable(i[1].args, f)
 
 # func_struct_variable
@@ -154,18 +155,33 @@ def func_method_getset(a, f):
 	config = a.config
 	args = a.args
 
+	# Declarations:
+	# If we don't have an environment handle, acquire one.
+	# If we are hand-coding the routine, we'll need a place to save the
+	# return value.
+	newl = 0
 	if handle != 'env':
-		f.write('\tENV *env;\n\n')
+		f.write('\tENV *env;\n')
+		newl = 1
+	if config.count('handcode'):
+		f.write('\tint ret;\n')
+		newl = 1
+	if newl:
+		f.write('\n')
+	if handle != 'env':
 		f.write('\tenv = ' + handle + '->env;\n\n')
 
-	# If we have a "flags" argument, check it before we continue.
-	for l in args:
-		if l.count('flags/'):
-			f.write('\tWT_ENV_FCHK(env,\n\t    "' +
-			    handle.upper() + '.' + method +
-			    '", flags, WT_APIMASK_' + handle.upper() +
-			    '_' + method.upper() + ');\n\n')
-			break
+	# If we have a "flags" argument to a setter fucntion, check it
+	# before we continue.
+	if config.count('setter'):
+		for l in args:
+			if l.count('flags/'):
+				f.write('\tWT_ENV_FCHK(env, "' +
+				    handle.upper() + '.' + method +
+				    '",\n\t    ' + l.split('/')[0]  +
+				    ', WT_APIMASK_' + handle.upper() +
+				    '_' + method.upper() + ');\n\n')
+				break
 
 	# Verify means call a standard verification routine because there are
 	# constraints or side-effects on setting the value.  The setter fails
@@ -179,12 +195,21 @@ def func_method_getset(a, f):
 		s += ')'
 		f.write(s + '));\n\n')
 
+	# Lock the data structure.
 	f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
-	if config.count('getter'):
+
+	# If the function is hand-coded, just call it.
+	if config.count('handcode'):
+		f.write('\tret = __wt_' +
+		    handle + '_' + method + '(\n\t    ' + handle)
+		for l in args:
+			f.write(', ' + l.split('/')[0])
+		f.write(');\n')
+	elif config.count('getter'):
 		for l in args:
 			if l.count('flags/') and flags[a.key][0] == '__NONE__':
 				continue
-			f.write('\t*(' + l.split('/')[0] + ')' + ' = ' +
+			f.write('\t*' + l.split('/')[0] + ' = ' +
 			    handle + '->' + l.split('/')[0] + ';\n')
 	else:
 		for l in args:
@@ -192,8 +217,15 @@ def func_method_getset(a, f):
 				continue
 			f.write('\t' + handle + '->' +
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
+
+	# Unlock the data structure.
 	f.write('\t__wt_unlock(&env->ienv->mtx);\n')
-	f.write('\treturn (0);\n}\n\n')
+	f.write('\treturn (')
+	if config.count('handcode'):
+		f.write('ret')
+	else:
+		f.write('0')
+	f.write(');\n}\n\n')
 
 # func_method --
 #	Generate API entry functions for anything taking a flags or WT_TOC

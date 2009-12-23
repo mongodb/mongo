@@ -245,6 +245,9 @@ struct __db {
 	int (*get_recno)(
 	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
 
+	int (*huffman_set)(
+	    DB *, u_int8_t const *, int , u_int32_t );
+
 	int (*open)(
 	    DB *, const char *, mode_t , u_int32_t );
 
@@ -401,8 +404,12 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
+#define	WT_ENGLISH					0x00000008
+#define	WT_HUFFMAN_DATA					0x00000004
+#define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INITIALIZED					0x00000002
 #define	WT_MODIFIED					0x00000008
+#define	WT_PHONE					0x00000001
 #define	WT_PINNED					0x00000004
 #define	WT_PRINTABLES					0x00000001
 #define	WT_SERVER_RUN					0x00000002
@@ -420,6 +427,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_GET_RECNO				0x00000000
+#define	WT_APIMASK_DB_HUFFMAN_SET			0x0000000f
 #define	WT_APIMASK_DB_OPEN				0x00000001
 #define	WT_APIMASK_DB_PUT				0x00000000
 #define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
@@ -455,6 +463,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_ERROR	-31800
 #define	WT_NOTFOUND	-31801
 #define	WT_RESTART	-31802
+#define	WT_TOOSMALL	-31803
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

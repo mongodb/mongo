@@ -48,7 +48,7 @@ typedef struct __wt_huffman_obj {
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
 	 * This contains the frequency table (tree) used to produce optimal
-	 * results.  This version of the encoder supports 8- and 16-bit symbols.
+	 * results.  This version of the encoder supports 1- and 2-byte symbols.
 	 */
 	u_int32_t numSymbols;
 	u_int8_t  numBytes;	/* 1 or 2 */
@@ -199,18 +199,18 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
 /*
  * __wt_huffman_open --
  *	Take a frequency table and return a pointer to a descriptor object.
- *	Return 0 on success, 1 on error.
  *
  *  The frequency table must be the full range of valid values.  For 1 byte
- *  tables there are 256 values in 8 bits.  The highest rank is 256 so 1 byte
- *  is needed to hold the rank so the input table must be 1 byte x 256 values.
+ *  tables there are 256 values in 8 bits.  The highest rank is 255, and the
+ * lowest rank is 1 (0 means the byte never appears in the input), so 1 byte
+ * is needed to hold the rank and the input table must be 1 byte x 256 values.
  *
- *  For unicode (nbytes == 2) the range is 0 - 65536 and the max rank is
- *  65536.   The table should be 2 bytes * 65536 values.
+ *  For UTF-16 (nbytes == 2) the range is 0 - 65535 and the max rank is 65535.
+ *  The table should be 2 bytes x 65536 values.
  */
 int
 __wt_huffman_open(ENV *env,
-    u_int8_t *byte_frequency_array, u_int nbytes, void *retp)
+    const u_int8_t *byte_frequency_array, u_int nbytes, void *retp)
 {
 	INDEXED_BYTE *indexed_freqs;
 	NODE_QUEUE *combined_nodes, *leaves;
@@ -280,7 +280,7 @@ __wt_huffman_open(ENV *env,
 		 * To decide which queue must be used, we get the weights of
 		 * the first items from both:
 		 */
-		w1 = w2 = ULONG_MAX;
+		w1 = w2 = UINT32_MAX;
 
 		if (!node_queue_is_empty(leaves)) {
 			tempnode = node_queue_get_first(leaves);
@@ -407,9 +407,11 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 			}
 
 			(void)printf("%s\n", buffer);
-		} else
+		} else {
 			(void)printf(
 			    "Symbol is not in the huffman tree: %x\n", symbol);
+			return (WT_ERROR);
+		}
 
 		__wt_free(env, buffer);
 	} else
@@ -422,7 +424,9 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 /*
  * __wt_huffman_encode --
  *	Take a byte string, encode it into the target.
- *	Return 0 on success, 1 on error.
+ *
+ *	Target buffer size: len_to should be (N + 1) to ensure the "to" buffer
+ *	is big enough for the encoding operation.
  */
 int
 __wt_huffman_encode(void *huffman_arg,
@@ -437,10 +441,17 @@ __wt_huffman_encode(void *huffman_arg,
 	int p;
 
 	huffman = huffman_arg;
-	n = 1 << huffman->max_depth;
-	bitpos = 3;
+
+	/*
+	 * Check the target buffer, just in case; we need N+1 bytes to encode
+	 * N bytes.
+	 */
+	if (len_to <= len_from)
+		return (WT_TOOSMALL);
 	memset(to, 0, len_to);
 
+	n = 1 << huffman->max_depth;
+	bitpos = 3;
 	for (i = 0; i < len_from; i += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
 		if (huffman->numBytes == 1)
@@ -464,8 +475,7 @@ __wt_huffman_encode(void *huffman_arg,
 			 * the output buffer in back order.
 			 */
 			for (p = node->codeword_length - 1; p >= 0; --p) {
-				MODIFY_BIT(
-				    to, bitpos + (u_int)p, (j % 2) ^ 1);
+				MODIFY_BIT(to, bitpos + (u_int)p, (j % 2) ^ 1);
 				j = (j - 1) / 2;
 			}
 
@@ -496,9 +506,12 @@ __wt_huffman_encode(void *huffman_arg,
 /*
  * __wt_huffman_decode --
  *	Take a byte string, decode it into the target.
- *	Return 0 on success, 1 on error.
  *
- *  the len_from value is also in bytes!  Encoded strings may be 0 padded
+ *	Encoded strings may be 0 padded.
+ *
+ *	Target buffer size: len_to should be (((N x 2) + 1) x len_from) to
+ *	ensure the "to" buffer is big enough for the decoding operation.
+ *	If the decode won't fit into the target buffer, return WT_TOOSMALL.
  */
 int
 __wt_huffman_decode(void *huffman_arg,
@@ -541,16 +554,12 @@ __wt_huffman_decode(void *huffman_arg,
 
 		/* If this is a leaf, we've found a complete symbol. */
 		if (node->valid && node->codeword_length > 0) {
-			if ((bytes + huffman->numBytes) > len_to) {
-				__wt_api_env_errx(NULL,
-				    "Huffman compression: target buffer too "
-				    "small");
-				return (WT_ERROR);
-			}
+			if (bytes + huffman->numBytes > len_to)
+				return (WT_TOOSMALL);
 
-			if (huffman->numBytes == 1) {
+			if (huffman->numBytes == 1)
 				*to++ = (u_int8_t)node->symbol;
-			} else {
+			else {
 				*to++ = (node->symbol & 0xFF00) >> 8;
 				*to++ = node->symbol & 0xFF;
 			}
@@ -599,8 +608,6 @@ node_queue_close(ENV *env, NODE_QUEUE* queue)
 /*
  * node_queue_enqueue --
  *	Push a tree node to the end of the queue.
- *
- * Returns 0 if succeeded.
  */
 static int
 node_queue_enqueue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)

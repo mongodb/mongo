@@ -119,6 +119,9 @@ struct __idb {
 
 	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
 
+	void *huffman_key;		/* Key huffman encoding */
+	void *huffman_data;		/* Data huffman encoding */
+
 	WT_STATS *stats;		/* Database handle statistics */
 	WT_STATS *dstats;		/* Database file statistics */
 };

@@ -19,13 +19,14 @@
 #	1: the method name
 #		 'handle' + '.' + 'method'
 #	2: a string of comma-separated configuration key words
-#		cache	-- method reads/writes the cache
-#		getter	-- getter method
-#		method	-- method returns an int
-#		methodV -- method returns void
-#		noauto	-- hand-coded method, don't create a stub
-#		setter	-- setter method
-#		verify  -- setters call a function to validate the arguments
+#		cache	 -- method reads/writes the cache
+#		getter	 -- auto-generated getter method
+#		handcode -- hand-coded getter/setter method
+#		method	 -- method returns an int
+#		methodV  -- method returns void
+#		noauto	 -- don't create a stub
+#		setter	 -- auto-generated setter method
+#		verify	 -- setter methods call validation function
 #	3: a list of argument and name/declaration pairs
 #		An argument to the method.  In an argument declaration, "@S"
 #		is replaced by the argument name when needed (sometimes we.
@@ -396,6 +397,15 @@ methods['db.get_recno'] = Api(
 	['__NONE__'],
 	['open'], [])
 
+methods['db.huffman_set'] = Api(
+	'db.huffman_set',
+	'method, setter, handcode',
+	['huffman_table/u_int8_t const *@S',
+	 'huffman_table_size/int @S',
+	 'huffman_flags/u_int32_t @S'],
+	[ 'ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'PHONE' ],
+	['init'], ['open'])
+
 methods['db.open'] = Api(
 	'db.open',
 	'method',
@@ -455,8 +465,8 @@ flags['wiredtiger_env_init'] = [ ]
 # Structure flag declarations
 ###################################################
 flags['cache'] = [ 'INITIALIZED', 'SERVER_SLEEPING' ]
-flags['wt_toc'] = [ 'CACHE_LOCK_RESTART', 'WAITING' ]
 flags['dbt'] = [ 'ALLOCATED' ]
 flags['ienv'] = [ 'WORKQ_RUN', 'SERVER_RUN' ]
 flags['wt_indx'] = [ 'ALLOCATED' ]
 flags['wt_page'] = [ 'ALLOCATED', 'MODIFIED', 'PINNED', 'UNFORMATTED' ]
+flags['wt_toc'] = [ 'CACHE_LOCK_RESTART', 'WAITING' ]
