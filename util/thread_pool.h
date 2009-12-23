@@ -17,7 +17,6 @@
 
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include <boost/ptr_container/ptr_list.hpp>
 #undef assert
 #define assert xassert
 
