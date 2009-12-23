@@ -24,6 +24,7 @@
 #include "clientcursor.h"
 #include "client.h"
 #include "dbhelpers.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -84,7 +85,7 @@ namespace mongo {
             massert("assert is misdefined", f);
         }
 
-        checkForInterrupt();
+        killCurrentOp.checkForInterrupt();
         assertValid(order, true);
 //	if( bt_fv==0 )
 //		return;

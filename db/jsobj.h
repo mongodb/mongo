@@ -811,7 +811,7 @@ namespace mongo {
 		/** @return subobject of the given name */
         BSONObj getObjectField(const char *name) const;
 
-        /** @return INT_MIN if not present */
+        /** @return INT_MIN if not present - does some type conversions */
         int getIntField(const char *name) const;
 
         /** @return false if not present */

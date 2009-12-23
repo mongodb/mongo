@@ -16,8 +16,24 @@
 
 #include "stdafx.h"
 #include "pdfile.h"
+#include "curop.h"
 
 namespace mongo {
+
+    bool BasicCursor::advance() {
+        killCurrentOp.checkForInterrupt();
+        if ( eof() ) {
+            if ( tailable_ && !last.isNull() ) {
+                curr = s->next( last );                    
+            } else {
+                return false;
+            }
+        } else {
+            last = curr;
+            curr = s->next( curr );
+        }
+        return ok();
+    }
 
     /* these will be used outside of mutexes - really functors - thus the const */
     class Forward : public AdvanceStrategy {
