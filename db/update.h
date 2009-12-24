@@ -28,6 +28,10 @@ namespace mongo {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10
         enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT  } op;
+        
+        static const char* modNames[];
+        static unsigned modNamesNum;
+
         const char *fieldName;
         const char *shortFieldName;
         
@@ -36,7 +40,7 @@ namespace mongo {
         int *nint;
         long long *nlong;
 
-        BSONElement elt;
+        BSONElement elt; // x:5 note: this is the actual element from the updateobj
         int pushStartSize;
         boost::shared_ptr<JSMatcher> matcher;
 
@@ -115,13 +119,33 @@ namespace mongo {
                 return true;
             return false;
         }
-
+        
         void apply( BSONObjBuilder& b , BSONElement in );
-
+        
         /**
          * @return true iff toMatch should be removed from the array
          */
         bool _pullElementMatch( BSONElement& toMatch ) const;
+
+        bool needOpLogRewrite() const {
+            switch( op ){
+            case BIT:
+            case BITAND:
+            case BITOR:
+                // TODO: should we convert this to $set?
+                return false;
+            default:
+                return false;
+            }
+        }
+        
+        void appendForOpLog( BSONObjBuilder& b ) const {
+            const char * name = modNames[op];
+            
+            BSONObjBuilder bb( b.subobjStart( name ) );
+            bb.append( elt );
+            bb.done();
+        }
     };
 
     class ModSet {
@@ -197,10 +221,8 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            const char *valid[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" };
-            for( unsigned i = 0; i < (sizeof(valid) / sizeof(*valid)); ++i )
-                if ( strcmp( fn, valid[ i ] ) == 0 )
+            for( unsigned i=0; i<Mod::modNamesNum; i++ )
+                if ( strcmp( fn, Mod::modNames[ i ] ) == 0 )
                     return Mod::Op( i );
             
             uassert( "Invalid modifier specified " + string( fn ), false );
@@ -261,6 +283,22 @@ namespace mongo {
             return false;
 
             
+        }
+        
+        // re-writing for oplog
+
+        bool needOpLogRewrite() const {
+            for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
+                if ( i->second.needOpLogRewrite() )
+                    return true;
+            return false;            
+        }
+        
+        BSONObj getOpLogRewrite() const {
+            BSONObjBuilder b;
+            for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
+                i->second.appendForOpLog( b );
+            return b.obj();
         }
 
         bool haveArrayDepMod() const {

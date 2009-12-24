@@ -26,6 +26,10 @@
 
 namespace mongo {
 
+    const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
+                                     "$bitand" , "$bitor" , "$bit" };
+    unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
+
     bool Mod::_pullElementMatch( BSONElement& toMatch ) const {
         
         if ( elt.type() != Object ){
@@ -653,15 +657,21 @@ namespace mongo {
                     }
                         
                 }
-
+                
                 if ( logop ) {
+                    
                     assert( mods.size() );
+
                     if ( mods.haveArrayDepMod() ) {
                         BSONObjBuilder patternBuilder;
                         patternBuilder.appendElements( pattern );
                         mods.appendSizeSpecForArrayDepMods( patternBuilder );
                         pattern = patternBuilder.obj();                        
                     }
+                    
+                    if ( mods.needOpLogRewrite() )
+                        updateobj = mods.getOpLogRewrite();
+                    
                     logOp("u", ns, updateobj, &pattern );
                 }
                 numModded++;

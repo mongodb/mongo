@@ -846,7 +846,7 @@ namespace ReplTests {
         class BitOp : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$bit:{x:{and:2,or:8}}}" ) );
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$bit:{a:{and:2,or:8}}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1038,7 +1038,7 @@ namespace ReplTests {
             add< Idempotence::PullAll >();
             add< Idempotence::Pop >();
             add< Idempotence::PopReverse >();
-            //add< Idempotence::BitOp >();
+            add< Idempotence::BitOp >();
             add< DeleteOpIsIdBased >();
             add< DbIdsTest >();
             add< MemIdsTest >();
