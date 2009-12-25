@@ -66,8 +66,17 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	page->hdr->type = WT_PAGE_LEAF;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
+		if (key->size == 0) {
+			__wt_db_errx(db, "zero-length keys are not supported");
+			ret = WT_ERROR;
+			goto err;
+		}
+
+		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f("Db.bulk_load", insert_cnt);
+		WT_STAT_INCR(idb->stats,
+		    BULK_PAIRS_READ, "bulk key/data pairs inserted");
 
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
@@ -79,14 +88,6 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 		data_copy.data = data->data;
 		data_copy.size = data->size;
 		data = &data_copy;
-
-		if (key->size == 0) {
-			__wt_db_errx(db, "zero-length keys are not supported");
-			ret = WT_ERROR;
-			goto err;
-		}
-		WT_STAT_INCR(idb->stats,
-		    BULK_PAIRS_READ, "bulk key/data pairs inserted");
 
 		/*
 		 * We pushed a set of duplicates off-page, and that routine
