@@ -96,13 +96,9 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	if (0) {
 overflow:	/* Handle overflow data items. */
 		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
-		if (F_ISSET(data, WT_ALLOCATED))
-			WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, data));
-		else {
-			WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, &toc->data));
-			data->data = toc->data.data;
-			data->size = toc->data.size;
-		}
+		WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, &toc->data));
+		data->data = toc->data.data;
+		data->size = toc->data.size;
 	}
 
 	if (callback == NULL)
@@ -127,22 +123,12 @@ __wt_bt_dbt_copyout(
 	 * We use memory in the TOC handle to return keys -- it's a per-thread
 	 * structure, so there's no chance of a race.
 	 */
-	if (F_ISSET(dbt, WT_ALLOCATED)) {
-		if (dbt->data_len < size) {
-			WT_RET(__wt_realloc(
-			    env, dbt->data_len, size, &dbt->data));
-			dbt->data_len = size;
-		}
-	} else {
-		if (local_dbt->data_len < size) {
-			WT_RET(__wt_realloc(
-			    env, size, size + 40, &local_dbt->data));
-			local_dbt->data_len = size + 40;
-		}
-		dbt->data = local_dbt->data;
-	}
+	if (local_dbt->data_len < size)
+		WT_RET(__wt_realloc(
+		    env, &local_dbt->data_len, size + 40, &local_dbt->data));
+	dbt->data = local_dbt->data;
+	dbt->size = size;
 
 	memcpy(dbt->data, p, size);
-	dbt->size = size;
 	return (0);
 }
