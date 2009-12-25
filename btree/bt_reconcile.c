@@ -204,7 +204,7 @@ __wt_bt_page_inmem_append(DB *db,
 	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM_OVFL *ovfl;
-	u_int32_t n;
+	u_int32_t bytes, n;
 
 	env = db->env;
 	idb = db->idb;
@@ -219,9 +219,9 @@ __wt_bt_page_inmem_append(DB *db,
 			idb->indx_size_hint = n;
 		else
 			n = idb->indx_size_hint;
+		bytes = page->indx_size * sizeof(page->indx[0]);
 		WT_RET((__wt_realloc(env,
-		    page->indx_size * sizeof(page->indx[0]),
-		    n * sizeof(page->indx[0]), &page->indx)));
+		    &bytes, n * sizeof(page->indx[0]), &page->indx)));
 		page->indx_size = n;
 	}
 	indx = page->indx + page->indx_count;

@@ -123,7 +123,7 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
  */
 int
 __wt_realloc(ENV *env,
-    u_int32_t bytes_allocated, u_int32_t bytes_to_allocate, void *retp)
+    u_int32_t *bytes_allocated, u_int32_t bytes_to_allocate, void *retp)
 {
 	void *p;
 
@@ -157,11 +157,14 @@ __wt_realloc(ENV *env,
 	}
 
 	/*
-	 * Clear allocated memory -- see comment above concerning __wt_malloc
-	 * as to why this is required.
+	 * Clear allocated memory -- see security comment above concerning
+	 * __wt_malloc as to why this is required.
 	 */
 	memset((u_int8_t *)
-	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
+	    p + *bytes_allocated, 0, bytes_to_allocate - *bytes_allocated);
+
+	/* Update caller's bytes allocated value. */
+	*bytes_allocated = bytes_to_allocate;
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)

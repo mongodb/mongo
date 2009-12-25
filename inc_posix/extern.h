@@ -172,7 +172,7 @@ int
 __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp);
 int
 __wt_realloc(ENV *env,
-    u_int32_t bytes_allocated, u_int32_t bytes_to_allocate, void *retp);
+    u_int32_t *bytes_allocated, u_int32_t bytes_to_allocate, void *retp);
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void
