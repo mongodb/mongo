@@ -54,15 +54,15 @@ extern "C" {
  * any variable, anywhere.
  */
 #define	F_CLR(p, mask)		((p)->flags &= ~(mask))
-#define	F_ISSET(p, mask)	((p)->flags & (mask) ? 1 : 0)
+#define	F_ISSET(p, mask)	((p)->flags & (mask))
 #define	F_SET(p, mask)		((p)->flags |= (mask))
 
 #define	LF_CLR(mask)		((flags) &= ~(mask))
-#define	LF_ISSET(mask)		((flags) & (mask) ? 1 : 0)
+#define	LF_ISSET(mask)		((flags) & (mask))
 #define	LF_SET(mask)		((flags) |= (mask))
 
 #define	FLD_CLR(field, mask)	((field) &= ~(mask))
-#define	FLD_ISSET(field, mask)	((field) & (mask) ? 1 : 0)
+#define	FLD_ISSET(field, mask)	((field) & (mask))
 #define	FLD_SET(field, mask)	((field) |= (mask))
 
 /* Check for a verbose flag setting. */
