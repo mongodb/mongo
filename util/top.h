@@ -29,6 +29,7 @@ namespace mongo {
     class Top {
         typedef boost::posix_time::ptime T;
         typedef boost::posix_time::time_duration D;
+        typedef boost::tuple< D, int, int, int > UsageData;
     public:
         Top() : _read(false), _write(false) { }
         
@@ -128,7 +129,7 @@ namespace mongo {
             const char *ret = strrchr( ns, '.' );
             return ret && ret[ 1 ] == '\0';
         }
-        typedef map< string, boost::tuple< D, int, int, int > > UsageMap; // duration, # reads, # writes, # total calls
+        typedef map<string,UsageData> UsageMap; // duration, # reads, # writes, # total calls
         static T currentTime() {
             return boost::posix_time::microsec_clock::universal_time();
         }
@@ -137,12 +138,13 @@ namespace mongo {
             recordUsageForMap( _nextSnapshot, client, duration );
         }
         void recordUsageForMap( UsageMap &map, const string &client, D duration ) {
-            map[ client ].get< 0 >() += duration;
+            UsageData& g = map[client];
+            g.get< 0 >() += duration;
             if ( _read && !_write )
-                map[ client ].get< 1 >()++;
+                g.get< 1 >()++;
             else if ( !_read && _write )
-                map[ client ].get< 2 >()++;
-            map[ client ].get< 3 >()++;        
+                g.get< 2 >()++;
+            g.get< 3 >()++;        
         }
         static void fillParentNamespaces( UsageMap &to, const UsageMap &from ) {
             for( UsageMap::const_iterator i = from.begin(); i != from.end(); ++i ) {
@@ -158,7 +160,7 @@ namespace mongo {
                 }            
             }        
         }
-        static void inc( boost::tuple< D, int, int, int > &to, const boost::tuple< D, int, int, int > &from ) {
+        static void inc( UsageData &to, const UsageData &from ) {
             to.get<0>() += from.get<0>();
             to.get<1>() += from.get<1>();
             to.get<2>() += from.get<2>();
