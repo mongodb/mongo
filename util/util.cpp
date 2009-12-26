@@ -89,15 +89,6 @@ namespace mongo {
         }
     } utilTest;
     
-    Top::T Top::snapshotStart_ = Top::currentTime();
-    Top::D Top::snapshotDuration_;
-    Top::UsageMap Top::totalUsage_;
-    Top::UsageMap Top::snapshotA_;
-    Top::UsageMap Top::snapshotB_;
-    Top::UsageMap &Top::snapshot_ = Top::snapshotA_;
-    Top::UsageMap &Top::nextSnapshot_ = Top::snapshotB_;
-    boost::mutex Top::topMutex;
-    
     // The mutex contained in this object may be held on shutdown.
     FileAllocator &theFileAllocator_ = *(new FileAllocator());
     FileAllocator &theFileAllocator() { return theFileAllocator_; }
