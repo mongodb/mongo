@@ -481,6 +481,11 @@ namespace mongo {
 
 
     bool handlePossibleShardedMessage( Message &m, DbResponse &dbresponse ){
+
+        if ( shardConfigServer.empty() ){
+            return false;
+        }
+
         int op = m.data->operation();
         if ( op < 2000 || op >= 3000 )
             return false;
