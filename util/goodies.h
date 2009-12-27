@@ -265,6 +265,9 @@ namespace mongo {
         Timer() {
             reset();
         }
+        Timer( unsigned long long start ) {
+            old = start;
+        }
         int seconds(){
             return (int)(micros() / 1000000);
         }
@@ -278,6 +281,9 @@ namespace mongo {
         unsigned long long micros(unsigned long long & n) { // returns cur time in addition to timer result
             n = curTimeMicros64();
             return n - old;
+        }
+        unsigned long long startTime(){
+            return old;
         }
         void reset() {
             old = curTimeMicros64();
