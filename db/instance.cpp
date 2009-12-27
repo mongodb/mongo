@@ -256,28 +256,21 @@ namespace mongo {
             return true;
         }
 
-        mongolock lk(writeLock);
-
         Client& c = cc();
         c.clearns();
 
         stringstream ss;
-        time_t now = time(0);
 
         CurOp& currentOp = *c.curop();
-        currentOp.reset(now, client);
+        currentOp.reset( client);
         currentOp.setOp(op);
 
-//        char buf[64];
-//        time_t_to_String(now, buf);
-//        buf[20] = 0; // don't want the year
-//        ss << buf;
-
-        Timer t;
-
         int logThreshold = 100;
-        int ms;
         bool log = logLevel >= 1;
+
+        Timer t( currentOp.startTime() );
+
+        mongolock lk(writeLock);
 
 #if 0
         /* use this if you only want to process operations for a particular namespace.
@@ -387,11 +380,11 @@ namespace mongo {
                 assert(false);
             }
         }
-        ms = t.millis();
+        int ms = t.millis();
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
         if ( log || ms > logThreshold ) {
-            ss << ' ' << t.millis() << "ms";
+            ss << ' ' << ms << "ms";
             mongo::log() << ss.str() << endl;
         }
         Database *database = cc().database();

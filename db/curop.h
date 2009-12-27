@@ -15,7 +15,7 @@ namespace mongo {
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
         bool _active;
-        time_t startTime;
+        Timer _timer;
         int _op;
         WrappingInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
@@ -33,10 +33,10 @@ namespace mongo {
         }
 
     public:
-        void reset(time_t now, const sockaddr_in &_client) { 
+        void reset( const sockaddr_in &_client) { 
             _active = true;
             _opNum = _nextOpNum.atomicIncrement();
-            startTime = now;
+            _timer.reset();
             _ns[0] = '?'; // just in case not set later
             resetQuery();
             client = _client;
@@ -44,6 +44,13 @@ namespace mongo {
 
         WrappingInt opNum() const { return _opNum; }
         bool active() const { return _active; }
+
+        int elapsedMillis(){ return _timer.millis(); }
+        
+        /** micros */
+        unsigned long long startTime(){
+            return _timer.startTime();
+        }
 
         void setActive(bool active) { _active = active; }
         void setNS(const char *ns) {
@@ -61,7 +68,6 @@ namespace mongo {
         CurOp() { 
             _active = false;
 //            opNum = 0; 
-            startTime = 0;
             _op = 0;
             // These addresses should never be written to again.  The zeroes are
             // placed here as a precaution because currentOp may be accessed
@@ -85,7 +91,7 @@ namespace mongo {
             b.append("opid", _opNum);
             b.append("active", _active);
             if( _active ) 
-                b.append("secs_running", (int) (time(0)-startTime));
+                b.append("secs_running", _timer.seconds() );
             if( _op == 2004 ) 
                 b.append("op", "query");
             else if( _op == 2005 )
