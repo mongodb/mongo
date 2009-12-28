@@ -54,7 +54,7 @@ namespace mongo {
         theFileAllocator().allocateAsap( filename, length );
         len = length;
 
-        massert( 10446 ,  "mmap() can't map area of size 0" , length > 0 );
+        massert( 10446 ,  (string)"mmap() can't map area of size 0 [" + filename + "]" , length > 0 );
 
         
         fd = open(filename, O_RDWR | O_NOATIME);
