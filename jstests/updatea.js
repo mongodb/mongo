@@ -28,7 +28,7 @@ t.save( orig );
 t.update( {} , { $inc: { "comments.0.rate_up" : 1 } , $push: { "comments.0.rate_ups" : 99 } } )
 orig.comments[0].rate_up++;
 orig.comments[0].rate_ups.push( 99 )
-//assert.eq( orig , t.findOne() , "B1" )
+assert.eq( orig , t.findOne() , "B1" )
 
 
 
