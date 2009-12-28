@@ -339,6 +339,7 @@ namespace mongo {
                     return boolean();
                 case EOO:
                 case jstNULL:
+                case Undefined:
                     return false;
                 
                 default:
