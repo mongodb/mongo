@@ -29,6 +29,6 @@ for( i = 0; i < 10; ++i ) {
     argvs.push( [ Math.random() * 20, i ] );
 }
 
-runParallelTests( test, argvs, "one or more tests failed" );
+assert.parallelTests( test, argvs, "one or more tests failed" );
 
 assert( f.validate().valid );

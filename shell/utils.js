@@ -368,7 +368,7 @@ if ( typeof _threadInject != "undefined" ){
     }    
     
     // argvs: array of argv arrays - test will be called for each entry in argvs
-    runParallelTests = function( test, argvs, msg ) {
+    assert.parallelTests = function( test, argvs, msg ) {
         var failed = false;
         var wrapper = function( fun, argv ) {
             return function() {
