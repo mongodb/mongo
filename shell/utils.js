@@ -366,6 +366,30 @@ if ( typeof _threadInject != "undefined" ){
         Thread.apply( t, arguments );
         return t;
     }    
+    
+    // argvs: array of argv arrays - test will be called for each entry in argvs
+    runParallelTests = function( test, argvs, msg ) {
+        var failed = false;
+        var wrapper = function( fun, argv ) {
+            return function() {
+                try {
+                    fun.apply( 0, argv );
+                } catch ( e ) {
+                    failed = true;
+                    throw e;
+                }
+            }
+        }
+        var runners = new Array();
+        for( var i in argvs ) {
+            runners.push( fork( wrapper( test, argvs[ i ] ) ) );
+        }
+        
+        runners.forEach( function( x ) { x.start(); } );
+        runners.forEach( function( x ) { x.join(); } );
+        
+        assert( !failed, msg );
+    }
 }
 
 tojson = function( x, indent , nolint ){

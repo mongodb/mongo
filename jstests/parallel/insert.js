@@ -1,3 +1,5 @@
+// perform inserts in parallel from several clients
+
 f = db.jstests_parallel_basic;
 f.drop();
 f.ensureIndex( {me:1} );
@@ -9,34 +11,24 @@ expTimeout = function( mean ) {
     return -Math.log( Math.random() ) * mean;
 }
 
-failed = false;
-
 test = function( mean, me ) {
     var m = new Mongo( db.getMongo().host );
     var t = m.getDB( "test" ).jstests_parallel_basic;
     for( var i = 0; i < 1000; ++i ) {
         sleep( expTimeout( mean ) );
         if ( i % 50 == 0 ) {
-            try {
-                assert.eq( i, t.count( { who:me } ) );
-            } catch ( e ) {
-                failed = true;
-                throw e;
-            }
+            assert.eq( i, t.count( { who:me } ) );
             print( me + " " + i );
         }
-        t.insert( { i:i, who:me } );
+        t.save( { i:i, who:me } );
     }
 }
 
-runners = new Array();
+argvs = Array();
 for( i = 0; i < 10; ++i ) {
-    runners.push( fork( test, Math.random() * 20, i ) );
+    argvs.push( [ Math.random() * 20, i ] );
 }
 
-runners.forEach( function( x ) { x.start() } );
-runners.forEach( function( x ) { x.join() } );
-
-assert( !failed, "one or more threads failed" );
+runParallelTests( test, argvs, "one or more tests failed" );
 
 assert( f.validate().valid );
