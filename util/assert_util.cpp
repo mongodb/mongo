@@ -30,14 +30,14 @@ namespace mongo {
     void wasserted(const char *msg, const char *file, unsigned line) {
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(msg && *msg ? msg : "wassertion failure");
+        raiseError(0,msg && *msg ? msg : "wassertion failure");
         lastAssert[1].set(msg, getDbContext().c_str(), file, line);
     }
 
     void asserted(const char *msg, const char *file, unsigned line) {
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(msg && *msg ? msg : "assertion failure");
+        raiseError(0,msg && *msg ? msg : "assertion failure");
         lastAssert[0].set(msg, getDbContext().c_str(), file, line);
         stringstream temp;
         temp << "assertion " << file << ":" << line;
@@ -49,7 +49,7 @@ namespace mongo {
 
     void uassert_nothrow(const char *msg) {
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
-        raiseError(msg);
+        raiseError(0,msg);
     }
 
     int uacount = 0;
@@ -59,14 +59,14 @@ namespace mongo {
         else
             RARELY log() << "User Exception " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
-        raiseError(msg);
+        raiseError(msgid,msg);
         throw UserException(msgid, msg);
     }
 
     void msgasserted(int msgid, const char *msg) {
         log() << "Assertion: " << msgid << ":" << msg << endl;
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
-        raiseError(msg && *msg ? msg : "massert failure");
+        raiseError(msgid,msg && *msg ? msg : "massert failure");
         breakpoint();
         printStackTrace(); // TEMP?? should we get rid of this?  TODO
         throw MsgAssertionException(msgid, msg);

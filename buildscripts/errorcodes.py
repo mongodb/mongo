@@ -80,6 +80,5 @@ def checkErrorCodes():
 if __name__ == "__main__":
     ok = checkErrorCodes()
     print( "ok:" + str( ok ) )
-    if ok == False:
-        print( "next: " + str( getNextCode() ) )
+    print( "next: " + str( getNextCode() ) )
 

@@ -1532,7 +1532,7 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
-                raiseError(saveerrmsg.c_str());
+                raiseError(12506,saveerrmsg.c_str());
                 throw;
             }
         }
