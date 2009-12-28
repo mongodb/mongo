@@ -360,7 +360,7 @@ namespace mongo {
         }
         
     }
-
+    
     void ModSet::createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj ){
         BSONObjIteratorSorted es( obj );
         BSONElement e = es.next();
@@ -378,13 +378,16 @@ namespace mongo {
                 
             case LEFT_SUBFIELD: { // Mod is embeddeed under this element
                 uassert( "LEFT_SUBFIELD only supports Object" , e.type() == Object || e.type() == Array );
-                BSONObjBuilder bb ( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
-                stringstream nr; nr << root << e.fieldName() << ".";
-                createNewFromMods( nr.str() , bb , e.embeddedObject() );
-                bb.done();
-                // inc both as we handled both
-                e = es.next();
-                m++;
+                if ( onedownseen.count( e.fieldName() ) == 0 ){
+                    onedownseen.insert( e.fieldName() );
+                    BSONObjBuilder bb ( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
+                    stringstream nr; nr << root << e.fieldName() << ".";
+                    createNewFromMods( nr.str() , bb , e.embeddedObject() );
+                    bb.done();
+                    // inc both as we handled both
+                    e = es.next();
+                    m++;
+                }
                 continue;
             }
             case LEFT_BEFORE: // Mod on a field that doesn't exist
@@ -419,7 +422,7 @@ namespace mongo {
             _appendNewFromMods( root , m->second , b , onedownseen );
         }
     }
-            
+
     BSONObj ModSet::createNewFromMods( const BSONObj &obj ) {
         BSONObjBuilder b( (int)(obj.objsize() * 1.1) );
         createNewFromMods( "" , b , obj );

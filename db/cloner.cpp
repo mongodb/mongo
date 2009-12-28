@@ -641,7 +641,15 @@ namespace mongo {
                     size += i.ext()->length;
             
             setClient( target.c_str() );
-            uassert( "target namespace exists", !nsdetails( target.c_str() ) );
+            
+            if ( nsdetails( target.c_str() ) ){
+                uassert( "target namespace exists", cmdObj["dropTarget"].trueValue() );
+                BSONObjBuilder bb( result.subobjStart( "dropTarget" ) );
+                dropCollection( target , errmsg , bb );
+                bb.done();
+                if ( errmsg.size() > 0 )
+                    return false;
+            }
 
             {
                 char from[256];
