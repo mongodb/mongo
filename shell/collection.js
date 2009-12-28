@@ -308,8 +308,10 @@ DBCollection.prototype.drop = function(){
     return true;
 }
 
-DBCollection.prototype.renameCollection = function( newName ){
-    return this._db._adminCommand( { renameCollection : this._fullName , to : this._db._name + "." + newName } )
+DBCollection.prototype.renameCollection = function( newName , dropTarget ){
+    return this._db._adminCommand( { renameCollection : this._fullName , 
+                                     to : this._db._name + "." + newName , 
+                                     dropTarget : dropTarget } )
 }
 
 DBCollection.prototype.validate = function() {
