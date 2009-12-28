@@ -47,7 +47,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb.foo.mapReduce( mapFunction , reduceFunction , <optional params> )" );
     print("\tdb.foo.remove(query)" );
-    print("\tdb.foo.renameCollection( newName ) renames the collection");
+    print("\tdb.foo.renameCollection( newName , <dropTarget> ) renames the collection.");
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.stats()");
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
