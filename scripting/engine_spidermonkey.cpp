@@ -61,7 +61,7 @@ namespace mongo {
         }
 
         void check(){
-            uassert( "holder magic value is wrong" , _magic == 17 && _obj.isValid() );
+            uassert( 10212 ,  "holder magic value is wrong" , _magic == 17 && _obj.isValid() );
         }
 
         BSONFieldIterator * it();
@@ -144,7 +144,7 @@ namespace mongo {
             free( dst );
             if ( !JS_CStringsAreUTF8() )
                 for( string::const_iterator i = ss.begin(); i != ss.end(); ++i )
-                    uassert( "non ascii character detected", (unsigned char)(*i) <= 127 );
+                    uassert( 10213 ,  "non ascii character detected", (unsigned char)(*i) <= 127 );
             return ss;
         }
 
@@ -154,7 +154,7 @@ namespace mongo {
 
         double toNumber( jsval v ){
             double d;
-            uassert( "not a number" , JS_ValueToNumber( _context , v , &d ) );
+            uassert( 10214 ,  "not a number" , JS_ValueToNumber( _context , v , &d ) );
             return d;
         }
 
@@ -228,7 +228,7 @@ namespace mongo {
                  JSVAL_IS_VOID( v ) )
                 return BSONObj();
 
-            uassert( "not an object" , JSVAL_IS_OBJECT( v ) );
+            uassert( 10215 ,  "not an object" , JSVAL_IS_OBJECT( v ) );
             return toObject( JSVAL_TO_OBJECT( v ) );
         }
 
@@ -237,7 +237,7 @@ namespace mongo {
         }
 
         string getFunctionCode( jsval v ){
-            uassert( "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
+            uassert( 10216 ,  "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
         
@@ -294,7 +294,7 @@ namespace mongo {
                 break;
             }
 
-            default: uassert( (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
+            default: uassert( 10217 ,  (string)"can't append field.  name:" + name + " type: " + typeString( val ) , 0 );
             }
         }
 
@@ -575,7 +575,7 @@ namespace mongo {
             }
 
             cout << "toval: unknown type: " << e.type() << endl;
-            uassert( "not done: toval" , 0 );
+            uassert( 10218 ,  "not done: toval" , 0 );
             return 0;
         }
 
@@ -602,7 +602,7 @@ namespace mongo {
         }
 
         jsval getProperty( JSObject * o , const char * field ){
-            uassert( "object passed to getPropery is null" , o );
+            uassert( 10219 ,  "object passed to getPropery is null" , o );
             jsval v;
             assert( JS_GetProperty( _context , o , field , &v ) );
             return v;
@@ -693,7 +693,7 @@ namespace mongo {
             return JS_TRUE;
         }
 
-        uassert( "don't know what to do with this op" , 0 );
+        uassert( 10220 ,  "don't know what to do with this op" , 0 );
         return JS_FALSE;
     }
 
@@ -916,7 +916,7 @@ namespace mongo {
 #endif
 
             _runtime = JS_NewRuntime(8L * 1024L * 1024L);
-            uassert( "JS_NewRuntime failed" , _runtime );
+            uassert( 10221 ,  "JS_NewRuntime failed" , _runtime );
             
             if ( ! utf8Ok() ){
                 log() << "*** warning: spider monkey build without utf8 support.  consider rebuilding with utf8 support" << endl;
@@ -924,7 +924,7 @@ namespace mongo {
 
             int x = 0;
             assert( x = 1 );
-            uassert( "assert not being executed" , x == 1 );
+            uassert( 10222 ,  "assert not being executed" , x == 1 );
         }
 
         ~SMEngine(){
@@ -975,16 +975,16 @@ namespace mongo {
             smlock;
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
-            massert( "JS_NewContext failed" , _context );
+            massert( 10431 ,  "JS_NewContext failed" , _context );
 
             JS_SetOptions( _context , JSOPTION_VAROBJFIX);
             //JS_SetVersion( _context , JSVERSION_LATEST); TODO
             JS_SetErrorReporter( _context , errorReporter );
 
             _global = JS_NewObject( _context , &global_class, NULL, NULL);
-            massert( "JS_NewObject failed for global" , _global );
+            massert( 10432 ,  "JS_NewObject failed for global" , _global );
             JS_SetGlobalObject( _context , _global );
-            massert( "js init failed" , JS_InitStandardClasses( _context , _global ) );
+            massert( 10433 ,  "js init failed" , JS_InitStandardClasses( _context , _global ) );
 
             JS_SetOptions( _context , JS_GetOptions( _context ) | JSOPTION_VAROBJFIX );
 
@@ -999,7 +999,7 @@ namespace mongo {
         
         ~SMScope(){
             smlock;
-            uassert( "deleted SMScope twice?" , _convertor );
+            uassert( 10223 ,  "deleted SMScope twice?" , _convertor );
 
             for ( list<void*>::iterator i=_roots.begin(); i != _roots.end(); i++ ){
                 JS_RemoveRoot( _context , *i );
@@ -1056,7 +1056,7 @@ namespace mongo {
 
         void externalSetup(){
             smlock;
-            uassert( "already local connected" , ! _localConnect );
+            uassert( 10224 ,  "already local connected" , ! _localConnect );
             if ( _externalSetup )
                 return;
             initMongoJS( this , _context , _global , false );
@@ -1065,9 +1065,9 @@ namespace mongo {
 
         void localConnect( const char * dbName ){
             smlock;
-            uassert( "already setup for external db" , ! _externalSetup );
+            uassert( 10225 ,  "already setup for external db" , ! _externalSetup );
             if ( _localConnect ){
-                uassert( "connected to different db" , _localDBName == dbName );
+                uassert( 10226 ,  "connected to different db" , _localDBName == dbName );
                 return;
             }
             
@@ -1135,7 +1135,7 @@ namespace mongo {
             case JSTYPE_NUMBER: return NumberDouble;
             case JSTYPE_BOOLEAN: return Bool;
             default:
-                uassert( "unknown type" , 0 );
+                uassert( 10227 ,  "unknown type" , 0 );
             }
             return 0;
         }
@@ -1259,7 +1259,7 @@ namespace mongo {
             uninstallCheckTimeout( timeoutMs );
 
             if ( assertOnError )
-                uassert( name + " exec failed" , worked );
+                uassert( 10228 ,  name + " exec failed" , worked );
 
             if ( reportError && ! _error.empty() ){
                 // cout << "exec error: " << _error << endl;
@@ -1446,7 +1446,7 @@ namespace mongo {
             return;
 
         SMScope * scope = currentScope.get();
-        uassert( "need a scope" , scope );
+        uassert( 10229 ,  "need a scope" , scope );
         
         JSObject * o = JS_GetFunctionObject( f );
         assert( o );

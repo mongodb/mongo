@@ -125,11 +125,11 @@ namespace mongo {
 
     void asserted(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
-    void uasserted(const char *msg);
-    inline void uasserted(string msg) { uasserted(msg.c_str()); }
+    void uasserted(int msgid, const char *msg);
+    inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
     void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
-    void msgasserted(const char *msg);
-    inline void msgasserted(string msg) { msgasserted(msg.c_str()); }
+    void msgasserted(int msgid, const char *msg);
+    inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
 
 #ifdef assert
 #undef assert
@@ -138,8 +138,8 @@ namespace mongo {
 #define assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-//#define uassert(_Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
-#define uassert(msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msg), 0) )
+//#define uassert( 10269 , _Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
@@ -153,7 +153,7 @@ namespace mongo {
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define massert(msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msg), 0) )
+#define massert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msgid, msg), 0) )
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
@@ -164,6 +164,9 @@ namespace mongo {
 #define dassert(x) 
 #endif
 
+    // some special ids that we want to duplicate
+#define ASSERT_ID_DUPKEY 11000
+
 } // namespace mongo
 
 #define BOOST_CHECK_EXCEPTION( expression ) \
@@ -173,5 +176,5 @@ namespace mongo {
 		problem() << "caught boost exception: " << e.what() << endl; \
 		assert( false ); \
 	} catch ( ... ) { \
-		massert( "unknown boost failed" , false );   \
+		massert( 10437 ,  "unknown boost failed" , false );   \
 	}

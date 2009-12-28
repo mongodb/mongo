@@ -47,11 +47,11 @@ namespace mongo {
     void Request::reset( bool reload ){
         _config = grid.getDBConfig( getns() );
         if ( reload )
-            uassert( "db config reload failed!" , _config->reload() );
+            uassert( 10192 ,  "db config reload failed!" , _config->reload() );
 
         if ( _config->isSharded( getns() ) ){
             _chunkManager = _config->getChunkManager( getns() , reload );
-            uassert( (string)"no shard info for: " + getns() , _chunkManager );
+            uassert( 10193 ,  (string)"no shard info for: " + getns() , _chunkManager );
         }
         else {
             _chunkManager = 0;
@@ -68,7 +68,7 @@ namespace mongo {
             return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() ).getShard();
         }
         string s = _config->getShard( getns() );
-        uassert( "can't call singleServerName on a sharded collection!" , s.size() > 0 );
+        uassert( 10194 ,  "can't call singleServerName on a sharded collection!" , s.size() > 0 );
         return s;
     }
     
@@ -93,7 +93,7 @@ namespace mongo {
             }
             catch ( StaleConfigException& staleConfig ){
                 log() << staleConfig.what() << " attempt: " << attempt << endl;
-                uassert( "too many attempts to update config, failing" , attempt < 5 );
+                uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
                 
                 sleepsecs( attempt );
                 reset( true );

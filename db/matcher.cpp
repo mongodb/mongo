@@ -55,7 +55,7 @@ namespace mongo {
         BSONObj *jsScope;
         
         void setFunc(const char *code) {
-            massert( "scope has to be created first!" , scope.get() );
+            massert( 10341 ,  "scope has to be created first!" , scope.get() );
             func = scope->createFunction( code );
         }
         
@@ -127,8 +127,8 @@ namespace mongo {
 
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
-                uassert( "$where occurs twice?", where == 0 );
-                uassert( "$where query, but no script engine", globalScriptEngine );
+                uassert( 10066 ,  "$where occurs twice?", where == 0 );
+                uassert( 10067 ,  "$where query, but no script engine", globalScriptEngine );
                 where = new Where();
                 where->scope = globalScriptEngine->getPooledScope( cc().ns() );
                 where->scope->localConnect( cc().database()->name.c_str() );
@@ -183,7 +183,7 @@ namespace mongo {
                             if ( fn[1] == 'r' && fn[2] == 'e' && fn[3] == 'f' && fn[4] == 0 ){
                                 break; // { $ref : xxx } - treat as normal object
                             }
-                            uassert( (string)"invalid operator: " + fn , op != -1 );
+                            uassert( 10068 ,  (string)"invalid operator: " + fn , op != -1 );
                         }
 
                         isOperator = true;
@@ -241,7 +241,7 @@ namespace mongo {
                             break;
                         }
                         default:
-                            uassert( (string)"BUG - can't operator for: " + fn , 0 );
+                            uassert( 10069 ,  (string)"BUG - can't operator for: " + fn , 0 );
                         }
                         
                     }
@@ -520,7 +520,7 @@ namespace mongo {
         
         if ( where ) {
             if ( where->func == 0 ) {
-                uassert("$where compile error", false);
+                uassert( 10070 , "$where compile error", false);
                 return false; // didn't compile
             }
             
@@ -537,10 +537,10 @@ namespace mongo {
                 stringstream ss;
                 ss << "error on invocation of $where function:\n" 
                    << where->scope->getError();
-                uassert(ss.str(), false);
+                uassert( 10071 , ss.str(), false);
                 return false;
             } else if ( err != 0 ) { // ! INVOKE_SUCCESS
-                uassert("unknown error in invocation of $where function", false);
+                uassert( 10072 , "unknown error in invocation of $where function", false);
                 return false;                
             }
             return where->scope->getBoolean( "return" ) != 0;
@@ -609,7 +609,7 @@ namespace mongo {
             int ret = 0;
             
             pcre_config( PCRE_CONFIG_UTF8 , &ret );
-            massert( "pcre not compiled with utf8 support" , ret );
+            massert( 10342 ,  "pcre not compiled with utf8 support" , ret );
 
             pcrecpp::RE re1(")({a}h.*o");
             pcrecpp::RE re("h.llo");

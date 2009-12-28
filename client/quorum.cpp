@@ -13,7 +13,7 @@ namespace mongo {
             _connect( h );
         }
         _connect( commaSeperated );
-        uassert( "QuorumConnection needs 3 servers" , _conns.size() == 3 );
+        uassert( 10020 ,  "QuorumConnection needs 3 servers" , _conns.size() == 3 );
     }
 
     QuorumConnection::QuorumConnection( string a , string b , string c ){
@@ -104,7 +104,7 @@ namespace mongo {
     auto_ptr<DBClientCursor> QuorumConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                      const BSONObj *fieldsToReturn, int queryOptions){ 
 
-        uassert( "$cmd not support yet in QuorumConnection::query" , ns.find( "$cmd" ) == string::npos );
+        uassert( 10021 ,  "$cmd not support yet in QuorumConnection::query" , ns.find( "$cmd" ) == string::npos );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
@@ -122,7 +122,7 @@ namespace mongo {
     }
     
     auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
-        uassert("QuorumConnection::getMore not supported yet" , 0); 
+        uassert( 10022 , "QuorumConnection::getMore not supported yet" , 0); 
         auto_ptr<DBClientCursor> c;
         return c;
     }
@@ -140,7 +140,7 @@ namespace mongo {
     }
         
     void QuorumConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
-        uassert("QuorumConnection bulk insert not implemented" , 0); 
+        uassert( 10023 , "QuorumConnection bulk insert not implemented" , 0); 
     }
 
     void QuorumConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }

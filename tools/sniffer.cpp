@@ -370,8 +370,8 @@ int main(int argc, char **argv){
             } else if ( arg == string( "--forward" ) ) {
                 forwardAddress = args[ ++i ];
             } else if ( arg == string( "--source" ) ) {
-                uassert( "can't use --source twice" , source == false );
-                uassert( "source needs more args" , args.size() > i + 2);
+                uassert( 10266 ,  "can't use --source twice" , source == false );
+                uassert( 10267 ,  "source needs more args" , args.size() > i + 2);
                 source = true;
                 replay = ( args[ ++i ] == string( "FILE" ) );
                 if ( replay )

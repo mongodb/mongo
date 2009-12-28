@@ -37,7 +37,7 @@ namespace mongo {
         if ( ! nsdetails( ns ) )
             return;
 
-        uassert( (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
+        uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
     }
     
     double elementDirection( const BSONElement &e ) {
@@ -175,7 +175,7 @@ namespace mongo {
             return findTableScan( fbs_.ns(), order_, startLoc );
         }
 
-        massert( "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
+        massert( 10363 ,  "newCursor() with start location not implemented for indexed plans", startLoc.isNull() );
         
         if ( indexBounds_.size() < 2 ) {
             // we are sure to spec endKeyInclusive_
@@ -194,7 +194,7 @@ namespace mongo {
                 orderSpec = 1;
             return findTableScan( fbs_.ns(), BSON( "$natural" << -orderSpec ) );
         }
-        massert( "newReverseCursor() not implemented for indexed plans", false );
+        massert( 10364 ,  "newReverseCursor() not implemented for indexed plans", false );
         return auto_ptr< Cursor >( 0 );
     }
     
@@ -235,7 +235,7 @@ namespace mongo {
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
             // This reformats min_ and max_ to be used for index lookup.
-            massert( errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
+            massert( 10365 ,  errmsg, indexDetailsForRange( fbs_.ns(), errmsg, min_, max_, keyPattern ) );
         }
         NamespaceDetails *d = nsdetails(ns);
         plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(id), fbs_, order_, min_, max_ ) ) );
@@ -270,9 +270,9 @@ namespace mongo {
             }
             else if( hint.type() == Object ) { 
                 BSONObj hintobj = hint.embeddedObject();
-                uassert( "bad hint", !hintobj.isEmpty() );
+                uassert( 10112 ,  "bad hint", !hintobj.isEmpty() );
                 if ( !strcmp( hintobj.firstElement().fieldName(), "$natural" ) ) {
-                    massert( "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
+                    massert( 10366 ,  "natural order cannot be specified with $min/$max", min_.isEmpty() && max_.isEmpty() );
                     // Table scan plan
                     plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
                     return;
@@ -286,14 +286,14 @@ namespace mongo {
                     }
                 }
             }
-            uassert( "bad hint", false );
+            uassert( 10113 ,  "bad hint", false );
         }
         
         if ( !min_.isEmpty() || !max_.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, min_, max_, keyPattern );
-            massert( errmsg, idx );
+            massert( 10367 ,  errmsg, idx );
             plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, min_, max_ ) ) );
             return;
         }
@@ -321,7 +321,7 @@ namespace mongo {
                         return;
                     }
                 }
-                massert( "Unable to locate previously recorded index", false );
+                massert( 10368 ,  "Unable to locate previously recorded index", false );
             }
         }
         
@@ -393,7 +393,7 @@ namespace mongo {
     }
     
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
-        massert( "no plans", plans_.plans_.size() > 0 );
+        massert( 10369 ,  "no plans", plans_.plans_.size() > 0 );
         
         if ( plans_.plans_.size() > 1 )
             log(1) << "  running multiple plans" << endl;

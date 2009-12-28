@@ -65,7 +65,7 @@ namespace mongo {
 
             Message response;
             bool ok = c.port().call( r.m() , response);
-            uassert("dbgrid: getmore: error calling db", ok);
+            uassert( 10204 , "dbgrid: getmore: error calling db", ok);
             r.reply( response );
         
             dbcon.done();
@@ -81,7 +81,7 @@ namespace mongo {
                     BSONObj o = d.nextJsObj();
                     const char * ns = o["ns"].valuestr();
                     if ( r.getConfig()->isSharded( ns ) ){
-                        uassert( (string)"can't use unique indexes with sharding  ns:" + ns + 
+                        uassert( 10205 ,  (string)"can't use unique indexes with sharding  ns:" + ns + 
                                  " key: " + o["key"].embeddedObjectUserCheck().toString() , 
                                  IndexDetails::isIdIndexPattern( o["key"].embeddedObjectUserCheck() ) || 
                                  ! o["unique"].trueValue() );

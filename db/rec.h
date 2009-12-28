@@ -65,7 +65,7 @@ public:
     static char* get(DiskLoc d, unsigned len) { 
         assert( d.a() == INMEMFILE );
 #ifdef __LP64__
-		massert("64 bit not done", false);
+		massert( 10372 , "64 bit not done", false);
 		return 0;
 #else
 		return (char *) d.getOfs();
@@ -93,7 +93,7 @@ public:
     }
 
     virtual void rename(const char *fromNs, const char *toNs) {
-      massert( "rename not yet implemented for InMem_RecStore", false );
+      massert( 10373 ,  "rename not yet implemented for InMem_RecStore", false );
     }
 };
 #endif

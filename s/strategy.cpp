@@ -42,7 +42,7 @@ namespace mongo {
                 }
             }
 
-            uassert("mongos: error calling db", ok);
+            uassert( 10200 , "mongos: error calling db", ok);
             r.reply( response );
             dbcon.done();
         }
@@ -98,7 +98,7 @@ namespace mongo {
                         int len;
 
                         Message m( (void*)data["msg"].binData( len ) , false );
-                        massert( "invalid writeback message" , m.data->valid() );                        
+                        massert( 10427 ,  "invalid writeback message" , m.data->valid() );                        
 
                         grid.getDBConfig( ns )->getChunkManager( ns , true );
                         
@@ -178,7 +178,7 @@ namespace mongo {
         log(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result.getBoolField( "need_authoritative" ) )
-            massert( "need_authoritative set but in authoritative mode already" , ! authoritative );
+            massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
         
         if ( ! authoritative ){
             checkShardVersion( conn , ns , 1 );
@@ -186,7 +186,7 @@ namespace mongo {
         }
         
         log(1) << "     setShardVersion failed: " << result << endl;
-        massert( "setShardVersion failed!" , 0 );
+        massert( 10429 ,  "setShardVersion failed!" , 0 );
     }
     
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){

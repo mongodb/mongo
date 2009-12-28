@@ -111,7 +111,7 @@ namespace mongo {
             size &= 0xffffffffffffff00LL;
         }
         
-        uassert( "invalid size spec", size > 0 );
+        uassert( 10083 ,  "invalid size spec", size > 0 );
 
         bool newCapped = false;
         int mx = 0;
@@ -172,7 +172,7 @@ namespace mongo {
     // returns true if successful
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication) {
         const char *coll = strchr( ns, '.' ) + 1;
-        massert( "invalid ns", coll && *coll );
+        massert( 10356 ,  "invalid ns", coll && *coll );
         char cl[ 256 ];
         nsToClient( ns, cl );
         bool ok = _userCreateNS(ns, j, err);
@@ -237,7 +237,7 @@ namespace mongo {
                 Database *database = cc().database();
                 if ( database )
                     s += database->name;
-                uasserted(s);
+                uasserted(12501,s);
             }
         }
 
@@ -265,9 +265,9 @@ namespace mongo {
         
         header = (MDFHeader *) mmf.map(filename, size);
         if( sizeof(char *) == 4 ) 
-            uassert("can't map file memory - mongo requires 64 bit build for larger datasets", header);
+            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", header);
         else
-            uassert("can't map file memory", header);
+            uassert( 10085 , "can't map file memory", header);
         header->init(fileNo, size);
     }
 
@@ -294,9 +294,9 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        massert( "shutdown in progress", !goingAway );
-        massert( "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
-        massert( "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
+        massert( 10357 ,  "shutdown in progress", !goingAway );
+        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
+        massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
         DiskLoc loc;
         if ( ExtentSize <= 0 ) {
@@ -389,7 +389,7 @@ namespace mongo {
 
     DiskLoc Extent::reuse(const char *nsname) { 
         log(3) << "reset extent was:" << nsDiagnostic.buf << " now:" << nsname << '\n';
-        massert( "Extent::reset bad magic value", magic == 0x41424344 );
+        massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
         xprev.Null();
         nsDiagnostic = nsname;
@@ -577,15 +577,15 @@ namespace mongo {
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
-        uassert( (string)"ns not found: " + nsToDrop , d );
+        uassert( 10086 ,  (string)"ns not found: " + nsToDrop , d );
 
         NamespaceString s(nsToDrop);
         assert( s.db == cc().database()->name );
         if( s.isSystem() ) {
             if( s.coll == "system.profile" ) 
-                uassert( "turn off profiling before dropping system.profile collection", cc().database()->profile == 0 );
+                uassert( 10087 ,  "turn off profiling before dropping system.profile collection", cc().database()->profile == 0 );
             else
-                uasserted( "can't drop system ns" );
+                uasserted( 12502, "can't drop system ns" );
         }
 
         {
@@ -604,7 +604,7 @@ namespace mongo {
                 string err;
                 _userCreateNS(s.c_str(), BSONObj(), err);
                 freeExtents = nsdetails(s.c_str());
-                massert("can't create .$freelist", freeExtents);
+                massert( 10361 , "can't create .$freelist", freeExtents);
             }
             if( freeExtents->firstExtent.isNull() ) { 
                 freeExtents->firstExtent = d->firstExtent;
@@ -635,7 +635,7 @@ namespace mongo {
                 assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
             catch( DBException& ) {
-                uasserted("drop: deleteIndexes for collection failed - consider trying repair");
+                uasserted(12503,"drop: deleteIndexes for collection failed - consider trying repair");
             }
             assert( d->nIndexes == 0 );
         }
@@ -697,7 +697,7 @@ namespace mongo {
                 arrElt = e;
             }
             // enforce single array path here
-            uassert( "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
+            uassert( 10088 ,  "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
         }
         bool allFound = true; // have we found elements for all field names in the key spec?
         for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
@@ -877,7 +877,7 @@ namespace mongo {
         NamespaceDetails* d = nsdetails(ns);
         if ( d->capped && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
-            uassert( "can't remove from a capped collection E00051" , 0 );
+            uassert( 10089 ,  "can't remove from a capped collection" , 0 );
             return;
         }
 
@@ -916,7 +916,7 @@ namespace mongo {
             if( added.empty() || !idx.unique() )
                 return;
             for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ )
-                uassert("E11001 duplicate key on update", !idx.hasKey(**i));
+                uassert( 11001 , "E11001 duplicate key on update", !idx.hasKey(**i));
         }
     };
 
@@ -982,7 +982,7 @@ namespace mongo {
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
-            uassert("E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
+            uassert( 10003 , "E10003 failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
             if ( cc().database()->profile )
                 ss << " moved ";
@@ -1165,7 +1165,7 @@ namespace mongo {
                        keep in ram and have a limit.
                     */
                     dupsToDrop.push_back(d.second);
-                    uassert("too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
+                    uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
                 pm2.hit();
             }
@@ -1329,11 +1329,11 @@ namespace mongo {
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
-        uassert("cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
-        uassert("invalid ns", strchr( ns , '.' ) > 0 );
+        uassert( 10093 , "cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
+        uassert( 10094 , "invalid ns", strchr( ns , '.' ) > 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {
-            uassert("attempt to insert in reserved database name 'system'", sys != ns);
+            uassert( 10095 , "attempt to insert in reserved database name 'system'", sys != ns);
             if ( strstr(ns, ".system.") ) {
                 // later:check for dba-type permissions here if have that at some point separate
                 if ( strstr(ns, ".system.indexes" ) )
@@ -1372,23 +1372,23 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
-            uassert( "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
+            uassert( 10096 ,  "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
             if ( cc().database()->name != nsToClient(tabletoidxns.c_str()) ) {
-                uassert("bad table to index name on add index attempt", false);
+                uassert( 10097 , "bad table to index name on add index attempt", false);
                 return DiskLoc();
             }
 
             BSONObj key = io.getObjectField("key");
             if( !validKeyPattern(key) ) {
                 string s = string("bad index key pattern ") + key.toString();
-                uassert(s.c_str(), false);
+                uassert( 10098 , s.c_str(), false);
             }
             if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
                 out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                     tabletoidxns << "\n  ourns:" << ns;
                 out() << "\n  idxobj:" << io.toString() << endl;
                 string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(s);
+                uasserted(12504, s);
             }
             tableToIndex = nsdetails(tabletoidxns.c_str());
             if ( tableToIndex == 0 ) {
@@ -1411,7 +1411,7 @@ namespace mongo {
                 ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
                 string s = ss.str();
                 log() << s << '\n';
-                uasserted(s);
+                uasserted(12505,s);
             }
             if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
                 ensureHaveIdIndex( tabletoidxns.c_str() );
@@ -1430,7 +1430,7 @@ namespace mongo {
             */
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
-            uassert( "_id cannot be an array", idField.type() != Array );
+            uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
             if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 ) {
                 addID = len;
                 if ( writeId.eoo() ) {

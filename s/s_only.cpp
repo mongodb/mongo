@@ -23,7 +23,7 @@
 namespace mongo {
 
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
-        uassert( "Helpers::find can't be used in mongos" , 0 );
+        uassert( 10196 ,  "Helpers::find can't be used in mongos" , 0 );
         auto_ptr<CursorIterator> i;
         return i;
     }

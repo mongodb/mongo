@@ -69,7 +69,7 @@ namespace mongo {
                 BSONObjIterator i(k);
                 while( i.more() ) {
                     BSONElement e = i.next();
-                    uassert( "can only handle numbers here - which i think is correct" , e.isNumber() );
+                    uassert( 10163 ,  "can only handle numbers here - which i think is correct" , e.isNumber() );
                     r.append( e.fieldName() , -1 * e.number() );
                 }
                 
@@ -91,7 +91,7 @@ namespace mongo {
                                                  ) , result ) ){
             stringstream ss;
             ss << "medianKey command failed: " << result;
-            uassert( ss.str() , 0 );
+            uassert( 10164 ,  ss.str() , 0 );
         }
         conn.done();
         
@@ -103,12 +103,12 @@ namespace mongo {
     }
     
     Chunk * Chunk::split( const BSONObj& m ){
-        uassert( "can't split as shard that doesn't have a manager" , _manager );
+        uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
         
         log(1) << " before split on: "  << m << "\n"
                << "\t self  : " << toString() << endl;
 
-        uassert( "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
+        uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
 
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
@@ -134,7 +134,7 @@ namespace mongo {
     }
 
     bool Chunk::moveAndCommit( const string& to , string& errmsg ){
-        uassert( "can't move shard to its current location!" , to != getShard() );
+        uassert( 10167 ,  "can't move shard to its current location!" , to != getShard() );
 
         log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard << " -> " << to << endl;
         
@@ -187,7 +187,7 @@ namespace mongo {
             }
             else if ( newVersion <= oldVersion ){
                 log() << "newVersion: " << newVersion << " oldVersion: " << oldVersion << endl;
-                uassert( "version has to be higher" , newVersion > oldVersion );
+                uassert( 10168 ,  "version has to be higher" , newVersion > oldVersion );
             }
             
             BSONObjBuilder b;
@@ -262,7 +262,7 @@ namespace mongo {
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation << " #objcets: " << toMove->countObjects() << endl;
 
         string errmsg;
-        massert( (string)"moveAndCommit failed: " + errmsg , 
+        massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 
                  toMove->moveAndCommit( newLocation , errmsg ) );
         
         return true;
@@ -272,7 +272,7 @@ namespace mongo {
         ScopedDbConnection conn( getShard() );
         
         BSONObj result;
-        uassert( "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
+        uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
                                                                         << "keyPattern" << _manager->getShardKey().key() 
                                                                         << "min" << getMin() 
                                                                         << "max" << getMax() 
@@ -335,11 +335,11 @@ namespace mongo {
             _max = from.getObjectField( "maxDotted" ).getOwned();
         }
         
-        uassert( "Chunk needs a ns" , ! _ns.empty() );
-        uassert( "Chunk needs a server" , ! _ns.empty() );
+        uassert( 10170 ,  "Chunk needs a ns" , ! _ns.empty() );
+        uassert( 10171 ,  "Chunk needs a server" , ! _ns.empty() );
 
-        uassert( "Chunk needs a min" , ! _min.isEmpty() );
-        uassert( "Chunk needs a max" , ! _max.isEmpty() );
+        uassert( 10172 ,  "Chunk needs a min" , ! _min.isEmpty() );
+        uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
     }
 
     string Chunk::modelServer() {
@@ -358,15 +358,15 @@ namespace mongo {
         Model::save( check );
         if ( reload ){
             // need to do this so that we get the new _lastMod and therefore version number
-            massert( "_id has to be filled in already" , ! _id.isEmpty() );
+            massert( 10413 ,  "_id has to be filled in already" , ! _id.isEmpty() );
             
             string b = toString();
             BSONObj q = _id.copy();
-            massert( "how could load fail?" , load( q ) );
+            massert( 10414 ,  "how could load fail?" , load( q ) );
             log(2) << "before: " << q << "\t" << b << endl;
             log(2) << "after : " << _id << "\t" << toString() << endl;
-            massert( "chunk reload changed content!" , b == toString() );
-            massert( "id changed!" , q["_id"] == _id["_id"] );
+            massert( 10415 ,  "chunk reload changed content!" , b == toString() );
+            massert( 10416 ,  "id changed!" , q["_id"] == _id["_id"] );
         }
     }
     
@@ -492,7 +492,7 @@ namespace mongo {
     }
     
     void ChunkManager::drop(){
-        uassert( "config servers not all up" , configServer.allUp() );
+        uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
         map<string,ShardChunkVersion> seen;
         
@@ -509,7 +509,7 @@ namespace mongo {
                 continue;
 
             // rollback
-            uassert( "don't know how to rollback locks b/c drop can't lock all shards" , 0 );
+            uassert( 10175 ,  "don't know how to rollback locks b/c drop can't lock all shards" , 0 );
         }
         
         log(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;        
@@ -529,7 +529,7 @@ namespace mongo {
         log(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;        
 
         // clean up database meta-data
-        uassert( "no sharding data?" , _config->removeSharding( _ns ) );
+        uassert( 10176 ,  "no sharding data?" , _config->removeSharding( _ns ) );
         _config->save();
         
         
@@ -567,7 +567,7 @@ namespace mongo {
             withRealChunks.insert( c->getShard() );
         }
         
-        massert( "how did version get smalled" , getVersion() >= a );
+        massert( 10417 ,  "how did version get smalled" , getVersion() >= a );
 
         ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
     }

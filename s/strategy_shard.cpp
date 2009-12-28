@@ -128,7 +128,7 @@ namespace mongo {
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
-            uassert( "invalid update" , d.moreJSObjs() );
+            uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
 
             BSONObj chunkFinder = query;
@@ -137,7 +137,7 @@ namespace mongo {
             bool multi = flags & Option_Multi;
 
             if ( multi )
-                uassert( "can't mix multi and upsert and sharding" , ! upsert );
+                uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
 
             if ( upsert && ! manager->hasShardKey( toupdate ) )
                 throw UserException( "can't upsert something without shard key" );
@@ -190,7 +190,7 @@ namespace mongo {
             int flags = d.pullInt();
             bool justOne = flags & 1;
             
-            uassert( "bad delete message" , d.moreJSObjs() );
+            uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
 
             vector<Chunk*> chunks;

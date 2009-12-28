@@ -53,9 +53,9 @@ namespace mongo {
     }
 
     int uacount = 0;
-    void uasserted(const char *msg) {
+    void uasserted(int msgid, const char *msg) {
         if ( ++uacount < 100 )
-            log() << "User Exception " << msg << endl;
+            log() << "User Exception " << msgid << ":" << msg << endl;
         else
             RARELY log() << "User Exception " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
@@ -63,8 +63,8 @@ namespace mongo {
         throw UserException(msg);
     }
 
-    void msgasserted(const char *msg) {
-        log() << "Assertion: " << msg << endl;
+    void msgasserted(int msgid, const char *msg) {
+        log() << "Assertion: " << msgid << ":" << msg << endl;
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg && *msg ? msg : "massert failure");
         breakpoint();
@@ -100,7 +100,7 @@ namespace mongo {
         }
         
         void start( const string& lp , bool append ){
-            uassert( "LoggingManager already started" , ! _enabled );
+            uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
 
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );

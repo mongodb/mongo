@@ -72,7 +72,7 @@ namespace mongo {
             memcpy( data , &_inHeader , sizeof( _inHeader ) );
             assert( data->len == _inHeader.len );
             
-            uassert( "_cur not empty! pipelining requests not supported" , ! _cur.data );
+            uassert( 10273 ,  "_cur not empty! pipelining requests not supported" , ! _cur.data );
 
             _cur.setData( data , true );
             async_read( _socket ,
@@ -112,7 +112,7 @@ namespace mongo {
 
             _reply.data->id = nextMessageId();
             _reply.data->responseTo = responseTo;
-            uassert( "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
+            uassert( 10274 ,  "pipelining requests doesn't work yet" , query.data->id == _cur.data->id );
         }
 
         

@@ -151,7 +151,7 @@ public:
             if ( size >= BUF_SIZE ){
                 cerr << "got an object of size: " << size << "  terminating..." << endl;
             }
-            uassert( "invalid object size" , size < BUF_SIZE );
+            uassert( 10264 ,  "invalid object size" , size < BUF_SIZE );
 
             file.read( buf + 4 , size - 4 );
 
@@ -166,7 +166,7 @@ public:
 
         free( buf );
 
-        uassert( "counts don't match" , m.done() == fileLength );
+        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
         out() << "\t "  << m.hits() << " objects" << endl;
     }
 };

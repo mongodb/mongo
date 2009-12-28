@@ -24,10 +24,10 @@ RecStoreInterface *btreeStore = new MongoMemMapped_RecStore();
 
 void BasicRecStore::init(const char *fn, unsigned recsize)
 { 
-    massert( "compile packing problem recstore?", sizeof(RecStoreHeader) == 8192);
+    massert( 10394 ,  "compile packing problem recstore?", sizeof(RecStoreHeader) == 8192);
     filename = fn;
     f.open(fn);
-    uassert( string("couldn't open file:")+fn, f.is_open() );
+    uassert( 10130 ,  string("couldn't open file:")+fn, f.is_open() );
     len = f.len();
     if( len == 0 ) { 
         log() << "creating recstore file " << fn << '\n';
@@ -37,13 +37,13 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
     }    
     else { 
         f.read(0, (char *) &h, sizeof(RecStoreHeader));
-        massert(string("recstore was not closed cleanly: ")+fn, h.cleanShutdown==0);
-        massert(string("recstore recsize mismatch, file:")+fn, h.recsize == recsize);
-        massert(string("bad recstore [1], file:")+fn, (h.leof-sizeof(RecStoreHeader)) % recsize == 0);        
+        massert( 10395 , string("recstore was not closed cleanly: ")+fn, h.cleanShutdown==0);
+        massert( 10396 , string("recstore recsize mismatch, file:")+fn, h.recsize == recsize);
+        massert( 10397 , string("bad recstore [1], file:")+fn, (h.leof-sizeof(RecStoreHeader)) % recsize == 0);        
         if( h.leof > len ) { 
             stringstream ss;
             ss << "bad recstore, file:" << fn << " leof:" << h.leof << " len:" << len;
-            massert(ss.str(), false);
+            massert( 10398 , ss.str(), false);
         }
         if( h.cleanShutdown )
             log() << "warning: non-clean shutdown for file " << fn << '\n';

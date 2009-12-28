@@ -35,11 +35,11 @@ namespace mongo {
         {
             {
                 int L = strlen(nm);
-                uassert( "db name is empty", L > 0 );
-                uassert( "bad db name [1]", *nm != '.' );
-                uassert( "bad db name [2]", nm[L-1] != '.' );
-                uassert( "bad char(s) in db name", strchr(nm, ' ') == 0 );
-                uassert( "db name too long", L < 64 );
+                uassert( 10028 ,  "db name is empty", L > 0 );
+                uassert( 10029 ,  "bad db name [1]", *nm != '.' );
+                uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
+                uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
+                uassert( 10032 ,  "db name too long", L < 64 );
             }
 
             newDb = namespaceIndex.exists();
@@ -86,9 +86,9 @@ namespace mongo {
                 out() << "getFile(): n=" << n << endl;
 #if !defined(_RECSTORE)
                 if( n >= RecCache::Base && n <= RecCache::Base+1000 )
-                    massert("getFile(): bad file number - using recstore db w/nonrecstore db build?", false);
+                    massert( 10294 , "getFile(): bad file number - using recstore db w/nonrecstore db build?", false);
 #endif
-                massert("getFile(): bad file number value (corrupt db?): run repair", false);
+                massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
             }
             DEV {
                 if ( n > 100 )

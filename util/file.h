@@ -94,7 +94,7 @@ public:
         if( !ok ) 
             err(ok);
         else
-            massert("ReadFile error - truncated file?", read == len);
+            massert( 10438 , "ReadFile error - truncated file?", read == len);
     }
     bool bad() { return _bad; }
     bool is_open() { return fd != INVALID_HANDLE_VALUE; }

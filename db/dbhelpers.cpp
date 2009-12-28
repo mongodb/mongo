@@ -131,7 +131,7 @@ namespace mongo {
         QueryPlanSet s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
-        massert( res->exceptionMessage(), res->complete() );
+        massert( 10302 ,  res->exceptionMessage(), res->complete() );
         if ( res->one().isEmpty() )
             return false;
         result = res->one();
@@ -139,7 +139,7 @@ namespace mongo {
     }
 
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
-        uassert( "requireIndex not supported in Helpers::find yet" , ! requireIndex );
+        uassert( 10047 ,  "requireIndex not supported in Helpers::find yet" , ! requireIndex );
         auto_ptr<CursorIterator> i;
         i.reset( new CursorIterator( DataFileMgr::findAll( ns ) , query ) );
         return i;
@@ -216,7 +216,7 @@ namespace mongo {
             Helpers::emptyCollection( name_.c_str() );
         } else {
             string err;
-            massert( err, userCreateNS( name_.c_str(), fromjson( "{autoIndexId:false}" ), err, false ) );
+            massert( 10303 ,  err, userCreateNS( name_.c_str(), fromjson( "{autoIndexId:false}" ), err, false ) );
         }
         Helpers::ensureIndex( name_.c_str(), key_, true, "setIdx" );            
     }

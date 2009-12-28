@@ -61,7 +61,7 @@ namespace mongo {
             MessageServer( port , handler ) , 
             Listener( "", port ){
             
-            uassert( "multiple PortMessageServer not supported" , ! pms::handler );
+            uassert( 10275 ,  "multiple PortMessageServer not supported" , ! pms::handler );
             pms::handler = handler;
         }
         

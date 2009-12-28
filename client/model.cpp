@@ -36,7 +36,7 @@ namespace mongo {
     }
 
     void Model::remove( bool safe ){
-        uassert( "_id isn't set - needed for remove()" , _id["_id"].type() );
+        uassert( 10016 ,  "_id isn't set - needed for remove()" , _id["_id"].type() );
         
         ScopedDbConnection conn( modelServer() );
         conn->remove( getNS() , _id );

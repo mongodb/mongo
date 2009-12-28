@@ -957,6 +957,13 @@ testEnv.Prepend( LIBPATH=["."] )
 
 # ----- TARGETS ------
 
+def checkErrorCodes():
+    import buildscripts.errorcodes as x
+    if x.checkErrorCodes() == False:
+        print( "next id to use:" + x.getNextCode() )
+        Exit(-1)
+
+checkErrorCodes()
 
 # main db target
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ] )

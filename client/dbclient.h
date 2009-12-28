@@ -418,7 +418,7 @@ namespace mongo {
         virtual bool dropCollection( const string &ns ){
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
-            uassert( "no collection name", coll.size() );
+            uassert( 10011 ,  "no collection name", coll.size() );
 
             BSONObj info;
             

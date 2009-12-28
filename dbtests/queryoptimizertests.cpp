@@ -779,7 +779,7 @@ namespace QueryOptimizerTests {
                 virtual void next() {
                     if ( iThrow_ )
                         threw_ = true;
-                    massert( "throw", !iThrow_ );
+                    massert( 10408 ,  "throw", !iThrow_ );
                     if ( ++i_ > 10 )
                         setComplete();
                 }
@@ -815,7 +815,7 @@ namespace QueryOptimizerTests {
             public:
                 virtual void init() {}
                 virtual void next() {
-                    massert( "throw", false );
+                    massert( 10409 ,  "throw", false );
                 }
                 virtual QueryOp *clone() const {
                     return new TestOp();
@@ -916,7 +916,7 @@ namespace QueryOptimizerTests {
                 virtual void init() {}
                 virtual void next() {
                     if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
-                        massert( "throw", false );
+                        massert( 10410 ,  "throw", false );
                     setComplete();
                 }
                 virtual QueryOp *clone() const {
@@ -928,7 +928,7 @@ namespace QueryOptimizerTests {
                 virtual void next() {
                     if ( qp().indexKey().firstElement().fieldName() == string( "$natural" ) )
                         setComplete();
-                    massert( "throw", false );
+                    massert( 10411 ,  "throw", false );
                 }
                 virtual QueryOp *clone() const {
                     return new ScanOnlyTestOp();

@@ -80,13 +80,13 @@ namespace mongo {
     public:
         /** get the associated connection object */
         DBClientBase* operator->(){ 
-            uassert( "did you call done already" , _conn );
+            uassert( 11004 ,  "did you call done already" , _conn );
             return _conn; 
         }
 
         /** get the associated connection object */
         DBClientBase& conn() {
-            uassert( "did you call done already" , _conn );
+            uassert( 11005 ,  "did you call done already" , _conn );
             return *_conn;
         }
 

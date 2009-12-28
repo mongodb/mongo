@@ -131,10 +131,10 @@ namespace mongo {
         void checkForInterrupt() { 
             if( state != Off ) { 
                 if( state == All ) 
-                    uasserted("interrupted at shutdown");
+                    uasserted(11600,"interrupted at shutdown");
                 if( cc().curop()->opNum() == toKill ) { 
                     state = Off;
-                    uasserted("interrupted");
+                    uasserted(11601,"interrupted");
                 }
             }
         }

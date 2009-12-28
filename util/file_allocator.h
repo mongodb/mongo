@@ -152,7 +152,7 @@ namespace mongo {
                             if ( fd <= 0 ) {
                                 stringstream ss;
                                 ss << "couldn't open " << name << ' ' << OUTPUT_ERRNO;
-                                massert( ss.str(), fd <= 0 );
+                                massert( 10439 ,  ss.str(), fd <= 0 );
                             }
 
 #if defined(POSIX_FADV_DONTNEED)
@@ -164,11 +164,11 @@ namespace mongo {
                             /* make sure the file is the full desired length */
                             off_t filelen = lseek(fd, 0, SEEK_END);
                             if ( filelen < size ) {
-                                massert( "failure creating new datafile", filelen == 0 );
+                                massert( 10440 ,  "failure creating new datafile", filelen == 0 );
                                 // Check for end of disk.
-                                massert( "Unable to allocate file of desired size",
+                                massert( 10441 ,  "Unable to allocate file of desired size",
                                         size - 1 == lseek(fd, size - 1, SEEK_SET) );
-                                massert( "Unable to allocate file of desired size",
+                                massert( 10442 ,  "Unable to allocate file of desired size",
                                         1 == write(fd, "", 1) );
                                 lseek(fd, 0, SEEK_SET);
                                 log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
@@ -179,10 +179,10 @@ namespace mongo {
                                 long left = size;
                                 while ( 1 ) {
                                     if ( left <= z ) {
-                                        massert( "write failed", left == write(fd, buf, left) );
+                                        massert( 10443 ,  "write failed", left == write(fd, buf, left) );
                                         break;
                                     }
-                                    massert( "write failed", z == write(fd, buf, z) );
+                                    massert( 10444 ,  "write failed", z == write(fd, buf, z) );
                                     left -= z;
                                 }
                                 log() << "done allocating datafile " << name << ", size: " << size/1024/1024 << "MB, took " << ((double)t.millis())/1000.0 << " secs" << endl;

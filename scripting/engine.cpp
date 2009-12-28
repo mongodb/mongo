@@ -78,14 +78,14 @@ namespace mongo {
             stringstream temp;
             temp << "can't append type from:";
             temp << t;
-            uassert( temp.str() , 0 );
+            uassert( 10206 ,  temp.str() , 0 );
         }
         
     }
 
     int Scope::invoke( const char* code , const BSONObj& args, int timeoutMs ){
         ScriptingFunction func = createFunction( code );
-        uassert( "compile failed" , func );
+        uassert( 10207 ,  "compile failed" , func );
         return invoke( func , args, timeoutMs );
     }
     
@@ -124,7 +124,7 @@ namespace mongo {
     }
     
     void Scope::validateObjectIdString( const string &str ) {
-        massert ( "invalid object id: length", str.size() == 24 );
+        massert( 10448 , "invalid object id: length", str.size() == 24 );
 
         for ( string::size_type i=0; i<str.size(); i++ ){
             char c = str[i];
@@ -133,7 +133,7 @@ namespace mongo {
                 ( c >= 'A' && c <= 'F' ) ){
                 continue;
             }
-            massert( "invalid object id: not hex", false );
+            massert( 10430 ,  "invalid object id: not hex", false );
         }        
     }
 
@@ -141,7 +141,7 @@ namespace mongo {
         if ( _localDBName.size() == 0 ){
             if ( ignoreNotConnected )
                 return;
-            uassert( "need to have locallyConnected already" , _localDBName.size() );
+            uassert( 10208 ,  "need to have locallyConnected already" , _localDBName.size() );
         }
         if ( _loadedVersion == _lastVersion )
             return;
@@ -158,8 +158,8 @@ namespace mongo {
             BSONElement n = o["_id"];
             BSONElement v = o["value"];
             
-            uassert( "name has to be a string" , n.type() == String );
-            uassert( "value has to be set" , v.type() != EOO );
+            uassert( 10209 ,  "name has to be a string" , n.type() == String );
+            uassert( 10210 ,  "value has to be set" , v.type() != EOO );
             
             setElement( n.valuestr() , v );
         }

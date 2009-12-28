@@ -111,21 +111,18 @@ namespace mongo {
                 if done here, as there are pointers into those objects in 
                 NamespaceDetails.
                 */
-                if( ! legalClientSystemNS( ns , true ) ){
-                    uasserted("cannot delete from system namespace");
-                    return -1;
-                }
+                uassert(12050, "cannot delete from system namespace", legalClientSystemNS( ns , true ) );
             }
             if ( strchr( ns , '$' ) ){
                 log() << "cannot delete from collection with reserved $ in name: " << ns << endl;
-                uassert( "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
+                uassert( 10100 ,  "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
             }
         }
 
         NamespaceDetails *d = nsdetails( ns );
         if ( ! d )
             return 0;
-        uassert( "can't remove from a capped collection E00052" , ! d->capped );
+        uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
 
         int nDeleted = 0;
         QueryPlanSet s( ns, pattern, BSONObj() );
@@ -252,11 +249,11 @@ namespace mongo {
             if ( j.isEmpty() )
                 break;
             BSONElement e = j.firstElement();
-            uassert("bad order array", !e.eoo());
-            uassert("bad order array [2]", e.isNumber());
+            uassert( 10102 , "bad order array", !e.eoo());
+            uassert( 10103 , "bad order array [2]", e.isNumber());
             b.append(e);
             (*p)++;
-            uassert("too many ordering elements", *p <= '9');
+            uassert( 10104 , "too many ordering elements", *p <= '9');
         }
 
         return b.obj();
@@ -497,7 +494,7 @@ namespace mongo {
             findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
             findingStartCursor_()
         {
-            uassert("bad skip value in query", ntoskip >= 0);
+            uassert( 10105 , "bad skip value in query", ntoskip >= 0);
         }
 
         virtual void init() {
@@ -723,13 +720,13 @@ namespace mongo {
         else {
             
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
+            uassert( 10106 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
 			   query the nonmaster member of a replica pair.
 			*/
-            uassert( "not master", isMaster() || (queryOptions & Option_SlaveOk) || slave == SimpleSlave );
+            uassert( 10107 ,  "not master", isMaster() || (queryOptions & Option_SlaveOk) || slave == SimpleSlave );
 
             BSONElement hint;
             BSONObj min;
@@ -769,8 +766,8 @@ namespace mongo {
                 BSONElement e = jsobj.getField("$snapshot");
                 snapshot = !e.eoo() && e.trueValue();
                 if( snapshot ) { 
-                    uassert("E12001 can't sort with $snapshot", order.isEmpty());
-					uassert("E12002 can't use hint with $snapshot", hint.eoo());
+                    uassert( 12001 , "E12001 can't sort with $snapshot", order.isEmpty());
+					uassert( 12002 , "E12002 can't use hint with $snapshot", hint.eoo());
                     NamespaceDetails *d = nsdetails(ns);
                     if ( d ){
                         int i = d->findIdIndex();
@@ -800,7 +797,7 @@ namespace mongo {
                 out() << "Bad query object?\n  jsobj:";
                 out() << jsobj.toString() << "\n  query:";
                 out() << query.toString() << endl;
-                uassert("bad query object", false);
+                uassert( 10110 , "bad query object", false);
             }
             
             if ( strcmp( query.firstElement().fieldName() , "_id" ) == 0 && query.nFields() == 1 && query.firstElement().isSimpleType() ){
@@ -833,7 +830,7 @@ namespace mongo {
                 UserQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
                 shared_ptr< UserQueryOp > o = qps.runOp( original );
                 UserQueryOp &dqo = *o;
-                massert( dqo.exceptionMessage(), dqo.complete() );
+                massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
                 n = dqo.n();
                 nscanned = dqo.nscanned();
                 if ( dqo.scanAndOrderRequired() )

@@ -57,7 +57,7 @@ namespace mongo {
     }
 
     void BSONObjExternalSorter::sort(){
-        uassert( "already sorted" , ! _sorted );
+        uassert( 10048 ,  "already sorted" , ! _sorted );
 
         _sorted = true;
 
@@ -82,7 +82,7 @@ namespace mongo {
     }
 
     void BSONObjExternalSorter::add( const BSONObj& o , const DiskLoc & loc ){
-        uassert( "sorted already" , ! _sorted );
+        uassert( 10049 ,  "sorted already" , ! _sorted );
         
         if ( ! _cur ){
             _cur = new InMemory();
@@ -99,7 +99,7 @@ namespace mongo {
     }
     
     void BSONObjExternalSorter::finishMap(){
-        uassert( "bad" , _cur );
+        uassert( 10050 ,  "bad" , _cur );
         
         _curSizeSoFar = 0;
         if ( _cur->size() == 0 )
@@ -113,7 +113,7 @@ namespace mongo {
         
         ofstream out;
         out.open( file.c_str() , ios_base::out | ios_base::binary );
-        uassert( (string)"couldn't open file: " + file , out.good() );
+        uassert( 10051 ,  (string)"couldn't open file: " + file , out.good() );
         
         int num = 0;
         for ( InMemory::iterator i=_cur->begin(); i != _cur->end(); i++ ){
@@ -205,7 +205,7 @@ namespace mongo {
     BSONObjExternalSorter::FileIterator::FileIterator( string file ){
         long length;
         _buf = (char*)_file.map( file.c_str() , length );
-        massert( "mmap failed" , _buf );
+        massert( 10308 ,  "mmap failed" , _buf );
         assert( (unsigned long)length == file_size( file ) );
         _end = _buf + length;
     }

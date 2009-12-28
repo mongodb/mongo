@@ -63,7 +63,7 @@ namespace mongo {
                 mod = o["0"].numberInt();
                 modm = o["1"].numberInt();
                 
-                uassert( "mod can't be 0" , mod );
+                uassert( 10073 ,  "mod can't be 0" , mod );
             }
             else if ( _op == BSONObj::opTYPE ){
                 type = (BSONType)(_e.embeddedObject().firstElement().numberInt());

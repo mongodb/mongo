@@ -166,7 +166,7 @@ namespace mongo {
         }
         
         virtual string modelServer(){
-            uassert( "ConfigServer not setup" , _primary.size() );
+            uassert( 10190 ,  "ConfigServer not setup" , _primary.size() );
             return _primary;
         }
         
