@@ -43,12 +43,15 @@ def assignErrorCodes():
 
 
 def readErrorCodes( callback ):
-    p = re.compile( "([um]asser(t|ted)) *\( *(\d+)" )
+    ps = [ re.compile( "([um]asser(t|ted)) *\( *(\d+)" ) ,
+           re.compile( "(User|Msg)Exceptio(n)\( *(\d+)" )
+           ]
     for x in getAllSourceFiles():
         lineNum = 1
         for line in open( x ):
-            for m in p.findall( line ):
-                callback( x , lineNum , line , m[2] )
+            for p in ps:               
+                for m in p.findall( line ):
+                    callback( x , lineNum , line , m[2] )
             lineNum = lineNum + 1
             
 

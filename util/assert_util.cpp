@@ -60,7 +60,7 @@ namespace mongo {
             RARELY log() << "User Exception " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msg);
-        throw UserException(msg);
+        throw UserException(msgid, msg);
     }
 
     void msgasserted(int msgid, const char *msg) {
@@ -69,7 +69,7 @@ namespace mongo {
         raiseError(msg && *msg ? msg : "massert failure");
         breakpoint();
         printStackTrace(); // TEMP?? should we get rid of this?  TODO
-        throw MsgAssertionException(msg);
+        throw MsgAssertionException(msgid, msg);
     }
 
     boost::mutex *Assertion::_mutex = new boost::mutex();

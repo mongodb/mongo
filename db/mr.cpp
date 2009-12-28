@@ -206,11 +206,11 @@ namespace mongo {
                 
                 map = scope->createFunction( setup.mapCode.c_str() );
                 if ( ! map )
-                    throw UserException( (string)"map compile failed: " + scope->getError() );
+                    throw UserException( 9012, (string)"map compile failed: " + scope->getError() );
 
                 reduce = scope->createFunction( setup.reduceCode.c_str() );
                 if ( ! reduce )
-                    throw UserException( (string)"reduce compile failed: " + scope->getError() );
+                    throw UserException( 9013, (string)"reduce compile failed: " + scope->getError() );
 
                 if ( setup.finalizeCode.size() )
                     finalize  = scope->createFunction( setup.finalizeCode.c_str() );
@@ -396,7 +396,7 @@ namespace mongo {
                         
                         state.scope->setThis( &o );
                         if ( state.scope->invoke( state.map , state.setup.mapparams , 0 , true ) )
-                            throw UserException( (string)"map invoke failed: " + state.scope->getError() );
+                            throw UserException( 9014, (string)"map invoke failed: " + state.scope->getError() );
                         
                         if ( mr.verbose ) mapTime += mt.micros();
                         

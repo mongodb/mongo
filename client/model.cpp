@@ -48,7 +48,7 @@ namespace mongo {
         conn.done();
         
         if ( safe && errmsg.size() )
-            throw UserException( (string)"error on Model::remove: " + errmsg );
+            throw UserException( 9002 , (string)"error on Model::remove: " + errmsg );
     }
 
     void Model::save( bool safe ){
@@ -91,7 +91,7 @@ namespace mongo {
         conn.done();
 
         if ( safe && errmsg.size() )
-            throw UserException( (string)"error on Model::save: " + errmsg );
+            throw UserException( 9003 , (string)"error on Model::save: " + errmsg );
     }
 
 } // namespace mongo

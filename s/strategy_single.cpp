@@ -96,15 +96,15 @@ namespace mongo {
                 }
             }
             else if ( op == dbUpdate ){
-                throw UserException( "can't update system.indexes" );
+                throw UserException( 8050 , "can't update system.indexes" );
             }
             else if ( op == dbDelete ){
                 // TODO
-                throw UserException( "can't delete indexes on sharded collection yet" );
+                throw UserException( 8051 , "can't delete indexes on sharded collection yet" );
             }
             else {
                 log() << "handleIndexWrite invalid write op: " << op << endl;
-                throw UserException( "handleIndexWrite invalid write op" );
+                throw UserException( 8052 , "handleIndexWrite invalid write op" );
             }
                     
         }

@@ -129,7 +129,7 @@ namespace mongo {
 
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
-            throw UserException( "filemd5 failed" );
+            throw UserException( 9008 , "filemd5 failed" );
 
         BSONObjBuilder file;
         file << "_id" << id

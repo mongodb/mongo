@@ -194,7 +194,7 @@ void mongo::Tool::needFields(){
     if ( hasParam( "fieldFile" ) ){
         string fn = getParam( "fieldFile" );
         if ( ! exists( fn ) )
-            throw UserException( ((string)"file: " + fn ) + " doesn't exist" );
+            throw UserException( 9999 , ((string)"file: " + fn ) + " doesn't exist" );
 
         const int BUF_SIZE = 1024;
         char line[ 1024 + 128];
@@ -215,7 +215,7 @@ void mongo::Tool::needFields(){
         return;
     }
 
-    throw UserException( "you need to specify fields" );
+    throw UserException( 9998 , "you need to specify fields" );
 }
 
 void mongo::Tool::auth( string dbname ){
@@ -234,5 +234,5 @@ void mongo::Tool::auth( string dbname ){
     if ( _conn->auth( "admin" , _username , _password , errmsg ) )
         return;
 
-    throw mongo::UserException( (string)"auth failed: " + errmsg );
+    throw mongo::UserException( 9997 , (string)"auth failed: " + errmsg );
 }

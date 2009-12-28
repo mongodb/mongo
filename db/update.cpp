@@ -205,7 +205,7 @@ namespace mongo {
                 }
 
                 else {
-                    throw UserException( (string)"unknown bit mod:" + e.fieldName() );
+                    throw UserException( 9016, (string)"unknown bit mod:" + e.fieldName() );
                 }
             }
             
@@ -221,7 +221,7 @@ namespace mongo {
         default:
             stringstream ss;
             ss << "Mod::apply can't handle type: " << op;
-            throw UserException( ss.str() );
+            throw UserException( 9017, ss.str() );
         }
     }
 

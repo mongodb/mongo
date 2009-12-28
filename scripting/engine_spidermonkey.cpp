@@ -427,7 +427,7 @@ namespace mongo {
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
                     cout << "\t why: " << toString( v ) << endl;
-                throw UserException( "invalid utf8" );
+                throw UserException( 9006 , "invalid utf8" );
             }
 
             assert( s );

@@ -446,7 +446,7 @@ namespace mongo {
         }
         stringstream ss;
         ss << "couldn't find a chunk which should be impossible  extracted: " << _key.extractKey( obj );
-        throw UserException( ss.str() );
+        throw UserException( 8070 , ss.str() );
     }
 
     Chunk* ChunkManager::findChunkOnServer( const string& server ) const {
@@ -544,7 +544,7 @@ namespace mongo {
             ScopedDbConnection conn( i->first );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
-                throw UserException( (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
+                throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
             conn.done();
         }
 

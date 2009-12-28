@@ -1164,7 +1164,7 @@ namespace mongo {
                 s->setObject( "obj" , obj , true );
                 s->setNumber( "n" , n - 1 );
                 if ( s->invoke( f , BSONObj() , 0 , true ) ){
-                    throw UserException( (string)"reduce invoke failed: " + s->getError() );
+                    throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
                 }
             }
 

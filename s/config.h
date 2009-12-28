@@ -82,7 +82,7 @@ namespace mongo {
         
         string getPrimary(){
             if ( _primary.size() == 0 )
-                throw UserException( (string)"no primary shard configured for db: " + _name );
+                throw UserException( 8041 , (string)"no primary shard configured for db: " + _name );
             return _primary;
         }
         

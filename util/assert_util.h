@@ -73,13 +73,15 @@ namespace mongo {
         virtual string toString() const {
             return what();
         }
+        virtual int getCode() = 0;
         operator string() const { return toString(); }
     };
-
+    
     class AssertionException : public DBException {
     public:
+        int code;
         string msg;
-        AssertionException() { }
+        AssertionException() { code = 0; }
         virtual ~AssertionException() throw() { }
         virtual bool severe() {
             return true;
@@ -87,17 +89,16 @@ namespace mongo {
         virtual bool isUserAssertion() {
             return false;
         }
+        virtual int getCode(){ return code; }
         virtual const char* what() const throw() { return msg.c_str(); }
     };
 
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
     class UserException : public AssertionException {
     public:
-        UserException(const char *_msg) {
-            msg = _msg;
-        }
-        UserException(string _msg) {
-            msg = _msg;
+        UserException(int c , const string& m) {
+            code = c;
+            msg = m;
         }
         virtual bool severe() {
             return false;
@@ -112,8 +113,9 @@ namespace mongo {
 
     class MsgAssertionException : public AssertionException {
     public:
-        MsgAssertionException(const char *_msg) {
-            msg = _msg;
+        MsgAssertionException(int c, const char *m) {
+            code = c;
+            msg = m;
         }
         virtual bool severe() {
             return false;
@@ -165,6 +167,10 @@ namespace mongo {
 #endif
 
     // some special ids that we want to duplicate
+    
+    // > 10000 asserts
+    // < 10000 UserException
+    
 #define ASSERT_ID_DUPKEY 11000
 
 } // namespace mongo

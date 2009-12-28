@@ -95,7 +95,7 @@ namespace mongo {
         FindOne( bool requireIndex ) : requireIndex_( requireIndex ) {}
         virtual void init() {
             if ( requireIndex_ && strcmp( qp().indexKey().firstElement().fieldName(), "$natural" ) == 0 )
-                throw MsgAssertionException( "Not an index cursor" );
+                throw MsgAssertionException( 9011 , "Not an index cursor" );
             c_ = qp().newCursor();
             if ( !c_->ok() )
                 setComplete();

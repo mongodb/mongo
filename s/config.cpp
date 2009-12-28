@@ -58,14 +58,14 @@ namespace mongo {
     
     ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
         if ( ! _shardingEnabled )
-            throw UserException( "db doesn't have sharding enabled" );
+            throw UserException( 8042 , "db doesn't have sharding enabled" );
         
         ChunkManager * info = _shards[ns];
         if ( info )
             return info;
         
         if ( isSharded( ns ) )
-            throw UserException( "already sharded" );
+            throw UserException( 8043 , "already sharded" );
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );

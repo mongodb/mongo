@@ -204,7 +204,7 @@ namespace mongo {
             default: 
                 stringstream ss;
                 ss << "unknown mod in appendNewFromMod: " << m.op;
-                throw UserException( ss.str() );
+                throw UserException( 9015, ss.str() );
             }
          
         }

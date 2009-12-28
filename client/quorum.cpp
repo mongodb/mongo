@@ -3,6 +3,8 @@
 #include "stdafx.h"
 #include "quorum.h"
 
+// error codes 8000-8009
+
 namespace mongo {
     
     QuorumConnection::QuorumConnection( string commaSeperated ){
@@ -13,7 +15,7 @@ namespace mongo {
             _connect( h );
         }
         _connect( commaSeperated );
-        uassert( 10020 ,  "QuorumConnection needs 3 servers" , _conns.size() == 3 );
+        uassert( 8004 ,  "QuorumConnection needs 3 servers" , _conns.size() == 3 );
     }
 
     QuorumConnection::QuorumConnection( string a , string b , string c ){
@@ -89,7 +91,7 @@ namespace mongo {
 
         if ( ok )
             return;
-        throw UserException( (string)"QuorumConnection write op failed: " + err.str() );
+        throw UserException( 8001 , (string)"QuorumConnection write op failed: " + err.str() );
     }
 
     void QuorumConnection::_connect( string host ){
@@ -118,7 +120,7 @@ namespace mongo {
                 log() << "query failed to: " << _conns[i]->toString() << " exception" << endl;
             }
         }
-        throw UserException( "all servers down!" );
+        throw UserException( 8002 , "all servers down!" );
     }
     
     auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
@@ -130,7 +132,7 @@ namespace mongo {
     void QuorumConnection::insert( const string &ns, BSONObj obj ){ 
         string errmsg;
         if ( ! prepare( errmsg ) )
-            throw UserException( (string)"QuorumConnection::insert prepare failed: " + errmsg );
+            throw UserException( 8003 , (string)"QuorumConnection::insert prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             _conns[i]->insert( ns , obj );

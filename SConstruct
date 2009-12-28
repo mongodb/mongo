@@ -960,7 +960,7 @@ testEnv.Prepend( LIBPATH=["."] )
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
-        print( "next id to use:" + x.getNextCode() )
+        print( "next id to use:" + str( x.getNextCode() ) )
         Exit(-1)
 
 checkErrorCodes()

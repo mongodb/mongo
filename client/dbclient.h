@@ -679,7 +679,7 @@ namespace mongo {
     
     class ConnectException : public UserException { 
     public:
-        ConnectException(string msg) : UserException(msg) { }
+        ConnectException(string msg) : UserException(9000,msg) { }
     };
 
     /** 
