@@ -294,17 +294,7 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                if( p && nsdetails(cc().database()->profileName.c_str()) == 0 ) {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "capped", true );
-                    spec.append( "size", 131072.0 );
-
-                    if ( !userCreateNS( cc().database()->profileName.c_str(), spec.done(), errmsg, true ) ) {
-                        return false;
-                    }
-                }
-                ok = true;
-                cc().database()->profile = p;
+                ok = cc().database()->setProfilingLevel( p , errmsg );
             }
             return ok;
         }

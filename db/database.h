@@ -158,13 +158,18 @@ namespace mongo {
             if( e ) return e;
             return suitableFile( size )->createExtent( ns, size, capped );
         }
-
+        
         MongoDataFile* newestFile() {
             int n = (int) files.size();
             if ( n > 0 ) n--;
             return getFile(n);
         }
         
+        /**
+         * @return true if success, false otherwise
+         */
+        bool setProfilingLevel( int newLevel , string& errmsg );
+
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"
         string path;

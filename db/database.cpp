@@ -24,4 +24,32 @@ namespace mongo {
 
     bool Database::_openAllFiles = false;
 
+    bool Database::setProfilingLevel( int newLevel , string& errmsg ){
+        if ( profile == newLevel )
+            return true;
+        
+        if ( newLevel < 0 || newLevel > 2 ){
+            errmsg = "profiling level has to be >=0 and <= 2";
+            return false;
+        }
+        
+        if ( newLevel == 0 ){
+            profile = 0;
+            return true;
+        }
+        
+        assert( cc().database() == this );
+
+        if ( ! nsdetails( profileName.c_str() ) ){
+            BSONObjBuilder spec;
+            spec.appendBool( "capped", true );
+            spec.append( "size", 131072.0 );
+            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , true ) ){
+                return false;
+            }
+        }
+        profile = newLevel;
+        return true;
+    }
+
 } // namespace mongo
