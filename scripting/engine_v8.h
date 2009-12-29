@@ -107,12 +107,6 @@ namespace mongo {
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8Unlocker ); }
         
     private:
-        // FIXME get rid of this
-        // HandleScope _handleScope;
-        //Handle<ObjectTemplate> _globalTemplate;
-        
-        //Handle<FunctionTemplate> _externalTemplate;
-        //Handle<FunctionTemplate> _localTemplate;
         friend class V8Scope;
     };
     
