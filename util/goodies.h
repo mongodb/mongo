@@ -438,5 +438,67 @@ namespace mongo {
         int _lastTime;
     };
 
+    class TicketHolder {
+    public:
+        TicketHolder( int num ){
+            _outof = num;
+            _num = num;
+        }
+        
+        bool tryAcquire(){
+            boostlock lk( _mutex );
+            if ( _num <= 0 ){
+                if ( _num < 0 ){
+                    cerr << "DISASTER! in TicketHolder" << endl;
+                }
+                return false;
+            }
+            _num--;
+            return true;
+        }
+        
+        void release(){
+            boostlock lk( _mutex );
+            _num++;
+        }
+
+        void resize( int newSize ){
+            boostlock lk( _mutex );            
+            int used = _outof - _num;
+            if ( used > newSize ){
+                cout << "ERROR: can't resize since we're using (" << used << ") more than newSize(" << newSize << ")" << endl;
+                return;
+            }
+            
+            _outof = newSize;
+            _num = _outof - used;
+        }
+
+        int available(){
+            return _num;
+        }
+
+        int used(){
+            return _outof - _num;
+        }
+
+    private:
+        int _outof;
+        int _num;
+        boost::mutex _mutex;
+    };
+
+    class TicketHolderReleaser {
+    public:
+        TicketHolderReleaser( TicketHolder * holder ){
+            _holder = holder;
+        }
+        
+        ~TicketHolderReleaser(){
+            _holder->release();
+        }
+    private:
+        TicketHolder * _holder;
+    };
 
 } // namespace mongo

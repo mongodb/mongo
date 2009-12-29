@@ -341,6 +341,14 @@ namespace mongo {
                 }
                     
             }
+            
+            {
+                BSONObjBuilder bb( result.subobjStart( "connections" ) );
+                bb.append( "current" , connTicketHolder.used() );
+                bb.append( "available" , connTicketHolder.available() );
+                bb.done();
+            }
+
 
             return true;
         }

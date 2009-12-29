@@ -105,6 +105,7 @@ namespace mongo {
     }
 
     MessagingPort *grab = 0;
+    TicketHolder connTicketHolder( 20000 );
     void connThread();
 
     class OurListener : public Listener {
@@ -112,6 +113,12 @@ namespace mongo {
         OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
             assert( grab == 0 );
+            if ( ! connTicketHolder.tryAcquire() ){
+                log() << "connection refused because too many open connections" << endl;
+                // TODO: would be nice if we notified them...
+                mp->shutdown();
+                return;
+            }
             grab = mp;
             boost::thread thr(connThread);
             while ( grab )
@@ -163,6 +170,7 @@ namespace mongo {
     */
     void connThread()
     {
+        TicketHolderReleaser connTicketReleaser( &connTicketHolder );
         Client::initThread("conn");
 
         /* todo: move to Client object */
@@ -585,6 +593,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("notablescan", "do not allow table scans")
         ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0 for never)")
         ("profile",po::value<int>(), "0=off 1=slow, 2=all")
+        ("maxConns",po::value<int>(), "max number of simultaneous connections")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -869,8 +878,16 @@ int main(int argc, char* argv[], char *envp[] )
         if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
             _diaglog.level = 1;
         }
-        if ( params.count( "profile" ) )
+        if ( params.count( "profile" ) ){
             cmdLine.defaultProfile = params["profile"].as<int>();
+        }
+        if ( params.count( "maxConns" ) ){
+            int newSize = params["maxConns"].as<int>();
+            uassert( 12507 , "maxConns has to be at least 5" , newSize >= 5 );
+            uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
+            connTicketHolder.resize( newSize );
+        }
+        
         Module::configAll( params );
         dataFileSync.go();
 
