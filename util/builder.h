@@ -17,9 +17,12 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "stdafx.h"
+#include <string.h>
 
 namespace mongo {
+
+    class StringBuilder;
 
     class BufBuilder {
     public:
@@ -41,6 +44,16 @@ namespace mongo {
                 free(data);
                 data = 0;
             }
+        }
+
+        void reset( int maxSize = 0 ){
+            l = 0;
+            if ( maxSize && size > maxSize ){
+                free(data);
+                data = (char*)malloc(maxSize);
+                size = maxSize;
+            }
+            
         }
 
         /* leave room for some stuff later */
@@ -118,6 +131,68 @@ namespace mongo {
         char *data;
         int l;
         int size;
+
+        friend class StringBuilder;
+    };
+
+    class StringBuilder {
+    public:
+        StringBuilder( int initsize=256 )
+            : _buf( initsize ){
+        }
+
+#define SBNUM(val,maxSize,macro) \
+            int prev = _buf.l; \
+            int z = sprintf( _buf.grow(maxSize) , macro , (val) );  \
+            _buf.l = prev + z; \
+            return *this; 
+        
+
+        StringBuilder& operator<<( double x ){
+            SBNUM( x , 25 , "%g" );
+        }
+        StringBuilder& operator<<( int x ){
+            SBNUM( x , 11 , "%d" );
+        }
+        StringBuilder& operator<<( unsigned x ){
+            SBNUM( x , 11 , "%u" );
+        }
+        StringBuilder& operator<<( long x ){
+            SBNUM( x , 22 , "%ld" );
+        }
+        StringBuilder& operator<<( long long x ){
+            SBNUM( x , 22 , "%lld" );
+        }
+        StringBuilder& operator<<( short x ){
+            SBNUM( x , 8 , "%hd" );
+        }
+
+
+        void append( const char * str ){
+            int x = strlen( str );
+            memcpy( _buf.grow( x ) , str , x );
+        }
+        StringBuilder& operator<<( const char * str ){
+            append( str );
+            return *this;
+        }
+        StringBuilder& operator<<( const string& s ){
+            append( s.c_str() );
+            return *this;
+        }
+
+        // access
+
+        void reset( int maxSize = 0 ){
+            _buf.reset( maxSize );
+        }
+        
+        string str(){
+            return string(_buf.data,0,_buf.l);
+        }
+
+    private:
+        BufBuilder _buf;
     };
 
 } // namespace mongo

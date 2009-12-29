@@ -110,6 +110,78 @@ namespace BasicTests {
             roundTrip( y , 40 );
         }
     };
+
+    namespace stringbuildertests {
+#define SBTGB(x) ss << (x); sb << (x);
+        
+        class Base {
+            virtual void pop() = 0;
+            
+        public:
+            Base(){}
+            virtual ~Base(){}
+
+            void run(){
+                pop();
+                ASSERT_EQUALS( ss.str() , sb.str() );
+            }
+
+            stringstream ss;
+            StringBuilder sb;
+        };
+        
+        class simple1 : public Base {
+            void pop(){
+                SBTGB(1);
+                SBTGB("yo");
+                SBTGB(2);
+            }
+        };
+
+        class simple2 : public Base {
+            void pop(){
+                SBTGB(1);
+                SBTGB("yo");
+                SBTGB(2);
+                SBTGB( 12123123123LL );
+                SBTGB( "xxx" );
+                SBTGB( 5.4 );
+                SBTGB( 5.4312 );
+                SBTGB( "yyy" );
+                SBTGB( (short)5 );
+                SBTGB( (short)1231231231231 );
+            }
+        };
+    
+        class reset1 {
+        public:
+            void run(){
+                StringBuilder sb;
+                sb << "1" << "abc" << "5.17";
+                ASSERT_EQUALS( "1abc5.17" , sb.str() );
+                ASSERT_EQUALS( "1abc5.17" , sb.str() );
+                sb.reset();
+                ASSERT_EQUALS( "" , sb.str() );
+                sb << "999";
+                ASSERT_EQUALS( "999" , sb.str() );
+            }
+        };
+
+        class reset2 {
+        public:
+            void run(){
+                StringBuilder sb;
+                sb << "1" << "abc" << "5.17";
+                ASSERT_EQUALS( "1abc5.17" , sb.str() );
+                ASSERT_EQUALS( "1abc5.17" , sb.str() );
+                sb.reset(1);
+                ASSERT_EQUALS( "" , sb.str() );
+                sb << "999";
+                ASSERT_EQUALS( "999" , sb.str() );
+            }
+        };
+
+    }
     
     class All : public Suite {
     public:
@@ -119,6 +191,11 @@ namespace BasicTests {
         void setupTests(){
             add< Rarely >();
             add< Base64Tests >();
+            
+            add< stringbuildertests::simple1 >();
+            add< stringbuildertests::simple2 >();
+            add< stringbuildertests::reset1 >();
+            add< stringbuildertests::reset2 >();
         }
     } myall;
     

@@ -257,11 +257,11 @@ namespace mongo {
         Client& c = cc();
         c.clearns();
 
-        stringstream ss;
-
         CurOp& currentOp = *c.curop();
         currentOp.reset( client);
         currentOp.setOp(op);
+
+        stringstream& ss = currentOp.debugstream();
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
