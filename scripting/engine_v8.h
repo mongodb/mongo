@@ -39,7 +39,7 @@ namespace mongo {
         virtual void localConnect( const char * dbName );
         virtual void externalSetup();
         
-        v8::Handle<v8::Value> get( const char * field );
+        v8::Handle<v8::Value> get( const char * field ); // caller must create context and handle scopes
         virtual double getNumber( const char *field );
         virtual int getNumberInt( const char *field );
         virtual long long getNumberLongLong( const char *field );
@@ -61,11 +61,7 @@ namespace mongo {
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError(){ return _error; }
         
-        virtual void injectNative( const char *field, NativeFunction func ){
-            Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
-            f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
-            _global->Set( v8::String::New( field ), f->GetFunction() );
-        }
+        virtual void injectNative( const char *field, NativeFunction func );
 
         void gc();
 
@@ -77,23 +73,17 @@ namespace mongo {
         static Handle< Value > nativeCallback( const Arguments &args );
 
         static Handle< Value > loadCallback( const Arguments &args );
-        
-        // doesn't matter how many lockers exist globally for the main thread
-        // we rely on Unlocker objects to release the v8 lock.
-        v8::Locker _locker;
-        
+
         V8ScriptEngine * _engine;
 
-        HandleScope _handleScope;
-        Handle<Context> _context;
-        Context::Scope _scope;
-        Handle<v8::Object> _global;
+        Persistent<Context> _context;
+        Persistent<v8::Object> _global;
 
         string _error;
-        vector< v8::Handle<Value> > _funcs;
-        v8::Handle<v8::Object> _this;
+        vector< Persistent<Value> > _funcs;
+        v8::Persistent<v8::Object> _this;
 
-        v8::Handle<v8::Function> _wrapper;
+        v8::Persistent<v8::Function> _wrapper;
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
@@ -117,11 +107,6 @@ namespace mongo {
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8Unlocker ); }
         
     private:
-        //HandleScope _handleScope;
-        //Handle<ObjectTemplate> _globalTemplate;
-        
-        //Handle<FunctionTemplate> _externalTemplate;
-        //Handle<FunctionTemplate> _localTemplate;
         friend class V8Scope;
     };
     

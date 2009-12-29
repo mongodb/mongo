@@ -21,21 +21,13 @@
 #include "v8_utils.h"
 #include "v8_db.h"
 
+#define V8_SIMPLE_HEADER Locker l; HandleScope handle_scope; Context::Scope context_scope( _context );
+
 namespace mongo {
 
     // --- engine ---
 
-    V8ScriptEngine::V8ScriptEngine()
-    //        : _handleScope() , _globalTemplate( ObjectTemplate::New() ) 
-{
-        
-        //_globalTemplate->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print));
-        //_globalTemplate->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version));
-
-        //_externalTemplate = getMongoFunctionTemplate( false );
-        //_localTemplate = getMongoFunctionTemplate( true );
-        //installDBTypes( _globalTemplate );
-    }
+    V8ScriptEngine::V8ScriptEngine() {}
     
     V8ScriptEngine::~V8ScriptEngine(){
     }
@@ -50,32 +42,43 @@ namespace mongo {
     
     V8Scope::V8Scope( V8ScriptEngine * engine ) 
         : _engine( engine ) , 
-          _handleScope(),
-          _context( Context::New() ) ,
-          _scope( _context ) ,
-          _global( _context->Global() ) ,
           _connectState( NOT ){
-        _this = v8::Object::New();
+
+        Locker l;
+        HandleScope handleScope;              
+        _context = Context::New();
+        Context::Scope context_scope( _context );
+        _global = Persistent< v8::Object >::New( _context->Global() );
+
+        _this = Persistent< v8::Object >::New( v8::Object::New() );
 
         _global->Set(v8::String::New("print"), v8::FunctionTemplate::New(Print)->GetFunction() );
         _global->Set(v8::String::New("version"), v8::FunctionTemplate::New(Version)->GetFunction() );
 
-        _global->Set(v8::String::New("load")
-                    ,v8::FunctionTemplate::New(loadCallback, v8::External::New(this))->GetFunction() );
+        _global->Set(v8::String::New("load"),
+                     v8::FunctionTemplate::New(loadCallback, v8::External::New(this))->GetFunction() );
 
-        //_externalTemplate = getMongoFunctionTemplate( false );
-        //_localTemplate = getMongoFunctionTemplate( true );
-
-        _wrapper = getObjectWrapperTemplate()->GetFunction();
+              _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate()->GetFunction() );
         
         installDBTypes( _global );
         installFork( _global, _context );
     }
 
     V8Scope::~V8Scope(){
+        Locker l;
+        Context::Scope context_scope( _context );        
+        _wrapper.Dispose();
+        _this.Dispose();
+        for( unsigned i = 0; i < _funcs.size(); ++i )
+            _funcs[ i ].Dispose();
+        _funcs.clear();
+        _global.Dispose();
+        _context.Dispose();
     }
 
     Handle< Value > V8Scope::nativeCallback( const Arguments &args ) {
+        Locker l;
+        HandleScope handle_scope;
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_native_function" ) ) );
         NativeFunction function = (NativeFunction)(f->Value());
         BSONObjBuilder b;
@@ -93,11 +96,12 @@ namespace mongo {
         } catch( ... ) {
             return v8::ThrowException(v8::String::New("unknown exception"));            
         }
-        return mongoToV8Element( ret.firstElement() );
+        return handle_scope.Close( mongoToV8Element( ret.firstElement() ) );
     }
 
     Handle< Value > V8Scope::loadCallback( const Arguments &args ) {
-        HandleScope scope;
+        Locker l;
+        HandleScope handle_scope;
         Handle<External> field = Handle<External>::Cast(args.Data());
         void* ptr = field->Value();
         V8Scope* self = static_cast<V8Scope*>(ptr);
@@ -115,6 +119,7 @@ namespace mongo {
     // ---- global stuff ----
 
     void V8Scope::init( BSONObj * data ){
+        Locker l;
         if ( ! data )
             return;
         
@@ -126,28 +131,34 @@ namespace mongo {
     }
     
     void V8Scope::setNumber( const char * field , double val ){
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::Number::New( val ) );
     }
 
     void V8Scope::setString( const char * field , const char * val ){
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::String::New( val ) );
     }
 
     void V8Scope::setBoolean( const char * field , bool val ){
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::Boolean::New( val ) );
     }
 
     void V8Scope::setElement( const char *field , const BSONElement& e ){ 
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , mongoToV8Element( e ) );
     }
 
     void V8Scope::setObject( const char *field , const BSONObj& obj , bool readOnly){
+        V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
         _global->Set( v8::String::New( field ) , mongoToV8( obj, false, readOnly) );
     }
 
     int V8Scope::type( const char *field ){
+        V8_SIMPLE_HEADER
         Handle<Value> v = get( field );
         if ( v->IsNull() )
             return jstNULL;
@@ -174,7 +185,7 @@ namespace mongo {
         if ( v->IsObject() )
             return Object;
 
-        throw UserException( (string)"don't know what this is: " + field );
+        throw UserException( 12509, (string)"don't know what this is: " + field );
     }
 
     v8::Handle<v8::Value> V8Scope::get( const char * field ){
@@ -182,26 +193,32 @@ namespace mongo {
     }
 
     double V8Scope::getNumber( const char *field ){ 
+        V8_SIMPLE_HEADER
         return get( field )->ToNumber()->Value();
     }
 
-    int V8Scope::getNumberInt( const char *field ){ 
+    int V8Scope::getNumberInt( const char *field ){
+        V8_SIMPLE_HEADER
         return get( field )->ToInt32()->Value();
     }
 
     long long V8Scope::getNumberLongLong( const char *field ){ 
+        V8_SIMPLE_HEADER
         return get( field )->ToInteger()->Value();
     }
 
     string V8Scope::getString( const char *field ){ 
+        V8_SIMPLE_HEADER
         return toSTLString( get( field ) );
     }
 
     bool V8Scope::getBoolean( const char *field ){ 
+        V8_SIMPLE_HEADER
         return get( field )->ToBoolean()->Value();
     }
     
     BSONObj V8Scope::getObject( const char * field ){
+        V8_SIMPLE_HEADER
         Handle<Value> v = get( field );
         if ( v->IsNull() || v->IsUndefined() )
             return BSONObj();
@@ -212,7 +229,7 @@ namespace mongo {
     // --- functions -----
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
-        
+        V8_SIMPLE_HEADER
         for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
@@ -251,25 +268,27 @@ namespace mongo {
             return 0;
         }        
         
-        Handle<Value> f = _global->Get( v8::String::New( fn.c_str() ) );
-        uassert( 10232 ,  "not a func" , f->IsFunction() );
+        Persistent<Value> f = Persistent< Value >::New( _global->Get( v8::String::New( fn.c_str() ) ) );
+        uassert( 10232, "not a func" , f->IsFunction() );
         _funcs.push_back( f );
         return num;
     }
 
     void V8Scope::setThis( const BSONObj * obj ){
+        V8_SIMPLE_HEADER
         if ( ! obj ){
-            _this = v8::Object::New();
+            _this = Persistent< v8::Object >::New( v8::Object::New() );
             return;
         }
 
         //_this = mongoToV8( *obj );
         v8::Handle<v8::Value> argv[1];
         argv[0] = v8::External::New( createWrapperHolder( obj , true , false ) );
-        _this = _wrapper->NewInstance( 1, argv );
+        _this = Persistent< v8::Object >::New( _wrapper->NewInstance( 1, argv ) );
     }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
+        V8_SIMPLE_HEADER
         Handle<Value> funcValue = _funcs[func-1];
         
         TryCatch try_catch;        
@@ -304,7 +323,6 @@ namespace mongo {
     }
 
     bool V8Scope::exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs ){
-
         if ( timeoutMs ){
             static bool t = 1;
             if ( t ){
@@ -313,7 +331,8 @@ namespace mongo {
             }
         }
         
-        HandleScope handle_scope;
+        V8_SIMPLE_HEADER
+        
         TryCatch try_catch;
     
         Handle<Script> script = v8::Script::Compile( v8::String::New( code.c_str() ) , 
@@ -348,19 +367,30 @@ namespace mongo {
         return true;
     }
     
+    void V8Scope::injectNative( const char *field, NativeFunction func ){
+        V8_SIMPLE_HEADER
+        
+        Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
+        f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
+        _global->Set( v8::String::New( field ), f->GetFunction() );
+    }        
+    
     void V8Scope::gc() {
+        Locker l;
         while( V8::IdleNotification() );
     }
 
     // ----- db access -----
 
     void V8Scope::localConnect( const char * dbName ){
+        V8_SIMPLE_HEADER
+
         if ( _connectState == EXTERNAL )
-            throw UserException( "externalSetup already called, can't call externalSetup" );
+            throw UserException( 12510, "externalSetup already called, can't call externalSetup" );
         if ( _connectState ==  LOCAL ){
             if ( _localDBName == dbName )
                 return;
-            throw UserException( "localConnect called with a different name previously" );
+            throw UserException( 12511, "localConnect called with a different name previously" );
         }
 
         //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
@@ -374,11 +404,13 @@ namespace mongo {
     }
     
     void V8Scope::externalSetup(){
+        V8_SIMPLE_HEADER
+        
         if ( _connectState == EXTERNAL )
             return;
         if ( _connectState == LOCAL )
-            throw UserException( "localConnect already called, can't call externalSetup" );
-        
+            throw UserException( 12512, "localConnect already called, can't call externalSetup" );
+
         _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( false )->GetFunction() );
         exec( jsconcatcode , "shell setup" , false , true , true , 0 );
         _connectState = EXTERNAL;
@@ -392,7 +424,6 @@ namespace mongo {
 
     void V8Scope::_startCall(){
         _error = "";
-        _context->Enter();
     }
     
 } // namespace mongo

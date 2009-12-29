@@ -68,6 +68,23 @@ namespace JSTests {
         }
     };
 
+    class ResetScope {
+    public:
+        void run(){
+            // Not worrying about this for now SERVER-446.
+            /*
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->createScope() );
+            
+            s->setBoolean( "x" , true );
+            ASSERT( s->getBoolean( "x" ) );
+
+            s->reset();
+            ASSERT( !s->getBoolean( "x" ) );
+            */
+        }
+    };
+    
     class FalseTests {
     public:
         void run(){
@@ -723,6 +740,7 @@ namespace JSTests {
         void setupTests(){
             add< Fundamental >();
             add< BasicScope >();
+            add< ResetScope >();
             add< FalseTests >();
             add< SimpleFunctions >();
 
