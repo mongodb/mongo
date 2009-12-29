@@ -201,13 +201,13 @@ public:
         log(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
-        char line[ (1024 * 1024 * 4) + 128];
+        boost::scoped_array<char> line(new char[BUF_SIZE]);
         while ( *in ){
-            in->getline( line , BUF_SIZE );
+            char * buf = line.get();
+            in->getline( buf , BUF_SIZE );
             uassert( 10263 ,  "unknown error reading file" , ( in->rdstate() & ios_base::badbit ) == 0 );
-            log(1) << "got line:" << line << endl;
+            log(1) << "got line:" << buf << endl;
 
-            char * buf = line;
             while( isspace( buf[0] ) ) buf++;
             
             int len = strlen( buf );

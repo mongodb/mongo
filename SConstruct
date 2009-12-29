@@ -1135,7 +1135,7 @@ def jsSpec( suffix ):
     return apply( os.path.join, args )
 
 def jsDirTestSpec( dir ):
-    return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
+    return mongo[0].abspath + " --nodb " + jsSpec( [ dir ] )
 
 def runShellTest( env, target, source ):
     global mongodForTestsPort
@@ -1144,10 +1144,10 @@ def runShellTest( env, target, source ):
     if target == "smokeJs":
         spec = [ jsSpec( [ "_runner.js" ] ) ]
     elif target == "smokeQuota":
-        g = Glob( jsSpec( [ "quota", "*.js" ] ) )
+        g = Glob( jsSpec( [ "quota" ] ) )
         spec = [ x.abspath for x in g ]
     elif target == "smokeJsPerf":
-        g = Glob( jsSpec( [ "perf", "*.js" ] ) )
+        g = Glob( jsSpec( [ "perf" ] ) )
         spec = [ x.abspath for x in g ]
     else:
         print( "invalid target for runShellTest()" )
