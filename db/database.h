@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "cmdline.h"
+
 /* Database represents a database database
    Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
 */
@@ -48,11 +50,13 @@ namespace mongo {
 
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
-            if ( !newDb ) {
+            if ( ! newDb || cmdLine.defaultProfile ) {
                 namespaceIndex.init();
                 if( _openAllFiles )
                     openAllFiles();
+
             }
+            
         }
 
         ~Database() {
@@ -169,6 +173,8 @@ namespace mongo {
          * @return true if success, false otherwise
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
+
+        void finishInit();
 
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"

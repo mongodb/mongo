@@ -40,7 +40,8 @@ namespace mongo {
         
         assert( cc().database() == this );
 
-        if ( ! nsdetails( profileName.c_str() ) ){
+        if ( ! namespaceIndex.details( profileName.c_str() ) ){
+            log(1) << "creating profile ns: " << profileName << endl;
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", 131072.0 );
@@ -50,6 +51,14 @@ namespace mongo {
         }
         profile = newLevel;
         return true;
+    }
+
+    void Database::finishInit(){
+        if ( cmdLine.defaultProfile == profile )
+            return;
+        
+        string errmsg;
+        massert( 12506 , errmsg , setProfilingLevel( cmdLine.defaultProfile , errmsg ) );
     }
 
 } // namespace mongo

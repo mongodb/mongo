@@ -584,6 +584,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
         ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0 for never)")
+        ("profile",po::value<int>(), "0=off 1=slow, 2=all")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -868,7 +869,8 @@ int main(int argc, char* argv[], char *envp[] )
         if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
             _diaglog.level = 1;
         }
-
+        if ( params.count( "profile" ) )
+            cmdLine.defaultProfile = params["profile"].as<int>();
         Module::configAll( params );
         dataFileSync.go();
 

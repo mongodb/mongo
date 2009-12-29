@@ -101,8 +101,9 @@ namespace mongo {
         bool justCreated;
         Database *newdb = new Database(cl, justCreated, path);
         databases[key] = newdb;
-        //newdb->finishInit();
         cc().setns(ns, newdb);
+
+        newdb->finishInit();
 
         return justCreated;
     }
