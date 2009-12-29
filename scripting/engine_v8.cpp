@@ -21,6 +21,8 @@
 #include "v8_utils.h"
 #include "v8_db.h"
 
+#define V8_SIMPLE_HEADER Locker l; HandleScope handle_scope; Context::Scope context_scope( _context );
+
 namespace mongo {
 
     // --- engine ---
@@ -129,46 +131,34 @@ namespace mongo {
     }
     
     void V8Scope::setNumber( const char * field , double val ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::Number::New( val ) );
     }
 
     void V8Scope::setString( const char * field , const char * val ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::String::New( val ) );
     }
 
     void V8Scope::setBoolean( const char * field , bool val ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , v8::Boolean::New( val ) );
     }
 
     void V8Scope::setElement( const char *field , const BSONElement& e ){ 
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         _global->Set( v8::String::New( field ) , mongoToV8Element( e ) );
     }
 
     void V8Scope::setObject( const char *field , const BSONObj& obj , bool readOnly){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
         _global->Set( v8::String::New( field ) , mongoToV8( obj, false, readOnly) );
     }
 
     int V8Scope::type( const char *field ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         Handle<Value> v = get( field );
         if ( v->IsNull() )
             return jstNULL;
@@ -203,44 +193,32 @@ namespace mongo {
     }
 
     double V8Scope::getNumber( const char *field ){ 
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         return get( field )->ToNumber()->Value();
     }
 
     int V8Scope::getNumberInt( const char *field ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         return get( field )->ToInt32()->Value();
     }
 
     long long V8Scope::getNumberLongLong( const char *field ){ 
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         return get( field )->ToInteger()->Value();
     }
 
     string V8Scope::getString( const char *field ){ 
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         return toSTLString( get( field ) );
     }
 
     bool V8Scope::getBoolean( const char *field ){ 
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         return get( field )->ToBoolean()->Value();
     }
     
     BSONObj V8Scope::getObject( const char * field ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         Handle<Value> v = get( field );
         if ( v->IsNull() || v->IsUndefined() )
             return BSONObj();
@@ -251,10 +229,7 @@ namespace mongo {
     // --- functions -----
 
     ScriptingFunction V8Scope::_createFunction( const char * raw ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
-
+        V8_SIMPLE_HEADER
         for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
@@ -300,10 +275,7 @@ namespace mongo {
     }
 
     void V8Scope::setThis( const BSONObj * obj ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
-
+        V8_SIMPLE_HEADER
         if ( ! obj ){
             _this = Persistent< v8::Object >::New( v8::Object::New() );
             return;
@@ -316,9 +288,7 @@ namespace mongo {
     }
     
     int V8Scope::invoke( ScriptingFunction func , const BSONObj& argsObject, int timeoutMs , bool ignoreReturn ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         Handle<Value> funcValue = _funcs[func-1];
         
         TryCatch try_catch;        
@@ -361,9 +331,7 @@ namespace mongo {
             }
         }
         
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         
         TryCatch try_catch;
     
@@ -399,6 +367,14 @@ namespace mongo {
         return true;
     }
     
+    void V8Scope::injectNative( const char *field, NativeFunction func ){
+        V8_SIMPLE_HEADER
+        
+        Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
+        f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
+        _global->Set( v8::String::New( field ), f->GetFunction() );
+    }        
+    
     void V8Scope::gc() {
         Locker l;
         while( V8::IdleNotification() );
@@ -407,9 +383,7 @@ namespace mongo {
     // ----- db access -----
 
     void V8Scope::localConnect( const char * dbName ){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
 
         if ( _connectState == EXTERNAL )
             throw UserException( "externalSetup already called, can't call externalSetup" );
@@ -430,9 +404,7 @@ namespace mongo {
     }
     
     void V8Scope::externalSetup(){
-        Locker l;
-        HandleScope handle_scope;
-        Context::Scope context_scope( _context );
+        V8_SIMPLE_HEADER
         
         if ( _connectState == EXTERNAL )
             return;

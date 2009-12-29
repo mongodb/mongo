@@ -61,15 +61,7 @@ namespace mongo {
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError(){ return _error; }
         
-        virtual void injectNative( const char *field, NativeFunction func ){
-            Locker l;
-            HandleScope handle_scope;
-            Context::Scope context_scope( _context );
-
-            Handle< FunctionTemplate > f( v8::FunctionTemplate::New( nativeCallback ) );
-            f->Set( v8::String::New( "_native_function" ), External::New( (void*)func ) );
-            _global->Set( v8::String::New( field ), f->GetFunction() );
-        }
+        virtual void injectNative( const char *field, NativeFunction func );
 
         void gc();
 
