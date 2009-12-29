@@ -482,6 +482,13 @@ elif "win32" == os.sys.platform:
     if force64:
         release = True
 
+    for pathdir in env['ENV']['PATH'].split(os.pathsep):
+	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
+	    break
+    else:
+	#use current environment
+	env['ENV'] = dict(os.environ)
+
     def find_boost():
 	for bv in reversed( range(33,50) ):
 	    for extra in ('', '_0', '_1'):
@@ -491,7 +498,6 @@ elif "win32" == os.sys.platform:
 	return None
 
     boostDir = find_boost()
-    print boostDir
     if boostDir is None:
         print( "can't find boost" )
         Exit(1)
