@@ -425,10 +425,11 @@ namespace mongo {
         Database *database = cc().database();
         assert( database );
         assert( database->name == cl );
+		/*
         if ( string("local") != cl ) {
             DBInfo i(cl);
             i.dbDropped();
-        }
+			}*/
 
         /* important: kill all open cursors on the database */
         string prefix(cl);

@@ -17,7 +17,6 @@
 
 #include "stdafx.h"
 #include "../client/dbclient.h"
-#include "../db/dbinfo.h"
 #include "../db/dbhelpers.h"
 #include "../db/cmdline.h"
 
