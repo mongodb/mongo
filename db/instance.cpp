@@ -46,8 +46,6 @@ namespace mongo {
     void receivedInsert(Message& m, stringstream& ss);
     bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
 
-    bool Database::_openAllFiles = false;
-
     CmdLine cmdLine;
 
     int nloggedsome = 0;

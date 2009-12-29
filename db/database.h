@@ -164,9 +164,7 @@ namespace mongo {
             if ( n > 0 ) n--;
             return getFile(n);
         }
-
-        //void finishInit(); // ugly...
-
+        
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"
         string path;

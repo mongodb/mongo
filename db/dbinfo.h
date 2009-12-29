@@ -52,8 +52,4 @@ namespace mongo {
         void dbDropped();
     };
 
-    /* inline void Database::finishInit() {
-        DBInfo i(name.c_str());
-    }*/
-
 } // namespace mongo
