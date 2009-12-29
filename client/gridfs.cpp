@@ -61,7 +61,7 @@ namespace mongo {
     }
 
     BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType){
-        massert("large files not yet implemented", length <= 0xffffffff);
+        massert( 10279 , "large files not yet implemented", length <= 0xffffffff);
         char const * const end = data + length;
 
         OID id;
@@ -83,14 +83,14 @@ namespace mongo {
 
 
     BSONObj GridFS::storeFile( const string& fileName , const string& remoteName , const string& contentType){
-        uassert( "file doesn't exist" , fileName == "-" || boost::filesystem::exists( fileName ) );
+        uassert( 10012 ,  "file doesn't exist" , fileName == "-" || boost::filesystem::exists( fileName ) );
 
         FILE* fd;
         if (fileName == "-")
             fd = stdin;
         else
             fd = fopen( fileName.c_str() , "rb" );
-        uassert("error opening file", fd);
+        uassert( 10013 , "error opening file", fd);
 
         OID id;
         id.init();
@@ -120,7 +120,7 @@ namespace mongo {
         if (fd != stdin)
             fclose( fd );
         
-        massert("large files not yet implemented", length <= 0xffffffff);
+        massert( 10280 , "large files not yet implemented", length <= 0xffffffff);
 
         return insertFile((remoteName.empty() ? fileName : remoteName), id, length, contentType);
     }
@@ -129,7 +129,7 @@ namespace mongo {
 
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
-            throw UserException( "filemd5 failed" );
+            throw UserException( 9008 , "filemd5 failed" );
 
         BSONObjBuilder file;
         file << "_id" << id
@@ -197,7 +197,7 @@ namespace mongo {
         b.append( "n" , n );
 
         BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
-        uassert( "chunk is empty!" , ! o.isEmpty() );
+        uassert( 10014 ,  "chunk is empty!" , ! o.isEmpty() );
         return Chunk(o);
     }
 
@@ -227,7 +227,7 @@ namespace mongo {
     }
 
     void GridFile::_exists(){
-        uassert( "doesn't exists" , exists() );
+        uassert( 10015 ,  "doesn't exists" , exists() );
     }
 
 }

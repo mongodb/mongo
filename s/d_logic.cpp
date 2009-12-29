@@ -525,7 +525,7 @@ namespace mongo {
         }
         
         OID * clientID = clientServerIds.get();
-        massert( "write with bad shard config and no server id!" , clientID );
+        massert( 10422 ,  "write with bad shard config and no server id!" , clientID );
         
         log() << "got write with an old config - writing back" << endl;
 

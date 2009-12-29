@@ -177,7 +177,7 @@ public:
         fileofs o = rs.insert((const char *) obuf, len);
         assert( o % recsize == 0 );
         fileofs recnum = o / recsize;
-        massert( "RecCache file too large?", recnum <= 0x7fffffff );
+        massert( 10377 ,  "RecCache file too large?", recnum <= 0x7fffffff );
         Node *n = mkNode();
         memcpy(n->data, obuf, len);
         DiskLoc d(rs.fileNumber + Base, (int) recnum);
@@ -214,7 +214,7 @@ public:
     }
 
     virtual void rename(const char *fromNs, const char *toNs) {
-      massert( "rename not yet implemented for CachedBasicRecStore", false );
+      massert( 10378 ,  "rename not yet implemented for CachedBasicRecStore", false );
     }
 
     /* close datafiles associated with the db specified. */

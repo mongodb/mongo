@@ -63,9 +63,9 @@ namespace mongo {
 
     int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) {
         BSONObj L = extractKey(lObject);
-        uassert("left object doesn't have shard key", !L.isEmpty());
+        uassert( 10198 , "left object doesn't have shard key", !L.isEmpty());
         BSONObj R = extractKey(rObject);
-        uassert("right object doesn't have shard key", !R.isEmpty());
+        uassert( 10199 , "right object doesn't have shard key", !R.isEmpty());
         return L.woCompare(R);
     }
 
@@ -129,11 +129,11 @@ namespace mongo {
                     case BSONObj::opIN:
                     case BSONObj::NE:
                     case BSONObj::opSIZE:
-                        massert("not implemented yet relevant()", false);
+                        massert( 10423 , "not implemented yet relevant()", false);
                     case BSONObj::Equality:
                         goto normal;
                     default:
-                        massert("bad operator in relevant()?", false);
+                        massert( 10424 , "bad operator in relevant()?", false);
                 }
             }
             return true;
@@ -143,7 +143,7 @@ normal:
     }
 
     bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Chunk * chunk ){
-        massert("not done for compound patterns", patternfields.size() == 1);
+        massert( 10425 , "not done for compound patterns", patternfields.size() == 1);
 
         bool rel = relevant(query, chunk->getMin(), chunk->getMax());
         if( ! hasShardKey( query ) )
@@ -157,7 +157,7 @@ normal:
         { $gte : keyval(min), $lt : keyval(max) }
     */
     void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
-        massert("not done for compound patterns", patternfields.size() == 1);
+        massert( 10426 , "not done for compound patterns", patternfields.size() == 1);
         BSONObjBuilder temp;
         temp.appendAs( extractKey(min).firstElement(), "$gte" );
         temp.appendAs( extractKey(max).firstElement(), "$lt" );

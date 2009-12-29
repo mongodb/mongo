@@ -164,7 +164,7 @@ namespace mongo {
         }
         CmdForceError() : Command("forceerror") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            uassert("forced error", false);
+            uassert( 10038 , "forced error", false);
             return true;
         }
     } cmdForceError;
@@ -294,17 +294,7 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                if( p && nsdetails(cc().database()->profileName.c_str()) == 0 ) {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "capped", true );
-                    spec.append( "size", 131072.0 );
-
-                    if ( !userCreateNS( cc().database()->profileName.c_str(), spec.done(), errmsg, true ) ) {
-                        return false;
-                    }
-                }
-                ok = true;
-                cc().database()->profile = p;
+                ok = cc().database()->setProfilingLevel( p , errmsg );
             }
             return ok;
         }
@@ -527,7 +517,7 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
-            uassert( "can't drop collection with reserved $ character in name", strchr(nsToDrop.c_str(), '$') == 0 );
+            uassert( 10039 ,  "can't drop collection with reserved $ character in name", strchr(nsToDrop.c_str(), '$') == 0 );
             dropCollection( nsToDrop, errmsg, result );
             return true;
         }
@@ -806,7 +796,7 @@ namespace mongo {
                 int myn = c.getIntField( "n" );
                 if ( n != myn ){
                     log() << "should have chunk: " << n << " have:" << myn << endl;
-                    uassert( "chunks out of order" , n == myn );
+                    uassert( 10040 ,  "chunks out of order" , n == myn );
                 }
 
                 int len;
@@ -999,9 +989,9 @@ namespace mongo {
 
             string fromNs = string( realDbName ) + "." + from;
             string toNs = string( realDbName ) + "." + to;
-            massert( "source collection " + fromNs + " does not exist", !setClient( fromNs.c_str() ) );
+            massert( 10300 ,  "source collection " + fromNs + " does not exist", !setClient( fromNs.c_str() ) );
             NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
-            massert( "source collection " + fromNs + " does not exist", nsd );
+            massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
             long long excessSize = nsd->datasize - size * 2;
             DiskLoc extent = nsd->firstExtent;
             for( ; excessSize > 0 && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
@@ -1099,9 +1089,9 @@ namespace mongo {
                 BSONObjBuilder b( obj.objsize() + 32 );
                 b.append( "0" , obj );
                 int res = s->invoke( func , b.obj() );
-                uassert( (string)"invoke failed in $keyf: " + s->getError() , res == 0 );
+                uassert( 10041 ,  (string)"invoke failed in $keyf: " + s->getError() , res == 0 );
                 int type = s->type("return");
-                uassert( "return of $key has to be an object" , type == Object );
+                uassert( 10042 ,  "return of $key has to be an object" , type == Object );
                 return s->getObject( "return" );
             }
             return obj.extractFields( keyPattern , true );
@@ -1158,13 +1148,13 @@ namespace mongo {
                     n = map.size();
                     s->setObject( "$key" , key , true );
 
-                    uassert( "group() can't handle more than 10000 unique keys" , n <= 10000 );
+                    uassert( 10043 ,  "group() can't handle more than 10000 unique keys" , n <= 10000 );
                 }
 
                 s->setObject( "obj" , obj , true );
                 s->setNumber( "n" , n - 1 );
                 if ( s->invoke( f , BSONObj() , 0 , true ) ){
-                    throw UserException( (string)"reduce invoke failed: " + s->getError() );
+                    throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
                 }
             }
 
@@ -1288,7 +1278,7 @@ namespace mongo {
                     continue;
                 if ( map.insert( value ).second ){
                     size += o.objsize() + 20;
-                    uassert( "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
+                    uassert( 10044 ,  "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
                 }
             }
 
@@ -1365,7 +1355,7 @@ namespace mongo {
             string errmsg;
             Command *c = i->second;
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
+            uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
 
             bool admin = c->adminOnly();
             if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {

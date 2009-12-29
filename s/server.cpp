@@ -104,7 +104,7 @@ namespace mongo {
     }
 
     DBClientBase *createDirectClient(){
-        uassert( "createDirectClient not implemented for sharding yet" , 0 );
+        uassert( 10197 ,  "createDirectClient not implemented for sharding yet" , 0 );
         return 0;
     }
 

@@ -21,7 +21,7 @@
 namespace mongo {
 
     int HttpClient::get( string url , map<string,string>& headers, stringstream& data ){
-        uassert( "invalid url" , url.find( "http://" ) == 0 );
+        uassert( 10271 ,  "invalid url" , url.find( "http://" ) == 0 );
         url = url.substr( 7 );
         
         string host , path;
@@ -35,7 +35,7 @@ namespace mongo {
         }
 
         int port = 80;
-        uassert( "non standard port not supported yet" , host.find( ":" ) == string::npos );
+        uassert( 10272 ,  "non standard port not supported yet" , host.find( ":" ) == string::npos );
         
         cout << "host [" << host << "]" << endl;
         cout << "path [" << path << "]" << endl;

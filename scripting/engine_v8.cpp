@@ -166,7 +166,7 @@ namespace mongo {
         if ( v->IsNumber() )
             return NumberDouble;
         if ( v->IsExternal() ){
-            uassert( "can't handle external yet" , 0 );
+            uassert( 10230 ,  "can't handle external yet" , 0 );
             return -1;
         }
         if ( v->IsDate() )
@@ -205,7 +205,7 @@ namespace mongo {
         Handle<Value> v = get( field );
         if ( v->IsNull() || v->IsUndefined() )
             return BSONObj();
-        uassert( "not an object" , v->IsObject() );
+        uassert( 10231 ,  "not an object" , v->IsObject() );
         return v8ToMongo( v->ToObject() );
     }
     
@@ -252,7 +252,7 @@ namespace mongo {
         }        
         
         Handle<Value> f = _global->Get( v8::String::New( fn.c_str() ) );
-        uassert( "not a func" , f->IsFunction() );
+        uassert( 10232 ,  "not a func" , f->IsFunction() );
         _funcs.push_back( f );
         return num;
     }
@@ -325,7 +325,7 @@ namespace mongo {
             if (reportError)
                 log() << _error << endl;
             if ( assertOnError )
-                uassert( _error , 0 );
+                uassert( 10233 ,  _error , 0 );
             return false;
         } 
     
@@ -335,7 +335,7 @@ namespace mongo {
             if ( reportError )
                 log() << _error << endl;
             if ( assertOnError )
-                uassert( _error , 0 );
+                uassert( 10234 ,  _error , 0 );
             return false;
         } 
         

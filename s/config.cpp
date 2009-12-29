@@ -48,7 +48,7 @@ namespace mongo {
         if ( isSharded( ns ) )
             return "";
         
-        uassert( "no primary!" , _primary.size() );
+        uassert( 10178 ,  "no primary!" , _primary.size() );
         return _primary;
     }
     
@@ -58,14 +58,14 @@ namespace mongo {
     
     ChunkManager* DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique ){
         if ( ! _shardingEnabled )
-            throw UserException( "db doesn't have sharding enabled" );
+            throw UserException( 8042 , "db doesn't have sharding enabled" );
         
         ChunkManager * info = _shards[ns];
         if ( info )
             return info;
         
         if ( isSharded( ns ) )
-            throw UserException( "already sharded" );
+            throw UserException( 8043 , "already sharded" );
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
         _sharded[ns] = CollectionInfo( fieldsAndOrder , unique );
@@ -89,8 +89,8 @@ namespace mongo {
             cout << "BBBB" << endl;
             return false;
         }
-        uassert( "_sharded but no info" , info );
-        uassert( "info but no sharded" , i != _sharded.end() );
+        uassert( 10179 ,  "_sharded but no info" , info );
+        uassert( 10180 ,  "info but no sharded" , i != _sharded.end() );
         
         _sharded.erase( i );
         _shards.erase( ns ); // TODO: clean this up, maybe switch to shared_ptr
@@ -102,7 +102,7 @@ namespace mongo {
         if ( m && ! reload )
             return m;
 
-        uassert( (string)"not sharded:" + ns , isSharded( ns ) );
+        uassert( 10181 ,  (string)"not sharded:" + ns , isSharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
         m = new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique );
@@ -138,9 +138,9 @@ namespace mongo {
             BSONObjIterator i(sharded);
             while ( i.more() ){
                 BSONElement e = i.next();
-                uassert( "sharded things have to be objects" , e.type() == Object );
+                uassert( 10182 ,  "sharded things have to be objects" , e.type() == Object );
                 BSONObj c = e.embeddedObject();
-                uassert( "key has to be an object" , c["key"].type() == Object );
+                uassert( 10183 ,  "key has to be an object" , c["key"].type() == Object );
                 _sharded[e.fieldName()] = CollectionInfo( c["key"].embeddedObject() , 
                                                           c["unique"].trueValue() );
             }
@@ -252,7 +252,7 @@ namespace mongo {
             i->second->drop();
             
             num++;
-            uassert( "_dropShardedCollections too many collections - bailing" , num < 100000 );
+            uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
             log(2) << "\t\t dropped " << num << " so far" << endl;
         }
         return true;
@@ -318,7 +318,7 @@ namespace mongo {
                     }
                     else {
                         log() << "\t can't find a shard to put new db on" << endl;
-                        uassert( "can't find a shard to put new db on" , 0 );
+                        uassert( 10185 ,  "can't find a shard to put new db on" , 0 );
                     }
                 }
                 else {
@@ -332,7 +332,7 @@ namespace mongo {
     }
 
     void Grid::removeDB( string database ){
-        uassert( "removeDB expects db name" , database.find( '.' ) == string::npos );
+        uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
         boostlock l( _lock );
         _databases.erase( database );
         
@@ -342,7 +342,7 @@ namespace mongo {
         ScopedDbConnection conn( configServer.getPrimary() );
         
         BSONObj result;
-        massert( "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
+        massert( 10421 ,  "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
         conn.done();
 
         return result["optime"]._numberLong();
@@ -360,7 +360,7 @@ namespace mongo {
     }
 
     bool ConfigServer::init( vector<string> configHosts ){
-        uassert( "need configdbs" , configHosts.size() );
+        uassert( 10187 ,  "need configdbs" , configHosts.size() );
 
         string hn = getHostName();
         if ( hn.empty() ) {
@@ -391,7 +391,7 @@ namespace mongo {
                 return false;
         }
         
-        uassert( "can only hand 1 config db right now" , configHosts.size() == 1 );
+        uassert( 10188 ,  "can only hand 1 config db right now" , configHosts.size() == 1 );
         _primary = configHosts[0];
         
         return true;
@@ -430,7 +430,7 @@ namespace mongo {
         if ( c->more() ){
             BSONObj o = c->next();
             version = o["version"].numberInt();
-            uassert( "should only have 1 thing in config.version" , ! c->more() );
+            uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
             if ( conn.count( "config.shard" ) || conn.count( "config.databases" ) ){

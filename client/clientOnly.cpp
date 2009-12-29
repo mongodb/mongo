@@ -50,7 +50,7 @@ namespace mongo {
     }
 /*
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
-        uassert( "Helpers::find can't be used in client" , 0 );
+        uassert( 10000 ,  "Helpers::find can't be used in client" , 0 );
         return auto_ptr<CursorIterator>(0);
     }
 */

@@ -33,7 +33,7 @@ namespace mongo {
     }
     
     auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra ){
-        uassert( "cursor already done" , ! _done );
+        uassert( 10017 ,  "cursor already done" , ! _done );
         
         BSONObj q = _query;
         if ( ! extra.isEmpty() ){
@@ -107,7 +107,7 @@ namespace mongo {
     }
     
     BSONObj SerialServerClusteredCursor::next(){
-        uassert( "no more items" , more() );
+        uassert( 10018 ,  "no more items" , more() );
         return _current->next();
     }
 
@@ -182,7 +182,7 @@ namespace mongo {
             bestFrom = i;
         }
             
-        uassert( "no more elements" , ! best.isEmpty() );
+        uassert( 10019 ,  "no more elements" , ! best.isEmpty() );
         _nexts[bestFrom] = BSONObj();
             
         return best;

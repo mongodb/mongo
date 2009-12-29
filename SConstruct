@@ -330,7 +330,8 @@ else:
 coreDbFiles = []
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
+
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
 
 if usesm:
@@ -957,6 +958,13 @@ testEnv.Prepend( LIBPATH=["."] )
 
 # ----- TARGETS ------
 
+def checkErrorCodes():
+    import buildscripts.errorcodes as x
+    if x.checkErrorCodes() == False:
+        print( "next id to use:" + str( x.getNextCode() ) )
+        Exit(-1)
+
+checkErrorCodes()
 
 # main db target
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + serverOnlyFiles + [ "db/db.cpp" ] )
@@ -1128,7 +1136,7 @@ def jsSpec( suffix ):
     return apply( os.path.join, args )
 
 def jsDirTestSpec( dir ):
-    return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
+    return mongo[0].abspath + " --nodb " + jsSpec( [ dir ] )
 
 def runShellTest( env, target, source ):
     global mongodForTestsPort
@@ -1137,10 +1145,10 @@ def runShellTest( env, target, source ):
     if target == "smokeJs":
         spec = [ jsSpec( [ "_runner.js" ] ) ]
     elif target == "smokeQuota":
-        g = Glob( jsSpec( [ "quota", "*.js" ] ) )
+        g = Glob( jsSpec( [ "quota" ] ) )
         spec = [ x.abspath for x in g ]
     elif target == "smokeJsPerf":
-        g = Glob( jsSpec( [ "perf", "*.js" ] ) )
+        g = Glob( jsSpec( [ "perf" ] ) )
         spec = [ x.abspath for x in g ]
     else:
         print( "invalid target for runShellTest()" )

@@ -339,6 +339,7 @@ namespace mongo {
                     return boolean();
                 case EOO:
                 case jstNULL:
+                case Undefined:
                     return false;
                 
                 default:
@@ -493,7 +494,7 @@ namespace mongo {
             default:
                 log() << "can't convert type: " << (int)(type()) << " to code" << endl;
             }
-            uassert( "not code" , 0 );
+            uassert( 10062 ,  "not code" , 0 );
             return "";
         }
 
@@ -593,12 +594,12 @@ namespace mongo {
         }
 
         const char * dbrefNS() const {
-            uassert( "not a dbref" , type() == DBRef );
+            uassert( 10063 ,  "not a dbref" , type() == DBRef );
             return value() + 4;
         }
 
         const OID& dbrefOID() const {
-            uassert( "not a dbref" , type() == DBRef );
+            uassert( 10064 ,  "not a dbref" , type() == DBRef );
             const char * start = value();
             start += 4 + *reinterpret_cast< const int* >( start );
             return *reinterpret_cast< const OID* >( start );
@@ -619,7 +620,7 @@ namespace mongo {
             else {
                 if ( maxLen != -1 ) {
                     int size = strnlen( fieldName(), maxLen - 1 );
-                    massert( "Invalid field name", size != -1 );
+                    massert( 10333 ,  "Invalid field name", size != -1 );
                     fieldNameSize_ = size + 1;
                 }
             }
@@ -706,7 +707,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "Invalid BSONObj spec size: " << objsize();
                 string s = ss.str();
-                massert( s , 0 );
+                massert( 10334 ,  s , 0 );
             }
         }
 #pragma pack(1)
@@ -1433,7 +1434,7 @@ namespace mongo {
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
-            massert( "builder does not own memory", owned() );
+            massert( 10335 ,  "builder does not own memory", owned() );
             int l;
             return BSONObj(decouple(l), true);
         }
@@ -1490,7 +1491,7 @@ namespace mongo {
         }
 
         Labeler operator<<( const Labeler::Label &l ) {
-            massert( "No subobject started", s_.subobjStarted() );
+            massert( 10336 ,  "No subobject started", s_.subobjStarted() );
             return s_ << l;
         }
 
@@ -1644,13 +1645,13 @@ namespace mongo {
     extern JSObj1 js1;
 
 #ifdef _DEBUG
-#define CHECK_OBJECT( o , msg ) massert( (string)"object not valid" + (msg) , (o).isValid() )
+#define CHECK_OBJECT( o , msg ) massert( 10337 ,  (string)"object not valid" + (msg) , (o).isValid() )
 #else
 #define CHECK_OBJECT( o , msg )
 #endif
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() {
-        uassert( "invalid parameter: expected an object", type()==Object || type()==Array );
+        uassert( 10065 ,  "invalid parameter: expected an object", type()==Object || type()==Array );
         return BSONObj(value());
     }
 

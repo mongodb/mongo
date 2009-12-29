@@ -155,14 +155,14 @@ namespace mongo {
         if ( p ) {
             remoteHost = string(remoteEnd, p-remoteEnd);
             remotePort = atoi(p+1);
-            uassert("bad port #", remotePort > 0 && remotePort < 0x10000 );
+            uassert( 10125 , "bad port #", remotePort > 0 && remotePort < 0x10000 );
             if ( remotePort == CmdLine::DefaultDBPort )
                 remote = remoteHost; // don't include ":27017" as it is default; in case ran in diff ways over time to normalizke the hostname format in sources collection
         }
 
-        uassert("arbiter parm is missing, use '-' for none", arb);
+        uassert( 10126 , "arbiter parm is missing, use '-' for none", arb);
         arbHost = arb;
-        uassert("arbiter parm is empty", !arbHost.empty());
+        uassert( 10127 , "arbiter parm is empty", !arbHost.empty());
     }
 
     /* This is set to true if we have EVER been up to date -- this way a new pair member

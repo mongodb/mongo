@@ -28,7 +28,23 @@ t.save( orig );
 t.update( {} , { $inc: { "comments.0.rate_up" : 1 } , $push: { "comments.0.rate_ups" : 99 } } )
 orig.comments[0].rate_up++;
 orig.comments[0].rate_ups.push( 99 )
-//assert.eq( orig , t.findOne() , "B1" )
+assert.eq( orig , t.findOne() , "B1" )
+
+t.drop();
+orig = { _id : 1 , a : [] }
+for ( i=0; i<12; i++ )
+    orig.a.push( i );
+
+
+t.save( orig );
+assert.eq( orig , t.findOne() , "C1" );
+
+t.update( {} , { $inc: { "a.0" : 1 } } );
+orig.a[0]++;
+assert.eq( orig , t.findOne() , "C2" );
+
+t.update( {} , { $inc: { "a.10" : 1 } } );
+orig.a[10]++;
 
 
 

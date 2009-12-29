@@ -16,7 +16,7 @@ unsigned RecCache::MAXNODES = 50000;
 void setRecCacheSize(unsigned mb) {
     unsigned long long MB = mb;
     log(2) << "reccache size: " << MB << "MB\n";
-    uassert( "bad cache size", MB > 0 && MB < 1000000 );
+    uassert( 10114 ,  "bad cache size", MB > 0 && MB < 1000000 );
     RecCache::MAXNODES = (unsigned) MB * 1024 * 1024 / 8192;
     log(3) << "RecCache::MAXNODES=" << RecCache::MAXNODES << '\n';
 }
@@ -103,7 +103,7 @@ BasicRecStore* RecCache::_initStore(string fname) {
 
     // arbitrary limit.  if you are hitting, we should use fewer files and put multiple 
     // indexes in a single file (which is easy to do)
-    massert( "too many index files", n < 10000 );
+    massert( 10374 ,  "too many index files", n < 10000 );
 
     if( stores.size() < (unsigned)n+1 )
         stores.resize(n+1);
@@ -148,11 +148,11 @@ BasicRecStore* RecCache::initStore(int n) {
     }
     catch (...) {
         string s = string("i/o error looking for .idx file in ") + directory();
-        massert(s, false);
+        massert( 10375 , s, false);
     }
     stringstream ss;
     ss << "index datafile missing? n=" << n;
-    uasserted(ss.str());
+    uasserted(12500,ss.str());
     return 0;
 }
 
@@ -196,7 +196,7 @@ string RecCache::findStoreFilename(const char *_ns, bool& found) {
     }
     catch (...) {
         string s = string("i/o error looking for .idx file in ") + directory();
-        massert(s, false);
+        massert( 10376 , s, false);
     }
 
     // DNE.  return a name that would work.

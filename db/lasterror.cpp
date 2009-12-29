@@ -40,6 +40,8 @@ namespace mongo {
             b.appendNull( "err" );
         else
             b.append( "err", msg );
+        if ( code )
+            b.append( "code" , code );
         if ( updatedExisting != NotUpdate )
             b.appendBool( "updatedExisting", updatedExisting == True );
         b.append( "n", nObjects );

@@ -75,7 +75,7 @@ namespace mongo {
                 _state.set(s+1);
                 return;
             }
-            massert("internal error: locks are not upgradeable", s == 0 );
+            massert( 10293 , "internal error: locks are not upgradeable", s == 0 );
             _state.set(1);
             _m.lock(); 
             _minfo.entered();

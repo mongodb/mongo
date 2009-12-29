@@ -24,7 +24,7 @@ namespace mongo {
     
 	Security::Security() {
 		static int n;
-		massert("Security is a singleton class", ++n == 1);
+		massert( 10352 , "Security is a singleton class", ++n == 1);
 		init(); 
 	}
 
@@ -34,7 +34,7 @@ namespace mongo {
 
 #if defined(__linux__)
         _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
-        massert( "can't open dev/urandom", _devrandom->is_open() );
+        massert( 10353 ,  "can't open dev/urandom", _devrandom->is_open() );
 #elif defined(_WIN32)
         srand(curTimeMicros());
 #else
@@ -44,7 +44,7 @@ namespace mongo {
         
 #ifndef NDEBUG
         if ( do_md5_test() )
-	    massert("md5 unit test fails", false);
+	    massert( 10354 , "md5 unit test fails", false);
 #endif
     }
     
@@ -59,7 +59,7 @@ namespace mongo {
         nonce n;
 #if defined(__linux__)
         _devrandom->read((char*)&n, sizeof(n));
-        massert("devrandom failed", !_devrandom->fail());
+        massert( 10355 , "devrandom failed", !_devrandom->fail());
 #elif defined(_WIN32)
         n = (((unsigned long long)rand())<<32) | rand();
 #else

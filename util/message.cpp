@@ -444,7 +444,7 @@ again:
     void setClientId( int id ){
         usingClientIds = true;
         id = id & 0xFFFF0000;
-        massert( "invalid id" , id );
+        massert( 10445 ,  "invalid id" , id );
         clientId.set( id );
     }
     

@@ -82,7 +82,7 @@ namespace mongo {
         {
             bool f = false;
             assert( f = true );
-            massert("assert is misdefined", f);
+            massert( 10281 , "assert is misdefined", f);
         }
 
         killCurrentOp.checkForInterrupt();
@@ -223,14 +223,14 @@ namespace mongo {
 	   does not bother returning that value.
     */
     void BucketBasics::popBack(DiskLoc& recLoc, BSONObj& key) { 
-        massert( "n==0 in btree popBack()", n > 0 );
+        massert( 10282 ,  "n==0 in btree popBack()", n > 0 );
         assert( k(n-1).isUsed() ); // no unused skipping in this function at this point - btreebuilder doesn't require that
         KeyNode kn = keyNode(n-1);
         recLoc = kn.recordLoc;
         key = kn.key;
         int keysize = kn.key.objsize();
 
-		massert("rchild not null in btree popBack()", nextChild.isNull());
+		massert( 10283 , "rchild not null in btree popBack()", nextChild.isNull());
 
 		/* weirdly, we also put the rightmost down pointer in nextchild, even when bucket isn't full. */
 		nextChild = kn.prevChildBucket;
@@ -408,11 +408,11 @@ namespace mongo {
                         if( !dupsChecked ) { 
                             dupsChecked = true;
                             if( idx.head.btree()->exists(idx, idx.head, key, order) )
-                                uasserted( dupKeyError( idx , key ) );
+                                uasserted( ASSERT_ID_DUPKEY , dupKeyError( idx , key ) );
                         }
                     }
                     else
-                        uasserted( dupKeyError( idx , key ) );
+                        uasserted( ASSERT_ID_DUPKEY , dupKeyError( idx , key ) );
                 }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
@@ -476,7 +476,7 @@ found:
         //defensive:
         n = -1;
         parent.Null();
-        massert("todo: use RecStoreInterface instead", false);
+        massert( 10284 , "todo: use RecStoreInterface instead", false);
         // TODO: this was broken anyway as deleteRecord does unindexRecord() call which assumes the data is a BSONObj, 
         // and it isn't.
         assert(false);
@@ -801,8 +801,8 @@ found:
             _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
                 log(4) << "btree _insert: reusing unused key" << endl;
-                massert("_insert: reuse key but lchild is not null", lChild.isNull());
-                massert("_insert: reuse key but rchild is not null", rChild.isNull());
+                massert( 10285 , "_insert: reuse key but lchild is not null", lChild.isNull());
+                massert( 10286 , "_insert: reuse key but rchild is not null", rChild.isNull());
                 kn.setUsed();
                 return 0;
             }
@@ -813,7 +813,7 @@ found:
             out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
             out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
             out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
-            massert("btree: key+recloc already in index", false);
+            massert( 10287 , "btree: key+recloc already in index", false);
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
@@ -961,10 +961,10 @@ namespace mongo {
         if( !dupsAllowed ) {
             if( n > 0 ) {
                 int cmp = keyLast.woCompare(key, order);
-                massert( "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
+                massert( 10288 ,  "bad key order in BtreeBuilder - server internal error", cmp <= 0 );
                 if( cmp == 0 ) {
                     //if( !dupsAllowed )
-                    uasserted( BtreeBucket::dupKeyError( idx , keyLast ) );
+                    uasserted( ASSERT_ID_DUPKEY , BtreeBucket::dupKeyError( idx , keyLast ) );
                 }
             }
             keyLast = key;

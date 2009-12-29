@@ -96,7 +96,7 @@ namespace mongo {
         void sort();
         
         auto_ptr<Iterator> iterator(){
-            uassert( "not sorted" , _sorted );
+            uassert( 10052 ,  "not sorted" , _sorted );
             return auto_ptr<Iterator>( new Iterator( this ) );
         }
         
