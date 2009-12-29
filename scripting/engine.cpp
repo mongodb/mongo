@@ -100,11 +100,27 @@ namespace mongo {
             return false;
         }
 
+        // iterate directories and recurse using all *.js files in the directory
         if ( is_directory( p ) ){
-            cout << "can't read directory [" << filename << "]" << endl;
-            if ( assertOnError )
-                assert( 0 );
-            return false;
+            directory_iterator end;
+            bool empty = true;
+            for (directory_iterator it (p); it != end; it++){
+                empty = false;
+                path sub (*it);
+                if (!endsWith(sub.string().c_str(), ".js"))
+                    continue;
+                if (!execFile(sub.string().c_str(), printResult, reportError, assertOnError, timeoutMs))
+                    return false;
+            }
+
+            if (empty){
+                cout << "directory [" << filename << "] doesn't have any *.js files" << endl;
+                if ( assertOnError )
+                    assert( 0 );
+                return false;
+            }
+
+            return true;
         }
         
         File f;
