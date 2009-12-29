@@ -19,7 +19,6 @@
 #include "engine.h"
 #include "../util/file.h"
 #include "../client/dbclient.h"
-#include "../db/dbinfo.h"
 
 namespace mongo {
 

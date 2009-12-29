@@ -59,11 +59,12 @@ namespace mongo {
            we need to be sure to clear any cached info for the database in
            local.*.
         */
+		/*
         if ( "local" != database_ ) {
             DBInfo i(database_.c_str());
             i.dbDropped();
         }
-
+		*/
 		int len = -1;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
