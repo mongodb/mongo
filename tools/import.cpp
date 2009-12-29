@@ -198,13 +198,14 @@ public:
         log(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
-        char line[ (1024 * 1024 * 4) + 128];
+        boost::scoped_array<char> line (new char[BUF_SIZE]);
         while ( *in ){
-            in->getline( line , BUF_SIZE );
-            uassert( "unknown error reading file" , ( in->rdstate() & ios_base::badbit ) == 0 );
-            log(1) << "got line:" << line << endl;
+            char * buf = line.get();
 
-            char * buf = line;
+            in->getline( buf , BUF_SIZE );
+            uassert( "unknown error reading file" , ( in->rdstate() & ios_base::badbit ) == 0 );
+            log(1) << "got line:" << buf << endl;
+
             while( isspace( buf[0] ) ) buf++;
             
             int len = strlen( buf );
