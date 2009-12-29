@@ -105,7 +105,6 @@ namespace mongo {
     }
 
     MessagingPort *grab = 0;
-    TicketHolder connTicketHolder( 20000 );
     void connThread();
 
     class OurListener : public Listener {
