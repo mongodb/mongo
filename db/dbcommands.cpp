@@ -298,6 +298,11 @@ namespace mongo {
             else if ( p >= 0 && p <= 2 ) {
                 ok = cc().database()->setProfilingLevel( p , errmsg );
             }
+
+            BSONElement slow = cmdObj["slowms"];
+            if ( slow.isNumber() )
+                cmdLine.slowMS = slow.numberInt();
+            
             return ok;
         }
     } cmdProfile;
@@ -857,7 +862,7 @@ namespace mongo {
             BtreeCursor c( d, idxNo, *id, min, max, false, 1 );
             for( ; num; c.advance(), --num );
             int ms = t.millis();
-            if ( ms > 100 ) {
+            if ( ms > cmdLine.slowMS ) {
                 out() << "Finding median for index: " << keyPattern << " between " << min << " and " << max << " took " << ms << "ms." << endl;
             }
 
@@ -912,7 +917,7 @@ namespace mongo {
                 numObjects++;
             }
             int ms = t.millis();
-            if ( ms > 100 ) {
+            if ( ms > cmdLine.slowMS ) {
                 if ( min.isEmpty() ) {
                     out() << "Finding size for ns: " << ns << " took " << ms << "ms." << endl;
                 } else {

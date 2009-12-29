@@ -88,7 +88,7 @@ namespace mongo {
             Timer t;
             res = s->invoke(f,args, cmdLine.quota ? 10 * 60 * 1000 : 0 );
             int m = t.millis();
-            if ( m > 100 ) {
+            if ( m > cmdLine.slowMS ) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << ns << endl;
                 if ( m >= 1000 ) log() << code << endl;
                 else OCCASIONALLY log() << code << endl;

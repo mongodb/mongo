@@ -268,7 +268,7 @@ DB.prototype.help = function() {
     print("\tdb.repairDatabase()");
     print("\tdb.resetError()");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
-    print("\tdb.setProfilingLevel(level) 0=off 1=slow 2=all");
+    print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.shutdownServer()");
     print("\tdb.version() current version of the server" );
 }
@@ -298,17 +298,16 @@ DB.prototype.printCollectionStats = function(){
  *  @param {String} level Desired level of profiling
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.setProfilingLevel = function(level) {
+DB.prototype.setProfilingLevel = function(level,slowms) {
     
     if (level < 0 || level > 2) { 
         throw { dbSetProfilingException : "input level " + level + " is out of range [0..2]" };        
     }
-    
-    if (level) {
-	// if already exists does nothing
-		this.createCollection("system.profile", { capped: true, size: 128 * 1024 } );
-    }
-    return this._dbCommand( { profile: level } );
+
+    var cmd = { profile: level };
+    if ( slowms )
+        cmd["slowms"] = slowms;
+    return this._dbCommand( cmd );
 }
 
 

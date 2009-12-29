@@ -263,7 +263,7 @@ namespace mongo {
         currentOp.reset( client);
         currentOp.setOp(op);
 
-        int logThreshold = 100;
+        int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
 
         Timer t( currentOp.startTime() );
@@ -387,7 +387,7 @@ namespace mongo {
         }
         Database *database = cc().database();
         if ( database && database->profile >= 1 ) {
-            if ( database->profile >= 2 || ms >= 100 ) {
+            if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
                 // performance profiling is on
                 if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
                     out() << "warning: not profiling because recursive lock" << endl;
