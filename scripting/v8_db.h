@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    // These functions may depend on the caller creating a handle scope and context scope.
+    
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( bool local );
     void installDBTypes( v8::Handle<v8::ObjectTemplate>& global );
     void installDBTypes( v8::Handle<v8::Object>& global );

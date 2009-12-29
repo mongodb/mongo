@@ -135,7 +135,8 @@ namespace mongo {
 
 
     Handle<v8::Value> Version(const Arguments& args) {
-        return v8::String::New(v8::V8::GetVersion());
+        HandleScope handle_scope;
+        return handle_scope.Close( v8::String::New(v8::V8::GetVersion()) );
     }
 
     void ReportException(v8::TryCatch* try_catch) {
@@ -231,7 +232,8 @@ namespace mongo {
     }
     
     Handle< Value > ThreadReturnData( const Arguments &args ) {
-        return thisConfig( args )->returnData();
+        HandleScope handle_scope;
+        return handle_scope.Close( thisConfig( args )->returnData() );
     }
 
     Handle< Value > ThreadInject( const Arguments &args ) {
