@@ -221,7 +221,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "Number " << number() << " cannot be represented in JSON";
                 string message = ss.str();
-                massert( message.c_str(), false );
+                massert( 10311 ,  message.c_str(), false );
             }
             break;
         case Bool:
@@ -332,7 +332,7 @@ namespace mongo {
             ss << "Cannot create a properly formatted JSON string with "
             << "element: " << toString() << " of type: " << type();
             string message = ss.str();
-            massert( message.c_str(), false );
+            massert( 10312 ,  message.c_str(), false );
         }
         return s.str();
     }
@@ -369,42 +369,42 @@ namespace mongo {
         case Symbol:
         case Code:
         case String:
-            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            massert( 10313 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = valuestrsize() + 4;
             break;
         case CodeWScope:
-            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            massert( 10314 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = objsize();
             break;
 
         case DBRef:
-            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            massert( 10315 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = valuestrsize() + 4 + 12;
             break;
         case Object:
         case Array:
-            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            massert( 10316 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = objsize();
             break;
         case BinData:
-            massert( "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
+            massert( 10317 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = valuestrsize() + 4 + 1/*subtype*/;
             break;
         case RegEx:
         {
             const char *p = value();
             int len1 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain );
-            massert( "Invalid regex string", len1 != -1 );
+            massert( 10318 ,  "Invalid regex string", len1 != -1 );
             p = p + len1 + 1;
             int len2 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain - len1 - 1 );
-            massert( "Invalid regex options string", len2 != -1 );
+            massert( 10319 ,  "Invalid regex options string", len2 != -1 );
             x = len1 + 1 + len2 + 1;
         }
         break;
         default: {
             stringstream ss;
             ss << "BSONElement: bad type " << (int) type();
-            massert(ss.str().c_str(),false);
+            massert( 10320 , ss.str().c_str(),false);
         }
         }
         totalSize =  x + fieldNameSize() + 1; // BSONType
@@ -610,21 +610,21 @@ namespace mongo {
             case Code:
             case Symbol:
             case String:
-                massert( "Invalid dbref/code/string/symbol size",
+                massert( 10321 ,  "Invalid dbref/code/string/symbol size",
                         valuestrsize() > 0 &&
                         valuestrsize() - 1 == strnlen( valuestr(), valuestrsize() ) );
                 break;
             case CodeWScope: {
                 int totalSize = *( int * )( value() );
-                massert( "Invalid CodeWScope size", totalSize >= 8 );
+                massert( 10322 ,  "Invalid CodeWScope size", totalSize >= 8 );
                 int strSizeWNull = *( int * )( value() + 4 );
-                massert( "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
-                massert( "Invalid CodeWScope string size",
+                massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
+                massert( 10324 ,  "Invalid CodeWScope string size",
                         strSizeWNull > 0 &&
                         strSizeWNull - 1 == strnlen( codeWScopeCode(), strSizeWNull ) );
-                massert( "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
+                massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
                 int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
-                massert( "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
+                massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
                 // Subobject validation handled elsewhere.
             }
             case Object:
@@ -707,17 +707,17 @@ namespace mongo {
         BSONObjIterator i(*this);
         bool first = true;
         while ( 1 ) {
-            massert( "Object does not end with EOO", i.moreWithEOO() );
+            massert( 10327 ,  "Object does not end with EOO", i.moreWithEOO() );
             BSONElement e = i.next( true );
-            massert( "Invalid element size", e.size() > 0 );
-            massert( "Element too large", e.size() < ( 1 << 30 ) );
+            massert( 10328 ,  "Invalid element size", e.size() > 0 );
+            massert( 10329 ,  "Element too large", e.size() < ( 1 << 30 ) );
             int offset = e.rawdata() - this->objdata();
-            massert( "Element extends past end of object",
+            massert( 10330 ,  "Element extends past end of object",
                     e.size() + offset <= this->objsize() );
             e.validate();
             bool end = ( e.size() + offset == this->objsize() );
             if ( e.eoo() ) {
-                massert( "EOO Before end of object", end );
+                massert( 10331 ,  "EOO Before end of object", end );
                 break;
             }
             if ( first )
@@ -814,7 +814,7 @@ namespace mongo {
         if ( other.isEmpty() )
             return 1;
 
-        uassert( "woSortOrder needs a non-empty sortKey" , ! sortKey.isEmpty() );
+        uassert( 10060 ,  "woSortOrder needs a non-empty sortKey" , ! sortKey.isEmpty() );
 
         BSONObjIterator i(sortKey);
         while ( 1 ){
@@ -1481,7 +1481,7 @@ namespace mongo {
     Labeler::Label SIZE( "$size" );
 
     void BSONElementManipulator::initTimestamp() {
-        massert( "Expected CurrentTime type", element_.type() == Timestamp );
+        massert( 10332 ,  "Expected CurrentTime type", element_.type() == Timestamp );
         unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
         if ( timestamp == 0 )
             timestamp = OpTime::now().asDate();
@@ -1529,7 +1529,7 @@ namespace mongo {
 
         };
         log() << "type not support for appendMinElementForType: " << t << endl;
-        uassert( "type not supported for appendMinElementForType" , false );
+        uassert( 10061 ,  "type not supported for appendMinElementForType" , false );
     }
 
     void BSONObjBuilder::appendMaxForType( const string& field , int t ){

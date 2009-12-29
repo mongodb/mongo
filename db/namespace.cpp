@@ -59,11 +59,12 @@ namespace mongo {
            we need to be sure to clear any cached info for the database in
            local.*.
         */
+		/*
         if ( "local" != database_ ) {
             DBInfo i(database_.c_str());
             i.dbDropped();
         }
-
+		*/
 		int len = -1;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
@@ -74,13 +75,13 @@ namespace mongo {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
                     log() << "bad .ns file: " << pathString << endl;
-                    uassert( "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+                    uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
                 }
             }
 		}
 		else {
 			// use lenForNewNsFiles, we are making a new database
-			massert( "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+			massert( 10343 ,  "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
 			long l = lenForNewNsFiles;
 			p = f.map(pathString.c_str(), l);
             if( p ) { 
@@ -492,14 +493,14 @@ namespace mongo {
                 continue;
             }
 
-            massert( "Capped collection full and delete not allowed", cappedMayDelete() );
+            massert( 10344 ,  "Capped collection full and delete not allowed", cappedMayDelete() );
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
             if( ++passes >= 5000 ) {
                 log() << "passes ns:" << ns << " len:" << len << '\n';
                 log() << "passes max:" << max << " nrecords:" << nrecords << " datasize: " << datasize << endl;
-                massert( "passes >= 5000 in capped collection alloc", false );
+                massert( 10345 ,  "passes >= 5000 in capped collection alloc", false );
             }
         }
 
@@ -537,7 +538,7 @@ namespace mongo {
        (aug08 - this method not currently used)
     */
     int NamespaceDetails::fieldIsIndexed(const char *fieldName) {
-        massert("not implemented", false);
+        massert( 10346 , "not implemented", false);
         /*
         for ( int i = 0; i < nIndexes; i++ ) {
             IndexDetails& idx = indexes[i];
@@ -607,7 +608,7 @@ namespace mongo {
         spec << "{size:" << logSizeMb * 1024 * 1024 << ",capped:true,autoIndexId:false}";
         setClient( _cll_ns.c_str() );
         string err;
-        massert( "Could not create log ns", userCreateNS( _cll_ns.c_str(), fromjson( spec.str() ), err, false ) );
+        massert( 10347 ,  "Could not create log ns", userCreateNS( _cll_ns.c_str(), fromjson( spec.str() ), err, false ) );
         NamespaceDetails *d = nsdetails( _cll_ns.c_str() );
         d->cappedDisallowDelete();
     }

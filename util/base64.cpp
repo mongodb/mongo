@@ -111,7 +111,7 @@ namespace mongo {
 
 
         void decode( stringstream& ss , const string& s ){
-            uassert( "invalid base64" , s.size() % 4 == 0 );
+            uassert( 10270 ,  "invalid base64" , s.size() % 4 == 0 );
             const unsigned char * data = (const unsigned char*)s.c_str();
             int size = s.size();
             

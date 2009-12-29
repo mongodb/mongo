@@ -195,7 +195,7 @@ namespace mongo {
             JavaJS->scopeSetString(s,field,val);
         }
         void setObject(const char *field, const BSONObj& obj , bool readOnly ) {
-            uassert( "only readOnly setObject supported in java" , readOnly );
+            uassert( 10211 ,  "only readOnly setObject supported in java" , readOnly );
             JavaJS->scopeSetObject(s,field,&obj);
         }
         void setBoolean(const char *field, bool val ) {

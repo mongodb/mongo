@@ -211,7 +211,7 @@ namespace mongo {
         fieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
             string name = b.popString();
-            massert( "Invalid use of reserved field name",
+            massert( 10338 ,  "Invalid use of reserved field name",
                      name != "$oid" &&
                      name != "$binary" &&
                      name != "$type" &&
@@ -343,7 +343,7 @@ namespace mongo {
     struct binDataBinary {
         binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            massert( "Badly formatted bindata", ( end - start ) % 4 == 0 );
+            massert( 10339 ,  "Badly formatted bindata", ( end - start ) % 4 == 0 );
             string encoded( start, end );
             b.binData = base64::decode( encoded );
         }
@@ -550,7 +550,7 @@ public:
                 len = 10;
             stringstream ss;
             ss << "Failure parsing JSON string near: " << string( result.stop, len );
-            massert( ss.str(), false );
+            massert( 10340 ,  ss.str(), false );
         }
         return b.pop();
     }

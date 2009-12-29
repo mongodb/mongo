@@ -117,13 +117,13 @@ namespace mongo {
         BSONObj nextJsObj() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
-            massert( "Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
+            massert( 10304 ,  "Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
             BSONObj js(nextjsobj);
-            massert( "Invalid object size", js.objsize() > 3 );
-            massert( "Next object larger than available space",
+            massert( 10305 ,  "Invalid object size", js.objsize() > 3 );
+            massert( 10306 ,  "Next object larger than available space",
                     js.objsize() < ( theEnd - data ) );
             if ( objcheck && !js.valid() ) {
-                massert("bad object in message", false);
+                massert( 10307 , "bad object in message", false);
             }            
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )

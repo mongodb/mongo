@@ -26,6 +26,7 @@ namespace mongo {
     class Message;
 
     struct LastError {
+        int code;
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         /* todo: nObjects should be 64 bit */
@@ -33,8 +34,9 @@ namespace mongo {
         int nPrev;
         bool valid;
         bool overridenById;
-        void raiseError(const char *_msg) {
+        void raiseError(int _code , const char *_msg) {
             reset( true );
+            code = _code;
             msg = _msg;
         }
         void recordUpdate( bool _updatedExisting, int nChanged ) {
@@ -51,6 +53,7 @@ namespace mongo {
             reset();
         }
         void reset( bool _valid = false ) {
+            code = 0;
             msg.clear();
             updatedExisting = NotUpdate;
             nObjects = 0;
@@ -93,13 +96,13 @@ namespace mongo {
         map<int,Status> _ids;        
     } lastError;
     
-    inline void raiseError(const char *msg) {
+    inline void raiseError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
             DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
             return;
         }
-        le->raiseError(msg);
+        le->raiseError(code, msg);
     }
     
     inline void recordUpdate( bool updatedExisting, int nChanged ) {

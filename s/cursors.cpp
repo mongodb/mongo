@@ -33,7 +33,7 @@ namespace mongo {
     }
 
     bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ){
-        uassert( "cursor already done" , ! _done );
+        uassert( 10191 ,  "cursor already done" , ! _done );
                 
         int maxSize = 1024 * 1024;
         if ( _totalSent > 0 )

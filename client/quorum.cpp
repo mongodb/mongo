@@ -3,6 +3,8 @@
 #include "stdafx.h"
 #include "quorum.h"
 
+// error codes 8000-8009
+
 namespace mongo {
     
     QuorumConnection::QuorumConnection( string commaSeperated ){
@@ -13,7 +15,7 @@ namespace mongo {
             _connect( h );
         }
         _connect( commaSeperated );
-        uassert( "QuorumConnection needs 3 servers" , _conns.size() == 3 );
+        uassert( 8004 ,  "QuorumConnection needs 3 servers" , _conns.size() == 3 );
     }
 
     QuorumConnection::QuorumConnection( string a , string b , string c ){
@@ -89,7 +91,7 @@ namespace mongo {
 
         if ( ok )
             return;
-        throw UserException( (string)"QuorumConnection write op failed: " + err.str() );
+        throw UserException( 8001 , (string)"QuorumConnection write op failed: " + err.str() );
     }
 
     void QuorumConnection::_connect( string host ){
@@ -104,7 +106,7 @@ namespace mongo {
     auto_ptr<DBClientCursor> QuorumConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                      const BSONObj *fieldsToReturn, int queryOptions){ 
 
-        uassert( "$cmd not support yet in QuorumConnection::query" , ns.find( "$cmd" ) == string::npos );
+        uassert( 10021 ,  "$cmd not support yet in QuorumConnection::query" , ns.find( "$cmd" ) == string::npos );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
@@ -118,11 +120,11 @@ namespace mongo {
                 log() << "query failed to: " << _conns[i]->toString() << " exception" << endl;
             }
         }
-        throw UserException( "all servers down!" );
+        throw UserException( 8002 , "all servers down!" );
     }
     
     auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
-        uassert("QuorumConnection::getMore not supported yet" , 0); 
+        uassert( 10022 , "QuorumConnection::getMore not supported yet" , 0); 
         auto_ptr<DBClientCursor> c;
         return c;
     }
@@ -130,7 +132,7 @@ namespace mongo {
     void QuorumConnection::insert( const string &ns, BSONObj obj ){ 
         string errmsg;
         if ( ! prepare( errmsg ) )
-            throw UserException( (string)"QuorumConnection::insert prepare failed: " + errmsg );
+            throw UserException( 8003 , (string)"QuorumConnection::insert prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             _conns[i]->insert( ns , obj );
@@ -140,7 +142,7 @@ namespace mongo {
     }
         
     void QuorumConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
-        uassert("QuorumConnection bulk insert not implemented" , 0); 
+        uassert( 10023 , "QuorumConnection bulk insert not implemented" , 0); 
     }
 
     void QuorumConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }

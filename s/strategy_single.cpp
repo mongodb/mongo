@@ -65,7 +65,7 @@ namespace mongo {
 
             Message response;
             bool ok = c.port().call( r.m() , response);
-            uassert("dbgrid: getmore: error calling db", ok);
+            uassert( 10204 , "dbgrid: getmore: error calling db", ok);
             r.reply( response );
         
             dbcon.done();
@@ -81,7 +81,7 @@ namespace mongo {
                     BSONObj o = d.nextJsObj();
                     const char * ns = o["ns"].valuestr();
                     if ( r.getConfig()->isSharded( ns ) ){
-                        uassert( (string)"can't use unique indexes with sharding  ns:" + ns + 
+                        uassert( 10205 ,  (string)"can't use unique indexes with sharding  ns:" + ns + 
                                  " key: " + o["key"].embeddedObjectUserCheck().toString() , 
                                  IndexDetails::isIdIndexPattern( o["key"].embeddedObjectUserCheck() ) || 
                                  ! o["unique"].trueValue() );
@@ -96,15 +96,15 @@ namespace mongo {
                 }
             }
             else if ( op == dbUpdate ){
-                throw UserException( "can't update system.indexes" );
+                throw UserException( 8050 , "can't update system.indexes" );
             }
             else if ( op == dbDelete ){
                 // TODO
-                throw UserException( "can't delete indexes on sharded collection yet" );
+                throw UserException( 8051 , "can't delete indexes on sharded collection yet" );
             }
             else {
                 log() << "handleIndexWrite invalid write op: " << op << endl;
-                throw UserException( "handleIndexWrite invalid write op" );
+                throw UserException( 8052 , "handleIndexWrite invalid write op" );
             }
                     
         }

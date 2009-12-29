@@ -62,6 +62,7 @@ namespace mongo {
     class SyncException : public DBException {
     public:
         virtual const char* what() const throw() { return "sync exception"; }
+        virtual int getCode(){ return 10001; }
     };
     
     /* A Source is a source from which we can pull (replicate) data.

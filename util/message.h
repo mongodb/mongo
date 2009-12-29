@@ -197,6 +197,7 @@ namespace mongo {
     class SocketException : public DBException {
     public:
         virtual const char* what() const throw() { return "socket exception"; }
+        virtual int getCode(){ return 9001; }
     };
 
     MSGID nextMessageId();

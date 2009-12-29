@@ -89,7 +89,7 @@ namespace mongo {
             lower = e;
             break;
         case BSONObj::opALL: {
-            massert( "$all requires array", e.type() == Array );
+            massert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
             if ( i.more() )
                 lower = upper = i.next();
@@ -337,7 +337,7 @@ namespace mongo {
     ///////////////////
     
     void FieldMatcher::add( const BSONObj& o ){
-        massert("can only add to FieldMatcher once", source_.isEmpty());
+        massert( 10371 , "can only add to FieldMatcher once", source_.isEmpty());
         source_ = o;
 
         BSONObjIterator i( o );

@@ -307,7 +307,7 @@ namespace mongo {
             if ( ! _suites )
                 _suites = new map<string,Suite*>();
             Suite*& m = (*_suites)[name];
-            uassert( "already have suite with that name" , ! m );
+            uassert( 10162 ,  "already have suite with that name" , ! m );
             m = s;
         }
 

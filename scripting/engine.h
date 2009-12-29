@@ -70,7 +70,7 @@ namespace mongo {
             int res = invoke( func , args , timeoutMs );
             if ( res == 0 )
                 return;
-            throw UserException( (string)"invoke failed: " + getError() );
+            throw UserException( 9004 , (string)"invoke failed: " + getError() );
         }
         virtual string getError() = 0;
         
@@ -78,7 +78,7 @@ namespace mongo {
         void invokeSafe( const char* code , const BSONObj& args, int timeoutMs = 0 ){
             if ( invoke( code , args , timeoutMs ) == 0 )
                 return;
-            throw UserException( (string)"invoke failed: " + getError() );
+            throw UserException( 9005 , (string)"invoke failed: " + getError() );
         }
 
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs = 0 ) = 0;

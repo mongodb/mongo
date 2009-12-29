@@ -132,7 +132,7 @@ namespace mongo {
         BSONObj cmd = BSON( "count" << ns.coll << "query" << query );
         BSONObj res;
         if( !runCommand(ns.db.c_str(), cmd, res, options) )
-            uasserted(string("count fails:") + res.toString());
+            uasserted(11010,string("count fails:") + res.toString());
         return res.getIntField("n");
     }
 
@@ -314,8 +314,8 @@ namespace mongo {
 
     list<string> DBClientWithCommands::getDatabaseNames(){
         BSONObj info;
-        uassert( "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
-        uassert( "listDatabases.databases not array" , info["databases"].type() == Array );
+        uassert( 10005 ,  "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
+        uassert( 10006 ,  "listDatabases.databases not array" , info["databases"].type() == Array );
         
         list<string> names;
         
@@ -426,7 +426,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
-        massert( "DBClientBase::findOne: transport error", c.get() );
+        massert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
 
         if ( !c->more() )
             return BSONObj();
@@ -448,7 +448,7 @@ namespace mongo {
             port = CmdLine::DefaultDBPort;
             ip = hostbyname( serverAddress.c_str() );
         }
-        massert( "Unable to parse hostname", !ip.empty() );
+        massert( 10277 ,  "Unable to parse hostname", !ip.empty() );
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
@@ -594,14 +594,14 @@ namespace mongo {
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
                            info ) ){
             log() << "dropIndex failed: " << info << endl;
-            uassert( "dropIndex failed" , 0 );
+            uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();
     }
     
     void DBClientWithCommands::dropIndexes( const string& ns ){
         BSONObj info;
-        uassert( "dropIndexes failed" , runCommand( nsToClient( ns.c_str() ) , 
+        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToClient( ns.c_str() ) , 
                                                     BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") , 
                                                     info ) );
         resetIndexCache();
@@ -716,7 +716,7 @@ namespace mongo {
             if ( !port().call(toSend, response) ) {
                 failed = true;
                 if ( assertOk )
-                    massert("dbclient error communicating with server", false);
+                    massert( 10278 , "dbclient error communicating with server", false);
                 return false;
             }
         }
@@ -878,7 +878,7 @@ namespace mongo {
             sleepsecs(1);
         }
 
-        uassert("checkmaster: no master found", false);
+        uassert( 10009 , "checkmaster: no master found", false);
     }
 
     inline DBClientConnection& DBClientPaired::checkMaster() {
@@ -922,7 +922,7 @@ namespace mongo {
 
     bool DBClientPaired::connect(string hostpairstring) { 
         size_t comma = hostpairstring.find( "," );
-        uassert("bad hostpairstring", comma != string::npos);
+        uassert( 10010 , "bad hostpairstring", comma != string::npos);
         return connect( hostpairstring.substr( 0 , comma ) , hostpairstring.substr( comma + 1 ) );
     }
 

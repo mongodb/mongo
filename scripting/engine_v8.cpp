@@ -177,7 +177,7 @@ namespace mongo {
         if ( v->IsNumber() )
             return NumberDouble;
         if ( v->IsExternal() ){
-            uassert( "can't handle external yet" , 0 );
+            uassert( 10230 ,  "can't handle external yet" , 0 );
             return -1;
         }
         if ( v->IsDate() )
@@ -185,7 +185,7 @@ namespace mongo {
         if ( v->IsObject() )
             return Object;
 
-        throw UserException( (string)"don't know what this is: " + field );
+        throw UserException( 12509, (string)"don't know what this is: " + field );
     }
 
     v8::Handle<v8::Value> V8Scope::get( const char * field ){
@@ -222,7 +222,7 @@ namespace mongo {
         Handle<Value> v = get( field );
         if ( v->IsNull() || v->IsUndefined() )
             return BSONObj();
-        uassert( "not an object" , v->IsObject() );
+        uassert( 10231 ,  "not an object" , v->IsObject() );
         return v8ToMongo( v->ToObject() );
     }
     
@@ -269,7 +269,7 @@ namespace mongo {
         }        
         
         Persistent<Value> f = Persistent< Value >::New( _global->Get( v8::String::New( fn.c_str() ) ) );
-        uassert( "not a func" , f->IsFunction() );
+        uassert( 10232, "not a func" , f->IsFunction() );
         _funcs.push_back( f );
         return num;
     }
@@ -344,7 +344,7 @@ namespace mongo {
             if (reportError)
                 log() << _error << endl;
             if ( assertOnError )
-                uassert( _error , 0 );
+                uassert( 10233 ,  _error , 0 );
             return false;
         } 
     
@@ -354,7 +354,7 @@ namespace mongo {
             if ( reportError )
                 log() << _error << endl;
             if ( assertOnError )
-                uassert( _error , 0 );
+                uassert( 10234 ,  _error , 0 );
             return false;
         } 
         
@@ -386,11 +386,11 @@ namespace mongo {
         V8_SIMPLE_HEADER
 
         if ( _connectState == EXTERNAL )
-            throw UserException( "externalSetup already called, can't call externalSetup" );
+            throw UserException( 12510, "externalSetup already called, can't call externalSetup" );
         if ( _connectState ==  LOCAL ){
             if ( _localDBName == dbName )
                 return;
-            throw UserException( "localConnect called with a different name previously" );
+            throw UserException( 12511, "localConnect called with a different name previously" );
         }
 
         //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
@@ -409,7 +409,7 @@ namespace mongo {
         if ( _connectState == EXTERNAL )
             return;
         if ( _connectState == LOCAL )
-            throw UserException( "localConnect already called, can't call externalSetup" );
+            throw UserException( 12512, "localConnect already called, can't call externalSetup" );
 
         _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( false )->GetFunction() );
         exec( jsconcatcode , "shell setup" , false , true , true , 0 );

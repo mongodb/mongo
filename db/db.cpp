@@ -105,6 +105,7 @@ namespace mongo {
     }
 
     MessagingPort *grab = 0;
+    TicketHolder connTicketHolder( 20000 );
     void connThread();
 
     class OurListener : public Listener {
@@ -112,6 +113,12 @@ namespace mongo {
         OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
             assert( grab == 0 );
+            if ( ! connTicketHolder.tryAcquire() ){
+                log() << "connection refused because too many open connections" << endl;
+                // TODO: would be nice if we notified them...
+                mp->shutdown();
+                return;
+            }
             grab = mp;
             boost::thread thr(connThread);
             while ( grab )
@@ -163,6 +170,7 @@ namespace mongo {
     */
     void connThread()
     {
+        TicketHolderReleaser connTicketReleaser( &connTicketHolder );
         Client::initThread("conn");
 
         /* todo: move to Client object */
@@ -432,7 +440,7 @@ namespace mongo {
 
         stringstream ss;
         ss << "dbpath (" << dbpath << ") does not exist";
-        massert( ss.str().c_str(), boost::filesystem::exists( dbpath ) );
+        massert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
 
         acquirePathLock();
         remove_all( dbpath + "/_tmp/" );
@@ -584,6 +592,8 @@ int main(int argc, char* argv[], char *envp[] )
         ("repair", "run repair on all dbs")
         ("notablescan", "do not allow table scans")
         ("syncdelay",po::value<double>(&dataFileSync._sleepsecs)->default_value(60), "seconds between disk syncs (0 for never)")
+        ("profile",po::value<int>(), "0=off 1=slow, 2=all")
+        ("maxConns",po::value<int>(), "max number of simultaneous connections")
 #if defined(_WIN32)
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
@@ -756,7 +766,7 @@ int main(int argc, char* argv[], char *envp[] )
 #endif
         if (params.count("logpath")) {
             string lp = params["logpath"].as<string>();
-            uassert( "logpath has to be non-zero" , lp.size() );
+            uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
             initLogging( lp , params.count( "logappend" ) );
         }
         if (params.count("nocursors")) {
@@ -830,32 +840,32 @@ int main(int argc, char* argv[], char *envp[] )
                 pairWith(paired.c_str(), "-");
             }
         } else if (params.count("arbiter")) {
-            uasserted("specifying --arbiter without --pairwith");
+            uasserted(10999,"specifying --arbiter without --pairwith");
         }
         if (params.count("autoresync")) {
             autoresync = true;
         }
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
-            uassert("bad --nssize arg", x > 0 && x <= (0x7fffffff/1024/1024));
+            uassert( 10034 , "bad --nssize arg", x > 0 && x <= (0x7fffffff/1024/1024));
             lenForNewNsFiles = x * 1024 * 1024;
             assert(lenForNewNsFiles > 0);
         }
         if (params.count("oplogSize")) {
             long x = params["oplogSize"].as<long>();
-            uassert("bad --oplogSize arg", x > 0);
+            uassert( 10035 , "bad --oplogSize arg", x > 0);
             cmdLine.oplogSize = x * 1024 * 1024;
             assert(cmdLine.oplogSize > 0);
         }
         if (params.count("opIdMem")) {
             long x = params["opIdMem"].as<long>();
-            uassert("bad --opIdMem arg", x > 0);
+            uassert( 10036 , "bad --opIdMem arg", x > 0);
             opIdMem = x;
             assert(opIdMem > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
-            uassert("bad --cacheSize arg", x > 0);
+            uassert( 10037 , "bad --cacheSize arg", x > 0);
             setRecCacheSize(x);
         }
 		if (params.count("port") == 0 ) { 
@@ -868,7 +878,16 @@ int main(int argc, char* argv[], char *envp[] )
         if ( params.count("configsvr" ) && params.count( "diaglog" ) == 0 ){
             _diaglog.level = 1;
         }
-
+        if ( params.count( "profile" ) ){
+            cmdLine.defaultProfile = params["profile"].as<int>();
+        }
+        if ( params.count( "maxConns" ) ){
+            int newSize = params["maxConns"].as<int>();
+            uassert( 12507 , "maxConns has to be at least 5" , newSize >= 5 );
+            uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
+            connTicketHolder.resize( newSize );
+        }
+        
         Module::configAll( params );
         dataFileSync.go();
 
@@ -1051,7 +1070,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;
         else
-            massert("Couldn't register Windows Ctrl-C handler", false);
+            massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
     }
 #endif
 

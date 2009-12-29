@@ -336,7 +336,7 @@ namespace mongo {
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             if ( replPair == 0 ) {
-                massert( "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
+                massert( 10383 ,  "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
                 // assume that we are an arbiter and should forward the request
                 string host = cmdObj.getStringField("your_name");
                 int port = cmdObj.getIntField( "your_port" );
@@ -462,11 +462,11 @@ namespace mongo {
         only = o.getStringField("only");
         hostName = o.getStringField("host");
         _sourceName = o.getStringField("source");
-        uassert( "'host' field not set in sources collection object", !hostName.empty() );
-        uassert( "only source='main' allowed for now with replication", sourceName() == "main" );
+        uassert( 10118 ,  "'host' field not set in sources collection object", !hostName.empty() );
+        uassert( 10119 ,  "only source='main' allowed for now with replication", sourceName() == "main" );
         BSONElement e = o.getField("syncedTo");
         if ( !e.eoo() ) {
-            uassert( "bad sources 'syncedTo' field value", e.type() == Date || e.type() == Timestamp );
+            uassert( 10120 ,  "bad sources 'syncedTo' field value", e.type() == Date || e.type() == Timestamp );
             OpTime tmp( e.date() );
             syncedTo = tmp;
         }
@@ -594,20 +594,20 @@ namespace mongo {
                 n++;
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != cmdLine.source ) {
-                    log() << "E10000 --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "--source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
                 if ( tmp.only != cmdLine.only ) {
-                    log() << "E10001 --only " << cmdLine.only << " != " << tmp.only << " from local.sources collection" << endl;
+                    log() << "--only " << cmdLine.only << " != " << tmp.only << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }
-            uassert( "E10002 local.sources collection corrupt?", n<2 );
+            uassert( 10002 ,  "local.sources collection corrupt?", n<2 );
             if ( n == 0 ) {
                 // source missing.  add.
                 ReplSource s;
@@ -618,7 +618,7 @@ namespace mongo {
         }
         else {
             try {
-                massert("--only requires use of --source", cmdLine.only.empty());
+                massert( 10384 , "--only requires use of --source", cmdLine.only.empty());
             } catch ( ... ) {
                 dbexit( EXIT_BADOPTIONS );
             }
@@ -636,14 +636,14 @@ namespace mongo {
                 n++;
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != remote ) {
-                    log() << "E10003 pairwith " << remote << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "pairwith " << remote << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
                 c->advance();
             }
-            uassert( "E10002 local.sources collection corrupt?", n<2 );
+            uassert( 10122 ,  "local.sources collection corrupt?", n<2 );
             if ( n == 0 ) {
                 // source missing.  add.
                 ReplSource s;
@@ -708,7 +708,7 @@ namespace mongo {
             dbtemprelease t;
             connect();
             bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
-            massert( "Unable to get database list", ok );
+            massert( 10385 ,  "Unable to get database list", ok );
         }
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
         while( i.moreWithEOO() ) {
@@ -984,7 +984,7 @@ namespace mongo {
         BSONObj last = conn->findOne( _ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
             BSONElement ts = last.findElement( "ts" );
-            massert( "non Date ts found", ts.type() == Date || ts.type() == Timestamp );
+            massert( 10386 ,  "non Date ts found", ts.type() == Date || ts.type() == Timestamp );
             syncedTo = OpTime( ts.date() );
         }        
     }
@@ -1003,7 +1003,7 @@ namespace mongo {
     }
     
     void ReplSource::resetSlave() {
-        massert( "request to kill slave replication falied",
+        massert( 10387 ,  "request to kill slave replication falied",
                 conn->simpleCommand( "admin", 0, "forcedead" ) );        
         syncToTailOfRemoteLog();
         {
@@ -1038,7 +1038,7 @@ namespace mongo {
             idTracker.reset();
             dbtemprelease t;
             resetSlave();
-            massert( "local master log filled, forcing slave resync", false );
+            massert( 10388 ,  "local master log filled, forcing slave resync", false );
         }        
         if ( !newTail.isNull() )
             localLogTail = newTail;
@@ -1071,7 +1071,7 @@ namespace mongo {
                 syncToTailOfRemoteLog();
                 BSONObj info;
                 bool ok = conn->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
-                massert( "Unable to get database list", ok );
+                massert( 10389 ,  "Unable to get database list", ok );
                 BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
                 while( i.moreWithEOO() ) {
                     BSONElement e = i.next();
@@ -1156,11 +1156,11 @@ namespace mongo {
             string err = op.getStringField("$err");
             if ( !err.empty() ) {
                 problem() << "repl: $err reading remote oplog: " + err << '\n';
-                massert( "got $err reading remote oplog", false );
+                massert( 10390 ,  "got $err reading remote oplog", false );
             }
             else {
                 problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
-                massert("repl: bad object read from remote oplog", false);
+                massert( 10391 , "repl: bad object read from remote oplog", false);
             }
         }
         
@@ -1264,7 +1264,7 @@ namespace mongo {
                 nextOpTime = tmp;
                 if ( !( last < nextOpTime ) ) {
                     problem() << "sync error: last " << last.toString() << " >= nextOpTime " << nextOpTime.toString() << endl;
-                    uassert("bad 'ts' value in sources", false);
+                    uassert( 10123 , "bad 'ts' value in sources", false);
                 }
 
                 sync_pullOpLog_applyOperation(op, &localLogTail);
@@ -1302,8 +1302,8 @@ namespace mongo {
 
 		string u = user.getStringField("user");
 		string p = user.getStringField("pwd");
-		massert("bad user object? [1]", !u.empty());
-		massert("bad user object? [2]", !p.empty());
+		massert( 10392 , "bad user object? [1]", !u.empty());
+		massert( 10393 , "bad user object? [2]", !p.empty());
 		string err;
 		if( !conn->auth("local", u.c_str(), p.c_str(), err, false) ) {
 			log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
@@ -1371,7 +1371,7 @@ namespace mongo {
         		log() << "        " << o.toString() << endl;
         		return false;
         	}
-        	uassert( e.type() == Date );
+        	uassert( 10124 ,  e.type() == Date );
         	OpTime serverCurTime;
         	serverCurTime.asDate() = e.date();
         */

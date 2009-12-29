@@ -40,7 +40,7 @@ namespace mongo {
                 log(2) << "creating new connection for pool to:" << host << endl;
                 if ( !cc->connect(host.c_str(), errmsg) ) {
                     delete cc;
-                    uassert( (string)"dbconnectionpool: connect failed " + host , false);
+                    uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host , false);
                     return 0;
                 }
                 c = cc;
@@ -50,7 +50,7 @@ namespace mongo {
                 DBClientPaired *p = new DBClientPaired();
                 if( !p->connect(host) ) { 
                     delete p;
-                    uassert( (string)"dbconnectionpool: connect failed [2] " + host , false);
+                    uassert( 11003 ,  (string)"dbconnectionpool: connect failed [2] " + host , false);
                     return 0;
                 }
                 c = p;

@@ -41,7 +41,7 @@ namespace mongo {
         typedef map< BSONObj,list<BSONObj>,MyCmp > InMemory;
 
         BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce , bool final , ScriptingFunction finalize ){
-            uassert( "need values" , values.size() );
+            uassert( 10074 ,  "need values" , values.size() );
             
             int sizeEstimate = ( values.size() * values.begin()->getField( "value" ).size() ) + 128;
             BSONObj key;
@@ -68,7 +68,7 @@ namespace mongo {
             
             s->invokeSafe( reduce , args );
             if ( s->type( "return" ) == Array ){
-                uassert("reduce -> multiple not supported yet",0);                
+                uassert( 10075 , "reduce -> multiple not supported yet",0);                
                 return BSONObj();
             }
             
@@ -159,7 +159,7 @@ namespace mongo {
                     db.dropCollection( finalLong );
                     if ( db.count( tempLong ) ){
                         BSONObj info;
-                        uassert( "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
+                        uassert( 10076 ,  "rename failed" , db.runCommand( "admin" , BSON( "renameCollection" << tempLong << "to" << finalLong ) , info ) );
                     }
                 }
                 return db.count( finalLong );
@@ -206,11 +206,11 @@ namespace mongo {
                 
                 map = scope->createFunction( setup.mapCode.c_str() );
                 if ( ! map )
-                    throw UserException( (string)"map compile failed: " + scope->getError() );
+                    throw UserException( 9012, (string)"map compile failed: " + scope->getError() );
 
                 reduce = scope->createFunction( setup.reduceCode.c_str() );
                 if ( ! reduce )
-                    throw UserException( (string)"reduce compile failed: " + scope->getError() );
+                    throw UserException( 9013, (string)"reduce compile failed: " + scope->getError() );
 
                 if ( setup.finalizeCode.size() )
                     finalize  = scope->createFunction( setup.finalizeCode.c_str() );
@@ -343,7 +343,7 @@ namespace mongo {
         boost::thread_specific_ptr<MRTL> _tlmr;
 
         BSONObj fast_emit( const BSONObj& args ){
-            uassert( "fast_emit takes 2 args" , args.nFields() == 2 );
+            uassert( 10077 ,  "fast_emit takes 2 args" , args.nFields() == 2 );
             _tlmr->insert( args );
             _tlmr->numEmits++;
             return BSONObj();
@@ -396,7 +396,7 @@ namespace mongo {
                         
                         state.scope->setThis( &o );
                         if ( state.scope->invoke( state.map , state.setup.mapparams , 0 , true ) )
-                            throw UserException( (string)"map invoke failed: " + state.scope->getError() );
+                            throw UserException( 9014, (string)"map invoke failed: " + state.scope->getError() );
                         
                         if ( mr.verbose ) mapTime += mt.micros();
                         
@@ -515,7 +515,7 @@ namespace mongo {
 
                     BSONObj res = e.embeddedObjectUserCheck();
                     
-                    uassert( "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
+                    uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
                     servers.insert( shard );
                     shardCounts.appendAs( res["counts"] , shard.c_str() );
 

@@ -418,7 +418,7 @@ namespace mongo {
         virtual bool dropCollection( const string &ns ){
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
-            uassert( "no collection name", coll.size() );
+            uassert( 10011 ,  "no collection name", coll.size() );
 
             BSONObj info;
             
@@ -679,7 +679,7 @@ namespace mongo {
     
     class ConnectException : public UserException { 
     public:
-        ConnectException(string msg) : UserException(msg) { }
+        ConnectException(string msg) : UserException(9000,msg) { }
     };
 
     /** 

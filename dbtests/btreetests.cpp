@@ -32,7 +32,7 @@ namespace BtreeTests {
             {
                 bool f = false;
                 assert( f = true );
-                massert("assert is misdefined", f);
+                massert( 10402 , "assert is misdefined", f);
             }
 
             setClient( ns() );

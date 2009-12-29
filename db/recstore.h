@@ -50,7 +50,7 @@ private:
     RecStoreHeader h; // h.reserved is wasteful here; fix later.
     void write(fileofs ofs, const char *data, unsigned len) { 
         f.write(ofs, data, len);
-        massert("basicrecstore write io error", !f.bad());
+        massert( 10380 , "basicrecstore write io error", !f.bad());
     }
 };
 
@@ -66,25 +66,25 @@ inline BasicRecStore::~BasicRecStore() {
 
 inline void BasicRecStore::writeHeader() { 
     write(0, (const char *) &h, 28); // update header in file for new leof
-    uassert("file io error in BasicRecStore [1]", !f.bad()); 
+    uassert( 10115 , "file io error in BasicRecStore [1]", !f.bad()); 
 }
 
 inline fileofs BasicRecStore::insert(const char *buf, unsigned reclen) { 
     if( h.firstDeleted ) { 
-        uasserted("deleted not yet implemented recstoreinsert");
+        uasserted(11500, "deleted not yet implemented recstoreinsert");
     }
-    massert("bad len", reclen == h.recsize);
+    massert( 10381 , "bad len", reclen == h.recsize);
     fileofs ofs = h.leof;
     h.leof += reclen;
     if( h.leof > len ) { 
         // grow the file.  we grow quite a bit to avoid excessive file system fragmentations
         len += (len / 8) + h.recsize;
-        uassert( "recstore file too big for 32 bit", len <= 0x7fffffff || sizeof(std::streamoff) > 4 );
+        uassert( 10116 ,  "recstore file too big for 32 bit", len <= 0x7fffffff || sizeof(std::streamoff) > 4 );
         write(len, "", 0);
     }
     writeHeader();
     write(ofs, buf, reclen);
-    uassert("file io error in BasicRecStore [2]", !f.bad());
+    uassert( 10117 , "file io error in BasicRecStore [2]", !f.bad());
     return ofs;
 }
 
@@ -98,11 +98,11 @@ inline void BasicRecStore::update(fileofs o, const char *buf, unsigned len) {
 inline void BasicRecStore::get(fileofs o, char *buf, unsigned len) { 
     assert(o <= h.leof && o >= sizeof(RecStoreHeader));
     f.read(o, buf, len);
-    massert("basicrestore::get I/O error", !f.bad());
+    massert( 10382 , "basicrestore::get I/O error", !f.bad());
 }
 
 inline void BasicRecStore::remove(fileofs o, unsigned len) { 
-    uasserted("not yet implemented recstoreremove");
+    uasserted(11501, "not yet implemented recstoreremove");
 }
 
 }

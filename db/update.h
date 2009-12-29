@@ -62,7 +62,7 @@ namespace mongo {
 
         /* [dm] why is this const? (or rather, why was setn const?)  i see why but think maybe clearer if were not.  */
         void inc(BSONElement& n) const { 
-            uassert( "$inc value is not a number", n.isNumber() );
+            uassert( 10160 ,  "$inc value is not a number", n.isNumber() );
             if( ndouble ) 
                 *ndouble += n.numberDouble();
             else if( nint )
@@ -204,7 +204,7 @@ namespace mongo {
             default: 
                 stringstream ss;
                 ss << "unknown mod in appendNewFromMod: " << m.op;
-                throw UserException( ss.str() );
+                throw UserException( 9015, ss.str() );
             }
          
         }
@@ -225,7 +225,7 @@ namespace mongo {
                 if ( strcmp( fn, Mod::modNames[ i ] ) == 0 )
                     return Mod::Op( i );
             
-            uassert( "Invalid modifier specified " + string( fn ), false );
+            uassert( 10161 ,  "Invalid modifier specified " + string( fn ), false );
             return Mod::INC;
         }
         

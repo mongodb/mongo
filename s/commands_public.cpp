@@ -98,7 +98,7 @@ namespace mongo {
                 }
                 
                 ChunkManager * cm = conf->getChunkManager( fullns );
-                massert( "how could chunk manager be null!" , cm );
+                massert( 10418 ,  "how could chunk manager be null!" , cm );
                 
                 cm->drop();
 
@@ -157,7 +157,7 @@ namespace mongo {
                 }
                 
                 ChunkManager * cm = conf->getChunkManager( fullns );
-                massert( "how could chunk manager be null!" , cm );
+                massert( 10419 ,  "how could chunk manager be null!" , cm );
                 
                 vector<Chunk*> chunks;
                 cm->getChunksForQuery( chunks , filter );
@@ -213,7 +213,7 @@ namespace mongo {
                 }
                 
                 ChunkManager * cm = conf->getChunkManager( fullns );
-                massert( "how could chunk manager be null!" , cm );
+                massert( 10420 ,  "how could chunk manager be null!" , cm );
                 
                 vector<Chunk*> chunks;
                 cm->getChunksForQuery( chunks , BSONObj() );
@@ -286,7 +286,7 @@ namespace mongo {
                         // we don't want to copy these
                     }
                     else {
-                        uassert( (string)"don't know mr field: " + fn , 0 );
+                        uassert( 10177 ,  (string)"don't know mr field: " + fn , 0 );
                     }
                 }
                 b.append( "out" , output );

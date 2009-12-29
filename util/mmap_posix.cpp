@@ -54,7 +54,7 @@ namespace mongo {
         theFileAllocator().allocateAsap( filename, length );
         len = length;
 
-        massert( "mmap() can't map area of size 0" , length > 0 );
+        massert( 10446 ,  (string)"mmap() can't map area of size 0 [" + filename + "]" , length > 0 );
 
         
         fd = open(filename, O_RDWR | O_NOATIME);
@@ -67,7 +67,7 @@ namespace mongo {
         if ( filelen != length ){
             cout << "wanted length: " << length << " filelen: " << filelen << endl;
             cout << sizeof(size_t) << endl;
-            massert( "file size allocation failed", filelen == length );
+            massert( 10447 ,  "file size allocation failed", filelen == length );
         }
         lseek( fd, 0, SEEK_SET );
         

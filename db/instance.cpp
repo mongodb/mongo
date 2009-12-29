@@ -46,8 +46,6 @@ namespace mongo {
     void receivedInsert(Message& m, stringstream& ss);
     bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
 
-    bool Database::_openAllFiles = false;
-
     CmdLine cmdLine;
 
     int nloggedsome = 0;
@@ -150,7 +148,7 @@ namespace mongo {
 
         try {
             if (q.fields.get() && q.fields->errmsg)
-                uassert(q.fields->errmsg, false);
+                uassert( 10053 , q.fields->errmsg, false);
 
             /* note these are logged BEFORE authentication -- which is sort of ok */
             if ( _diaglog.level && logit ) {
@@ -427,10 +425,11 @@ namespace mongo {
         Database *database = cc().database();
         assert( database );
         assert( database->name == cl );
+		/*
         if ( string("local") != cl ) {
             DBInfo i(cl);
             i.dbDropped();
-        }
+			}*/
 
         /* important: kill all open cursors on the database */
         string prefix(cl);
@@ -448,7 +447,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMasterNs( ns ) );
+        uassert( 10054 ,  "not master", isMasterNs( ns ) );
         setClient(ns);
         Client& client = cc();
         client.top.setWrite();
@@ -459,7 +458,7 @@ namespace mongo {
         assert( d.moreJSObjs() );
         assert( query.objsize() < m.data->dataLen() );
         BSONObj toupdate = d.nextJsObj();
-        uassert("update object too large", toupdate.objsize() <= MaxBSONObjectSize);
+        uassert( 10055 , "update object too large", toupdate.objsize() <= MaxBSONObjectSize);
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
         bool upsert = flags & Option_Upsert;
@@ -480,7 +479,7 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
-        uassert( "not master", isMasterNs( ns ) );
+        uassert( 10056 ,  "not master", isMasterNs( ns ) );
         setClient(ns);
         Client& client = cc();
         client.top.setWrite();
@@ -514,7 +513,7 @@ namespace mongo {
         QueryResult* msgdata;
         try {
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert("unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
+            uassert( 10057 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid, ss);
         }
         catch ( AssertionException& e ) {
@@ -536,14 +535,14 @@ namespace mongo {
         DbMessage d(m);
 		const char *ns = d.getns();
 		assert(*ns);
-        uassert( "not master", isMasterNs( ns ) );
+        uassert( 10058 ,  "not master", isMasterNs( ns ) );
 		setClient(ns);
         cc().top.setWrite();
 		ss << ns;
 		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
-            uassert("object to insert too large", js.objsize() <= MaxBSONObjectSize);
+            uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);
             theDataFileMgr.insert(ns, js, false);
             logOp("i", ns, js);
         }
@@ -720,8 +719,8 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
         lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
-        massert( "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
-        massert( "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
         
         stringstream ss;
         ss << getpid() << endl;

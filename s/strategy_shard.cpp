@@ -7,6 +7,8 @@
 #include "../client/connpool.h"
 #include "../db/commands.h"
 
+// error codes 8010-8040
+
 namespace mongo {
     
     class ShardStrategy : public Strategy {
@@ -17,7 +19,7 @@ namespace mongo {
             log(3) << "shard query: " << q.ns << "  " << q.query << endl;
             
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
-                throw UserException( "something is wrong, shouldn't see a command here" );
+                throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
 
             ChunkManager * info = r.getChunkManager();
             assert( info );
@@ -111,7 +113,7 @@ namespace mongo {
                     
                     if ( bad ){
                         log() << "tried to insert object without shard key: " << r.getns() << "  " << o << endl;
-                        throw UserException( "tried to insert object without shard key" );
+                        throw UserException( 8011 , "tried to insert object without shard key" );
                     }
                     
                 }
@@ -128,7 +130,7 @@ namespace mongo {
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
-            uassert( "invalid update" , d.moreJSObjs() );
+            uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
             BSONObj toupdate = d.nextJsObj();
 
             BSONObj chunkFinder = query;
@@ -137,17 +139,17 @@ namespace mongo {
             bool multi = flags & Option_Multi;
 
             if ( multi )
-                uassert( "can't mix multi and upsert and sharding" , ! upsert );
+                uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
 
             if ( upsert && ! manager->hasShardKey( toupdate ) )
-                throw UserException( "can't upsert something without shard key" );
+                throw UserException( 8012 , "can't upsert something without shard key" );
 
             bool save = false;
             if ( ! manager->hasShardKey( query ) ){
                 if ( multi ){
                 }
                 else if ( query.nFields() != 1 || strcmp( query.firstElement().fieldName() , "_id" ) ){
-                    throw UserException( "can't do update with query that doesn't have the shard key" );
+                    throw UserException( 8013 , "can't do update with query that doesn't have the shard key" );
                 }
                 else {
                     save = true;
@@ -161,7 +163,7 @@ namespace mongo {
                     // TODO: check for $set, etc.. on shard key
                 }
                 else if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
-                    throw UserException( "change would move shards!" );
+                    throw UserException( 8014 , "change would move shards!" );
                 }
             }
             
@@ -190,7 +192,7 @@ namespace mongo {
             int flags = d.pullInt();
             bool justOne = flags & 1;
             
-            uassert( "bad delete message" , d.moreJSObjs() );
+            uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
 
             vector<Chunk*> chunks;
@@ -202,7 +204,7 @@ namespace mongo {
             }
             
             if ( justOne && ! pattern.hasField( "_id" ) )
-                throw UserException( "can only delete with a non-shard key pattern if can delete as many as we find" );
+                throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
             
             set<string> seen;
             for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
@@ -233,7 +235,7 @@ namespace mongo {
             }
             else {
                 log() << "sharding can't do write op: " << op << endl;
-                throw UserException( "can't do this write op on sharded collection" );
+                throw UserException( 8016 , "can't do this write op on sharded collection" );
             }
             
         }
