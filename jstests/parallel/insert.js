@@ -1,6 +1,6 @@
 // perform inserts in parallel from several clients
 
-f = db.jstests_parallel_basic;
+f = db.jstests_parallel_insert;
 f.drop();
 f.ensureIndex( {me:1} );
 
@@ -24,7 +24,7 @@ test = function( mean, me ) {
     }
 }
 
-argvs = Array();
+argvs = new Array();
 for( i = 0; i < 10; ++i ) {
     argvs.push( [ Math.random() * 20, i ] );
 }
