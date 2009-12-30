@@ -18,7 +18,6 @@ test = function( mean, me ) {
         sleep( expTimeout( mean ) );
         if ( i % 50 == 0 ) {
             assert.eq( i, t.count( { who:me } ) );
-            assert(false);
             print( me + " " + i );
         }
         t.save( { i:i, who:me } );
