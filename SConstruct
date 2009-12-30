@@ -1351,7 +1351,7 @@ def checkGlibc(target,source,env):
     stringProcess = subprocess.Popen( [ "strings" , str( target[0] ) ] , stdout=subprocess.PIPE )
     stringResult = stringProcess.communicate()[0]
     if stringResult.count( "GLIBC_2.4" ) > 0:
-        print( str( target[0] ) + " has GLIBC_2.4 dependencies!" )
+        print( "************* " + str( target[0] ) + " has GLIBC_2.4 dependencies!" )
         Exit(-3)
 
 allBinaries = []
