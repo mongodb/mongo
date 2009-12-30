@@ -541,9 +541,9 @@ namespace mongo {
         BSONObj o = jsobj();
         log( 1 ) << "Saving repl source: " << o << endl;
 
-        stringstream ss;
+        OpDebug debug;
         setClient("local.sources");
-        UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,ss,false);
+        UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
         assert( ! res.mod );
         assert( res.num == 1 );
         cc().clearns();
@@ -759,8 +759,8 @@ namespace mongo {
     }
 
     void ReplSource::applyOperation(const BSONObj& op) {
-      log( 6 ) << "applying op: " << op << endl;
-        stringstream ss;
+        log( 6 ) << "applying op: " << op << endl;
+        OpDebug debug;
         BSONObj o = op.getObjectField("o");
         const char *ns = op.getStringField("ns");
         // operation type -- see logOp() comments for types
@@ -779,7 +779,7 @@ namespace mongo {
 					if( !o.getObjectID(_id) ) {
 						/* No _id.  This will be very slow. */
                         Timer t;
-                        updateObjects(ns, o, o, true, false, ss, false );
+                        updateObjects(ns, o, o, true, false, false , debug );
                         if( t.millis() >= 2 ) {
                             RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                         }
@@ -791,13 +791,13 @@ namespace mongo {
                         /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
                         RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow 
 
-                        updateObjects(ns, o, b.done(), true, false, ss, false );
+                        updateObjects(ns, o, b.done(), true, false, false , debug );
                     }
                 }
             }
             else if ( *opType == 'u' ) {
                 RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
-                updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), false, ss, false );
+                updateObjects(ns, o, op.getObjectField("o2"), op.getBoolField("b"), false, false , debug );
             }
             else if ( *opType == 'd' ) {
                 if ( opType[1] == 0 )
@@ -812,7 +812,7 @@ namespace mongo {
                 BufBuilder bb;
                 BSONObjBuilder ob;
                 assert( *opType == 'c' );
-                _runCommands(ns, o, ss, bb, ob, true, 0);
+                _runCommands(ns, o, bb, ob, true, 0);
             }
         }
         catch ( UserException& e ) {

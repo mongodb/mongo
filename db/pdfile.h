@@ -38,6 +38,7 @@ namespace mongo {
     class Extent;
     class Record;
     class Cursor;
+    class OpDebug;
 
     void dropDatabase(const char *ns);
     bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
@@ -101,7 +102,7 @@ namespace mongo {
         const DiskLoc update(
             const char *ns,
             Record *toupdate, const DiskLoc& dl,
-            const char *buf, int len, stringstream& profiling);
+            const char *buf, int len, OpDebug& debug);
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
         DiskLoc insert(const char *ns, BSONObj &o, bool god = false);

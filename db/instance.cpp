@@ -38,13 +38,11 @@
 
 namespace mongo {
 
-    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, stringstream& ss );
-
     void receivedKillCursors(Message& m);
-    void receivedUpdate(Message& m, stringstream& ss);
-    void receivedDelete(Message& m, stringstream& ss);
-    void receivedInsert(Message& m, stringstream& ss);
-    bool receivedGetMore(DbResponse& dbresponse, Message& m, stringstream& ss);
+    void receivedUpdate(Message& m, CurOp& op);
+    void receivedDelete(Message& m, CurOp& op);
+    void receivedInsert(Message& m, CurOp& op);
+    bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
 
     CmdLine cmdLine;
 
@@ -136,8 +134,8 @@ namespace mongo {
     }
 
     static bool receivedQuery(DbResponse& dbresponse, Message& m, 
-                       stringstream& ss, bool logit, 
-                       mongolock& lock
+                              CurOp& op, bool logit, 
+                              mongolock& lock
       ) {
         bool ok = true;
         MSGID responseTo = m.data->id;
@@ -165,11 +163,11 @@ namespace mongo {
             Client& client = cc();
             client.top.setRead();
             client.curop()->setNS(q.ns);
-            msgdata = runQuery(m, q, ss ).release();
+            msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
             ok = false;
-            ss << " exception ";
+            op.debug().str << " exception ";
             LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
             log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
             if ( q.query.valid() )
@@ -204,7 +202,7 @@ namespace mongo {
         Database *database = cc().database();
         if ( database ) {
             if ( database->profile )
-                ss << " bytes:" << resp->data->dataLen();
+                op.debug().str << " bytes:" << resp->data->dataLen();
         }
         else {
             if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
@@ -258,10 +256,11 @@ namespace mongo {
         c.clearns();
 
         CurOp& currentOp = *c.curop();
-        currentOp.reset( client);
+        currentOp.reset(client);
         currentOp.setOp(op);
-
-        stringstream ss;
+        
+        OpDebug& debug = currentOp.debug();
+        StringBuilder& ss = debug.str;
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
@@ -285,7 +284,7 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(dbresponse, m, ss, true, lk) )
+            if ( ! receivedQuery(dbresponse, m, currentOp, true, lk) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
@@ -293,7 +292,7 @@ namespace mongo {
             OPREAD;
             DEV log = true;
             ss << "getmore ";
-            if ( ! receivedGetMore(dbresponse, m, ss) )
+            if ( ! receivedGetMore(dbresponse, m, currentOp) )
                 log = true;
         }
         else if ( op == dbMsg ) {
@@ -327,11 +326,11 @@ namespace mongo {
                 OPWRITE;
                 try {
                     ss << "insert ";
-                    receivedInsert(m, ss);
+                    receivedInsert(m, currentOp);
                 }
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion insert, continuing\n";
-                    ss << " exception " + e.toString();
+                    ss << " exception " << e.toString();
                     log = true;
                 }
             }
@@ -339,11 +338,11 @@ namespace mongo {
                 OPWRITE;
                 try {
                     ss << "update ";
-                    receivedUpdate(m, ss);
+                    receivedUpdate(m, currentOp);
                 }
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion update, continuing" << endl;
-                    ss << " exception " + e.toString();
+                    ss << " exception " << e.toString();
                     log = true;
                 }
             }
@@ -351,11 +350,11 @@ namespace mongo {
                 OPWRITE;
                 try {
                     ss << "remove ";
-                    receivedDelete(m, ss);
+                    receivedDelete(m, currentOp);
                 }
                 catch ( AssertionException& e ) {
                     LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
-                    ss << " exception " + e.toString();
+                    ss << " exception " << e.toString();
                     log = true;
                 }
             }
@@ -443,7 +442,7 @@ namespace mongo {
         cc().clearns();
     }
 
-    void receivedUpdate(Message& m, stringstream& ss) {
+    void receivedUpdate(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
@@ -451,7 +450,7 @@ namespace mongo {
         setClient(ns);
         Client& client = cc();
         client.top.setWrite();
-        ss << ns << ' ';
+        op.debug().str << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -466,16 +465,16 @@ namespace mongo {
         {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
-            ss << " query: " << s;
+            op.debug().str << " query: " << s;
             CurOp& currentOp = *client.curop();
             currentOp.setQuery(query);
         }        
-        UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, ss, true);
+        UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
         /* TODO FIX: recordUpdate should take a long int for parm #2 */
         recordUpdate( res.existing , (int) res.num ); // for getlasterror
     }
 
-    void receivedDelete(Message& m, stringstream &ss) {
+    void receivedDelete(Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
         assert(*ns);
@@ -489,7 +488,7 @@ namespace mongo {
         BSONObj pattern = d.nextJsObj();
         {
             string s = pattern.toString();
-            ss << " query: " << s;
+            op.debug().str << " query: " << s;
             CurOp& currentOp = *client.curop();
             currentOp.setQuery(pattern);
         }        
@@ -499,10 +498,11 @@ namespace mongo {
     
     QueryResult* emptyMoreResult(long long);
 
-    bool receivedGetMore(DbResponse& dbresponse, /*AbstractMessagingPort& dbMsgPort, */Message& m, stringstream& ss) {
+    bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
         DbMessage d(m);
         const char *ns = d.getns();
+        StringBuilder& ss = curop.debug().str;
         ss << ns;
         setClient(ns);
         cc().top.setRead();
@@ -514,7 +514,7 @@ namespace mongo {
         try {
             AuthenticationInfo *ai = currentClient.get()->ai;
             uassert( 10057 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
-            msgdata = getMore(ns, ntoreturn, cursorid, ss);
+            msgdata = getMore(ns, ntoreturn, cursorid, curop);
         }
         catch ( AssertionException& e ) {
             ss << " exception " + e.toString();
@@ -531,14 +531,14 @@ namespace mongo {
         return ok;
     }
 
-    void receivedInsert(Message& m, stringstream& ss) {
+    void receivedInsert(Message& m, CurOp& op) {
         DbMessage d(m);
 		const char *ns = d.getns();
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
 		setClient(ns);
         cc().top.setWrite();
-		ss << ns;
+        op.debug().str << ns;
 		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();

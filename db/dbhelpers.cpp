@@ -181,9 +181,9 @@ namespace mongo {
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
+        OpDebug debug;
         DBContext context(ns);
-        stringstream ss;
-        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false, ss, /*logop=*/true );
+        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , true , debug );
     }
 
     void Helpers::emptyCollection(const char *ns) {

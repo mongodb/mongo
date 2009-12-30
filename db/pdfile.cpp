@@ -39,6 +39,7 @@ _ disallow system* manipulations from the database.
 #include "namespace.h"
 #include "queryutil.h"
 #include "extsort.h"
+#include "curop.h"
 
 namespace mongo {
 
@@ -949,8 +950,9 @@ namespace mongo {
      */
     const DiskLoc DataFileMgr::update(const char *ns,
                                        Record *toupdate, const DiskLoc& dl,
-                                       const char *_buf, int _len, stringstream& ss)
+                                       const char *_buf, int _len, OpDebug& debug)
     {
+        StringBuilder& ss = debug.str;
         dassert( toupdate == dl.rec() );
 
         NamespaceDetails *d = nsdetails(ns);
@@ -1021,7 +1023,7 @@ namespace mongo {
                         problem() << " caught assertion update index " << idx.indexNamespace() << endl;
                     }
                     if ( cc().database()->profile )
-                        ss << '\n' << changes[x].added.size() << " key updates ";
+                        ss << "\n" << changes[x].added.size() << " key updates ";
                 }
 
             }

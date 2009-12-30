@@ -72,7 +72,7 @@
 namespace mongo {
 
     // for an existing query (ie a ClientCursor), send back additional information.
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , stringstream& ss);
+    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op);
 
     struct UpdateResult {
         bool existing;
@@ -101,14 +101,14 @@ namespace mongo {
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
     */
-    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi , stringstream& ss, bool logop );
+    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
 
     // If justOne is true, deletedId is set to the id of the deleted object.
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false);
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     
-    //auto_ptr< QueryResult > runQuery(Message& m, stringstream& ss );
+    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop );
     
 } // namespace mongo
 

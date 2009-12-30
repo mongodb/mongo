@@ -8,9 +8,18 @@
 
 namespace mongo { 
 
+    struct OpDebug {
+
+        StringBuilder str;
+        
+        void reset(){
+            str.reset();
+        }
+    };
+    
     /* Current operation (for the current Client).
        an embedded member of Client class, and typically used from within the mutex there. */
-    class CurOp {
+    class CurOp : boost::noncopyable {
         static WrappingInt _nextOpNum;
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
@@ -32,19 +41,19 @@ namespace mongo {
             return o;
         }
 
-        stringstream _debug;
+        OpDebug _debug;
     public:
         void reset( const sockaddr_in &_client) { 
             _active = true;
             _opNum = _nextOpNum.atomicIncrement();
             _timer.reset();
             _ns[0] = '?'; // just in case not set later
-            _debug.rdbuf()->pubseekpos(0);
+            _debug.reset();
             resetQuery();
             client = _client;
         }
 
-        stringstream& debugstream(){
+        OpDebug& debug(){
             return _debug;
         }
 
