@@ -57,6 +57,7 @@ namespace mongo {
         virtual void setThis( const BSONObj * obj );
         
         virtual ScriptingFunction _createFunction( const char * code );
+        Local< v8::Function > __createFunction( const char * code );
         virtual int invoke( ScriptingFunction func , const BSONObj& args, int timeoutMs = 0 , bool ignoreReturn = false );
         virtual bool exec( const string& code , const string& name , bool printResult , bool reportError , bool assertOnError, int timeoutMs );
         virtual string getError(){ return _error; }

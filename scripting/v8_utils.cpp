@@ -25,9 +25,14 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
+#include "engine_v8.h"
+#include "v8_wrapper.h"
+#include <shell/utils.h>
 
 using namespace std;
 using namespace v8;
+
+extern const char * jsconcatcode_server;
 
 namespace mongo {
 
@@ -147,7 +152,7 @@ namespace mongo {
     
     class JSThreadConfig {
     public:
-        JSThreadConfig( const Arguments &args ) : started_(), done_() {
+        JSThreadConfig( const Arguments &args, bool newScope = false ) : started_(), done_(), newScope_( newScope ) {
             jsassert( args.Length() > 0, "need at least one argument" );
             jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
             Local< v8::Function > f = v8::Function::Cast( *args[ 0 ] );
@@ -184,12 +189,34 @@ namespace mongo {
             JSThread( JSThreadConfig &config ) : config_( config ) {}
             void operator()() {
                 Locker l;
-                Context::Scope context_scope( baseContext_ );
                 HandleScope handle_scope;
+                Handle< Context > context;
+                Handle< v8::Function > fun;
+                auto_ptr< V8Scope > scope;
+                if ( config_.newScope_ ) {
+                    scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->createScope() ) );
+                    // these lines duplicated from dbshell, extract to common location.
+                    scope->externalSetup();
+                    mongo::shellUtils::installShellUtils( *scope );
+                    scope->execSetup( jsconcatcode_server , "setupServerCode" );
+                    context = scope->context();
+                    // A v8::Function tracks the context in which it was created, so we have to
+                    // create a new function in the new context.
+                    Context::Scope baseScope( baseContext_ );
+                    string fCode = toSTLString( config_.f_->ToString() );
+                    Context::Scope context_scope( context );
+                    fun = scope->__createFunction( fCode.c_str() );
+                } else {
+                    context = baseContext_;
+                    Context::Scope context_scope( context );
+                    fun = config_.f_;
+                }
+                Context::Scope context_scope( context );
+                // TODO maybe we can get away with local handles here
                 boost::scoped_array< Persistent< Value > > argv( new Persistent< Value >[ config_.args_.size() ] );
                 for( unsigned int i = 0; i < config_.args_.size(); ++i )
                     argv[ i ] = Persistent< Value >::New( config_.args_[ i ] );
-                Local< Value > ret = config_.f_->Call( Context::GetCurrent()->Global(), config_.args_.size(), argv.get() );
+                Local< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
                 for( unsigned int i = 0; i < config_.args_.size(); ++i )
                     argv[ i ].Dispose();
                 config_.returnData_ = Persistent< Value >::New( ret );
@@ -200,6 +227,7 @@ namespace mongo {
         
         bool started_;
         bool done_;
+        bool newScope_;
         Persistent< v8::Function > f_;
         vector< Persistent< Value > > args_;
         auto_ptr< boost::thread > thread_;
@@ -215,6 +243,15 @@ namespace mongo {
         return v8::Undefined();
     }
     
+    Handle< Value > ScopedThreadInit( const Arguments &args ) {
+        Handle<v8::Object> it = args.This();
+        // NOTE I believe the passed JSThreadConfig will never be freed.  If this
+        // policy is changed, JSThread may no longer be able to store JSThreadConfig
+        // by reference.
+        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
+        return v8::Undefined();
+    }
+
     JSThreadConfig *thisConfig( const Arguments &args ) {
         Local< External > c = External::Cast( *(args.This()->Get( v8::String::New( "_JSThreadConfig" ) ) ) );
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
@@ -250,9 +287,23 @@ namespace mongo {
         return v8::Undefined();    
     }
 
+    Handle< Value > ScopedThreadInject( const Arguments &args ) {
+        jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
+        jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
+        
+        Local<v8::Object> o = args[0]->ToObject();
+        
+        o->Set( v8::String::New( "init" ) , FunctionTemplate::New( ScopedThreadInit )->GetFunction() );
+        // inheritance takes care of other member functions
+        
+        return v8::Undefined();
+    }
+    
     void installFork( v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
-        baseContext_ = context;
+        if ( baseContext_.IsEmpty() ) // if this is the shell, first call will be with shell context, otherwise don't expect to use fork() anyway
+            baseContext_ = context;
         global->Set( v8::String::New( "_threadInject" ), FunctionTemplate::New( ThreadInject )->GetFunction() );
+        global->Set( v8::String::New( "_scopedThreadInject" ), FunctionTemplate::New( ScopedThreadInject )->GetFunction() );
     }
 
 }

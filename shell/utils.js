@@ -358,8 +358,13 @@ if ( typeof _threadInject != "undefined" ){
     Thread = function(){
         this.init.apply( this, arguments );
     }
-    
     _threadInject( Thread.prototype );
+    
+    ScopedThread = function() {
+        this.init.apply( this, arguments );
+    }
+    ScopedThread.prototype = new Thread( function() {} );
+    _scopedThreadInject( ScopedThread.prototype );
     
     fork = function() {
         var t = new Thread( function() {} );

@@ -228,8 +228,7 @@ namespace mongo {
     
     // --- functions -----
 
-    ScriptingFunction V8Scope::_createFunction( const char * raw ){
-        V8_SIMPLE_HEADER
+    Local< v8::Function > V8Scope::__createFunction( const char * raw ){
         for(; isspace( *raw ); ++raw ); // skip whitespace
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
@@ -258,18 +257,27 @@ namespace mongo {
         if ( script.IsEmpty() ){
             _error = (string)"compile error: " + toSTLString( &try_catch );
             log() << _error << endl;
-            return 0;
+            return Local< v8::Function >();
         }
         
         Local<Value> result = script->Run();
         if ( result.IsEmpty() ){
             _error = (string)"compile error: " + toSTLString( &try_catch );
             log() << _error << endl;
-            return 0;
+            return Local< v8::Function >();
         }        
-        
-        Persistent<Value> f = Persistent< Value >::New( _global->Get( v8::String::New( fn.c_str() ) ) );
+     
+        return v8::Function::Cast( *_global->Get( v8::String::New( fn.c_str() ) ) );
+    }
+    
+    ScriptingFunction V8Scope::_createFunction( const char * raw ){
+        V8_SIMPLE_HEADER
+        Local< Value > ret = __createFunction( raw );
+        if ( ret.IsEmpty() )
+            return 0;
+        Persistent<Value> f = Persistent< Value >::New( ret );
         uassert( 10232, "not a func" , f->IsFunction() );
+        int num = _funcs.size() + 1;
         _funcs.push_back( f );
         return num;
     }

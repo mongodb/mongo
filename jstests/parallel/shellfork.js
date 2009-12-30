@@ -20,3 +20,14 @@ z = fork( function( a ) {
          }, 1 );
 z.start();
 assert.eq( 7, z.returnData() );
+
+
+t = 1;
+z = new ScopedThread( function() {
+                     assert( typeof( t ) == "undefined", "t not undefined" );
+                     t = 5;
+                     return t;
+                     } );
+z.start();
+assert.eq( 5, z.returnData() );
+assert.eq( 1, t );
