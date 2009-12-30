@@ -785,10 +785,11 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
         else:
             Exit(1)
 
-    if asio and conf.CheckCXXHeader( "boost/asio.hpp" ):
-        myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
-    else:
-        print( "WARNING: old version of boost - you should consider upgrading" )
+    if asio:
+        if conf.CheckCXXHeader( "boost/asio.hpp" ):
+            myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+        else:
+            print( "WARNING: old version of boost - you should consider upgrading" )
 
     # this will add it iff it exists and works
     myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
@@ -1350,7 +1351,7 @@ def checkGlibc(target,source,env):
     stringProcess = subprocess.Popen( [ "strings" , str( target[0] ) ] , stdout=subprocess.PIPE )
     stringResult = stringProcess.communicate()[0]
     if stringResult.count( "GLIBC_2.4" ) > 0:
-        print( str( target[0] ) + " has GLIBC_2.4 dependencies!" )
+        print( "************* " + str( target[0] ) + " has GLIBC_2.4 dependencies!" )
         Exit(-3)
 
 allBinaries = []
