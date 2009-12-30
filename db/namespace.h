@@ -311,7 +311,16 @@ namespace mongo {
         }
         DiskLoc firstExtent;
         DiskLoc lastExtent;
+
+        /* NOTE: capped collections override the meaning of deleted list.  
+                 deletedList[0] points to a list of free records (DeletedRecord's) for the currently 
+                 active extent. 
+                 deletedList[1] points to the last record in the prev extent.  When the "current extent" 
+                 changes, this value is updated.  !deletedList[1].isValid() when this value is not 
+                 yet computed.
+        */
         DiskLoc deletedList[Buckets];
+
         long long datasize;
         long long nrecords;
         int lastExtentSize;
