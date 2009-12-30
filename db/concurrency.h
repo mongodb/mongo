@@ -17,6 +17,8 @@
 #include <boost/thread/shared_mutex.hpp>
 #undef assert
 #define assert xassert
+#else
+#warning built with boost version 1.34 or older limited concurrency
 #endif
 
 namespace mongo {
