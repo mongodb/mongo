@@ -54,6 +54,13 @@ namespace mongo {
             return false;
         }
 
+        /* Like adminOnly, but even stricter: we must either be authenticated for admin db, 
+           or, if running without auth, on the local interface.
+
+           When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
+        */
+        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return false; }
+
         /* Return true if slaves of a replication pair are allowed to execute the command
            (the command directly from a client -- if fromRepl, always allowed).
         */
