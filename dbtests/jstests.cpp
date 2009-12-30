@@ -47,7 +47,7 @@ namespace JSTests {
     public:
         void run(){
             auto_ptr<Scope> s;
-            s.reset( globalScriptEngine->createScope() );
+            s.reset( globalScriptEngine->newScope() );
 
             s->setNumber( "x" , 5 );
             ASSERT( 5 == s->getNumber( "x" ) );
@@ -74,7 +74,7 @@ namespace JSTests {
             // Not worrying about this for now SERVER-446.
             /*
             auto_ptr<Scope> s;
-            s.reset( globalScriptEngine->createScope() );
+            s.reset( globalScriptEngine->newScope() );
             
             s->setBoolean( "x" , true );
             ASSERT( s->getBoolean( "x" ) );
@@ -88,7 +88,7 @@ namespace JSTests {
     class FalseTests {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
 
             ASSERT( ! s->getBoolean( "x" ) );
             
@@ -103,7 +103,7 @@ namespace JSTests {
     class SimpleFunctions {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
 
             s->invoke( "x=5;" , BSONObj() );
             ASSERT( 5 == s->getNumber( "x" ) );
@@ -132,7 +132,7 @@ namespace JSTests {
     class ObjectMapping {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" );
             s->setObject( "blah" , o );
@@ -189,7 +189,7 @@ namespace JSTests {
     class ObjectDecoding {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             s->invoke( "z = { num : 1 };" , BSONObj() );
             BSONObj out = s->getObject( "z" );
@@ -214,7 +214,7 @@ namespace JSTests {
     public:
         void run(){
 #ifdef MOZJS
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             s->localConnect( "blah" );
             
@@ -247,7 +247,7 @@ namespace JSTests {
     class SetImplicit {
     public:
         void run() {
-            Scope *s = globalScriptEngine->createScope();
+            Scope *s = globalScriptEngine->newScope();
 
             BSONObj o = BSON( "foo" << "bar" );
             s->setObject( "a.b", o );
@@ -268,7 +268,7 @@ namespace JSTests {
     class ObjectModReadonlyTests {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             BSONObj o = BSON( "x" << 17 << "y" << "eliot" << "z" << "sara" << "zz" << BSONObj() );
             s->setObject( "blah" , o , true );
@@ -315,7 +315,7 @@ namespace JSTests {
     class OtherJSTypes {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             { // date
                 BSONObj o;
@@ -382,7 +382,7 @@ namespace JSTests {
     class SpecialDBTypes {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
 
             BSONObjBuilder b;
             b.appendTimestamp( "a" , 123456789 );
@@ -418,7 +418,7 @@ namespace JSTests {
     class TypeConservation {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             //  --  A  --
             
@@ -527,7 +527,7 @@ namespace JSTests {
         }
         
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
 
             s->localConnect( "blah" );
             
@@ -600,7 +600,7 @@ namespace JSTests {
     class CodeTests {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             {
                 BSONObjBuilder b;
@@ -687,7 +687,7 @@ namespace JSTests {
         }
 
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             s->localConnect( "asd" );
             const char * foo = "asdas\0asdasd";
 
@@ -721,7 +721,7 @@ namespace JSTests {
     class VarTests {
     public:
         void run(){
-            Scope * s = globalScriptEngine->createScope();
+            Scope * s = globalScriptEngine->newScope();
             
             ASSERT( s->exec( "a = 5;" , "a" , false , true , false ) );
             ASSERT_EQUALS( 5 , s->getNumber("a" ) );

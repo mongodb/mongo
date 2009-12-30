@@ -255,7 +255,8 @@ int _main(int argc, char* argv[]) {
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
 
     mongo::ScriptEngine::setup();
-    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->createScope() );
+    mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
+    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );
 
     string url = "test";
     string dbhost;
@@ -356,8 +357,6 @@ int _main(int argc, char* argv[]) {
             }
         }
     }
-
-    mongo::shellUtils::initScope( *scope );
     
     cout << "MongoDB shell version: " << mongo::versionString << endl;
 

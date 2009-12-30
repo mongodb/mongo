@@ -122,7 +122,12 @@ namespace mongo {
         ScriptEngine();
         virtual ~ScriptEngine();
         
-        virtual Scope * createScope() = 0;
+        virtual Scope * newScope() {
+            Scope *s = createScope();
+            if ( s && _scopeInitCallback )
+                _scopeInitCallback( *s );
+            return s;
+        }
         
         virtual void runTest() = 0;
         
@@ -134,8 +139,15 @@ namespace mongo {
         void threadDone();
         
         struct Unlocker { virtual ~Unlocker() {} };
-        
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new Unlocker ); }
+        
+        void setScopeInitCallback( void ( *func )( Scope & ) ) { _scopeInitCallback = func; }
+        
+    protected:
+        virtual Scope * createScope() = 0;
+        
+    private:
+        void ( *_scopeInitCallback )( Scope & );
     };
 
     extern ScriptEngine * globalScriptEngine;

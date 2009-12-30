@@ -26,7 +26,6 @@
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include "engine_v8.h"
-#include <shell/utils.h>
 
 using namespace std;
 using namespace v8;
@@ -191,9 +190,7 @@ namespace mongo {
                 Handle< v8::Function > fun;
                 auto_ptr< V8Scope > scope;
                 if ( config_.newScope_ ) {
-                    scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->createScope() ) );
-                    // these lines duplicated from dbshell, extract to common location.
-                    mongo::shellUtils::initScope( *scope );
+                    scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->newScope() ) );
                     context = scope->context();
                     // A v8::Function tracks the context in which it was created, so we have to
                     // create a new function in the new context.

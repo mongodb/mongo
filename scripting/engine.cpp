@@ -380,7 +380,7 @@ namespace mongo {
 
         Scope * s = scopeCache->get( pool );
         if ( ! s ){
-            s = createScope();
+            s = newScope();
         }
         
         auto_ptr<Scope> p;
