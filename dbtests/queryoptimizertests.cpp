@@ -29,7 +29,10 @@
 
 namespace mongo {
     extern BSONObj id_obj;
-    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, stringstream& ss );
+    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q ){
+        CurOp op;
+        return runQuery( m , q , op );
+    }
 } // namespace mongo
 
 namespace QueryOptimizerTests {
@@ -742,7 +745,7 @@ namespace QueryOptimizerTests {
 
                 DbMessage d(m);
                 QueryMessage q(d);
-                ASSERT_EQUALS( 0, runQuery( m, q, ss )->nReturned );
+                ASSERT_EQUALS( 0, runQuery( m, q)->nReturned );
             }
         };
         
@@ -1014,7 +1017,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m);
                     QueryMessage q(d);
-                    runQuery( m, q, ss );
+                    runQuery( m, q);
                 }
                 ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
                 
@@ -1023,7 +1026,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m2);
                     QueryMessage q(d);
-                    runQuery( m2, q, ss );
+                    runQuery( m2, q);
                 }
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
                 ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
