@@ -254,8 +254,14 @@ namespace mongo {
 
         Client& c = cc();
         c.clearns();
-
-        CurOp& currentOp = *c.curop();
+        
+        auto_ptr<CurOp> nestedOp;
+        CurOp* currentOpP = c.curop();
+        if ( currentOpP->active() ){
+            nestedOp.reset( new CurOp() );
+            currentOpP = nestedOp.get();
+        }
+        CurOp& currentOp = *currentOpP;
         currentOp.reset(client);
         currentOp.setOp(op);
         
