@@ -204,13 +204,10 @@ namespace mongo {
                     fun = config_.f_;
                 }
                 Context::Scope context_scope( context );
-                // TODO maybe we can get away with local handles here
-                boost::scoped_array< Persistent< Value > > argv( new Persistent< Value >[ config_.args_.size() ] );
+                boost::scoped_array< Local< Value > > argv( new Local< Value >[ config_.args_.size() ] );
                 for( unsigned int i = 0; i < config_.args_.size(); ++i )
-                    argv[ i ] = Persistent< Value >::New( config_.args_[ i ] );
+                    argv[ i ] = Local< Value >::New( config_.args_[ i ] );
                 Local< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
-                for( unsigned int i = 0; i < config_.args_.size(); ++i )
-                    argv[ i ].Dispose();
                 config_.returnData_ = Persistent< Value >::New( ret );
             }
         private:
