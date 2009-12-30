@@ -191,8 +191,8 @@ namespace mongo {
 
                             if ( loc.questionable() ) {
                                 if( d->capped && !loc.isValid() && i == 1 ) { 
-                                    /* [dm] the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid -- presumably as 
-                                       a defensive measure? (can't remember).  So we allow it here.
+                                    /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
+                                       see comments in namespace.h
                                     */
                                     break;
                                 }
