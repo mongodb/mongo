@@ -34,7 +34,7 @@ namespace mongo {
         _numScopes--;
     }
 
-    ScriptEngine::ScriptEngine(){
+    ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
 
     ScriptEngine::~ScriptEngine(){
