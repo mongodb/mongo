@@ -32,14 +32,20 @@ namespace mongo {
             return o;
         }
 
+        stringstream _debug;
     public:
         void reset( const sockaddr_in &_client) { 
             _active = true;
             _opNum = _nextOpNum.atomicIncrement();
             _timer.reset();
             _ns[0] = '?'; // just in case not set later
+            _debug.rdbuf()->pubseekpos(0);
             resetQuery();
             client = _client;
+        }
+
+        stringstream& debugstream(){
+            return _debug;
         }
 
         WrappingInt opNum() const { return _opNum; }

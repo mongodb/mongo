@@ -38,7 +38,8 @@ namespace mongo {
 
         long long oplogSize;   // --oplogSize
         int defaultProfile;    // --profile
-        
+        int slowMS;            // --time in ms that is "slow"
+
         enum { 
             DefaultDBPort = 27017,
 			ConfigServerPort = 27019,
@@ -47,7 +48,7 @@ namespace mongo {
 
         CmdLine() : 
             port(DefaultDBPort), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
-            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0)
+            quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100)
         { } 
 
     };

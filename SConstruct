@@ -482,16 +482,27 @@ elif "win32" == os.sys.platform:
     if force64:
         release = True
 
-    for bv in reversed( range(33,50) ):
-        boostDir = "C:/Program Files/Boost/boost_1_" + str(bv) + "_0"
-        if os.path.exists( boostDir ):
-            break
+    for pathdir in env['ENV']['PATH'].split(os.pathsep):
+	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
+	    break
+    else:
+	#use current environment
+	env['ENV'] = dict(os.environ)
 
-    serverOnlyFiles += [ "util/ntservice.cpp" ]
+    def find_boost():
+	for bv in reversed( range(33,50) ):
+	    for extra in ('', '_0', '_1'):
+		boostDir = "C:/Program Files/Boost/boost_1_" + str(bv) + extra
+		if os.path.exists( boostDir ):
+		    return boostDir
+	return None
 
-    if not os.path.exists( boostDir ):
+    boostDir = find_boost()
+    if boostDir is None:
         print( "can't find boost" )
         Exit(1)
+
+    serverOnlyFiles += [ "util/ntservice.cpp" ]
 
     boostLibs = []
 
