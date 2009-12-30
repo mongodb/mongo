@@ -190,6 +190,13 @@ namespace mongo {
                             ndel++;
 
                             if ( loc.questionable() ) {
+                                if( d->capped && !loc.isValid() && i == 1 ) { 
+                                    /* [dm] the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid -- presumably as 
+                                       a defensive measure? (can't remember).  So we allow it here.
+                                    */
+                                    break;
+                                }
+
                                 if ( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
                                     ss << "    ?bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k << endl;
                                     valid = false;
