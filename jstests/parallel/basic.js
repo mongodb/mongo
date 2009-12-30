@@ -31,4 +31,4 @@ test = function() {
                   );
 }
 
-assert.parallelTests( test, argvs, "one or more tests failed" );
+assert.parallelTests( test, argvs, "one or more tests failed", true );

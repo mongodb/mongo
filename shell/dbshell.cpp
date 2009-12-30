@@ -254,10 +254,6 @@ int _main(int argc, char* argv[]) {
 
     mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
 
-    mongo::ScriptEngine::setup();
-    mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
-    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );
-
     string url = "test";
     string dbhost;
     string port;
@@ -268,7 +264,7 @@ int _main(int argc, char* argv[]) {
 
     bool runShell = false;
     bool nodb = false;
-
+    
     string script;
 
     po::options_description shell_options("options");
@@ -364,23 +360,20 @@ int _main(int argc, char* argv[]) {
 
     if ( !nodb ) { // connect to db
         cout << "url: " << url << endl;
-        string setup = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
-        if ( ! scope->exec( setup , "(connect)" , false , true , false ) )
-            return -1;
+        mongo::shellUtils::_dbConnect = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
 
         if ( username.size() && password.size() ){
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
-
-            if ( ! scope->exec( ss.str() , "(auth)" , true , true , false ) ){
-                cout << "login failed" << endl;
-                return -1;
-            }
-
+            mongo::shellUtils::_dbAuth = ss.str();
         }
 
     }
 
+    mongo::ScriptEngine::setup();
+    mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
+    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );    
+    
     if ( !script.empty() ) {
         mongo::shellUtils::MongoProgramScope s;
         if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )

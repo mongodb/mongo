@@ -373,22 +373,33 @@ if ( typeof _threadInject != "undefined" ){
     }    
     
     // argvs: array of argv arrays - test will be called for each entry in argvs
-    assert.parallelTests = function( test, argvs, msg ) {
+    assert.parallelTests = function( test, argvs, msg, newScopes ) {
+        newScopes = newScopes || false;
         var wrapper = function( fun, argv ) {
-            return function() {
-                var __parallelTests__passed = false;
-                try {
-                    fun.apply( 0, argv );
-                    __parallelTests__passed = true;
-                } catch ( e ) {
-                    print( e );
-                }
-                return __parallelTests__passed;
-            }
+                   eval (
+                         "var z = function() {" +
+                         "var fun = " + fun.toString() + ";" +
+                         "var argv = " + tojson( argv ) + ";" +
+                         "var __parallelTests__passed = false;" +
+                         "try {" +
+                            "fun.apply( 0, argv );" +
+                            "__parallelTests__passed = true;" +
+                         "} catch ( e ) {" +
+                            "print( e );" +
+                         "}" +
+                         "return __parallelTests__passed;" +
+                         "}"
+                         );
+            return z;
         }
         var runners = new Array();
         for( var i in argvs ) {
-            runners.push( fork( wrapper( test, argvs[ i ] ) ) );
+            var t;
+            if ( newScopes )
+                t = new ScopedThread( wrapper( test, argvs[ i ] ) );
+            else
+                t = new Thread( wrapper( test, argvs[ i ] ) );
+            runners.push( t );
         }
         
         runners.forEach( function( x ) { x.start(); } );

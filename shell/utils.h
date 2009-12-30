@@ -8,6 +8,9 @@ namespace mongo {
 
     namespace shellUtils {
 
+        extern std::string _dbConnect;
+        extern std::string _dbAuth;
+
         void RecordMyLocation( const char *_argv0 );
         void installShellUtils( Scope& scope );
 
