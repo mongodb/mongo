@@ -149,7 +149,7 @@ namespace BasicTests {
                 SBTGB( 5.4312 );
                 SBTGB( "yyy" );
                 SBTGB( (short)5 );
-                SBTGB( (short)1231231231231 );
+                SBTGB( (short)(1231231231231LL) );
             }
         };
     
