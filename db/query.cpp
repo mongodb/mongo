@@ -206,15 +206,15 @@ namespace mongo {
 
     int initialExtentSize(int len);
 
-    bool runCommands(const char *ns, BSONObj& jsobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+    bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         try {
-            return _runCommands(ns, jsobj, ss, b, anObjBuilder, fromRepl, queryOptions);
+            return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
         catch ( AssertionException& e ) {
             if ( !e.msg.empty() )
                 anObjBuilder.append("assertion", e.msg);
         }
-        ss << " assertion ";
+        curop.debug().str << " assertion ";
         anObjBuilder.append("errmsg", "db assertion failure");
         anObjBuilder.append("ok", 0.0);
         BSONObj x = anObjBuilder.done();
@@ -276,7 +276,8 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , stringstream& ss) {
+    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop ) {
+        StringBuilder& ss = curop.debug().str;
         ClientCursor *cc = ClientCursor::find(cursorid);
         
         int bufSize = 512;
@@ -667,7 +668,8 @@ namespace mongo {
         ClientCursor * findingStartCursor_;
     };
     
-    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, stringstream& ss ) {
+    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop ) {
+        StringBuilder& ss = curop.debug().str;
         const char *ns = q.ns;
         int ntoskip = q.ntoskip;
         int _ntoreturn = q.ntoreturn;
@@ -704,7 +706,7 @@ namespace mongo {
         int n = 0;
         
         /* we assume you are using findOne() for running a cmd... */
-        if ( ntoreturn == 1 && runCommands(ns, jsobj, ss, bb, cmdResBuf, false, queryOptions) ) {
+        if ( ntoreturn == 1 && runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
             n = 1;
             qr.reset( (QueryResult *) bb.buf() );
             bb.decouple();

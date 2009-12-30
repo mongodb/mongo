@@ -160,8 +160,14 @@ namespace mongo {
         StringBuilder& operator<<( long x ){
             SBNUM( x , 22 , "%ld" );
         }
+        StringBuilder& operator<<( unsigned long x ){
+            SBNUM( x , 22 , "%lu" );
+        }
         StringBuilder& operator<<( long long x ){
             SBNUM( x , 22 , "%lld" );
+        }
+        StringBuilder& operator<<( unsigned long long x ){
+            SBNUM( x , 22 , "%llu" );
         }
         StringBuilder& operator<<( short x ){
             SBNUM( x , 8 , "%hd" );

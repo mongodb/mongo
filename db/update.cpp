@@ -563,8 +563,9 @@ namespace mongo {
     };
 
     
-    UpdateResult updateObjects(const char *ns, BSONObj updateobjOrig, BSONObj patternOrig, bool upsert, bool multi, stringstream& ss, bool logop ) {
+    UpdateResult updateObjects(const char *ns, BSONObj updateobjOrig, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
         int profile = cc().database()->profile;
+        StringBuilder& ss = debug.str;
         
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
@@ -653,7 +654,7 @@ namespace mongo {
                 } 
                 else {
                     BSONObj newObj = mods.createNewFromMods( loc.obj() );
-                    DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), ss);
+                    DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), debug);
                     if ( newLoc != loc || isIndexed ){
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
@@ -689,7 +690,7 @@ namespace mongo {
 
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
-            theDataFileMgr.update(ns, r, loc , updateobj.objdata(), updateobj.objsize(), ss);
+            theDataFileMgr.update(ns, r, loc , updateobj.objdata(), updateobj.objsize(), debug);
             if ( logop )
                 logOp("u", ns, updateobj, &pattern );
             return UpdateResult( 1 , 0 , 1 );

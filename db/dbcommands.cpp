@@ -1341,7 +1341,7 @@ namespace mongo {
 
        returns true if ran a cmd
     */
-    bool _runCommands(const char *ns, BSONObj& _cmdobj, stringstream& ss, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+    bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         if( logLevel >= 1 ) 
             log() << "run command " << ns << ' ' << _cmdobj << endl;
 

@@ -79,8 +79,7 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     void testTheDb() {
-        stringstream ss;
-
+        OpDebug debug;
         setClient("sys.unittest.pdfile");
 
         /* this is not validly formatted, if you query this namespace bad things will happen */
@@ -91,8 +90,8 @@ namespace mongo {
         deleteObjects("sys.unittest.delete", j1, false);
         theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
         deleteObjects("sys.unittest.delete", j1, false);
-        updateObjects("sys.unittest.delete", j1, j1, true,false,ss,true);
-        updateObjects("sys.unittest.delete", j1, j1, false,false,ss,true);
+        updateObjects("sys.unittest.delete", j1, j1, true,false,true,debug);
+        updateObjects("sys.unittest.delete", j1, j1, false,false,true,debug);
 
         auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
         while ( c->ok() ) {
