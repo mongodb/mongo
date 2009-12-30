@@ -13,11 +13,12 @@ expTimeout = function( mean ) {
 
 test = function( mean, me ) {
     var m = new Mongo( db.getMongo().host );
-    var t = m.getDB( "test" ).jstests_parallel_basic;
+    var t = m.getDB( "test" ).jstests_parallel_insert;
     for( var i = 0; i < 1000; ++i ) {
         sleep( expTimeout( mean ) );
         if ( i % 50 == 0 ) {
             assert.eq( i, t.count( { who:me } ) );
+            assert(false);
             print( me + " " + i );
         }
         t.save( { i:i, who:me } );

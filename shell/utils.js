@@ -374,15 +374,16 @@ if ( typeof _threadInject != "undefined" ){
     
     // argvs: array of argv arrays - test will be called for each entry in argvs
     assert.parallelTests = function( test, argvs, msg ) {
-        var failed = false;
         var wrapper = function( fun, argv ) {
             return function() {
+                var __parallelTests__passed = false;
                 try {
                     fun.apply( 0, argv );
+                    __parallelTests__passed = true;
                 } catch ( e ) {
-                    failed = true;
-                    throw e;
+                    print( e );
                 }
+                return __parallelTests__passed;
             }
         }
         var runners = new Array();
@@ -391,9 +392,7 @@ if ( typeof _threadInject != "undefined" ){
         }
         
         runners.forEach( function( x ) { x.start(); } );
-        runners.forEach( function( x ) { x.join(); } );
-        
-        assert( !failed, msg );
+        runners.forEach( function( x ) { assert( x.returnData(), msg ); } );
     }
 }
 
