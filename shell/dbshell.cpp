@@ -17,9 +17,6 @@ jmp_buf jbuf;
 using namespace std;
 using namespace boost::filesystem;
 
-extern const char * jsconcatcode;
-extern const char * jsconcatcode_server;
-
 string historyFile;
 bool gotInterrupted = 0;
 bool inMultiLine = 0;
@@ -360,11 +357,8 @@ int _main(int argc, char* argv[]) {
         }
     }
 
-    scope->externalSetup();
-    mongo::shellUtils::installShellUtils( *scope );
-
-    scope->execSetup( jsconcatcode_server , "setupServerCode" );
-
+    mongo::shellUtils::initScope( *scope );
+    
     cout << "MongoDB shell version: " << mongo::versionString << endl;
 
     mongo::UnitTest::runTests();

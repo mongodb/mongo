@@ -21,6 +21,8 @@
 #include "../util/md5.hpp"
 #include "utils.h"
 
+extern const char * jsconcatcode_server;
+
 namespace mongo {
 
     namespace shellUtils {
@@ -496,6 +498,11 @@ namespace mongo {
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
 #endif
         }
-        
+
+        void initScope( Scope &scope ) {
+            scope.externalSetup();
+            mongo::shellUtils::installShellUtils( scope );
+            scope.execSetup( jsconcatcode_server , "setupServerCode" );
+        }
     }
 }

@@ -26,13 +26,10 @@
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include "engine_v8.h"
-#include "v8_wrapper.h"
 #include <shell/utils.h>
 
 using namespace std;
 using namespace v8;
-
-extern const char * jsconcatcode_server;
 
 namespace mongo {
 
@@ -196,9 +193,7 @@ namespace mongo {
                 if ( config_.newScope_ ) {
                     scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->createScope() ) );
                     // these lines duplicated from dbshell, extract to common location.
-                    scope->externalSetup();
-                    mongo::shellUtils::installShellUtils( *scope );
-                    scope->execSetup( jsconcatcode_server , "setupServerCode" );
+                    mongo::shellUtils::initScope( *scope );
                     context = scope->context();
                     // A v8::Function tracks the context in which it was created, so we have to
                     // create a new function in the new context.

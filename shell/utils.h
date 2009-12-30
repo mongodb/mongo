@@ -19,5 +19,6 @@ namespace mongo {
         };
         void KillMongoProgramInstances();
         
+        void initScope( Scope &scope );
     }
 }
