@@ -221,10 +221,55 @@ namespace mongo {
             return true;
         }
         static Mod::Op opFromStr( const char *fn ) {
-            for( unsigned i=0; i<Mod::modNamesNum; i++ )
-                if ( strcmp( fn, Mod::modNames[ i ] ) == 0 )
-                    return Mod::Op( i );
-            
+            assert( fn[0] == '$' );
+            switch( fn[1] ){
+            case 'i': {
+                if ( fn[2] == 'n' && fn[3] == 'c' && fn[4] == 0 )
+                    return Mod::INC;
+                break;
+            }
+            case 's': {
+                if ( fn[2] == 'e' && fn[3] == 't' && fn[4] == 0 )
+                    return Mod::SET;
+                break;
+            }
+            case 'p': {
+                if ( fn[2] == 'u' ){
+                    if ( fn[3] == 's' && fn[4] == 'h' ){
+                        if ( fn[5] == 0 )
+                            return Mod::PUSH;
+                        if ( fn[5] == 'A' && fn[6] == 'l' && fn[7] == 'l' && fn[8] == 0 )
+                            return Mod::PUSH_ALL;
+                    }
+                    else if ( fn[3] == 'l' && fn[4] == 'l' ){
+                        if ( fn[5] == 0 )
+                            return Mod::PULL;
+                        if ( fn[5] == 'A' && fn[6] == 'l' && fn[7] == 'l' && fn[8] == 0 )
+                            return Mod::PULL_ALL;
+                    }
+                }
+                else if ( fn[2] == 'o' && fn[3] == 'p' && fn[4] == 0 )
+                    return Mod::POP;
+                break;
+            }
+            case 'u': {
+                if ( fn[2] == 'n' && fn[3] == 's' && fn[4] == 'e' && fn[5] == 't' && fn[6] == 0 )
+                    return Mod::UNSET;
+                break;
+            }
+            case 'b': {
+                if ( fn[2] == 'i' && fn[3] == 't' ){
+                    if ( fn[4] == 0 )
+                        return Mod::BIT;
+                    if ( fn[4] == 'a' && fn[5] == 'n' && fn[6] == 'd' && fn[7] == 0 )
+                        return Mod::BITAND;
+                    if ( fn[4] == 'o' && fn[5] == 'r' && fn[6] == 0 )
+                        return Mod::BITOR;
+                }
+                break;
+            }
+            default: break;
+            }
             uassert( 10161 ,  "Invalid modifier specified " + string( fn ), false );
             return Mod::INC;
         }
