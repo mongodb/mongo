@@ -8,8 +8,8 @@
 
 namespace mongo { 
 
-    struct OpDebug {
-
+    class OpDebug {
+    public:
         StringBuilder str;
         
         void reset(){
