@@ -508,9 +508,9 @@ namespace mongo {
             scope.execSetup( jsconcatcode_server , "setupServerCode" );
             
             if ( !_dbConnect.empty() ) {
-                massert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
+                uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
                 if ( !_dbAuth.empty() ) {
-                    massert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
+                    uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
                 }
             }
         }
