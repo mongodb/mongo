@@ -261,7 +261,7 @@ namespace mongo {
         currentOp.reset( client);
         currentOp.setOp(op);
 
-        stringstream& ss = currentOp.debugstream();
+        stringstream ss;
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
