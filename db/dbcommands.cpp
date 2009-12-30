@@ -48,6 +48,7 @@ namespace mongo {
     public:
         virtual bool requiresAuth() { return true; }
         virtual bool adminOnly() { return true; }
+        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
         virtual bool logTheOp() {
             return false;
         }
@@ -59,15 +60,6 @@ namespace mongo {
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( noauth ) {
-                // if running without auth, you must be on localhost
-                AuthenticationInfo *ai = currentClient.get()->ai;
-                if( !ai->isLocalHost ) {
-                    log() << "ignoring shutdown cmd from client, not from localhost and running without auth" << endl;
-                    errmsg = "unauthorized [2]";
-                    return false;
-                }
-            }
             log() << "terminating, shutdown command received" << endl;
             dbexit( EXIT_CLEAN );
             return true;
@@ -1373,10 +1365,16 @@ namespace mongo {
             uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
 
             bool admin = c->adminOnly();
-            if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
+
+            if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 
+                ok = false;
+                errmsg = "unauthorized: this command must run from localhost when running db without auth";
+                log() << "command denied: " << jsobj.toString() << endl;
+            }
+            else if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
                 ok = false;
                 errmsg = "access denied";
-                cout << "command denied: " << jsobj.toString() << endl;
+                log() << "command denied: " << jsobj.toString() << endl;
             }
             else if ( isMaster() ||
                       c->slaveOk() ||

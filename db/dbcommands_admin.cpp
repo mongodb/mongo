@@ -255,12 +255,25 @@ namespace mongo {
 
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }
-        
+        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
+            string x = cmdObj["exec"].valuestrsafe();
+            return !x.empty();
+        }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
+            string exec = cmdObj["exec"].valuestrsafe();
             log() << "CMD fsync:  sync:" << sync << endl;
             result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
+            if( !exec.empty() ) { 
+                uassert(12032, "fsync: sync option must be true when using exec", sync);
+                assert( localHostOnlyIfNoAuth(cmdObj) );
+                log() << "execing: " << exec << " (db will be locked during operation)" << endl;
+                // ADD EXEC HERE
+                log() << "ERROR: exec call not yet implemented" << endl;
+                result.append("execOutput", "exec not yet implemented");
+                log() << "exec complete" << endl;
+            }
             return 1;
         }
         
