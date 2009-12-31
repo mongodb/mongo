@@ -42,6 +42,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.find(...).skip(n)");
     print("\tdb.foo.find(...).sort(...)");
     print("\tdb.foo.findOne([query])");
+    print("\tdb.foo.findAndModify( { update : ... , remove : bool [, query: {}, sort: {}, 'new': false] } )");
     print("\tdb.foo.getDB() get DB object associated with collection");
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
@@ -306,6 +307,22 @@ DBCollection.prototype.drop = function(){
         throw "drop failed: " + tojson( ret );
     }
     return true;
+}
+
+DBCollection.prototype.findAndModify = function(args){
+    var cmd = { findandmodify: this.getName() };
+    for (key in args){
+        cmd[key] = args[key];
+    }
+
+    var ret = this._db.runCommand( cmd );
+    if ( ! ret.ok ){
+        if (ret.errmsg == "No matching object found"){
+            return {};
+        }
+        throw "findAndModifyFailed failed: " + tojson( ret.errmsg );
+    }
+    return ret.value;
 }
 
 DBCollection.prototype.renameCollection = function( newName , dropTarget ){
