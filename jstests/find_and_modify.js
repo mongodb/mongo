@@ -16,7 +16,7 @@ t.update({_id: out._id}, {$set: {inprogress: false}});
 out = t.findAndModify({update: {$set: {inprogress: true}, $inc: {value:1}}, 'new': true});
 assert.eq(out.value, 2);
 assert.eq(out.inprogress, true);
-t.update({_id: out._id}, {$set: {inprogress: false}, value:0});
+t.update({_id: out._id}, {$set: {inprogress: false}});
 
 // update highest priority
 out = t.findAndModify({query: {inprogress:false}, sort:{priority:-1}, update: {$set: {inprogress: true}}});
