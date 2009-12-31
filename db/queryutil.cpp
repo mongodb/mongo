@@ -123,6 +123,10 @@ namespace mongo {
             
             break;
         }
+        case BSONObj::opELEM_MATCH: {
+            log() << "warning: shouldn't get here?" << endl;
+            break;
+        }
         default:
             break;
         }
@@ -205,15 +209,26 @@ namespace mongo {
                 break;
             if ( strcmp( e.fieldName(), "$where" ) == 0 )
                 continue;
-            if ( getGtLtOp( e ) == BSONObj::Equality ) {
+
+            int op = getGtLtOp( e );
+            
+            if ( op == BSONObj::Equality ) {
                 ranges_[ e.fieldName() ] &= FieldRange( e , optimize );
+            }
+            else if ( op == BSONObj::opELEM_MATCH ){
+                BSONObjIterator i( e.embeddedObjectUserCheck().firstElement().embeddedObjectUserCheck() );
+                while ( i.more() ){
+                    BSONElement f = i.next();
+                    StringBuilder buf(32);
+                    buf << e.fieldName() << "." << f.fieldName();
+                    string fullname = buf.str();
+                    ranges_[ fullname ] &= FieldRange( f , optimize );
+                }
             }
             else {
                 BSONObjIterator i( e.embeddedObject() );
-                while( i.moreWithEOO() ) {
+                while( i.more() ) {
                     BSONElement f = i.next();
-                    if ( f.eoo() )
-                        break;
                     ranges_[ e.fieldName() ] &= FieldRange( f , optimize );
                 }                
             }
