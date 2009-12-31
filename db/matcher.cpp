@@ -43,9 +43,9 @@ namespace mongo {
             if ( scope.get() )
                 scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
 
-
             if ( jsScope ){
                 delete jsScope;
+                jsScope = 0;
             }
             func = 0;
         }
@@ -63,7 +63,32 @@ namespace mongo {
 
     JSMatcher::~JSMatcher() {
         delete where;
+        where = 0;
     }
+
+    BasicMatcher::BasicMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ) {
+        if ( _op == BSONObj::opMOD ){
+            BSONObj o = _e.embeddedObject().firstElement().embeddedObject();
+            mod = o["0"].numberInt();
+            modm = o["1"].numberInt();
+            
+            uassert( 10073 ,  "mod can't be 0" , mod );
+        }
+        else if ( _op == BSONObj::opTYPE ){
+            type = (BSONType)(_e.embeddedObject().firstElement().numberInt());
+        }
+        else if ( _op == BSONObj::opELEM_MATCH ){
+            BSONElement m = toMatch.embeddedObjectUserCheck().firstElement();
+            uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
+            subMatcher.reset( new JSMatcher( m.embeddedObject() ) );
+        }
+    }
+
+
+    BasicMatcher::~BasicMatcher(){
+    }
+
+
 
 } // namespace mongo
 
@@ -118,7 +143,7 @@ namespace mongo {
     */
     JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
         where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), _atomic(false), nRegex(0){
-
+        
         BSONObjIterator i(jsobj);
         while ( i.moreWithEOO() ) {
             BSONElement e = i.next();
@@ -215,6 +240,8 @@ namespace mongo {
                             break;
                         case BSONObj::opMOD:
                         case BSONObj::opTYPE:
+                        case BSONObj::opELEM_MATCH:
+                            // these are types where BasicMatcher has all the info
                             basics.push_back( BasicMatcher( e , op ) );
                             break;
                         case BSONObj::opSIZE:{
@@ -282,7 +309,7 @@ namespace mongo {
     inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
-        if ( op == 0 )
+        if ( op == BSONObj::Equality )
             return l.valuesEqual(r);
         
         if ( op == BSONObj::opIN ) {
@@ -437,15 +464,30 @@ namespace mongo {
             valuesMatch(e, toMatch, compareOp, bm ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
+            
             BSONObjIterator ai(e.embeddedObject());
+
             while ( ai.moreWithEOO() ) {
                 BSONElement z = ai.next();
-                if ( valuesMatch( z, toMatch, compareOp, bm) ) {
-                    return 1;
+                
+                if ( compareOp == BSONObj::opELEM_MATCH ){
+                    // SERVER-377
+                    if ( z.type() == Object && bm.subMatcher->matches( z.embeddedObject() ) )
+                        return 1;
                 }
+                else {
+                    if ( valuesMatch( z, toMatch, compareOp, bm) ) {
+                        return 1;
+                    }
+                }
+
             }
-            if ( compareOp == BSONObj::Equality && e.woCompare( toMatch ) == 0 )
+            
+            if ( compareOp == BSONObj::Equality && e.woCompare( toMatch ) == 0 ){
+                // match an entire array to itself
                 return 1;
+            }
+            
         }
         else if ( e.eoo() ) {
             // 0 indicates "missing element"
