@@ -1303,6 +1303,57 @@ namespace mongo {
 
     } distinctCmd;
 
+    /* Find and Modify an object returning either the old (default) or new value*/
+    class CmdFindAndModify : public Command {
+    public:
+        /* {findandmodify: "collection", query: {processed:false}, update: {$set: {processed:true}}, new: true}
+         * {findandmodify: "collection", query: {processed:false}, remove: true, sort: {priority:-1}}
+         * 
+         * either update or remove is required, all other fields have default values
+         * output is in the "value" field
+         */
+        CmdFindAndModify() : Command("findandmodify") { }
+        virtual bool logTheOp() {
+            return false; // the modification will be logged directly
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            static DBDirectClient db;
+
+            string ns = nsToClient(dbname) + '.' + cmdObj.firstElement().valuestr();
+
+            Query q (cmdObj.getObjectField("query")); // defaults to {}
+            BSONElement sort = cmdObj["sort"];
+            if (!sort.eoo())
+                q.sort(sort.embeddedObjectUserCheck());
+
+            BSONObj out = db.findOne(ns, q);
+            if (out.firstElement().eoo()){
+                errmsg = "No matching object found";
+                return false;
+            }
+
+            q = QUERY( "_id" << out["_id"]);
+
+            if (cmdObj["remove"].trueValue()){
+                uassert(12515, "can't remove and update", cmdObj["update"].eoo());
+                db.remove(ns, q, 1);
+            } else {
+                BSONElement update = cmdObj["update"];
+                uassert(12516, "must specify remove or update", !update.eoo());
+                db.update(ns, q, update.embeddedObjectUserCheck());
+
+                if (cmdObj["new"].trueValue())
+                    out = db.findOne(ns, q);
+            }
+
+            result.append("value", out);
+
+            return true;
+        }
+    } cmdFindAndModify;
 
     extern map<string,Command*> *commands;
 

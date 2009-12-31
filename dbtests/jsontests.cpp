@@ -950,7 +950,7 @@ namespace JsonTests {
             }
         };
 
-        class EmbeddedDates : public Base  {
+        class EmbeddedDatesBase : public Base  {
         public:
             
             virtual void run(){
@@ -971,9 +971,22 @@ namespace JsonTests {
                 b.append( "time.valid" , e.obj() );
                 return b.obj();
             }
+            virtual string json() const = 0;
+        };
 
+        struct EmbeddedDatesFormat1 :  EmbeddedDatesBase  {
             string json() const {
                 return "{ \"time.valid\" : { $gt : { \"$date\" :  1257829200000 } , $lt : { \"$date\" : 1257829200100 } } }";
+            }
+        };
+        struct EmbeddedDatesFormat2 :  EmbeddedDatesBase  {
+            string json() const {
+                return "{ \"time.valid\" : { $gt : Date(1257829200000) , $lt : Date( 1257829200100 ) } }";
+            }
+        };
+        struct EmbeddedDatesFormat3 :  EmbeddedDatesBase  {
+            string json() const {
+                return "{ \"time.valid\" : { $gt : new Date(1257829200000) , $lt : new Date( 1257829200100 ) } }";
             }
         };
         
@@ -1058,7 +1071,9 @@ namespace JsonTests {
             add< FromJsonTests::ObjectId2 >();
             add< FromJsonTests::NumericTypes >();
             add< FromJsonTests::NegativeNumericTypes >();
-            add< FromJsonTests::EmbeddedDates >();
+            add< FromJsonTests::EmbeddedDatesFormat1 >();
+            add< FromJsonTests::EmbeddedDatesFormat2 >();
+            add< FromJsonTests::EmbeddedDatesFormat3 >();
         }
     } myall;
 
