@@ -34,6 +34,7 @@ namespace mongo {
     class AuthenticationInfo;
     class Database;
     class CurOp;
+    class Command;
 
     class Client : boost::noncopyable { 
     public:

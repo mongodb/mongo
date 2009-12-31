@@ -177,10 +177,11 @@ namespace mongo {
 
         MessagingPort& dbMsgPort = *grab;
         grab = 0;
+        Client& c = cc();
 
         try {
 
-            currentClient.get()->ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            c.ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -188,7 +189,7 @@ namespace mongo {
 
                 if ( !dbMsgPort.recv(m) ) {
                     if( !cmdLine.quiet )
-                    log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
+                        log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
                     dbMsgPort.shutdown();
                     break;
                 }

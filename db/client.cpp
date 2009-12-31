@@ -40,7 +40,6 @@ namespace mongo {
       _god(0)
     { 
         ai = new AuthenticationInfo(); 
-
         boostlock bl(clientsMutex);
         clients.insert(this);
     }

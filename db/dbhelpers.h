@@ -73,7 +73,7 @@ namespace mongo {
         */
         static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex = false);
         
-        static bool findById(const char *ns, BSONObj query, BSONObj& result );
+        static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result );
 
         static auto_ptr<CursorIterator> find( const char *ns , BSONObj query = BSONObj() , bool requireIndex = false );
 

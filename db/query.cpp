@@ -809,7 +809,7 @@ namespace mongo {
                 nscanned = 1;
 
                 BSONObj resObject;
-                bool found = Helpers::findById( ns , query , resObject );
+                bool found = Helpers::findById( c, ns , query , resObject );
                 if ( found ){
                     n = 1;
                     fillQueryResultFromObj( bb , filter.get() , resObject );

@@ -390,7 +390,7 @@ namespace mongo {
             ss << ' ' << ms << "ms";
             mongo::log() << ss.str() << endl;
         }
-        Database *database = cc().database();
+        Database *database = c.database();
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
                 // performance profiling is on
@@ -398,7 +398,7 @@ namespace mongo {
                     out() << "warning: not profiling because recursive lock" << endl;
                 }
                 else {
-                    string old_ns = cc().ns();
+                    string old_ns = c.ns();
                     lk.releaseAndWriteLock();
                     resetClient(old_ns.c_str());
                     profile(ss.str().c_str(), ms);
@@ -408,7 +408,7 @@ namespace mongo {
 
         currentOp.setActive(false);
         return true;
-    }
+    } /* assembleResponse() */
 
     void killCursors(int n, long long *ids);
     void receivedKillCursors(Message& m) {
