@@ -47,8 +47,6 @@ namespace mongo {
 
     /* sometimes we deal with databases with the same name in different directories - thus this */
     inline string makeDbKeyStr( const char *ns, const string& path ) {
-        if ( path == dbpath )
-            return ns;
         char cl[256];
         nsToDatabase(ns, cl);
         return string( cl ) + ":" + path;
