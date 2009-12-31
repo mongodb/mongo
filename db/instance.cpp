@@ -144,6 +144,8 @@ namespace mongo {
         QueryMessage q(d);
         QueryResult* msgdata;
 
+        Client& c = cc();
+
         try {
             if (q.fields.get() && q.fields->errmsg)
                 uassert( 10053 , q.fields->errmsg, false);
@@ -160,9 +162,8 @@ namespace mongo {
             }
 
             setClient( q.ns, dbpath, &lock );
-            Client& client = cc();
-            client.top.setRead();
-            client.curop()->setNS(q.ns);
+            c.top.setRead();
+            c.curop()->setNS(q.ns);
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
@@ -199,7 +200,7 @@ namespace mongo {
         resp->setData(msgdata, true); // transport will free
         dbresponse.response = resp;
         dbresponse.responseTo = responseTo;
-        Database *database = cc().database();
+        Database *database = c.database();
         if ( database ) {
             if ( database->profile )
                 op.debug().str << " bytes:" << resp->data->dataLen();
