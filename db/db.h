@@ -73,12 +73,13 @@ namespace mongo {
 
         dbMutex.assertAtLeastReadLocked();
 
-        cc().top.clientStart( ns );
+        Client& c = cc();
+        c.top.clientStart( ns );
 
         string key = makeDbKeyStr( ns, path );
         map<string,Database*>::iterator it = databases.find(key);
         if ( it != databases.end() ) {
-            cc().setns(ns, it->second);
+            c.setns(ns, it->second);
             return false;
         }
 
@@ -101,7 +102,7 @@ namespace mongo {
         bool justCreated;
         Database *newdb = new Database(cl, justCreated, path);
         databases[key] = newdb;
-        cc().setns(ns, newdb);
+        c.setns(ns, newdb);
 
         newdb->finishInit();
 

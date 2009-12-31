@@ -668,6 +668,7 @@ namespace mongo {
         ClientCursor * findingStartCursor_;
     };
     
+    /* run a query -- includes checking for and running a Command */
     auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop ) {
         StringBuilder& ss = curop.debug().str;
         const char *ns = q.ns;
@@ -694,7 +695,7 @@ namespace mongo {
             wantMore = false;
         }
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
-        cc().curop()->setQuery(jsobj);
+        curop.setQuery(jsobj);
         
         BufBuilder bb;
         BSONObjBuilder cmdResBuf;
@@ -705,6 +706,7 @@ namespace mongo {
         auto_ptr< QueryResult > qr;
         int n = 0;
         
+        Client& c = cc();
         /* we assume you are using findOne() for running a cmd... */
         if ( ntoreturn == 1 && runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
             n = 1;
@@ -720,9 +722,10 @@ namespace mongo {
             qr->nReturned = n;            
         }
         else {
+            /* regular query */
             
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert( 10106 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
+            uassert( 10106 , "unauthorized", ai->isAuthorized(c.database()->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
@@ -890,7 +893,7 @@ namespace mongo {
         }
         
         int duration = t.millis();
-        Database *database = cc().database();
+        Database *database = c.database();
         if ( (database && database->profile) || duration >= 100 ) {
             ss << " nscanned:" << nscanned << ' ';
             if ( ntoskip )
