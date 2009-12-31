@@ -36,7 +36,7 @@ namespace mongo {
     const int MaxClientLen = 256; // max str len for the db name, including null char
 
 	// "database.a.b.c" -> "database"
-    inline void nsToClient(const char *ns, char *database) {
+    inline void nsToDatabase(const char *ns, char *database) {
         const char *p = ns;
         char *q = database;
         while ( *p != '.' ) {
@@ -46,13 +46,13 @@ namespace mongo {
         }
         *q = 0;
         if (q-database>=MaxClientLen) {
-            log() << "nsToClient: ns too long. terminating, buf overrun condition" << endl;
+            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
             dbexit( EXIT_POSSIBLE_CORRUPTION );
         }
     }
-    inline string nsToClient(const char *ns) {
+    inline string nsToDatabase(const char *ns) {
         char buf[MaxClientLen];
-        nsToClient(ns, buf);
+        nsToDatabase(ns, buf);
         return buf;
     }
 

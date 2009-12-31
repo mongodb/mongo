@@ -281,7 +281,7 @@ namespace mongo {
 
     bool Cloner::startCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, string &errmsg, bool logForRepl, bool copyIndexes, int logSizeMb, long long &cursorId ) {
         char db[256];
-        nsToClient( ns, db );
+        nsToDatabase( ns, db );
 
         NamespaceDetails *nsd = nsdetails( ns );
         if ( nsd ){
@@ -365,7 +365,7 @@ namespace mongo {
     
     bool Cloner::finishCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, long long cursorId, string &errmsg ) {
         char db[256];
-        nsToClient( ns, db );
+        nsToDatabase( ns, db );
 
         auto_ptr< DBClientCursor > cur;
         {
@@ -653,9 +653,9 @@ namespace mongo {
 
             {
                 char from[256];
-                nsToClient( source.c_str(), from );
+                nsToDatabase( source.c_str(), from );
                 char to[256];
-                nsToClient( target.c_str(), to );
+                nsToDatabase( target.c_str(), to );
                 if ( strcmp( from, to ) == 0 ) {
                     renameNamespace( source.c_str(), target.c_str() );
                     return true;
@@ -686,9 +686,9 @@ namespace mongo {
             }
             
             char cl[256];
-            nsToClient( source.c_str(), cl );
+            nsToDatabase( source.c_str(), cl );
             string sourceIndexes = string( cl ) + ".system.indexes";
-            nsToClient( target.c_str(), cl );
+            nsToDatabase( target.c_str(), cl );
             string targetIndexes = string( cl ) + ".system.indexes";
             {
                 c = bridge.query( sourceIndexes, QUERY( "ns" << source ) );

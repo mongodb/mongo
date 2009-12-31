@@ -237,7 +237,7 @@ namespace mongo {
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
         if ( max ) b.append("max", max);
-        string db = nsToClient(ns.c_str());
+        string db = nsToDatabase(ns.c_str());
         return runCommand(db.c_str(), b.done(), *info);
     }
 
@@ -590,7 +590,7 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ){
         BSONObj info;
-        if ( ! runCommand( nsToClient( ns.c_str() ) , 
+        if ( ! runCommand( nsToDatabase( ns.c_str() ) , 
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
                            info ) ){
             log() << "dropIndex failed: " << info << endl;
@@ -601,7 +601,7 @@ namespace mongo {
     
     void DBClientWithCommands::dropIndexes( const string& ns ){
         BSONObj info;
-        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToClient( ns.c_str() ) , 
+        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns.c_str() ) , 
                                                     BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") , 
                                                     info ) );
         resetIndexCache();

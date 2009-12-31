@@ -775,7 +775,7 @@ namespace mongo {
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             static DBDirectClient db;
 
-            string ns = nsToClient( dbname );
+            string ns = nsToDatabase( dbname );
             ns += ".";
             {
                 string root = jsobj.getStringField( "root" );
@@ -992,7 +992,7 @@ namespace mongo {
             }
 
             char realDbName[256];
-            nsToClient( dbname, realDbName );
+            nsToDatabase( dbname, realDbName );
 
             string fromNs = string( realDbName ) + "." + from;
             string toNs = string( realDbName ) + "." + to;
@@ -1054,7 +1054,7 @@ namespace mongo {
             }
 
             char realDbName[256];
-            nsToClient( dbname, realDbName );
+            nsToDatabase( dbname, realDbName );
 
             DBDirectClient client;
             client.dropCollection( string( realDbName ) + "." + from + ".$temp_convertToCapped" );
@@ -1322,7 +1322,7 @@ namespace mongo {
         virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             static DBDirectClient db;
 
-            string ns = nsToClient(dbname) + '.' + cmdObj.firstElement().valuestr();
+            string ns = nsToDatabase(dbname) + '.' + cmdObj.firstElement().valuestr();
 
             Query q (cmdObj.getObjectField("query")); // defaults to {}
             BSONElement sort = cmdObj["sort"];

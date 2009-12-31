@@ -50,7 +50,7 @@ namespace mongo {
         if ( path == dbpath )
             return ns;
         char cl[256];
-        nsToClient(ns, cl);
+        nsToDatabase(ns, cl);
         return string( cl ) + ":" + path;
     }
 
@@ -100,7 +100,7 @@ namespace mongo {
         assertInWriteLock();
 
         char cl[256];
-        nsToClient(ns, cl);
+        nsToDatabase(ns, cl);
         bool justCreated;
         Database *newdb = new Database(cl, justCreated, path);
         databases[key] = newdb;

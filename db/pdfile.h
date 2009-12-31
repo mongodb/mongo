@@ -407,7 +407,7 @@ namespace mongo {
         assert( database );
         DEV {
             char buf[256];
-            nsToClient(ns, buf);
+            nsToDatabase(ns, buf);
             if ( database->name != buf ) {
                 out() << "ERROR: attempt to write to wrong database database\n";
                 out() << " ns:" << ns << '\n';

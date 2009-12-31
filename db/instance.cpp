@@ -322,7 +322,7 @@ namespace mongo {
         else {
             const char *ns = m.data->_data + 4;
             char cl[256];
-            nsToClient(ns, cl);
+            nsToDatabase(ns, cl);
             currentOp.setNS(ns);
             AuthenticationInfo *ai = currentClient.get()->ai;
             if( !ai->isAuthorized(cl) ) { 

@@ -836,7 +836,7 @@ namespace mongo {
         
         char clientName[MaxClientLen];
         const char *ns = op.getStringField("ns");
-        nsToClient(ns, clientName);
+        nsToDatabase(ns, clientName);
 
         if ( *ns == '.' ) {
             problem() << "skipping bad op in oplog: " << op.toString() << endl;
@@ -1388,7 +1388,7 @@ namespace mongo {
         if ( master ) {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
             char cl[ 256 ];
-            nsToClient( ns, cl );
+            nsToDatabase( ns, cl );
         }
         NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
         if ( t.cllEnabled() ) {

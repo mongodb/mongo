@@ -175,7 +175,7 @@ namespace mongo {
         const char *coll = strchr( ns, '.' ) + 1;
         massert( 10356 ,  "invalid ns", coll && *coll );
         char cl[ 256 ];
-        nsToClient( ns, cl );
+        nsToDatabase( ns, cl );
         bool ok = _userCreateNS(ns, j, err);
         if ( logForReplication && ok ) {
             if ( j.getField( "create" ).eoo() ) {
@@ -1375,7 +1375,7 @@ namespace mongo {
             const char *name = io.getStringField("name"); // name of the index
             tabletoidxns = io.getStringField("ns");  // table it indexes
             uassert( 10096 ,  "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
-            if ( cc().database()->name != nsToClient(tabletoidxns.c_str()) ) {
+            if ( cc().database()->name != nsToDatabase(tabletoidxns.c_str()) ) {
                 uassert( 10097 , "bad table to index name on add index attempt", false);
                 return DiskLoc();
             }
@@ -1621,7 +1621,7 @@ namespace mongo {
     void dropDatabase(const char *ns) {
         // ns is of the form "<dbname>.$cmd"
         char cl[256];
-        nsToClient(ns, cl);
+        nsToDatabase(ns, cl);
         log(1) << "dropDatabase " << cl << endl;
         assert( cc().database()->name == cl );
 
@@ -1729,7 +1729,7 @@ namespace mongo {
 
         // ns is of the form "<dbname>.$cmd"
         char dbName[256];
-        nsToClient(ns, dbName);
+        nsToDatabase(ns, dbName);
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
 

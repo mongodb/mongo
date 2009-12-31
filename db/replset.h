@@ -142,7 +142,7 @@ namespace mongo {
     }
     inline bool isMasterNs( const char *ns ) {
         char cl[ 256 ];
-        nsToClient( ns, cl );
+        nsToDatabase( ns, cl );
         return isMaster( cl );
     }
 

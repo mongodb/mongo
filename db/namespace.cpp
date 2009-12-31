@@ -656,7 +656,7 @@ namespace mongo {
                 b.append("options", *options);
             BSONObj j = b.done();
             char database[256];
-            nsToClient(ns, database);
+            nsToDatabase(ns, database);
             string s = database;
             s += ".system.namespaces";
             theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
@@ -690,7 +690,7 @@ namespace mongo {
 		
 		BSONObj oldSpec;
 		char database[MaxClientLen];
-		nsToClient(from, database);
+		nsToDatabase(from, database);
 		string s = database;
 		s += ".system.namespaces";
 		assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
