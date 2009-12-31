@@ -689,7 +689,7 @@ namespace mongo {
 		details = todetails;
 		
 		BSONObj oldSpec;
-		char database[MaxClientLen];
+		char database[MaxDatabaseLen];
 		nsToDatabase(from, database);
 		string s = database;
 		s += ".system.namespaces";
