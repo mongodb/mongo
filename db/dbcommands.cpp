@@ -721,6 +721,7 @@ namespace mongo {
                 seen.insert( i->c_str() );
             }
             
+            // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
             set<string> allShortNames;
             dbHolder.getAllShortNames( allShortNames );
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ){

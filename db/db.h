@@ -83,6 +83,9 @@ namespace mongo {
             return _size;
         }
         
+        /**
+         * gets all unique db names, ignoring paths
+         */
         void getAllShortNames( set<string>& all ) const{
             dbMutex.assertAtLeastReadLocked();
             for ( map<string, map<string,Database*> >::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ){
