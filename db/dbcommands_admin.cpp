@@ -262,6 +262,7 @@ namespace mongo {
         virtual bool adminOnly(){ return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( lockedForWriting ) { 
+				log() << "command: unlock requested" << endl;
                 errmsg = "unlock requested";
                 unlockRequested = true;
             }
