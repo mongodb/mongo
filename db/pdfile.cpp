@@ -46,7 +46,7 @@ namespace mongo {
     string dbpath = "/data/db/";
 
     DataFileMgr theDataFileMgr;
-    map<string,Database*> databases;
+    DatabaseHolder dbHolder;
     int MAGIC = 0x1000;
 //    int curOp = -2;
 
@@ -1812,4 +1812,31 @@ namespace mongo {
 
     NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
+    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result ){
+        log(2) << "DatabaseHolder::closeAll path:" << path << endl;
+        dbMutex.assertWriteLocked();
+        
+        map<string,Database*>& m = _paths[path];
+        _size -= m.size();
+        
+        set< string > dbs;
+        for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
+            dbs.insert( i->first );
+        }
+        
+        BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
+        int n = 0;
+        for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+            string name = *i;
+            log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
+            setClient( name.c_str() , path );
+            closeDatabase( name.c_str() , path );
+            bb.append( bb.numStr( n++ ).c_str() , name );
+        }
+        bb.done();
+        
+        return true;
+    }
+    
+
 } // namespace mongo
