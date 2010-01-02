@@ -83,6 +83,7 @@ namespace mongo {
     KillCurrentOp killCurrentOp;
     
     int lockFile = 0;
+    unsigned lockedForWriting; // see FSyncCommand
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
@@ -104,6 +105,11 @@ namespace mongo {
                 }
             }
             b.append("inprog", vals);
+            unsigned x = lockedForWriting;
+            if( x ) {
+                b.append("fsyncLock", x);
+                b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
+            }
         }
 
         replyToQuery(0, m, dbresponse, b.obj());

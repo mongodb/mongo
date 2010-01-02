@@ -30,6 +30,7 @@
 #include "cmdline.h"
 #include "btree.h"
 #include "curop.h"
+#include "../util/background.h"
 
 namespace mongo {
 
@@ -249,30 +250,97 @@ namespace mongo {
         }
     } validateCmd;
 
+    static bool unlockRequested = false;
+    extern unsigned lockedForWriting;
+    static boost::mutex lockedForWritingMutex;
+
+    class UnlockCommand : public Command { 
+    public:
+        UnlockCommand() : Command( "unlock" ) { }
+        virtual bool readOnly() { return true; }
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return true; }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( lockedForWriting ) { 
+                errmsg = "unlock requested";
+                unlockRequested = true;
+            }
+            else { 
+                errmsg = "not locked, so cannot unlock";
+                return 0;
+            }
+            return 1;
+        }
+        
+    } unlockCommand;
+
     class FSyncCommand : public Command {
+        class LockDBJob : public BackgroundJob { 
+        protected:
+            void run() { 
+                {
+                    boostlock lk(lockedForWritingMutex);
+                    lockedForWriting++;
+                }
+                readlock lk("");
+                MemoryMappedFile::flushAll(true);
+                log() << "db is now locked for snapshotting, no writes allowed. use command {unlock:1} to unlock" << endl;
+                _ready = true;
+                while( 1 ) { 
+                    if( unlockRequested ) { 
+                        unlockRequested = false;
+                        break;
+                    }
+                    sleepmillis(20);
+                }
+                {
+                    boostlock lk(lockedForWritingMutex);
+                    lockedForWriting--;
+                }
+            }
+        public:
+            bool& _ready;
+            LockDBJob(bool& ready) : _ready(ready) {
+                deleteSelf = true;
+                _ready = false;
+            }
+        };
     public:
         FSyncCommand() : Command( "fsync" ){}
 
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }
-        virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
+        /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
-        }
+        }*/
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
-            string exec = cmdObj["exec"].valuestrsafe();
-            log() << "CMD fsync:  sync:" << sync << endl;
-            result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
-            if( !exec.empty() ) { 
-                uassert(12032, "fsync: sync option must be true when using exec", sync);
-                assert( localHostOnlyIfNoAuth(cmdObj) );
-                log() << "execing: " << exec << " (db will be locked during operation)" << endl;
-                // ADD EXEC HERE
-                log() << "ERROR: exec call not yet implemented" << endl;
-                result.append("execOutput", "exec not yet implemented");
-                log() << "exec complete" << endl;
+            bool lock = cmdObj["lock"].trueValue();
+            log() << "CMD fsync:  sync:" << sync << " lock:" << lock << endl;
+
+            if( lock ) { 
+                uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
+                uassert(12032, "fsync: sync option must be true when using lock", sync);
+                /* With releaseEarly(), we must be extremely careful we don't do anything 
+                   where we would have assumed we were locked.  profiling is one of those things. 
+                   Perhaps at profile time we could check if we released early -- however, 
+                   we need to be careful to keep that code very fast it's a very common code path when on.
+                */
+                uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
+                bool ready = false;
+                LockDBJob *l = new LockDBJob(ready);
+                dbMutex.releaseEarly();
+                l->go();
+                // don't return until background thread has acquired the write lock
+                while( !ready ) { 
+                    sleepmillis(10);
+                }
+                result.append("info", "now locked against writes, use admin command {unlock:1} to unlock");
+            }
+            else {
+                result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
             }
             return 1;
         }
