@@ -3,9 +3,14 @@ t = db.dbadmin;
 t.save( { x : 1 } );
 
 before = db._adminCommand( "serverStatus" )
-db._adminCommand( "closeAllDatabases" );
-after = db._adminCommand( "serverStatus" );
-assert( before.mem.mapped > after.mem.mapped , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) );
+if ( typeof( before.mem )  == "object" ){
+    db._adminCommand( "closeAllDatabases" );
+    after = db._adminCommand( "serverStatus" );
+    assert( before.mem.mapped > after.mem.mapped , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) );
+}
+else {
+    print( "can't test serverStatus on this machine" );
+}
 
 t.save( { x : 1 } );
 
