@@ -19,6 +19,9 @@ import shutil
 import urllib
 import urllib2
 import buildscripts
+import buildscripts.bb
+
+buildscripts.bb.checkOk()
 
 # --- options ----
 AddOption('--prefix',

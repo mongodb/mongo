@@ -450,7 +450,7 @@ namespace mongo {
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        eraseDatabase( cl, path );
+        dbHolder.erase( cl, path );
         delete database; // closes files
         cc().clearns();
     }
