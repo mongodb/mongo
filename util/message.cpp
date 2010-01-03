@@ -293,6 +293,14 @@ again:
                 }
                 goto again;
             }
+
+            if ( len == 542393671 ){
+                // an http GET
+                log() << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
+                static const char * wrongPort = "HTTP 1.0 404 Not Found\nConnection: Close\n\nYou are trying to access MongoDB on the native driver port.  For http access, add 1000 to the port\n\n";
+                ::send( sock , wrongPort , strlen( wrongPort ) , 0 );
+                return false;
+            }
             log() << "bad recv() len: " << len << '\n';
             return false;
         }
