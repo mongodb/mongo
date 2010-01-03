@@ -135,8 +135,8 @@ namespace mongo {
 
             BSONObj chunkFinder = query;
             
-            bool upsert = flags & Option_Upsert;
-            bool multi = flags & Option_Multi;
+            bool upsert = flags & UpdateOption_Upsert;
+            bool multi = flags & UpdateOption_Multi;
 
             if ( multi )
                 uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );

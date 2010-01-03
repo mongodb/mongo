@@ -88,7 +88,7 @@ public:
         }
 
 
-        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , ((Query)(getParam( "query" , "" ))).snapshot() , 0 , 0 , fieldsToReturn , Option_SlaveOk | Option_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , ((Query)(getParam( "query" , "" ))).snapshot() , 0 , 0 , fieldsToReturn , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
 
         if ( csv ){
             for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ){

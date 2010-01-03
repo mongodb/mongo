@@ -153,7 +153,9 @@ namespace mongo {
 
         static void idleTimeReport(unsigned millis);
 
-        void noTimeout() {
+        // cursors normally timeout after an inactivy period to prevent excess memory use
+        // setting this prevents timeout of the cursor in question.
+        void noTimeout() { 
             _noTimeout = true;
         }
 

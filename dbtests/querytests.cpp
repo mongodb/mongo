@@ -196,7 +196,7 @@ namespace QueryTests {
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 1, 0, 0, Option_CursorTailable );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 1, 0, 0, QueryOption_CursorTailable );
             // If only one result requested, a cursor is not saved.
             ASSERT_EQUALS( 0, c->getCursorId() );
             ASSERT( c->more() );
@@ -214,7 +214,7 @@ namespace QueryTests {
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
             ASSERT( 0 != c->getCursorId() );
             while( c->more() )
                 c->next();
@@ -235,9 +235,9 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.EmptyTail";
-            ASSERT_EQUALS( 0, client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
+            ASSERT_EQUALS( 0, client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable )->getCursorId() );
             insert( ns, BSON( "a" << 0 ) );
-            ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable )->getCursorId() );
+            ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable )->getCursorId() );
         }
     };
 
@@ -250,7 +250,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.TailableDelete";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
             c->next();
             c->next();
             ASSERT( !c->more() );
@@ -270,7 +270,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.TailableInsertDelete";
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, Option_CursorTailable );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
             c->next();
             c->next();
             ASSERT( !c->more() );
@@ -293,7 +293,7 @@ namespace QueryTests {
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_OplogReplay );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_OplogReplay );
             ASSERT( c->more() );
             ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
             ASSERT( !c->more() );
@@ -734,7 +734,7 @@ namespace QueryTests {
             
             int a = count();
             
-            auto_ptr< DBClientCursor > c = client().query( ns() , QUERY( "i" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_CursorTailable );
+            auto_ptr< DBClientCursor > c = client().query( ns() , QUERY( "i" << GT << 0 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_CursorTailable );
             int n=0;
             while ( c->more() ){
                 BSONObj z = c->next();

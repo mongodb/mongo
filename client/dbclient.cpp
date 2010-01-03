@@ -566,8 +566,8 @@ namespace mongo {
         b.append( ns );
 
         int flags = 0;
-        if ( upsert ) flags |= Option_Upsert;
-        if ( multi ) flags |= Option_Multi;
+        if ( upsert ) flags |= UpdateOption_Upsert;
+        if ( multi ) flags |= UpdateOption_Multi;
         b.append( flags );
 
         query.obj.appendSelfToBufBuilder( b );
@@ -785,7 +785,7 @@ namespace mongo {
             cursorId = 0; // 0 indicates no longer valid (dead)
             // TODO: should we throw a UserException here???
         }
-        if ( cursorId == 0 || ! ( opts & Option_CursorTailable ) ) {
+        if ( cursorId == 0 || ! ( opts & QueryOption_CursorTailable ) ) {
             // only set initially: we don't want to kill it on end of data
             // if it's a tailable cursor
             cursorId = qr->cursorId;

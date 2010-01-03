@@ -34,22 +34,28 @@ namespace mongo {
            final object it references were deleted.  Thus, you should be prepared to requery if you get back
            ResultFlag_CursorNotFound.
         */
-        Option_CursorTailable = 1 << 1,
+        QueryOption_CursorTailable = 1 << 1,
 
         /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
-        Option_SlaveOk = 1 << 2,
+        QueryOption_SlaveOk = 1 << 2,
         
-        Option_OplogReplay = 1 << 3,
+        QueryOption_OplogReplay = 1 << 3,
 
-        /** if there is a cursor, ignore the normal cursor timeout behavior and never time it out
+        /** The server normally times out idle cursors after an inactivy period to prevent excess memory use
+            Set this option to prevent that. 
          */
-        Option_NoCursorTimeout = 1 << 4
+        QueryOption_NoCursorTimeout = 1 << 4
+
     };
 
     enum UpdateOptions {
-        Option_Upsert = 1 << 0,
-        Option_Multi = 1 << 1
+        /** Upsert - that is, insert the item if no matching item is found. */
+        UpdateOption_Upsert = 1 << 0,
+
+        /** Update multiple documents (if multiple documents match query expression). 
+           (Default is update a single document and stop.) */
+        UpdateOption_Multi = 1 << 1
     };
 
     class BSONObj;
@@ -223,7 +229,7 @@ namespace mongo {
         }
 
         bool tailable() const {
-            return (opts & Option_CursorTailable) != 0;
+            return (opts & QueryOption_CursorTailable) != 0;
         }
         
         bool hasResultFlag( int flag ){

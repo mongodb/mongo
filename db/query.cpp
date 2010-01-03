@@ -492,7 +492,7 @@ namespace mongo {
             n_(),
             soSize_(),
             saveClientCursor_(),
-            findingStart_( (queryOptions & Option_OplogReplay) != 0 ),
+            findingStart_( (queryOptions & QueryOption_OplogReplay) != 0 ),
             findingStartCursor_()
         {
             uassert( 10105 , "bad skip value in query", ntoskip >= 0);
@@ -646,7 +646,7 @@ namespace mongo {
         int n() const { return n_; }
         long long nscanned() const { return nscanned_; }
         bool saveClientCursor() const { return saveClientCursor_; }
-        bool mayCreateCursor2() const { return ( queryOptions_ & Option_CursorTailable ) && ntoreturn_ != 1; }
+        bool mayCreateCursor2() const { return ( queryOptions_ & QueryOption_CursorTailable ) && ntoreturn_ != 1; }
     private:
         BufBuilder b_;
         int ntoskip_;
@@ -731,7 +731,7 @@ namespace mongo {
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
 			   query the nonmaster member of a replica pair.
 			*/
-            uassert( 10107 ,  "not master", isMaster() || (queryOptions & Option_SlaveOk) || slave == SimpleSlave );
+            uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || slave == SimpleSlave );
 
             BSONElement hint;
             BSONObj min;
@@ -844,7 +844,7 @@ namespace mongo {
                 log( 5 ) << "   used cursor: " << c.get() << endl;
                 if ( dqo.saveClientCursor() ) {
                     ClientCursor *cc = new ClientCursor();
-                    if ( queryOptions & Option_NoCursorTimeout )
+                    if ( queryOptions & QueryOption_NoCursorTimeout )
                         cc->noTimeout();
                     cc->c = c;
                     cursorid = cc->cursorid;

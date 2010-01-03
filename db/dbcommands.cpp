@@ -1420,7 +1420,7 @@ namespace mongo {
             }
             else if ( isMaster() ||
                       c->slaveOk() ||
-                      ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
+                      ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
                       fromRepl ){
                 if ( jsobj.getBoolField( "help" ) ) {
                     stringstream help;

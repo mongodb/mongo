@@ -120,7 +120,7 @@ namespace mongo {
 
         /* the last time point we have already synced up to. */
         OpTime syncedTo;
-        OpTime lastSavedLocalTs_;
+        OpTime _lastSavedLocalTs;
 
         int nClonedThisPass;
 
