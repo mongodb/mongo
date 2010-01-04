@@ -469,6 +469,9 @@
 		93BCE15A10F25DFE00FA139B /* fsync.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fsync.js; sourceTree = "<group>"; };
 		93BCE15B10F25DFE00FA139B /* regex5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = regex5.js; sourceTree = "<group>"; };
 		93BCE15C10F25DFE00FA139B /* rename3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = rename3.js; sourceTree = "<group>"; };
+		93BCE16010F2642900FA139B /* database.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = database.cpp; path = db/database.cpp; sourceTree = "<group>"; };
+		93BCE16110F2642900FA139B /* dbcommands_admin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = dbcommands_admin.cpp; path = db/dbcommands_admin.cpp; sourceTree = "<group>"; };
+		93BCE1D310F26CDA00FA139B /* fsync2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fsync2.js; sourceTree = "<group>"; };
 		93C38E940FA66622007D6E4A /* basictests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basictests.cpp; sourceTree = "<group>"; };
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
@@ -505,6 +508,8 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				93BCE16010F2642900FA139B /* database.cpp */,
+				93BCE16110F2642900FA139B /* dbcommands_admin.cpp */,
 				934BEB9A10DFFA9600178102 /* jstests */,
 				93A479F20FAF2A5000E760DD /* scripting */,
 				932AC4310F4A5E9D005BF8B0 /* SConstruct */,
@@ -710,6 +715,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93BCE1D310F26CDA00FA139B /* fsync2.js */,
 				93BCE15610F25DFE00FA139B /* arrayfind1.js */,
 				93BCE15710F25DFE00FA139B /* dbadmin.js */,
 				93BCE15810F25DFE00FA139B /* error4.js */,
