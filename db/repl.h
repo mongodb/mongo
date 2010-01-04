@@ -127,8 +127,15 @@ namespace mongo {
         }
         string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
-        /* the last time point we have already synced up to. */
+        /* the last time point we have already synced up to (in the remote/master's oplog). */
         OpTime syncedTo;
+
+        /* This is for repl pairs.
+           _lastSavedLocalTs is the most recent point in the local log that we know is consistent
+           with the remote log ( ie say the local op log has entries ABCDE and the remote op log 
+           has ABCXY, then _lastSavedLocalTs won't be greater than C until we have reconciled 
+           the DE-XY difference.)
+        */
         OpTime _lastSavedLocalTs;
 
         int nClonedThisPass;

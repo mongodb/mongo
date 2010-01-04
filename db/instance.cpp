@@ -83,7 +83,11 @@ namespace mongo {
     KillCurrentOp killCurrentOp;
     
     int lockFile = 0;
-    unsigned lockedForWriting; // see FSyncCommand
+
+    // see FSyncCommand:
+    unsigned lockedForWriting; 
+    boost::mutex lockedForWritingMutex;
+    bool unlockRequested = false;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
@@ -134,6 +138,25 @@ namespace mongo {
             else { 
                 obj = fromjson("{\"info\":\"attempting to kill op\"}");
                 killCurrentOp.kill( (unsigned) e.number() );
+            }
+        }
+        replyToQuery(0, m, dbresponse, obj);
+    }
+
+    void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
+        BSONObj obj;
+        AuthenticationInfo *ai = currentClient.get()->ai;
+        if( !ai->isAuthorized("admin") || strncmp(ns, "admin.", 6) != 0 ) { 
+            obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else {
+            if( lockedForWriting ) { 
+				log() << "command: unlock requested" << endl;
+                obj = fromjson("{ok:1,\"info\":\"unlock requested\"}");
+                unlockRequested = true;
+            }
+            else { 
+                obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");
             }
         }
         replyToQuery(0, m, dbresponse, obj);
@@ -238,6 +261,10 @@ namespace mongo {
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) { 
                         killOp(m, dbresponse);
+                        return true;
+                    }
+                    if( strstr(ns, "$cmd.sys.unlock") ) { 
+                        unlockFsync(ns, m, dbresponse);
                         return true;
                     }
                 }
