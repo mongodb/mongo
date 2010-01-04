@@ -12,7 +12,7 @@ assert(x.ok,"C");
 y = d.currentOp();
 assert(y.fsyncLock,"B");
 
-z = d.runCommand({unlock:1});
+z = d.$cmd.sys.unlock.findOne();
 
 // it will take some time to unlock, and unlock does not block and wait for that
 // doing a write will make us wait until db is writeable.

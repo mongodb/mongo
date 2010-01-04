@@ -250,10 +250,11 @@ namespace mongo {
         }
     } validateCmd;
 
-    static bool unlockRequested = false;
+    extern bool unlockRequested;
     extern unsigned lockedForWriting;
-    static boost::mutex lockedForWritingMutex;
+    extern boost::mutex lockedForWritingMutex;
 
+/*
     class UnlockCommand : public Command { 
     public:
         UnlockCommand() : Command( "unlock" ) { }
@@ -274,7 +275,10 @@ namespace mongo {
         }
         
     } unlockCommand;
-
+*/
+    /* see unlockFsync() for unlocking:
+       db.$cmd.sys.unlock.findOne()
+    */
     class FSyncCommand : public Command {
         class LockDBJob : public BackgroundJob { 
         protected:
@@ -285,7 +289,7 @@ namespace mongo {
                 }
                 readlock lk("");
                 MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. use command {unlock:1} to unlock" << endl;
+                log() << "db is now locked for snapshotting, no writes allowed. use db.$cmd.sys.unlock.findOne() to unlock" << endl;
                 _ready = true;
                 while( 1 ) { 
                     if( unlockRequested ) { 
@@ -338,7 +342,7 @@ namespace mongo {
                 while( !ready ) { 
                     sleepmillis(10);
                 }
-                result.append("info", "now locked against writes, use admin command {unlock:1} to unlock");
+                result.append("info", "now locked against writes, use db.$cmd.sys.unlock.findOne() to unlock");
             }
             else {
                 result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
