@@ -1,12 +1,12 @@
 
-a = db.dbref1a;
-b = db.dbref1b;
+a = db.dbref2a;
+b = db.dbref2b;
 
 a.drop();
 b.drop();
 
 a.save( { name : "eliot" } );
-b.save( { num : 1 , link : new DBRef( "dbref1a" , a.findOne()._id ) } );
+b.save( { num : 1 , link : new DBRef( "dbref2a" , a.findOne()._id ) } );
 assert.eq( "eliot" , b.findOne().link.fetch().name , "A" );
 
 assert.eq( 1 , b.find( function(){ return this.link.fetch().name == "eliot"; } ).count() , "B" );
