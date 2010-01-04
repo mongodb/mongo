@@ -1196,7 +1196,7 @@ def startMongodForTests( env, target, source ):
     dirName = "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
-    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
+    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName, "--nohttpinterface" ] )
     # Wait for mongod to start
     import time
     time.sleep( 5 )
