@@ -378,11 +378,11 @@ if ( typeof _threadInject != "undefined" ){
         var wrapper = function( fun, argv ) {
                    eval (
                          "var z = function() {" +
-                         "var fun = " + fun.toString() + ";" +
-                         "var argv = " + tojson( argv ) + ";" +
+                         "var __parallelTests__fun = " + fun.toString() + ";" +
+                         "var __parallelTests__argv = " + tojson( argv ) + ";" +
                          "var __parallelTests__passed = false;" +
                          "try {" +
-                            "fun.apply( 0, argv );" +
+                            "__parallelTests__fun.apply( 0, __parallelTests__argv );" +
                             "__parallelTests__passed = true;" +
                          "} catch ( e ) {" +
                             "print( e );" +
@@ -403,7 +403,12 @@ if ( typeof _threadInject != "undefined" ){
         }
         
         runners.forEach( function( x ) { x.start(); } );
-        runners.forEach( function( x ) { assert( x.returnData(), msg ); } );
+        var nFailed = 0;
+        runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );
+        
+        // v8 doesn't like it if we assert here before all threads joined.  For now,
+        // just avoid that possibility.
+        assert.eq( 0, nFailed, msg );
     }
 }
 
