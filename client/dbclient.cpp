@@ -800,6 +800,7 @@ namespace mongo {
         */
     }
 
+    /** If true, safe to call next().  Requests more from server if necessary. */
     bool DBClientCursor::more() {
         if ( pos < nReturned )
             return true;
@@ -820,7 +821,7 @@ namespace mongo {
     }
 
     DBClientCursor::~DBClientCursor() {
-        if ( cursorId && ownCursor_ ) {
+        if ( cursorId && _ownCursor ) {
             BufBuilder b;
             b.append( (int)0 ); // reserved
             b.append( (int)1 ); // number

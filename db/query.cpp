@@ -289,7 +289,7 @@ namespace mongo {
 
         b.skip(sizeof(QueryResult));
 
-        int resultFlags = 0;
+        int resultFlags = 0; //QueryResult::ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
@@ -348,7 +348,7 @@ namespace mongo {
         QueryResult *qr = (QueryResult *) b.buf();
         qr->len = b.len();
         qr->setOperation(opReply);
-        qr->resultFlags() = resultFlags;
+        qr->_resultFlags() = resultFlags;
         qr->cursorId = cursorid;
         qr->startingFrom = start;
         qr->nReturned = n;
@@ -712,7 +712,7 @@ namespace mongo {
             n = 1;
             qr.reset( (QueryResult *) bb.buf() );
             bb.decouple();
-            qr->resultFlags() = 0;
+            qr->setResultFlagsToOk();
             qr->len = bb.len();
             ss << " reslen:" << bb.len();
             //	qr->channel = 0;
@@ -816,7 +816,7 @@ namespace mongo {
                 }
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
-                qr->resultFlags() = 0;
+                qr->setResultFlagsToOk();
                 qr->len = bb.len();
                 ss << " reslen:" << bb.len();
                 qr->setOperation(opReply);
@@ -883,7 +883,7 @@ namespace mongo {
                 qr.reset( (QueryResult *) dqo.builder().buf() );
                 dqo.builder().decouple();
                 qr->cursorId = cursorid;
-                qr->resultFlags() = 0;
+                qr->setResultFlagsToOk();
                 qr->len = dqo.builder().len();
                 ss << " reslen:" << qr->len;
                 qr->setOperation(opReply);

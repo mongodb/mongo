@@ -38,9 +38,21 @@ namespace mongo {
 #pragma pack(1)
     struct QueryResult : public MsgData {
         enum ResultFlagType {
-            ResultFlag_CursorNotFound = 1,   /* returned, with zero results, when getMore is called but the cursor id is not valid at the server. */
-            ResultFlag_ErrSet = 2,           /* { $err : ... } is being returned */
-            ResultFlag_ShardConfigStale = 4  /* have to update config from the server,  usually $err is also set */
+            /* returned, with zero results, when getMore is called but the cursor id 
+               is not valid at the server. */
+            ResultFlag_CursorNotFound = 1,   
+
+            /* { $err : ... } is being returned */
+            ResultFlag_ErrSet = 2,           
+
+            /* Have to update config from the server, usually $err is also set */
+            ResultFlag_ShardConfigStale = 4,  
+
+            /* for backward compatability: this let's us know the server supports 
+               the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep 
+               a little between getMore's.
+            */
+            ResultFlag_AwaitCapable = 8
         };
 
         long long cursorId;
@@ -49,8 +61,14 @@ namespace mongo {
         const char *data() {
             return (char *) (((int *)&nReturned)+1);
         }
-        int& resultFlags() {
+        int resultFlags() {
             return dataAsInt();
+        }
+        int& _resultFlags() {
+            return dataAsInt();
+        }
+        void setResultFlagsToOk() { 
+            _resultFlags() = 0; // ResultFlag_AwaitCapable
         }
     };
 #pragma pack()
@@ -197,7 +215,7 @@ namespace mongo {
         b.skip(sizeof(QueryResult));
         b.append(data, size);
         QueryResult *qr = (QueryResult *) b.buf();
-        qr->resultFlags() = queryResultFlags;
+        qr->_resultFlags() = queryResultFlags;
         qr->len = b.len();
         qr->setOperation(opReply);
         qr->cursorId = cursorId;
@@ -234,7 +252,7 @@ namespace mongo {
         QueryResult* msgdata = (QueryResult *) b.buf();
         b.decouple();
         QueryResult *qr = msgdata;
-        qr->resultFlags() = queryResultFlags;
+        qr->_resultFlags() = queryResultFlags;
         qr->len = b.len();
         qr->setOperation(opReply);
         qr->cursorId = 0;
