@@ -13,16 +13,16 @@ d = t.find().sort( { i: -1 } ).limit( 2 );
 d.next();
 d.next();
 
-for( i = 20; i < 40; ++i ) {
+for( i = 20; t.findOne( { i:19 } ); ++i ) {
     t.save( { i : i } );
 }
-assert( !t.findOne( { i : 19 } ) );
-assert( !c.hasNext() );
-assert( !d.hasNext() );
-assert( t.find().sort( { i : 1 } ).hint( { i : 1 } ).toArray().length > 10 );
+//assert( !t.findOne( { i : 19 } ), "A" );
+assert( !c.hasNext(), "B" );
+assert( !d.hasNext(), "C" );
+assert( t.find().sort( { i : 1 } ).hint( { i : 1 } ).toArray().length > 10, "D" );
 
-assert( t.findOne( { i : 38 } ) );
-t.remove( { i : 38 } );
-assert( db.getLastError().indexOf( "capped" ) >= 0 );
+assert( t.findOne( { i : i - 1 } ), "E" );
+t.remove( { i : i - 1 } );
+assert( db.getLastError().indexOf( "capped" ) >= 0, "F" );
 
-assert( t.validate().valid );
+assert( t.validate().valid, "G" );
