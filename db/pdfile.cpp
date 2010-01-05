@@ -134,7 +134,10 @@ namespace mongo {
             assert( size <= 0x7fffffff );
             for ( int i = 0; i < nExtents; ++i ) {
                 assert( size <= 0x7fffffff );
-                database->allocExtent( ns, (int) size, newCapped );
+                // $nExtents is just for testing - always allocate new extents
+                // rather than reuse existing extents so we have some predictibility
+                // in the extent size used by our tests
+                database->suitableFile( size )->createExtent( ns, (int) size, newCapped );
             }
         } else {
             while ( size > 0 ) {
