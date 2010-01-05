@@ -494,7 +494,13 @@ namespace mongo {
         
         BSONObj JSRand( const BSONObj &a ) {
             uassert( 12519, "rand accepts no arguments", a.nFields() == 0 );
-            return BSON( "" << double( rand_r( &_randomSeed ) ) / ( double( RAND_MAX ) + 1 ) );
+            unsigned r;
+#if !defined(_WIN32)
+            r = rand_r( &_randomSeed );
+#else
+            r = rand(); // seed not used in this case
+#endif
+            return BSON( "" << double( r ) / ( double( RAND_MAX ) + 1 ) );
         }
         
         void installShellUtils( Scope& scope ){
