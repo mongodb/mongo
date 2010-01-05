@@ -11,15 +11,15 @@ for( i in params ) {
     t.add( ParallelTester.fileTester, params[ i ] );
 }
 
-//for( var i = 4; i < 8; ++i ) {
-//    var g = new EventGenerator( i, "jstests_parallel_basicPlus", Random.randInt( 20 ) );
-//    for( var j = ( i - 4 ) * 3000; j < ( i - 3 ) * 3000; ++j ) {
-//        var expected = j - ( ( i - 4 ) * 3000 );
-//        g.addCheckCount( expected, {j:{$gte:(i-4)*3000,$lt:(i-3)*3000}}, expected % 1000 == 0, expected % 500 == 0 );
-//        g.addInsert( {_id:j} );
-//    }
-//    t.add( EventGenerator.dispatch, g.getEvents() );
-//}
+for( var i = 4; i < 8; ++i ) {
+    var g = new EventGenerator( i, "jstests_parallel_basicPlus", Random.randInt( 20 ) );
+    for( var j = ( i - 4 ) * 3000; j < ( i - 3 ) * 3000; ++j ) {
+        var expected = j - ( ( i - 4 ) * 3000 );
+        g.addCheckCount( expected, {_id:{$gte:((i-4)*3000),$lt:((i-3)*3000)}}, expected % 1000 == 0, expected % 500 == 0 );
+        g.addInsert( {_id:j} );
+    }
+    t.add( EventGenerator.dispatch, g.getEvents() );
+}
 
 t.run( "one or more tests failed", true );
 
