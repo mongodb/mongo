@@ -4,21 +4,24 @@ f = db.jstests_parallel_insert;
 f.drop();
 f.ensureIndex( {me:1} );
 
-// would be nice to configure and log a random seed so we can reproduce
-// behavior.  Seems like that's impossible using Math.random(), though :(
+seed = new Date().getTime();
+print( "random seed: " + seed );
+srand( seed );
 
 expTimeout = function( mean ) {
-    return -Math.log( Math.random() ) * mean;
+    return -Math.log( rand() ) * mean;
 }
 
-test = function( mean, me ) {
+test = function() {
+    args = argumentsToArray( arguments );
+    var me = args.shift();
     var m = new Mongo( db.getMongo().host );
     var t = m.getDB( "test" ).jstests_parallel_insert;
-    for( var i = 0; i < 1000; ++i ) {
-        sleep( expTimeout( mean ) );
+    for( var i in args ) {
+        sleep( args[ i ] );
         if ( i % 50 == 0 ) {
             assert.eq( i, t.count( { who:me } ) );
-            print( me + " " + i );
+//            print( me + " " + i );
         }
         t.save( { i:i, who:me } );
     }
@@ -26,7 +29,11 @@ test = function( mean, me ) {
 
 argvs = new Array();
 for( i = 0; i < 10; ++i ) {
-    argvs.push( [ Math.random() * 20, i ] );
+    argvs.push( [ i ] );
+    var mean = rand() * 20;
+    for( j = 0; j < 1000; ++j ) {
+        argvs[ argvs.length - 1 ].push( expTimeout( mean ) );
+    }
 }
 
 assert.parallelTests( test, argvs, "one or more tests failed" );
