@@ -9,7 +9,7 @@ Random.setRandomSeed();
 t = new ParallelTester();
 
 for( id = 0; id < 10; ++id ) {
-    var g = new EventGenerator( id, "jstests_parallel_insert", Random.rand() * 20 );
+    var g = new EventGenerator( id, "jstests_parallel_insert", Random.randInt( 20 ) );
     for( j = 0; j < 1000; ++j ) {
         if ( j % 50 == 0 ) {
             g.addCheckCount( j, {who:id} );

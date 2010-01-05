@@ -204,7 +204,7 @@ Array.unique = function( a ){
 
 Array.shuffle = function( arr ){
     for ( var i=0; i<arr.length-1; i++ ){
-        var pos = i+Math.floor(Random.rand()*(arr.length-i));
+        var pos = i+Random.randInt(arr.length-i);
         var save = arr[i];
         arr[i] = arr[pos];
         arr[pos] = save;
@@ -394,9 +394,14 @@ if ( typeof _threadInject != "undefined" ){
         this._add( "t.update( " + tojson( objOld ) + ", " + tojson( objNew ) + " )" );
     }
     
-    EventGenerator.prototype.addCheckCount = function( count, query ) {
+    EventGenerator.prototype.addCheckCount = function( count, query, shouldPrint ) {
         query = query || {};
-        this._add( "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) ); print( me + ' ' + " + count + " );" );
+        shouldPrint = shouldPrint || false;
+        var action = "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) );"
+        if ( shouldPrint ) {
+            action += " print( me + ' ' + " + count + " );";
+        }
+        this._add( action );
     }
     
     EventGenerator.prototype.getEvents = function() {
@@ -433,7 +438,8 @@ if ( typeof _threadInject != "undefined" ){
     }
     
     // creates lists of tests from jstests dir in a format suitable for use by
-    // ParallelTester.fileTester
+    // ParallelTester.fileTester.  The lists will be in random order.
+    // n: number of lists to split these tests into
     ParallelTester.createJstestsLists = function( n ) {
         var params = new Array();
         for( var i = 0; i < n; ++i ) {
@@ -866,9 +872,14 @@ Math.sigFig = function( x , N ){
 
 Random = function() {}
 
+// set random seed
 Random.srand = function( s ) { _srand( s ); }
 
+// random number 0 <= r < 1
 Random.rand = function() { return _rand(); }
+
+// random integer 0 <= r < n
+Random.randInt = function( n ) { return Math.floor( Random.rand() * n ); }
 
 Random.setRandomSeed = function( s ) {
     s = s || new Date().getTime();
