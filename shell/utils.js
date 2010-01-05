@@ -372,21 +372,127 @@ if ( typeof _threadInject != "undefined" ){
         return t;
     }    
 
+    // Helper class to generate a list of events which may be executed by a ParallelTester
+    EventGenerator = function( me, collectionName, mean ) {
+        this.mean = mean;
+        this.events = new Array( me, collectionName );
+    }
+    
+    EventGenerator.prototype._add = function( action ) {
+        this.events.push( [ Random.genExp( this.mean ), action ] );
+    }
+    
+    EventGenerator.prototype.addInsert = function( obj ) {
+        this._add( "t.insert( " + tojson( obj ) + " )" );
+    }
+
+    EventGenerator.prototype.addRemove = function( obj ) {
+        this._add( "t.remove( " + tojson( obj ) + " )" );
+    }
+
+    EventGenerator.prototype.addUpdate = function( objOld, objNew ) {
+        this._add( "t.update( " + tojson( objOld ) + ", " + tojson( objNew ) + " )" );
+    }
+    
+    EventGenerator.prototype.addCheckCount = function( count, query ) {
+        query = query || {};
+        this._add( "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) ); print( me + ' ' + " + count + " );" );
+    }
+    
+    EventGenerator.prototype.getEvents = function() {
+        return this.events;
+    }
+    
+    EventGenerator.dispatch = function() {
+        var args = argumentsToArray( arguments );
+        var me = args.shift();
+        var collectionName = args.shift();
+        var m = new Mongo( db.getMongo().host );
+        var t = m.getDB( "test" )[ collectionName ];
+        for( var i in args ) {
+            sleep( args[ i ][ 0 ] );
+            eval( args[ i ][ 1 ] );
+        }
+    }
+    
     // Helper class for running tests in parallel.  It assembles a set of tests
     // and then calls assert.parallelests to run them.
     ParallelTester = function() {
-        _params = new Array();
+        this.params = new Array();
     }
     
     ParallelTester.prototype.add = function( fun, args ) {
         args = args || [];
         args.unshift( fun );
-        _params.push( args );
+        this.params.push( args );
     }
     
     ParallelTester.prototype.run = function( msg, newScopes ) {
         newScopes = newScopes || false;
-        assert.parallelTests( _params, msg, newScopes );
+        assert.parallelTests( this.params, msg, newScopes );
+    }
+    
+    // creates lists of tests from jstests dir in a format suitable for use by
+    // ParallelTester.fileTester
+    ParallelTester.createJstestsLists = function( n ) {
+        var params = new Array();
+        for( var i = 0; i < n; ++i ) {
+            params.push( [] );
+        }
+
+        var makeKeys = function( a ) {
+            var ret = {};
+            for( var i in a ) {
+                ret[ a[ i ] ] = 1;
+            }
+            return ret;
+        }
+        
+        // some tests can't run in parallel with most others
+        var skipTests = makeKeys( [ "jstests/dbadmin.js",
+                                   "jstests/repair.js",
+                                   "jstests/cursor8.js",
+                                   "jstests/recstore.js",
+                                   "jstests/extent.js",
+                                   "jstests/indexb.js",
+                                   "jstests/profile1.js"] );
+        
+        // some tests can't be run in parallel with each other
+        var serialTestsArr = [ "jstests/fsync.js",
+                              "jstests/fsync2.js" ];
+        var serialTests = makeKeys( serialTestsArr );
+        
+        params[ 0 ] = serialTestsArr;
+        
+        var files = listFiles("jstests");
+        files = Array.shuffle( files );
+        
+        var i = 0;
+        files.forEach(
+                      function(x) {
+                      
+                      if ( /_runner/.test(x.name) ||
+                          /_lodeRunner/.test(x.name) ||
+                          ( x.name in skipTests ) ||
+                          ( x.name in serialTests ) ||
+                          ! /\.js$/.test(x.name ) ){ 
+                      print(" >>>>>>>>>>>>>>> skipping " + x.name);
+                      return;
+                      }
+                      
+                      params[ i % n ].push( x.name );
+                      ++i;
+                      }
+        );
+        
+        // randomize ordering of the serialTests
+        params[ 0 ] = Array.shuffle( params[ 0 ] );
+        
+        for( var i in params ) {
+            params[ i ].unshift( i );
+        }
+        
+        return params;
     }
     
     // runs a set of test files
