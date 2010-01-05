@@ -1,12 +1,10 @@
 // perform basic js tests in parallel
 
 var files = listFiles("jstests");
-var i = 0;
-var argvs = new Array( [{0:[]}], [{1:[]}], [{2:[]}], [{3:[]}] );
 
-seed = new Date().getTime();
-print( "random seed: " + seed );
-srand( seed );
+var params = new Array( [], [], [], [] );
+
+Random.setRandomSeed();
 
 makeKeys = function( a ) {
     var ret = {};
@@ -30,10 +28,11 @@ var serialTestsArr = [ "jstests/fsync.js",
                       "jstests/fsync2.js" ];
 var serialTests = makeKeys( serialTestsArr );
 
-argvs[ 0 ][ 0 ][ 0 ] = serialTestsArr;
+params[ 0 ] = serialTestsArr;
 
 files = Array.shuffle( files );
 
+var i = 0;
 files.forEach(
               function(x) {
               
@@ -46,25 +45,19 @@ files.forEach(
               return;
               }
               
-              argvs[ i % 4 ][0][ i % 4 ].push( x.name );
+              params[ i % 4 ].push( x.name );
               ++i;
               }
 );
 
 // randomize ordering of the serialTests
-argvs[ 0 ][ 0 ][ 0 ] = Array.shuffle( argvs[ 0 ][ 0 ][ 0 ] );
+params[ 0 ] = Array.shuffle( params[ 0 ] );
 
-test = function() {
-    var args = argumentsToArray( arguments )[ 0 ];
-    var suite = Object.keySet( args )[ 0 ];
-    var args = args[ suite ];
-    args.forEach(
-                  function( x ) {
-                  print("         S" + suite + " Test : " + x + " ...");
-                  var time = Date.timeFunc( function() { load(x); }, 1);
-                  print("         S" + suite + " Test : " + x + " " + time + "ms" );
-                  }
-                  );
+t = new ParallelTester();
+
+for( var i in params ) {
+    params[ i ].unshift( i );
+    t.add( ParallelTester.fileTester, params[ i ] );
 }
 
-assert.parallelTests( test, argvs, "one or more tests failed", true );
+t.run( "one or more tests failed", true );

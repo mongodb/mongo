@@ -204,7 +204,7 @@ Array.unique = function( a ){
 
 Array.shuffle = function( arr ){
     for ( var i=0; i<arr.length-1; i++ ){
-        var pos = i+Math.floor(rand()*(arr.length-i));
+        var pos = i+Math.floor(Random.rand()*(arr.length-i));
         var save = arr[i];
         arr[i] = arr[pos];
         arr[pos] = save;
@@ -372,11 +372,43 @@ if ( typeof _threadInject != "undefined" ){
         return t;
     }    
 
-    // test: test function
-    // argvs: array of argv arrays - test will be called for each entry in argvs in a separate thread
+    // Helper class for running tests in parallel.  It assembles a set of tests
+    // and then calls assert.parallelests to run them.
+    ParallelTester = function() {
+        _params = new Array();
+    }
+    
+    ParallelTester.prototype.add = function( fun, args ) {
+        args = args || [];
+        args.unshift( fun );
+        _params.push( args );
+    }
+    
+    ParallelTester.prototype.run = function( msg, newScopes ) {
+        newScopes = newScopes || false;
+        assert.parallelTests( _params, msg, newScopes );
+    }
+    
+    // runs a set of test files
+    // first argument is an identifier for this tester, remaining arguments are file names
+    ParallelTester.fileTester = function() {
+        var args = argumentsToArray( arguments );
+        var suite = args.shift();
+        args.forEach(
+                     function( x ) {
+                     print("         S" + suite + " Test : " + x + " ...");
+                     var time = Date.timeFunc( function() { load(x); }, 1);
+                     print("         S" + suite + " Test : " + x + " " + time + "ms" );
+                     }
+                     );        
+    }
+    
+    // params: array of arrays, each element of which consists of a function followed
+    // by zero or more arguments to that function.  Each function and its arguments will
+    // be called in a separate thread.
     // msg: failure message
     // newScopes: if true, each thread starts in a fresh scope
-    assert.parallelTests = function( test, argvs, msg, newScopes ) {
+    assert.parallelTests = function( params, msg, newScopes ) {
         newScopes = newScopes || false;
         var wrapper = function( fun, argv ) {
                    eval (
@@ -396,12 +428,14 @@ if ( typeof _threadInject != "undefined" ){
             return z;
         }
         var runners = new Array();
-        for( var i in argvs ) {
+        for( var i in params ) {
+            var param = params[ i ];
+            var test = param.shift();
             var t;
             if ( newScopes )
-                t = new ScopedThread( wrapper( test, argvs[ i ] ) );
+                t = new ScopedThread( wrapper( test, param ) );
             else
-                t = new Thread( wrapper( test, argvs[ i ] ) );
+                t = new Thread( wrapper( test, param ) );
             runners.push( t );
         }
         
@@ -724,3 +758,19 @@ Math.sigFig = function( x , N ){
     return Math.round(x*p)/p;
 }
 
+Random = function() {}
+
+Random.srand = function( s ) { _srand( s ); }
+
+Random.rand = function() { return _rand(); }
+
+Random.setRandomSeed = function( s ) {
+    s = s || new Date().getTime();
+    print( "setting random seed: " + s );
+    Random.srand( s );
+}
+
+// generate a random value from the exponential distribution with the specified mean
+Random.genExp = function( mean ) {
+    return -Math.log( Random.rand() ) * mean;
+}

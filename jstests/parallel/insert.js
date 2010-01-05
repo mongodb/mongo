@@ -4,16 +4,12 @@ f = db.jstests_parallel_insert;
 f.drop();
 f.ensureIndex( {me:1} );
 
-seed = new Date().getTime();
-print( "random seed: " + seed );
-srand( seed );
+Random.setRandomSeed();
 
-expTimeout = function( mean ) {
-    return -Math.log( rand() ) * mean;
-}
+t = new ParallelTester();
 
 test = function() {
-    args = argumentsToArray( arguments );
+    var args = argumentsToArray( arguments );
     var me = args.shift();
     var m = new Mongo( db.getMongo().host );
     var t = m.getDB( "test" ).jstests_parallel_insert;
@@ -21,21 +17,21 @@ test = function() {
         sleep( args[ i ] );
         if ( i % 50 == 0 ) {
             assert.eq( i, t.count( { who:me } ) );
-//            print( me + " " + i );
+            print( me + " " + i );
         }
         t.save( { i:i, who:me } );
     }
 }
 
-argvs = new Array();
 for( i = 0; i < 10; ++i ) {
-    argvs.push( [ i ] );
-    var mean = rand() * 20;
+    var params = [ i ];
+    var mean = Random.rand() * 20;
     for( j = 0; j < 1000; ++j ) {
-        argvs[ argvs.length - 1 ].push( expTimeout( mean ) );
+        params.push( Random.genExp( mean ) );
     }
+    t.add( test, params );
 }
 
-assert.parallelTests( test, argvs, "one or more tests failed" );
+t.run( "one or more tests failed" );
 
 assert( f.validate().valid );
