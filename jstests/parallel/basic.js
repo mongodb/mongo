@@ -2,7 +2,7 @@
 
 var files = listFiles("jstests");
 var i = 0;
-var argvs = new Array( [{0:[]}], [{1:[]}], [{2:[]}], [{3:[]}], [{4:[]}] );
+var argvs = new Array( [{0:[]}], [{1:[]}], [{2:[]}], [{3:[]}] );
 
 seed = new Date().getTime();
 print( "random seed: " + seed );
@@ -30,7 +30,7 @@ var serialTestsArr = [ "jstests/fsync.js",
                       "jstests/fsync2.js" ];
 var serialTests = makeKeys( serialTestsArr );
 
-//argvs[ 4 ][ 0 ][ 0 ] = serialTestsArr;
+argvs[ 0 ][ 0 ][ 0 ] = serialTestsArr;
 
 files = Array.shuffle( files );
 
@@ -50,6 +50,9 @@ files.forEach(
               ++i;
               }
 );
+
+// randomize ordering of the serialTests
+argvs[ 0 ][ 0 ][ 0 ] = Array.shuffle( argvs[ 0 ][ 0 ][ 0 ] );
 
 test = function() {
     var args = argumentsToArray( arguments )[ 0 ];
