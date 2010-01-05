@@ -392,11 +392,12 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 		node = NULL;
 		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
 			node = &(huffman->nodes[i]);
-			if (node->valid && node->symbol == symbol)
+			if (node->valid &&
+			    node->symbol == symbol && node->codeword_length > 0)
 				break;
 		}
 
-		if (node != NULL && node->symbol == symbol) {
+		if (node != NULL) {
 			/*
 			 * We've got the leaf node, at index 'i'.  Now we fill
 			 * the output buffer in back order.
@@ -465,11 +466,12 @@ __wt_huffman_encode(void *huffman_arg,
 		node = NULL;
 		for (j = 0; j < n; ++j) {
 			node = &(huffman->nodes[j]);
-			if (node->valid && node->symbol == symbol)
+			if (node->valid &&
+			    node->symbol == symbol && node->codeword_length > 0)
 				break;
 		}
 
-		if (node != NULL && node->symbol == symbol) {
+		if (node != NULL) {
 			/*
 			 * We've got the leaf node, at index 'j'.  Now we fill
 			 * the output buffer in back order.
