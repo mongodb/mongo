@@ -204,7 +204,7 @@ Array.unique = function( a ){
 
 Array.shuffle = function( arr ){
     for ( var i=0; i<arr.length-1; i++ ){
-        var pos = i+Math.floor(Math.random()*(arr.length-i));
+        var pos = i+Math.floor(rand()*(arr.length-i));
         var save = arr[i];
         arr[i] = arr[pos];
         arr[pos] = save;
