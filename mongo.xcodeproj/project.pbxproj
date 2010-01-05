@@ -472,6 +472,11 @@
 		93BCE16010F2642900FA139B /* database.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = database.cpp; path = db/database.cpp; sourceTree = "<group>"; };
 		93BCE16110F2642900FA139B /* dbcommands_admin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = dbcommands_admin.cpp; path = db/dbcommands_admin.cpp; sourceTree = "<group>"; };
 		93BCE1D310F26CDA00FA139B /* fsync2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fsync2.js; sourceTree = "<group>"; };
+		93BCE35F10F2BD8300FA139B /* clienttests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = clienttests.cpp; sourceTree = "<group>"; };
+		93BCE36010F2BD8300FA139B /* framework.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = framework.cpp; sourceTree = "<group>"; };
+		93BCE36110F2BD8300FA139B /* framework.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = framework.h; sourceTree = "<group>"; };
+		93BCE36210F2BD8300FA139B /* threadedtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = threadedtests.cpp; sourceTree = "<group>"; };
+		93BCE36310F2BD8300FA139B /* updatetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = updatetests.cpp; sourceTree = "<group>"; };
 		93C38E940FA66622007D6E4A /* basictests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basictests.cpp; sourceTree = "<group>"; };
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
@@ -601,6 +606,11 @@
 		934223850EF16D7000608550 /* dbtests */ = {
 			isa = PBXGroup;
 			children = (
+				93BCE35F10F2BD8300FA139B /* clienttests.cpp */,
+				93BCE36010F2BD8300FA139B /* framework.cpp */,
+				93BCE36110F2BD8300FA139B /* framework.h */,
+				93BCE36210F2BD8300FA139B /* threadedtests.cpp */,
+				93BCE36310F2BD8300FA139B /* updatetests.cpp */,
 				93BC2AE10FB87662006BC285 /* cursortests.cpp */,
 				93BC2AE20FB87662006BC285 /* jstests.cpp */,
 				93C38E940FA66622007D6E4A /* basictests.cpp */,
