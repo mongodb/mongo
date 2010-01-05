@@ -478,6 +478,7 @@
 		93BCE36310F2BD8300FA139B /* updatetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = updatetests.cpp; sourceTree = "<group>"; };
 		93BCE41810F3AF1B00FA139B /* capped2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped2.js; sourceTree = "<group>"; };
 		93BCE4B510F3C8DB00FA139B /* allops.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = allops.js; sourceTree = "<group>"; };
+		93BCE5A510F3F8E900FA139B /* manyclients.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = manyclients.js; sourceTree = "<group>"; };
 		93C38E940FA66622007D6E4A /* basictests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basictests.cpp; sourceTree = "<group>"; };
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
@@ -1167,6 +1168,7 @@
 		93F0956F10E165E50053380C /* parallel */ = {
 			isa = PBXGroup;
 			children = (
+				93BCE5A510F3F8E900FA139B /* manyclients.js */,
 				93BCE4B510F3C8DB00FA139B /* allops.js */,
 				93AEC57A10E94749005DF720 /* insert.js */,
 				93F095CC10E16FF70053380C /* shellfork.js */,
