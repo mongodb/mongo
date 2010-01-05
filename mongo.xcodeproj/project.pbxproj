@@ -139,7 +139,7 @@
 		934BEBB310DFFA9600178102 /* basicb.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basicb.js; sourceTree = "<group>"; };
 		934BEBB410DFFA9600178102 /* capped.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped.js; sourceTree = "<group>"; };
 		934BEBB510DFFA9600178102 /* capped1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped1.js; sourceTree = "<group>"; };
-		934BEBB610DFFA9600178102 /* capped2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped2.js; sourceTree = "<group>"; };
+		934BEBB610DFFA9600178102 /* btree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = btree.h; sourceTree = "<group>"; };
 		934BEBB710DFFA9600178102 /* capped3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped3.js; sourceTree = "<group>"; };
 		934BEBB810DFFA9600178102 /* capped4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped4.js; sourceTree = "<group>"; };
 		934BEBBA10DFFA9600178102 /* clonecollection.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = clonecollection.js; sourceTree = "<group>"; };
@@ -477,6 +477,7 @@
 		93BCE36110F2BD8300FA139B /* framework.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = framework.h; sourceTree = "<group>"; };
 		93BCE36210F2BD8300FA139B /* threadedtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = threadedtests.cpp; sourceTree = "<group>"; };
 		93BCE36310F2BD8300FA139B /* updatetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = updatetests.cpp; sourceTree = "<group>"; };
+		93BCE41810F3AF1B00FA139B /* capped2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped2.js; sourceTree = "<group>"; };
 		93C38E940FA66622007D6E4A /* basictests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = basictests.cpp; sourceTree = "<group>"; };
 		93D0C1520EF1D377005253B7 /* jsobjtests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsobjtests.cpp; sourceTree = "<group>"; };
 		93D0C1FB0EF1E267005253B7 /* namespacetests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = namespacetests.cpp; sourceTree = "<group>"; };
@@ -725,6 +726,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93BCE41810F3AF1B00FA139B /* capped2.js */,
 				93BCE1D310F26CDA00FA139B /* fsync2.js */,
 				93BCE15610F25DFE00FA139B /* arrayfind1.js */,
 				93BCE15710F25DFE00FA139B /* dbadmin.js */,
@@ -761,7 +763,7 @@
 				934BEBB310DFFA9600178102 /* basicb.js */,
 				934BEBB410DFFA9600178102 /* capped.js */,
 				934BEBB510DFFA9600178102 /* capped1.js */,
-				934BEBB610DFFA9600178102 /* capped2.js */,
+				934BEBB610DFFA9600178102 /* btree.h */,
 				934BEBB710DFFA9600178102 /* capped3.js */,
 				934BEBB810DFFA9600178102 /* capped4.js */,
 				934BEBB910DFFA9600178102 /* clone */,
