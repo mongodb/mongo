@@ -19,7 +19,7 @@ for( id = 0; id < 10; ++id ) {
                 g.addRemove( { _id:Random.randInt( 1000 ) } );
                 break;
             case 2: // update
-                g.addUpdate( {}, { _id:Random.randInt( 1000 ) } );
+                g.addUpdate( {_id:{$lt:1000}}, { _id:Random.randInt( 1000 ) } );
                 break;
             default:
                 assert( false, "Invalid op code" );
@@ -29,8 +29,8 @@ for( id = 0; id < 10; ++id ) {
 }
 
 var g = new EventGenerator( id, "jstests_parallel_allops", Random.randInt( 5 ) );
-for( var j = 1000; j < 5000; ++j ) {
-    g.addCheckCount( j - 1000, { _id: {$gte:1000} }, j % 100 == 0 );
+for( var j = 1000; j < 3000; ++j ) {
+    g.addCheckCount( j - 1000, { _id: {$gte:1000} }, j % 100 == 0, j % 500 == 0 );
     g.addInsert( {_id:j} );
 }
 t.add( EventGenerator.dispatch, g.getEvents() );

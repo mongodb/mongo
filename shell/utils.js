@@ -394,10 +394,14 @@ if ( typeof _threadInject != "undefined" ){
         this._add( "t.update( " + tojson( objOld ) + ", " + tojson( objNew ) + " )" );
     }
     
-    EventGenerator.prototype.addCheckCount = function( count, query, shouldPrint ) {
+    EventGenerator.prototype.addCheckCount = function( count, query, shouldPrint, checkQuery ) {
         query = query || {};
         shouldPrint = shouldPrint || false;
+        checkQuery = checkQuery || false;
         var action = "assert.eq( " + count + ", t.count( " + tojson( query ) + " ) );"
+        if ( checkQuery ) {
+            action += " assert.eq( " + count + ", t.find( " + tojson( query ) + " ).toArray().length );"
+        }
         if ( shouldPrint ) {
             action += " print( me + ' ' + " + count + " );";
         }
