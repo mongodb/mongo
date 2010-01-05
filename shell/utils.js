@@ -371,8 +371,11 @@ if ( typeof _threadInject != "undefined" ){
         Thread.apply( t, arguments );
         return t;
     }    
-    
-    // argvs: array of argv arrays - test will be called for each entry in argvs
+
+    // test: test function
+    // argvs: array of argv arrays - test will be called for each entry in argvs in a separate thread
+    // msg: failure message
+    // newScopes: if true, each thread starts in a fresh scope
     assert.parallelTests = function( test, argvs, msg, newScopes ) {
         newScopes = newScopes || false;
         var wrapper = function( fun, argv ) {
@@ -406,8 +409,8 @@ if ( typeof _threadInject != "undefined" ){
         var nFailed = 0;
         runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );
         
-        // v8 doesn't like it if we assert here before all threads joined.  For now,
-        // just avoid that possibility.
+        // v8 doesn't like it if we assert before all threads are joined.  For now,
+        // just avoid that possibility by asserting after threads are joined.
         assert.eq( 0, nFailed, msg );
     }
 }
