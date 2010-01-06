@@ -231,7 +231,7 @@ __wt_msg_stream(FILE *fp,
 void
 __wt_assert(ENV *env, const char *check, const char *file_name, int line_number);
 int
-__wt_api_flags(ENV *env, const char *name);
+__wt_api_args(ENV *env, const char *name);
 int
 __wt_database_format(DB *db);
 int

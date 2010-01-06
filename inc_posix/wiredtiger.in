@@ -400,21 +400,21 @@ char	*wiredtiger_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ALLOCATED					0x00000001
+#define	WT_ASCII_ENGLISH				0x00000008
 #define	WT_CACHE_LOCK_RESTART				0x00000002
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
-#define	WT_ENGLISH					0x00000008
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INITIALIZED					0x00000002
 #define	WT_MODIFIED					0x00000008
-#define	WT_PHONE					0x00000001
 #define	WT_PINNED					0x00000004
 #define	WT_PRINTABLES					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SERVER_SLEEPING				0x00000001
 #define	WT_SORTED_INPUT					0x00000001
+#define	WT_TELEPHONE					0x00000001
 #define	WT_UNFORMATTED					0x00000002
 #define	WT_VERB_ALL					0x00000002
 #define	WT_VERB_FILEOPS					0x00000001
@@ -434,7 +434,6 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
 #define	WT_APIMASK_DB_SYNC				0x00000000
 #define	WT_APIMASK_DB_VERIFY				0x00000000
-#define	WT_APIMASK_DBT					0x00000001
 #define	WT_APIMASK_ENV_CLOSE				0x00000000
 #define	WT_APIMASK_ENV_DB				0x00000000
 #define	WT_APIMASK_ENV_OPEN				0x00000000

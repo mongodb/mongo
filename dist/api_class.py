@@ -403,7 +403,7 @@ methods['db.huffman_set'] = Api(
 	['huffman_table/u_int8_t const *@S',
 	 'huffman_table_size/int @S',
 	 'huffman_flags/u_int32_t @S'],
-	[ 'ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'PHONE' ],
+	[ 'ASCII_ENGLISH', 'HUFFMAN_DATA', 'HUFFMAN_KEY', 'TELEPHONE' ],
 	['init'], ['open'])
 
 methods['db.open'] = Api(

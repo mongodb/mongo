@@ -94,14 +94,15 @@ __wt_assert(ENV *env, const char *check, const char *file_name, int line_number)
 #endif
 
 /*
- * __wt_api_flags --
+ * __wt_api_args --
  *	Print a standard error message when an API function is passed illegal
- *	flags.
+ *	arguments.
  */
 int
-__wt_api_flags(ENV *env, const char *name)
+__wt_api_args(ENV *env, const char *name)
 {
-	__wt_api_env_errx(env, "%s: illegal API flag specified", name);
+	__wt_api_env_errx(env,
+	    "%s: illegal API arguments or flag values specified", name);
 	return (WT_ERROR);
 }
 
