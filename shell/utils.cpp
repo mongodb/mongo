@@ -488,7 +488,7 @@ namespace mongo {
         BSONObj JSSrand( const BSONObj &a ) {
             uassert( 12518, "srand requires a single numeric argument",
                     a.nFields() == 1 && a.firstElement().isNumber() );
-            _randomSeed = a.firstElement().numberInt();
+            _randomSeed = a.firstElement().numberLong(); // grab least significant digits
             return undefined_;
         }
         
@@ -510,8 +510,8 @@ namespace mongo {
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "version" , JSVersion );
             scope.injectNative( "hex_md5" , jsmd5 );
-            scope.injectNative( "srand" , JSSrand );
-            scope.injectNative( "rand" , JSRand );
+            scope.injectNative( "_srand" , JSSrand );
+            scope.injectNative( "_rand" , JSRand );
 #if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );

@@ -17,7 +17,12 @@ function checkIncreasing( i ) {
     assert( res.hasNext(), "A" );
     var j = i;
     while( res.hasNext() ) {
-      	assert.eq( val[ j-- ].a, res.next().a, "B" );
+        try {
+             assert.eq( val[ j-- ].a, res.next().a, "B" );
+        } catch( e ) {
+            debug( "capped2 err " + j );
+            throw e;
+        }
     }
     res = tzz.find().sort( { $natural: 1 } );
     assert( res.hasNext(), "C" );
