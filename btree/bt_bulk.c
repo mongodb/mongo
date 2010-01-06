@@ -836,11 +836,9 @@ err:	/* Discard the parent page. */
 static int
 __wt_bt_dbt_copy(ENV *env, DBT *orig, DBT *copy)
 {
-	if (copy->data == NULL || copy->data_len < orig->size) {
+	if (copy->data == NULL || copy->data_len < orig->size)
 		WT_RET(__wt_realloc(
-		    env, copy->data_len, orig->size, &copy->data));
-		copy->data_len = orig->size;
-	}
+		    env, &copy->data_len, orig->size, &copy->data));
 	memcpy(copy->data, orig->data, copy->size = orig->size);
 
 	return (0);
