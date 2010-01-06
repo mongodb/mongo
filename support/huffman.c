@@ -493,7 +493,7 @@ __wt_huffman_encode(void *huffman_arg,
 
 	/*
 	 * At this point, bitpos is the total number of used bits (including
-	 * the 3 bit at the beginning of the buffer, which we'll set now to
+	 * the 3 bits at the beginning of the buffer, which we'll set now to
 	 * the number of bits used in the last byte).
 	 */
 	padding_info = (bitpos % 8) << 5;
