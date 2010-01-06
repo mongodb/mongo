@@ -1,7 +1,7 @@
 t = db.many;
 
 t.drop();
-db.bar.drop();
+db.many2.drop();
 
 t.save({x:9});
 t.save({x:19});
@@ -27,8 +27,8 @@ assert( t.getIndexes().length == 40, "40" );
 
 assert( t.find({x:9}).length() == 1, "b" ) ;
 
-t.renameCollection( "bar" );
+t.renameCollection( "many2" );
 
 assert( t.find({x:9}).length() == 0, "c" ) ;
 
-assert( db.bar.find({x:9}).length() == 1, "d" ) ;
+assert( db.many2.find({x:9}).length() == 1, "d" ) ;
