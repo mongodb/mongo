@@ -278,7 +278,8 @@ namespace mongo {
 
     QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop ) {
         StringBuilder& ss = curop.debug().str;
-        ClientCursor *cc = ClientCursor::find(cursorid);
+        ClientCursor::Pointer p(cursorid);
+        ClientCursor *cc = p._c;
         
         int bufSize = 512;
         if ( cc ){
@@ -311,6 +312,7 @@ namespace mongo {
                         }
                         break;
                     }
+                    p.release();
                     bool ok = ClientCursor::erase(cursorid);
                     assert(ok);
                     cursorid = 0;
