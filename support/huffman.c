@@ -210,7 +210,7 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
  */
 int
 __wt_huffman_open(ENV *env,
-    const u_int8_t *byte_frequency_array, u_int nbytes, void *retp)
+    u_int8_t const *byte_frequency_array, u_int nbytes, void *retp)
 {
 	INDEXED_BYTE *indexed_freqs;
 	NODE_QUEUE *combined_nodes, *leaves;
@@ -485,7 +485,7 @@ __wt_huffman_encode(void *huffman_arg,
 		} else {
 			__wt_api_env_errx(NULL,
 			    "Huffman compression: there was a symbol in the "
-			    "source originally defined with zero frequency; "
+			    "source originally declared with zero frequency; "
 			    "undefined source symbol: %lu", (u_long)symbol);
 			return (WT_ERROR);
 		}

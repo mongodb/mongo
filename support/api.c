@@ -441,12 +441,12 @@ static int __wt_api_db_get_recno(
 static int __wt_api_db_huffman_set(
 	DB *db,
 	u_int8_t const *huffman_table,
-	int huffman_table_size,
+	u_int huffman_table_size,
 	u_int32_t huffman_flags);
 static int __wt_api_db_huffman_set(
 	DB *db,
 	u_int8_t const *huffman_table,
-	int huffman_table_size,
+	u_int huffman_table_size,
 	u_int32_t huffman_flags)
 {
 	ENV *env;
@@ -926,7 +926,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
-	    (DB *, u_int8_t const *, int , u_int32_t ))
+	    (DB *, u_int8_t const *, u_int , u_int32_t ))
 	    __wt_db_lockout;
 	db->open = (int (*)
 	    (DB *, const char *, mode_t , u_int32_t ))
@@ -996,7 +996,7 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
-	    (DB *, u_int8_t const *, int , u_int32_t ))
+	    (DB *, u_int8_t const *, u_int , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
 	db->dump = __wt_api_db_dump;

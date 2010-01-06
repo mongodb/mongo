@@ -246,7 +246,7 @@ struct __db {
 	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
 
 	int (*huffman_set)(
-	    DB *, u_int8_t const *, int , u_int32_t );
+	    DB *, u_int8_t const *, u_int , u_int32_t );
 
 	int (*open)(
 	    DB *, const char *, mode_t , u_int32_t );

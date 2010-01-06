@@ -108,7 +108,7 @@ int
 __wt_db_lockout_open(DB *db);
 int
 __wt_db_huffman_set(DB *db,
-    u_int8_t const *huffman_table, int huffman_table_size, u_int32_t flags);
+    u_int8_t const *huffman_table, u_int huffman_table_size, u_int32_t flags);
 int
 __wt_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags);
 int
@@ -242,7 +242,7 @@ int
 __wt_env_lockout(ENV *env);
 int
 __wt_huffman_open(ENV *env,
-    const u_int8_t *byte_frequency_array, u_int nbytes, void *retp);
+    u_int8_t const *byte_frequency_array, u_int nbytes, void *retp);
 void
 __wt_huffman_close(ENV *env, void *huffman_arg);
 int

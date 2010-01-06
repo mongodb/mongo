@@ -159,11 +159,11 @@ static u_int8_t const __wt_huffman_ascii_english[256] = {
  */
 int
 __wt_db_huffman_set(DB *db,
-    u_int8_t const *huffman_table, int huffman_table_size, u_int32_t flags)
+    u_int8_t const *huffman_table, u_int huffman_table_size, u_int32_t flags)
 {
 	ENV *env;
 	IDB *idb;
-	char phone[256];
+	u_int8_t phone[256];
 
 	env = db->env;
 	idb = db->idb;
