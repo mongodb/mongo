@@ -209,8 +209,8 @@ setup()
 	assert(db->btree_pagesize_set(
 	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
 	if (huffman)
-		assert(db->huffman_set(db,
-		    NULL, 0, WT_ENGLISH|WT_HUFFMAN_DATA|WT_HUFFMAN_KEY) == 0);
+		assert(db->huffman_set(db, NULL, 0,
+		    WT_ASCII_ENGLISH|WT_HUFFMAN_DATA|WT_HUFFMAN_KEY) == 0);
 	assert(db->open(db, MYDB, 0660, WT_CREATE) == 0);
 }
 
