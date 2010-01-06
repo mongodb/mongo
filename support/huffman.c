@@ -451,8 +451,12 @@ __wt_huffman_encode(void *huffman_arg,
 		return (WT_TOOSMALL);
 	memset(to, 0, len_to);
 
-	n = 1 << huffman->max_depth;
+	/*
+	 * Leave the first 3 bits of the encoded value empty, it holds the
+	 * number of bits actually used in the last byte of the encoded value.
+	 */
 	bitpos = 3;
+	n = 1 << huffman->max_depth;
 	for (i = 0; i < len_from; i += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
 		if (huffman->numBytes == 1)
@@ -494,7 +498,11 @@ __wt_huffman_encode(void *huffman_arg,
 	/*
 	 * At this point, bitpos is the total number of used bits (including
 	 * the 3 bits at the beginning of the buffer, which we'll set now to
-	 * the number of bits used in the last byte).
+	 * the number of bits used in the last byte).   Note if the number of
+	 * bits used in the last byte is 8, we set the 3 bits to 0, in other
+	 * words, the first 3 bits of the encoded value are the number of bits
+	 * used in the last byte, unless they're 0, in which case there are 8
+	 * bits used in the last byte.
 	 */
 	padding_info = (bitpos % 8) << 5;
 	*to |= padding_info;
@@ -530,9 +538,14 @@ __wt_huffman_decode(void *huffman_arg,
 	bytes = 0;
 	node_idx = 0;
 
-	/* This is the number of used bits in the last byte. */
+	/*
+	 * The first 3 bits are the number of used bits in the last byte, unless
+	 * they're 0, in which case there are 8 bits used in the last byte.
+	 */
 	padding_info = (*from & 0xE0) >> 5;
-	len_from_bits = ((len_from - 1) * 8) + padding_info;
+	len_from_bits = len_from * 8;
+	if (padding_info != 0)
+		len_from_bits -= 8 - padding_info;
 
 	/*
 	 * The loop will go through each bit of the source stream, its length
