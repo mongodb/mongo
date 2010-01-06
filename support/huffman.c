@@ -138,13 +138,13 @@ traverse_tree(
     WT_FREQTREE_NODE *node, u_int16_t current_length, u_int16_t *max_depth)
 {
 	/* Recursively traverse the tree */
-	if (node->left)
+	if (node->left != NULL)
 		traverse_tree(node->left, current_length + 1, max_depth);
-	if (node->right)
+	if (node->right != NULL)
 		traverse_tree(node->right, current_length + 1, max_depth);
 
 	/* If this is a leaf: */
-	if (!node->left && !node->right) {
+	if (node->left == NULL && node->right == NULL) {
 		/*
 		 * Setting the leaf's codeword length (for inner nodes, it
 		 * is always 0!)
@@ -152,7 +152,7 @@ traverse_tree(
 		node->codeword_length = current_length;
 
 		/* Store the new maximal depth. */
-		if (*max_depth < (current_length + 1))
+		if (*max_depth < current_length + 1)
 			*max_depth = current_length + 1;
 	}
 }
@@ -171,14 +171,14 @@ fill_static_representation(
 {
 	WT_STATIC_HUFFMAN_NODE *current_target;
 
-	current_target = &(target[idx]);
+	current_target = &target[idx];
 	current_target->symbol = node->symbol;
 	current_target->codeword_length = node->codeword_length;
 	current_target->valid = 1;
 
-	if (node->left)
+	if (node->left != NULL)
 		fill_static_representation(target, node->left, idx * 2 + 1);
-	if (node->right)
+	if (node->right != NULL)
 		fill_static_representation(target, node->right, idx * 2 + 2);
 }
 
@@ -304,7 +304,7 @@ __wt_huffman_open(ENV *env,
 		/*
 		 * In every second run, we have both node and node2 initialized.
 		 */
-		if (node && node2) {
+		if (node != NULL && node2) != NULL {
 			WT_ERR(__wt_calloc(
 			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
 
@@ -391,7 +391,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 
 		node = NULL;
 		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
-			node = &(huffman->nodes[i]);
+			node = &huffman->nodes[i];
 			if (node->valid &&
 			    node->symbol == symbol && node->codeword_length > 0)
 				break;
@@ -465,7 +465,7 @@ __wt_huffman_encode(void *huffman_arg,
 		/* Getting the symbol's huffman code from the table */
 		node = NULL;
 		for (j = 0; j < n; ++j) {
-			node = &(huffman->nodes[j]);
+			node = &huffman->nodes[j];
 			if (node->valid &&
 			    node->symbol == symbol && node->codeword_length > 0)
 				break;
@@ -552,7 +552,7 @@ __wt_huffman_decode(void *huffman_arg,
 		else
 			node_idx = (node_idx * 2) + 1;
 
-		node = &(huffman->nodes[node_idx]);
+		node = &huffman->nodes[node_idx];
 
 		/* If this is a leaf, we've found a complete symbol. */
 		if (node->valid && node->codeword_length > 0) {
@@ -624,14 +624,14 @@ node_queue_enqueue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
 	elem->next = NULL;
 
 	/* If the queue is empty, the first element will be the new one. */
-	if (!queue->first)
+	if (queue->first == NULL)
 		queue->first = elem;
 
 	/*
 	 * If the queue is not empty, the last element's next pointer must be
 	 * updated.
 	 */
-	if (queue->last)
+	if (queue->last != NULL)
 		queue->last->next = elem;
 
 	/* The last element is the new one */
