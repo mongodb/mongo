@@ -304,7 +304,7 @@ __wt_huffman_open(ENV *env,
 		/*
 		 * In every second run, we have both node and node2 initialized.
 		 */
-		if (node != NULL && node2) != NULL {
+		if (node != NULL && node2 != NULL) {
 			WT_ERR(__wt_calloc(
 			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
 
