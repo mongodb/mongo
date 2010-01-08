@@ -30,3 +30,13 @@ a.addUser( "super", pass );
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
+db2 = new Mongo( db.getMongo().host ).getDB( db.getName() );
+
+users = db2.getCollection( "system.users" );
+users.remove( {} );
+
+pass = "a" + Math.random();
+
+db2.addUser( "eliot" , pass );
+
+assert.commandFailed( db2.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );

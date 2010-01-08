@@ -88,11 +88,10 @@ assert.eq( 1 , z.b , "C2z" );
 assert.eq( 2 , z.c , "C3z" );
 x.drop();
 
-
-res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
+res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m , reduce : r , query : { x : { "$gt" : 2 } } } );
 d( res );
 assert.eq( 2 , res.counts.input , "B2" );
-assert.eq( "foo" , res.result , "B2-c" );
+assert.eq( "mr1_foo" , res.result , "B2-c" );
 x = db[res.result];
 z = {};
 x.find().forEach( function(a){ z[a[ks]] = a.value.count; } );
@@ -100,8 +99,6 @@ assert.eq( 1 , z.a , "C1a" );
 assert.eq( 1 , z.b , "C2a" );
 assert.eq( 2 , z.c , "C3a" );
 x.drop();
-
-
 
 for ( i=5; i<1000; i++ ){
     t.save( { x : i , tags : [ "b" , "d" ] } );
@@ -156,7 +153,7 @@ if ( true ){
         t.save( { x : i , tags : [ k ] } );
     }
     
-    res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m , reduce : r } );
+    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m , reduce : r } );
     d( res );
     print( "t2: " + res.timeMillis + " (~3500 on 2.8ghz) - itcount: " + Date.timeFunc( function(){ db.mr1.find().itcount(); } ) );
     x = db[res.result];
@@ -168,8 +165,8 @@ if ( true ){
         }
     }
     x.drop();
-
-    res = db.runCommand( { mapreduce : "mr1" , out : "foo" , map : m2 , reduce : r2 } );
+    
+    res = db.runCommand( { mapreduce : "mr1" , out : "mr1_foo" , map : m2 , reduce : r2 } );
     d(res);
     print( "t3: " + res.timeMillis + " (~3500 on 2.8ghz)" );
 }

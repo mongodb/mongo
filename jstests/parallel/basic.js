@@ -1,34 +1,11 @@
 // perform basic js tests in parallel
 
-var files = listFiles("jstests");
-var i = 0;
-var argvs = new Array( [], [], [], [] );
+Random.setRandomSeed();
 
-files.forEach(
-              function(x) {
-              
-              if ( /_runner/.test(x.name) ||
-                  /_lodeRunner/.test(x.name) ||
-                  ! /\.js$/.test(x.name ) ){ 
-              print(" >>>>>>>>>>>>>>> skipping " + x.name);
-              return;
-              }
-
-              argvs[ i++ % 4 ].push( x.name );
-              }
-);
-
-printjson( argvs );
-
-test = function() {
-    var args = argumentsToArray( arguments );
-    args.forEach(
-                  function( x ) {
-                  print("         Test : " + x + " ...");
-                  var time = Date.timeFunc( function() { load(x); }, 1);
-                  print("         Test : " + x + " " + time + "ms" );
-                  }
-                  );
+var params = ParallelTester.createJstestsLists( 4 );
+var t = new ParallelTester();
+for( i in params ) {
+    t.add( ParallelTester.fileTester, params[ i ] );
 }
 
-assert.parallelTests( test, argvs, "one or more tests failed", true );
+t.run( "one or more tests failed", true );

@@ -208,7 +208,7 @@ namespace mongo {
             int nToSkip = (int)(args[4]->ToNumber()->Value());
             {
                 v8::Unlocker u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? Option_SlaveOk : 0 );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );

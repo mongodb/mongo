@@ -77,13 +77,22 @@ namespace mongo {
     */
     class ReplSource {
         bool resync(string db);
+
+        /* pull some operations from the master's oplog, and apply them. */
         bool sync_pullOpLog(int& nApplied);
+
         void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
         auto_ptr<DBClientConnection> conn;
         auto_ptr<DBClientCursor> cursor;
 
+        /* we only clone one database per pass, even if a lot need done.  This helps us
+           avoid overflowing the master's transaction log by doing too much work before going
+           back to read more transactions. (Imagine a scenario of slave startup where we try to
+           clone 100 databases in one pass.)
+        */
         set<string> addDbNextPass;
+
         set<string> incompleteCloneDbs;
 
         ReplSource();
@@ -118,9 +127,16 @@ namespace mongo {
         }
         string only; // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
 
-        /* the last time point we have already synced up to. */
+        /* the last time point we have already synced up to (in the remote/master's oplog). */
         OpTime syncedTo;
-        OpTime lastSavedLocalTs_;
+
+        /* This is for repl pairs.
+           _lastSavedLocalTs is the most recent point in the local log that we know is consistent
+           with the remote log ( ie say the local op log has entries ABCDE and the remote op log 
+           has ABCXY, then _lastSavedLocalTs won't be greater than C until we have reconciled 
+           the DE-XY difference.)
+        */
+        OpTime _lastSavedLocalTs;
 
         int nClonedThisPass;
 

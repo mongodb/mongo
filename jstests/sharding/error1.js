@@ -18,10 +18,10 @@ assert( db.getLastError() , "gle22" );
 
 s.adminCommand( { shardcollection : "test.foo2" , key : { num : 1 } } );
 
-db.foo2.save( { _id : 1 , num : 5 } );
-db.foo2.save( { _id : 2 , num : 10 } );
-db.foo2.save( { _id : 3 , num : 15 } );
-db.foo2.save( { _id : 4 , num : 20 } );
+db.foo2.insert( { _id : 1 , num : 5 } );
+db.foo2.insert( { _id : 2 , num : 10 } );
+db.foo2.insert( { _id : 3 , num : 15 } );
+db.foo2.insert( { _id : 4 , num : 20 } );
 
 s.adminCommand( { split : "test.foo2" , middle : { num : 10 } } );
 s.adminCommand( { movechunk : "test.foo2" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
@@ -30,7 +30,7 @@ assert( a.foo2.count() > 0 && a.foo2.count() < 4 , "se1" );
 assert( b.foo2.count() > 0 && b.foo2.count() < 4 , "se2" );
 assert.eq( 4 , db.foo2.count() , "se3" );
 
-db.foo2.save( { _id : 5 , num : 25 } );
+db.foo2.insert( { _id : 5 , num : 25 } );
 assert( ! db.getLastError() , "se3.5" );
 s.sync();
 assert.eq( 5 , db.foo2.count() , "se4" );

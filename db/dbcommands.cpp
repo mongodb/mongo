@@ -720,10 +720,12 @@ namespace mongo {
 
                 seen.insert( i->c_str() );
             }
-
-            for ( map<string,Database*>::iterator i = databases.begin(); i != databases.end(); i++ ){
-                string name = i->first;
-                name = name.substr( 0 , name.find( ":" ) );
+            
+            // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
+            set<string> allShortNames;
+            dbHolder.getAllShortNames( allShortNames );
+            for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ){
+                string name = *i;
 
                 if ( seen.count( name ) )
                     continue;
@@ -748,18 +750,7 @@ namespace mongo {
         virtual bool slaveOk() { return false; }
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            set< string > dbs;
-            for ( map<string,Database*>::iterator i = databases.begin(); i != databases.end(); i++ ) {
-                string name = i->first;
-                name = name.substr( 0 , name.find( ":" ) );
-                dbs.insert( name );
-            }
-            for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-                setClient( i->c_str() );
-                closeDatabase( i->c_str() );
-            }
-
-            return true;
+            return dbHolder.closeAll( dbpath , result );
         }
     } cmdCloseAllDatabases;
 
@@ -1429,7 +1420,7 @@ namespace mongo {
             }
             else if ( isMaster() ||
                       c->slaveOk() ||
-                      ( c->slaveOverrideOk() && ( queryOptions & Option_SlaveOk ) ) ||
+                      ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
                       fromRepl ){
                 if ( jsobj.getBoolField( "help" ) ) {
                     stringstream help;

@@ -493,7 +493,7 @@ namespace mongo {
             }
         }        
 
-        lastSavedLocalTs_ = OpTime( o.getField( "localLogTs" ).date() );
+        _lastSavedLocalTs = OpTime( o.getField( "localLogTs" ).date() );
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -506,7 +506,7 @@ namespace mongo {
         if ( !syncedTo.isNull() )
             b.appendTimestamp("syncedTo", syncedTo.asDate());
 
-        b.appendTimestamp("localLogTs", lastSavedLocalTs_.asDate());
+        b.appendTimestamp("localLogTs", _lastSavedLocalTs.asDate());
         
         BSONObjBuilder dbsNextPassBuilder;
         int n = 0;
@@ -998,8 +998,8 @@ namespace mongo {
     }
     
     void ReplSource::setLastSavedLocalTs( const OpTime &nextLocalTs ) {
-        lastSavedLocalTs_ = nextLocalTs;
-        log( 3 ) << "updated lastSavedLocalTs_ to: " << lastSavedLocalTs_ << endl;
+        _lastSavedLocalTs = nextLocalTs;
+        log( 3 ) << "updated _lastSavedLocalTs to: " << _lastSavedLocalTs << endl;
     }
     
     void ReplSource::resetSlave() {
@@ -1045,7 +1045,9 @@ namespace mongo {
         return true;
     }
     
-    /* note: not yet in mutex at this point. */
+    /* slave: pull some data from the master's oplog
+       note: not yet in db mutex at this point. 
+    */
     bool ReplSource::sync_pullOpLog(int& nApplied) {
         string ns = string("local.oplog.$") + sourceName();
         log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
@@ -1061,7 +1063,7 @@ namespace mongo {
             dblock lk;
             idTracker.reset();
         }
-        OpTime localLogTail = lastSavedLocalTs_;
+        OpTime localLogTail = _lastSavedLocalTs;
 
         bool initial = syncedTo.isNull();
         
@@ -1096,14 +1098,17 @@ namespace mongo {
             BSONObjBuilder query;
             query.append("ts", q.done());
             if ( !only.empty() ) {
-                // note we may here skip a LOT of data table scanning, a lot of work for the master.
+               // note we may here skip a LOT of data table scanning, a lot of work for the master.
                 query.appendRegex("ns", string("^") + only);
             }
             BSONObj queryObj = query.done();
             // queryObj = { ts: { $gte: syncedTo } }
 
             log(2) << "repl: " << ns << ".find(" << queryObj.toString() << ')' << '\n';
-            cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, Option_CursorTailable | Option_SlaveOk | Option_OplogReplay );
+            cursor = conn->query( ns.c_str(), queryObj, 0, 0, 0, 
+                                  QueryOption_CursorTailable | QueryOption_SlaveOk | QueryOption_OplogReplay |
+                                  QueryOption_AwaitData
+                                  );
             c = cursor.get();
             tailing = false;
         }

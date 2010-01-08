@@ -84,6 +84,11 @@ namespace mongo {
     
     int lockFile = 0;
 
+    // see FSyncCommand:
+    unsigned lockedForWriting; 
+    boost::mutex lockedForWritingMutex;
+    bool unlockRequested = false;
+
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
 
@@ -104,6 +109,11 @@ namespace mongo {
                 }
             }
             b.append("inprog", vals);
+            unsigned x = lockedForWriting;
+            if( x ) {
+                b.append("fsyncLock", x);
+                b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
+            }
         }
 
         replyToQuery(0, m, dbresponse, b.obj());
@@ -128,6 +138,25 @@ namespace mongo {
             else { 
                 obj = fromjson("{\"info\":\"attempting to kill op\"}");
                 killCurrentOp.kill( (unsigned) e.number() );
+            }
+        }
+        replyToQuery(0, m, dbresponse, obj);
+    }
+
+    void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
+        BSONObj obj;
+        AuthenticationInfo *ai = currentClient.get()->ai;
+        if( !ai->isAuthorized("admin") || strncmp(ns, "admin.", 6) != 0 ) { 
+            obj = fromjson("{\"err\":\"unauthorized\"}");
+        }
+        else {
+            if( lockedForWriting ) { 
+				log() << "command: unlock requested" << endl;
+                obj = fromjson("{ok:1,\"info\":\"unlock requested\"}");
+                unlockRequested = true;
+            }
+            else { 
+                obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");
             }
         }
         replyToQuery(0, m, dbresponse, obj);
@@ -188,7 +217,7 @@ namespace mongo {
             msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
-            qr->resultFlags() = QueryResult::ResultFlag_ErrSet;
+            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;
@@ -232,6 +261,10 @@ namespace mongo {
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) { 
                         killOp(m, dbresponse);
+                        return true;
+                    }
+                    if( strstr(ns, "$cmd.sys.unlock") ) { 
+                        unlockFsync(ns, m, dbresponse);
                         return true;
                     }
                 }
@@ -444,7 +477,7 @@ namespace mongo {
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        eraseDatabase( cl, path );
+        dbHolder.erase( cl, path );
         delete database; // closes files
         cc().clearns();
     }
@@ -467,8 +500,8 @@ namespace mongo {
         uassert( 10055 , "update object too large", toupdate.objsize() <= MaxBSONObjectSize);
         assert( toupdate.objsize() < m.data->dataLen() );
         assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
-        bool upsert = flags & Option_Upsert;
-        bool multi = flags & Option_Multi;
+        bool upsert = flags & UpdateOption_Upsert;
+        bool multi = flags & UpdateOption_Multi;
         {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */

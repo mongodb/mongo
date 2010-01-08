@@ -50,7 +50,13 @@ namespace mongo {
         friend class CmdCursorInfo;
         DiskLoc _lastLoc;                        // use getter and setter not this (important)
         unsigned _idleAgeMillis;                 // how long has the cursor been around, relative to server idle time
-        bool _noTimeout;                       // if true, never time out cursor
+
+        /* 0 = normal
+           1 = no timeout allowed
+           100 = in use (pinned) -- see Pointer class
+        */
+        unsigned _pinValue;
+
         bool _doingDeletes;
 
         static CCById clientCursorsById;
@@ -60,6 +66,38 @@ namespace mongo {
         static CursorId allocCursorId_inlock();
 
     public:
+        /* use this to assure we don't in the background time out cursor while it is under use.
+           if you are using noTimeout() already, there is no risk anyway.
+           Further, this mechanism guards against two getMore requests on the same cursor executing
+           at the same time - which might be bad.  That should never happen, but if a client driver
+           had a bug, it could (or perhaps some sort of attack situation).
+        */
+        class Pointer : boost::noncopyable { 
+        public:
+            ClientCursor *_c;
+            void release() {
+                if( _c ) {
+                    assert( _c->_pinValue >= 100 );
+                    _c->_pinValue -= 100;
+                }
+                _c = 0;
+            }
+            Pointer(long long cursorid) {
+                recursive_boostlock lock(ccmutex);
+                _c = ClientCursor::find_inlock(cursorid, true);
+                if( _c ) {
+                    if( _c->_pinValue >= 100 ) {
+                        _c = 0;
+                        uassert(12051, "clientcursor already in use? driver problem?", false);
+                    }
+                    _c->_pinValue += 100;
+                }
+            }
+            ~Pointer() {
+                release();
+            }
+        }; 
+
         /*const*/ CursorId cursorid;
         string ns;
         auto_ptr<CoveredIndexMatcher> matcher;
@@ -67,7 +105,7 @@ namespace mongo {
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
 
-        ClientCursor() : _idleAgeMillis(0), _noTimeout(false), _doingDeletes(false), pos(0) {
+        ClientCursor() : _idleAgeMillis(0), _pinValue(0), _doingDeletes(false), pos(0) {
             recursive_boostlock lock(ccmutex);
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );
@@ -110,13 +148,16 @@ namespace mongo {
     public:
         static ClientCursor* find(CursorId id, bool warn = true) { 
             recursive_boostlock lock(ccmutex);
-            return find_inlock(id, warn);
+            ClientCursor *c = find_inlock(id, warn);
+            assert( c->_pinValue ); // otherwise, not thread safe
+            return c;
         }
 
         static bool erase(CursorId id) {
             recursive_boostlock lock(ccmutex);
             ClientCursor *cc = find_inlock(id);
             if ( cc ) {
+                assert( cc->_pinValue < 100 ); // you can't still have an active ClientCursor::Pointer
                 delete cc;
                 return true;
             }
@@ -144,7 +185,7 @@ namespace mongo {
          */
         bool shouldTimeout( unsigned millis ){
             _idleAgeMillis += millis;
-            return ! _noTimeout && _idleAgeMillis > 600000;
+            return _idleAgeMillis > 600000 && _pinValue == 0;
         }
         
         unsigned idleTime(){
@@ -153,8 +194,10 @@ namespace mongo {
 
         static void idleTimeReport(unsigned millis);
 
-        void noTimeout() {
-            _noTimeout = true;
+        // cursors normally timeout after an inactivy period to prevent excess memory use
+        // setting this prevents timeout of the cursor in question.
+        void noTimeout() { 
+            _pinValue++;
         }
 
         void setDoingDeletes( bool doingDeletes ){
@@ -162,7 +205,6 @@ namespace mongo {
         }
 
         static unsigned byLocSize();        // just for diagnostics
-//        static void idleTimeReport(unsigned millis);
 
         static void informAboutToDeleteBucket(const DiskLoc& b);
         static void aboutToDelete(const DiskLoc& dl);

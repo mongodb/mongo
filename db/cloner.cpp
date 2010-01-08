@@ -92,7 +92,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c;
         {
             dbtemprelease r;
-            c = conn->query( from_collection, query, 0, 0, 0, Option_NoCursorTimeout | ( slaveOk ? Option_SlaveOk : 0 ) );
+            c = conn->query( from_collection, query, 0, 0, 0, QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 ) );
         }
         
         list<BSONObj> storedForLater;
@@ -202,7 +202,7 @@ namespace mongo {
                 } else {
                     conn.reset( new DBDirectClient() );
                 }
-                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? Option_SlaveOk : 0 );
+                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? QueryOption_SlaveOk : 0 );
             }
 
             if ( c.get() == 0 ) {
@@ -332,7 +332,7 @@ namespace mongo {
         {
             dbtemprelease r;
             string logNS = "local.temp.oplog." + string( ns );
-            c = conn->query( logNS.c_str(), Query(), 0, 0, 0, Option_CursorTailable );
+            c = conn->query( logNS.c_str(), Query(), 0, 0, 0, QueryOption_CursorTailable );
         }
         if ( c->more() ) {
             replayOpLog( c.get(), query );

@@ -1,5 +1,5 @@
 
-t = db.foo;
+t = db.jstests_uniqueness;
 
 t.drop();
 

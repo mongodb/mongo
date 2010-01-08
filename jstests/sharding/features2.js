@@ -51,9 +51,9 @@ assert.eq( 0 , db.foo.count() , "D7" );
 
 // --- _id key ---
 
-db.foo2.save( { _id : new ObjectId() } );
-db.foo2.save( { _id : new ObjectId() } );
-db.foo2.save( { _id : new ObjectId() } );
+db.foo2.insert( { _id : new ObjectId() } );
+db.foo2.insert( { _id : new ObjectId() } );
+db.foo2.insert( { _id : new ObjectId() } );
 
 assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 

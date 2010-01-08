@@ -59,6 +59,11 @@ namespace mongo {
         MutexInfo _minfo;
         boost::shared_mutex _m;
         ThreadLocalValue<int> _state;
+
+        /* we use a separate TLS value for releasedEarly - that is ok as 
+           our normal/common code path, we never even touch it.
+        */
+        ThreadLocalValue<bool> _releasedEarly;
     public:
         /**
          * @return
@@ -67,9 +72,13 @@ namespace mongo {
          *    < 0  read lock
          */
         int getState(){ return _state.get(); }
-        void assertWriteLocked() { assert( _state.get() > 0 ); }
+        void assertWriteLocked() { 
+            assert( getState() > 0 ); 
+            DEV assert( !_releasedEarly.get() );
+        }
         bool atLeastReadLocked() { return _state.get() != 0; }
         void assertAtLeastReadLocked() { assert(atLeastReadLocked()); }
+
         void lock() { 
             DEV cout << "LOCK" << endl;
             int s = _state.get();
@@ -89,11 +98,28 @@ namespace mongo {
                 _state.set(s-1);
                 return;
             }
-            assert( s == 1 );
+            if( s != 1 ) { 
+                if( _releasedEarly.get() ) { 
+                    _releasedEarly.set(false);
+                    return;
+                }
+                assert(false); // attempt to unlock when wasn't in a write lock
+            }
             _state.set(0);
             _minfo.leaving();
             _m.unlock(); 
         }
+
+        /* unlock (write lock), and when unlock() is called later, 
+           be smart then and don't unlock it again.
+           */
+        void releaseEarly() {
+            assert( getState() == 1 ); // must not be recursive
+            assert( !_releasedEarly.get() );
+            _releasedEarly.set(true);
+            unlock();
+        }
+
         void lock_shared() { 
             DEV cout << " LOCKSHARED" << endl;
             int s = _state.get();
@@ -135,6 +161,7 @@ namespace mongo {
     class MongoMutex { 
         MutexInfo _minfo;
         boost::recursive_mutex m;
+        ThreadLocalValue<bool> _releasedEarly;
     public:
         MongoMutex() { }
         void lock() { 
@@ -146,13 +173,27 @@ namespace mongo {
             _minfo.entered();
         }
 
-        void unlock() {
+        void releaseEarly() {
+            assertWriteLocked(); // aso must not be recursive, although we don't verify that in the old boost version
+            assert( !_releasedEarly.get() );
+            _releasedEarly.set(true);
+            _unlock();
+        }
+
+        void _unlock() {
             _minfo.leaving();
 #if BOOST_VERSION >= 103500
             m.unlock();
 #else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
 #endif
+        }
+        void unlock() { 
+            if( _releasedEarly.get() ) { 
+                _releasedEarly.set(false);
+                return;
+            }
+            _unlock();
         }
 
         void lock_shared() { lock(); }

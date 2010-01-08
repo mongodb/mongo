@@ -508,7 +508,7 @@ namespace mongo {
             }
             
             QueryResult *qr = (QueryResult*)b.buf();
-            qr->resultFlags() = QueryResult::ResultFlag_ErrSet | QueryResult::ResultFlag_ShardConfigStale;
+            qr->_resultFlags() = QueryResult::ResultFlag_ErrSet | QueryResult::ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation( opReply );
             qr->cursorId = 0;

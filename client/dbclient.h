@@ -34,22 +34,41 @@ namespace mongo {
            final object it references were deleted.  Thus, you should be prepared to requery if you get back
            ResultFlag_CursorNotFound.
         */
-        Option_CursorTailable = 1 << 1,
+        QueryOption_CursorTailable = 1 << 1,
 
         /** allow query of replica slave.  normally these return an error except for namespace "local".
         */
-        Option_SlaveOk = 1 << 2,
+        QueryOption_SlaveOk = 1 << 2,
         
-        Option_OplogReplay = 1 << 3,
+        // findingStart mode is used to find the first operation of interest when
+        // we are scanning through a repl log.  For efficiency in the common case,
+        // where the first operation of interest is closer to the tail than the head,
+        // we start from the tail of the log and work backwards until we find the
+        // first operation of interest.  Then we scan forward from that first operation,
+        // actually returning results to the client.  During the findingStart phase,
+        // we release the db mutex occasionally to avoid blocking the db process for
+        // an extended period of time.
+        QueryOption_OplogReplay = 1 << 3,
 
-        /** if there is a cursor, ignore the normal cursor timeout behavior and never time it out
-         */
-        Option_NoCursorTimeout = 1 << 4
+        /** The server normally times out idle cursors after an inactivy period to prevent excess memory use
+            Set this option to prevent that. 
+        */
+        QueryOption_NoCursorTimeout = 1 << 4,
+
+        /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while rather 
+            than returning no data. After a timeout period, we do return as normal.
+        */
+        QueryOption_AwaitData = 1 << 5
+
     };
 
     enum UpdateOptions {
-        Option_Upsert = 1 << 0,
-        Option_Multi = 1 << 1
+        /** Upsert - that is, insert the item if no matching item is found. */
+        UpdateOption_Upsert = 1 << 0,
+
+        /** Update multiple documents (if multiple documents match query expression). 
+           (Default is update a single document and stop.) */
+        UpdateOption_Multi = 1 << 1
     };
 
     class BSONObj;
@@ -181,8 +200,9 @@ namespace mongo {
 	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
         friend class DBClientBase;
+        bool init();
     public:
-		/** if true, safe to call next() */
+		/** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
 
         /** next
@@ -223,14 +243,12 @@ namespace mongo {
         }
 
         bool tailable() const {
-            return (opts & Option_CursorTailable) != 0;
+            return (opts & QueryOption_CursorTailable) != 0;
         }
         
         bool hasResultFlag( int flag ){
             return (resultFlags & flag) != 0;
         }
-    private:
-        bool init();
     public:
         DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions ) :
@@ -246,7 +264,7 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                ownCursor_( true ) {
+                _ownCursor( true ) {
         }
         
         DBClientCursor( DBConnector *_connector, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -259,13 +277,17 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                ownCursor_( true ) {
+                _ownCursor( true ) {
         }            
 
         virtual ~DBClientCursor();
 
         long long getCursorId() const { return cursorId; }
-        void decouple() { ownCursor_ = false; }
+
+        /** by default we "own" the cursor and will send the server a KillCursor
+            message when ~DBClientCursor() is called. This function overrides that.
+        */
+        void decouple() { _ownCursor = false; }
         
     private:
         DBConnector *connector;
@@ -284,10 +306,9 @@ namespace mongo {
         const char *data;
         void dataReceived();
         void requestMore();
-        bool ownCursor_;
+        bool _ownCursor; // see decouple()
     };
     
-
     /**
        The interface that any db connection should implement
      */

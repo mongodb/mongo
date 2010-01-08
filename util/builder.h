@@ -172,7 +172,10 @@ namespace mongo {
         StringBuilder& operator<<( short x ){
             SBNUM( x , 8 , "%hd" );
         }
-
+        StringBuilder& operator<<( char c ){
+            _buf.grow( 1 )[0] = c;
+            return *this;
+        }
 
         void append( const char * str ){
             int x = strlen( str );
@@ -186,7 +189,7 @@ namespace mongo {
             append( s.c_str() );
             return *this;
         }
-
+        
         // access
 
         void reset( int maxSize = 0 ){

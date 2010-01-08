@@ -41,9 +41,9 @@ public:
         out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
         uassert( 10262 ,  "couldn't open file" , out.good() );
 
-        ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , Option_SlaveOk ) );
+        ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
 
-        auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn( true ).query( coll.c_str() , Query().snapshot() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
 
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
@@ -63,7 +63,7 @@ public:
 
         string sns = db + ".system.namespaces";
         
-        auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , Option_SlaveOk | Option_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->next();
             if ( obj.toString().find( ".$" ) != string::npos )
