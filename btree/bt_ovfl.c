@@ -116,29 +116,3 @@ __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_ITEM_OVFL *ovfl, DBT *copy)
 
 	return (ret);
 }
-
-/*
- * __wt_bt_ovfl_to_indx --
- *	Copy an overflow item into allocated memory in a WT_INDX
- */
-int
-__wt_bt_ovfl_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip)
-{
-	ENV *env;
-	WT_PAGE *ovfl_page;
-
-	env = toc->env;
-
-	WT_RET(
-	    __wt_bt_ovfl_in(toc, WT_INDX_OVFL_ADDR(ip), ip->size, &ovfl_page));
-
-	WT_RET(__wt_calloc(env, ip->size, 1, &ip->data));
-	memcpy(ip->data, WT_PAGE_BYTE(ovfl_page), ip->size);
-
-	WT_RET(__wt_bt_page_out(toc, ovfl_page, 0));
-
-	F_SET(ip, WT_ALLOCATED);
-	F_SET(page, WT_ALLOCATED);
-
-	return (0);
-}

@@ -158,6 +158,8 @@ static int
 __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 {
 	DB *db;
+	ENV *env;
+	IDB *idb;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE *page_ovfl;
@@ -165,14 +167,24 @@ __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	void *pdata;
 
 	db = toc->db;
-	item = ip->ditem;
+	env = toc->env;
+	idb = db->idb;
 
+	/* Optional Huffman compression. */
+	if (idb->huffman_data != NULL) {
+		WT_RET(__wt_huffman_encode(idb->huffman_data,
+		    data->data, data->size, &toc->scratch.data,
+		    &toc->scratch.data_len, &toc->scratch.size));
+		data = &toc->scratch;
+	}
+
+	item = ip->ditem;
 	page_ovfl = NULL;
 	switch (page->hdr->type) {
 	case WT_PAGE_LEAF:
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
 			pdata = WT_ITEM_BYTE(item);
-			psize = (u_int32_t)WT_ITEM_LEN(item);
+			psize = WT_ITEM_LEN(item);
 			break;
 		}
 		goto overflow;
@@ -255,12 +267,12 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			indx = base + (limit >> 1);
 
 			/*
-			 * If the key is an overflow, it may not have been
-			 * instantiated yet.
+			 * If the key is compressed or an overflow, it may not
+			 * have been instantiated yet.
 			 */
 			ip = page->indx + indx;
-			if (ip->data == NULL)
-				WT_ERR(__wt_bt_ovfl_to_indx(toc, page, ip));
+			if (WT_INDX_NEED_PROCESS(idb, ip))
+				WT_ERR(__wt_bt_key_to_indx(toc, page, ip));
 
 			/*
 			 * If we're about to compare an application key with

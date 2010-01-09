@@ -9,7 +9,9 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_dbt_copyout(WT_TOC *, DBT *, DBT *, u_int8_t *, u_int32_t);
+typedef enum { WT_DATA, WT_KEY, WT_KEY_NO_HUFFMAN } COPY_OP;
+static int __wt_bt_dbt_copyout(
+    WT_TOC *, DBT *, DBT *, u_int8_t *, u_int32_t, COPY_OP);
 
 /*
  * __wt_bt_dbt_return --
@@ -22,42 +24,50 @@ __wt_bt_dbt_return(WT_TOC *toc,
 {
 	DB *db;
 	DBT local_key, local_data;
+	IDB *idb;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
-	int (*callback)(DB *, DBT *, DBT *);
+	WT_PAGE *ovfl_page;
+	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;
+	idb = db->idb;
+	ovfl_page = NULL;
+	callback = data->callback;
 
 	/*
-	 * If the data DBT has been configured for a callback return, we don't
-	 * have to build or copy anything except overflow key/data items.  We
-	 * don't want to overwrite the user's DBTs, however, so use local ones.
-	 */
-	if ((callback = data->callback) != NULL) {
-		if (key_return) {
-			key = &local_key;
-			WT_CLEAR(local_key);
-		}
-		data = &local_data;
-		WT_CLEAR(local_data);
-	}
-
-	/*
-	 * Handle the key -- the key may be unchanged, in which case don't
-	 * touch it.
+	 * Hand out a key/data pair.
 	 *
-	 * If the key is an overflow, it may not have been instantiated yet.
+	 * If the key/data items are being passed to a callback routine and
+	 * there's nothing special about them (they aren't uninstantiated
+	 * overflow or compressed items), then give the callback a pointer to
+	 * the on-page data.  (We use a local DBT in this case, so we don't
+	 * touch potentially allocated application DBT memory.)  Else, copy
+	 * the items into the application's DBTs.
+	 *
+	 * If the key/data item are uninstantiated overflow and/or compressed
+	 * items, they require processing before being copied into the DBTs.
+	 * Don't allocate WT_INDX memory for key/data items here.  (We never
+	 * allocate WT_INDX memory for data items.   We do allocate WT_INDX
+	 * memory for keys, but if we are looking at a key only to return it,
+	 * it's not that likely to be accessed again (think of a cursor moving
+	 * through the tree).  Use memory in the application's DBT instead, it
+	 * is discarded when the WT_TOC is discarded.
+	 *
+	 * Handle the key item -- the key may be unchanged, in which case we
+	 * don't touch it, it's already correct.
 	 */
 	if (key_return) {
-		if (ip->data == NULL)
-			WT_RET(__wt_bt_ovfl_to_indx(toc, page, ip));
-		if (callback == NULL) {
-			WT_RET(__wt_bt_dbt_copyout(
-			    toc, key, &toc->key, ip->data, ip->size));
-		} else {
+		if (callback != NULL &&
+		    ip->data != NULL && !F_ISSET(ip, WT_HUFFMAN)) {
+			WT_CLEAR(local_key);
+			key = &local_key;
 			key->data = ip->data;
 			key->size = ip->size;
-		}
+		} else
+			WT_RET(__wt_bt_dbt_copyout(toc, key, &toc->key,
+			    ip->data, ip->size, WT_INDX_NEED_PROCESS(idb, ip) ?
+			    WT_KEY : WT_KEY_NO_HUFFMAN));
 	}
 
 	/*
@@ -66,45 +76,53 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	item = ip->ditem;
 	switch (page->hdr->type) {
 	case WT_PAGE_LEAF:
+		if (callback != NULL &&
+		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
+		    idb->huffman_data == NULL) {
+			WT_CLEAR(local_data);
+			data = &local_data;
+			data->data = WT_ITEM_BYTE(item);
+			data->size = WT_ITEM_LEN(item);
+			break;
+		}
+
 		if (WT_ITEM_TYPE(item) != WT_ITEM_DATA)
 			goto overflow;
 
-		if (callback == NULL) {
-			WT_RET(__wt_bt_dbt_copyout(toc, data,
-			    &toc->data, WT_ITEM_BYTE(item),
-			    (u_int32_t)WT_ITEM_LEN(item)));
-		} else {
-			data->data = WT_ITEM_BYTE(item);
-			data->size = (u_int32_t)WT_ITEM_LEN(item);
-		}
+		WT_RET(__wt_bt_dbt_copyout(toc, data, &toc->data,
+		    WT_ITEM_BYTE(item), WT_ITEM_LEN(item), WT_DATA));
 		break;
 	case WT_PAGE_DUP_LEAF:
+		if (callback != NULL &&
+		    WT_ITEM_TYPE(item) == WT_ITEM_DUP &&
+		    idb->huffman_data == NULL) {
+			WT_CLEAR(local_data);
+			data = &local_data;
+			data->data = ip->data;
+			data->size = ip->size;
+			break;
+		}
+
 		if (WT_ITEM_TYPE(item) != WT_ITEM_DUP)
 			goto overflow;
 
-		if (callback == NULL) {
-			WT_RET(__wt_bt_dbt_copyout(toc, data,
-			    &toc->data, ip->data, ip->size));
-		} else {
-			data->data = ip->data;
-			data->size = ip->size;
-		}
+		WT_RET(__wt_bt_dbt_copyout(toc, data,
+		    &toc->data, ip->data, ip->size, WT_DATA));
 		break;
 	WT_DEFAULT_FORMAT(db);
 	}
 
 	if (0) {
-overflow:	/* Handle overflow data items. */
-		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
-		WT_RET(__wt_bt_ovfl_to_dbt(toc, ovfl, &toc->data));
-		data->data = toc->data.data;
-		data->size = toc->data.size;
+overflow:	ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
+		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+		ret = __wt_bt_dbt_copyout(toc, data,
+		    &toc->data, WT_PAGE_BYTE(ovfl_page), ovfl->len, WT_DATA);
+		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+		if (ret != 0)
+			return (ret);
 	}
 
-	if (callback == NULL)
-		return (0);
-
-	return (callback(db, key, data));
+	return (callback == NULL ? 0 : callback(db, key, data));
 }
 
 /*
@@ -112,23 +130,41 @@ overflow:	/* Handle overflow data items. */
  *	Do the actual allocation and copy for a returned DBT.
  */
 static int
-__wt_bt_dbt_copyout(
-    WT_TOC *toc, DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size)
+__wt_bt_dbt_copyout(WT_TOC *toc,
+    DBT *dbt, DBT *local_dbt, u_int8_t *p, u_int32_t size, COPY_OP op)
 {
 	ENV *env;
+	IDB *idb;
+	void *huffman;
 
 	env = toc->env;
+	idb = toc->db->idb;
 
-	/*
-	 * We use memory in the TOC handle to return keys -- it's a per-thread
-	 * structure, so there's no chance of a race.
-	 */
-	if (local_dbt->data_len < size)
-		WT_RET(__wt_realloc(
-		    env, &local_dbt->data_len, size + 40, &local_dbt->data));
+	/* Uncompress any Huffman-encoded data. */
+	switch (op) {
+	case WT_DATA:
+		huffman = idb->huffman_data;
+		break;
+	case WT_KEY:
+		huffman = idb->huffman_key;
+		break;
+	case WT_KEY_NO_HUFFMAN:
+		huffman = NULL;
+		break;
+	}
+	if (huffman != NULL)
+		 WT_RET(__wt_huffman_decode(huffman, p, size,
+		     &local_dbt->data, &local_dbt->data_len, &local_dbt->size));
+	else {
+		/* Don't grow the return buffer a byte at a time. */
+		if (local_dbt->data_len < size)
+			WT_RET(__wt_realloc(env,
+			    &local_dbt->data_len, size + 40, &local_dbt->data));
+		local_dbt->size = size;
+		memcpy(local_dbt->data, p, size);
+	}
+
 	dbt->data = local_dbt->data;
-	dbt->size = size;
-
-	memcpy(dbt->data, p, size);
+	dbt->size = local_dbt->size;
 	return (0);
 }
