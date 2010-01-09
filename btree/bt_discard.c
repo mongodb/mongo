@@ -388,14 +388,12 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
-	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 
-	idb = db->idb;
 	hdr = page->hdr;
 
 	/*
@@ -441,12 +439,12 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip)
 	IDB *idb;
 	WT_PAGE *ovfl_page;
 	int is_overflow;
-	u_int32_t len;
 	u_int8_t *p, *dest;
 	int ret;
 
 	env = toc->env;
 	idb = toc->db->idb;
+	ovfl_page = NULL;
 
 	/*
 	 * 3 cases:
