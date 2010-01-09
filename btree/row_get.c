@@ -269,7 +269,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			 * have been instantiated yet.
 			 */
 			ip = page->indx + indx;
-			if (WT_INDX_NEED_PROCESS(idb, ip))
+			if (WT_INDX_NEED_PROCESS(ip))
 				WT_ERR(__wt_bt_key_to_indx(toc, page, ip));
 
 			/*

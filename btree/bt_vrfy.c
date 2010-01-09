@@ -130,7 +130,6 @@ static int
 __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 {
 	DB *db;
-	IDB *idb;
 	IENV *ienv;
 	WT_INDX *page_indx, *prev_indx;
 	WT_PAGE *page, *prev;
@@ -140,7 +139,6 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
-	idb = db->idb;
 	ienv = toc->env->ienv;
 	addr_arg = WT_ADDR_INVALID;
 	ret = 0;
@@ -283,10 +281,10 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		 * The two keys we're going to compare may be overflow keys.
 		 */
 		prev_indx = prev->indx + (prev->indx_count - 1);
-		if (WT_INDX_NEED_PROCESS(idb, prev_indx))
+		if (WT_INDX_NEED_PROCESS(prev_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, prev, prev_indx));
 		page_indx = page->indx;
-		if (WT_INDX_NEED_PROCESS(idb, page_indx))
+		if (WT_INDX_NEED_PROCESS(page_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, page, page_indx));
 		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
 			__wt_db_errx(db,
@@ -335,7 +333,6 @@ static int
 __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
-	IDB *idb;
 	WT_ITEM_OFFP *offp;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
@@ -345,7 +342,6 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	int ret;
 
 	db = toc->db;
-	idb = db->idb;
 	parent = NULL;
 	hdr = child->hdr;
 	addr = child->addr;
@@ -461,9 +457,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	} else {
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx;
-		if (WT_INDX_NEED_PROCESS(idb, child_indx))
+		if (WT_INDX_NEED_PROCESS(child_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, child, child_indx));
-		if (WT_INDX_NEED_PROCESS(idb, parent_indx))
+		if (WT_INDX_NEED_PROCESS(parent_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_indx));
 
 		/* Compare the parent's key against the child's key. */
@@ -515,9 +511,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	if (parent != NULL) {
 		/* The two keys we're going to compare may be overflow keys. */
 		child_indx = child->indx + (child->indx_count - 1);
-		if (WT_INDX_NEED_PROCESS(idb, child_indx))
+		if (WT_INDX_NEED_PROCESS(child_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, child, child_indx));
-		if (WT_INDX_NEED_PROCESS(idb, parent_indx))
+		if (WT_INDX_NEED_PROCESS(parent_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_indx));
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {

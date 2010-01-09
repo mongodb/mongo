@@ -59,7 +59,7 @@ typedef	struct __wt_indx {
 	 * Overflow and/or compressed on-page items need processing before
 	 * we look at them.   Handy macro to identify such.
 	 */
-#define	WT_INDX_NEED_PROCESS(idb, ip)					\
+#define	WT_INDX_NEED_PROCESS(ip)					\
 	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */

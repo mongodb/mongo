@@ -66,7 +66,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			key->size = ip->size;
 		} else
 			WT_RET(__wt_bt_dbt_copyout(toc, key, &toc->key,
-			    ip->data, ip->size, WT_INDX_NEED_PROCESS(idb, ip) ?
+			    ip->data, ip->size, WT_INDX_NEED_PROCESS(ip) ?
 			    WT_KEY : WT_KEY_NO_HUFFMAN));
 	}
 
