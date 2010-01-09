@@ -139,6 +139,7 @@ __wt_bt_dbt_copyout(WT_TOC *toc,
 
 	env = toc->env;
 	idb = toc->db->idb;
+	huffman = NULL;
 
 	/* Uncompress any Huffman-encoded data. */
 	switch (op) {
@@ -148,21 +149,18 @@ __wt_bt_dbt_copyout(WT_TOC *toc,
 	case WT_KEY:
 		huffman = idb->huffman_key;
 		break;
-	case WT_KEY_NO_HUFFMAN:
-		huffman = NULL;
-		break;
 	}
-	if (huffman != NULL)
-		 WT_RET(__wt_huffman_decode(huffman, p, size,
-		     &local_dbt->data, &local_dbt->data_len, &local_dbt->size));
-	else {
+
+	if (huffman == NULL) {
 		/* Don't grow the return buffer a byte at a time. */
 		if (local_dbt->data_len < size)
 			WT_RET(__wt_realloc(env,
 			    &local_dbt->data_len, size + 40, &local_dbt->data));
 		local_dbt->size = size;
 		memcpy(local_dbt->data, p, size);
-	}
+	} else
+		 WT_RET(__wt_huffman_decode(huffman, p, size,
+		     &local_dbt->data, &local_dbt->data_len, &local_dbt->size));
 
 	dbt->data = local_dbt->data;
 	dbt->size = local_dbt->size;
