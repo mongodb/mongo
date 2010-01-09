@@ -258,6 +258,7 @@ __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	env = toc->env;
 	idb = toc->db->idb;
 	page = NULL;
+	hp = NULL;
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
