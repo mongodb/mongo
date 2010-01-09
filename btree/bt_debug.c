@@ -246,7 +246,6 @@ __wt_bt_dump_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 static int
 __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
-	ENV *env;
 	IDB *idb;
 	WT_ITEM_OFFP *offp;
 	WT_ITEM_OVFL *ovfl;
@@ -255,7 +254,6 @@ __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	u_int8_t *p;
 	void *hp;
 
-	env = toc->env;
 	idb = toc->db->idb;
 	page = NULL;
 	hp = NULL;
@@ -293,7 +291,7 @@ __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		return (0);
 	default:
 		fprintf(fp, "unsupported type");
-		break;
+		return (1);
 	}
 
 	/* Uncompress the item as necessary. */

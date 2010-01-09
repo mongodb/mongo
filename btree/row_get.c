@@ -158,7 +158,6 @@ static int
 __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 {
 	DB *db;
-	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
@@ -167,7 +166,6 @@ __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	void *pdata;
 
 	db = toc->db;
-	env = toc->env;
 	idb = db->idb;
 
 	/* Optional Huffman compression. */
