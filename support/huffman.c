@@ -527,7 +527,7 @@ __wt_huffman_encode(void *huffman_arg,
  */
 int
 __wt_huffman_decode(void *huffman_arg,
-    u_int8_t *from, u_int16_t from_len,
+    u_int8_t *from, u_int32_t from_len,
     void *top, u_int32_t *to_len, u_int32_t *out_bytes_used)
 {
 	ENV *env;
