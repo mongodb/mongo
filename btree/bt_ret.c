@@ -149,6 +149,8 @@ __wt_bt_dbt_copyout(WT_TOC *toc,
 	case WT_KEY:
 		huffman = idb->huffman_key;
 		break;
+	case WT_KEY_NO_HUFFMAN:
+		break;
 	}
 
 	if (huffman == NULL) {
