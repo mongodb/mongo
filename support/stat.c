@@ -92,6 +92,10 @@ __wt_stat_alloc_idb_stats(ENV *env, WT_STATS **statsp)
 
 	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
 	    "bulk duplicate data pairs read";
+	stats[WT_STAT_BULK_HUFFMAN_DATA].desc =
+	    "bulk insert huffman data compression";
+	stats[WT_STAT_BULK_HUFFMAN_KEY].desc =
+	    "bulk insert huffman key compression";
 	stats[WT_STAT_BULK_OVERFLOW_DATA].desc =
 	    "bulk overflow data items read";
 	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
@@ -120,6 +124,8 @@ void
 __wt_stat_clear_idb_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
+	stats[WT_STAT_BULK_HUFFMAN_DATA].v = 0;
+	stats[WT_STAT_BULK_HUFFMAN_KEY].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
 	stats[WT_STAT_BULK_PAIRS_READ].v = 0;

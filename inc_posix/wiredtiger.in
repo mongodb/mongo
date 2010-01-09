@@ -75,8 +75,6 @@ struct __dbt {
 
 					/* callback return */
 	int (*callback)(DB *, DBT *, DBT *);
-
-	u_int32_t flags;
 };
 
 /*******************************************
@@ -108,6 +106,7 @@ struct __wt_toc {
 
 	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
+	DBT	  scratch;		/* Temporary use by anybody */
 
 	u_int32_t api_gen;		/* API generation */
 
@@ -405,6 +404,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
+#define	WT_HUFFMAN					0x00000002
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INITIALIZED					0x00000002
@@ -443,7 +443,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
 #define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
-#define	WT_APIMASK_WT_INDX				0x00000001
+#define	WT_APIMASK_WT_INDX				0x00000003
 #define	WT_APIMASK_WT_PAGE				0x0000000f
 #define	WT_APIMASK_WT_TOC				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000

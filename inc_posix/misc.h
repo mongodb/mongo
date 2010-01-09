@@ -74,11 +74,11 @@ extern "C" {
 	memset(&(s), 0, sizeof(s))
 
 /* Free memory if set, avoiding any race with another thread. */
-#define	WT_FREE_AND_CLEAR(env, p) do {					\
+#define	WT_FREE_AND_CLEAR(env, p, len) do {				\
 	void *__p;							\
 	if ((__p = p) != NULL) {					\
 		(p) = NULL;						\
-		__wt_free(env, __p);					\
+		__wt_free(env, __p, len);				\
 	}								\
 } while (0)
 

@@ -45,6 +45,7 @@ typedef struct __wt_static_huffman_node {
 } WT_STATIC_HUFFMAN_NODE;
 
 typedef struct __wt_huffman_obj {
+	ENV *env;		/* Enclosing environment */
 	/*
 	 * Data structure here defines specific instance of the encoder/decoder.
 	 * This contains the frequency table (tree) used to produce optimal
@@ -192,7 +193,7 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
 	if (node != NULL) {
 		recursive_free_node(env, node->left);
 		recursive_free_node(env, node->right);
-		__wt_free(env, node);
+		__wt_free(env, node, sizeof(WT_FREQTREE_NODE));
 	}
 }
 
@@ -227,6 +228,7 @@ __wt_huffman_open(ENV *env,
 
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
 	WT_ERR(__wt_calloc(env, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
+	huffman->env = env;
 
 	/*
 	 * The frequency array must be sorted to be able to use linear time
@@ -344,13 +346,13 @@ err:	if (leaves != NULL)
 	if (combined_nodes != NULL)
 		node_queue_close(env, combined_nodes);
 	if (indexed_freqs != NULL)
-		__wt_free(env, indexed_freqs);
+		__wt_free(env, indexed_freqs, 0);
 	if (node != NULL)
 		recursive_free_node(env, node);
 	if (ret != 0) {
 		if (huffman->nodes != NULL)
-			__wt_free(env, huffman->nodes);
-		__wt_free(env, huffman);
+			__wt_free(env, huffman->nodes, 0);
+		__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
 	}
 	return (ret);
 }
@@ -366,8 +368,8 @@ __wt_huffman_close(ENV *env, void *huffman_arg)
 
 	huffman = huffman_arg;
 
-	__wt_free(env, huffman->nodes);
-	__wt_free(env, huffman);
+	__wt_free(env, huffman->nodes, 0);
+	__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -414,7 +416,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 			return (WT_ERROR);
 		}
 
-		__wt_free(env, buffer);
+		__wt_free(env, buffer, 0);
 	} else
 		(void)printf("Symbol out of range: %lu >= %lu\n",
 		    (u_long)symbol, (u_long)huffman->numSymbols);
@@ -425,31 +427,38 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 /*
  * __wt_huffman_encode --
  *	Take a byte string, encode it into the target.
- *
- *	Target buffer size: len_to should be (N + 1) to ensure the "to" buffer
- *	is big enough for the encoding operation.
  */
 int
 __wt_huffman_encode(void *huffman_arg,
-    u_int8_t *from, u_int32_t len_from,
-    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used)
+    u_int8_t *from, u_int32_t from_len,
+    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used)
 {
+	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE *node;
 	u_int32_t bitpos, i, n, j;
 	u_int16_t symbol;
-	u_int8_t padding_info;
+	u_int8_t padding_info, *to;
 	int p;
 
 	huffman = huffman_arg;
+	env = huffman->env;
 
 	/*
-	 * Check the target buffer, just in case; we need N+1 bytes to encode
-	 * N bytes.
+	 * We need N+1 bytes to encode N bytes, re-allocate as necessary.
+	 *
+	 * If the initial target pointer, or the initial target buffer length,
+	 * aren't set, it's an allocation.   Clear the initial target pointer,
+	 * our caller may have only set the initial target buffer length, not
+	 * the initial pointer value.
 	 */
-	if (len_to <= len_from)
-		return (WT_TOOSMALL);
-	memset(to, 0, len_to);
+	if (to_len == NULL || *to_len < from_len + 1) {
+		*(void **)top = NULL;
+		WT_RET(__wt_realloc(env, to_len, from_len + 1, top));
+	}
+
+	to = *(u_int8_t **)top;
+	memset(to, 0, from_len + 1);
 
 	/*
 	 * Leave the first 3 bits of the encoded value empty, it holds the
@@ -457,7 +466,7 @@ __wt_huffman_encode(void *huffman_arg,
 	 */
 	bitpos = 3;
 	n = 1 << huffman->max_depth;
-	for (i = 0; i < len_from; i += huffman->numBytes) {
+	for (i = 0; i < from_len; i += huffman->numBytes) {
 		/* Getting the next symbol, either 1 or 2 bytes */
 		if (huffman->numBytes == 1)
 			symbol = *from++;
@@ -507,8 +516,7 @@ __wt_huffman_encode(void *huffman_arg,
 	padding_info = (bitpos % 8) << 5;
 	*to |= padding_info;
 
-	if (out_bytes_used != NULL)
-		*out_bytes_used = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
+	*out_bytes_used = bitpos / 8 + ((bitpos % 8) ? 1 : 0);
 
 	return (0);
 }
@@ -516,24 +524,36 @@ __wt_huffman_encode(void *huffman_arg,
 /*
  * __wt_huffman_decode --
  *	Take a byte string, decode it into the target.
- *
- *	Encoded strings may be 0 padded.
- *
- *	Target buffer size: len_to should be (((N x 2) + 1) x len_from) to
- *	ensure the "to" buffer is big enough for the decoding operation.
- *	If the decode won't fit into the target buffer, return WT_TOOSMALL.
  */
 int
 __wt_huffman_decode(void *huffman_arg,
-    u_int8_t *from, u_int16_t len_from,
-    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used)
+    u_int8_t *from, u_int16_t from_len,
+    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used)
 {
+	ENV *env;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_STATIC_HUFFMAN_NODE* node;
-	u_int32_t bytes, i, len_from_bits, node_idx;
-	u_int8_t bitpos, mask, bit, padding_info;
+	u_int32_t bytes, i, from_len_bits, node_idx;
+	u_int8_t bitpos, mask, bit, padding_info, *to;
 
 	huffman = huffman_arg;
+	env = huffman->env;
+
+	/*
+	 * We need 2N+1 bytes to decode N bytes, re-allocate as necessary.
+	 *
+	 * If the initial target pointer, or the initial target buffer length,
+	 * aren't set, it's an allocation.   Clear the initial target pointer,
+	 * our caller may have only set the initial target buffer length, not
+	 * the initial pointer value.
+	 */
+	if (to_len == NULL || *to_len < 2 * from_len + 1) {
+		*(void **)top = NULL;
+		WT_RET(__wt_realloc(env, to_len, 2 * from_len + 1, top));
+	}
+
+	to = *(u_int8_t **)top;
+
 	bitpos = 4;			/* Skipping the first 3 bits. */
 	bytes = 0;
 	node_idx = 0;
@@ -543,15 +563,15 @@ __wt_huffman_decode(void *huffman_arg,
 	 * they're 0, in which case there are 8 bits used in the last byte.
 	 */
 	padding_info = (*from & 0xE0) >> 5;
-	len_from_bits = len_from * 8;
+	from_len_bits = from_len * 8;
 	if (padding_info != 0)
-		len_from_bits -= 8 - padding_info;
+		from_len_bits -= 8 - padding_info;
 
 	/*
 	 * The loop will go through each bit of the source stream, its length
 	 * is given in BITS!
 	 */
-	for (i = 3; i < len_from_bits; i++) {
+	for (i = 3; i < from_len_bits; i++) {
 		/* Extracting the current bit */
 		mask = (u_int8_t)(1 << bitpos);
 		bit = (*from & mask);
@@ -569,9 +589,6 @@ __wt_huffman_decode(void *huffman_arg,
 
 		/* If this is a leaf, we've found a complete symbol. */
 		if (node->valid && node->codeword_length > 0) {
-			if (bytes + huffman->numBytes > len_to)
-				return (WT_TOOSMALL);
-
 			if (huffman->numBytes == 1)
 				*to++ = (u_int8_t)node->symbol;
 			else {
@@ -593,8 +610,7 @@ __wt_huffman_decode(void *huffman_arg,
 	}
 
 	/* Return the number of bytes used. */
-	if (out_bytes_used != NULL)
-		*out_bytes_used = bytes;
+	*out_bytes_used = bytes;
 
 	return (0);
 }
@@ -606,18 +622,18 @@ __wt_huffman_decode(void *huffman_arg,
  * It does not delete the pointed huffman tree nodes!
  */
 static void
-node_queue_close(ENV *env, NODE_QUEUE* queue)
+node_queue_close(ENV *env, NODE_QUEUE *queue)
 {
 	NODE_QUEUE_ELEM *elem, *next_elem;
 
 	/* Freeing each element of the queue's linked list. */
 	for (elem = queue->first; elem != NULL; elem = next_elem) {
 		next_elem = elem->next;
-		__wt_free(env, elem);
+		__wt_free(env, elem, sizeof(NODE_QUEUE_ELEM));
 	}
 
 	/* Freeing the queue record itself. */
-	__wt_free(env, queue);
+	__wt_free(env, queue, sizeof(NODE_QUEUE));
 }
 
 /*
@@ -679,5 +695,5 @@ node_queue_dequeue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 		queue->last = NULL;
 
 	/* Freeing the linked list element that has been dequeued */
-	__wt_free(env, first_elem);
+	__wt_free(env, first_elem, sizeof(NODE_QUEUE_ELEM));
 }

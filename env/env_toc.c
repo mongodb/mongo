@@ -48,8 +48,9 @@ __wt_wt_toc_close(WT_TOC *toc)
 	env = toc->env;
 	ret = 0;
 
-	WT_FREE_AND_CLEAR(env, toc->key.data);
-	WT_FREE_AND_CLEAR(env, toc->data.data);
+	WT_FREE_AND_CLEAR(env, toc->key.data, toc->key.data_len);
+	WT_FREE_AND_CLEAR(env, toc->data.data, toc->data.data_len);
+	WT_FREE_AND_CLEAR(env, toc->scratch.data, toc->scratch.data_len);
 
 	__wt_toc_link_op(env, toc, 0);		/* Delete from the ENV's list */
 

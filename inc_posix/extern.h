@@ -15,6 +15,8 @@ __wt_bt_dump_debug(DB *db, char *ofile, FILE *fp);
 int
 __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
 void
+__wt_bt_dump_dbt(const char *tag, DBT *dbt, FILE *fp);
+void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
 void
 __wt_bt_desc_stats(DB *db, WT_PAGE *page);
@@ -59,8 +61,6 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
 int
 __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_ITEM_OVFL *ovfl, DBT *copy);
 int
-__wt_bt_ovfl_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip);
-int
 __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
@@ -74,6 +74,8 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_page_inmem_append(DB *db,
     WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
+int
+__wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip);
 int
 __wt_db_get_recno(
     DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data);
@@ -172,11 +174,11 @@ int
 __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp);
 int
 __wt_realloc(ENV *env,
-    u_int32_t *bytes_allocated, u_int32_t bytes_to_allocate, void *retp);
+    u_int32_t *bytes_allocated_ret, u_int32_t bytes_to_allocate, void *retp);
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void
-__wt_free(ENV *env, void *p);
+__wt_free(ENV *env, void *p, u_int32_t len);
 int
 __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
@@ -249,12 +251,12 @@ int
 __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol);
 int
 __wt_huffman_encode(void *huffman_arg,
-    u_int8_t *from, u_int32_t len_from,
-    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used);
+    u_int8_t *from, u_int32_t from_len,
+    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
 int
 __wt_huffman_decode(void *huffman_arg,
-    u_int8_t *from, u_int16_t len_from,
-    u_int8_t *to, u_int32_t len_to, u_int32_t *out_bytes_used);
+    u_int8_t *from, u_int16_t from_len,
+    void *top, u_int32_t *to_len, u_int32_t *out_bytes_used);
 u_int32_t
 __wt_prime(u_int32_t n);
 void

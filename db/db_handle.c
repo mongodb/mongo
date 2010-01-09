@@ -115,9 +115,8 @@ __wt_db_close(DB *db)
 	/* Discard the underlying IDB object. */
 	WT_TRET(__wt_idb_close(db, 0));
 
-	/* Make sure the user can't screw up, and discard the DB object. */
-	memset(db, WT_OVERWRITE, sizeof(db));
-	WT_FREE_AND_CLEAR(env, db);
+	/* Discard the DB object. */
+	__wt_free(env, db, sizeof(db));
 
 	return (ret);
 }
@@ -143,20 +142,22 @@ __wt_idb_close(DB *db, int refresh)
 	if (idb == NULL)
 		return (0);
 
+	if (idb->huffman_key != NULL) {
+		/* Key and data may use the same table, only close it once. */
+		if (idb->huffman_data == idb->huffman_key)
+			idb->huffman_data = NULL;
+		__wt_huffman_close(env, idb->huffman_key);
+		idb->huffman_key = NULL;
+	}
 	if (idb->huffman_data != NULL) {
 		__wt_huffman_close(env, idb->huffman_data);
 		idb->huffman_data = NULL;
 	}
-	if (idb->huffman_key != NULL) {
-		__wt_huffman_close(env, idb->huffman_key);
-		idb->huffman_key = NULL;
-	}
 
 	/* Free any allocated memory. */
-	WT_FREE_AND_CLEAR(env, idb->dbname);
-
-	WT_FREE_AND_CLEAR(env, idb->stats);
-	WT_FREE_AND_CLEAR(env, idb->dstats);
+	WT_FREE_AND_CLEAR(env, idb->dbname, 0);
+	WT_FREE_AND_CLEAR(env, idb->stats, 0);
+	WT_FREE_AND_CLEAR(env, idb->dstats, 0);
 
 	/*
 	 * This is the guts of the split between the public/private, DB/IDB
@@ -176,7 +177,7 @@ __wt_idb_close(DB *db, int refresh)
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
 	__wt_unlock(&ienv->mtx);
 
-	__wt_free(env, idb);
+	__wt_free(env, idb, sizeof(IDB));
 
 	db->idb = NULL;
 	return (0);

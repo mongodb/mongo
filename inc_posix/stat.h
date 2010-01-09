@@ -71,19 +71,21 @@ struct __wt_stats {
  * Statistics entries for IDB_STATS
  */
 #define	WT_STAT_BULK_DUP_DATA_READ	    0
-#define	WT_STAT_BULK_OVERFLOW_DATA	    1
-#define	WT_STAT_BULK_OVERFLOW_KEY	    2
-#define	WT_STAT_BULK_PAIRS_READ		    3
-#define	WT_STAT_DB_CACHE_ALLOC		    4
-#define	WT_STAT_DB_CACHE_HIT		    5
-#define	WT_STAT_DB_CACHE_MISS		    6
-#define	WT_STAT_DB_READ_BY_KEY		    7
-#define	WT_STAT_DB_READ_BY_KEY_RESTART	    8
-#define	WT_STAT_DB_READ_BY_RECNO	    9
-#define	WT_STAT_DB_READ_BY_RECNO_RESTART	   10
-#define	WT_STAT_DB_WRITE_BY_KEY		   11
-#define	WT_STAT_DB_WRITE_BY_KEY_RESTART	   12
-#define	WT_STAT_IDB_STATS_TOTAL		   13
+#define	WT_STAT_BULK_HUFFMAN_DATA	    1
+#define	WT_STAT_BULK_HUFFMAN_KEY	    2
+#define	WT_STAT_BULK_OVERFLOW_DATA	    3
+#define	WT_STAT_BULK_OVERFLOW_KEY	    4
+#define	WT_STAT_BULK_PAIRS_READ		    5
+#define	WT_STAT_DB_CACHE_ALLOC		    6
+#define	WT_STAT_DB_CACHE_HIT		    7
+#define	WT_STAT_DB_CACHE_MISS		    8
+#define	WT_STAT_DB_READ_BY_KEY		    9
+#define	WT_STAT_DB_READ_BY_KEY_RESTART	   10
+#define	WT_STAT_DB_READ_BY_RECNO	   11
+#define	WT_STAT_DB_READ_BY_RECNO_RESTART	   12
+#define	WT_STAT_DB_WRITE_BY_KEY		   13
+#define	WT_STAT_DB_WRITE_BY_KEY_RESTART	   14
+#define	WT_STAT_IDB_STATS_TOTAL		   15
 
 /*
  * Statistics entries for IENV_STATS

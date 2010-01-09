@@ -464,8 +464,20 @@ flags['wiredtiger_env_init'] = [ ]
 ###################################################
 # Structure flag declarations
 ###################################################
-flags['cache'] = [ 'INITIALIZED', 'SERVER_SLEEPING' ]
-flags['ienv'] = [ 'WORKQ_RUN', 'SERVER_RUN' ]
-flags['wt_indx'] = [ 'ALLOCATED' ]
-flags['wt_page'] = [ 'ALLOCATED', 'MODIFIED', 'PINNED', 'UNFORMATTED' ]
-flags['wt_toc'] = [ 'CACHE_LOCK_RESTART', 'WAITING' ]
+flags['cache'] = [
+	'INITIALIZED',
+	'SERVER_SLEEPING' ]
+flags['ienv'] = [
+	'WORKQ_RUN',
+	'SERVER_RUN' ]
+flags['wt_indx'] = [
+	'ALLOCATED',
+	'HUFFMAN' ]
+flags['wt_page'] = [
+	'ALLOCATED',
+	'MODIFIED',
+	'PINNED',
+	'UNFORMATTED' ]
+flags['wt_toc'] = [
+	'CACHE_LOCK_RESTART',
+	'WAITING' ]

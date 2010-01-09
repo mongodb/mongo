@@ -106,20 +106,16 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		WT_INDX_FOREACH(page, indx, i)
 			if (F_ISSET(indx, WT_ALLOCATED)) {
 				F_CLR(indx, WT_ALLOCATED);
-				__wt_free(env, indx->data);
+				__wt_free(env, indx->data, 0);
 			}
 	}
 	if (page->indx != NULL)
-		__wt_free(env, page->indx);
+		__wt_free(env, page->indx, 0);
 #ifdef HAVE_DIAGNOSTIC
 	memset(page->hdr, WT_OVERWRITE, page->bytes);
 #endif
-	__wt_free(env, page->hdr);
-
-#ifdef HAVE_DIAGNOSTIC
-	memset(page, WT_OVERWRITE, sizeof(WT_PAGE));
-#endif
-	__wt_free(env, page);
+	__wt_free(env, page->hdr, sizeof(WT_PAGE_HDR));
+	__wt_free(env, page, sizeof(WT_PAGE));
 }
 
 /*
@@ -168,7 +164,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	 * been freed.
 	 */
 	if (page->indx != NULL && page->indx_size < nindx)
-		WT_FREE_AND_CLEAR(env, page->indx);
+		WT_FREE_AND_CLEAR(env, page->indx, 0);
 
 	if (page->indx == NULL) {
 		WT_RET((__wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)));
@@ -239,6 +235,9 @@ __wt_bt_page_inmem_append(DB *db,
 	WT_DEFAULT_FORMAT(db);
 	}
 
+	if (idb->huffman_key != NULL)
+		F_SET(indx, WT_HUFFMAN);
+
 	indx->ditem = data_item;
 
 	return (0);
@@ -252,6 +251,7 @@ __wt_bt_page_inmem_append(DB *db,
 static int
 __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	WT_ITEM_OFFP *offp;
@@ -260,6 +260,7 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 	u_int64_t records;
 	u_int32_t i;
 
+	idb = db->idb;
 	hdr = page->hdr;
 	indx = page->indx;
 	records = 0;
@@ -276,10 +277,14 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 		case WT_ITEM_KEY:
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
+			if (idb->huffman_key != NULL)
+				F_SET(indx, WT_HUFFMAN);
 			break;
 		case WT_ITEM_KEY_OVFL:
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
+			if (idb->huffman_key != NULL)
+				F_SET(indx, WT_HUFFMAN);
 			break;
 		case WT_ITEM_OFFP_INTL:
 		case WT_ITEM_OFFP_LEAF:
@@ -305,10 +310,13 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	u_int32_t i, indx_count;
+
+	idb = db->idb;
 
 	/*
 	 * Walk the page, building indices and finding the end of the page.
@@ -332,6 +340,8 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
+			if (idb->huffman_key != NULL)
+				F_SET(indx, WT_HUFFMAN);
 
 			++indx_count;
 			break;
@@ -343,6 +353,8 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 
 			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
+			if (idb->huffman_key != NULL)
+				F_SET(indx, WT_HUFFMAN);
 
 			++indx_count;
 			break;
@@ -352,6 +364,10 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_OFFP_INTL:
 		case WT_ITEM_OFFP_LEAF:
+			/*
+			 * BUG!!!
+			 * Can indx->ditem ever be NULL here?
+			 */
 			if (indx->ditem == NULL)
 				indx->ditem = item;
 			break;
@@ -372,12 +388,14 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
 	WT_ITEM_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 
+	idb = db->idb;
 	hdr = page->hdr;
 
 	/*
@@ -408,4 +426,64 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 
 	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
 	return (0);
+}
+
+/*
+ * __wt_bt_key_to_indx --
+ *	Overflow and/or compressed on-page items need processing before
+ *	we look at them.   Copy such items into allocated memory in a
+ *	WT_INDX.
+ */
+int
+__wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip)
+{
+	ENV *env;
+	IDB *idb;
+	WT_PAGE *ovfl_page;
+	int is_overflow;
+	u_int32_t len;
+	u_int8_t *p, *dest;
+	int ret;
+
+	env = toc->env;
+	idb = toc->db->idb;
+
+	/*
+	 * 3 cases:
+	 * (1) Uncompressed overflow item
+	 * (2) Compressed overflow item
+	 * (3) Compressed on-page item
+	 *
+	 * If the item is an overflow item, bring it into memory.
+	 */
+	is_overflow = ip->data == NULL ? 1 : 0;
+	if (is_overflow) {
+		WT_RET(__wt_bt_ovfl_in(
+		    toc, WT_INDX_OVFL_ADDR(ip), ip->size, &ovfl_page));
+		p = WT_PAGE_BYTE(ovfl_page);
+	} else
+		p = ip->data;
+
+	/*
+	 * If the item is compressed, decode it, otherwise just copy it into
+	 * place.
+	 */
+	if (F_ISSET(ip, WT_HUFFMAN))
+		WT_ERR(__wt_huffman_decode(idb->huffman_key,
+		    p, ip->size, &dest, NULL, &ip->size));
+	else {
+		WT_ERR(__wt_calloc(env, ip->size, 1, &dest));
+		memcpy(dest, p, ip->size);
+	}
+
+	F_SET(ip, WT_ALLOCATED);
+	F_CLR(ip, WT_HUFFMAN);
+
+	ip->data = dest;
+	F_SET(page, WT_ALLOCATED);
+
+err:	if (is_overflow)
+		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+
+	return (ret);
 }

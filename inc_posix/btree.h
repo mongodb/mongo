@@ -55,7 +55,12 @@ typedef	struct __wt_indx {
 	/*
 	 * The first part of the WT_INDX structure looks exactly like a DBT
 	 * so we can feed it to a Btree comparison function without copying.
+	 *
+	 * Overflow and/or compressed on-page items need processing before
+	 * we look at them.   Handy macro to identify such.
 	 */
+#define	WT_INDX_NEED_PROCESS(idb, ip)					\
+	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 

@@ -123,11 +123,19 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
  */
 int
 __wt_realloc(ENV *env,
-    u_int32_t *bytes_allocated, u_int32_t bytes_to_allocate, void *retp)
+    u_int32_t *bytes_allocated_ret, u_int32_t bytes_to_allocate, void *retp)
 {
 	void *p;
+	u_int32_t bytes_allocated;
 
 	p = *(void **)retp;
+
+	/*
+	 * Sometimes we're allocating memory and we don't care about the
+	 * final length -- bytes_allocated_ret may be NULL.
+	 */
+	bytes_allocated =
+	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (__wt_mfp == NULL)
@@ -161,10 +169,11 @@ __wt_realloc(ENV *env,
 	 * __wt_malloc as to why this is required.
 	 */
 	memset((u_int8_t *)
-	    p + *bytes_allocated, 0, bytes_to_allocate - *bytes_allocated);
+	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
 	/* Update caller's bytes allocated value. */
-	*bytes_allocated = bytes_to_allocate;
+	if (bytes_allocated_ret != NULL)
+		*bytes_allocated_ret = bytes_to_allocate;
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
@@ -207,18 +216,21 @@ __wt_strdup(ENV *env, const char *str, void *retp)
  *	ANSI free function.
  */
 void
-__wt_free(ENV *env, void *p)
+__wt_free(ENV *env, void *p, u_int32_t len)
 {
 	/*
-	 * The ENV * argument isn't used, but routines at this layer
-	 * are always passed one.
-	 *
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
 	WT_ASSERT(env, env == NULL || p != NULL);
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
 		WT_STAT_INCR(env->ienv->stats, MEMFREE, "memory frees");
+
+#ifdef HAVE_DIAGNOSTIC
+	/* If we know how long the object is, clear it. */
+	if (len != 0)
+		memset(p, WT_OVERWRITE, len);
+#endif
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
