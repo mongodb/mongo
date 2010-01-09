@@ -11,9 +11,8 @@
 
 #ifdef HAVE_DIAGNOSTIC
 static int  __wt_bt_dump_addr(DB *, u_int32_t, char *, FILE *);
-static void __wt_bt_dump_dbt(DBT *, FILE *);
-static void __wt_bt_dump_item(WT_TOC *, WT_ITEM *, FILE *);
-static void __wt_bt_dump_item_data(WT_TOC *, WT_ITEM *, FILE *);
+static int  __wt_bt_dump_item(WT_TOC *, WT_ITEM *, FILE *);
+static int  __wt_bt_dump_item_data(WT_TOC *, WT_ITEM *, FILE *);
 
 int
 __wt_diag_set_fp(const char *ofile, FILE **fpp, int *close_varp)
@@ -140,6 +139,7 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
 	int do_close, ret;
 
 	env = db->env;
+	toc = NULL;
 	ret = 0;
 
 	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
@@ -189,13 +189,11 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
 		WT_INDX_FOREACH(page, ip, i) {
 			fprintf(fp, "%6lu: {flags %#lx}\n",
 			    ++icnt, (u_long)ip->flags);
-			if (ip->data != NULL) {
-				fprintf(fp, "\tdbt: ");
-				__wt_bt_dump_dbt((DBT *)ip, fp);
-			}
+			if (ip->data != NULL)
+				__wt_bt_dump_dbt("\tdbt", (DBT *)ip, fp);
 			if (ip->ditem != NULL) {
 				fprintf(fp, "\tditem: ");
-				__wt_bt_dump_item(toc, ip->ditem, fp);
+				WT_ERR(__wt_bt_dump_item(toc, ip->ditem, fp));
 			}
 		}
 	} else
@@ -205,15 +203,16 @@ __wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
 			    (u_long)i, __wt_bt_item_type(item),
 			    (u_long)WT_ITEM_LEN(item),
 			    (u_long)(p - (u_int8_t *)hdr));
-			__wt_bt_dump_item_data(toc, item, fp);
+			WT_ERR(__wt_bt_dump_item_data(toc, item, fp));
 			fprintf(fp, "}\n");
 			p += WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
 		}
 	fprintf(fp, "\n");
 
-	WT_TRET(toc->close(toc, 0));
+err:	if (toc != NULL)
+		WT_TRET(toc->close(toc, 0));
 
-err:	if (do_close)
+	if (do_close)
 		(void)fclose(fp);
 
 	return (ret);
@@ -223,35 +222,54 @@ err:	if (do_close)
  * __wt_bt_dump_item --
  *	Dump a single item in debugging mode.
  */
-static void
+static int
 __wt_bt_dump_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
+	int ret;
+
 	if (fp == NULL)
 		fp = stdout;
 
 	fprintf(fp, "%s {", __wt_bt_item_type(item));
 
-	__wt_bt_dump_item_data(toc, item, fp);
+	ret = __wt_bt_dump_item_data(toc, item, fp);
 
 	fprintf(fp, "}\n");
+
+	return (ret);
 }
 
 /*
  * __wt_bt_dump_item_data --
  *	Dump a single item's data in debugging mode.
  */
-static void
+static int
 __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
-	WT_ITEM_OVFL *ovfl;
+	ENV *env;
+	IDB *idb;
 	WT_ITEM_OFFP *offp;
+	WT_ITEM_OVFL *ovfl;
 	WT_PAGE *page;
+	u_int32_t len;
+	u_int8_t *p;
+	void *hp;
+
+	env = toc->env;
+	idb = toc->db->idb;
+	page = NULL;
 
 	switch (WT_ITEM_TYPE(item)) {
 	case WT_ITEM_KEY:
+		hp = idb->huffman_key;
+		p = WT_ITEM_BYTE(item);
+		len = WT_ITEM_LEN(item);
+		break;
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
-		__wt_bt_print(WT_ITEM_BYTE(item), WT_ITEM_LEN(item), fp);
+		hp = idb->huffman_data;
+		p = WT_ITEM_BYTE(item);
+		len = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
@@ -260,33 +278,50 @@ __wt_bt_dump_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
-		if (__wt_bt_ovfl_in(toc,
-		    ovfl->addr, (u_int32_t)ovfl->len, &page) == 0) {
-			__wt_bt_print(WT_PAGE_BYTE(page), ovfl->len, fp);
-			(void)__wt_bt_page_out(toc, page, 0);
-		}
+		WT_RET(__wt_bt_ovfl_in(
+		    toc, ovfl->addr, (u_int32_t)ovfl->len, &page));
+		hp = idb->huffman_data;
+		p = WT_PAGE_BYTE(page);
+		len = ovfl->len;
 		break;
 	case WT_ITEM_OFFP_INTL:
 	case WT_ITEM_OFFP_LEAF:
 		offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
 		fprintf(fp, "addr: %lu, records %llu",
 		    (u_long)offp->addr, WT_64_CAST(offp->records));
-		break;
+		return (0);
 	default:
 		fprintf(fp, "unsupported type");
 		break;
 	}
+
+	/* Uncompress the item as necessary. */
+	if (hp != NULL) {
+		WT_RET(__wt_huffman_decode(
+		    hp, p, len, &toc->scratch.data,
+		    &toc->scratch.size, &toc->scratch.data_len));
+		p = toc->scratch.data;
+		len = toc->scratch.size;
+	}
+
+	__wt_bt_print(p, len, fp);
+
+	if (page != NULL)
+		(void)__wt_bt_page_out(toc, page, 0);
+	return (0);
 }
 
 /*
  * __wt_bt_dump_dbt --
- *	Dump a single DBT in debugging mode.
+ *	Dump a single DBT in debugging mode, with an optional tag.
  */
-static void
-__wt_bt_dump_dbt(DBT *dbt, FILE *fp)
+void
+__wt_bt_dump_dbt(const char *tag, DBT *dbt, FILE *fp)
 {
 	if (fp == NULL)
 		fp = stdout;
+	if (tag != NULL)
+		fprintf(fp, "%s: ", tag);
 	fprintf(fp, "{");
 	__wt_bt_print(dbt->data, dbt->size, fp);
 	fprintf(fp, "}\n");

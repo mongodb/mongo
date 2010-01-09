@@ -4,7 +4,6 @@
  * Copyright (c) 2008 WiredTiger Software.
  *	All rights reserved.
  *
- * $Id$
  */
 
 #include "wt_internal.h"
@@ -22,7 +21,7 @@ int
 __wt_db_bulk_load(DB *db, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
-	DBT *key, *data, key_copy, data_copy;
+	DBT *key, *data, key_copy, data_copy, key_compress, data_compress;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	IDB *idb;
@@ -46,8 +45,10 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	insert_cnt = 0;
 
 	lastkey = &lastkey_std;
+	WT_CLEAR(data_compress);
 	WT_CLEAR(data_copy);
 	WT_CLEAR(data_item);
+	WT_CLEAR(key_compress);
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_ovfl);
@@ -89,11 +90,33 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 		data_copy.size = data->size;
 		data = &data_copy;
 
-		/*
+		/* Optional Huffman compression. */
+		if (idb->huffman_key != NULL) {
+			WT_RET(__wt_huffman_encode(idb->huffman_key,
+			    key->data, key->size, &key_compress.data,
+			    &key_compress.data_len, &key_compress.size));
+			if (key->size > key_compress.size)
+				WT_STAT_INCRV(idb->stats, BULK_HUFFMAN_KEY,
+				    "bulk insert huffman key compression",
+				    key->size - key_compress.size);
+			key = &key_compress;
+		}
+		if (idb->huffman_data != NULL) {
+			WT_RET(__wt_huffman_encode(idb->huffman_data,
+			    data->data, data->size, &data_compress.data,
+			    &data_compress.data_len, &data_compress.size));
+			if (data->size > data_compress.size)
+				WT_STAT_INCRV(idb->stats, BULK_HUFFMAN_DATA,
+				    "bulk insert huffman data compression",
+				    data->size - data_compress.size);
+			data = &data_compress;
+		}
+
+skip_read:	/*
 		 * We pushed a set of duplicates off-page, and that routine
-		 * returned a ending key/data pair to us.
+		 * returned an ending key/data pair to us.
 		 */
-skip_read:
+
 		/*
 		 * Check for duplicate data; we don't store the key on the page
 		 * in the case of a duplicate.   The check through the rest of
@@ -143,16 +166,17 @@ skip_read:
 			key->size = sizeof(key_ovfl);
 
 			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY_OVFL);
-			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_KEY,
-			    "bulk overflow key items read");
+			WT_STAT_INCR(idb->stats,
+			    BULK_OVERFLOW_KEY, "bulk overflow key items read");
 		} else
 			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY);
 
 		if (data->size > db->leafitemsize) {
 			data_ovfl.len = data->size;
 			WT_ERR(__wt_bt_ovfl_write(toc, data, &data_ovfl.addr));
-			data->data = &data_ovfl;
-			data->size = sizeof(data_ovfl);
+			data_copy.data = &data_ovfl;
+			data_copy.size = sizeof(data_ovfl);
+			data = &data_copy;
 
 			WT_ITEM_TYPE_SET(&data_item,
 			    key == NULL ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
@@ -371,12 +395,18 @@ skip_read:
 	/* Get a permanent root page reference. */
 	WT_TRET(__wt_bt_root_page(toc));
 
+	/* Wrap up reporting. */
+	if (f != NULL)
+		f("Db.bulk_load", insert_cnt);
+
 	if (0) {
 err:		if (page != NULL)
 			(void)__wt_bt_page_out(toc, page, 0);
 	}
 
-	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data);
+	WT_FREE_AND_CLEAR(env, data_compress.data, data_compress.data_len);
+	WT_FREE_AND_CLEAR(env, key_compress.data, key_compress.data_len);
+	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data, lastkey_ovfl.data_len);
 
 	WT_TRET(toc->close(toc, 0));
 
