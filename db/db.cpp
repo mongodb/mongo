@@ -139,7 +139,7 @@ namespace mongo {
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);
         if ( l.init() ) {
-            registerListenerSocket( l.socket() );
+            ListeningSockets::get()->add( l.socket() );
             l.listen();
         }
     }

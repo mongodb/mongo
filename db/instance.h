@@ -101,9 +101,6 @@ namespace mongo {
 
     void getDatabaseNames( vector< string > &names );
 
-    // must call with db lock
-    void registerListenerSocket( int socket );
-    
 // --- local client ---
     
     class DBDirectClient : public DBClientBase {

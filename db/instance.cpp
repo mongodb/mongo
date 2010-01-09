@@ -647,13 +647,6 @@ namespace mongo {
 
     void recCacheCloseAll();
 
-    boost::mutex &listenerSocketMutex( *( new boost::mutex ) );
-    vector< int > listenerSockets;
-    void registerListenerSocket( int socket ) {
-        boostlock lk( listenerSocketMutex );
-        listenerSockets.push_back( socket );
-    }
-    
     boost::mutex &exitMutex( *( new boost::mutex ) );
     int numExitCalls = 0;
     void shutdown();
@@ -711,16 +704,9 @@ namespace mongo {
     
     void shutdown() {
 
-#ifndef _WIN32
-        {
-            // close listener sockets
-            // We would only hang here if a synchronous signal is received 
-            // during a registerListenerSocket() call, which we don't expect.
-            boostlock lk( listenerSocketMutex );
-            for( vector< int >::iterator i = listenerSockets.begin(); i != listenerSockets.end(); ++i )
-                close( *i );
-        }
-#endif
+
+        log() << "\t shutdown: going to close listening sockets..." << endl;        
+        ListeningSockets::get()->closeAll();
 
         log() << "\t shutdown: going to flush oplog..." << endl;
         stringstream ss2;
@@ -734,7 +720,7 @@ namespace mongo {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
-        log() << "\t shutdown: waiting for fs..." << endl;
+        log() << "\t shutdown: waiting for fs preallocator..." << endl;
         theFileAllocator().waitUntilFinished();
         
         log() << "\t shutdown: closing all files..." << endl;

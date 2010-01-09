@@ -486,8 +486,8 @@ namespace mongo {
         DbWebServer mini;
         int p = cmdLine.port + 1000;
         if ( mini.init(bind_ip, p) ) {
-            registerListenerSocket( mini.socket() );
-            log() << "web admin interface listening on port " << p << '\n';
+            ListeningSockets::get()->add( mini.socket() );
+            log() << "web admin interface listening on port " << p << endl;
             mini.run();
         }
         else { 

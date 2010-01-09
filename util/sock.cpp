@@ -199,6 +199,11 @@ namespace mongo {
 
 #endif
 
+    ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
+    
+    ListeningSockets* ListeningSockets::get(){
+        return _instance;
+    }
 
 
 } // namespace mongo
