@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -5,12 +6,77 @@
 #include <string.h>
 #include <time.h>
 
-#include "wiredtiger.h"
+#include "wt_internal.h"
+
+int test0(u_int8_t *, u_int32_t);
+int test1(void);
+int test2(void);
 
 int
-main()
+main(int argc, char *argv[])
 {
+	char *text;
+	u_int32_t len;
+
+	(void)__wt_library_init();
+
+#if 0
 	return (test1() == 0 && test2() == 0 ? 0 : 1);
+#endif
+
+#if 0
+	text = "0000000006";
+	len = strlen(text);;
+	return (test0(text, len));
+#endif
+
+#if 1
+	return (test0((u_int8_t *)argv[1], (u_int32_t)strlen(argv[1])));
+#endif
+}
+
+/******************************************************************
+ * Test #0:
+ *
+ * Encode & decode a string using the library interfaces.
+ */
+void
+show(char *msg, u_int8_t *p, u_int32_t len)
+{
+	printf("%s: {", msg);
+	__wt_bt_print(p, len, stdout);
+	printf("}\n");
+}
+
+int
+test0(u_int8_t *s, u_int32_t len)
+{
+	DB *db;
+	void *hp;
+	u_int32_t v_in, v_out;
+	int ret;
+	char *in, *out;
+
+	printf("library encode/decode:\n");
+	assert(wiredtiger_simple_setup("ht", &db) == 0);
+	assert(db->huffman_set(db,
+	    NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_DATA|WT_HUFFMAN_KEY) == 0);
+	hp = db->idb->huffman_key;
+
+	show("original", s, len);
+
+	assert(__wt_huffman_encode(hp, s, len, &in, NULL, &v_in) == 0);
+	show("encode", in, v_in);
+
+	assert(__wt_huffman_decode(hp, in, v_in, &out, NULL, &v_out) == 0);
+	show("decode", out, v_out);
+
+	printf("original: %lu, encode %lu, decode %lu\n",
+	    (u_long)len, (u_long)v_in, (u_long)v_out);
+	printf("%smatch\n",
+	    (u_long)len == v_out && memcmp(s, out, v_out) == 0 ? "" : "NO ");
+
+	return (0);
 }
 
 /******************************************************************
@@ -50,7 +116,7 @@ test1()
 	u_int8_t* decoded;
 	u_int8_t* source;
 	u_int32_t sl, bytecount, bytecount2;
-	int i;
+	int i, ret;
 
 	/* In your code you must allocate a buffer large enough for the frequency table 
 	* Which is 256 bytes for simple ASCII */
@@ -90,16 +156,15 @@ test1()
 	buffers large enough now.  These are write-only values (const) so
 	we don't know actual usage information from them. */
 	sl      = strlen(text);
-	encoded = (u_int8_t*)malloc(sl);
 	source  = (u_int8_t*)malloc(sl);
-	decoded = (u_int8_t*)malloc(sl+1);
 	memcpy(source, text, sl);
 
 	/* the output buffer (encoded) is the length of the string (sl) and 
 	the total bytes used is bytecount.*/
-	if (__wt_huffman_encode(huffman, source, sl, encoded, sl, &bytecount))
+	if ((ret = __wt_huffman_encode(
+	    huffman, source, sl, &encoded, NULL, &bytecount)) != 0)
 	{
-		printf("Failed to encode\n");
+		printf("Failed to encode: %s\n", wiredtiger_strerror(ret));
 		exit(1);
 	}
 
@@ -110,7 +175,7 @@ test1()
 	buffer which we made the size of the initial string.   In your database code you
 	need to make this sufficiently large enough for the largest possible value you support.*/
 	
-	__wt_huffman_decode(huffman, encoded, bytecount, decoded, sl, &bytecount2);
+	__wt_huffman_decode(huffman, encoded, bytecount, &decoded, NULL, &bytecount2);
 	
 	/* Not really required but we know this is string data so terminate it */
 	decoded[bytecount2] = 0;
@@ -144,7 +209,6 @@ test2()
 	void* huffman;
 	u_int8_t* freqTablePhones;
 	u_int8_t* encoded;
-	u_int8_t* decoded;
 	u_int8_t* source;
 	u_int32_t sl;
 	u_int32_t totalRaw = 0;
@@ -179,9 +243,7 @@ test2()
 
 	/* Preallocate buffers for phone numbers */
 	sl      = 15; 
-	encoded = (u_int8_t*)malloc(sl);
 	source  = (u_int8_t*)malloc(sl);
-  	decoded = (u_int8_t*)malloc(sl+1);
 	
 	for (i=0; i<100; i++)
 	{
@@ -199,7 +261,7 @@ test2()
 		
 		/* Encode the phone number (notice we pass in only the 
 		bytes used not the null terminator on the string*/
-		if (__wt_huffman_encode(huffman, source, 14, encoded, sl, &bytecount))
+		if (__wt_huffman_encode(huffman, source, 14, &encoded, NULL, &bytecount))
 		{
 			printf("Failed to encode\n");
 			exit(1);

@@ -21,7 +21,6 @@ int keys_cnt = 0;				/* Count of keys loaded */
 int leafsize = 0;				/* Leaf page size */
 int nodesize = 0;				/* Node page size */
 int runs = 0;					/* Runs: default forever */
-int stats = 0;					/* Show statistics */
 int verbose = 0;				/* Verbose debugging */
 
 int a_dump = 0;					/* Dump database */
@@ -53,7 +52,7 @@ main(int argc, char *argv[])
 {
 	u_int r;
 	int ch, i, ret, run_cnt;
-	int rand_cache, rand_keys, rand_leaf, rand_node;
+	int rand_cache, rand_huffman, rand_keys, rand_leaf, rand_node;
 
 	ret = 0;
 #if 0
@@ -66,7 +65,7 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
-	rand_cache = rand_keys = rand_leaf = rand_node =  1;
+	rand_cache = rand_huffman = rand_keys = rand_leaf = rand_node =  1;
 	while ((ch = getopt(argc, argv, "a:c:hk:L:l:n:R:r:v")) != EOF)
 		switch (ch) {
 		case 'a':
@@ -90,6 +89,7 @@ main(int argc, char *argv[])
 			cachesize = atoi(optarg);
 			break;
 		case 'h':
+			rand_huffman = 0;
 			huffman = 1;
 			break;
 		case 'k':
@@ -157,10 +157,13 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
+		if (rand_huffman)
+			huffman = rand() % 2;
+
 		(void)printf(
-		    "%s: %4d { -c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
-		    progname, run_cnt, cachesize, keys, leafsize, nodesize,
-		    r);
+		    "%s: %4d { %s-c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
+		    progname, run_cnt, huffman ? "-h " : "",
+		    cachesize, keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		setup();
