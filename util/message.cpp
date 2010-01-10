@@ -79,7 +79,7 @@ namespace mongo {
                     log() << "Listener on port " << port << " aborted" << endl;
                     return;
                 }
-                log() << "Listener: accept() returns " << s << OUTPUT_ERRNO << endl;
+                log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNO << endl;
                 continue;
             }
             disableNagle(s);
