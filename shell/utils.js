@@ -217,6 +217,10 @@ Array.tojson = function( a , indent ){
     if (!indent) 
         indent = "";
 
+    if (a.length == 0) {
+        return "[ ]";
+    }
+
     var s = "[\n";
     indent += "\t";
     for ( var i=0; i<a.length; i++){
