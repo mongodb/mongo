@@ -161,8 +161,8 @@ main(int argc, char *argv[])
 			huffman = rand() % 2;
 
 		(void)printf(
-		    "%s: %4d { %s-c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
-		    progname, run_cnt, huffman ? "-h " : "",
+		    "%s: %4d { %s -c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
+		    progname, run_cnt, huffman ? "-h" : "  ",
 		    cachesize, keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
