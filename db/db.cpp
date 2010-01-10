@@ -118,9 +118,16 @@ namespace mongo {
                 return;
             }
             grab = mp;
-            boost::thread thr(connThread);
-            while ( grab )
-                sleepmillis(1);
+            try {
+                boost::thread thr(connThread);
+                while ( grab )
+                    sleepmillis(1);
+            }
+            catch ( boost::thread_resource_error& e ){
+                log() << "can't create new thread, closing connection" << endl;
+                mp->shutdown();
+                grab = 0;
+            }
         }
     };
 
