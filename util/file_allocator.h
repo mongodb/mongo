@@ -55,6 +55,8 @@ namespace mongo {
             */
 #if !defined(_WIN32)
             boostlock lk( pendingMutex_ );
+            if ( failed_ )
+                return;
             long oldSize = prevSize( name );
             if ( oldSize != -1 ) {
                 size = oldSize;
@@ -76,6 +78,7 @@ namespace mongo {
                 if ( !inProgress( name ) )
                     return;
             }
+            checkFailure();
             pendingSize_[ name ] = size;
             if ( pending_.size() == 0 )
                 pending_.push_back( name );
@@ -86,8 +89,10 @@ namespace mongo {
                 pending_.insert( i, name );
             }
             pendingUpdated_.notify_all();
-            while( inProgress( name ) )
+            while( inProgress( name ) ) {
+                checkFailure();
                 pendingUpdated_.wait( lk );
+            }
 #endif
         }
 
@@ -103,6 +108,10 @@ namespace mongo {
         
     private:
 #if !defined(_WIN32)
+        void checkFailure() {
+            massert( 12520, "file allocation failure", !failed_ );            
+        }
+        
         // caller must hold pendingMutex_ lock.  Returns size if allocated or 
         // allocation requested, -1 otherwise.
         long prevSize( const string &name ) const {
@@ -196,8 +205,11 @@ namespace mongo {
                                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                             } catch ( ... ) {
                             }
+                            boostlock lk( a_.pendingMutex_ );
                             a_.failed_ = true;
-                            dbexit( EXIT_FS );
+                            // not erasing from pending
+                            a_.pendingUpdated_.notify_all();
+                            return; // no more allocation
                         }
                         
                         {
