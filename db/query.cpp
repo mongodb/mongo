@@ -545,7 +545,9 @@ namespace mongo {
                         {
                             dbtemprelease t;
                         }
-                        findingStartCursor_ = ClientCursor::find( id, false );
+
+                        ClientCursor::Pointer p(id);
+                        findingStartCursor_ = p._c;
                     }
                     return;
                 }
