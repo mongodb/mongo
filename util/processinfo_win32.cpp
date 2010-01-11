@@ -1,4 +1,4 @@
-// processinfo_none.cpp
+// processinfo_win32.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -19,10 +19,20 @@
 #include "processinfo.h"
 
 #include <iostream>
+
+#include <windows.h>
+
 using namespace std;
+
+int getpid(){
+    // TODO: fill me in
+    return 0;
+}
 
 namespace mongo {
     
+    
+
     ProcessInfo::ProcessInfo( pid_t pid ){
     }
 
@@ -30,15 +40,19 @@ namespace mongo {
     }
 
     bool ProcessInfo::supported(){
-        return false;
+        return true;
     }
     
     int ProcessInfo::getVirtualMemorySize(){
-        return -1;
+        MEMORYSTATUS ms;
+        GlobalMemoryStatus(&ms);
+        return (int)(ms.dwTotalVirtual / ( 1024 * 1024 ));
     }
     
     int ProcessInfo::getResidentSize(){
-        return -1;
+        MEMORYSTATUS ms;
+        GlobalMemoryStatus(&ms);
+        return (int)(ms.dwTotalPhys / ( 1024 * 1024 ));
     }
 
 }

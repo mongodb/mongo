@@ -327,17 +327,23 @@ namespace mongo {
             }
             
             {
+
+                BSONObjBuilder t( result.subobjStart( "mem" ) );
+                
                 ProcessInfo p;
                 if ( p.supported() ){
-                    BSONObjBuilder t;
                     t.append( "resident" , p.getResidentSize() );
                     t.append( "virtual" , p.getVirtualMemorySize() );
-                    t.append( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
-                    result.append( "mem" , t.obj() );
+                    t.appendBool( "supported" , true );
                 }
                 else {
-                    result.append( "mem" , "not support on this platform" );
+                    result.append( "note" , "not all mem info support on this platform" );
+                    t.appendBool( "supported" , false );
                 }
+                    
+                t.append( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+
+                t.done();
                     
             }
             
