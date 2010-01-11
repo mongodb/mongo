@@ -29,22 +29,22 @@ debug( "b" )
 assert(t.validate().valid);
 
 
-db.bar.drop();
-db.bar.save({x:'a'});
-db.bar.save({x:'aba'});
-db.bar.save({x:'zed'});
-db.bar.save({x:'foo'});
+db.sorrrt2.drop();
+db.sorrrt2.save({x:'a'});
+db.sorrrt2.save({x:'aba'});
+db.sorrrt2.save({x:'zed'});
+db.sorrrt2.save({x:'foo'});
 
 debug( "c" )
 
 for( var pass = 0; pass < 2; pass++ ) { 
-    debug( tojson( db.bar.find().sort( { "x" : 1 } ).limit(1).next() ) );
-    assert.eq( "a" , db.bar.find().sort({'x': 1}).limit(1).next().x , "c.1" );
-    assert.eq( "a" , db.bar.find().sort({'x': 1}).next().x , "c.2" );
-    assert.eq( "zed" , db.bar.find().sort({'x': -1}).limit(1).next().x , "c.3" );
-    assert.eq( "zed" , db.bar.find().sort({'x': -1}).next().x , "c.4" );
+    debug( tojson( db.sorrrt2.find().sort( { "x" : 1 } ).limit(1).next() ) );
+    assert.eq( "a" , db.sorrrt2.find().sort({'x': 1}).limit(1).next().x , "c.1" );
+    assert.eq( "a" , db.sorrrt2.find().sort({'x': 1}).next().x , "c.2" );
+    assert.eq( "zed" , db.sorrrt2.find().sort({'x': -1}).limit(1).next().x , "c.3" );
+    assert.eq( "zed" , db.sorrrt2.find().sort({'x': -1}).next().x , "c.4" );
 }
 
 debug( "d" )
 
-assert(db.bar.validate().valid);
+assert(db.sorrrt2.validate().valid);
