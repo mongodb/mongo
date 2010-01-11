@@ -21,19 +21,18 @@
 #include <iostream>
 
 #include <windows.h>
+#include <psapi.h>
 
 using namespace std;
 
 int getpid(){
-    // TODO: fill me in
-    return 0;
+    return GetCurrentProcessId();
 }
 
 namespace mongo {
     
-    
     int _wconvertmtos( SIZE_T s ){
-        return ( s / ( 1024 * 1024 ) );
+        return (int)( s / ( 1024 * 1024 ) );
     }
     
     ProcessInfo::ProcessInfo( pid_t pid ){
@@ -48,13 +47,13 @@ namespace mongo {
     
     int ProcessInfo::getVirtualMemorySize(){
         PROCESS_MEMORY_COUNTERS pmc;
-        assert( GetProcessMemoryInfo(process_, &pmc, sizeof(pmc) ) );
+        assert( GetProcessMemoryInfo( _pid , &pmc, sizeof(pmc) ) );
         return _wconvertmtos( pmc.PagefileUsage );
     }
     
     int ProcessInfo::getResidentSize(){
         PROCESS_MEMORY_COUNTERS pmc;
-        GlobalMemoryStatus(&ms);
+        assert( GetProcessMemoryInfo( _pid , &pmc, sizeof(pmc) ) );
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
