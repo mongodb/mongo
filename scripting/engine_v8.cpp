@@ -61,7 +61,6 @@ namespace mongo {
               _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate()->GetFunction() );
         
         installDBTypes( _global );
-        installFork( _global, _context );
     }
 
     V8Scope::~V8Scope(){
@@ -413,12 +412,12 @@ namespace mongo {
     
     void V8Scope::externalSetup(){
         V8_SIMPLE_HEADER
-        
         if ( _connectState == EXTERNAL )
             return;
         if ( _connectState == LOCAL )
             throw UserException( 12512, "localConnect already called, can't call externalSetup" );
 
+        installFork( _global, _context );
         _global->Set( v8::String::New( "Mongo" ) , getMongoFunctionTemplate( false )->GetFunction() );
         exec( jsconcatcode , "shell setup" , false , true , true , 0 );
         _connectState = EXTERNAL;
