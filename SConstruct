@@ -528,7 +528,7 @@ elif "win32" == os.sys.platform:
 
     env.Append( CPPFLAGS=" /EHsc /W3 " )
     env.Append( CPPFLAGS=" /wd4355 /wd4800 " ) #some warnings we don't like
-    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8" ] )
+    env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
 
     #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
 
@@ -569,12 +569,14 @@ elif "win32" == os.sys.platform:
     commonFiles += pcreFiles
     allClientFiles += pcreFiles
 
-    winLibString = "ws2_32.lib kernel32.lib advapi32.lib"
+    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
+
     if force64:
         winLibString += " LIBCMT LIBCPMT "
     else:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
         winLibString += " odbc32.lib odbccp32.lib uuid.lib "
+
     env.Append( LIBS=Split(winLibString) )
 
     if force64:
