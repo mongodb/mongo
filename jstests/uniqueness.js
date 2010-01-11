@@ -22,11 +22,11 @@ assert( db.getLastError() , 4);
 assert( t.findOne( {_id:4} ), 5 );
 
 // Check for an error message when we index and there are dups 
-db.jstests_uniqueness_2.drop();
-db.jstests_uniqueness_2.insert({a:3});
-db.jstests_uniqueness_2.insert({a:3});
-assert( db.jstests_uniqueness_2.count() == 2 , 6) ;
-db.jstests_uniqueness_2.ensureIndex({a:1}, true);
+db.bar.drop();
+db.bar.insert({a:3});
+db.bar.insert({a:3});
+assert( db.bar.count() == 2 , 6) ;
+db.bar.ensureIndex({a:1}, true);
 assert( db.getLastError() , 7);
 
 /* Check that if we update and remove _id, it gets added back by the DB */
