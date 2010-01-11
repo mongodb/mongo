@@ -47,13 +47,13 @@ namespace mongo {
     
     int ProcessInfo::getVirtualMemorySize(){
         PROCESS_MEMORY_COUNTERS pmc;
-        assert( GetProcessMemoryInfo( _pid , &pmc, sizeof(pmc) ) );
+        assert( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
         return _wconvertmtos( pmc.PagefileUsage );
     }
     
     int ProcessInfo::getResidentSize(){
         PROCESS_MEMORY_COUNTERS pmc;
-        assert( GetProcessMemoryInfo( _pid , &pmc, sizeof(pmc) ) );
+        assert( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
