@@ -178,7 +178,7 @@ __wt_realloc(ENV *env,
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void
-__wt_free(ENV *env, void *p, u_int32_t len);
+__wt_free(ENV *env, void *p_arg, u_int32_t len);
 int
 __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int

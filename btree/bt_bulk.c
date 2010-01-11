@@ -404,9 +404,9 @@ err:		if (page != NULL)
 			(void)__wt_bt_page_out(toc, page, 0);
 	}
 
-	WT_FREE_AND_CLEAR(env, data_compress.data, data_compress.data_len);
-	WT_FREE_AND_CLEAR(env, key_compress.data, key_compress.data_len);
-	WT_FREE_AND_CLEAR(env, lastkey_ovfl.data, lastkey_ovfl.data_len);
+	__wt_free(env, &data_compress.data, data_compress.data_len);
+	__wt_free(env, &key_compress.data, key_compress.data_len);
+	__wt_free(env, &lastkey_ovfl.data, lastkey_ovfl.data_len);
 
 	WT_TRET(toc->close(toc, 0));
 

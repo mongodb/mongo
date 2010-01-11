@@ -106,16 +106,14 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		WT_INDX_FOREACH(page, indx, i)
 			if (F_ISSET(indx, WT_ALLOCATED)) {
 				F_CLR(indx, WT_ALLOCATED);
-				__wt_free(env, indx->data, 0);
+				__wt_free(env, &indx->data, 0);
 			}
 	}
 	if (page->indx != NULL)
-		__wt_free(env, page->indx, 0);
-#ifdef HAVE_DIAGNOSTIC
-	memset(page->hdr, WT_OVERWRITE, page->bytes);
-#endif
-	__wt_free(env, page->hdr, sizeof(WT_PAGE_HDR));
-	__wt_free(env, page, sizeof(WT_PAGE));
+		__wt_free(env, &page->indx, 0);
+
+	__wt_free(env, &page->hdr, sizeof(WT_PAGE_HDR));
+	__wt_free(env, &page, sizeof(WT_PAGE));
 }
 
 /*
@@ -164,7 +162,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	 * been freed.
 	 */
 	if (page->indx != NULL && page->indx_size < nindx)
-		WT_FREE_AND_CLEAR(env, page->indx, 0);
+		__wt_free(env, &page->indx, 0);
 
 	if (page->indx == NULL) {
 		WT_RET((__wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)));

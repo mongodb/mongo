@@ -116,7 +116,7 @@ __wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp)
 	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (vstuff.fragbits != NULL)
-		__wt_free(env, vstuff.fragbits, 0);
+		__wt_free(env, &vstuff.fragbits, 0);
 	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
@@ -866,12 +866,12 @@ eop:			__wt_db_errx(db,
 err_set:	ret = WT_ERROR;
 	}
 
-err:	WT_FREE_AND_CLEAR(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
-	WT_FREE_AND_CLEAR(env, _b.item_ovfl.data, _b.item_ovfl.data_len);
-	WT_FREE_AND_CLEAR(env, _c.item_ovfl.data, _c.item_ovfl.data_len);
-	WT_FREE_AND_CLEAR(env, _a.item_comp.data, _a.item_comp.data_len);
-	WT_FREE_AND_CLEAR(env, _b.item_comp.data, _b.item_comp.data_len);
-	WT_FREE_AND_CLEAR(env, _c.item_comp.data, _c.item_comp.data_len);
+err:	__wt_free(env, &_a.item_ovfl.data, _a.item_ovfl.data_len);
+	__wt_free(env, &_b.item_ovfl.data, _b.item_ovfl.data_len);
+	__wt_free(env, &_c.item_ovfl.data, _c.item_ovfl.data_len);
+	__wt_free(env, &_a.item_comp.data, _a.item_comp.data_len);
+	__wt_free(env, &_b.item_comp.data, _b.item_comp.data_len);
+	__wt_free(env, &_c.item_comp.data, _c.item_comp.data_len);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */

@@ -73,18 +73,6 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-/* Free memory if set, avoiding any race with another thread. */
-#define	WT_FREE_AND_CLEAR(env, p, len) do {				\
-	void *__p;							\
-	if ((__p = p) != NULL) {					\
-		(p) = NULL;						\
-		__wt_free(env, __p, len);				\
-	}								\
-} while (0)
-
-/* A distinguished byte pattern to overwrite memory we are done using. */
-#define	WT_OVERWRITE	0xab
-
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_ASSERT(env, e)						\
 	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))

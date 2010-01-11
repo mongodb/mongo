@@ -102,7 +102,7 @@ __wt_env_close(ENV *env)
 	WT_TRET(__wt_ienv_destroy(env, 0));
 
 	/* Free the Env structure. */
-	__wt_free(NULL, env, sizeof(ENV));
+	__wt_free(NULL, &env, sizeof(ENV));
 
 	if (ret == 0)
 		ret = secondary_err;

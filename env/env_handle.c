@@ -108,7 +108,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 		return (0);
 
 	/* Free allocated memory. */
-	__wt_free(env, ienv->stats, 0);
+	__wt_free(env, &ienv->stats, 0);
 
 	/*
 	 * This is the guts of the split between the public/private, ENV/IENV
@@ -125,7 +125,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	}
 
 	/* If we're truly done, discard the actual memory. */
-	__wt_free(NULL, ienv, sizeof(IENV));
+	__wt_free(NULL, &ienv, sizeof(IENV));
 	env->ienv = NULL;
 	return (0);
 }

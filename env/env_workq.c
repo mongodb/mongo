@@ -221,7 +221,7 @@ __wt_queue_op_check(ENV *env)
 	}
 	if (ienv->toc_del != NULL) {
 		TAILQ_REMOVE(&ienv->tocqh, ienv->toc_del, q);
-		__wt_free(env, ienv->toc_del, sizeof(WT_TOC));
+		__wt_free(env, &ienv->toc_del, sizeof(WT_TOC));
 		ienv->toc_del = NULL;
 		__wt_unlock(&ienv->mtx);
 	}

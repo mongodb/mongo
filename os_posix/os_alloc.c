@@ -38,7 +38,7 @@ program under a debugger.
 
 #define	WT_MEMORY_FILE	"memory.out"
 
-static void __wt_debug_loadme(ENV *, const char *, void *);
+static void __wt_debug_loadme(const char *, void *);
 static void  __wt_open_mfp(ENV *);
 
 static FILE *__wt_mfp;
@@ -46,11 +46,11 @@ static void *debug_addr;
 static int debug_count;
 
 static void
-__wt_debug_loadme(ENV *env, const char *msg, void *addr)
+__wt_debug_loadme(const char *msg, void *addr)
 {
 	fprintf(stderr, "memory: %lx: %s\n", (u_long)addr, msg);
 	if (debug_count > 0 && --debug_count == 0)
-		__wt_abort(env);
+		__wt_abort();
 }
 
 static void
@@ -60,7 +60,7 @@ __wt_open_mfp(ENV *env)
 
 	if ((__wt_mfp = fopen(WT_MEMORY_FILE, "w")) == NULL) {
 		__wt_api_env_err(env, errno, "%s: open", WT_MEMORY_FILE);
-		__wt_abort(env);
+		__wt_abort();
 	}
 
 	if (debug_addr == 0 && (v = getenv("WT_MEMORY_VALUE")) != NULL)
@@ -110,7 +110,7 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 	if (__wt_mfp == NULL)
 		__wt_open_mfp(env);
 	if (debug_addr == p)
-		__wt_debug_loadme(env, "allocation", p);
+		__wt_debug_loadme("allocation", p);
 	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
 #endif
 
@@ -155,7 +155,7 @@ __wt_realloc(ENV *env,
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (p != NULL) {
 		if (debug_addr == p)
-			__wt_debug_loadme(env, "free", p);
+			__wt_debug_loadme("free", p);
 		fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
 	}
 #endif
@@ -177,7 +177,7 @@ __wt_realloc(ENV *env,
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
-		__wt_debug_loadme(env, "allocation", p);
+		__wt_debug_loadme("allocation", p);
 	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
 #endif
 
@@ -216,28 +216,41 @@ __wt_strdup(ENV *env, const char *str, void *retp)
  *	ANSI free function.
  */
 void
-__wt_free(ENV *env, void *p, u_int32_t len)
+__wt_free(ENV *env, void *p_arg, u_int32_t len)
 {
+	void *p;
+
 	/*
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	WT_ASSERT(env, env == NULL || p != NULL);
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
 		WT_STAT_INCR(env->ienv->stats, MEMFREE, "memory frees");
 
+	p = *(void **)p_arg;
+	if (p == NULL)			/* ANSI C free semantics */
+		return;
+
+	/*
+	 * If there's a serialization bug we might race with another thread.
+	 * Avoid the race by clearing the location atomically.
+	 */
+	*(void **)p_arg = NULL;
+
 #ifdef HAVE_DIAGNOSTIC
-	/* If we know how long the object is, clear it. */
+	/*
+	 * If we know how long the object is, overwrite it with an easily
+	 * recognizable value for debugging.
+	 */
 	if (len != 0)
-		memset(p, WT_OVERWRITE, len);
+		memset(p, 0xab, len);
 #endif
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
-		__wt_debug_loadme(env, "free", p);
+		__wt_debug_loadme("free", p);
 	fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
 #endif
 
-	if (p != NULL)			/* ANSI C free semantics */
-		free(p);
+	free(p);
 }

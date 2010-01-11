@@ -135,7 +135,7 @@ __wt_cache_destroy(ENV *env)
 	WT_ASSERT(env, cache->bytes_alloc == 0);
 
 	/* Discard allocated memory. */
-	WT_FREE_AND_CLEAR(env, cache->hb, 0);
+	__wt_free(env, &cache->hb, 0);
 	F_SET(cache, WT_INITIALIZED);
 
 	/* It's really, really dead. */
@@ -232,7 +232,7 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
 	WT_ERR(__wt_calloc(env, 1, (size_t)bytes, &page->hdr));
 	if (0) {
-err:		__wt_free(env, page, sizeof(WT_PAGE));
+err:		__wt_free(env, &page, sizeof(WT_PAGE));
 		return (ret);
 	}
 
@@ -355,9 +355,8 @@ __wt_cache_in(WT_TOC *toc,
 		    "checksum error", (u_quad)offset, (u_long)bytes);
 		ret = WT_ERROR;
 
-err:		if (page->hdr != NULL)
-			__wt_free(env, page->hdr, sizeof(WT_PAGE_HDR));
-		__wt_free(env, page, sizeof(WT_PAGE));
+err:		__wt_free(env, &page->hdr, sizeof(WT_PAGE_HDR));
+		__wt_free(env, &page, sizeof(WT_PAGE));
 		return (ret);
 	}
 
