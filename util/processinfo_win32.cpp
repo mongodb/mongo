@@ -32,7 +32,10 @@ int getpid(){
 namespace mongo {
     
     
-
+    int _wconvertmtos( SIZE_T s ){
+        return ( s / ( 1024 * 1024 ) );
+    }
+    
     ProcessInfo::ProcessInfo( pid_t pid ){
     }
 
@@ -44,15 +47,15 @@ namespace mongo {
     }
     
     int ProcessInfo::getVirtualMemorySize(){
-        MEMORYSTATUS ms;
-        GlobalMemoryStatus(&ms);
-        return (int)(ms.dwTotalVirtual / ( 1024 * 1024 ));
+        PROCESS_MEMORY_COUNTERS pmc;
+        assert( GetProcessMemoryInfo(process_, &pmc, sizeof(pmc) ) );
+        return _wconvertmtos( pmc.PagefileUsage );
     }
     
     int ProcessInfo::getResidentSize(){
-        MEMORYSTATUS ms;
+        PROCESS_MEMORY_COUNTERS pmc;
         GlobalMemoryStatus(&ms);
-        return (int)(ms.dwTotalPhys / ( 1024 * 1024 ));
+        return _wconvertmtos( pmc.WorkingSetSize );
     }
 
 }
