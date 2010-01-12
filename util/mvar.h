@@ -60,9 +60,9 @@ namespace mongo {
         // puts val into the MVar
         // will block if the MVar is already full
         void put(const T& val){
+            Mutex::scoped_lock lock(_mutex);
             while (!tryPut(val)){
                  // unlocks lock while waiting and relocks before returning
-                Mutex::scoped_lock lock(_mutex);
                 _condition.wait(lock);
             } 
         }
