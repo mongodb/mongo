@@ -287,7 +287,8 @@ namespace mongo {
 
                 // port allocator left this socket open to prevent someone else from grabbing
                 // the port -- now we need to close the socket
-                assert( 0 == close( oldSocket_ ) );
+                if ( oldSocket_ > 0 )
+                    assert( 0 == close( oldSocket_ ) );
                                 
                 fflush( 0 );
                 pid_ = fork();
