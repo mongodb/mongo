@@ -130,9 +130,7 @@ namespace mongo {
         }
         CmdGetLastError() : Command("getlasterror") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            LastError *le = lastError.get();
-            assert( le );
-            le->nPrev--; // we don't count as an operation
+            LastError *le = lastError.disableForCommand();
             if ( le->nPrev != 1 )
                 LastError::noError.appendSelf( result );
             else
@@ -178,9 +176,7 @@ namespace mongo {
         }
         CmdGetPrevError() : Command("getpreverror") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            LastError *le = lastError.get();
-            assert( le );
-            le->nPrev--; // we don't count as an operation
+            LastError *le = lastError.disableForCommand();
             le->appendSelf( result );
             if ( le->valid )
                 result.append( "nPrev", le->nPrev );
@@ -208,9 +204,7 @@ namespace mongo {
                 errmsg = "already in client id mode";
                 return false;
             }
-            LastError *le = lastError.get();
-            assert( le );
-            le->nPrev--;
+            LastError *le = lastError.disableForCommand();
             le->overridenById = true;
             result << "ok" << 1;
             return true;

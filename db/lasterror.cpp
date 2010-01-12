@@ -55,6 +55,14 @@ namespace mongo {
         return _id.get();
     }
 
+    LastError * LastErrorHolder::disableForCommand() {
+        LastError *le = get();
+        disable();
+        assert( le );
+        le->nPrev--; // caller is a command that shouldn't count as an operation
+        return le;
+    }
+
     LastError * LastErrorHolder::get( bool create ){
         if ( _disabled )
             return 0;
@@ -102,6 +110,7 @@ namespace mongo {
     }
     
     void LastErrorHolder::reset( LastError * le ){
+        _disabled = false;
         int id = _id.get();
         if ( id == 0 ){
             _tl.reset( le );
@@ -121,6 +130,11 @@ namespace mongo {
     }
 
     void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {
+        // a killCursors message shouldn't affect last error
+        if ( m.data->operation() == dbKillCursors ) {
+            disable();
+            return;
+        }
         if ( !connectionOwned->overridenById ) {
             connectionOwned->nPrev++;
             return;

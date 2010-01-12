@@ -87,10 +87,11 @@ namespace mongo {
         
         // used to disable lastError reporting while processing a killCursors message
         // disable causes get() to return 0.
-        void disable() { _disabled = true; }
+        LastError *disableForCommand(); // only call once per command invocation!
         void enable() { _disabled = false; }
         bool disabled() { return _disabled; }
     private:
+        void disable() { _disabled = true; }
         ThreadLocalValue<int> _id;
         boost::thread_specific_ptr<LastError> _tl;
         
