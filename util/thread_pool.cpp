@@ -126,7 +126,7 @@ void ThreadPool::task_done(Worker* worker){
         worker->set_task(_tasks.front());
         _tasks.pop_front();
     }else{
-        _freeWorkers.push_back(worker);
+        _freeWorkers.push_front(worker);
     }
 
     _tasksRemaining--;
