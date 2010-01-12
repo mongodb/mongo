@@ -271,13 +271,10 @@ namespace mongo {
                     cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
                     assert( dbs.count( port_ ) == 0 );        
                 }
-                if ( port_ > 0 ) {
-                    if ( portToSocket.find( port_ ) == portToSocket.end() ) {
+                if ( port_ <= 0 || portToSocket.find( port_ ) == portToSocket.end() || portToSocket[ port_ ] <= 0 ) {
                         oldSocket_ = -1;
-                    } else {
-                        oldSocket_ = portToSocket[ port_ ];
-                        assert( oldSocket_ > 0 );
-                    }
+                } else {
+                    oldSocket_ = portToSocket[ port_ ];
                 }
             }
             
@@ -287,8 +284,11 @@ namespace mongo {
 
                 // port allocator left this socket open to prevent someone else from grabbing
                 // the port -- now we need to close the socket
-                if ( oldSocket_ > 0 )
+                if ( oldSocket_ > 0 ) {
                     assert( 0 == close( oldSocket_ ) );
+                    portToSocket[ port_ ] = -1;
+                    oldSocket_ = -1;
+                }
                                 
                 fflush( 0 );
                 pid_ = fork();
