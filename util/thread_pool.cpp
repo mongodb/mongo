@@ -99,8 +99,8 @@ ThreadPool::~ThreadPool(){
 }
 
 void ThreadPool::join(){
+    boostlock lock(_mutex);
     while(_tasksRemaining){
-        boostlock lock(_mutex);
         _condition.wait(lock);
     }
 }
