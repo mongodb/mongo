@@ -515,6 +515,7 @@ namespace mongo {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).
                 findingStartCursor_ = new ClientCursor();
+				findingStartCursor_->noTimeout();
                 findingStartCursor_->c = qp().newReverseCursor();
                 findingStartCursor_->ns = qp().ns();
             } else {
@@ -545,9 +546,7 @@ namespace mongo {
                         {
                             dbtemprelease t;
                         }
-
-                        ClientCursor::Pointer p(id);
-                        findingStartCursor_ = p._c;
+                        findingStartCursor_ = ClientCursor::find( id, false );
                     }
                     return;
                 }
