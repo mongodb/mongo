@@ -272,7 +272,7 @@ namespace mongo {
                     assert( dbs.count( port_ ) == 0 );        
                 }
                 if ( port_ <= 0 || portToSocket.find( port_ ) == portToSocket.end() || portToSocket[ port_ ] <= 0 ) {
-                        oldSocket_ = -1;
+                    oldSocket_ = -1;
                 } else {
                     oldSocket_ = portToSocket[ port_ ];
                 }
