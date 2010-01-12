@@ -180,6 +180,23 @@ int main( int argc, const char **argv ) {
                ( oldInc + 1 == found["ts"].timestampInc() ) );
 
     }
+    
+    { // check that killcursors doesn't affect last error
+        assert( conn.getLastError().empty() );
+        
+        BufBuilder b;
+        b.append( (int)0 ); // reserved
+        b.append( (int)-1 ); // invalid # of cursors triggers exception
+        b.append( (int)-1 ); // bogus cursor id
+        
+        Message m;
+        m.setData( dbKillCursors, b.buf(), b.len() );
+        
+        // say() is protected in DBClientConnection, so get superclass
+        static_cast< DBConnector* >( &conn )->say( m );
+        
+        assert( conn.getLastError().empty() );
+    }
 
     {
         list<string> l = conn.getDatabaseNames();

@@ -201,7 +201,12 @@ namespace mongo {
                     break;
                 }
 
-                lastError.startRequest( m , le );
+                // a killCursors message shouldn't affect last error
+                if ( m.data->operation() == dbKillCursors ) {
+                    lastError.disable();
+                } else {
+                    lastError.startRequest( m , le );
+                }
 
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse, dbMsgPort.farEnd.sa ) ) {
@@ -220,6 +225,8 @@ namespace mongo {
 
                 if ( dbresponse.response )
                     dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);
+
+                lastError.enable();
             }
 
         }

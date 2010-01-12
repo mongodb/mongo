@@ -66,7 +66,7 @@ namespace mongo {
 
     extern class LastErrorHolder {
     public:
-        LastErrorHolder() : _id( 0 ){}
+        LastErrorHolder() : _id( 0 ), _disabled() {}
 
         LastError * get( bool create = false );
 
@@ -84,6 +84,12 @@ namespace mongo {
         /** when db receives a message/request, call this */
         void startRequest( Message& m , LastError * connectionOwned );
         void startRequest( Message& m );
+        
+        // used to disable lastError reporting while processing a killCursors message
+        // disable causes get() to return 0.
+        void disable() { _disabled = true; }
+        void enable() { _disabled = false; }
+        bool disabled() { return _disabled; }
     private:
         ThreadLocalValue<int> _id;
         boost::thread_specific_ptr<LastError> _tl;
@@ -93,13 +99,18 @@ namespace mongo {
             LastError *lerr;
         };
         static boost::mutex _idsmutex;
-        map<int,Status> _ids;        
+        map<int,Status> _ids;    
+        bool _disabled;
     } lastError;
     
     inline void raiseError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
-            DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
+            if ( lastError.disabled() ) {
+                log() << "lastError disabled, can't report: " << msg << endl;
+            } else {
+                DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
+            }
             return;
         }
         le->raiseError(code, msg);

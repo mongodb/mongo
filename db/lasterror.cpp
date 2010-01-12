@@ -56,6 +56,9 @@ namespace mongo {
     }
 
     LastError * LastErrorHolder::get( bool create ){
+        if ( _disabled )
+            return 0;
+        
         int id = _id.get();
         if ( id == 0 )
             return _tl.get();
