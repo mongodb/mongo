@@ -232,6 +232,7 @@ namespace mongo {
     // All functions must be called with db mutex held
     // Kind of sloppy class structure, for now just want to keep the in mem
     // version speedy.
+	// see http://www.mongodb.org/display/DOCS/Pairing+Internals
     class IdTracker {
     public:
         IdTracker() :

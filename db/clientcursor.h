@@ -149,7 +149,9 @@ namespace mongo {
         static ClientCursor* find(CursorId id, bool warn = true) { 
             recursive_boostlock lock(ccmutex);
             ClientCursor *c = find_inlock(id, warn);
-            assert( c->_pinValue ); // otherwise, not thread safe
+			// if this asserts, your code was not thread safe - you either need to set no timeout 
+			// for the cursor or keep a ClientCursor::Pointer in scope for it.
+            massert( 12521, "internal error: use of an unlocked ClientCursor", c->_pinValue ); 
             return c;
         }
 
