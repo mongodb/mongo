@@ -148,6 +148,8 @@ namespace mongo {
 #include <sys/stat.h>
 #include <sys/wait.h>
         
+        map< int, int > portToSocket;
+        
         BSONObj AllocatePorts( const BSONObj &args ) {
             uassert( 10259 ,  "allocatePorts takes exactly 1 argument", args.nFields() == 1 );
             uassert( 10260 ,  "allocatePorts needs to be passed an integer", args.firstElement().isNumber() );
@@ -157,7 +159,8 @@ namespace mongo {
             vector< int > ports;
             vector< int > sockets;
             for( int i = 0; i < n; ++i ) {
-                int s = socket( AF_INET, SOCK_STREAM, 0 );
+                // configure for udp transport so we don't have to wait to clean up an ip socket on close.
+                int s = socket( AF_INET, SOCK_DGRAM, 0 );
                 assert( s );
                 
                 sockaddr_in address;
@@ -173,8 +176,9 @@ namespace mongo {
                 ports.push_back( ntohs( newAddress.sin_port ) );
                 sockets.push_back( s );
             }
-            for( vector< int >::const_iterator i = sockets.begin(); i != sockets.end(); ++i )
-                assert( 0 == close( *i ) );
+            for( unsigned i = 0; i < ports.size(); ++i ) {
+                portToSocket[ ports[ i ] ] = sockets[ i ];
+            }
             
             sort( ports.begin(), ports.end() );
             for( unsigned i = 1; i < ports.size(); ++i )
@@ -216,6 +220,7 @@ namespace mongo {
             char **argv_;
             int port_;
             int pipe_;
+            int oldSocket_;
             pid_t pid_;
         public:
             pid_t pid() const { return pid_; }
@@ -266,12 +271,24 @@ namespace mongo {
                     cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
                     assert( dbs.count( port_ ) == 0 );        
                 }
+                if ( port_ > 0 ) {
+                    if ( portToSocket.find( port_ ) == portToSocket.end() ) {
+                        oldSocket_ = -1;
+                    } else {
+                        oldSocket_ = portToSocket[ port_ ];
+                        assert( oldSocket_ > 0 );
+                    }
+                }
             }
             
             void start() {
                 int pipeEnds[ 2 ];
                 assert( pipe( pipeEnds ) != -1 );
-                
+
+                // port allocator left this socket open to prevent someone else from grabbing
+                // the port -- now we need to close the socket
+                assert( 0 == close( oldSocket_ ) );
+                                
                 fflush( 0 );
                 pid_ = fork();
                 assert( pid_ != -1 );
@@ -513,6 +530,7 @@ namespace mongo {
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
 #if !defined(_WIN32)
+            // NOTE Most of these aren't thread safe for running in multiple js threads
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
