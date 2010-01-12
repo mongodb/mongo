@@ -55,7 +55,7 @@ namespace mongo {
         }
         prebindOptions( sock );
         if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
-            log() << "listen(): bind() failed " << OUTPUT_ERRNO << endl;
+            log() << "listen(): bind() failed " << OUTPUT_ERRNO << " for port: " << port << endl;
             closesocket(sock);
             return false;
         }
