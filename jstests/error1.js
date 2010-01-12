@@ -1,3 +1,4 @@
+db.jstests_error1.drop();
 
 // test 1
 db.$cmd.findOne({reseterror:1});
