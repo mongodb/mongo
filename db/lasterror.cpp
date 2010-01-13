@@ -55,10 +55,22 @@ namespace mongo {
         return _id.get();
     }
 
-    LastError * LastErrorHolder::get( bool create ){
-        if ( _disabled )
-            return 0;
-        
+    LastError * LastErrorHolder::disableForCommand() {
+        LastError *le = _get();
+        assert( le );
+        le->disabled = true;
+        le->nPrev--; // caller is a command that shouldn't count as an operation
+        return le;
+    }
+
+    LastError * LastErrorHolder::get( bool create ) {
+        LastError *ret = _get( create );
+        if ( ret && !ret->disabled )
+            return ret;
+        return 0;
+    }
+    
+    LastError * LastErrorHolder::_get( bool create ){
         int id = _id.get();
         if ( id == 0 )
             return _tl.get();
@@ -112,17 +124,27 @@ namespace mongo {
         status.time = time(0);
         status.lerr = le;
     }
+
+    void prepareErrForNewRequest( Message &m, LastError * err ) {
+        // a killCursors message shouldn't affect last error
+        if ( m.data->operation() == dbKillCursors ) {
+            err->disabled = true;
+        } else {
+            err->disabled = false;
+            err->nPrev++;
+        }        
+    }
     
     void LastErrorHolder::startRequest( Message& m ) {
         int id = m.data->id & 0xFFFF0000;
         setID( id );
-        LastError * le = get( true);
-        le->nPrev++;
+        LastError * le = _get( true );
+        prepareErrForNewRequest( m, le );
     }
 
     void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {
         if ( !connectionOwned->overridenById ) {
-            connectionOwned->nPrev++;
+            prepareErrForNewRequest( m, connectionOwned );
             return;
         }
         startRequest(m);
