@@ -615,7 +615,8 @@ namespace mongo {
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
         SavedContext c;
-        lastError.enable();
+        if ( lastError._get() )
+            lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -625,7 +626,8 @@ namespace mongo {
 
     void DBDirectClient::say( Message &toSend ) {
         SavedContext c;
-        lastError.enable();
+        if ( lastError._get() )
+            lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }

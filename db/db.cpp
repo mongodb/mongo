@@ -192,7 +192,6 @@ namespace mongo {
 
             Message m;
             while ( 1 ) {
-                lastError.enable();
                 m.reset();
 
                 if ( !dbMsgPort.recv(m) ) {
