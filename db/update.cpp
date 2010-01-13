@@ -654,6 +654,7 @@ namespace mongo {
                 } 
                 else {
                     BSONObj newObj = mods.createNewFromMods( loc.obj() );
+                    uassert( 12522 , "$ operator made objcet too large" , newObj.isValid() );
                     DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), debug);
                     if ( newLoc != loc || isIndexed ){
                         // object moved, need to make sure we don' get again
