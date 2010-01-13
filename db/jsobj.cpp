@@ -573,7 +573,11 @@ namespace mongo {
 
         string r = "";
 
-        if ( *regexFlags() )
+        const char* flags = regexFlags();
+        if ( ! ( flags[0] == '\0'
+               || (flags[0] == 'm' && flags[1] == '\0') // multiline doesn't change anything here
+                //TODO: support x (EXTENDED). basically just ignore whitespace and treat '#' as a metacharacter
+               ))
             return r;
 
         const char *i = regex();
@@ -589,16 +593,17 @@ namespace mongo {
         for( ; *i; ++i ){
             char c = *i;
             if ( c == '*' || c == '?' ){
+                // These are the only two symbols that make the last char optional
                 r = ss.str();
                 r = r.substr( 0 , r.size() - 1 );
                 break;
-            }
-            else if ( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ){
-                ss << *i;
-            }
-            else {
+            } else if (strchr("\\^$.[|()+{", c)){
+                // list of "metacharacters" from man pcrepattern
                 r = ss.str();
                 break;
+            } else {
+                // self-matching char
+                ss << *i;
             }
         }
 
@@ -1293,6 +1298,24 @@ namespace mongo {
                 b.appendRegex("r", "^fz?oo");
                 BSONObj o = b.done();
                 assert( o.firstElement().simpleRegex() == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "");
+                BSONObj o = b.done();
+                assert( o.firstElement().simpleRegex() == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "m");
+                BSONObj o = b.done();
+                assert( o.firstElement().simpleRegex() == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "mi");
+                BSONObj o = b.done();
+                assert( o.firstElement().simpleRegex() == "" );
             }
         }
         void testoid() {
