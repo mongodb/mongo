@@ -235,7 +235,7 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
         return v8::Undefined();
     }
     
@@ -244,12 +244,12 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
         return v8::Undefined();
     }
 
     JSThreadConfig *thisConfig( const Arguments &args ) {
-        Local< External > c = External::Cast( *(args.This()->Get( v8::String::New( "_JSThreadConfig" ) ) ) );
+        Local< External > c = External::Cast( *(args.This()->GetHiddenValue( v8::String::New( "_JSThreadConfig" ) ) ) );
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
         return config;
     }

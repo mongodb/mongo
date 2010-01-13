@@ -455,7 +455,7 @@ int _main(int argc, char* argv[]) {
             if ( ! wascmd ){
                 try {
                     scope->exec( code.c_str() , "(shell)" , false , true , false );
-//                    scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                    scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
                 }
                 catch ( std::exception& e ){
                     cout << "error:" << e.what() << endl;
