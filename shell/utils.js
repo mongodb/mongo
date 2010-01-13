@@ -562,10 +562,8 @@ if ( typeof _threadInject != "undefined" ){
         
         runners.forEach( function( x ) { x.start(); } );
         var nFailed = 0;
-        runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );
-        
-        // v8 doesn't like it if we assert before all threads are joined.  For now,
-        // just avoid that possibility by asserting after threads are joined.
+        // v8 doesn't like it if we exit before all threads are joined (SERVER-529)
+        runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );        
         assert.eq( 0, nFailed, msg );
     }
 }
