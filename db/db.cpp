@@ -830,6 +830,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("slave")) {
             slave = SimpleSlave;
         }
+        if (params.count("autoresync")) {
+            autoresync = true;
+        }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();
@@ -847,9 +850,6 @@ int main(int argc, char* argv[], char *envp[] )
             }
         } else if (params.count("arbiter")) {
             uasserted(10999,"specifying --arbiter without --pairwith");
-        }
-        if (params.count("autoresync")) {
-            autoresync = true;
         }
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
