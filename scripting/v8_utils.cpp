@@ -207,7 +207,14 @@ namespace mongo {
                 boost::scoped_array< Local< Value > > argv( new Local< Value >[ config_.args_.size() ] );
                 for( unsigned int i = 0; i < config_.args_.size(); ++i )
                     argv[ i ] = Local< Value >::New( config_.args_[ i ] );
-                Local< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
+                TryCatch try_catch;
+                Handle< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
+                if ( ret.IsEmpty() ) {
+                    string e = toSTLString( &try_catch );
+                    log() << "js thread raised exception: " << e << endl;
+                    // v8 probably does something sane if ret is empty, but not going to assume that for now
+                    ret = v8::Undefined();
+                }
                 config_.returnData_ = Persistent< Value >::New( ret );
             }
         private:
