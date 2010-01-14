@@ -293,6 +293,7 @@ def addExtraLibs( s ):
     for x in s.split(","):
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
+        env.Append( LIBPATH=[ x + "/lib64" ] )
         extraLibPlaces.append( x + "/lib" )
 
 if GetOption( "extrapath" ) is not None:
