@@ -37,6 +37,16 @@ namespace mongo {
                 num++;
             }
             
+            if ( logLevel > 3 ){
+                StringBuilder ss;
+                ss << " shard query servers: " << servers.size() << "\n";
+                for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
+                    const ServerAndQuery& s = *i;
+                    ss << "       " << s.toString() << "\n";
+                }
+                log() << ss.str();
+            }
+
             ClusteredCursor * cursor = 0;
             
             BSONObj sort = query.getSort();

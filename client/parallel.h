@@ -74,6 +74,12 @@ namespace mongo {
             return _extra.woCompare( other._extra ) < 0;
         }
 
+        string toString() const {
+            StringBuilder ss;
+            ss << "server:" << _server << " _extra:" << _extra << " _orderObject:" << _orderObject;
+            return ss.str();
+        }
+
         string _server;
         BSONObj _extra;
         BSONObj _orderObject;
