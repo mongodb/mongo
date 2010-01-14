@@ -110,6 +110,27 @@ namespace BasicTests {
             roundTrip( y , 40 );
         }
     };
+
+    class sleeptest {
+    public:
+        void run(){
+            Timer t;
+            sleepsecs( 1 );
+            ASSERT_EQUALS( 1 , t.seconds() );
+
+            t.reset();
+            sleepmicros( 1527123 );
+            ASSERT( t.micros() > 1000000 );
+            ASSERT( t.micros() < 2000000 );
+
+            t.reset();
+            sleepmillis( 1727 );
+            ASSERT( t.millis() >= 1000 );
+            ASSERT( t.millis() <= 2000 );
+
+        }
+        
+    };
     
     class All : public Suite {
     public:
@@ -119,6 +140,8 @@ namespace BasicTests {
         void setupTests(){
             add< Rarely >();
             add< Base64Tests >();
+
+            add< sleeptest >();
         }
     } myall;
     
