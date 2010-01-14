@@ -1348,12 +1348,10 @@ namespace mongo {
         }
 
         if ( !connect() ) {
+			log() << "repl:   can't connect to sync source" << endl;
             if ( replPair && paired ) {
                 assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
                 replPair->arbitrate();
-            }
-            {
-                ReplInfo r("can't connect to sync source");
             }
             return false;            
         }
