@@ -145,16 +145,23 @@ namespace mongo {
         return i;
     }
     
-
-    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ){
+    
+    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
+                           bool * nsFound , bool * indexFound ){
         Database *database = c.database();
         assert( database );
         NamespaceDetails *d = database->namespaceIndex.details(ns);
         if ( ! d )
             return false;
+        if ( nsFound )
+            *nsFound = 1;
+        
         int idxNo = d->findIdIndex();
         if ( idxNo < 0 )
             return false;
+        if ( indexFound )
+            *indexFound = 1;
+
         IndexDetails& i = d->idx( idxNo );
         
         BSONObj key = i.getKeyFromQuery( query );

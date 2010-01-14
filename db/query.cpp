@@ -808,26 +808,35 @@ namespace mongo {
                 uassert( 10110 , "bad query object", false);
             }
             
+            bool idHackWorked = false;
+
             if ( strcmp( query.firstElement().fieldName() , "_id" ) == 0 && query.nFields() == 1 && query.firstElement().isSimpleType() ){
                 nscanned = 1;
 
+                bool nsFound = false;
+                bool indexFound = false;
+
                 BSONObj resObject;
-                bool found = Helpers::findById( c, ns , query , resObject );
-                if ( found ){
-                    n = 1;
-                    fillQueryResultFromObj( bb , filter.get() , resObject );
-                }
-                qr.reset( (QueryResult *) bb.buf() );
-                bb.decouple();
-                qr->setResultFlagsToOk();
-                qr->len = bb.len();
-                ss << " reslen:" << bb.len();
-                qr->setOperation(opReply);
-                qr->cursorId = cursorid;
-                qr->startingFrom = 0;
-                qr->nReturned = n;            
+                bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+                if ( nsFound == false || indexFound == true ){
+                    idHackWorked = true;
+                    if ( found ){
+                        n = 1;
+                        fillQueryResultFromObj( bb , filter.get() , resObject );
+                    }
+                    qr.reset( (QueryResult *) bb.buf() );
+                    bb.decouple();
+                    qr->setResultFlagsToOk();
+                    qr->len = bb.len();
+                    ss << " reslen:" << bb.len();
+                    qr->setOperation(opReply);
+                    qr->cursorId = cursorid;
+                    qr->startingFrom = 0;
+                    qr->nReturned = n;       
+                }     
             }
-            else { // non-simple _id lookup
+            
+            if ( ! idHackWorked ){ // non-simple _id lookup
                 BSONObj oldPlan;
                 if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
                     QueryPlanSet qps( ns, query, order );
