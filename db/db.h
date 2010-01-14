@@ -162,10 +162,6 @@ namespace mongo {
     // does not delete the files on disk
     void closeDatabase( const char *cl, const string& path = dbpath );
 
-    inline bool clientIsEmpty() {
-        return !cc().database()->namespaceIndex.allocated();
-    }
-
     struct dbtemprelease {
         string clientname;
         string clientpath;

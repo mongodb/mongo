@@ -714,7 +714,7 @@ namespace mongo {
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
                 setClient( i->c_str() );
-                b.appendBool( "empty", clientIsEmpty() );
+                b.appendBool( "empty", cc().database()->isEmpty() );
                 totalSize += size;
                 dbInfos.push_back( b.obj() );
 
@@ -733,7 +733,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 b << "name" << name << "sizeOnDisk" << double( 1 );
                 setClient( name.c_str() );
-                b.appendBool( "empty", clientIsEmpty() );
+                b.appendBool( "empty", cc().database()->isEmpty() );
 
                 dbInfos.push_back( b.obj() );
             }

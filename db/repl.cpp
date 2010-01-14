@@ -873,7 +873,7 @@ namespace mongo {
             return;
         }
 
-        bool empty = clientIsEmpty();
+        bool empty = cc().database()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;

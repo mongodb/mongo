@@ -66,6 +66,10 @@ namespace mongo {
                 delete files[i];
         }
 
+        bool isEmpty(){
+            return ! namespaceIndex.allocated();
+        }
+
         bool exists(int n) { 
             stringstream ss;
             ss << name << '.' << n;
