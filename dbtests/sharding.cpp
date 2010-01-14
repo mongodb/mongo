@@ -38,7 +38,7 @@ namespace ShardingTests {
                 s.insert( a );
                 s.insert( b );
                 
-                ASSERT_EQUALS( (uint)2 , s.size() );
+                ASSERT_EQUALS( (unsigned int)2 , s.size() );
             }
         };
     }
