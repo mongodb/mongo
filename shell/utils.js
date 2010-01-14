@@ -1,4 +1,11 @@
 
+__quiet = false;
+
+chatty = function(s){
+    if ( ! __quiet )
+        print( s );
+}
+
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;

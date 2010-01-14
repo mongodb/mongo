@@ -60,7 +60,7 @@ Mongo.prototype.toString = function(){
 }
 
 connect = function( url , user , pass ){
-    print( "connecting to: " + url )
+    chatty( "connecting to: " + url )
 
     if ( user && ! pass )
         throw "you specified a user and not a password.  either you need a password, or you're using the old connect api";
