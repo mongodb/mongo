@@ -63,7 +63,10 @@ namespace mongo {
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
         BSONObj _nullKey;
-
+        
+        BSONObj _nullObj;
+        BSONElement _nullElt;
+        
         void _init();
     };
 
