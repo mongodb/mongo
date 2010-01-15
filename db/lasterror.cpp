@@ -74,7 +74,8 @@ namespace mongo {
         int id = _id.get();
         if ( id == 0 )
             return _tl.get();
-        
+
+        boostlock lock(_idsmutex);        
         map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() ){
             if ( ! create )
@@ -119,7 +120,8 @@ namespace mongo {
             _tl.reset( le );
             return;
         }
-        
+
+        boostlock lock(_idsmutex);
         Status & status = _ids[id];
         status.time = time(0);
         status.lerr = le;
