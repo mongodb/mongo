@@ -26,9 +26,17 @@ namespace mongo {
     public:
         BSONObj keys;
         BSONObj meta;
+        
+        vector< const char * > fieldNames;
+        vector< BSONElement > fixed;
+        BSONObj nullKey;
+        
+        IndexSpec(){
+        }
 
         IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
             : keys(k) , meta(m){
+            _init();
         }
 
         /**
@@ -36,6 +44,10 @@ namespace mongo {
            should have a key field 
          */
         IndexSpec( const DiskLoc& loc ){
+            reset( loc );
+        }
+        
+        void reset( const DiskLoc& loc ){
             meta = loc.obj();
             keys = meta["key"].embeddedObjectUserCheck();
             if ( keys.objsize() == 0 ) {
@@ -43,8 +55,24 @@ namespace mongo {
                 assert(false);
                 
             }
+            _init();
         }
+        
+    private:
+        void _init(){
+            assert( keys.objsize() );
 
+            BSONObjIterator i( keys );
+            BSONObjBuilder nullKeyB;
+            while( i.more() ) {
+                fieldNames.push_back( i.next().fieldName() );
+                fixed.push_back( BSONElement() );
+                nullKeyB.appendNull( "" );
+            }
+            
+            nullKey = nullKeyB.obj();
+        }
+        
     };
     
     void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys );

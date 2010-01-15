@@ -129,18 +129,9 @@ namespace mongo {
     }
 
     void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-        BSONObjIterator i( spec.keys );
-        vector< const char * > fieldNames;
-        vector< BSONElement > fixed;
-        BSONObjBuilder nullKey;
-        while( i.more() ) {
-            fieldNames.push_back( i.next().fieldName() );
-            fixed.push_back( BSONElement() );
-            nullKey.appendNull( "" );
-        }
-        getKeys( fieldNames, fixed, obj, keys );
+        getKeys( spec.fieldNames, spec.fixed, obj, keys );
         if ( keys.empty() )
-            keys.insert( nullKey.obj() );
+            keys.insert( spec.nullKey );
     }
 
     /* Pull out the relevant key objects from obj, so we
@@ -149,7 +140,7 @@ namespace mongo {
        Keys will be left empty if key not found in the object.
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        mongo::getKeysFromObject( IndexSpec( info ) , obj, keys );
+        mongo::getKeysFromObject( NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this ) , obj, keys );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
