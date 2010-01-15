@@ -246,9 +246,9 @@ namespace mongo {
     }
 
     JSBool mongo_update(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( 10242 ,  "mongo_find needs at elast 3 args" , argc >= 3 );
-        uassert( 10243 ,  "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
-        uassert( 10244 ,  "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
+        smuassert( cx ,  "mongo_find needs at elast 3 args" , argc >= 3 );
+        smuassert( cx ,  "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -275,8 +275,8 @@ namespace mongo {
     }
 
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        uassert( 10246 ,  "mongo_insert needs 2 args" , argc == 2 );
-        uassert( 10247 ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "mongo_insert needs 2 args" , argc == 2 );
+        smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -311,8 +311,8 @@ namespace mongo {
     }
 
     JSBool mongo_remove(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        uassert( 10249 ,  "mongo_remove needs 2 arguments" , argc == 2 );
-        uassert( 10250 ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "mongo_remove needs 2 arguments" , argc == 2 );
+        smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -349,7 +349,7 @@ namespace mongo {
      // -------------  db_collection -------------
 
      JSBool db_collection_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){    
-         uassert( 10252 ,  "db_collection_constructor wrong args" , argc == 4 );
+         smuassert( cx ,  "db_collection_constructor wrong args" , argc == 4 );
          assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
          assert( JS_SetProperty( cx , obj , "_db" , &(argv[1]) ) );
          assert( JS_SetProperty( cx , obj , "_shortName" , &(argv[2]) ) );
@@ -432,7 +432,7 @@ namespace mongo {
     
     
     JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        uassert( 10253 ,  "wrong number of arguments to DB" , argc == 2 );
+        smuassert( cx,  "wrong number of arguments to DB" , argc == 2 );
         assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
         assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
 
@@ -484,7 +484,7 @@ namespace mongo {
             oid.init();
         }
         else {
-            uassert( 10254 ,  "object_id_constructor can't take more than 1 param" , argc == 1 );
+            smuassert( cx ,  "object_id_constructor can't take more than 1 param" , argc == 1 );
             string s = c.toString( argv[0] );
 
             try {
@@ -674,7 +674,7 @@ namespace mongo {
     // dbquery
 
     JSBool dbquery_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        uassert( 10255 ,  "DDQuery needs at least 4 args" , argc >= 4 );
+        smuassert( cx ,  "DDQuery needs at least 4 args" , argc >= 4 );
         
         Convertor c(cx);
         c.setProperty( obj , "_mongo" , argv[0] );

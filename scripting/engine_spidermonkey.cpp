@@ -26,6 +26,12 @@
 #define assert xassert
 #endif
 
+#define smuassert( cx , msg , val ) \
+  if ( ! ( val ) ){ \
+    JS_ReportError( cx , msg ); \
+    return JS_FALSE; \
+  }
+
 namespace mongo {
 
     string trim( string s ){
