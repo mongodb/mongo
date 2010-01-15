@@ -136,6 +136,12 @@ namespace mongo {
         char buf[MaxNsLen];
     };
 
+}
+
+#include "index.h"
+
+namespace mongo {
+
     /**
        @return true if a client can modify this namespace
        things like *.system.users
@@ -148,115 +154,6 @@ namespace mongo {
     */
     const int Buckets = 19;
     const int MaxBucket = 18;
-
-	/* Maximum # of indexes per collection.  We need to raise this limit at some point.  
-	   (Backward datafile compatibility is main issue with changing.)
-	*/
-//    const int MaxIndexes = 10;
-
-	/* Details about a particular index. There is one of these effectively for each object in 
-	   system.namespaces (although this also includes the head pointer, which is not in that 
-	   collection).
-	 */
-    class IndexDetails {
-    public:
-        DiskLoc head; /* btree head disk location */
-
-        /* Location of index info object. Format:
-
-             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}[, unique: <bool>] }
-
-           This object is in the system.indexes collection.  Note that since we
-           have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
-        */
-        DiskLoc info;
-
-        /* extract key value from the query object
-           e.g., if key() == { x : 1 },
-                 { x : 70, y : 3 } -> { x : 70 }
-        */
-        BSONObj getKeyFromQuery(const BSONObj& query) const {
-            BSONObj k = keyPattern();
-            BSONObj res = query.extractFieldsUnDotted(k);
-            return res;
-        }
-
-        /* pull out the relevant key objects from obj, so we
-           can index them.  Note that the set is multiple elements
-           only when it's a "multikey" array.
-           keys will be left empty if key not found in the object.
-        */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
-
-        /* get the key pattern for this object.
-           e.g., { lastname:1, firstname:1 }
-        */
-        BSONObj keyPattern() const {
-            return info.obj().getObjectField("key");
-        }
-
-        /* true if the specified key is in the index */
-        bool hasKey(const BSONObj& key);
-
-        // returns name of this index's storage area
-        // database.table.$index
-        string indexNamespace() const {
-            BSONObj io = info.obj();
-            string s;
-            s.reserve(Namespace::MaxNsLen);
-            s = io.getStringField("ns");
-            assert( !s.empty() );
-            s += ".$";
-            s += io.getStringField("name");
-            return s;
-        }
-
-        string indexName() const { // e.g. "ts_1"
-            BSONObj io = info.obj();
-            return io.getStringField("name");
-        }
-
-        static bool isIdIndexPattern( const BSONObj &pattern ) {
-            BSONObjIterator i(pattern);
-            BSONElement e = i.next();
-            if( strcmp(e.fieldName(), "_id") != 0 ) return false;
-            return i.next().eoo();            
-        }
-        
-        /* returns true if this is the _id index. */
-        bool isIdIndex() const { 
-            return isIdIndexPattern( keyPattern() );
-        }
-
-        /* gets not our namespace name (indexNamespace for that),
-           but the collection we index, its name.
-           */
-        string parentNS() const {
-            BSONObj io = info.obj();
-            return io.getStringField("ns");
-        }
-
-        bool unique() const { 
-            BSONObj io = info.obj();
-            return io["unique"].trueValue() || 
-                /* temp: can we juse make unique:true always be there for _id and get rid of this? */
-                isIdIndex();
-        }
-
-        /* if set, when building index, if any duplicates, drop the duplicating object */
-        bool dropDups() const {
-            return info.obj().getBoolField( "dropDups" );
-        }
-
-        /* delete this index.  does NOT clean up the system catalog
-           (system.indexes or system.namespaces) -- only NamespaceIndex.
-        */
-        void kill_idx();
-
-        operator string() const {
-            return info.obj().toString();
-        }
-    };
 
     extern int bucketSizes[];
 
