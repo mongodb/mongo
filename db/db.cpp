@@ -123,7 +123,7 @@ namespace mongo {
                 while ( connGrab )
                     sleepmillis(1);
             }
-            catch ( boost::thread_resource_error& e ){
+            catch ( boost::thread_resource_error& ){
                 log() << "can't create new thread, closing connection" << endl;
                 mp->shutdown();
                 connGrab = 0;

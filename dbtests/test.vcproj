@@ -65,7 +65,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib"
+				AdditionalDependencies="ws2_32.lib Psapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;c:\Program Files\boost\boost_1_35_0\lib&quot;"
 				IgnoreAllDefaultLibraries="false"
@@ -1760,7 +1760,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\util\processinfo_none.cpp"
+					RelativePath="..\util\processinfo_win32.cpp"
 					>
 				</File>
 				<File
