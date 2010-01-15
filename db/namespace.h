@@ -472,6 +472,19 @@ namespace mongo {
             return _indexKeys;
         }
 
+        /* IndexSpec caching */
+    private:
+        map<const IndexDetails*,IndexSpec> _indexSpecs;
+    public:
+        const IndexSpec& getIndexSpec( const IndexDetails * details ){
+            DEV assertInWriteLock();
+            IndexSpec& spec = _indexSpecs[details];
+            if ( spec.meta.isEmpty() ){
+                spec.reset( details->info );
+            }
+            return spec;
+        }
+
         /* query cache (for query optimizer) ------------------------------------- */
     private:
         int _qcWriteCount;

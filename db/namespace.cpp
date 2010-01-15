@@ -570,6 +570,7 @@ namespace mongo {
     void NamespaceDetailsTransient::reset() {
         clearQueryCache();
         _keysComputed = false;
+        _indexSpecs.clear();
     }
     
 /*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
