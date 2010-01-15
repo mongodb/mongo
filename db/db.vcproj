@@ -1547,6 +1547,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\index.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\instance.cpp"
 					>
 				</File>

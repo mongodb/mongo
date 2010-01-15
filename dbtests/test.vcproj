@@ -1519,6 +1519,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\db\index.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\instance.cpp"
 					>
 				</File>
