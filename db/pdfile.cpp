@@ -1035,7 +1035,6 @@ namespace mongo {
         Timer t;
 		unsigned long long n;
         if( 1 ) {
-			//cout << "fastBuild\n";
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
