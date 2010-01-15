@@ -298,7 +298,7 @@ namespace mongo {
 
         /* multikey indexes are indexes where there are more than one key in the index
              for a single document. see multikey in wiki.
-           for these, we have to do some dedup object on queries.
+           for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) {
             return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0;
@@ -415,7 +415,7 @@ namespace mongo {
         DiskLoc __stdAlloc(int len);
         DiskLoc __capAlloc(int len);
         DiskLoc _alloc(const char *ns, int len);
-        void compact();
+        void compact(); // combine adjacent deleted records
 
         DiskLoc &firstDeletedInCapExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
