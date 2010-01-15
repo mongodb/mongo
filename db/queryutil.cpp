@@ -32,53 +32,61 @@ namespace mongo {
         inline string simpleRegexHelper(const char* regex, const char* flags){
             string r = "";
 
-            if ( ! ( flags[0] == '\0'
-                   || (flags[0] == 'm' && flags[1] == '\0') // multiline doesn't change anything here
-                    //TODO: support x (EXTENDED). basically just ignore whitespace and treat '#' as a metacharacter
-                   ))
-                return r;
+            bool extended = false;
+            while (*flags){
+                switch (*(flags++)){
+                    case 'm': // multiline
+                        continue;
+                    case 'x': // extended
+                        extended = true;
+                        break;
+                    default:
+                        return r; // cant use index
+                }
+            }
 
-            const char *i = regex;
-            if ( *i != '^' )
-                return r;
-            ++i;
-
-            // Empty string matches everything, won't limit our search.
-            if ( !*i )
+            if ( *(regex++) != '^' )
                 return r;
 
             stringstream ss;
-            for( ; *i; ++i ){
-                char c = *i;
+
+            while(*regex){
+                char c = *(regex++);
                 if ( c == '*' || c == '?' ){
                     // These are the only two symbols that make the last char optional
                     r = ss.str();
                     r = r.substr( 0 , r.size() - 1 );
-                    break;
+                    return r; //breaking here fails with /^a?/
                 } else if (c == '\\'){
                     // slash followed by non-alphanumeric represents the following char
-                    c = *(++i);
+                    c = *(regex++);
                     if ((c >= 'A' && c <= 'Z') ||
                         (c >= 'a' && c <= 'z') ||
-                        (c >= '0' && c <= '0'))
+                        (c >= '0' && c <= '0') ||
+                        (c == '\0'))
                     {
                         r = ss.str();
                         break;
                     } else {
-                        ss << *i;
+                        ss << c;
                     }
-
-                } else if (strchr("\\^$.[|()+{", c)){
+                } else if (strchr("^$.[|()+{", c)){
                     // list of "metacharacters" from man pcrepattern
                     r = ss.str();
                     break;
+                } else if (extended && c == '#'){
+                    // comment
+                    r = ss.str();
+                    break;
+                } else if (extended && isspace(c)){
+                    continue;
                 } else {
                     // self-matching char
-                    ss << *i;
+                    ss << c;
                 }
             }
 
-            if ( r.size() == 0 && *i == 0 )
+            if ( r.size() == 0 && *regex == 0 )
                 r = ss.str();
 
             return r;
@@ -574,6 +582,12 @@ namespace mongo {
                 b.appendRegex("r", "^f", "mi");
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f \t\vo\n\ro  \\ \\# #comment", "mx");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "foo #" );
             }
         }
     } simple_regex_unittest;
