@@ -55,6 +55,19 @@ namespace mongo {
                     r = ss.str();
                     r = r.substr( 0 , r.size() - 1 );
                     break;
+                } else if (c == '\\'){
+                    // slash followed by non-alphanumeric represents the following char
+                    c = *(++i);
+                    if ((c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z') ||
+                        (c >= '0' && c <= '0'))
+                    {
+                        r = ss.str();
+                        break;
+                    } else {
+                        ss << *i;
+                    }
+
                 } else if (strchr("\\^$.[|()+{", c)){
                     // list of "metacharacters" from man pcrepattern
                     r = ss.str();

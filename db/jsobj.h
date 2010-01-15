@@ -519,12 +519,6 @@ namespace mongo {
             return value();
         }
 
-        /** returns a string that when used as a matcher, would match a super set of regex() 
-			returns "" for complex regular expressions
-			used to optimize queries in some simple regex cases that start with '^'
-		 */
-        string simpleRegex() const;
-
         /** Retrieve the regex flags (options) for a Regex element */
         const char *regexFlags() const {
             const char *p = regex();
