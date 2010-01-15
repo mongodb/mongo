@@ -25,6 +25,7 @@ namespace mongo {
         fd = 0;
         maphandle = 0;
         view = 0;
+        len = 0;
         created();
     }
 
