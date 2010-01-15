@@ -40,6 +40,8 @@ namespace mongo {
         
         static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
         
+        virtual string type() const = 0;
+
     protected:
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
 
@@ -80,6 +82,10 @@ namespace mongo {
             return ss.str();
         }
 
+        operator string() const {
+            return toString();
+        }
+
         string _server;
         BSONObj _extra;
         BSONObj _orderObject;
@@ -95,6 +101,7 @@ namespace mongo {
         SerialServerClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , int sortOrder=0);
         virtual bool more();
         virtual BSONObj next();
+        virtual string type() const { return "SerialServer"; }
     private:
         vector<ServerAndQuery> _servers;
         unsigned _serverIndex;
@@ -115,6 +122,7 @@ namespace mongo {
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
+        virtual string type() const { return "ParallelSort"; }
     private:
         void _init();
         

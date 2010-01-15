@@ -8,7 +8,7 @@ placeCheck = function( num ){
     print("shard2 step: " + num );
 }
 
-s = new ShardingTest( "shard2" , 2 , 5 );
+s = new ShardingTest( "shard2" , 2 , 6 );
 
 db = s.getDB( "test" );
 
@@ -141,6 +141,15 @@ function countCursor( c ){
 }
 assert.eq( 6 , countCursor( db.foo.find()._exec() ) , "getMore 2" );
 assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
+
+// find by non-shard-key
+db.foo.find().forEach(
+    function(z){
+        var y = db.foo.findOne( { _id : z._id } );
+        assert( y , "_id check 1 : " + tojson( z ) );
+        assert.eq( z.num , y.num , "_id check 2 : " + tojson( z ) );
+    }
+);
 
 // update
 person = db.foo.findOne( { num : 3 } );

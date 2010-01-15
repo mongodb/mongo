@@ -50,8 +50,9 @@ namespace mongo {
             b.append( (void*)o.objdata() , o.objsize() );
             num++;
             
-            if ( b.len() > maxSize )
+            if ( b.len() > maxSize ){
                 break;
+            }
 
             if ( num == ntoreturn ){
                 // soft limit aka batch size

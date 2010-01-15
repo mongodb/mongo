@@ -37,7 +37,7 @@ namespace mongo {
                 num++;
             }
             
-            if ( logLevel > 3 ){
+            if ( logLevel > 4 ){
                 StringBuilder ss;
                 ss << " shard query servers: " << servers.size() << "\n";
                 for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
@@ -74,6 +74,8 @@ namespace mongo {
 
             assert( cursor );
             
+            log(5) << "   cursor type: " << cursor->type() << endl;
+
             ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
             if ( ! cc->sendNextBatch( r ) ){
                 delete( cursor );

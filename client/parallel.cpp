@@ -98,12 +98,18 @@ namespace mongo {
         if ( _current.get() && _current->more() )
             return true;
         
-        if ( _serverIndex >= _servers.size() )
+        if ( _serverIndex >= _servers.size() ){
             return false;
+        }
         
         ServerAndQuery& sq = _servers[_serverIndex++];
+
         _current = query( sq._server , 0 , sq._extra );
-        return _current->more();
+        if ( _current->more() )
+            return true;
+        
+        // this sq has nothing, so keep looking
+        return more();
     }
     
     BSONObj SerialServerClusteredCursor::next(){
