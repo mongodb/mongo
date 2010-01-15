@@ -349,6 +349,16 @@ namespace mongo {
             return -1;
         }
 
+        //returns offset in indexes[]
+        int findIndexByKeyPattern(const BSONObj& keyPattern) {
+            IndexIterator i = ii();
+            while( i.more() ) {
+                if( i.next().keyPattern() == keyPattern ) 
+                    return i.pos()-1;
+            }
+            return -1;
+        }
+
         /* @return -1 = not found 
            generally id is first index, so not that expensive an operation (assuming present).
         */
