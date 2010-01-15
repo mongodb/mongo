@@ -184,7 +184,7 @@ namespace mongo {
 #define localtime _localtime_not_threadsafe_
 #define ctime _ctime_is_not_threadsafe_
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__sunos__)
     inline void sleepsecs(int s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
