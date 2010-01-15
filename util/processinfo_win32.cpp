@@ -60,4 +60,5 @@ namespace mongo {
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
 }

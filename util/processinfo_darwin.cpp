@@ -90,4 +90,6 @@ namespace mongo {
         return (int)( ti.resident_size / (1024 * 1024 ) );
     }
 
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+
 }

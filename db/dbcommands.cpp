@@ -347,6 +347,14 @@ namespace mongo {
                 bb.append( "available" , connTicketHolder.available() );
                 bb.done();
             }
+            {
+                BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
+                bb.append("note", "fields vary by platform");
+                ProcessInfo p;
+                p.getExtraInfo(bb);
+                bb.done();
+            }
+
 
 
             return true;

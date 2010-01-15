@@ -27,6 +27,8 @@ int getpid();
 #endif
 
 namespace mongo {
+
+    class BSONObjBuilder;
     
     class ProcessInfo {
     public:
@@ -42,6 +44,11 @@ namespace mongo {
          * @return mbytes
          */
         int getResidentSize();
+
+        /**
+         * Append platform-specific data to obj
+         */
+        void getExtraInfo(BSONObjBuilder& info);
         
         bool supported();
 
