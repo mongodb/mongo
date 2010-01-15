@@ -1398,6 +1398,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\extsort.h"
+				>
+			</File>
+			<File
 				RelativePath="..\db\introspect.h"
 				>
 			</File>
