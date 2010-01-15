@@ -141,7 +141,17 @@ namespace mongo {
             nodes[i].value = value;
             return true;
         }
-
+        
+        typedef void (*IteratorCallback)( const Key& k , Type& v );
+        
+        void iterall( IteratorCallback callback ){
+            for ( int i=0; i<n; i++ ){
+                if ( ! nodes[i].inUse() )
+                    continue;
+                callback( nodes[i].k , nodes[i].value );
+            }
+        }
+    
     };
 
 #pragma pack()

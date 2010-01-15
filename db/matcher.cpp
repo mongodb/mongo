@@ -391,7 +391,7 @@ namespace mongo {
             if ( bm.myset->size() == 0 )
                 return -1; // is this desired?
             BSONObjSetDefaultOrder actualKeys;
-            getKeysFromObject( BSON( fieldName << 1 ), obj, actualKeys );
+            IndexSpec( BSON( fieldName << 1 ) ).getKeys( obj, actualKeys );
             if ( actualKeys.size() == 0 )
                 return 0;
             for( set< BSONElement, element_lt >::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {

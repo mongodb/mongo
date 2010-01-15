@@ -55,7 +55,30 @@ namespace mongo {
         wassert( n == 1 );
     }
 
-    void getKeys( vector< const char * > fieldNames, vector< BSONElement > fixed, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+    void IndexSpec::_init(){
+        assert( keys.objsize() );
+        
+        BSONObjIterator i( keys );
+        BSONObjBuilder nullKeyB;
+        while( i.more() ) {
+            _fieldNames.push_back( i.next().fieldName() );
+            _fixed.push_back( BSONElement() );
+            nullKeyB.appendNull( "" );
+        }
+        
+        _nullKey = nullKeyB.obj();
+    }
+
+
+    void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+        vector<const char*> fieldNames( _fieldNames );
+        vector<BSONElement> fixed( _fixed );
+        _getKeys( fieldNames , fixed , obj, keys );
+        if ( keys.empty() )
+            keys.insert( _nullKey );
+    }
+
+    void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
         BSONObjBuilder b;
         b.appendNull( "" );
         BSONElement nullElt = b.done().firstElement();
@@ -89,7 +112,8 @@ namespace mongo {
                 for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
                     b.appendAs( *i, "" );
                 keys.insert( b.obj() );
-            } else {
+            } 
+            else {
                 // terminal array element to expand, so generate all keys
                 BSONObjIterator i( arrElt.embeddedObject() );
                 if ( i.more() ){
@@ -123,15 +147,9 @@ namespace mongo {
             while( i.more() ) {
                 BSONElement e = i.next();
                 if ( e.type() == Object )
-                    getKeys( fieldNames, fixed, e.embeddedObject(), keys );
+                    _getKeys( fieldNames, fixed, e.embeddedObject(), keys );
             }
         }
-    }
-
-    void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-        getKeys( spec.fieldNames, spec.fixed, obj, keys );
-        if ( keys.empty() )
-            keys.insert( spec.nullKey );
     }
 
     /* Pull out the relevant key objects from obj, so we
@@ -140,7 +158,7 @@ namespace mongo {
        Keys will be left empty if key not found in the object.
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        mongo::getKeysFromObject( NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this ) , obj, keys );
+        NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this ).getKeys( obj, keys );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {

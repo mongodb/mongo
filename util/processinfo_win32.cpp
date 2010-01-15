@@ -46,9 +46,10 @@ namespace mongo {
     }
     
     int ProcessInfo::getVirtualMemorySize(){
-        PROCESS_MEMORY_COUNTERS pmc;
-        assert( GetProcessMemoryInfo( GetCurrentProcess() , &pmc, sizeof(pmc) ) );
-        return _wconvertmtos( pmc.PagefileUsage );
+        MEMORYSTATUSEX mse;
+	mse.dwLength = sizeof(mse);
+        assert( GlobalMemoryStatusEx( &mse ) );
+        return (mse.ullTotalVirtual - mse.ullAvailVirtual) / (1024 * 1024) ;
     }
     
     int ProcessInfo::getResidentSize(){

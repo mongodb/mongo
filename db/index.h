@@ -27,10 +27,6 @@ namespace mongo {
         BSONObj keys;
         BSONObj meta;
         
-        vector< const char * > fieldNames;
-        vector< BSONElement > fixed;
-        BSONObj nullKey;
-        
         IndexSpec(){
         }
 
@@ -58,24 +54,18 @@ namespace mongo {
             _init();
         }
         
-    private:
-        void _init(){
-            assert( keys.objsize() );
+        void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
-            BSONObjIterator i( keys );
-            BSONObjBuilder nullKeyB;
-            while( i.more() ) {
-                fieldNames.push_back( i.next().fieldName() );
-                fixed.push_back( BSONElement() );
-                nullKeyB.appendNull( "" );
-            }
-            
-            nullKey = nullKeyB.obj();
-        }
-        
+    private:
+
+        void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
+
+        vector<const char*> _fieldNames;
+        vector<BSONElement> _fixed;
+        BSONObj _nullKey;
+
+        void _init();
     };
-    
-    void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys );
 
 	/* Details about a particular index. There is one of these effectively for each object in 
 	   system.namespaces (although this also includes the head pointer, which is not in that 
