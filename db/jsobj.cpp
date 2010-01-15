@@ -569,18 +569,16 @@ namespace mongo {
         returns "" for complex regular expressions
         used to optimize queries in some simple regex cases that start with '^'
     */
-    string BSONElement::simpleRegex() const {
-
+    inline string simpleRegexHelper(const char* regex, const char* flags){
         string r = "";
 
-        const char* flags = regexFlags();
         if ( ! ( flags[0] == '\0'
                || (flags[0] == 'm' && flags[1] == '\0') // multiline doesn't change anything here
                 //TODO: support x (EXTENDED). basically just ignore whitespace and treat '#' as a metacharacter
                ))
             return r;
 
-        const char *i = regex();
+        const char *i = regex;
         if ( *i != '^' )
             return r;
         ++i;
@@ -612,6 +610,18 @@ namespace mongo {
 
         return r;
     }
+    string BSONElement::simpleRegex() const {
+        switch(type()){
+            case RegEx:
+                return simpleRegexHelper(regex(), regexFlags());
+            case Object:{
+                BSONObj o = embeddedObject();
+                return simpleRegexHelper(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
+            }
+            default: assert(false); return ""; //return squashes compiler warning
+        }
+    }
+
 
     void BSONElement::validate() const {
         switch( type() ) {

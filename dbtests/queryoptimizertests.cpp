@@ -156,6 +156,16 @@ namespace QueryOptimizerTests {
             virtual bool upperInclusive() { return false; }
             BSONObj o1_, o2_;
         };        
+
+        class RegexObj : public Base {
+        public:
+            RegexObj() : o1_( BSON( "" << "abc" ) ), o2_( BSON( "" << "abd" ) ) {}
+            virtual BSONObj query() { return BSON("a" << BSON("$regex" << "^abc")); }
+            virtual BSONElement lower() { return o1_.firstElement(); }
+            virtual BSONElement upper() { return o2_.firstElement(); }
+            virtual bool upperInclusive() { return false; }
+            BSONObj o1_, o2_;
+        };
         
         class UnhelpfulRegex : public Base {
             virtual BSONObj query() {
@@ -1126,6 +1136,7 @@ namespace QueryOptimizerTests {
             add< FieldRangeTests::EqGte >();
             add< FieldRangeTests::EqGteInvalid >();
             add< FieldRangeTests::Regex >();
+            add< FieldRangeTests::RegexObj >();
             add< FieldRangeTests::UnhelpfulRegex >();
             add< FieldRangeTests::In >();
             add< FieldRangeTests::Equality >();

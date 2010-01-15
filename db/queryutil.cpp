@@ -65,7 +65,10 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
-        if ( e.type() == RegEx ) {
+        if ( e.type() == RegEx
+             || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
+           )
+        {
             const string r = e.simpleRegex();
             if ( r.size() ) {
                 lower = addObj( BSON( "" << r ) ).firstElement();
@@ -212,7 +215,7 @@ namespace mongo {
 
             int op = getGtLtOp( e );
             
-            if ( op == BSONObj::Equality ) {
+            if ( op == BSONObj::Equality || op == BSONObj::opREGEX || op == BSONObj::opOPTIONS ) {
                 ranges_[ e.fieldName() ] &= FieldRange( e , optimize );
             }
             else if ( op == BSONObj::opELEM_MATCH ){
