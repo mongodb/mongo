@@ -1104,17 +1104,6 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), true);
     }
 
-    // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
-    bool validKeyPattern(BSONObj kp) { 
-        BSONObjIterator i(kp);
-        while( i.moreWithEOO() ) { 
-            BSONElement e = i.next();
-            if( e.type() == Object || e.type() == Array ) 
-                return false;
-        }
-        return true;
-    }
-
 #pragma pack(1)
     struct IDToInsert_ { 
         char type;
@@ -1143,6 +1132,8 @@ namespace mongo {
             o = BSONObj( loc.rec() );
         return loc;
     }
+
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection);
 
     /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc 
              after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
@@ -1190,56 +1181,9 @@ namespace mongo {
         string tabletoidxns;
         if ( addIndex ) {
             BSONObj io((const char *) obuf);
-            const char *name = io.getStringField("name"); // name of the index
-            tabletoidxns = io.getStringField("ns");  // table it indexes
-            uassert( 10096 ,  "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
-            if ( cc().database()->name != nsToDatabase(tabletoidxns.c_str()) ) {
-                uassert( 10097 , "bad table to index name on add index attempt", false);
+            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) ) {
                 return DiskLoc();
             }
-
-            BSONObj key = io.getObjectField("key");
-            if( !validKeyPattern(key) ) {
-                string s = string("bad index key pattern ") + key.toString();
-                uassert( 10098 , s.c_str(), false);
-            }
-            if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
-                out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
-                    tabletoidxns << "\n  ourns:" << ns;
-                out() << "\n  idxobj:" << io.toString() << endl;
-                string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(12504, s);
-            }
-            tableToIndex = nsdetails(tabletoidxns.c_str());
-            if ( tableToIndex == 0 ) {
-                // try to create it
-                string err;
-                if ( !userCreateNS(tabletoidxns.c_str(), BSONObj(), err, false) ) {
-                    problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
-                    return DiskLoc();
-                }
-                tableToIndex = nsdetails(tabletoidxns.c_str());
-                log() << "info: creating collection " << tabletoidxns << " on add index\n";
-                assert( tableToIndex );
-            }
-            if ( tableToIndex->findIndexByName(name) >= 0 ) {
-                // index already exists.
-                return DiskLoc();
-            }
-            if ( tableToIndex->nIndexes >= NamespaceDetails::NIndexesMax ) {
-                stringstream ss;
-                ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
-                string s = ss.str();
-                log() << s << '\n';
-                uasserted(12505,s);
-            }
-            if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
-                ensureHaveIdIndex( tabletoidxns.c_str() );
-                return DiskLoc();
-            }
-            //indexFullNS = tabletoidxns;
-            //indexFullNS += ".$";
-            //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
         }
 
         const BSONElement *newId = &writeId;

@@ -184,5 +184,98 @@ namespace mongo {
         }
     }
 
+    // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
+    static bool validKeyPattern(BSONObj kp) { 
+        BSONObjIterator i(kp);
+        while( i.moreWithEOO() ) { 
+            BSONElement e = i.next();
+            if( e.type() == Object || e.type() == Array ) 
+                return false;
+        }
+        return true;
+    }
+
+    /* Prepare to build an index.  Does not actually build it (except for a special _id case).
+       - We validate that the params are good
+       - That the index does not already exist
+       - Creates the source collection if it DNE
+
+       example of 'io':
+         { ns : 'test.foo', name : 'z', key : { z : 1 } }
+
+       throws DBException
+
+       @return 
+         true if ok to continue.  when false we stop/fail silently (index already exists)
+         sourceNS - source NS we are indexing
+         sourceCollection - its details ptr
+    */
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection) {
+        sourceCollection = 0;
+
+        // logical name of the index.  todo: get rid of the name, we don't need it!
+        const char *name = io.getStringField("name"); 
+        uassert(12523, "no index name specified", *name);
+
+        // the collection for which we are building an index
+        sourceNS = io.getStringField("ns");  
+        uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
+        uassert(10097, "bad table to index name on add index attempt", 
+            cc().database()->name == nsToDatabase(sourceNS.c_str()));
+
+        BSONObj key = io.getObjectField("key");
+        uassert(12524, "index key pattern too large", key.objsize() <= 2048);
+        if( !validKeyPattern(key) ) {
+            string s = string("bad index key pattern ") + key.toString();
+            uasserted(10098 , s.c_str());
+        }
+
+        if ( sourceNS.empty() || key.isEmpty() ) {
+            log(2) << "bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
+                sourceNS << "\n  idxobj:" << io.toString() << endl;
+            string s = "bad add index attempt " + sourceNS + " key:" + key.toString();
+            uasserted(12504, s);
+        }
+
+        sourceCollection = nsdetails(sourceNS.c_str());
+        if( sourceCollection == 0 ) {
+            // try to create it
+            string err;
+            if ( !userCreateNS(sourceNS.c_str(), BSONObj(), err, false) ) {
+                problem() << "ERROR: failed to create collection while adding its index. " << sourceNS << endl;
+                return false;
+            }
+            sourceCollection = nsdetails(sourceNS.c_str());
+            log() << "info: creating collection " << sourceNS << " on add index\n";
+            assert( sourceCollection );
+        }
+
+        if ( sourceCollection->findIndexByName(name) >= 0 ) {
+            // index already exists.
+            return false;
+        }
+        if( sourceCollection->findIndexByKeyPattern(key) >= 0 ) {
+            log(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
+            return false;
+        }
+
+        if ( sourceCollection->nIndexes >= NamespaceDetails::NIndexesMax ) {
+            stringstream ss;
+            ss << "add index fails, too many indexes for " << sourceNS << " key:" << key.toString();
+            string s = ss.str();
+            log() << s << '\n';
+            uasserted(12505,s);
+        }
+
+        /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to 
+           all be treated as the same pattern.
+        */
+        if ( !god && IndexDetails::isIdIndexPattern(key) ) {
+            ensureHaveIdIndex( sourceNS.c_str() );
+            return false;
+        }
+
+        return true;
+    }
 
 }

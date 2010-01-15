@@ -38,7 +38,7 @@ namespace mongo {
     class Key,
     class Type
     >
-    class HashTable {
+    class HashTable : boost::noncopyable {
     public:
         const char *name;
         struct Node {
