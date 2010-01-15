@@ -67,6 +67,11 @@ namespace mongo {
         }
         
         _nullKey = nullKeyB.obj();
+
+        BSONObjBuilder b;
+        b.appendNull( "" );
+        _nullObj = b.obj();
+        _nullElt = _nullObj.firstElement();
     }
 
 
@@ -79,9 +84,6 @@ namespace mongo {
     }
 
     void IndexSpec::_getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-        BSONObjBuilder b;
-        b.appendNull( "" );
-        BSONElement nullElt = b.done().firstElement();
         BSONElement arrElt;
         unsigned arrIdx = ~0;
         for( unsigned i = 0; i < fieldNames.size(); ++i ) {
@@ -89,7 +91,7 @@ namespace mongo {
                 continue;
             BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
             if ( e.eoo() )
-                e = nullElt; // no matching field
+                e = _nullElt; // no matching field
             if ( e.type() != Array )
                 fieldNames[ i ] = ""; // no matching field or non-array match
             if ( *fieldNames[ i ] == '\0' )
@@ -101,10 +103,15 @@ namespace mongo {
             // enforce single array path here
             uassert( 10088 ,  "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
         }
+
         bool allFound = true; // have we found elements for all field names in the key spec?
-        for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
-            if ( **i != '\0' )
+        for( vector<const char*>::const_iterator i = fieldNames.begin(); i != fieldNames.end(); ++i ){
+            if ( **i != '\0' ){
                 allFound = false;
+                break;
+            }
+        }
+
         if ( allFound ) {
             if ( arrElt.eoo() ) {
                 // no terminal array element to expand
