@@ -565,64 +565,6 @@ namespace mongo {
         return -1;
     }
 
-    /** returns a string that when used as a matcher, would match a super set of regex()
-        returns "" for complex regular expressions
-        used to optimize queries in some simple regex cases that start with '^'
-    */
-    inline string simpleRegexHelper(const char* regex, const char* flags){
-        string r = "";
-
-        if ( ! ( flags[0] == '\0'
-               || (flags[0] == 'm' && flags[1] == '\0') // multiline doesn't change anything here
-                //TODO: support x (EXTENDED). basically just ignore whitespace and treat '#' as a metacharacter
-               ))
-            return r;
-
-        const char *i = regex;
-        if ( *i != '^' )
-            return r;
-        ++i;
-
-        // Empty string matches everything, won't limit our search.
-        if ( !*i )
-            return r;
-
-        stringstream ss;
-        for( ; *i; ++i ){
-            char c = *i;
-            if ( c == '*' || c == '?' ){
-                // These are the only two symbols that make the last char optional
-                r = ss.str();
-                r = r.substr( 0 , r.size() - 1 );
-                break;
-            } else if (strchr("\\^$.[|()+{", c)){
-                // list of "metacharacters" from man pcrepattern
-                r = ss.str();
-                break;
-            } else {
-                // self-matching char
-                ss << *i;
-            }
-        }
-
-        if ( r.size() == 0 && *i == 0 )
-            r = ss.str();
-
-        return r;
-    }
-    string BSONElement::simpleRegex() const {
-        switch(type()){
-            case RegEx:
-                return simpleRegexHelper(regex(), regexFlags());
-            case Object:{
-                BSONObj o = embeddedObject();
-                return simpleRegexHelper(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
-            }
-            default: assert(false); return ""; //return squashes compiler warning
-        }
-    }
-
-
     void BSONElement::validate() const {
         switch( type() ) {
             case DBRef:
@@ -1291,42 +1233,6 @@ namespace mongo {
             assert( !o.woEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^foo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "foo" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f?oo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^fz?oo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f", "");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f", "m");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "f" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f", "mi");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "" );
-            }
         }
         void testoid() {
             OID id;
