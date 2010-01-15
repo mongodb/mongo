@@ -21,12 +21,39 @@
 #include "../stdafx.h"
 
 namespace mongo {
+    
+    class IndexSpec {
+    public:
+        BSONObj keys;
+        BSONObj meta;
 
-    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys );
+        IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
+            : keys(k) , meta(m){
+        }
+
+        /**
+           this is a DickLock of an IndexDetails info
+           should have a key field 
+         */
+        IndexSpec( const DiskLoc& loc ){
+            meta = loc.obj();
+            keys = meta["key"].embeddedObjectUserCheck();
+            if ( keys.objsize() == 0 ) {
+                out() << meta.toString() << endl;
+                assert(false);
+                
+            }
+        }
+
+    };
+    
+    void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys );
 
 	/* Details about a particular index. There is one of these effectively for each object in 
 	   system.namespaces (although this also includes the head pointer, which is not in that 
 	   collection).
+
+       ** MemoryMapped Record  **
 	 */
     class IndexDetails {
     public:

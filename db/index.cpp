@@ -128,8 +128,8 @@ namespace mongo {
         }
     }
 
-    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-        BSONObjIterator i( keyPattern );
+    void getKeysFromObject( const IndexSpec &spec, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
+        BSONObjIterator i( spec.keys );
         vector< const char * > fieldNames;
         vector< BSONElement > fixed;
         BSONObjBuilder nullKey;
@@ -149,13 +149,7 @@ namespace mongo {
        Keys will be left empty if key not found in the object.
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
-        if ( keyPattern.objsize() == 0 ) {
-            out() << keyPattern.toString() << endl;
-            out() << info.obj().toString() << endl;
-            assert(false);
-        }
-        mongo::getKeysFromObject( keyPattern, obj, keys );
+        mongo::getKeysFromObject( IndexSpec( info ) , obj, keys );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
