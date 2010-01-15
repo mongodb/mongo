@@ -911,6 +911,7 @@ namespace mongo {
         }
     }
 
+    // throws DBException
     /* _ TODO dropDups 
      */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
@@ -963,9 +964,10 @@ namespace mongo {
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             ProgressMeter pm2( nkeys , 10 );
             while( i->more() ) { 
+                RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
 
-                //                cout<<"TEMP SORTER next " << d.first.toString() << endl;
+                //cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }
@@ -1027,6 +1029,7 @@ namespace mongo {
         return n;
     }
 
+    // throws DBException
     void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         Timer t;
