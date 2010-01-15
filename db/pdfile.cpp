@@ -811,7 +811,8 @@ namespace mongo {
         d->paddingFits();
 
         /* have any index keys changed? */
-        if( d->nIndexes ) {
+        {
+            unsigned keyUpdates = 0;
             for ( int x = 0; x < d->nIndexes; x++ ) {
                 IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
@@ -825,6 +826,7 @@ namespace mongo {
                 }
                 assert( !dl.isNull() );
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
+                keyUpdates += changes[x].added.size();
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
@@ -837,11 +839,10 @@ namespace mongo {
                         out() << " caught assertion update index " << idx.indexNamespace() << '\n';
                         problem() << " caught assertion update index " << idx.indexNamespace() << endl;
                     }
-                    if ( cc().database()->profile )
-                        ss << "\n" << changes[x].added.size() << " key updates ";
                 }
-
             }
+            if( keyUpdates && cc().database()->profile )
+                ss << '\n' << keyUpdates << " key updates ";
         }
 
         //	update in place
