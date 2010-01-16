@@ -36,6 +36,7 @@
 #include "security.h"
 #include "queryoptimizer.h"
 #include "../scripting/engine.h"
+#include "dbstats.h"
 
 namespace mongo {
 
@@ -355,8 +356,8 @@ namespace mongo {
                 bb.done();
             }
 
-
-
+            result.append( "opcounters" , globalOpCounters.getObj() );
+            
             return true;
         }
         time_t started;

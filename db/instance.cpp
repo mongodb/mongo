@@ -35,6 +35,7 @@
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
+#include "dbstats.h"
 
 namespace mongo {
 
@@ -251,6 +252,7 @@ namespace mongo {
 
         // before we lock...
         int op = m.data->operation();
+        globalOpCounters.gotOp( op );
         const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
