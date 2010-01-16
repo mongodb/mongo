@@ -327,6 +327,11 @@ namespace mongo {
                     }
             }
             break;
+
+        case Code:
+            s << ascode();
+            break;
+
         default:
             stringstream ss;
             ss << "Cannot create a properly formatted JSON string with "

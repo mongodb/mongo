@@ -324,6 +324,16 @@ namespace JsonTests {
             }
         };
 
+        class CodeTests {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.appendCode( "x" , "function(){ return 1; }" );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
+            }
+        };
+
     } // namespace JsonStringTests
 
     namespace FromJsonTests {
@@ -1025,6 +1035,8 @@ namespace JsonTests {
             add< JsonStringTests::Regex >();
             add< JsonStringTests::RegexEscape >();
             add< JsonStringTests::RegexManyOptions >();
+            add< JsonStringTests::CodeTests >();
+
             add< FromJsonTests::Empty >();
             add< FromJsonTests::EmptyWithSpace >();
             add< FromJsonTests::SingleString >();
