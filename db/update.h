@@ -146,6 +146,17 @@ namespace mongo {
             bb.append( elt );
             bb.done();
         }
+
+        void _checkForAppending( BSONElement& e ){
+            if ( e.type() == Object ){
+                // this is a tiny bit slow, but rare and important
+                // only when setting something TO an object, not setting something in an object
+                // and it checks for { $set : { x : { 'a.b' : 1 } } } 
+                // which is feel has been common
+                uassert( 12527 , "not okForStorage" , e.embeddedObject().okForStorage() );
+            }
+        }
+        
     };
 
     class ModSet {
@@ -173,7 +184,6 @@ namespace mongo {
         void _appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen );
         
         void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
-            
             switch ( m.op ){
                 
             case Mod::PUSH: { 
@@ -198,6 +208,7 @@ namespace mongo {
                 
             case Mod::INC:
             case Mod::SET: {
+                m._checkForAppending( m.elt );
                 b.appendAs( m.elt, m.shortFieldName );
                 break;
             }

@@ -57,6 +57,7 @@ namespace mongo {
         }
             
         case SET: {
+            _checkForAppending( elt );
             b.appendAs( elt , shortFieldName );
             break;
         }
