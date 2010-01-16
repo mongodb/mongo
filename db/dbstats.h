@@ -27,16 +27,7 @@ namespace mongo {
         void gotDelete(){ _delete[0]++; }
         void gotGetMore(){ _getmore[0]++; }
 
-        void gotOp( int op ){
-            switch ( op ){
-            case dbInsert: gotInsert(); break;
-            case dbQuery: gotQuery(); break;
-            case dbUpdate: gotUpdate(); break;
-            case dbDelete: gotDelete(); break;
-            case dbGetMore: gotGetMore(); break;
-            default: log() << "unkonw op: " << op << endl;
-            }
-        }
+        void gotOp( int op );
 
         BSONObj& getObj(){ return _obj; }
     private:

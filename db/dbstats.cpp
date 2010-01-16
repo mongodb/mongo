@@ -23,5 +23,21 @@ namespace mongo {
         _getmore = (int*)_obj["getmore"].value();
     }
 
+    void OpCounters::gotOp( int op ){
+        switch ( op ){
+        case dbInsert: gotInsert(); break;
+        case dbQuery: gotQuery(); break;
+        case dbUpdate: gotUpdate(); break;
+        case dbDelete: gotDelete(); break;
+        case dbGetMore: gotGetMore(); break;
+        case dbKillCursors:
+        case opReply:
+        case dbMsg:
+            break;
+        default: log() << "OpCounters::gotOp unkonwn op: " << op << endl;
+        }
+    }
+
+
     OpCounters globalOpCounters;
 }
