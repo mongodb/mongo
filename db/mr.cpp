@@ -467,11 +467,6 @@ namespace mongo {
                 
                 long long finalCount = mr.renameIfNeeded( db );
 
-                if ( finalCount == 0 && shouldHaveData ){
-                    errmsg = "there were emits but no data!";
-                    return false;
-                }
-
                 timingBuilder.append( "total" , t.millis() );
                 
                 result.append( "result" , mr.finalShort );
@@ -479,7 +474,13 @@ namespace mongo {
                 countsBuilder.append( "output" , finalCount );
                 if ( mr.verbose ) result.append( "timing" , timingBuilder.obj() );
                 result.append( "counts" , countsBuilder.obj() );
-                
+
+                if ( finalCount == 0 && shouldHaveData ){
+                    result.append( "cmd" , cmd );
+                    errmsg = "there were emits but no data!";
+                    return false;
+                }
+
                 return true;
             }
 
@@ -558,6 +559,7 @@ namespace mongo {
                         continue;
                     }
                     
+
                     db.insert( mr.tempLong , reduceValues( values , s.get() , reduceFunction , 1 , finalizeFunction ) );
                     values.clear();
                     values.push_back( t );
