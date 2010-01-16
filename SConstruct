@@ -474,10 +474,6 @@ elif "sunos5" == os.sys.platform:
      env.Append( CPPDEFINES=[ "__linux__" , "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
 
-     #all solaris builds should be static
-     static = True
-     env.Append( LINKFLAGS=" -static " )
-
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
     freebsd = True
