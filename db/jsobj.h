@@ -852,6 +852,11 @@ namespace mongo {
 
         bool isValid();
 
+        /** @return if the user is a valid user doc
+            criter: isValid() no . or $ field names
+         */
+        bool okForStorage() const;
+
 		/** @return true if object is empty -- i.e.,  {} */
         bool isEmpty() const {
             return objsize() <= 5;

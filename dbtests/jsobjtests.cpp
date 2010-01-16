@@ -1219,6 +1219,32 @@ namespace JsobjTests {
 
     };
 
+    class checkForStorageTests {
+    public:
+        
+        void good( string s ){
+            BSONObj o = fromjson( s );
+            if ( o.okForStorage() )
+                return;
+            throw UserException( 12528 , (string)"should be ok for storage:" + s );
+        }
+
+        void bad( string s ){
+            BSONObj o = fromjson( s );
+            if ( ! o.okForStorage() )
+                return;
+            throw UserException( 12529 , (string)"should NOT be ok for storage:" + s );
+        }
+
+        void run(){
+            good( "{x:1}" );
+            bad( "{'x.y':1}" );
+
+            good( "{x:{a:2}}" );
+            bad( "{x:{'$a':2}}" );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1305,6 +1331,8 @@ namespace JsobjTests {
             add< ArrayMacroTest >();
             add< NumberParsing >();
             add< bson2settest >();
+            add< checkForStorageTests >();
+
         }
     } myall;
     

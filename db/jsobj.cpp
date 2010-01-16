@@ -1129,6 +1129,37 @@ namespace mongo {
         return b.obj();
     }
 
+    bool BSONObj::okForStorage() const {
+        BSONObjIterator i( *this );
+        while ( i.more() ){
+            BSONElement e = i.next();
+            const char * name = e.fieldName();
+            
+            if ( strchr( name , '.' ) ||
+                 strchr( name , '$' ) ){
+                return false;
+            }
+            
+            if ( e.mayEncapsulate() ){
+                switch ( e.type() ){
+                case Object:
+                case Array:
+                    if ( ! e.embeddedObject().okForStorage() )
+                        return false;
+                    break;
+                case CodeWScope:
+                    if ( ! e.codeWScopeObject().okForStorage() )
+                        return false;
+                    break;
+                default:
+                    uassert( 12579, "unhandled cases in BSONObj okForStorage" , 0 );
+                }
+                
+            }
+        }
+        return true;
+    }
+
     string BSONObj::hexDump() const {
         stringstream ss;
         const char *d = objdata();
