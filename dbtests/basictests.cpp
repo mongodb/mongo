@@ -203,6 +203,30 @@ namespace BasicTests {
         }
         
     };
+
+    class AssertTests {
+    public:
+
+        int x;
+
+        AssertTests(){
+            x = 0;
+        }
+
+        string foo(){
+            x++;
+            return "";
+        }
+        void run(){
+            uassert( -1 , foo() , 1 );
+            ASSERT_EQUALS( 0 , x );
+            try {
+                uassert( -1 , foo() , 0 );
+            }
+            catch ( ... ){}
+            ASSERT_EQUALS( 1 , x );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -219,6 +243,7 @@ namespace BasicTests {
             add< stringbuildertests::reset2 >();
 
             add< sleeptest >();
+            add< AssertTests >();
         }
     } myall;
     
