@@ -434,7 +434,8 @@ namespace mongo {
 
         {
             BSONObjBuilder bb;
-            BSONObjIterator i( query );
+            EmbeddedBuilder eb( &bb );
+            BSONObjIteratorSorted i( query );
             while ( i.more() ){
                 BSONElement e = i.next();
 
@@ -443,11 +444,9 @@ namespace mongo {
                     continue;
                 }
 
-                uassert( 10146 ,  "upsert with foo.bar type queries not supported yet" , strchr( e.fieldName() , '.' ) == 0 );
-
-
-                bb.append( e );
+                eb.appendAs( e , e.fieldName() );
             }
+            eb.done();
             newObj = bb.obj();
         }
         
