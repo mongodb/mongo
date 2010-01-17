@@ -103,35 +103,6 @@ namespace mongo {
 
     class Database;
 
-    /* Set database we want to use, then, restores when we finish (are out of scope)
-       Note this is also helpful if an exception happens as the state if fixed up.
-    */
-    class DBContext {
-        Database *olddb;
-        string oldns;
-    public:
-        DBContext(const char *ns) {
-            olddb = cc().database();
-            oldns = cc().ns();
-            setClient(ns);
-        }
-        DBContext(string ns) {
-            olddb = cc().database();
-            oldns = cc().ns();
-            setClient(ns.c_str());
-        }
-
-        /* this version saves the context but doesn't yet set the new one: */
-        DBContext() {
-            olddb = cc().database();
-            oldns = cc().ns();        }
-
-
-        ~DBContext() {
-            cc().setns(oldns.c_str(), olddb);
-        }
-    };
-
     // manage a set using collection backed storage
     class DbSet {
     public:

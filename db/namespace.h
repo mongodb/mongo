@@ -133,6 +133,10 @@ namespace mongo {
             return old + "." + local;
         }
 
+        operator string() const {
+            return (string)buf;
+        }
+
         char buf[MaxNsLen];
     };
 

@@ -35,6 +35,12 @@ namespace mongo {
     class Database;
     class CurOp;
     class Command;
+    class Client;
+
+    extern boost::thread_specific_ptr<Client> currentClient;
+
+    bool setClient(const char *ns, const string& path=dbpath, mongolock *lock = 0);
+
 
     class Client : boost::noncopyable { 
     public:
@@ -46,6 +52,41 @@ namespace mongo {
         public:
             GodScope();
             ~GodScope();
+        };
+
+        /* Set database we want to use, then, restores when we finish (are out of scope)
+           Note this is also helpful if an exception happens as the state if fixed up.
+        */
+        class Context {
+            Client * _client;
+            Database * _olddb;
+            string _oldns;
+        public:
+            Context(const char *ns) 
+                : _client( currentClient.get() ) {
+                _olddb = _client->_database;
+                _oldns = _client->_ns;
+                setClient(ns);
+            }
+            Context(string ns) 
+                : _client( currentClient.get() ){
+                _olddb = _client->_database;
+                _oldns = _client->_ns;
+                setClient(ns.c_str());
+            }
+            
+            /* this version saves the context but doesn't yet set the new one: */
+            Context() 
+                : _client( currentClient.get() ) {
+                _olddb = _client->database();
+                _oldns = _client->ns();        
+            }
+            
+            ~Context() {
+                DEV assert( _client == currentClient.get() );
+                _client->setns( _oldns.c_str(), _olddb );
+            }
+
         };
 
     private:
@@ -97,9 +138,6 @@ namespace mongo {
         bool isGod() const { return _god; }
     };
     
-    /* defined in security.cpp - one day add client.cpp? */
-    extern boost::thread_specific_ptr<Client> currentClient;
-
     inline Client& cc() { 
         return *currentClient.get();
     }

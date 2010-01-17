@@ -60,7 +60,7 @@ namespace mongo {
 			if( m["local"].level == 2 ) return true;
 			if( isLocalHost ) { 
                 readlock l(""); 
-				DBContext c("admin.system.users");
+                Client::Context c("admin.system.users");
 				BSONObj result;
 				if( Helpers::getSingleton("admin.system.users", result) )
 					return false;

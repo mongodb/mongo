@@ -126,7 +126,7 @@ namespace mongo {
        path - datafiles directory, if not the default, so we can differentiate between db's of the same
               name in different places (for example temp ones on repair).
     */
-    inline bool setClient(const char *ns, const string& path=dbpath, mongolock *lock = 0) {
+    inline bool setClient(const char *ns, const string& path , mongolock *lock ) {
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
