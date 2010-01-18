@@ -1001,48 +1001,92 @@ namespace mongo {
         return n;
     }
 
-    /* note there are faster ways to build an index in bulk, that can be
-       done eventually */
-    int addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-        bool dupsAllowed = !idx.unique();
-        bool dropDups = idx.dropDups();
+    static class BackgroundIndexBuildJobs { 
 
-        int n = 0;
-        auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-        while ( c->ok() ) {
-            BSONObj js = c->current();
-            try { 
-                _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
-                c->advance();
-            } catch( AssertionException& e ) { 
-                if ( dropDups ) {
-                    DiskLoc toDelete = c->currLoc();
+        unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+            bool dupsAllowed = !idx.unique();
+            bool dropDups = idx.dropDups();
+
+            unsigned long long n = 0;
+            auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+            while ( c->ok() ) {
+                BSONObj js = c->current();
+                try { 
+                    _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
                     c->advance();
-                    theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
-                } else {
-                    _log() << endl;
-                    log(2) << "addExistingToIndex exception " << e.what() << endl;
-                    throw;
+                } catch( AssertionException& e ) { 
+                    if ( dropDups ) {
+                        DiskLoc toDelete = c->currLoc();
+                        c->advance();
+                        theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                    } else {
+                        _log() << endl;
+                        log(2) << "addExistingToIndex exception " << e.what() << endl;
+                        throw;
+                    }
                 }
+                n++;
+            };
+            return n;
+        }
+
+        /* we do set a flag in the namespace for quick checking, but this is our authoritative info - 
+           that way on a crash/restart, we don't think we are still building one. */
+        set<NamespaceDetails*> bgJobsInProgress;
+
+        void prep(NamespaceDetails *d) {
+            assertInWriteLock();
+            assert( bgJobsInProgress.count(d) == 0 );
+            bgJobsInProgress.insert(d);
+            d->backgroundIndexBuildInProgress = 1;
+        }
+
+    public:
+        /* Note you cannot even do a foreground index build if a background is in progress,
+           as bg build assumes it is the last index in the array!
+        */
+        void checkInProg(NamespaceDetails *d) { 
+            assertInWriteLock();
+            uassert(12580, "already building an index for this namespace in background", bgJobsInProgress.count(d) == 0);
+        }
+
+/* todo: clean bg flag on loading of NamespaceDetails  */
+
+        unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+            unsigned long long n;
+            prep(d);
+            try { 
+                idx.head = BtreeBucket::addBucket(idx);
+                n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
-            n++;
-        };
-        return n;
-    }
+            catch(...) { 
+                assertInWriteLock();
+                bgJobsInProgress.erase(d);
+                d->backgroundIndexBuildInProgress = 0;
+                throw;
+            }
+            return n;
+        }
+    } backgroundIndex;
 
     // throws DBException
-    void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         Timer t;
 		unsigned long long n;
-        if( 1 ) {
+
+        BSONObj info = idx.info.obj();
+        bool background = info["background"].trueValue();
+        if( background ) { 
+            log() << "WARNING: background index build not yet implemented" << endl;
+        }
+
+        if( !background ) {
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
 		else {
-			cout << "oldBuild\n";
-			idx.head = BtreeBucket::addBucket(idx);
-			n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+            n = backgroundIndex.go(ns, d, idx, idxNo);
 		}
         log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
@@ -1181,6 +1225,7 @@ namespace mongo {
         string tabletoidxns;
         if ( addIndex ) {
             BSONObj io((const char *) obuf);
+            backgroundIndex.checkInProg(d);
             if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) ) {
                 return DiskLoc();
             }
@@ -1280,7 +1325,7 @@ namespace mongo {
             IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str()); // clear transient info caches so they refresh; increments nIndexes
             idx.info = loc;
             try {
-                buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
                 // save our error msg string as an exception on deleteIndexes will overwrite our message
                 LastError *le = lastError.get();

@@ -82,7 +82,9 @@ namespace mongo {
 
         /* Location of index info object. Format:
 
-             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}[, unique: <bool>] }
+             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}
+               [, unique: <bool>, background: <bool>] 
+             }
 
            This object is in the system.indexes collection.  Note that since we
            have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.

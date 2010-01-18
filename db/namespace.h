@@ -208,6 +208,7 @@ namespace mongo {
             multiKeyIndexBits = 0;
             reservedA = 0;
             extraOffset = 0;
+            backgroundIndexBuildInProgress = 0;
             memset(reserved, 0, sizeof(reserved));
         }
         DiskLoc firstExtent;
@@ -247,8 +248,12 @@ namespace mongo {
         unsigned long long reservedA;
         long long extraOffset; // where the $extra info is located (bytes relative to this)
     public:
-        char reserved[80];
+        int backgroundIndexBuildInProgress; // 1 if in prog
+        char reserved[76];
 
+        /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so, 
+                 this isn't thread safe.  TODO
+        */
         enum NamespaceFlags {
             Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
