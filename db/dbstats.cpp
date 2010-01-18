@@ -1,6 +1,6 @@
 // dbstats.cpp
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "dbstats.h"
 
 namespace mongo {
@@ -34,7 +34,7 @@ namespace mongo {
         case opReply:
         case dbMsg:
             break;
-        default: log() << "OpCounters::gotOp unkonwn op: " << op << endl;
+        default: log() << "OpCounters::gotOp unknown op: " << op << endl;
         }
     }
 
