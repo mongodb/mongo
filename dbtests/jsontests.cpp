@@ -334,6 +334,17 @@ namespace JsonTests {
             }
         };
 
+        class TimestampTests {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.appendTimestamp( "x" , 4000 , 10 );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : { \"t\" : 4000 , \"i\" : 10 } }" , o.jsonString() );
+            }
+        };
+
+
     } // namespace JsonStringTests
 
     namespace FromJsonTests {
@@ -1036,6 +1047,7 @@ namespace JsonTests {
             add< JsonStringTests::RegexEscape >();
             add< JsonStringTests::RegexManyOptions >();
             add< JsonStringTests::CodeTests >();
+            add< JsonStringTests::TimestampTests >();
 
             add< FromJsonTests::Empty >();
             add< FromJsonTests::EmptyWithSpace >();
