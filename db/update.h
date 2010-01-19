@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    /* Used for modifiers such as $inc, $set, ... */
+    /* Used for modifiers such as $inc, $set, $push, ... */
     struct Mod {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10
@@ -42,13 +42,13 @@ namespace mongo {
 
         BSONElement elt; // x:5 note: this is the actual element from the updateobj
         int pushStartSize;
-        boost::shared_ptr<JSMatcher> matcher;
+        boost::shared_ptr<Matcher> matcher;
 
         void init( Op o , BSONElement& e ){
             op = o;
             elt = e;
             if ( op == PULL && e.type() == Object )
-                matcher.reset( new JSMatcher( e.embeddedObject() ) );
+                matcher.reset( new Matcher( e.embeddedObject() ) );
         }
 
         void setFieldName( const char * s ){

@@ -1,6 +1,6 @@
 // matcher.cpp
 
-/* JSMatcher is our boolean expression evaluator for "where" clauses */
+/* Matcher is our boolean expression evaluator for "where" clauses */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -61,12 +61,12 @@ namespace mongo {
         
     };
 
-    JSMatcher::~JSMatcher() {
+    Matcher::~Matcher() {
         delete where;
         where = 0;
     }
 
-    BasicMatcher::BasicMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ) {
+    ElementMatcher::ElementMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ) {
         if ( _op == BSONObj::opMOD ){
             BSONObj o = _e.embeddedObject().firstElement().embeddedObject();
             mod = o["0"].numberInt();
@@ -80,12 +80,12 @@ namespace mongo {
         else if ( _op == BSONObj::opELEM_MATCH ){
             BSONElement m = toMatch.embeddedObjectUserCheck().firstElement();
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
-            subMatcher.reset( new JSMatcher( m.embeddedObject() ) );
+            subMatcher.reset( new Matcher( m.embeddedObject() ) );
         }
     }
 
 
-    BasicMatcher::~BasicMatcher(){
+    ElementMatcher::~ElementMatcher(){
     }
 
 
@@ -141,14 +141,12 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    JSMatcher::JSMatcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), _atomic(false), nRegex(0){
-        
+    Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), _atomic(false), nRegex(0) {
+
         BSONObjIterator i(jsobj);
-        while ( i.moreWithEOO() ) {
+        while ( i.more() ) {
             BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
 
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
@@ -236,13 +234,13 @@ namespace mongo {
                             all = true;
                         case BSONObj::opIN:
                         case BSONObj::NIN:
-                            basics.push_back( BasicMatcher( e , op , fe.embeddedObject() ) );
+                            basics.push_back( ElementMatcher( e , op , fe.embeddedObject() ) );
                             break;
                         case BSONObj::opMOD:
                         case BSONObj::opTYPE:
                         case BSONObj::opELEM_MATCH:
-                            // these are types where BasicMatcher has all the info
-                            basics.push_back( BasicMatcher( e , op ) );
+                            // these are types where ElementMatcher has all the info
+                            basics.push_back( ElementMatcher( e , op ) );
                             break;
                         case BSONObj::opSIZE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
@@ -306,7 +304,7 @@ namespace mongo {
         constrainIndexKey_ = constrainIndexKey;
     }
 
-    inline int JSMatcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm) {
+    inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
         if ( op == BSONObj::Equality )
@@ -352,7 +350,7 @@ namespace mongo {
         return (op & z);
     }
 
-    int JSMatcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const BasicMatcher& bm ) {
+    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm ) {
         int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm );
         if ( bm.toMatch.type() != jstNULL )
             return ( ret <= 0 ) ? 1 : 0;
@@ -360,7 +358,7 @@ namespace mongo {
             return -ret;
     }
 
-    int retMissing( const BasicMatcher &bm ) {
+    int retMissing( const ElementMatcher &bm ) {
         if ( bm.compareOp != BSONObj::opEXISTS )
             return 0;
         return bm.toMatch.boolean() ? -1 : 1;
@@ -385,7 +383,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int JSMatcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const BasicMatcher& bm , bool isArr) {
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& bm , bool isArr) {
 
         if ( compareOp == BSONObj::opALL ) {
             if ( bm.myset->size() == 0 )
@@ -518,13 +516,13 @@ namespace mongo {
 
     /* See if an object matches the query.
     */
-    bool JSMatcher::matches(const BSONObj& jsobj ) {
+    bool Matcher::matches(const BSONObj& jsobj ) {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
         // check normal non-regex cases:
         for ( unsigned i = 0; i < basics.size(); i++ ) {
-            BasicMatcher& bm = basics[i];
+            ElementMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm );
@@ -617,17 +615,17 @@ namespace mongo {
 
             BSONObj j1((const char *) &js1);
             BSONObj j2((const char *) &js2);
-            JSMatcher m(j2);
+            Matcher m(j2);
             assert( m.matches(j1) );
             js2.sval[0] = 'z';
             assert( !m.matches(j1) );
-            JSMatcher n(j1);
+            Matcher n(j1);
             assert( n.matches(j1) );
             assert( !n.matches(j2) );
 
             BSONObj j0 = BSONObj();
 //		BSONObj j0((const char *) &js0);
-            JSMatcher p(j0);
+            Matcher p(j0);
             assert( p.matches(j1) );
             assert( p.matches(j2) );
         }
