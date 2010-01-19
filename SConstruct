@@ -1168,6 +1168,8 @@ def runShellTest( env, target, source ):
     elif target == "smokeJsPerf":
         g = Glob( jsSpec( [ "perf" ] ) )
         spec = [ x.abspath for x in g ]
+    elif target == "smokeJsSlow":
+        spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
     else:
         print( "invalid target for runShellTest()" )
         Exit( 1 )
@@ -1181,6 +1183,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
+    addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
 
