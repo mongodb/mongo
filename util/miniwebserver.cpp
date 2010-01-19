@@ -153,7 +153,20 @@ namespace mongo {
         string responseMsg;
         int responseCode = 599;
         vector<string> headers;
-        doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, from);
+        
+        try {
+            doRequest(buf, parseURL( buf ), responseMsg, responseCode, headers, from);
+        }
+        catch ( std::exception& e ){
+            responseCode = 500;
+            responseMsg = "error loading page: ";
+            responseMsg += e.what();
+        }
+        catch ( std::exception& e ){
+            responseCode = 500;
+            responseMsg = "error loading page: ";
+            responseMsg += e.what();
+        }
 
         stringstream ss;
         ss << "HTTP/1.0 " << responseCode;
