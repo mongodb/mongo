@@ -354,6 +354,7 @@ namespace mongo {
 
         if ( shouldRepairDatabases ){
             log() << "finished checking dbs" << endl;
+            cc().shutdown();
             dbexit( EXIT_CLEAN );
         }
     }
