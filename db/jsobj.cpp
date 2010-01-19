@@ -332,6 +332,10 @@ namespace mongo {
             s << ascode();
             break;
 
+        case Timestamp:
+            s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
+            break;
+
         default:
             stringstream ss;
             ss << "Cannot create a properly formatted JSON string with "

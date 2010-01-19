@@ -1340,6 +1340,9 @@ namespace mongo {
             b.append( val );
         }
 
+        /**
+         * @param time - in millis (but stored in seconds)
+         */
         void appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
             OpTime t( (unsigned) (time / 1000) , inc );
             appendTimestamp( fieldName , t.asDate() );
