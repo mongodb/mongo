@@ -435,8 +435,9 @@ namespace mongo {
                 }
                 else {
                     string old_ns = c.ns();
+                    Database * old_db = c.database();
                     lk.releaseAndWriteLock();
-                    resetClient(old_ns.c_str());
+                    Client::Context c( old_ns , old_db );
                     profile(ss.str().c_str(), ms);
                 }
             }

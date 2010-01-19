@@ -112,16 +112,6 @@ namespace mongo {
 
     extern DatabaseHolder dbHolder;
 
-    inline void resetClient(const char *ns, const string& path=dbpath) {
-        dbMutex.assertAtLeastReadLocked();
-        Database * d = dbHolder.get( ns , path );
-        if ( d ){
-            cc().setns(ns, d);
-            return;
-        }
-        assert(false);
-    }
-
     /* returns true if the database ("database") did not exist, and it was created on this call 
        path - datafiles directory, if not the default, so we can differentiate between db's of the same
               name in different places (for example temp ones on repair).

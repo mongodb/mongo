@@ -80,8 +80,15 @@ namespace mongo {
                 : _client( currentClient.get() ) {
                 _olddb = _client->database();
                 _oldns = _client->ns();        
+
             }
             
+            /**
+             * if you are doing this after allowing a write there could be a race condition
+             * if someone closes that db.  this checks that the DB is still valid
+             */
+            Context( string ns , Database * db );
+
             ~Context() {
                 DEV assert( _client == currentClient.get() );
                 _client->setns( _oldns.c_str(), _olddb );
