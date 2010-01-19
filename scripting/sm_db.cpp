@@ -17,7 +17,7 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include "../client/quorum.h"
+#include "../client/syncclusterconnection.h"
 
 namespace mongo {
 
@@ -173,7 +173,7 @@ namespace mongo {
                 }
             }
             else if ( numCommas == 2 ){
-                conn.reset( new QuorumConnection( host ) );
+                conn.reset( new SyncCluterConnection( host ) );
             }
             else {
                 JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
