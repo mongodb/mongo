@@ -30,7 +30,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":\"b\"}" );
-            JSMatcher m( query );
+            Matcher m( query );
             ASSERT( m.matches( fromjson( "{\"a\":\"b\"}" ) ) );
         }
     };
@@ -39,7 +39,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
-            JSMatcher m( query );
+            Matcher m( query );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
         }
     };
@@ -49,7 +49,7 @@ namespace MatcherTests {
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
-            JSMatcher m( query.done() );
+            Matcher m( query.done() );
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );            
         }        
     };
@@ -58,7 +58,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
-            JSMatcher m( query );
+            Matcher m( query );
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
@@ -72,7 +72,7 @@ namespace MatcherTests {
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
             ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
             
-            JSMatcher m( query );
+            Matcher m( query );
 
             {
                 BSONObjBuilder b;
@@ -100,7 +100,7 @@ namespace MatcherTests {
     class Size {
     public:
         void run() {
-            JSMatcher m( fromjson( "{a:{$size:4}}" ) );
+            Matcher m( fromjson( "{a:{$size:4}}" ) );
             ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );

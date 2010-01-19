@@ -600,7 +600,7 @@ namespace mongo {
         }
     }
 
-    /* JSMatcher --------------------------------------*/
+    /* Matcher --------------------------------------*/
 
 // If the element is something like:
 //   a : { $gt : 3 }

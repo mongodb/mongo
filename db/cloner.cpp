@@ -347,7 +347,7 @@ namespace mongo {
     }
     
     void Cloner::replayOpLog( DBClientCursor *c, const BSONObj &query ) {
-        JSMatcher matcher( query );
+        Matcher matcher( query );
         while( 1 ) {
             BSONObj op;
             {
