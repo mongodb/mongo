@@ -162,10 +162,9 @@ namespace mongo {
             responseMsg = "error loading page: ";
             responseMsg += e.what();
         }
-        catch ( std::exception& e ){
+        catch ( ... ){
             responseCode = 500;
-            responseMsg = "error loading page: ";
-            responseMsg += e.what();
+            responseMsg = "unknown error loading page";
         }
 
         stringstream ss;
