@@ -173,7 +173,7 @@ namespace mongo {
                 }
             }
             else if ( numCommas == 2 ){
-                conn.reset( new SyncCluterConnection( host ) );
+                conn.reset( new SyncClusterConnection( host ) );
             }
             else {
                 JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );

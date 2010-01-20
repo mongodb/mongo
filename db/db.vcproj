@@ -1345,6 +1345,10 @@
 				RelativePath="..\client\quorum.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\client\syncclusterconnection.cpp"
+				>
+			</File>
 			<Filter
 				Name="btree related"
 				>
