@@ -156,6 +156,9 @@ namespace mongo {
             case 't':
                 o = '\t';
                 break;
+            case 'v':
+                o = '\v';
+                break;
             default:
                 assert( false );
             }
@@ -456,28 +459,32 @@ public:
                 // NOTE We use range_p rather than cntrl_p, because the latter is locale dependent.
                 str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
                                 *( ( ch_p( '\\' ) >>
-                                     ( ch_p( '"' )[ chE( self.b ) ] |
-                                       ch_p( '\\' )[ chE( self.b ) ] |
-                                       ch_p( '/' )[ chE( self.b ) ] |
+                                     (
                                        ch_p( 'b' )[ chE( self.b ) ] |
                                        ch_p( 'f' )[ chE( self.b ) ] |
                                        ch_p( 'n' )[ chE( self.b ) ] |
                                        ch_p( 'r' )[ chE( self.b ) ] |
                                        ch_p( 't' )[ chE( self.b ) ] |
-                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                                       ch_p( 'v' )[ chE( self.b ) ] |
+                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
+                                       ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
+                                     )
+                                   ) |
                                    ( ~range_p( 0x00, 0x1f ) & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
 
                 singleQuoteStr = lexeme_d[ ch_p( '\'' )[ chClear( self.b ) ] >>
                                 *( ( ch_p( '\\' ) >>
-                                     ( ch_p( '\'' )[ chE( self.b ) ] |
-                                       ch_p( '\\' )[ chE( self.b ) ] |
-                                       ch_p( '/' )[ chE( self.b ) ] |
+                                     (
                                        ch_p( 'b' )[ chE( self.b ) ] |
                                        ch_p( 'f' )[ chE( self.b ) ] |
                                        ch_p( 'n' )[ chE( self.b ) ] |
                                        ch_p( 'r' )[ chE( self.b ) ] |
                                        ch_p( 't' )[ chE( self.b ) ] |
-                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
+                                       ch_p( 'v' )[ chE( self.b ) ] |
+                                       ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
+                                       ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
+                                     )
+                                   ) |
                                    ( ~range_p( 0x00, 0x1f ) & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which

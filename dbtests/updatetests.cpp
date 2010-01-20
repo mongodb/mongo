@@ -686,6 +686,16 @@ namespace UpdateTests {
             }
         };
 
+        class setswitchint : public Base {
+            const char * ns(){
+                return "unittests.int1";
+            }
+            void dotest(){
+                test( BSON( "_id" << 1 << "x" << 1 ) , BSON( "$set" << BSON( "x" << 5.6 ) ) , BSON( "_id" << 1 << "x" << 5.6 ) );
+                test( BSON( "_id" << 1 << "x" << 5.6 ) , BSON( "$set" << BSON( "x" << 1 ) ) , BSON( "_id" << 1 << "x" << 1 ) );
+            }
+        };
+
 
     };
     
@@ -752,6 +762,7 @@ namespace UpdateTests {
             add< basic::inc1 >();
             add< basic::bit1 >();
             add< basic::unset >();
+            add< basic::setswitchint >();
         }
     } myall;
 

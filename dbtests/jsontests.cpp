@@ -559,11 +559,22 @@ namespace JsonTests {
         class EscapedCharacters : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", "\" \\ / \b \f \n \r \t" );
+                b.append( "a", "\" \\ / \b \f \n \r \t \v" );
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }";
+                return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t \\v\" }";
+            }
+        };
+
+        class NonEscapedCharacters : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "% { a z $ # '  " );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\% \\{ \\a \\z \\$ \\# \\' \\ \" }";
             }
         };
 
@@ -1065,6 +1076,7 @@ namespace JsonTests {
             add< FromJsonTests::False >();
             add< FromJsonTests::Null >();
             add< FromJsonTests::EscapedCharacters >();
+            add< FromJsonTests::NonEscapedCharacters >();
             add< FromJsonTests::AllowedControlCharacter >();
             add< FromJsonTests::EscapeFieldName >();
             add< FromJsonTests::EscapedUnicodeToUtf8 >();

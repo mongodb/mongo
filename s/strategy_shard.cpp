@@ -153,8 +153,11 @@ namespace mongo {
             if ( multi )
                 uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
 
-            if ( upsert && ! manager->hasShardKey( query ) )
+            if ( upsert && !(manager->hasShardKey(toupdate) ||
+                             (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))))
+            {
                 throw UserException( 8012 , "can't upsert something without shard key" );
+            }
 
             bool save = false;
             if ( ! manager->hasShardKey( query ) ){
