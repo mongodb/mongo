@@ -100,9 +100,14 @@ namespace mongo {
                 return cmdObj["q"].embeddedObject();
             return BSONObj();
         }
-    };
 
-    bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+        static map<string,Command*> * _commands;
+
+    public:
+        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
+        static bool readOnly( const string& name );
+        static Command * findCommand( const string& name );
+    };
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
 

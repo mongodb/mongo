@@ -1354,9 +1354,7 @@ namespace mongo {
             return true;
         }
     } cmdFindAndModify;
-
-    extern map<string,Command*> *commands;
-
+    
     bool commandIsReadOnly(BSONObj& _cmdobj) { 
         BSONObj jsobj;
         {
@@ -1369,12 +1367,9 @@ namespace mongo {
             }
         }
         BSONElement e = jsobj.firstElement();
-        map<string,Command*>::iterator i;
-        if ( e.type() && ( i = commands->find(e.fieldName()) ) != commands->end() ){
-            Command *c = i->second;
-            return c->readOnly();
-        }
-        return false;
+        if ( ! e.type() )
+            return false;
+        return Command::readOnly( e.fieldName() );
     }
 
     /* TODO make these all command objects -- legacy stuff here
@@ -1407,11 +1402,9 @@ namespace mongo {
 
         BSONElement e = jsobj.firstElement();
 
-        map<string,Command*>::iterator i;
-
-        if ( e.type() && ( i = commands->find(e.fieldName()) ) != commands->end() ){
+        Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
+        if ( c ){
             string errmsg;
-            Command *c = i->second;
             AuthenticationInfo *ai = currentClient.get()->ai;
             uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
 
