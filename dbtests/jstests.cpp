@@ -515,6 +515,37 @@ namespace JSTests {
         
     };
     
+    class NumberLong {
+    public:
+        void run() {
+            Scope * s = globalScriptEngine->newScope();
+            s->localConnect( "blah" );
+            BSONObjBuilder b;
+            long long val = (long long)( 0xdeadbeefbaddULL );
+            b.append( "a", val );
+            BSONObj in = b.obj();
+            s->setObject( "a", in );
+            BSONObj out = s->getObject( "a" );
+            ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
+            
+            ASSERT( s->exec( "b = {b:a.a}", "foo", false, true, false ) );
+            out = s->getObject( "b" );
+            ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
+            ASSERT_EQUALS( val, out.firstElement().numberLong() );
+            
+            ASSERT( s->exec( "c = {c:a.a.toString()}", "foo", false, true, false ) );
+            out = s->getObject( "c" );
+            stringstream ss;
+            ss << val;
+            ASSERT_EQUALS( ss.str(), out.firstElement().valuestr() );
+
+            ASSERT( s->exec( "d = {d:a.a.toNumber()}", "foo", false, true, false ) );
+            out = s->getObject( "d" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT_EQUALS( double( val ), out.firstElement().number() );
+        }
+    };
+    
     class WeirdObjects {
     public:
 
@@ -752,6 +783,7 @@ namespace JSTests {
             add< OtherJSTypes >();
             add< SpecialDBTypes >();
             add< TypeConservation >();
+            add< NumberLong >();
 
             add< WeirdObjects >();
             add< Utf8Check >();

@@ -101,7 +101,6 @@ namespace mongo {
         *rval = c.toval( &n );
         return JS_TRUE;
     }
-    
 
     JSFunctionSpec internal_cursor_functions[] = {
         { "hasNext" , internal_cursor_hasNext , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
@@ -526,6 +525,7 @@ namespace mongo {
         { 0 }
     };
 
+
     // dbpointer
 
     JSBool dbpointer_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
@@ -656,7 +656,33 @@ namespace mongo {
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
+    
+    JSClass numberlong_class = {
+        "NumberLong" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
+    JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        stringstream ss;
+        ss <<  c.toNumberLongUnsafe( obj );
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+    
+    JSBool numberlong_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        return *rval = c.toval( double( c.toNumberLongUnsafe( obj ) ) );
+    }
 
+    JSFunctionSpec numberlong_functions[] = {
+    { "toString" , numberlong_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { "toNumber" , numberlong_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { 0 }
+    };    
+    
     JSClass minkey_class = {
         "MinKey" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -748,6 +774,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &numberlong_class , 0 , 0 , 0 , numberlong_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
@@ -783,6 +810,11 @@ namespace mongo {
             return true;
         }
 
+        if ( JS_InstanceOf( c->_context , o , &numberlong_class , 0 ) ){
+            b.append( name.c_str() , c->toNumberLongUnsafe( o ) );
+            return true;
+        }
+        
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ){
             b.appendDBRef( name.c_str() , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
             return true;
