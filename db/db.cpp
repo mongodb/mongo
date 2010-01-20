@@ -206,6 +206,11 @@ namespace mongo {
                     break;
                 }
 
+                if ( inShutdown() ) {
+                    log() << "got request after shutdown()" << endl;
+                    break;
+                }
+                
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
