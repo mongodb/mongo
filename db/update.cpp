@@ -245,9 +245,9 @@ namespace mongo {
                         inPlacePossible = false;
                     break;
                 case Mod::SET:
-                    if ( !( e.isNumber() && m.elt.isNumber() ) &&
-                         m.elt.valuesize() != e.valuesize() )
-                        inPlacePossible = false;
+                    inPlacePossible = 
+                        m.elt.type() == e.type() &&
+                        m.elt.valuesize() == e.valuesize();
                     break;
                 case Mod::PUSH:
                 case Mod::PUSH_ALL:

@@ -277,7 +277,7 @@ namespace mongo {
             return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
         }
 
-        bool uninitialized() {
+        bool uninitialized() const {
             if ( version == 0 ) return true;
             return false;
         }
@@ -300,6 +300,10 @@ namespace mongo {
                 unusedLength = fileLength - headerSize() - 16;
                 memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
+        }
+        
+        bool isEmpty() const {
+            return uninitialized() || ( unusedLength == fileLength - headerSize() - 16 );
         }
     };
 

@@ -30,11 +30,10 @@ for ( var i=1; i<10; i++ ){
 
 
 // --- test save support ---
-// TODO: this is known to be broken
 
-//o = db.data.findOne();
-//o.x = 16;
-//db.data.save( o );
-//assert.eq( 16 , db.data.findOne( { _id : o._id } ).x , "x1 - did save fail?" );
+o = db.data.findOne();
+o.x = 16;
+db.data.save( o );
+assert.eq( 16 , db.data.findOne( { _id : o._id } ).x , "x1 - did save fail?" );
 
 s.stop();

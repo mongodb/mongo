@@ -435,8 +435,9 @@ namespace mongo {
                 }
                 else {
                     string old_ns = c.ns();
+                    Database * old_db = c.database();
                     lk.releaseAndWriteLock();
-                    resetClient(old_ns.c_str());
+                    Client::Context c( old_ns , old_db );
                     profile(ss.str().c_str(), ms);
                 }
             }
@@ -721,7 +722,7 @@ namespace mongo {
 
         /* must do this before unmapping mem or you may get a seg fault */
         log() << "\t shutdown: going to close sockets..." << endl;
-        closeAllSockets();
+        boost::thread close_socket_thread(closeAllSockets);
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a

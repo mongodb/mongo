@@ -26,7 +26,7 @@ namespace mongo {
             try {
                 if ( ( q.ntoreturn == -1 || q.ntoreturn == 1 ) && strstr(q.ns, ".$cmd") ) {
                     BSONObjBuilder builder;
-                    bool ok = runCommandAgainstRegistered(q.ns, q.query, builder);
+                    bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
                     if ( ok ) {
                         BSONObj x = builder.done();
                         replyToQuery(0, r.p(), r.m(), x);
