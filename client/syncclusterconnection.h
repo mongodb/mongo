@@ -1,4 +1,4 @@
-// quorum.h
+// syncclusterconnection.h
 
 #include "../stdafx.h"
 #include "dbclient.h"
@@ -9,14 +9,14 @@ namespace mongo {
      * this is a connection to a cluster of servers that operate as one
      * for super high durability
      */
-    class QuorumConnection : public DBClientWithCommands {
+    class SyncCluterConnection : public DBClientWithCommands {
     public:
         /**
          * @param commaSeperated should be 3 hosts comma seperated
          */
-        QuorumConnection( string commaSeperated );
-        QuorumConnection( string a , string b , string c );
-        ~QuorumConnection();
+        SyncCluterConnection( string commaSeperated );
+        SyncCluterConnection( string a , string b , string c );
+        ~SyncCluterConnection();
         
         
         /**
