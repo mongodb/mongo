@@ -217,7 +217,7 @@ namespace mongo {
             static bool inEmpty = false;
             if( test && !inEmpty ) { 
                 inEmpty = true;
-                log() << "TEST: manipulate collection during remove" << endl;
+                log() << "TEST: manipulate collection during cc:yield" << endl;
                 if( test == 1 ) 
                     Helpers::emptyCollection(ns.c_str());
                 else if( test == 2 ) {
