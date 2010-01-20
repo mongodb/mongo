@@ -1,5 +1,12 @@
-doIt = true;
-if ( !( "diskfulltest" in listFiles( "/data/db" ) ) ) {
+doIt = false;
+files = listFiles( "/data/db" );
+for ( i in files ) {
+    if ( files[ i ].name == "/data/db/diskfulltest" ) {
+        doIt = true;
+    }
+}
+
+if ( !doIt ) {
     print( "path /data/db/diskfulltest/ missing, skipping diskfull test" );
     doIt = false;
 }
