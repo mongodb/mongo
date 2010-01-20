@@ -66,7 +66,7 @@ public:
         if ( cc_ ) cc_->beforeCommand();
         SetGlobalReplPair s( rp_ );
         BSONObjBuilder result;
-        result.append( "ok", runCommandAgainstRegistered( "admin.$cmd", query.obj, result ) ? 1.0 : 0.0 );
+        result.append( "ok", Command::runAgainstRegistered( "admin.$cmd", query.obj, result ) ? 1.0 : 0.0 );
         if ( cc_ ) cc_->afterCommand();
         return result.obj();
     }

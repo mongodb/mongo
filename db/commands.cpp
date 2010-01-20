@@ -23,20 +23,20 @@
 
 namespace mongo {
 
-    map<string,Command*> *commands;
+    map<string,Command*> * Command::_commands;
 
     Command::Command(const char *_name) : name(_name) {
         // register ourself.
-        if ( commands == 0 )
-            commands = new map<string,Command*>;
-        (*commands)[name] = this;
+        if ( _commands == 0 )
+            _commands = new map<string,Command*>;
+        (*_commands)[name] = this;
     }
 
     void Command::help( stringstream& help ) const {
         help << "no help defined";
     }
-
-    bool runCommandAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
+    
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder) {
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
@@ -54,7 +54,7 @@ namespace mongo {
         /* check for properly registered command objects.  Note that all the commands below should be
            migrated over to the command object format.
            */
-        else if ( (i = commands->find(e.fieldName())) != commands->end() ) {
+        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
             valid = true;
             string errmsg;
             Command *c = i->second;
@@ -84,4 +84,19 @@ namespace mongo {
         return false;
     }
 
+    Command* Command::findCommand( const string& name ){
+        map<string,Command*>::iterator i = _commands->find( name );
+        if ( i == _commands->end() )
+            return 0;
+        return i->second;
+    }
+
+
+    bool Command::readOnly( const string& name ){
+        Command * c = findCommand( name );
+        if ( ! c )
+            return false;
+        return c->readOnly();
+    }
+    
 } // namespace mongo
