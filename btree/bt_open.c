@@ -229,6 +229,6 @@ __wt_bt_root_page(WT_TOC *toc)
 	WT_RET(
 	    __wt_bt_page_in(toc, root_addr, isleaf, 1, &idb->root_page));
 
-	F_SET(idb->root_page, WT_PINNED);
+	WT_PAGE_PIN_SET(idb->root_page);
 	return (0);
 }

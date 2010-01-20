@@ -279,14 +279,15 @@ skip_read:	/*
 			 * of room, pin the page we're holding and wait for the
 			 * cache thread.
 			 *
-			 * Pinning the page is safe -- this is a bulk load,
-			 * nobody else better be looking at this page.
+			 * Pinning the page is safe -- this is a bulk load and
+			 * nobody else should be looking at this page.  Flush
+			 * to make the change visible to the server.
 			 */
 			if (ienv->cache_lockout.api_gen) {
-				F_SET(page, WT_PINNED);
+				WT_PAGE_PIN_SET(page);
 				__wt_toc_serialize_wait(
 				    toc, &ienv->cache_lockout);
-				F_CLR(page, WT_PINNED);
+				WT_PAGE_PIN_CLR(page);
 			}
 		}
 

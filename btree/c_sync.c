@@ -155,7 +155,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	ENV *env;
 	WT_CACHE *cache;
 	WT_HB *hb;
-	WT_PAGE *page;
+	WT_PAGE volatile *page;
 	u_int64_t fcnt;
 	u_int i;
 
@@ -496,8 +496,7 @@ __wt_cache_srvr(void *arg)
 
 		/*
 		 * Look at review_max hash buckets, and pick a page with the
-		 * lowest LRU.  An unformatted page is totally useless, and
-		 * won't need to be written, so it's even better.
+		 * lowest LRU.
 		 */
 		for (chosen_gen = 0, review = 0;; ++i) {
 			if (i == cache->hashsize)

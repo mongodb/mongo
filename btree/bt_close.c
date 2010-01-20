@@ -30,7 +30,7 @@ __wt_bt_close(DB *db)
 
 	/* Discard the pinned root page. */
 	if (idb->root_page != NULL) {
-		F_CLR(idb->root_page, WT_PINNED);
+		WT_PAGE_PIN_CLR(idb->root_page);
 		WT_TRET(__wt_bt_page_out(toc, idb->root_page, 0));
 		idb->root_page = NULL;
 	}

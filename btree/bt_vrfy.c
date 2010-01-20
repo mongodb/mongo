@@ -303,14 +303,15 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		 * are blocked because we're running out of room, pin the page
 		 * we're holding and wait for the cache thread.
 		 *
+		 * BUG!!!
 		 * Pinning the page is ALMOST safe -- this is a database verify,
 		 * and the only risk is if there were somehow to be two threads
 		 * verifying the same database at the same time.
 		 */
 		if (ienv->cache_lockout.api_gen) {
-			F_SET(page, WT_PINNED);
+			WT_PAGE_PIN_SET(page);
 			__wt_toc_serialize_wait(toc, &ienv->cache_lockout);
-			F_CLR(page, WT_PINNED);
+			WT_PAGE_PIN_CLR(page);
 		}
 	}
 

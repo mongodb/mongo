@@ -97,7 +97,7 @@ typedef	struct __wt_indx {
 struct __wt_page {
 	WT_SERIAL serial_private;	/* Private serialization point */
 
-	WT_PAGE *next;			/* Hash queue */
+	WT_PAGE volatile *next;		/* Hash queue */
 	u_int32_t page_gen;		/* LRU generation number */
 
 	DB	 *db;			/* Page's backing database */
@@ -129,7 +129,20 @@ struct __wt_page {
 
 	u_int64_t records;		/* Records in this page and below */
 
-	u_int32_t flags;
+	/*
+	 * The flags field is volatile because threads set a PINNED flag before
+	 * letting the cache server run so in-use pages aren't pushed out of the
+	 * cache.
+	 */
+#define	WT_PAGE_PIN_SET(page) do {					\
+	F_SET(page, WT_PINNED);						\
+	WT_MEMORY_FLUSH;						\
+} while (0)
+#define	WT_PAGE_PIN_CLR(page) do {					\
+	F_CLR(page, WT_PINNED);						\
+	WT_MEMORY_FLUSH;						\
+} while (0)
+	u_int32_t volatile flags;
 };
 
 /* Macro to walk the indexes of an in-memory page. */
