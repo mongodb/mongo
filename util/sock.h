@@ -87,9 +87,9 @@ namespace mongo {
     inline void closesocket(int s) {
         // never wait for socket to close
 #ifdef _WIN32
-        boost::thread(bind(::closesocket, s));
+        boost::thread(boost::bind(::closesocket, s));
 #else
-        boost::thread(bind(::close, s));
+        boost::thread(boost::bind(::close, s));
 #endif
     }
 
