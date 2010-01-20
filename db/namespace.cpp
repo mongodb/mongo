@@ -310,18 +310,18 @@ namespace mongo {
         }
     }
 
-    DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
+    DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent, const DiskLoc &endExtent ) const {
         for (DiskLoc i = startExtent.isNull() ? firstExtent : startExtent;
-                !i.isNull(); i = i.ext()->xnext ) {
+                !i.isNull() && i != endExtent; i = i.ext()->xnext ) {
             if ( !i.ext()->firstRecord.isNull() )
                 return i.ext()->firstRecord;
         }
         return DiskLoc();
     }
 
-    DiskLoc NamespaceDetails::lastRecord( const DiskLoc &startExtent ) const {
+    DiskLoc NamespaceDetails::lastRecord( const DiskLoc &startExtent, const DiskLoc &endExtent ) const {
         for (DiskLoc i = startExtent.isNull() ? lastExtent : startExtent;
-                !i.isNull(); i = i.ext()->xprev ) {
+                !i.isNull() && i != endExtent; i = i.ext()->xprev ) {
             if ( !i.ext()->lastRecord.isNull() )
                 return i.ext()->lastRecord;
         }

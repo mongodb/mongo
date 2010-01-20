@@ -573,7 +573,7 @@ namespace NamespaceTests {
         class Base {
             dblock lk;
         public:
-            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) {}
+            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ), objC_( 'a' ) {}
             virtual ~Base() {
                 if ( !nsd() )
                     return;
@@ -621,14 +621,15 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() );
             }
-            static BSONObj bigObj() {
-                string as( 187, 'a' );
+            BSONObj bigObj() {
+                string as( 187, ++objC_ );
                 BSONObjBuilder b;
                 b.append( "a", as );
                 return b.obj();
             }
         private:
             const char *ns_;
+            char objC_;
         };
 
         class Create : public Base {
@@ -756,6 +757,71 @@ namespace NamespaceTests {
             }
         };
         
+        class UndoInsert : public Base {
+        public:
+            void run() {
+                create();
+                ASSERT_EQUALS( 2, nExtents() );
+                BSONObj b = bigObj();
+                DiskLoc l = theDataFileMgr.insert( ns(), b );
+                ASSERT_EQUALS( 1U, _cl.count( ns() ) );
+                theDataFileMgr.undoInsert( nsdetails( ns() ), ns(), l );
+                ASSERT_EQUALS( 0U, _cl.count( ns() ) );
+                auto_ptr< DBClientCursor > c = _cl.query( ns(), "" );
+                ASSERT_EQUALS( 0U, count( c.get(), true ) );
+                
+                unsigned n = 0;
+                while( _cl.count( ns() ) == n ) {
+                    ++n;
+                    BSONObj b = bigObj();
+                    l = theDataFileMgr.insert( ns(), b );                    
+                }
+                --n;
+                
+                for( int i = 0; i < 5; ++i ) {
+                    theDataFileMgr.undoInsert( nsdetails( ns() ), ns(), l );
+                    checkCount( n - 1 );
+                
+                    b = bigObj();
+                    l = theDataFileMgr.insert( ns(), b );                    
+                    checkCount( n );                
+
+                    b = bigObj();
+                    l = theDataFileMgr.insert( ns(), b );                    
+                    n = nRecords();
+                }
+            }
+        private:
+            DBDirectClient _cl;
+            virtual string spec() const {
+                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+            }          
+            unsigned count( DBClientCursor *c, bool forward ) const {
+                char o = '\0';
+                unsigned ret = 0;
+                for( ; c->more(); ++ret ) {
+                    BSONObj b = c->next();
+                    char n = b.getStringField( "a" )[ 0 ];
+                    if ( o ) {
+                        if ( forward ) {
+                            ASSERT( o < n );
+                        } else {
+                            ASSERT( o > n );
+                        }
+                    }
+                    o = n;
+                }
+                return ret;
+            }
+            void checkCount( unsigned expected ) {
+                ASSERT_EQUALS( expected, _cl.count( ns() ) );
+                auto_ptr< DBClientCursor > c = _cl.query( ns(), Query().sort( BSON( "$natural" << 1 ) ) );
+                ASSERT_EQUALS( expected, count( c.get(), true ) );
+                c = _cl.query( ns(), Query().sort( BSON( "$natural" << -1 ) ) );
+                ASSERT_EQUALS( expected, count( c.get(), false ) );                                
+            }
+        };
+        
     } // namespace NamespaceDetailsTests
 
     class All : public Suite {
@@ -792,6 +858,7 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Migrate >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
+            add< NamespaceDetailsTests::UndoInsert >();
         }
     } myall;
 } // namespace NamespaceTests
