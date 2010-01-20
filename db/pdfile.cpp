@@ -1378,7 +1378,7 @@ namespace mongo {
         massert( 12583, "most recently inserted object already removed", !d->capFirstNewRecord.isValid() || !d->capFirstNewRecord.isNull() );
         if ( dl == d->capFirstNewRecord )
             d->capFirstNewRecord = DiskLoc(); // make capFirstNewRecord null if going to delete it
-        deleteRecord( ns, dl.rec(), dl, true );
+        _deleteRecord( d, ns, dl.rec(), dl );
     }
 
     /* special version of insert for transaction logging -- streamlined a bit.
