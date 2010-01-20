@@ -248,6 +248,8 @@ namespace mongo {
                     if ( !( e.isNumber() && m.elt.isNumber() ) &&
                          m.elt.valuesize() != e.valuesize() )
                         inPlacePossible = false;
+                    if ( e.type() != m.elt.type() )
+                        inPlacePossible = false;
                     break;
                 case Mod::PUSH:
                 case Mod::PUSH_ALL:
