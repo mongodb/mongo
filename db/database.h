@@ -93,6 +93,12 @@ namespace mongo {
                 getFile(n);
                 n++;
             }
+            // If last file is empty, consider it preallocated and make sure it's not mapped
+            // until a write is requested
+            if ( n > 1 && getFile( n - 1 )->getHeader()->isEmpty() ) {
+                delete files[ n - 1 ];
+                files.pop_back();
+            }
         }
 
         MongoDataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
@@ -155,7 +161,7 @@ namespace mongo {
         // safe to call this multiple times - the implementation will only preallocate one file
         void preallocateAFile() {
             int n = (int) files.size();
-            getFile( n, 0, true );            
+            getFile( n, 0, true );
         }
 
         MongoDataFile* suitableFile( int sizeNeeded ) {
