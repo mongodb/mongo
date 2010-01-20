@@ -58,6 +58,9 @@ namespace mongo {
 
 namespace mongo {
 
+    inline void closesocket(int s) {
+        close(s);
+    }
     const int INVALID_SOCKET = -1;
     typedef int SOCKET;
 
@@ -83,15 +86,6 @@ namespace mongo {
 
 
 #endif
-
-    inline void closesocket(int s) {
-        // never wait for socket to close
-#ifdef _WIN32
-        boost::thread(boost::bind(::closesocket, s));
-#else
-        boost::thread(boost::bind(::close, s));
-#endif
-    }
 
     inline void setSockReceiveTimeout(int sock, int secs) {
 // todo - finish - works?
