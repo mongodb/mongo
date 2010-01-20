@@ -1371,11 +1371,11 @@ namespace mongo {
     
     // only for capped collections - only guaranteed to be able to delete most recently inserted record, otherwise may throw an exception
     void DataFileMgr::undoInsert( NamespaceDetails *d, const char *ns, const DiskLoc &dl ) {
-        massert( 12581, "uninsert implemented for capped namespaces only", d->capped );
+        massert( 12582, "undoInsert implemented for capped namespaces only", d->capped );
         // doesn't always fire when most recent object already removed, only if last
         // removed object was capFirstNewRecord -- but if that happens it implies the
         // most recent inserted object has already been removed
-        massert( 12582, "most recently inserted object already removed", !d->capFirstNewRecord.isValid() || !d->capFirstNewRecord.isNull() );
+        massert( 12583, "most recently inserted object already removed", !d->capFirstNewRecord.isValid() || !d->capFirstNewRecord.isNull() );
         if ( dl == d->capFirstNewRecord )
             d->capFirstNewRecord = DiskLoc(); // make capFirstNewRecord null if going to delete it
         deleteRecord( ns, dl.rec(), dl, true );
