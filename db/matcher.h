@@ -71,7 +71,7 @@ namespace mongo {
             }
         }
         
-        ~ElementMatcher();
+        ~ElementMatcher() { }
 
         BSONElement toMatch;
         int compareOp;
@@ -85,8 +85,7 @@ namespace mongo {
         shared_ptr<Matcher> subMatcher;
     };
 
-// SQL where clause equivalent
-    class Where;
+    class Where; // used for $where javascript eval
     class DiskLoc;
 
     /* Match BSON objects against a query pattern.
@@ -145,7 +144,6 @@ namespace mongo {
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;
         vector<ElementMatcher> basics;
-//        int n;                           // # of basicmatcher items
         bool haveSize;
         bool all;
         bool hasArray;

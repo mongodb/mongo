@@ -926,12 +926,11 @@ namespace mongo {
         b->k(1).setUnused();
 
         b->dumpTree(id.head, order);
-        cout << "---\n";
 
         b->bt_insert(id.head, A, key, order, false, id);
 
         b->dumpTree(id.head, order);
-        cout << "---\n";*/
+        */
 
         // this should assert.  does it? (it might "accidentally" though, not asserting proves a problem, asserting proves nothing)
         b->bt_insert(id.head, C, key, order, false, id);
