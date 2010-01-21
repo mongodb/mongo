@@ -521,7 +521,7 @@ namespace JSTests {
             Scope * s = globalScriptEngine->newScope();
             s->localConnect( "blah" );
             BSONObjBuilder b;
-            long long val = (long long)( 0xdeadbeefbaddULL );
+            long long val = (long long)( 0xbabadeadbeefbaddULL );
             b.append( "a", val );
             BSONObj in = b.obj();
             s->setObject( "a", in );

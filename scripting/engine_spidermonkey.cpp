@@ -162,7 +162,7 @@ namespace mongo {
         long long toNumberLongUnsafe( JSObject *o ) {
             unsigned long long val =
             ( (unsigned long long)( getNumber( o , "top" ) ) << 32 ) +
-            ( unsigned long long )( getNumber( o , "bottom" ) );
+            ( unsigned )( getNumber( o , "bottom" ) );
             return val;
         }
         
