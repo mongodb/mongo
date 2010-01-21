@@ -1178,6 +1178,25 @@ namespace mongo {
 
     bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection);
 
+    // We are now doing two btree scans for all unique indexes (one here, and one when we've
+    // written the record to the collection.  This could be made more efficient inserting
+    // dummy data here, keeping pointers to the btree nodes holding the dummy data and then
+    // updating the dummy data with the DiskLoc of the real record.    
+    void checkNoIndexConflicts( NamespaceDetails *d, const BSONObj &obj ) {
+        for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
+            if( d->idx(idxNo).unique() ) {
+                IndexDetails& idx = d->idx(idxNo);
+                BSONObjSetDefaultOrder keys;
+                idx.getKeysFromObject(obj, keys);
+                BSONObj order = idx.keyPattern();
+                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                    uassert( 12582, "duplicate key insert for unique index of capped collection",
+                            idx.head.btree()->findSingle(idx, idx.head, *i ).isNull() );
+                }
+            }
+        }        
+    }
+    
     /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc 
              after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */
@@ -1261,6 +1280,13 @@ namespace mongo {
             d->paddingFactor = 1.0;
             lenWHdr = len + Record::HeaderSize;
         }
+        
+        // If the collection is capped, check if the new object will violate a unique index
+        // constraint before allocating space.
+        if ( d->nIndexes && d->capped && !god ) {
+            checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
+        }
+        
         DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
         if ( loc.isNull() ) {
             // out of space
@@ -1352,7 +1378,8 @@ namespace mongo {
             } 
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index
-                if( tableToIndex || d->capped ) { 
+                if( tableToIndex || d->capped ) {
+                    massert( 12583, "unexpected index insertion failure on capped collection", !d->capped );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
                     uassert_nothrow(s.c_str());
