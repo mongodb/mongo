@@ -10,11 +10,6 @@
  *   Author Brian Pollack <brian@brians.com>
  */
 
-/*
- * BUG!!!
- * WHEN INTEGRATION IS FINISHED, NEED A REAL ENV HANDLE FOR ERROR MESSAGES.
- */
-
 #include "wt_internal.h"
 
 typedef struct __wt_freqtree_node {
