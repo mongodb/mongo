@@ -136,8 +136,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc( new ClientCursor(creal,ns) );
-        cc->noTimeout();
+        auto_ptr<ClientCursor> cc( new ClientCursor(creal,ns, false) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;
@@ -512,8 +511,7 @@ namespace mongo {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).
                 auto_ptr<Cursor> c = qp().newReverseCursor();
-                findingStartCursor_ = new ClientCursor(c, qp().ns());
-				findingStartCursor_->noTimeout();
+                findingStartCursor_ = new ClientCursor(c, qp().ns(), false);
             } else {
                 c_ = qp().newCursor();
             }
@@ -851,9 +849,8 @@ namespace mongo {
                 auto_ptr< Cursor > c = dqo.cursor();
                 log( 5 ) << "   used cursor: " << c.get() << endl;
                 if ( dqo.saveClientCursor() ) {
-                    ClientCursor *cc = new ClientCursor(c, ns); // the clientcursor now owns the Cursor* and 'c' is released.
-                    if ( queryOptions & QueryOption_NoCursorTimeout )
-                        cc->noTimeout();
+                    // the clientcursor now owns the Cursor* and 'c' is released:
+                    ClientCursor *cc = new ClientCursor(c, ns, !(queryOptions & QueryOption_NoCursorTimeout));
                     cursorid = cc->cursorid;
                     cc->query = jsobj.getOwned();
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;

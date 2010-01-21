@@ -974,6 +974,7 @@ namespace mongo {
         }
     } cmdBuildInfo;
 
+    /* convertToCapped seems to use this */
     class CmdCloneCollectionAsCapped : public Command {
     public:
         CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
@@ -1012,7 +1013,7 @@ namespace mongo {
             CursorId id;
             {
                 auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
-                ClientCursor *cc = new ClientCursor(c, fromNs.c_str());
+                ClientCursor *cc = new ClientCursor(c, fromNs.c_str(), true);
                 cc->matcher.reset( new CoveredIndexMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
                 id = cc->cursorid;
             }
