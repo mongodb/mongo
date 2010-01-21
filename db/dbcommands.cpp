@@ -617,7 +617,6 @@ namespace mongo {
         }
         CmdDeleteIndexes() : Command("deleteIndexes") { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
-            /* note: temp implementation.  space not reclaimed! */
             BSONElement e = jsobj.findElement(name.c_str());
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());

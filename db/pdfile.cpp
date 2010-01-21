@@ -913,8 +913,6 @@ namespace mongo {
     }
 
     // throws DBException
-    /* _ TODO dropDups 
-     */
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         //        testSorting();
         Timer t;
@@ -1007,24 +1005,39 @@ namespace mongo {
             bool dropDups = idx.dropDups();
 
             unsigned long long n = 0;
-            auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-            while ( c->ok() ) {
-                BSONObj js = c->current();
+            auto_ptr<ClientCursor> cc;
+            {
+                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                cc.reset( new ClientCursor(c, ns, false) );
+            }
+            CursorId id = cc->cursorid;
+
+            while ( cc->c->ok() ) {
+                BSONObj js = cc->c->current();
                 try { 
-                    _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
-                    c->advance();
+                    _indexRecord(d, idxNo, js, cc->c->currLoc(), dupsAllowed);
+                    cc->c->advance();
                 } catch( AssertionException& e ) { 
                     if ( dropDups ) {
-                        DiskLoc toDelete = c->currLoc();
-                        c->advance();
+                        DiskLoc toDelete = cc->c->currLoc();
+                        cc->c->advance();
+                        cc->updateLocation();
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                        if( ClientCursor::find(id, false) == 0 ) {
+                            cc.release();
+                            break;
+                        }
                     } else {
-                        _log() << endl;
-                        log(2) << "addExistingToIndex exception " << e.what() << endl;
+                        log() << "background addExistingToIndex exception " << e.what() << endl;
                         throw;
                     }
                 }
                 n++;
+
+                if ( n % 128 == 0 && !cc->yield() ) {
+                    cc.release();
+                    break;
+                }
             };
             return n;
         }
@@ -1035,38 +1048,41 @@ namespace mongo {
 
         void prep(NamespaceDetails *d) {
             assertInWriteLock();
-            assert( bgJobsInProgress.count(d) == 0 );
+            assert( bgJobsInProgress.count(d) == 0 ); // better be 0, checkInProg should have caught earlier.
             bgJobsInProgress.insert(d);
             d->backgroundIndexBuildInProgress = 1;
+            d->nIndexes--;
         }
 
     public:
         /* Note you cannot even do a foreground index build if a background is in progress,
-           as bg build assumes it is the last index in the array!
+           as bg build assumes it is the last index in the array - so check for BOTH styles of builds.
         */
         void checkInProg(NamespaceDetails *d) { 
             assertInWriteLock();
             uassert(12580, "already building an index for this namespace in background", bgJobsInProgress.count(d) == 0);
         }
 
-/* todo: clean bg flag on loading of NamespaceDetails  */
-
         unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
-            unsigned long long n;
+            unsigned long long n = 0;
+
             prep(d);
+            assert( idxNo == d->nIndexes );
             try { 
                 idx.head = BtreeBucket::addBucket(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
             catch(...) { 
+                assert( idxNo == d->nIndexes );
+                d->nIndexes++;
+                d->backgroundIndexBuildInProgress = 0;
                 assertInWriteLock();
                 bgJobsInProgress.erase(d);
-                d->backgroundIndexBuildInProgress = 0;
                 throw;
             }
             return n;
         }
-    } backgroundIndex;
+    } backgroundIndex; /* class BackgroundIndexBuildJobs */
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
@@ -1242,11 +1258,10 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
-            BSONObj io((const char *) obuf);
             backgroundIndex.checkInProg(d);
-            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) ) {
+            BSONObj io((const char *) obuf);
+            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();
-            }
         }
 
         const BSONElement *newId = &writeId;
