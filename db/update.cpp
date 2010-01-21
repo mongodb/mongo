@@ -293,7 +293,7 @@ namespace mongo {
         return inPlacePossible;
     }
     
-    void ModSet::applyModsInPlace(const BSONObj &obj) const {
+    void ModSet::applyModsInPlace( BSONObj &obj ) const {
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
@@ -642,7 +642,8 @@ namespace mongo {
                 }
 
                 if ( isIndexed <= 0 && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
-                    mods.applyModsInPlace( loc.obj() );
+                    const BSONObj& onDisk = loc.obj();
+                    mods.applyModsInPlace( const_cast<BSONObj&>(onDisk) );
                     //seenObjects.insert( loc );
                     if ( profile )
                         ss << " fastmod ";
