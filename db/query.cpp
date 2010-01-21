@@ -136,10 +136,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc;
-        cc.reset( new ClientCursor() );
-        cc->c = creal;
-        cc->ns = ns;
+        auto_ptr<ClientCursor> cc( new ClientCursor(creal,ns) );
         cc->noTimeout();
         cc->setDoingDeletes( true );
 
@@ -514,10 +511,9 @@ namespace mongo {
             if ( findingStart_ ) {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).
-                findingStartCursor_ = new ClientCursor();
+                auto_ptr<Cursor> c = qp().newReverseCursor();
+                findingStartCursor_ = new ClientCursor(c, qp().ns());
 				findingStartCursor_->noTimeout();
-                findingStartCursor_->c = qp().newReverseCursor();
-                findingStartCursor_->ns = qp().ns();
             } else {
                 c_ = qp().newCursor();
             }
@@ -855,15 +851,13 @@ namespace mongo {
                 auto_ptr< Cursor > c = dqo.cursor();
                 log( 5 ) << "   used cursor: " << c.get() << endl;
                 if ( dqo.saveClientCursor() ) {
-                    ClientCursor *cc = new ClientCursor();
+                    ClientCursor *cc = new ClientCursor(c, ns); // the clientcursor now owns the Cursor* and 'c' is released.
                     if ( queryOptions & QueryOption_NoCursorTimeout )
                         cc->noTimeout();
-                    cc->c = c;
                     cursorid = cc->cursorid;
                     cc->query = jsobj.getOwned();
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;
                     cc->matcher = dqo.matcher();
-                    cc->ns = ns;
                     cc->pos = n;
                     cc->filter = filter;
                     cc->originalMessage = m;

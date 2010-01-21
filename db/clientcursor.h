@@ -105,7 +105,12 @@ namespace mongo {
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
 
-        ClientCursor() : _idleAgeMillis(0), _pinValue(0), _doingDeletes(false), pos(0) {
+        ClientCursor(auto_ptr<Cursor>& _c, const char *_ns) : 
+            _idleAgeMillis(0), _pinValue(0), 
+            _doingDeletes(false), 
+            ns(_ns), c(_c), 
+            pos(0) 
+        {
             recursive_boostlock lock(ccmutex);
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );

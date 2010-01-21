@@ -1012,9 +1012,7 @@ namespace mongo {
             CursorId id;
             {
                 auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
-                ClientCursor *cc = new ClientCursor();
-                cc->c = c;
-                cc->ns = fromNs;
+                ClientCursor *cc = new ClientCursor(c, fromNs.c_str());
                 cc->matcher.reset( new CoveredIndexMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
                 id = cc->cursorid;
             }
