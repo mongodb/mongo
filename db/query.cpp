@@ -136,7 +136,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc( new ClientCursor(creal,ns, false) );
+        auto_ptr<ClientCursor> cc( new ClientCursor(creal, ns, false) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;

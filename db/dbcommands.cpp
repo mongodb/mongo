@@ -1036,6 +1036,11 @@ namespace mongo {
         }
     } cmdCloneCollectionAsCapped;
 
+    /* jan2010: 
+       Converts the given collection to a capped collection w/ the specified size. 
+       This command is not highly used, and is not currently supported with sharded 
+       environments. 
+       */
     class CmdConvertToCapped : public Command {
     public:
         CmdConvertToCapped() : Command( "convertToCapped" ) {}

@@ -149,7 +149,7 @@ namespace mongo {
         
         typedef void (*IteratorCallback)( const Key& k , Type& v );
         
-        void iterall( IteratorCallback callback ){
+        void iterAll( IteratorCallback callback ){
             for ( int i=0; i<n; i++ ){
                 if ( ! nodes[i].inUse() )
                     continue;

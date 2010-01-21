@@ -100,6 +100,10 @@ namespace mongo {
             massert( 10348 , "ns name too long", s.size() < MaxNsLen);
             return s;
         }
+        bool isExtra() const { 
+            const char *p = strstr(buf, "$extra");
+            return p && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
+        }
 
         void kill() {
             buf[0] = 0x7f;
@@ -185,6 +189,9 @@ namespace mongo {
         enum { NIndexesMax = 40 };
 
         BOOST_STATIC_ASSERT( NIndexesMax == NIndexesBase + NIndexesExtra );
+
+        /* called when loaded from disk */
+        void onLoad(const Namespace& k);
 
         NamespaceDetails( const DiskLoc &loc, bool _capped ) {
             /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
@@ -555,9 +562,9 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
     public:
         NamespaceIndex(const string &dir, const string &database) :
-        ht( 0 ),
-        dir_( dir ),
-        database_( database ) {}
+          ht( 0 ),
+          dir_( dir ),
+          database_( database ) {}
 
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
