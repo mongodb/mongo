@@ -160,9 +160,9 @@ namespace mongo {
 
         // NOTE No validation of passed in object
         long long toNumberLongUnsafe( JSObject *o ) {
-            unsigned long long val =
-            ( (unsigned long long)( getNumber( o , "top" ) ) << 32 ) +
-            ( unsigned )( getNumber( o , "bottom" ) );
+            uint64_t val =
+            ( (uint64_t)( getNumber( o , "top" ) ) << 32 ) +
+            ( uint32_t)( getNumber( o , "bottom" ) );
             return val;
         }
         
@@ -565,7 +565,7 @@ namespace mongo {
                 return OBJECT_TO_JSVAL( o );
             }
             case NumberLong: {
-                unsigned long long val = (unsigned long long)e.numberLong();
+                uint64_t val = (uint64_t)e.numberLong();
                 JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
                 // using 2 doubles here instead of a single double because certain double
                 // bit patterns represent undefined values and sm might trash them
