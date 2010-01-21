@@ -52,6 +52,25 @@ namespace mongo {
 
 	int lenForNewNsFiles = 16 * 1024 * 1024;
     
+    void NamespaceDetails::onLoad(const Namespace& k) { 
+        if( k.isExtra() ) { 
+            /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
+            return;
+        }
+
+        assertInWriteLock();
+        if( backgroundIndexBuildInProgress ) { 
+            log() << "backgroundIndexBuildInProgress was " << backgroundIndexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
+            backgroundIndexBuildInProgress = 0;
+        }
+    }
+
+    static void callback(const Namespace& k, NamespaceDetails& v) { 
+        v.onLoad(k);
+    }
+
+    bool checkNsFilesOnLoad = true;
+
     void NamespaceIndex::init() {
         if ( ht )
             return;
@@ -95,6 +114,8 @@ namespace mongo {
             dbexit( EXIT_FS );
         }
         ht = new HashTable<Namespace,NamespaceDetails>(p, len, "namespace index");
+        if( checkNsFilesOnLoad )
+            ht->iterAll(callback);
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {

@@ -617,7 +617,6 @@ namespace mongo {
         }
         CmdDeleteIndexes() : Command("deleteIndexes") { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
-            /* note: temp implementation.  space not reclaimed! */
             BSONElement e = jsobj.findElement(name.c_str());
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
@@ -974,6 +973,7 @@ namespace mongo {
         }
     } cmdBuildInfo;
 
+    /* convertToCapped seems to use this */
     class CmdCloneCollectionAsCapped : public Command {
     public:
         CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
@@ -1012,7 +1012,7 @@ namespace mongo {
             CursorId id;
             {
                 auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
-                ClientCursor *cc = new ClientCursor(c, fromNs.c_str());
+                ClientCursor *cc = new ClientCursor(c, fromNs.c_str(), true);
                 cc->matcher.reset( new CoveredIndexMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
                 id = cc->cursorid;
             }
@@ -1035,6 +1035,11 @@ namespace mongo {
         }
     } cmdCloneCollectionAsCapped;
 
+    /* jan2010: 
+       Converts the given collection to a capped collection w/ the specified size. 
+       This command is not highly used, and is not currently supported with sharded 
+       environments. 
+       */
     class CmdConvertToCapped : public Command {
     public:
         CmdConvertToCapped() : Command( "convertToCapped" ) {}

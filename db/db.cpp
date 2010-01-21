@@ -332,8 +332,14 @@ namespace mongo {
         return repairDatabase( dbName.c_str(), errmsg );
     }
     
+    extern bool checkNsFilesOnLoad;
+
     void repairDatabases() {
         log(1) << "enter repairDatabases" << endl;
+
+        assert(checkNsFilesOnLoad);
+        checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
+
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -374,6 +380,8 @@ namespace mongo {
             cc().shutdown();
             dbexit( EXIT_CLEAN );
         }
+
+        checkNsFilesOnLoad = true;
     }
 
     void clearTmpFiles() {
