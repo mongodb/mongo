@@ -32,9 +32,6 @@
     return JS_FALSE; \
   }
 
-using boost::uint32_t;
-using boost::uint64_t;
-
 namespace mongo {
 
     string trim( string s ){
