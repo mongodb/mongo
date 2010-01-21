@@ -1464,7 +1464,7 @@ namespace mongo {
     Labeler::Label SIZE( "$size" );
 
     void BSONElementManipulator::initTimestamp() {
-        massert( 10332 ,  "Expected CurrentTime type", element_.type() == Timestamp );
+        massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
         unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
         if ( timestamp == 0 )
             timestamp = OpTime::now().asDate();
