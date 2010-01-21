@@ -159,7 +159,7 @@ namespace mongo {
         
     };
 
-    class ModSet {
+    class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
         
@@ -286,8 +286,8 @@ namespace mongo {
         }
         
     public:
-
-        void getMods( const BSONObj &from );
+        
+        ModSet( const BSONObj &from );
         /**
            will return if can be done in place, or uassert if there is an error
            @return whether or not the mods can be done in place
@@ -377,6 +377,14 @@ namespace mongo {
         }
     };
     
-
+    /**
+     * this is used to hold state, meta data while applying a ModSet to a BSONObj
+     * the goal is to make ModSet const so its re-usable
+     */
+    class ModState {
+    public:
+        
+    };
+    
 }
 

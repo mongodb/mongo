@@ -468,7 +468,7 @@ namespace mongo {
        { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
-    void ModSet::getMods(const BSONObj &from) {
+    ModSet::ModSet(const BSONObj &from) {
         BSONObjIterator it(from);
         while ( it.more() ) {
             BSONElement e = it.next();
@@ -632,8 +632,7 @@ namespace mongo {
                     updateobj = updateobj.copy();
                 }
                 
-                ModSet mods;
-                mods.getMods(updateobj);
+                ModSet mods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get_w(ns);
                 set<string>& idxKeys = ndt.indexKeys();
                 int isIndexed = mods.isIndexed( idxKeys );
@@ -707,8 +706,7 @@ namespace mongo {
         if ( upsert ) {
             if ( updateobjOrig.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
-                ModSet mods;
-                mods.getMods(updateobjOrig);
+                ModSet mods(updateobjOrig);
                  
                 BSONObj newObj = mods.createNewFromQuery( patternOrig );
 
