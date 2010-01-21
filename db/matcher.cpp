@@ -84,12 +84,6 @@ namespace mongo {
         }
     }
 
-
-    ElementMatcher::~ElementMatcher(){
-    }
-
-
-
 } // namespace mongo
 
 #include "pdfile.h"
@@ -307,8 +301,9 @@ namespace mongo {
     inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
-        if ( op == BSONObj::Equality )
+        if ( op == BSONObj::Equality ) {
             return l.valuesEqual(r);
+        }
         
         if ( op == BSONObj::opIN ) {
             // { $in : [1,2,3] }
@@ -383,16 +378,15 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& bm , bool isArr) {
-
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr) {
         if ( compareOp == BSONObj::opALL ) {
-            if ( bm.myset->size() == 0 )
+            if ( em.myset->size() == 0 )
                 return -1; // is this desired?
             BSONObjSetDefaultOrder actualKeys;
             IndexSpec( BSON( fieldName << 1 ) ).getKeys( obj, actualKeys );
             if ( actualKeys.size() == 0 )
                 return 0;
-            for( set< BSONElement, element_lt >::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {
+            for( set< BSONElement, element_lt >::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
                 // ignore nulls
                 if ( i->type() == jstNULL )
                     continue;
@@ -406,10 +400,10 @@ namespace mongo {
         }
 
         if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, bm );
+            return matchesNe( fieldName, toMatch, obj, em );
         if ( compareOp == BSONObj::NIN ) {
-            for( set<BSONElement,element_lt>::const_iterator i = bm.myset->begin(); i != bm.myset->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, bm );
+            for( set<BSONElement,element_lt>::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
+                int ret = matchesNe( fieldName, *i, obj, em );
                 if ( ret != 1 )
                     return ret;
             }
@@ -422,14 +416,37 @@ namespace mongo {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
             assert( !e.eoo() );
         } else {
+
+            const char *p = strchr(fieldName, '.');
+            if ( p ) {
+                string left(fieldName, p-fieldName);
+
+                BSONElement se = obj.getField(left.c_str());
+                if ( se.eoo() )
+                    ;
+                else if ( se.type() != Object && se.type() != Array )
+                    ;
+                else {
+                    BSONObj eo = se.embeddedObject();
+                    return matchesDotted(p+1, toMatch, eo, compareOp, em, se.type() == Array);
+                }
+            }
+
             if ( isArr ) {
+
                 BSONObjIterator ai(obj);
                 bool found = false;
                 while ( ai.moreWithEOO() ) {
                     BSONElement z = ai.next();
+
+                    if( strcmp(z.fieldName(),fieldName) == 0 && valuesMatch(z, toMatch, compareOp, em) ) {
+                        // "field.<n>" array notation was used
+                        return 1;
+                    }
+
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, bm, false);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false);
                         if ( cmp > 0 ) {
                             return 1;
                         } else if ( cmp < 0 ) {
@@ -437,21 +454,13 @@ namespace mongo {
                         }
                     }
                 }
-                return found ? -1 : retMissing( bm );
+                return found ? -1 : retMissing( em );
             }
-            const char *p = strchr(fieldName, '.');
-            if ( p ) {
-                string left(fieldName, p-fieldName);
 
-                BSONElement se = obj.getField(left.c_str());
-                if ( se.eoo() )
-                    return retMissing( bm );
-                if ( se.type() != Object && se.type() != Array )
-                    return retMissing( bm );
-
-                BSONObj eo = se.embeddedObject();
-                return matchesDotted(p+1, toMatch, eo, compareOp, bm, se.type() == Array);
-            } else {
+            if( p ) { 
+                return retMissing( em );
+            }
+            else {
                 e = obj.getField(fieldName);
             }
         }
@@ -459,7 +468,7 @@ namespace mongo {
         if ( compareOp == BSONObj::opEXISTS ) {
             return ( e.eoo() ^ toMatch.boolean() ) ? 1 : -1;
         } else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
-            valuesMatch(e, toMatch, compareOp, bm ) ) {
+            valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
             
@@ -470,11 +479,11 @@ namespace mongo {
                 
                 if ( compareOp == BSONObj::opELEM_MATCH ){
                     // SERVER-377
-                    if ( z.type() == Object && bm.subMatcher->matches( z.embeddedObject() ) )
+                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) )
                         return 1;
                 }
                 else {
-                    if ( valuesMatch( z, toMatch, compareOp, bm) ) {
+                    if ( valuesMatch( z, toMatch, compareOp, em) ) {
                         return 1;
                     }
                 }

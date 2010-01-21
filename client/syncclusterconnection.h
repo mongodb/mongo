@@ -9,14 +9,14 @@ namespace mongo {
      * this is a connection to a cluster of servers that operate as one
      * for super high durability
      */
-    class SyncCluterConnection : public DBClientWithCommands {
+    class SyncClusterConnection : public DBClientWithCommands {
     public:
         /**
          * @param commaSeperated should be 3 hosts comma seperated
          */
-        SyncCluterConnection( string commaSeperated );
-        SyncCluterConnection( string a , string b , string c );
-        ~SyncCluterConnection();
+        SyncClusterConnection( string commaSeperated );
+        SyncClusterConnection( string a , string b , string c );
+        ~SyncClusterConnection();
         
         
         /**

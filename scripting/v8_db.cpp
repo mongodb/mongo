@@ -49,6 +49,17 @@ namespace mongo {
         return mongo;
     }
 
+    v8::Handle<v8::FunctionTemplate> getNumberLongFunctionTemplate() {
+        v8::Local<v8::FunctionTemplate> numberLong = FunctionTemplate::New( numberLongInit );
+        v8::Local<v8::Template> proto = numberLong->PrototypeTemplate();
+        
+        proto->Set( v8::String::New( "toString" ) , FunctionTemplate::New( numberLongToString ) );
+        proto->Set( v8::String::New( "toNumber" ) , FunctionTemplate::New( numberLongToNumber ) );        
+        
+        return numberLong;
+    }
+
+    
     void installDBTypes( Handle<ObjectTemplate>& global ){
         v8::Local<v8::FunctionTemplate> db = FunctionTemplate::New( dbInit );
         db->InstanceTemplate()->SetNamedPropertyHandler( collectionFallback );
@@ -70,6 +81,8 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit ) );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit ) );
+
+        global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate() );
 
     }
 
@@ -94,6 +107,8 @@ namespace mongo {
         global->Set( v8::String::New("DBPointer") , FunctionTemplate::New( dbPointerInit )->GetFunction() );
 
         global->Set( v8::String::New("BinData") , FunctionTemplate::New( binDataInit )->GetFunction() );
+
+        global->Set( v8::String::New("NumberLong") , getNumberLongFunctionTemplate()->GetFunction() );
 
         BSONObjBuilder b;
         b.appendMaxKey( "" );
@@ -531,6 +546,59 @@ namespace mongo {
         return it;
     }
     
+    v8::Handle<v8::Value> numberLongInit( const v8::Arguments& args ) {
+        
+        if (args.Length() != 2) {
+            return v8::ThrowException( v8::String::New( "NumberLong needs 2 arguments" ) );
+        }
+        
+        v8::Handle<v8::Object> it = args.This();
+        
+        if ( it->IsUndefined() || it == v8::Context::GetCurrent()->Global() ){
+            v8::Function* f = getNamedCons( "NumberLong" );
+            it = f->NewInstance();
+        }
+        
+        it->Set( v8::String::New( "top" ) , args[0] );
+        it->Set( v8::String::New( "bottom" ) , args[1] );
+        it->SetHiddenValue( v8::String::New( "__NumberLong" ), v8::Number::New( 1 ) );
+        
+        return it;
+    }
+
+    v8::Handle<v8::Value> numberLongToString( const v8::Arguments& args ) {
+        
+        if (args.Length() != 0) {
+            return v8::ThrowException( v8::String::New( "toString needs 0 arguments" ) );
+        }
+        
+        v8::Handle<v8::Object> it = args.This();
+        
+        unsigned long long val =
+        ( (unsigned long long)( it->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
+        (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
+        
+        stringstream ss;
+        ss << (long long)val;
+        string ret = ss.str();
+        return v8::String::New( ret.c_str() );
+    }
+
+    v8::Handle<v8::Value> numberLongToNumber( const v8::Arguments& args ) {
+        
+        if (args.Length() != 0) {
+            return v8::ThrowException( v8::String::New( "toNumber needs 0 arguments" ) );
+        }
+        
+        v8::Handle<v8::Object> it = args.This();
+        
+        unsigned long long val =
+        ( (unsigned long long)( it->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
+        (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
+        
+        return v8::Number::New( double( (long long)val ) );
+    }
+
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
         
         if (args.Length() != 1 || !args[ 0 ]->IsObject()) {

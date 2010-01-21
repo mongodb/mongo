@@ -968,7 +968,6 @@ namespace mongo {
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
 
-                //cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }

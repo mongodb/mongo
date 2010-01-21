@@ -6,7 +6,7 @@ before = db._adminCommand( "serverStatus" )
 if ( before.mem.supported ){
     db._adminCommand( "closeAllDatabases" );
     after = db._adminCommand( "serverStatus" );
-    assert( before.mem.mapped > after.mem.mapped , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) );
+    assert( before.mem.mapped.toNumber() > after.mem.mapped.toNumber() , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) );
 }
 else {
     print( "can't test serverStatus on this machine" );

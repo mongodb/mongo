@@ -7,7 +7,7 @@
 
 namespace mongo {
     
-    SyncCluterConnection::SyncCluterConnection( string commaSeperated ){
+    SyncClusterConnection::SyncClusterConnection( string commaSeperated ){
         string::size_type idx;
         while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ){
             string h = commaSeperated.substr( 0 , idx );
@@ -15,27 +15,27 @@ namespace mongo {
             _connect( h );
         }
         _connect( commaSeperated );
-        uassert( 8004 ,  "SyncCluterConnection needs 3 servers" , _conns.size() == 3 );
+        uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    SyncCluterConnection::SyncCluterConnection( string a , string b , string c ){
+    SyncClusterConnection::SyncClusterConnection( string a , string b , string c ){
         // connect to all even if not working
         _connect( a );
         _connect( b );
         _connect( c );
     }
 
-    SyncCluterConnection::~SyncCluterConnection(){
+    SyncClusterConnection::~SyncClusterConnection(){
         for ( size_t i=0; i<_conns.size(); i++ )
             delete _conns[i];
         _conns.clear();
     }
 
-    bool SyncCluterConnection::prepare( string& errmsg ){
+    bool SyncClusterConnection::prepare( string& errmsg ){
         return fsync( errmsg );
     }
     
-    bool SyncCluterConnection::fsync( string& errmsg ){
+    bool SyncClusterConnection::fsync( string& errmsg ){
         bool ok = true;
         errmsg = "";
         for ( size_t i=0; i<_conns.size(); i++ ){
@@ -55,7 +55,7 @@ namespace mongo {
         return ok;
     }
 
-    void SyncCluterConnection::_checkLast(){
+    void SyncClusterConnection::_checkLast(){
         vector<BSONObj> all;
         vector<string> errors;
 
@@ -91,22 +91,22 @@ namespace mongo {
 
         if ( ok )
             return;
-        throw UserException( 8001 , (string)"SyncCluterConnection write op failed: " + err.str() );
+        throw UserException( 8001 , (string)"SyncClusterConnection write op failed: " + err.str() );
     }
 
-    void SyncCluterConnection::_connect( string host ){
-        log() << "SyncCluterConnection connecting to: " << host << endl;
+    void SyncClusterConnection::_connect( string host ){
+        log() << "SyncClusterConnection connecting to: " << host << endl;
         DBClientConnection * c = new DBClientConnection( true );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
-            log() << "SyncCluterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
+            log() << "SyncClusterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
         _conns.push_back( c );
     }
 
-    auto_ptr<DBClientCursor> SyncCluterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
+    auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                      const BSONObj *fieldsToReturn, int queryOptions){ 
 
-        uassert( 10021 ,  "$cmd not support yet in SyncCluterConnection::query" , ns.find( "$cmd" ) == string::npos );
+        uassert( 10021 ,  "$cmd not support yet in SyncClusterConnection::query" , ns.find( "$cmd" ) == string::npos );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
@@ -123,16 +123,16 @@ namespace mongo {
         throw UserException( 8002 , "all servers down!" );
     }
     
-    auto_ptr<DBClientCursor> SyncCluterConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
-        uassert( 10022 , "SyncCluterConnection::getMore not supported yet" , 0); 
+    auto_ptr<DBClientCursor> SyncClusterConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
+        uassert( 10022 , "SyncClusterConnection::getMore not supported yet" , 0); 
         auto_ptr<DBClientCursor> c;
         return c;
     }
     
-    void SyncCluterConnection::insert( const string &ns, BSONObj obj ){ 
+    void SyncClusterConnection::insert( const string &ns, BSONObj obj ){ 
         string errmsg;
         if ( ! prepare( errmsg ) )
-            throw UserException( 8003 , (string)"SyncCluterConnection::insert prepare failed: " + errmsg );
+            throw UserException( 8003 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             _conns[i]->insert( ns , obj );
@@ -141,17 +141,17 @@ namespace mongo {
         _checkLast();
     }
         
-    void SyncCluterConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
-        uassert( 10023 , "SyncCluterConnection bulk insert not implemented" , 0); 
+    void SyncClusterConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
+        uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0); 
     }
 
-    void SyncCluterConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }
+    void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }
 
-    void SyncCluterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
+    void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
 
-    string SyncCluterConnection::toString(){ 
+    string SyncClusterConnection::toString(){ 
         stringstream ss;
-        ss << "SyncCluterConnection [";
+        ss << "SyncClusterConnection [";
         for ( size_t i=0; i<_conns.size(); i++ ){
             if ( i > 0 )
                 ss << ",";

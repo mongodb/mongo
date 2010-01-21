@@ -1330,7 +1330,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\client\quorum.cpp"
+				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>
 			<Filter
