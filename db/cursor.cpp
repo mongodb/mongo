@@ -55,26 +55,20 @@ namespace mongo {
         return &_reverse;
     }
 
-    DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev, const DiskLoc &endExt = DiskLoc() ) {
+    DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev ) {
         assert( nsd->capLooped() );
-        DiskLoc next = prev.rec()->getNext( prev, endExt );
-        if ( !next.isValid() )
-            return DiskLoc();
+        DiskLoc next = forward()->next( prev );
         if ( !next.isNull() )
             return next;
-        next = nsd->firstRecord( DiskLoc(), endExt );
-        return next.isValid() ? next : DiskLoc();
+        return nsd->firstRecord();
     }
 
-    DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr, const DiskLoc &endExt = DiskLoc() ) {
+    DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr ) {
         assert( nsd->capLooped() );
-        DiskLoc prev = curr.rec()->getPrev( curr, endExt );
-        if ( !prev.isValid() )
-            return DiskLoc();
+        DiskLoc prev = reverse()->next( curr );
         if ( !prev.isNull() )
             return prev;
-        prev = nsd->lastRecord( DiskLoc(), endExt );
-        return prev.isValid() ? prev : DiskLoc();
+        return nsd->lastRecord();
     }
 
     ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
@@ -87,11 +81,7 @@ namespace mongo {
                 start = nsd->firstRecord();
             else {
                 start = nsd->capExtent.ext()->firstRecord;
-                if ( start.isNull() ) { // in this case capFirstNewRecord must be null
-                    start = nsd->firstRecord( nsd->capExtent );
-                    if ( start.isNull() )
-                        start = nsd->firstRecord();
-                } else if ( start == nsd->capFirstNewRecord ) {
+                if ( !start.isNull() && start == nsd->capFirstNewRecord ) {
                     start = nsd->capExtent.ext()->lastRecord;
                     start = nextLoop( nsd, start );
                 }
@@ -107,17 +97,13 @@ namespace mongo {
             return forward()->next( prev );
 
         DiskLoc i = prev;
-
-        if ( nsd->capFirstNewRecord.isNull() ) {
-            return nextLoop( nsd, i, nsd->capExtent );
-        }
-        
         // Last record
         if ( i == nsd->capExtent.ext()->lastRecord )
             return DiskLoc();
         i = nextLoop( nsd, i );
         // If we become capFirstNewRecord from same extent, advance to next extent.
-        if ( i == nsd->capFirstNewRecord && i != nsd->capExtent.ext()->firstRecord )
+        if ( i == nsd->capFirstNewRecord &&
+                i != nsd->capExtent.ext()->firstRecord )
             i = nextLoop( nsd, nsd->capExtent.ext()->lastRecord );
         // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
         if ( i == nsd->capExtent.ext()->firstRecord )
@@ -133,13 +119,8 @@ namespace mongo {
         if ( start.isNull() ) {
             if ( !nsd->capLooped() ) {
                 start = nsd->lastRecord();
-            } else if( !nsd->capFirstNewRecord.isNull() ) {
-                start = nsd->capExtent.ext()->lastRecord;
             } else {
-                if ( !nsd->capExtent.ext()->xprev.isNull() )
-                    start = nsd->lastRecord( nsd->capExtent.ext()->xprev );
-                if ( start.isNull() )
-                    start = nsd->lastRecord();
+                start = nsd->capExtent.ext()->lastRecord;
             }
         }
         curr = start;
@@ -152,11 +133,6 @@ namespace mongo {
             return reverse()->next( prev );
 
         DiskLoc i = prev;
-
-        if ( nsd->capFirstNewRecord.isNull() ) {
-            return prevLoop( nsd, i, nsd->capExtent.ext()->xprev.isNull() ? nsd->lastExtent : nsd->capExtent.ext()->xprev );
-        }
-        
         // Last record
         if ( nsd->capFirstNewRecord == nsd->capExtent.ext()->firstRecord ) {
             if ( i == nextLoop( nsd, nsd->capExtent.ext()->lastRecord ) ) {

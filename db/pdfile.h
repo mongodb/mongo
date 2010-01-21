@@ -121,10 +121,6 @@ namespace mongo {
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
-        // only public for testing
-        // only for capped collections - only guaranteed to be able to delete most recently inserted record, otherwise may throw an exception
-        void undoInsert( NamespaceDetails *d, const char *ns, const DiskLoc &dl );
-
     private:
         vector<MongoDataFile *> files;
     };
@@ -176,9 +172,8 @@ namespace mongo {
             return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
         }
         /* get the next record in the namespace, traversing extents as necessary */
-        /* returns null if reach end of namespace, invalid if reach endExtent */
-        DiskLoc getNext(const DiskLoc& myLoc, const DiskLoc &endExtent = DiskLoc());
-        DiskLoc getPrev(const DiskLoc& myLoc, const DiskLoc &endExtent = DiskLoc());
+        DiskLoc getNext(const DiskLoc& myLoc);
+        DiskLoc getPrev(const DiskLoc& myLoc);
     };
 
     /* extents are datafile regions where all the records within the region
@@ -331,7 +326,7 @@ namespace mongo {
         return header->getRecord(dl);
     }
 
-    inline DiskLoc Record::getNext(const DiskLoc& myLoc, const DiskLoc &endExtent) {
+    inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
         if ( nextOfs != DiskLoc::NullOfs ) {
             /* defensive */
             if ( nextOfs >= 0 && nextOfs < 10 ) {
@@ -344,12 +339,7 @@ namespace mongo {
         Extent *e = myExtent(myLoc);
         while ( 1 ) {
             if ( e->xnext.isNull() )
-                return DiskLoc(); // end of table
-            if ( e->xnext == endExtent ) {
-                DiskLoc ret;
-                ret.setInvalid();
-                return ret;
-            }
+                return DiskLoc(); // end of table.
             e = e->xnext.ext();
             if ( !e->firstRecord.isNull() )
                 break;
@@ -357,24 +347,13 @@ namespace mongo {
         }
         return e->firstRecord;
     }
-    inline DiskLoc Record::getPrev(const DiskLoc& myLoc, const DiskLoc &endExtent) {
+    inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
         if ( prevOfs != DiskLoc::NullOfs )
             return DiskLoc(myLoc.a(), prevOfs);
         Extent *e = myExtent(myLoc);
-        while ( 1 ) {
-            if ( e->xprev.isNull() )
-                return DiskLoc(); // end of table
-            if ( e->xprev == endExtent ) {
-                DiskLoc ret;
-                ret.setInvalid();
-                return ret;
-            }
-            e = e->xprev.ext();
-            if ( !e->lastRecord.isNull() )
-                break;
-            // entire extent could be empty, keep looking
-        }
-        return e->lastRecord;
+        if ( e->xprev.isNull() )
+            return DiskLoc();
+        return e->xprev.ext()->lastRecord;
     }
 
     inline Record* DiskLoc::rec() const {

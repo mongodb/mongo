@@ -401,10 +401,10 @@ namespace mongo {
         }
 
         // Start from firstExtent by default.
-        DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc(), const DiskLoc &endExtent = DiskLoc() ) const;
+        DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
         // Start from lastExtent by default.
-        DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc(), const DiskLoc &endExtent = DiskLoc() ) const;
+        DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
 
         bool inCapExtent( const DiskLoc &dl ) const;
 

@@ -1354,8 +1354,10 @@ namespace mongo {
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index
                 if( tableToIndex || d->capped ) { 
-                    undoInsert( d, ns, loc );
-                    throw;
+                    string s = e.toString();
+                    s += " : on addIndex/capped - collection and its index will not match";
+                    uassert_nothrow(s.c_str());
+                    log() << s << '\n';
                 }
                 else { 
                     // normal case -- we can roll back
@@ -1367,18 +1369,6 @@ namespace mongo {
 
         //	out() << "   inserted at loc:" << hex << loc.getOfs() << " lenwhdr:" << hex << lenWHdr << dec << ' ' << ns << endl;
         return loc;
-    }
-    
-    // only for capped collections - only guaranteed to be able to delete most recently inserted record, otherwise may throw an exception
-    void DataFileMgr::undoInsert( NamespaceDetails *d, const char *ns, const DiskLoc &dl ) {
-        massert( 12582, "undoInsert implemented for capped namespaces only", d->capped );
-        // doesn't always fire when most recent object already removed, only if last
-        // removed object was capFirstNewRecord -- but if that happens it implies the
-        // most recent inserted object has already been removed
-        massert( 12583, "most recently inserted object already removed", !d->capFirstNewRecord.isValid() || !d->capFirstNewRecord.isNull() );
-        if ( dl == d->capFirstNewRecord )
-            d->capFirstNewRecord = DiskLoc(); // make capFirstNewRecord null if going to delete it
-        _deleteRecord( d, ns, dl.rec(), dl );
     }
 
     /* special version of insert for transaction logging -- streamlined a bit.
