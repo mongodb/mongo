@@ -73,8 +73,8 @@ int mongo::Tool::main( int argc , char ** argv ){
 
         po::notify( _params );
     } catch (po::error &e) {
-        cout << "ERROR: " << e.what() << endl << endl;
-        printHelp(cout);
+        cerr << "ERROR: " << e.what() << endl << endl;
+        printHelp(cerr);
         return EXIT_BADOPTIONS;
     }
 
