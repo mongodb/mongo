@@ -455,7 +455,7 @@ namespace mongo {
     void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
     int removeFromSysIndexes(const char *ns, const char *idxName);
 
-    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
+    bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
 
         BackgroundOperation::assertNoBgOpInProgForNs(ns);
 
@@ -486,7 +486,7 @@ namespace mongo {
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
             assureSysIndexesEmptied(ns, idIndex);
-            anObjBuilder.append("msg", "all indexes deleted for collection");
+            anObjBuilder.append("msg", "non-_id indexes dropped for collection");
         }
         else {
             // delete just one index
@@ -514,7 +514,7 @@ namespace mongo {
                 if( n ) { 
                     log() << "info: removeFromSysIndexes cleaned up " << n << " entries" << endl;
                 }
-                log() << "deleteIndexes: " << name << " not found" << endl;
+                log() << "dropIndexes: " << name << " not found" << endl;
                 errmsg = "index not found";
                 return false;
             }
@@ -615,7 +615,8 @@ namespace mongo {
         }
     } cmdCreate;
 
-    class CmdDeleteIndexes : public Command {
+    /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
+    class CmdDropIndexes : public Command {
     public:
         virtual bool logTheOp() {
             return true;
@@ -624,19 +625,19 @@ namespace mongo {
             return false;
         }
         virtual void help( stringstream& help ) const {
-            help << "delete indexes for a collection";
+            help << "drop indexes for a collection";
         }
-        CmdDeleteIndexes() : Command("deleteIndexes") { }
+        CmdDropIndexes(const char *cmdname = "dropIndexes") : Command(cmdname) { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             BSONElement e = jsobj.findElement(name.c_str());
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             if ( !cmdLine.quiet )
-                log() << "CMD: deleteIndexes " << toDeleteNs << endl;
+                log() << "CMD: dropIndexes " << toDeleteNs << endl;
             if ( d ) {
                 BSONElement f = jsobj.findElement("index");
                 if ( f.type() == String ) {
-                    return deleteIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
+                    return dropIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
                 }
                 else {
                     errmsg = "invalid index name spec";
@@ -648,6 +649,10 @@ namespace mongo {
                 return false;
             }
         }
+    } cmdDropIndexes;
+    class CmdDeleteIndexes : public CmdDropIndexes { 
+    public:
+        CmdDeleteIndexes() : CmdDropIndexes("deleteIndexes") { }
     } cmdDeleteIndexes;
 
     class CmdReIndex : public Command {
@@ -687,9 +692,9 @@ namespace mongo {
             }
 
 
-            bool ok = deleteIndexes( d, toDeleteNs.c_str(), "*" , errmsg, result, true );
+            bool ok = dropIndexes( d, toDeleteNs.c_str(), "*" , errmsg, result, true );
             if ( ! ok ){
-                errmsg = "deleteIndexes failed";
+                errmsg = "dropIndexes failed";
                 return false;
             }
 

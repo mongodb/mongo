@@ -127,7 +127,7 @@ namespace mongo {
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
         /* Get rid of cursors for namespaces that begin with nsprefix.
-           Used by drop, deleteIndexes, dropDatabase.
+           Used by drop, dropIndexes, dropDatabase.
         */
         static void invalidate(const char *nsPrefix);
 

@@ -680,7 +680,7 @@ namespace mongo {
 
         if ( d->nIndexes != 0 ) {
             try { 
-                assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+                assert( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
             catch( DBException& ) {
                 uasserted(12503,"drop: dropIndexes for collection failed - consider trying repair");
@@ -1422,7 +1422,7 @@ namespace mongo {
             try {
                 buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
-                // save our error msg string as an exception on deleteIndexes will overwrite our message
+                // save our error msg string as an exception on dropIndexes will overwrite our message
                 LastError *le = lastError.get();
                 assert( le );
                 string saveerrmsg = le->msg;
@@ -1432,7 +1432,7 @@ namespace mongo {
                 string name = idx.indexName();
                 BSONObjBuilder b;
                 string errmsg;
-                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
+                bool ok = dropIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }

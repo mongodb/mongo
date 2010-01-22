@@ -35,7 +35,7 @@ namespace mongo {
 
     /* this is just an attempt to clean up old orphaned stuff on a delete all indexes 
        call. repair database is the clean solution, but this gives one a lighter weight 
-       partial option.  see deleteIndexes()
+       partial option.  see dropIndexes()
     */
     void assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) { 
         string system_indexes = cc().database()->name + ".system.indexes";
