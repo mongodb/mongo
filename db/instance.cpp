@@ -36,6 +36,7 @@
 #include <sys/file.h>
 #endif
 #include "dbstats.h"
+#include "background.h"
 
 namespace mongo {
 
@@ -460,13 +461,18 @@ namespace mongo {
         killCursors(n, (long long *) x);
     }
 
-    /* cl - database name
+    /* db - database name
        path - db directory
     */
-    void closeDatabase( const char *cl, const string& path ) {
+    void closeDatabase( const char *db, const string& path ) {
         Database *database = cc().database();
         assert( database );
-        assert( database->name == cl );
+        assert( database->name == db );
+
+        if( BackgroundOperation::inProgForDb(db) ) { 
+            log() << "warning: bg op in prog during close db? " << db << endl;
+        }
+
 		/*
         if ( string("local") != cl ) {
             DBInfo i(cl);
@@ -474,13 +480,13 @@ namespace mongo {
 			}*/
 
         /* important: kill all open cursors on the database */
-        string prefix(cl);
+        string prefix(db);
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        dbHolder.erase( cl, path );
+        dbHolder.erase( db, path );
         delete database; // closes files
         cc().clearns();
     }

@@ -75,6 +75,10 @@ namespace mongo {
         NamespaceString( const char * ns ) { init(ns); }
         NamespaceString( const string& ns ) { init(ns.c_str()); }
 
+        string ns() const { 
+            return db + '.' + coll;
+        }
+
         bool isSystem() { 
             return strncmp(coll.c_str(), "system.", 7) == 0;
         }

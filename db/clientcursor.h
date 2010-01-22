@@ -137,7 +137,8 @@ namespace mongo {
          *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
          *       (ie not set for remote/update)
          * @return if the cursor is still valid. 
-         *         if false is returned, then this ClientCursor should be considered deleted
+         *         if false is returned, then this ClientCursor should be considered deleted - 
+         *         in fact, the whole database could be gone.
          */
         bool yield();
     private:

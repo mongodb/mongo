@@ -77,7 +77,8 @@ namespace mongo {
             _size -= m.erase( _todb( ns ) );
         }
 
-        bool closeAll( const string& path , BSONObjBuilder& result );
+        /* force - force close even if something underway - use at shutdown */
+        bool closeAll( const string& path , BSONObjBuilder& result, bool force );
 
         int size(){
             return _size;

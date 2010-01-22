@@ -37,6 +37,7 @@
 #include "queryoptimizer.h"
 #include "../scripting/engine.h"
 #include "dbstats.h"
+#include "background.h"
 
 namespace mongo {
 
@@ -456,6 +457,8 @@ namespace mongo {
 
     bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
 
+        BackgroundOperation::assertNoBgOpInProgForNs(ns);
+
         d->aboutToDeleteAnIndex();
 
         /* there may be pointers pointing at keys in the btree(s).  kill them. */
@@ -660,6 +663,8 @@ namespace mongo {
         }
         CmdReIndex() : Command("reIndex") { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            BackgroundOperation::assertNoBgOpInProgForNs(ns);
+
             static DBDirectClient db;
 
             BSONElement e = jsobj.findElement(name.c_str());
@@ -699,8 +704,6 @@ namespace mongo {
             return true;
         }
     } cmdReIndex;
-
-
 
     class CmdListDatabases : public Command {
     public:
@@ -760,13 +763,16 @@ namespace mongo {
         }
     } cmdListDatabases;
 
+    /* note an access to a database right after this will open it back up - so this is mainly 
+       for diagnostic purposes. 
+       */
     class CmdCloseAllDatabases : public Command {
     public:
         virtual bool adminOnly() { return true; }
         virtual bool slaveOk() { return false; }
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            return dbHolder.closeAll( dbpath , result );
+            return dbHolder.closeAll( dbpath , result, false );
         }
     } cmdCloseAllDatabases;
 
@@ -1056,6 +1062,8 @@ namespace mongo {
             help << "example: { convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            BackgroundOperation::assertNoBgOpInProgForDb(dbname);
+
             string from = jsobj.getStringField( "convertToCapped" );
             long long size = (long long)jsobj.getField( "size" ).number();
 

@@ -1366,6 +1366,10 @@
 			Name="db"
 			>
 			<File
+				RelativePath=".\background.h"
+				>
+			</File>
+			<File
 				RelativePath=".\client.h"
 				>
 			</File>

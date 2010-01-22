@@ -40,8 +40,47 @@ _ disallow system* manipulations from the database.
 #include "queryutil.h"
 #include "extsort.h"
 #include "curop.h"
+#include "background.h"
 
 namespace mongo {
+
+    map<string, unsigned> BackgroundOperation::dbsInProg;
+    set<string> BackgroundOperation::nsInProg;
+
+    bool BackgroundOperation::inProgForDb(const char *db) {
+        assertInWriteLock();
+        return dbsInProg.count(db) != 0;
+    }
+
+    bool BackgroundOperation::inProgForNs(const char *ns) { 
+        assertInWriteLock();
+        return nsInProg.count(ns) != 0;
+    }
+
+    void BackgroundOperation::assertNoBgOpInProgForDb(const char *db) { 
+        uassert(12586, "cannot perform operation: a background operation is currently running for this database",
+            !inProgForDb(db));
+    }
+
+    void BackgroundOperation::assertNoBgOpInProgForNs(const char *ns) { 
+        uassert(12587, "cannot perform operation: a background operation is currently running for this collection",
+            !inProgForNs(ns));
+    } 
+
+    BackgroundOperation::BackgroundOperation(const char *ns) : _ns(ns) { 
+        assertInWriteLock();
+        dbsInProg[_ns.db]++;
+        assert( nsInProg.count(_ns.ns()) == 0 );
+        nsInProg.insert(_ns.ns());
+    }
+
+    BackgroundOperation::~BackgroundOperation() { 
+        assertInWriteLock();
+        dbsInProg[_ns.db]--;
+        nsInProg.erase(_ns.ns());
+    }
+
+    /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
 
@@ -583,6 +622,8 @@ namespace mongo {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
         uassert( 10086 ,  (string)"ns not found: " + nsToDrop , d );
 
+        BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
+
         NamespaceString s(nsToDrop);
         assert( s.db == cc().database()->name );
         if( s.isSystem() ) {
@@ -634,16 +675,19 @@ namespace mongo {
         log(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         assert( d );
+
+        BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
+
         if ( d->nIndexes != 0 ) {
             try { 
                 assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
             catch( DBException& ) {
-                uasserted(12503,"drop: deleteIndexes for collection failed - consider trying repair");
+                uasserted(12503,"drop: dropIndexes for collection failed - consider trying repair");
             }
             assert( d->nIndexes == 0 );
         }
-        log(1) << "\t deleteIndexes done" << endl;
+        log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         dropNS(name);        
@@ -998,7 +1042,7 @@ namespace mongo {
         return n;
     }
 
-    static class BackgroundIndexBuildJobs { 
+    class BackgroundIndexBuildJob : public BackgroundOperation { 
 
         unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
             bool dupsAllowed = !idx.unique();
@@ -1025,6 +1069,7 @@ namespace mongo {
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
                         if( ClientCursor::find(id, false) == 0 ) {
                             cc.release();
+                            uasserted(12585, "cursor gone during bg index; dropDups");
                             break;
                         }
                     } else {
@@ -1036,6 +1081,7 @@ namespace mongo {
 
                 if ( n % 128 == 0 && !cc->yield() ) {
                     cc.release();
+                    uasserted(12584, "cursor gone during bg index");
                     break;
                 }
             };
@@ -1046,9 +1092,8 @@ namespace mongo {
            that way on a crash/restart, we don't think we are still building one. */
         set<NamespaceDetails*> bgJobsInProgress;
 
-        void prep(NamespaceDetails *d) {
+        void prep(const char *ns, NamespaceDetails *d) {
             assertInWriteLock();
-            assert( bgJobsInProgress.count(d) == 0 ); // better be 0, checkInProg should have caught earlier.
             bgJobsInProgress.insert(d);
             d->backgroundIndexBuildInProgress = 1;
             d->nIndexes--;
@@ -1057,37 +1102,35 @@ namespace mongo {
             d->nIndexes++;
             d->backgroundIndexBuildInProgress = 0;
             assertInWriteLock();
-            bgJobsInProgress.erase(d);
         }
 
     public:
-        /* Note you cannot even do a foreground index build if a background is in progress,
-           as bg build assumes it is the last index in the array - so check for BOTH styles of builds.
-        */
-        void checkInProg(NamespaceDetails *d) { 
-            assertInWriteLock();
-            uassert(12580, "already building an index for this namespace in background", bgJobsInProgress.count(d) == 0);
-        }
+        BackgroundIndexBuildJob(const char *ns) : BackgroundOperation(ns) { }
 
         unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
             unsigned long long n = 0;
 
-            prep(d);
+            prep(ns.c_str(), d);
             assert( idxNo == d->nIndexes );
             try { 
                 idx.head = BtreeBucket::addBucket(idx);
                 n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
             }
             catch(...) { 
-                assert( idxNo == d->nIndexes );
-                done(d);
+                if( cc().database() && nsdetails(ns.c_str()) == d ) {
+                    assert( idxNo == d->nIndexes );
+                    done(d);
+                }
+                else {
+                    log() << "ERROR: db gone during bg index?" << endl;
+                }
                 throw;
             }
             assert( idxNo == d->nIndexes );
             done(d);
             return n;
         }
-    } backgroundIndex; /* class BackgroundIndexBuildJobs */
+    };
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
@@ -1099,6 +1142,7 @@ namespace mongo {
         bool background = info["background"].trueValue();
         if( background ) { 
             log() << "WARNING: background index build not yet implemented" << endl;
+            assert(false);
         }
 
         if( !background ) {
@@ -1106,7 +1150,9 @@ namespace mongo {
 			assert( !idx.head.isNull() );
 		}
 		else {
-            n = backgroundIndex.go(ns, d, idx, idxNo);
+            assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
+            BackgroundIndexBuildJob j(ns.c_str());
+            n = j.go(ns, d, idx, idxNo);
 		}
         log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
@@ -1263,7 +1309,11 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
-            backgroundIndex.checkInProg(d);
+            /* we can't build a new index for the ns if a build is already in progress in the background - 
+               EVEN IF this is a foreground build.
+               */
+            uassert(12588, "cannot add index with a background operation in progress", 
+                !BackgroundOperation::inProgForNs(tabletoidxns.c_str()));
             BSONObj io((const char *) obuf);
             if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();
@@ -1473,13 +1523,15 @@ namespace mongo {
 
     void dropDatabase(const char *ns) {
         // ns is of the form "<dbname>.$cmd"
-        char cl[256];
-        nsToDatabase(ns, cl);
-        log(1) << "dropDatabase " << cl << endl;
-        assert( cc().database()->name == cl );
+        char db[256];
+        nsToDatabase(ns, db);
+        log(1) << "dropDatabase " << db << endl;
+        assert( cc().database()->name == db );
 
-        closeDatabase( cl );
-        _deleteDataFiles(cl);
+        BackgroundOperation::assertNoBgOpInProgForDb(db);
+
+        closeDatabase( db );
+        _deleteDataFiles(db);
     }
 
     typedef boost::filesystem::path Path;
@@ -1586,6 +1638,8 @@ namespace mongo {
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
 
+        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+
         boost::intmax_t totalSize = dbSize( dbName );
         boost::intmax_t freeSize = freeSpace();
         if ( freeSize > -1 && freeSize < totalSize ) {
@@ -1665,7 +1719,7 @@ namespace mongo {
 
     NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
-    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result ){
+    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ){
         log(2) << "DatabaseHolder::closeAll path:" << path << endl;
         dbMutex.assertWriteLocked();
         
@@ -1683,7 +1737,10 @@ namespace mongo {
             string name = *i;
             log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             setClient( name.c_str() , path );
-            closeDatabase( name.c_str() , path );
+            if( !force && BackgroundOperation::inProgForDb(name.c_str()) )
+                log() << "WARNING: can't close database " << name << "because a bg job is in progress - try killOp command" << endl;
+            else
+                closeDatabase( name.c_str() , path );
             bb.append( bb.numStr( n++ ).c_str() , name );
         }
         bb.done();

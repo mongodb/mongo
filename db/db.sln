@@ -18,7 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 		..\tools\export.cpp = ..\tools\export.cpp
 		..\tools\files.cpp = ..\tools\files.cpp
 		..\tools\sniffer.cpp = ..\tools\sniffer.cpp
-		..\tools\tool.cpp = ..\tools\tool.cpp
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\s\dbgrid.vcproj", "{E03717ED-69B4-4D21-BC55-DF6690B585C6}"
