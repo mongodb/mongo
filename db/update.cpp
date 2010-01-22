@@ -235,7 +235,8 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             if ( e.eoo() ) {
-                inPlacePossible = (m.op == Mod::UNSET);
+                if ( inPlacePossible )
+                    inPlacePossible = (m.op == Mod::UNSET);
             } 
             else {
                 switch( m.op ) {
