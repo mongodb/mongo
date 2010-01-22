@@ -1053,6 +1053,12 @@ namespace mongo {
             d->backgroundIndexBuildInProgress = 1;
             d->nIndexes--;
         }
+        void done(NamespaceDetails *d) {
+            d->nIndexes++;
+            d->backgroundIndexBuildInProgress = 0;
+            assertInWriteLock();
+            bgJobsInProgress.erase(d);
+        }
 
     public:
         /* Note you cannot even do a foreground index build if a background is in progress,
@@ -1074,12 +1080,11 @@ namespace mongo {
             }
             catch(...) { 
                 assert( idxNo == d->nIndexes );
-                d->nIndexes++;
-                d->backgroundIndexBuildInProgress = 0;
-                assertInWriteLock();
-                bgJobsInProgress.erase(d);
+                done(d);
                 throw;
             }
+            assert( idxNo == d->nIndexes );
+            done(d);
             return n;
         }
     } backgroundIndex; /* class BackgroundIndexBuildJobs */
