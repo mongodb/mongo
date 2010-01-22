@@ -24,19 +24,45 @@
 
 namespace mongo {
 
+    int removeFromSysIndexes(const char *ns, const char *idxName) { 
+        string system_indexes = cc().database()->name + ".system.indexes";
+        BSONObjBuilder b;
+        b.append("ns", ns);
+        b.append("name", idxName); // e.g.: { name: "ts_1", ns: "foo.coll" }
+        BSONObj cond = b.done();
+        return deleteObjects(system_indexes.c_str(), cond, false, false, true);
+    }
+
+    /* this is just an attempt to clean up old orphaned stuff on a delete all indexes 
+       call. repair database is the clean solution, but this gives one a lighter weight 
+       partial option.  see deleteIndexes()
+    */
+    void assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) { 
+        string system_indexes = cc().database()->name + ".system.indexes";
+        BSONObjBuilder b;
+        b.append("ns", ns);
+        if( idIndex ) { 
+            b.append("name", BSON( "$ne" << idIndex->indexName().c_str() ));
+        }
+        BSONObj cond = b.done();
+        int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        if( n ) { 
+            log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
+        }
+    }
+
     /* delete this index.  does NOT clean up the system catalog
        (system.indexes or system.namespaces) -- only NamespaceIndex.
     */
     void IndexDetails::kill_idx() {
         string ns = indexNamespace(); // e.g. foo.coll.$ts_1
+
+        string pns = parentNS(); // note we need a copy, as parentNS() won't work after the drop() below 
         
         // clean up parent namespace index cache
-        NamespaceDetailsTransient::get_w( parentNS().c_str() ).deletedIndex();
+        NamespaceDetailsTransient::get_w( pns.c_str() ).deletedIndex();
 
-        BSONObjBuilder b;
-        b.append("name", indexName().c_str());
-        b.append("ns", parentNS().c_str());
-        BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
+        string name = indexName();
 
         /* important to catch exception here so we can finish cleanup below. */
         try { 
@@ -48,10 +74,8 @@ namespace mongo {
         head.setInvalid();
         info.setInvalid();
 
-        // clean up in system.indexes.  we do this last on purpose.  note we have 
-        // to make the cond object before the drop() above though.
-        string system_indexes = cc().database()->name + ".system.indexes";
-        int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        // clean up in system.indexes.  we do this last on purpose.
+        int n = removeFromSysIndexes(pns.c_str(), name.c_str());
         wassert( n == 1 );
     }
 

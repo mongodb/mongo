@@ -451,6 +451,9 @@ namespace mongo {
         }
     } dbc_unittest;
 
+    void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
+    int removeFromSysIndexes(const char *ns, const char *idxName);
+
     bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
 
         d->aboutToDeleteAnIndex();
@@ -479,6 +482,7 @@ namespace mongo {
             }
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
+            assureSysIndexesEmptied(ns, idIndex);
             anObjBuilder.append("msg", "all indexes deleted for collection");
         }
         else {
@@ -503,6 +507,10 @@ namespace mongo {
                 for ( int i = x; i < d->nIndexes; i++ )
                     d->idx(i) = d->idx(i+1);
             } else {
+                int n = removeFromSysIndexes(ns, name); // just in case an orphaned listing there - i.e. should have been repaired but wasn't
+                if( n ) { 
+                    log() << "info: removeFromSysIndexes cleaned up " << n << " entries" << endl;
+                }
                 log() << "deleteIndexes: " << name << " not found" << endl;
                 errmsg = "index not found";
                 return false;
