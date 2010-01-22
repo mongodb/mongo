@@ -525,8 +525,7 @@ namespace UpdateTests {
         public:
             void run(){
                 BSONObj b = BSON( "$inc" << BSON( "x" << 1 << "a.b" << 1 ) );
-                ModSet m;
-                m.getMods( b );
+                ModSet m(b);
 
                 ASSERT( m.haveModForField( "x" ) );
                 ASSERT( m.haveModForField( "a.b" ) );
@@ -551,8 +550,7 @@ namespace UpdateTests {
             
             void test( BSONObj morig , BSONObj in , BSONObj wanted ){
                 BSONObj m = morig.copy();
-                ModSet set;
-                set.getMods( m );
+                ModSet set(m);
 
                 BSONObj out = set.createNewFromMods( in );
                 ASSERT_EQUALS( wanted , out );

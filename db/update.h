@@ -159,7 +159,9 @@ namespace mongo {
         
     };
 
-    class ModSet {
+    class ModState;
+
+    class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
         
@@ -286,14 +288,17 @@ namespace mongo {
         }
         
     public:
+        
+        ModSet( const BSONObj &from );
 
-        void getMods( const BSONObj &from );
+        auto_ptr<ModState> prepare( const BSONObj& obj ) const;
+
         /**
            will return if can be done in place, or uassert if there is an error
            @return whether or not the mods can be done in place
          */
         bool canApplyInPlaceAndVerify( const BSONObj &obj ) const;
-        void applyModsInPlace( const BSONObj &obj ) const;
+        void applyModsInPlace( BSONObj &obj ) const;
 
         // new recursive version, will replace at some point
         void createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj );
@@ -377,6 +382,14 @@ namespace mongo {
         }
     };
     
-
+    /**
+     * this is used to hold state, meta data while applying a ModSet to a BSONObj
+     * the goal is to make ModSet const so its re-usable
+     */
+    class ModState {
+    public:
+        
+    };
+    
 }
 

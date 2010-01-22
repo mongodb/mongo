@@ -235,7 +235,8 @@ namespace mongo {
             BSONElement e = obj.getFieldDotted(m.fieldName);
             
             if ( e.eoo() ) {
-                inPlacePossible = (m.op == Mod::UNSET);
+                if ( inPlacePossible )
+                    inPlacePossible = (m.op == Mod::UNSET);
             } 
             else {
                 switch( m.op ) {
@@ -293,7 +294,7 @@ namespace mongo {
         return inPlacePossible;
     }
     
-    void ModSet::applyModsInPlace(const BSONObj &obj) const {
+    void ModSet::applyModsInPlace( BSONObj &obj ) const {
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
@@ -468,7 +469,7 @@ namespace mongo {
        { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
-    void ModSet::getMods(const BSONObj &from) {
+    ModSet::ModSet(const BSONObj &from) {
         BSONObjIterator it(from);
         while ( it.more() ) {
             BSONElement e = it.next();
@@ -632,8 +633,7 @@ namespace mongo {
                     updateobj = updateobj.copy();
                 }
                 
-                ModSet mods;
-                mods.getMods(updateobj);
+                ModSet mods(updateobj);
                 NamespaceDetailsTransient& ndt = NamespaceDetailsTransient::get_w(ns);
                 set<string>& idxKeys = ndt.indexKeys();
                 int isIndexed = mods.isIndexed( idxKeys );
@@ -643,7 +643,8 @@ namespace mongo {
                 }
 
                 if ( isIndexed <= 0 && mods.canApplyInPlaceAndVerify( loc.obj() ) ) {
-                    mods.applyModsInPlace( loc.obj() );
+                    const BSONObj& onDisk = loc.obj();
+                    mods.applyModsInPlace( const_cast<BSONObj&>(onDisk) );
                     //seenObjects.insert( loc );
                     if ( profile )
                         ss << " fastmod ";
@@ -707,8 +708,7 @@ namespace mongo {
         if ( upsert ) {
             if ( updateobjOrig.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
-                ModSet mods;
-                mods.getMods(updateobjOrig);
+                ModSet mods(updateobjOrig);
                  
                 BSONObj newObj = mods.createNewFromQuery( patternOrig );
 
