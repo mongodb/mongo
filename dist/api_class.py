@@ -22,6 +22,7 @@
 #		cache	 -- method reads/writes the cache
 #		getter	 -- auto-generated getter method
 #		handcode -- hand-coded getter/setter method
+#		ienvlock -- lock the IENV structure (implied by getter/setter)
 #		method	 -- method returns an int
 #		methodV  -- method returns void
 #		noauto	 -- don't create a stub
@@ -58,7 +59,7 @@ class Api:
 ###################################################
 methods['wt_toc.close'] = Api(
 	'wt_toc.close',
-	'method',
+	'method, ienvlock',
 	['flags/u_int32_t @S'],
 	['__NONE__'],
 	['init'], [])
@@ -147,6 +148,19 @@ methods['env.errx'] = Api(
 	[],
 	['init'], [])
 
+methods['env.hazard_max_get'] = Api(
+	'env.hazard_max_get',
+	'method, getter',
+	['hazard_max/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.hazard_max_set'] = Api(
+	'env.hazard_max_set',
+	'method, setter',
+	['hazard_max/u_int32_t @S'],
+	[],
+	['init'], ['open'])
+
 methods['env.msgcall_get'] = Api(
 	'env.msgcall_get',
 	'method, getter',
@@ -199,11 +213,24 @@ methods['env.stat_print'] = Api(
 
 methods['env.toc'] = Api(
 	'env.toc',
-	'method',
+	'method, ienvlock',
 	['flags/u_int32_t @S',
 	 'tocp/WT_TOC **@S'],
 	['__NONE__'],
 	['open'], [])
+
+methods['env.toc_max_get'] = Api(
+	'env.toc_max_get',
+	'method, getter',
+	['toc_max/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.toc_max_set'] = Api(
+	'env.toc_max_set',
+	'method, setter',
+	['toc_max/u_int32_t @S'],
+	[],
+	['init'], ['open'])
 
 methods['env.verbose_get'] = Api(
 	'env.verbose_get',
@@ -468,6 +495,7 @@ flags['cache'] = [
 	'INITIALIZED',
 	'SERVER_SLEEPING' ]
 flags['ienv'] = [
+	'CACHE_LOCKOUT',
 	'WORKQ_RUN',
 	'SERVER_RUN' ]
 flags['wt_indx'] = [
@@ -479,5 +507,4 @@ flags['wt_page'] = [
 	'PINNED',
 	'UNFORMATTED' ]
 flags['wt_toc'] = [
-	'CACHE_LOCK_RESTART',
-	'WAITING' ]
+	'CACHE_DRAIN_WAIT' ]
