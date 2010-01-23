@@ -116,7 +116,7 @@ __wt_db_close(DB *db)
 	WT_TRET(__wt_idb_close(db, 0));
 
 	/* Discard the DB object. */
-	__wt_free(env, &db, sizeof(DB));
+	__wt_free(env, db, sizeof(DB));
 
 	return (ret);
 }
@@ -155,9 +155,9 @@ __wt_idb_close(DB *db, int refresh)
 	}
 
 	/* Free any allocated memory. */
-	__wt_free(env, &idb->dbname, 0);
-	__wt_free(env, &idb->stats, 0);
-	__wt_free(env, &idb->dstats, 0);
+	__wt_free(env, idb->dbname, 0);
+	__wt_free(env, idb->stats, 0);
+	__wt_free(env, idb->dstats, 0);
 
 	/*
 	 * This is the guts of the split between the public/private, DB/IDB
@@ -177,7 +177,7 @@ __wt_idb_close(DB *db, int refresh)
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
 	__wt_unlock(&ienv->mtx);
 
-	__wt_free(env, &idb, sizeof(IDB));
+	__wt_free(env, idb, sizeof(IDB));
 
 	db->idb = NULL;
 	return (0);

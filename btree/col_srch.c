@@ -43,16 +43,7 @@ __wt_db_get_recno(
 	WT_TOC_DB_INIT(toc, db, "Db.get_recno");
 
 	/* Search the primary btree for the key. */
-	F_SET(toc, WT_CACHE_LOCK_RESTART);
-	while ((ret =
-	    __wt_bt_search_recno(toc, recno, &page, &indx)) == WT_RESTART) {
-		WT_STAT_INCR(idb->stats, DB_READ_BY_RECNO_RESTART,
-		    "database read-by-recno operation restarted");
-		__wt_toc_serialize_wait(toc, NULL);
-	}
-	F_CLR(toc, WT_CACHE_LOCK_RESTART);
-	if (ret != 0)
-		goto err;
+	WT_ERR(__wt_bt_search_recno(toc, recno, &page, &indx));
 
 	/*
 	 * The Db.get_recno method can only return single key/data pairs.

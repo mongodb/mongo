@@ -149,7 +149,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 	}
 
 err:	/* Discard any space allocated to hold an overflow key. */
-	__wt_free(env, &last_key_ovfl.data, last_key_ovfl.data_len);
+	__wt_free(env, last_key_ovfl.data, last_key_ovfl.data_len);
 
 	WT_TRET(toc->close(toc, 0));
 

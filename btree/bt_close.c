@@ -19,7 +19,8 @@ __wt_bt_close(DB *db)
 	ENV *env;
 	IDB *idb;
 	WT_TOC *toc;
-	int ret;
+	WT_PAGE *page;
+	int isleaf, ret;
 
 	env = db->env;
 	idb = db->idb;
@@ -28,10 +29,17 @@ __wt_bt_close(DB *db)
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.close");
 
-	/* Discard the pinned root page. */
+	/*
+	 * Discard any pinned root page.  We have a direct reference but we
+	 * have to get another one, otherwise the hazard pointers won't be
+	 * set.
+	 */
 	if (idb->root_page != NULL) {
-		WT_PAGE_PIN_CLR(idb->root_page);
-		WT_TRET(__wt_bt_page_out(toc, idb->root_page, 0));
+		isleaf = idb->root_page->addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
+		WT_TRET(__wt_bt_page_in(
+		    toc, idb->root_page->addr, isleaf, 0, &page));
+		F_CLR(page, WT_PINNED);
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 		idb->root_page = NULL;
 	}
 

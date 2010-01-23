@@ -40,15 +40,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	WT_TOC_DB_INIT(toc, db, "Db.get");
 
 	/* Search the primary btree for the key. */
-	F_SET(toc, WT_CACHE_LOCK_RESTART);
-	while ((ret = __wt_bt_search(toc, key, &page, &ip)) == WT_RESTART) {
-		WT_STAT_INCR(idb->stats, DB_READ_BY_KEY_RESTART,
-		    "database read-by-key operation restarted");
-		__wt_toc_serialize_wait(toc, NULL);
-	}
-	F_CLR(toc, WT_CACHE_LOCK_RESTART);
-	if (ret != 0)
-		goto err;
+	WT_ERR(__wt_bt_search(toc, key, &page, &ip));
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -88,38 +80,16 @@ __wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data)
 	WT_STAT_INCR(idb->stats,
 	    DB_WRITE_BY_KEY, "database put-by-key operations");
 
-	/*
-	 * Initialize the thread-of-control structure.
-	 * We're willing to restart if the cache is too full.
-	 */
 	WT_TOC_DB_INIT(toc, db, "Db.put");
 
 	/*
-	 * Search the primary btree for the key, and replace the item on the
-	 * page.
+	 * Search the primary btree for the key, replace the item on the
+	 * page, and discard the page.
 	 */
-	for (;;) {
-		F_SET(toc, WT_CACHE_LOCK_RESTART);
-		ret = __wt_bt_search(toc, key, &page, &ip);
-		F_CLR(toc, WT_CACHE_LOCK_RESTART);
-		if (ret != 0 && ret != WT_RESTART)
-			break;
+	WT_ERR(__wt_bt_search(toc, key, &page, &ip));
+	WT_TRET(__wt_bt_page_put(toc, data, page, ip));
 
-		if (ret == 0) {
-			ret = __wt_bt_page_put(toc, data, page, ip);
-			if (ret != WT_RESTART)
-				break;
-		}
-
-		WT_STAT_INCR(idb->stats, DB_WRITE_BY_KEY_RESTART,
-		    "database write-by-key operation restarted");
-		__wt_toc_serialize_wait(toc, NULL);
-	}
-
-	/* Discard the returned page. */
-	WT_TRET(__wt_bt_page_out(toc, page, ret == 0 ? WT_MODIFIED : 0));
-
-	WT_TOC_DB_CLEAR(toc);
+err:	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }
@@ -139,8 +109,7 @@ typedef struct {
 	_args.page_ovfl = _page_ovfl;					\
 	_args.from = _from;						\
 	_args.to = _to;							\
-	__wt_toc_serialize_request(toc,					\
-	    __wt_put_serial_func, &_args, &(_page)->serial_private);	\
+	__wt_toc_serialize_request(toc,	__wt_put_serial_func, &_args);	\
 } while (0);
 #define	__wt_put_unpack(toc, _page, _page_ovfl, _from, _to) do {	\
 	_page =	((__wt_put_args *)(toc)->serial_args)->page;		\

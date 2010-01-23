@@ -222,13 +222,15 @@ __wt_bt_root_page(WT_TOC *toc)
 		return (0);
 
 	/*
+	 * Read the root page in, and pin it -- it's not going anywhere.
+	 *
 	 * The isleaf value tells us how big a page to read.  If the tree has
 	 * split, the root page is an internal page, otherwise it's a leaf page.
 	 */
 	isleaf = root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-	WT_RET(
-	    __wt_bt_page_in(toc, root_addr, isleaf, 1, &idb->root_page));
+	WT_RET(__wt_bt_page_in(toc, root_addr, isleaf, 1, &idb->root_page));
+	F_SET(idb->root_page, WT_PINNED);
+	WT_RET(__wt_bt_page_out(toc, idb->root_page, 0));
 
-	WT_PAGE_PIN_SET(idb->root_page);
 	return (0);
 }

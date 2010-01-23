@@ -25,7 +25,6 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_ITEM_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
@@ -35,7 +34,6 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	int ret;
 
 	env = db->env;
-	ienv = env->ienv;
 	idb = db->idb;
 	ret = 0;
 
@@ -271,24 +269,6 @@ skip_read:	/*
 
 			/* Switch to the next page. */
 			page = next;
-
-			/*
-			 * Bulk-load is a long-lived action and we can't let it
-			 * block the cache server thread for the entire time.
-			 * If API calls are blocked because we're running out
-			 * of room, pin the page we're holding and wait for the
-			 * cache thread.
-			 *
-			 * Pinning the page is safe -- this is a bulk load and
-			 * nobody else should be looking at this page.  Flush
-			 * to make the change visible to the server.
-			 */
-			if (ienv->cache_lockout.api_gen) {
-				WT_PAGE_PIN_SET(page);
-				__wt_toc_serialize_wait(
-				    toc, &ienv->cache_lockout);
-				WT_PAGE_PIN_CLR(page);
-			}
 		}
 
 		/* Copy the key item onto the page. */
@@ -405,9 +385,9 @@ err:		if (page != NULL)
 			(void)__wt_bt_page_out(toc, page, 0);
 	}
 
-	__wt_free(env, &data_compress.data, data_compress.data_len);
-	__wt_free(env, &key_compress.data, key_compress.data_len);
-	__wt_free(env, &lastkey_ovfl.data, lastkey_ovfl.data_len);
+	__wt_free(env, data_compress.data, data_compress.data_len);
+	__wt_free(env, key_compress.data, key_compress.data_len);
+	__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.data_len);
 
 	WT_TRET(toc->close(toc, 0));
 

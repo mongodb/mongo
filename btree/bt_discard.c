@@ -81,13 +81,26 @@ __wt_bt_page_in(
 int
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
-	/*
-	 * We don't have to call the cache code unless the page was modified
-	 * (WT_MODIFIED).   We have this function as a place to verify a page
-	 * after it's been accessed.
-	 */
+	WT_PAGE **hp;
+
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
+	/* Discard the caller's hazard pointer. */
+	for (hp = toc->hazard; hp < toc->hazard_next; ++hp)
+		if (*hp == page)
+			break;
+	WT_ASSERT(toc->env, hp < toc->hazard_next);
+	--toc->hazard_next;
+	*hp = *toc->hazard_next;
+	*toc->hazard_next = NULL;
+
+	/*
+	 * We don't have to flush memory here for correctness, but doing so
+	 * gives the cache drain code immediate access to the buffer.
+	 */
+	WT_MEMORY_FLUSH;
+
+	/* We don't have to call the cache code unless the page was modified. */
 	return (flags == 0 ? 0 : __wt_cache_out(toc, page, flags));
 }
 
@@ -101,19 +114,21 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	WT_INDX *indx;
 	u_int32_t i;
 
+	WT_ASSERT(env, !F_ISSET(page, WT_MODIFIED));
+
 	if (F_ISSET(page, WT_ALLOCATED)) {
 		F_CLR(page, WT_ALLOCATED);
 		WT_INDX_FOREACH(page, indx, i)
 			if (F_ISSET(indx, WT_ALLOCATED)) {
 				F_CLR(indx, WT_ALLOCATED);
-				__wt_free(env, &indx->data, 0);
+				__wt_free(env, indx->data, 0);
 			}
 	}
 	if (page->indx != NULL)
-		__wt_free(env, &page->indx, 0);
+		__wt_free(env, page->indx, 0);
 
-	__wt_free(env, &page->hdr, sizeof(WT_PAGE_HDR));
-	__wt_free(env, &page, sizeof(WT_PAGE));
+	__wt_free(env, page->hdr, page->bytes);
+	__wt_free(env, page, sizeof(WT_PAGE));
 }
 
 /*
@@ -162,7 +177,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	 * been freed.
 	 */
 	if (page->indx != NULL && page->indx_size < nindx)
-		__wt_free(env, &page->indx, 0);
+		__wt_free(env, page->indx, 0);
 
 	if (page->indx == NULL) {
 		WT_RET((__wt_calloc(env, nindx, sizeof(WT_INDX), &page->indx)));

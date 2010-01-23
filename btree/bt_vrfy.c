@@ -116,7 +116,7 @@ __wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp)
 	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (vstuff.fragbits != NULL)
-		__wt_free(env, &vstuff.fragbits, 0);
+		__wt_free(env, vstuff.fragbits, 0);
 	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
@@ -130,7 +130,6 @@ static int
 __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 {
 	DB *db;
-	IENV *ienv;
 	WT_INDX *page_indx, *prev_indx;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
@@ -139,7 +138,6 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
-	ienv = toc->env->ienv;
 	addr_arg = WT_ADDR_INVALID;
 	ret = 0;
 
@@ -296,23 +294,6 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 
 		/* We're done with the previous page. */
 		WT_ERR(__wt_bt_page_out(toc, prev, 0));
-
-		/*
-		 * Verification is a long-lived action and we can't let it block
-		 * the cache server thread for the entire time.  If API calls
-		 * are blocked because we're running out of room, pin the page
-		 * we're holding and wait for the cache thread.
-		 *
-		 * BUG!!!
-		 * Pinning the page is ALMOST safe -- this is a database verify,
-		 * and the only risk is if there were somehow to be two threads
-		 * verifying the same database at the same time.
-		 */
-		if (ienv->cache_lockout.api_gen) {
-			WT_PAGE_PIN_SET(page);
-			__wt_toc_serialize_wait(toc, &ienv->cache_lockout);
-			WT_PAGE_PIN_CLR(page);
-		}
 	}
 
 err:	if (prev != NULL)
@@ -867,12 +848,12 @@ eop:			__wt_db_errx(db,
 err_set:	ret = WT_ERROR;
 	}
 
-err:	__wt_free(env, &_a.item_ovfl.data, _a.item_ovfl.data_len);
-	__wt_free(env, &_b.item_ovfl.data, _b.item_ovfl.data_len);
-	__wt_free(env, &_c.item_ovfl.data, _c.item_ovfl.data_len);
-	__wt_free(env, &_a.item_comp.data, _a.item_comp.data_len);
-	__wt_free(env, &_b.item_comp.data, _b.item_comp.data_len);
-	__wt_free(env, &_c.item_comp.data, _c.item_comp.data_len);
+err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
+	__wt_free(env, _b.item_ovfl.data, _b.item_ovfl.data_len);
+	__wt_free(env, _c.item_ovfl.data, _c.item_ovfl.data_len);
+	__wt_free(env, _a.item_comp.data, _a.item_comp.data_len);
+	__wt_free(env, _b.item_comp.data, _b.item_comp.data_len);
+	__wt_free(env, _c.item_comp.data, _c.item_comp.data_len);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
