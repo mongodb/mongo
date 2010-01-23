@@ -195,7 +195,7 @@ def func_method_getset(a, f):
 		s += ')'
 		f.write(s + '));\n\n')
 
-	# Lock the data structure.
+	# getter/setter implies ienvlock: lock the data structure.
 	f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
 
 	# If the function is hand-coded, just call it.
@@ -218,7 +218,7 @@ def func_method_getset(a, f):
 			f.write('\t' + handle + '->' +
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 
-	# Unlock the data structure.
+	# getter/setter implies ienvlock: unlock the data structure.
 	f.write('\t__wt_unlock(&env->ienv->mtx);\n')
 	f.write('\treturn (')
 	if config.count('handcode'):
@@ -228,8 +228,7 @@ def func_method_getset(a, f):
 	f.write(');\n}\n\n')
 
 # func_method --
-#	Generate API entry functions for anything taking a flags or WT_TOC
-#	argument.
+#	Generate all other API entry functions.
 def func_method(a, f):
 	func_method_decl(a, f)
 
@@ -238,10 +237,21 @@ def func_method(a, f):
 	config = a.config
 	args = a.args
 
-	# We need an ENV handle.
+	# We need a return variable if we're doing locking.
+	if config.count('ienvlock'):
+		locking = 1
+	else:
+		locking = 0
+
+	# We need an ENV handle, find one.
 	if handle != 'env':
-		f.write('\tENV *env;\n\n')
-		f.write('\tenv = ' + handle + '->env;\n\n')
+		f.write('\tENV *env;\n')
+		if locking:
+			f.write('\tint ret;\n\n')
+		f.write('\n\tenv = ' + handle + '->env;\n\n')
+	else:
+		if locking:
+			f.write('\tint ret;\n\n')
 
 	# If we have a "flags" argument, check it before we continue.
 	for l in args:
@@ -251,12 +261,25 @@ def func_method(a, f):
 			    handle.upper() + '_' + method.upper() + ');\n\n')
 			break
 
-	f.write('\treturn (__wt_' + handle + '_' + method + '(' + handle)
+	if locking:
+		f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
+		f.write('\tret = ')
+	else:
+		f.write('\treturn (')
+
+	f.write('__wt_' + handle + '_' + method + '(' + handle)
 	for l in args:
 		if l.count('flags/') and flags[a.key][0] == '__NONE__':
 			continue
 		f.write(', ' + l.split('/')[0])
-	f.write('));\n}\n\n')
+
+	if locking:
+		f.write(');\n\t__wt_unlock(&env->ienv->mtx);\n')
+		f.write('\treturn (ret);\n')
+	else:
+		f.write('));\n')
+	f.write('}\n\n')
+
 
 #####################################################################
 # Build the API dictionary.
