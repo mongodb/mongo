@@ -54,10 +54,8 @@ main(int argc, char *argv[])
 	int ch, i, ret, run_cnt;
 	int rand_cache, rand_huffman, rand_keys, rand_leaf, rand_node;
 
+	(void)putenv("MALLOC_OPTIONS=AJZ");
 	ret = 0;
-#if 0
-	_malloc_options = "AJZ";
-#endif
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -66,7 +64,7 @@ main(int argc, char *argv[])
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
 	rand_cache = rand_huffman = rand_keys = rand_leaf = rand_node =  1;
-	while ((ch = getopt(argc, argv, "a:c:hk:L:l:n:R:r:v")) != EOF)
+	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:v")) != EOF)
 		switch (ch) {
 		case 'a':
 			switch (optarg[0]) {
@@ -90,7 +88,7 @@ main(int argc, char *argv[])
 			break;
 		case 'h':
 			rand_huffman = 0;
-			huffman = 1;
+			huffman = atoi(optarg);
 			break;
 		case 'k':
 			rand_keys = 0;
@@ -161,15 +159,17 @@ main(int argc, char *argv[])
 			huffman = rand() % 2;
 
 		(void)printf(
-		    "%s: %4d { %s -c %2d -k %7d -l %6d -n %6d -R %010u }\n\t",
-		    progname, run_cnt, huffman ? "-h" : "  ",
-		    cachesize, keys, leafsize, nodesize, r);
+		    "%s: %4d { -c %2d -h %d -k %7d -l %6d -n %6d "
+		    "-R %010u }\n\t",
+		    progname, run_cnt, cachesize, huffman, keys,
+		    leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		setup();
 		if (load() != 0)
 			goto err;
 
+#if 1
 		if (a_reopen) {
 			teardown();
 			setup();
@@ -183,6 +183,7 @@ main(int argc, char *argv[])
 		}
 		if (read_check() != 0)
 			goto err;
+#endif
 		teardown();
 
 		progress(NULL, 0);
@@ -498,7 +499,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dhv] [-a d|r|s|v] [-c cachesize] [-k keys] "
+	    "usage: %s [-dv] [-a d|r|s|v] [-c cachesize] [-h 0|1] [-k keys] "
 	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n",
 	    progname);
 	exit(1);
