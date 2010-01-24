@@ -20,8 +20,8 @@ static int  __wt_cache_drain(WT_TOC *, WT_DRAIN *, size_t, WT_PAGE **, size_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
 static void __wt_cache_hazard_confirm(ENV *, WT_PAGE *);
-static int  __wt_cache_drain_compare_addr(const void *a, const void *b);
 static int  __wt_cache_drain_compare_gen(const void *a, const void *b);
+static int  __wt_cache_drain_compare_page(const void *a, const void *b);
 static int  __wt_cache_hazard_compare(const void *a, const void *b);
 
 /*
