@@ -276,7 +276,9 @@ struct __env {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * ENV getter/setter variables: BEGIN
 	 */
-	u_int32_t cachesize;
+	u_int32_t cache_hash_size;
+
+	u_int32_t cache_size;
 
 	void (*errcall)(const ENV *, const char *);
 
@@ -284,13 +286,13 @@ struct __env {
 
 	const char *errpfx;
 
-	u_int32_t hazard_max;
+	u_int32_t hazard_size;
 
 	void (*msgcall)(const ENV *, const char *);
 
 	FILE *msgfile;
 
-	u_int32_t toc_max;
+	u_int32_t toc_size;
 
 	u_int32_t verbose;
 	/*
@@ -302,10 +304,16 @@ struct __env {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * ENV methods: BEGIN
 	 */
-	int (*cachesize_get)(
+	int (*cache_hash_size_get)(
 	    ENV *, u_int32_t *);
 
-	int (*cachesize_set)(
+	int (*cache_hash_size_set)(
+	    ENV *, u_int32_t );
+
+	int (*cache_size_get)(
+	    ENV *, u_int32_t *);
+
+	int (*cache_size_set)(
 	    ENV *, u_int32_t );
 
 	int (*close)(
@@ -338,10 +346,10 @@ struct __env {
 	void (*errx)(
 	    ENV *, const char *, ...);
 
-	int (*hazard_max_get)(
+	int (*hazard_size_get)(
 	    ENV *, u_int32_t *);
 
-	int (*hazard_max_set)(
+	int (*hazard_size_set)(
 	    ENV *, u_int32_t );
 
 	int (*msgcall_get)(
@@ -368,10 +376,10 @@ struct __env {
 	int (*toc)(
 	    ENV *, u_int32_t , WT_TOC **);
 
-	int (*toc_max_get)(
+	int (*toc_size_get)(
 	    ENV *, u_int32_t *);
 
-	int (*toc_max_set)(
+	int (*toc_size_set)(
 	    ENV *, u_int32_t );
 
 	int (*verbose_get)(

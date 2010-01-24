@@ -98,7 +98,7 @@ __wt_cache_create(ENV *env)
 	WT_RET(__wt_mtx_init(&cache->mtx));	/* Cache server mutex */
 	__wt_lock(env, &cache->mtx);		/* Blocking mutex */
 
-	cache->bytes_max = env->cachesize * WT_MEGABYTE;
+	cache->bytes_max = env->cache_size * WT_MEGABYTE;
 
 	/*
 	 * Initialize the cache page queues.  No server support needed, this is
@@ -112,14 +112,17 @@ __wt_cache_create(ENV *env)
 	 * all our time walking the linked list.  To help, we do put the bucket
 	 * into LRU order when looking for pages to evict.
 	 *
-	 * Size for a cache filled with 8KB pages, and 4 pages per bucket (or,
-	 * 32 buckets per MB).
+	 * By default, size for a cache filled with 8KB pages, and 4 pages per
+	 * bucket (or, 32 buckets per MB).
 	 */
-	cache->hashsize = __wt_prime(env->cachesize * 32);
-	WT_STAT_SET(ienv->stats, HASH_BUCKETS, "hash buckets", cache->hashsize);
+	cache->hash_size = env->cache_hash_size;
+	if (cache->hash_size == WT_CACHE_HASH_SIZE_DEFAULT)
+		cache->hash_size = __wt_prime(env->cache_size * 32);
+	WT_STAT_SET(
+	    ienv->stats, HASH_BUCKETS, "hash buckets", cache->hash_size);
 
 	WT_RET(
-	    __wt_calloc(env, cache->hashsize, sizeof(WT_PAGE *), &cache->hb));
+	    __wt_calloc(env, cache->hash_size, sizeof(WT_PAGE *), &cache->hb));
 
 	F_SET(cache, WT_INITIALIZED);
 	return (0);
@@ -151,7 +154,7 @@ __wt_cache_destroy(ENV *env)
 	 * There shouldn't be any modified pages, because all of the databases
 	 * have been closed.
 	 */
-	for (i = 0; i < cache->hashsize; ++i)
+	for (i = 0; i < cache->hash_size; ++i)
 		while ((page = cache->hb[i]) != NULL) {
 			__wt_cache_discard(env, page);
 			__wt_bt_page_recycle(env, page);
@@ -161,7 +164,7 @@ __wt_cache_destroy(ENV *env)
 	WT_ASSERT(env, cache->bytes_alloc == 0);
 
 	/* Discard allocated memory, and clear. */
-	__wt_free(env, cache->hb, cache->hashsize * sizeof(WT_PAGE *));
+	__wt_free(env, cache->hb, cache->hash_size * sizeof(WT_PAGE *));
 	memset(cache, 0, sizeof(cache));
 
 	return (ret);
@@ -230,7 +233,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	 *
 	 * We only report progress on every 10 writes, to minimize callbacks.
 	 */
-	for (i = 0, fcnt = 0; i < cache->hashsize; ++i) {
+	for (i = 0, fcnt = 0; i < cache->hash_size; ++i) {
 retry:		for (page = cache->hb[i]; page != NULL; page = page->next) {
 			if (page->db != db || !F_ISSET(page, WT_MODIFIED))
 				continue;
@@ -593,7 +596,7 @@ __wt_cache_srvr(void *arg)
 	cache = &env->ienv->cache;
 
 	hazard = NULL;
-	hazard_elem = env->toc_max * env->hazard_max;
+	hazard_elem = env->toc_size * env->hazard_size;
 	drain = NULL;
 	drain_len = 0;
 
@@ -649,7 +652,7 @@ __wt_cache_srvr(void *arg)
 		 * is pinned.
 		 */
 		for (drainp = drain; review_cnt > 0; ++bucket_cnt) {
-			if (bucket_cnt == cache->hashsize)
+			if (bucket_cnt == cache->hash_size)
 				bucket_cnt = 0;
 
 			for (page = cache->hb[bucket_cnt];
@@ -943,7 +946,7 @@ __wt_cache_dump(ENV *env, const char *ofile, FILE *fp)
 	fprintf(fp, "Cache dump: ==================\n");
 	page_total = 0;
 	cache = &env->ienv->cache;
-	for (i = 0; i < cache->hashsize; ++i) {
+	for (i = 0; i < cache->hash_size; ++i) {
 		sep = "";
 		page_count = 0;
 		for (page = cache->hb[i]; page != NULL; page = page->next) {

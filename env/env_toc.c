@@ -23,10 +23,10 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	ienv = env->ienv;
 	*tocp = NULL;
 
-	if (ienv->toc_cnt == env->toc_max - 1) {
+	if (ienv->toc_cnt == env->toc_size - 1) {
 		__wt_api_env_errx(env,
 		    "WiredTiger only configured to support %d thread contexts",
-		    env->toc_max);
+		    env->toc_size);
 		return (WT_ERROR);
 	}
 
@@ -41,7 +41,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	memset(toc, 0, sizeof(WT_TOC));
 
 	toc->env = env;
-	toc->hazard = toc->hazard_next = ienv->hazard + slot * env->hazard_max;
+	toc->hazard = toc->hazard_next = ienv->hazard + slot * env->hazard_size;
 
 	__wt_methods_wt_toc_lockout(toc);
 	__wt_methods_wt_toc_init_transition(toc);

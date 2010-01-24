@@ -118,7 +118,7 @@ struct __idb {
 struct __wt_cache {
 	WT_MTX mtx;			/* Cache server mutex */
 
-#define	WT_CACHE_DEFAULT_SIZE	(20)	/* 20MB */
+#define	WT_CACHE_SIZE_DEFAULT	(20)	/* 20MB */
 	u_int64_t bytes_max;		/* Maximum bytes */
 	u_int64_t bytes_alloc;		/* Allocated bytes */
 	u_int32_t pages;		/* Page count */
@@ -136,9 +136,11 @@ struct __wt_cache {
 	 * threads of control using the linked lists even while they are
 	 * being modified.
 	 */
+#define	WT_CACHE_HASH_SIZE_DEFAULT	0
+#define	WT_HASH(cache, addr)	((addr) % (cache)->hash_size)
+	u_int32_t hash_size;
+
 	WT_PAGE **hb;
-#define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
-	u_int32_t hashsize;
 
 	u_int32_t flags;
 };
@@ -172,7 +174,7 @@ struct __ienv {
 	 * code to avoid walking the entire array when only a few threads are
 	 * running.
 	 */
-#define	WT_TOC_DEFAULT_MAX	50
+#define	WT_TOC_SIZE_DEFAULT	50
 	WT_TOC	**toc;			/* TOC reference */
 	u_int32_t toc_cnt;		/* TOC count */
 	void	 *toc_array;		/* TOC array */
@@ -188,7 +190,7 @@ struct __ienv {
 	 * The hazard array is separate from the WT_TOC array because we want to
 	 * be able to easily copy and search it when draining the cache.
 	 */
-#define	WT_HAZARD_DEFAULT_MAX	5
+#define	WT_HAZARD_SIZE_DEFAULT	5
 	WT_PAGE	**hazard;		/* Hazard references array */
 
 	WT_CACHE  cache;		/* Page cache */

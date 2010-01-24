@@ -67,16 +67,29 @@ methods['wt_toc.close'] = Api(
 ###################################################
 # ENV method declarations
 ###################################################
-methods['env.cachesize_get'] = Api(
-	'env.cachesize_get',
+methods['env.cache_hash_size_get'] = Api(
+	'env.cache_hash_size_get',
 	'method, getter',
-	['cachesize/u_int32_t *@S'],
+	['cache_hash_size/u_int32_t *@S'],
 	[],
 	['init'], [])
-methods['env.cachesize_set'] = Api(
-	'env.cachesize_set',
+methods['env.cache_hash_size_set'] = Api(
+	'env.cache_hash_size_set',
 	'method, setter',
-	['cachesize/u_int32_t @S'],
+	['cache_hash_size/u_int32_t @S'],
+	[],
+	['init'], [])
+
+methods['env.cache_size_get'] = Api(
+	'env.cache_size_get',
+	'method, getter',
+	['cache_size/u_int32_t *@S'],
+	[],
+	['init'], [])
+methods['env.cache_size_set'] = Api(
+	'env.cache_size_set',
+	'method, setter',
+	['cache_size/u_int32_t @S'],
 	[],
 	['init'], [])
 
@@ -148,16 +161,16 @@ methods['env.errx'] = Api(
 	[],
 	['init'], [])
 
-methods['env.hazard_max_get'] = Api(
-	'env.hazard_max_get',
+methods['env.hazard_size_get'] = Api(
+	'env.hazard_size_get',
 	'method, getter',
-	['hazard_max/u_int32_t *@S'],
+	['hazard_size/u_int32_t *@S'],
 	[],
 	['init'], [])
-methods['env.hazard_max_set'] = Api(
-	'env.hazard_max_set',
+methods['env.hazard_size_set'] = Api(
+	'env.hazard_size_set',
 	'method, setter',
-	['hazard_max/u_int32_t @S'],
+	['hazard_size/u_int32_t @S'],
 	[],
 	['init'], ['open'])
 
@@ -219,16 +232,16 @@ methods['env.toc'] = Api(
 	['__NONE__'],
 	['open'], [])
 
-methods['env.toc_max_get'] = Api(
-	'env.toc_max_get',
+methods['env.toc_size_get'] = Api(
+	'env.toc_size_get',
 	'method, getter',
-	['toc_max/u_int32_t *@S'],
+	['toc_size/u_int32_t *@S'],
 	[],
 	['init'], [])
-methods['env.toc_max_set'] = Api(
-	'env.toc_max_set',
+methods['env.toc_size_set'] = Api(
+	'env.toc_size_set',
 	'method, setter',
-	['toc_max/u_int32_t @S'],
+	['toc_size/u_int32_t @S'],
 	[],
 	['init'], ['open'])
 

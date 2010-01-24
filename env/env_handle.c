@@ -54,9 +54,10 @@ err:	(void)__wt_env_close(env);
 static int
 __wt_env_config_default(ENV *env)
 {
-	env->cachesize = WT_CACHE_DEFAULT_SIZE;
-	env->hazard_max = WT_HAZARD_DEFAULT_MAX;
-	env->toc_max = WT_TOC_DEFAULT_MAX;
+	env->cache_hash_size = WT_CACHE_HASH_SIZE_DEFAULT;
+	env->cache_size = WT_CACHE_SIZE_DEFAULT;
+	env->hazard_size = WT_HAZARD_SIZE_DEFAULT;
+	env->toc_size = WT_TOC_SIZE_DEFAULT;
 
 	__wt_methods_env_lockout(env);
 	__wt_methods_env_init_transition(env);
@@ -83,11 +84,11 @@ __wt_ienv_config_default(ENV *env)
 	TAILQ_INIT(&ienv->fhqh);		/* File list */
 
 	/* WT_TOC and hazard arrays. */
-	WT_RET(__wt_calloc(env, env->toc_max, sizeof(WT_TOC *), &ienv->toc));
+	WT_RET(__wt_calloc(env, env->toc_size, sizeof(WT_TOC *), &ienv->toc));
 	WT_RET(
-	    __wt_calloc(env, env->toc_max, sizeof(WT_TOC), &ienv->toc_array));
+	    __wt_calloc(env, env->toc_size, sizeof(WT_TOC), &ienv->toc_array));
 	WT_RET(__wt_calloc(env,
-	   env->toc_max * env->hazard_max, sizeof(WT_PAGE *), &ienv->hazard));
+	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_ienv_stats(env, &ienv->stats));
