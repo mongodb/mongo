@@ -1561,7 +1561,7 @@ namespace mongo {
                     if ( !autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
                         break;
                 }
-                assert( syncing == 0 );
+                assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
             }
             try {
