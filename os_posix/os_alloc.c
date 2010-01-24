@@ -216,7 +216,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
  *	ANSI free function.
  */
 void
-__wt_free(ENV *env, void *p_arg, u_int32_t len)
+__wt_free_worker(ENV *env, void *p_arg, u_int32_t len)
 {
 	void *p;
 
@@ -243,7 +243,7 @@ __wt_free(ENV *env, void *p_arg, u_int32_t len)
 	 * recognizable value for debugging.
 	 */
 	if (len != 0)
-		memset(p, 0xab, len);
+		memset(p, WT_DEBUG_BYTE, len);
 #endif
 
 #ifdef HAVE_DIAGNOSTIC_MEMORY

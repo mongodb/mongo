@@ -89,8 +89,8 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 
 err:	if (fh != NULL) {
 		if (fh->name != NULL)
-			__wt_free(env, &fh->name, 0);
-		__wt_free(env, &fh, sizeof(WT_FH));
+			__wt_free(env, fh->name, 0);
+		__wt_free(env, fh, sizeof(WT_FH));
 	}
 	(void)close(fd);
 	return (ret);
@@ -122,8 +122,8 @@ __wt_close(ENV *env, WT_FH *fh)
 		ret = WT_ERROR;
 	}
 
-	__wt_free(env, &fh->name, 0);
-	__wt_free(env, &fh->stats, 0);
-	__wt_free(env, &fh, sizeof(WT_FH));
+	__wt_free(env, fh->name, 0);
+	__wt_free(env, fh->stats, 0);
+	__wt_free(env, fh, sizeof(WT_FH));
 	return (ret);
 }

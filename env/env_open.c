@@ -81,7 +81,6 @@ __wt_env_close(ENV *env)
 	/* Close down and wait for any server threads. */
 	F_CLR(ienv, WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
-
 	__wt_unlock(&ienv->cache.mtx);
 	__wt_thread_join(ienv->cache_tid);
 
@@ -92,7 +91,6 @@ __wt_env_close(ENV *env)
 	 */
 	F_CLR(ienv, WT_WORKQ_RUN);
 	WT_MEMORY_FLUSH;
-
 	__wt_thread_join(ienv->workq_tid);
 
 	/* Discard the cache. */
@@ -102,7 +100,7 @@ __wt_env_close(ENV *env)
 	WT_TRET(__wt_ienv_destroy(env, 0));
 
 	/* Free the Env structure. */
-	__wt_free(NULL, &env, sizeof(ENV));
+	__wt_free(NULL, env, sizeof(ENV));
 
 	if (ret == 0)
 		ret = secondary_err;

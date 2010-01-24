@@ -706,6 +706,32 @@ static int __wt_api_env_errpfx_set(
 	return (0);
 }
 
+static int __wt_api_env_hazard_max_get(
+	ENV *env,
+	u_int32_t *hazard_max);
+static int __wt_api_env_hazard_max_get(
+	ENV *env,
+	u_int32_t *hazard_max)
+{
+	__wt_lock(env, &env->ienv->mtx);
+	*hazard_max = env->hazard_max;
+	__wt_unlock(&env->ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_hazard_max_set(
+	ENV *env,
+	u_int32_t hazard_max);
+static int __wt_api_env_hazard_max_set(
+	ENV *env,
+	u_int32_t hazard_max)
+{
+	__wt_lock(env, &env->ienv->mtx);
+	env->hazard_max = hazard_max;
+	__wt_unlock(&env->ienv->mtx);
+	return (0);
+}
+
 static int __wt_api_env_msgcall_get(
 	ENV *env,
 	void (**msgcall)(const ENV *, const char *));
@@ -809,9 +835,40 @@ static int __wt_api_env_toc(
 	u_int32_t flags,
 	WT_TOC **tocp)
 {
+	int ret;
+
 	WT_ENV_FCHK(env, "ENV.toc", flags, WT_APIMASK_ENV_TOC);
 
-	return (__wt_env_toc(env, tocp));
+	__wt_lock(env, &env->ienv->mtx);
+	ret = __wt_env_toc(env, tocp);
+	__wt_unlock(&env->ienv->mtx);
+	return (ret);
+}
+
+static int __wt_api_env_toc_max_get(
+	ENV *env,
+	u_int32_t *toc_max);
+static int __wt_api_env_toc_max_get(
+	ENV *env,
+	u_int32_t *toc_max)
+{
+	__wt_lock(env, &env->ienv->mtx);
+	*toc_max = env->toc_max;
+	__wt_unlock(&env->ienv->mtx);
+	return (0);
+}
+
+static int __wt_api_env_toc_max_set(
+	ENV *env,
+	u_int32_t toc_max);
+static int __wt_api_env_toc_max_set(
+	ENV *env,
+	u_int32_t toc_max)
+{
+	__wt_lock(env, &env->ienv->mtx);
+	env->toc_max = toc_max;
+	__wt_unlock(&env->ienv->mtx);
+	return (0);
 }
 
 static int __wt_api_env_verbose_get(
@@ -848,12 +905,17 @@ static int __wt_api_wt_toc_close(
 	u_int32_t flags)
 {
 	ENV *env;
+	int ret;
+
 
 	env = wt_toc->env;
 
 	WT_ENV_FCHK(env, "WT_TOC.close", flags, WT_APIMASK_WT_TOC_CLOSE);
 
-	return (__wt_wt_toc_close(wt_toc));
+	__wt_lock(env, &env->ienv->mtx);
+	ret = __wt_wt_toc_close(wt_toc);
+	__wt_unlock(&env->ienv->mtx);
+	return (ret);
 }
 
 void
@@ -1045,6 +1107,12 @@ __wt_methods_env_lockout(ENV *env)
 	env->errx = (void (*)
 	    (ENV *, const char *, ...))
 	    __wt_env_lockout;
+	env->hazard_max_get = (int (*)
+	    (ENV *, u_int32_t *))
+	    __wt_env_lockout;
+	env->hazard_max_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
 	env->msgcall_get = (int (*)
 	    (ENV *, void (**)(const ENV *, const char *)))
 	    __wt_env_lockout;
@@ -1069,6 +1137,12 @@ __wt_methods_env_lockout(ENV *env)
 	env->toc = (int (*)
 	    (ENV *, u_int32_t , WT_TOC **))
 	    __wt_env_lockout;
+	env->toc_max_get = (int (*)
+	    (ENV *, u_int32_t *))
+	    __wt_env_lockout;
+	env->toc_max_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
 	env->verbose_get = (int (*)
 	    (ENV *, u_int32_t *))
 	    __wt_env_lockout;
@@ -1091,6 +1165,8 @@ __wt_methods_env_init_transition(ENV *env)
 	env->errpfx_get = __wt_api_env_errpfx_get;
 	env->errpfx_set = __wt_api_env_errpfx_set;
 	env->errx = __wt_api_env_errx;
+	env->hazard_max_get = __wt_api_env_hazard_max_get;
+	env->hazard_max_set = __wt_api_env_hazard_max_set;
 	env->msgcall_get = __wt_api_env_msgcall_get;
 	env->msgcall_set = __wt_api_env_msgcall_set;
 	env->msgfile_get = __wt_api_env_msgfile_get;
@@ -1098,6 +1174,8 @@ __wt_methods_env_init_transition(ENV *env)
 	env->open = __wt_api_env_open;
 	env->stat_clear = __wt_api_env_stat_clear;
 	env->stat_print = __wt_api_env_stat_print;
+	env->toc_max_get = __wt_api_env_toc_max_get;
+	env->toc_max_set = __wt_api_env_toc_max_set;
 	env->verbose_get = __wt_api_env_verbose_get;
 	env->verbose_set = __wt_api_env_verbose_set;
 }
@@ -1105,8 +1183,14 @@ __wt_methods_env_init_transition(ENV *env)
 void
 __wt_methods_env_open_transition(ENV *env)
 {
+	env->hazard_max_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
 	env->open = (int (*)
 	    (ENV *, const char *, mode_t , u_int32_t ))
+	    __wt_env_lockout;
+	env->toc_max_set = (int (*)
+	    (ENV *, u_int32_t ))
 	    __wt_env_lockout;
 	env->db = __wt_api_env_db;
 	env->toc = __wt_api_env_toc;

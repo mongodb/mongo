@@ -125,6 +125,8 @@ int
 __wt_cache_create(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
+void
+__wt_cache_size_check(ENV *env);
 int
 __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t));
 int
@@ -136,6 +138,8 @@ int
 __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 void *
 __wt_cache_srvr(void *arg);
+int
+__wt_cache_dump(ENV *env, const char *ofile, FILE *fp);
 void
 __wt_api_env_err(ENV *env, int error, const char *fmt, ...);
 void
@@ -178,7 +182,7 @@ __wt_realloc(ENV *env,
 int
 __wt_strdup(ENV *env, const char *str, void *retp);
 void
-__wt_free(ENV *env, void *p_arg, u_int32_t len);
+__wt_free_worker(ENV *env, void *p_arg, u_int32_t len);
 int
 __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
@@ -262,10 +266,7 @@ __wt_prime(u_int32_t n);
 void
 __wt_progress(const char *s, u_int64_t v);
 void
-__wt_toc_serialize_request(
-    WT_TOC *toc, int (*serial)(WT_TOC *), void *args, WT_SERIAL *serial_private);
-void
-__wt_toc_serialize_wait(WT_TOC *toc, WT_SERIAL *serial_private);
+__wt_toc_serialize_request(WT_TOC *toc, int (*serial)(WT_TOC *), void *args);
 int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 void

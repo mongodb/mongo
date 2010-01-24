@@ -188,7 +188,7 @@ recursive_free_node(ENV *env, WT_FREQTREE_NODE *node)
 	if (node != NULL) {
 		recursive_free_node(env, node->left);
 		recursive_free_node(env, node->right);
-		__wt_free(env, &node, sizeof(WT_FREQTREE_NODE));
+		__wt_free(env, node, sizeof(WT_FREQTREE_NODE));
 	}
 }
 
@@ -341,13 +341,13 @@ err:	if (leaves != NULL)
 	if (combined_nodes != NULL)
 		node_queue_close(env, combined_nodes);
 	if (indexed_freqs != NULL)
-		__wt_free(env, &indexed_freqs, 0);
+		__wt_free(env, indexed_freqs, 0);
 	if (node != NULL)
 		recursive_free_node(env, node);
 	if (ret != 0) {
 		if (huffman->nodes != NULL)
-			__wt_free(env, &huffman->nodes, 0);
-		__wt_free(env, &huffman, sizeof(WT_HUFFMAN_OBJ));
+			__wt_free(env, huffman->nodes, 0);
+		__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
 	}
 	return (ret);
 }
@@ -363,8 +363,8 @@ __wt_huffman_close(ENV *env, void *huffman_arg)
 
 	huffman = huffman_arg;
 
-	__wt_free(env, &huffman->nodes, 0);
-	__wt_free(env, &huffman, sizeof(WT_HUFFMAN_OBJ));
+	__wt_free(env, huffman->nodes, 0);
+	__wt_free(env, huffman, sizeof(WT_HUFFMAN_OBJ));
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -411,7 +411,7 @@ __wt_print_huffman_code(ENV *env, void *huffman_arg, u_int16_t symbol)
 			return (WT_ERROR);
 		}
 
-		__wt_free(env, &buffer, 0);
+		__wt_free(env, buffer, 0);
 	} else
 		(void)printf("Symbol out of range: %lu >= %lu\n",
 		    (u_long)symbol, (u_long)huffman->numSymbols);
@@ -626,11 +626,11 @@ node_queue_close(ENV *env, NODE_QUEUE *queue)
 	/* Freeing each element of the queue's linked list. */
 	for (elem = queue->first; elem != NULL; elem = next_elem) {
 		next_elem = elem->next;
-		__wt_free(env, &elem, sizeof(NODE_QUEUE_ELEM));
+		__wt_free(env, elem, sizeof(NODE_QUEUE_ELEM));
 	}
 
 	/* Freeing the queue record itself. */
-	__wt_free(env, &queue, sizeof(NODE_QUEUE));
+	__wt_free(env, queue, sizeof(NODE_QUEUE));
 }
 
 /*
@@ -692,5 +692,5 @@ node_queue_dequeue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE **retp)
 		queue->last = NULL;
 
 	/* Freeing the linked list element that has been dequeued */
-	__wt_free(env, &first_elem, sizeof(NODE_QUEUE_ELEM));
+	__wt_free(env, first_elem, sizeof(NODE_QUEUE_ELEM));
 }

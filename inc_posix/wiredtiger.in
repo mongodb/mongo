@@ -57,6 +57,7 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
+struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 
 /*******************************************
@@ -78,14 +79,6 @@ struct __dbt {
 };
 
 /*******************************************
- * Private serialization point
- *******************************************/
-typedef struct {
-	u_int32_t volatile api_gen;	/* API generation */
-	u_int32_t mod_gen;		/* Data modification generation */
-} WT_SERIAL;
-
-/*******************************************
  * Application thread-of-control information
  *******************************************/
 struct __wt_toc {
@@ -95,30 +88,22 @@ struct __wt_toc {
 	 * Enclosing environment, set when the WT_TOC is created (which
 	 * implies that threads-of-control are confined to an environment).
 	 *
-	 * Explicit representations of structures from queue.h.
-	 * TAILQ_ENTRY(__wt_toc) q;
+	 * If NULL, the WT_TOC entry is not currently in use.
 	 */
 	ENV	*env;			/* Operation environment */
-	struct {
-		struct __wt_toc *tqe_next;
-		struct __wt_toc **tqe_prev;
-	} q;				/* Environment's list of WT_TOCs */
 
 	DB	 *db;			/* Current database */
 	DBT	  key, data;		/* Returned key/data pairs */
 	DBT	  scratch;		/* Temporary use by anybody */
 
-	u_int32_t api_gen;		/* API generation */
-
+	/* WT_TOC serialization request. */
 	int (*
 	    volatile serial)(WT_TOC *);	/* Serialization function */
-	void	 *serial_args;		/* Serialization function argument */
-	int	  serial_ret;		/* Serialization function return */
+	void	*serial_args;		/* Serialization function argument */
+	int	 serial_ret;		/* Serialization function return */
 
-	WT_SERIAL *serial_private;	/* Private serialization reference */
-	u_int32_t  mod_gen;		/* Private serialization generation */
-
-	u_int32_t flags;
+	WT_PAGE	**hazard;		/* Hazard reference array */
+	WT_PAGE	**hazard_next;		/* Next hazard reference */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -130,6 +115,8 @@ struct __wt_toc {
 	 * WT_TOC methods: END
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
+
+	u_int32_t flags;
 };
 
 /*******************************************
@@ -297,9 +284,13 @@ struct __env {
 
 	const char *errpfx;
 
+	u_int32_t hazard_max;
+
 	void (*msgcall)(const ENV *, const char *);
 
 	FILE *msgfile;
+
+	u_int32_t toc_max;
 
 	u_int32_t verbose;
 	/*
@@ -347,6 +338,12 @@ struct __env {
 	void (*errx)(
 	    ENV *, const char *, ...);
 
+	int (*hazard_max_get)(
+	    ENV *, u_int32_t *);
+
+	int (*hazard_max_set)(
+	    ENV *, u_int32_t );
+
 	int (*msgcall_get)(
 	    ENV *, void (**)(const ENV *, const char *));
 
@@ -370,6 +367,12 @@ struct __env {
 
 	int (*toc)(
 	    ENV *, u_int32_t , WT_TOC **);
+
+	int (*toc_max_get)(
+	    ENV *, u_int32_t *);
+
+	int (*toc_max_set)(
+	    ENV *, u_int32_t );
 
 	int (*verbose_get)(
 	    ENV *, u_int32_t *);
@@ -400,7 +403,8 @@ char	*wiredtiger_version(int *, int *, int *);
  */
 #define	WT_ALLOCATED					0x00000001
 #define	WT_ASCII_ENGLISH				0x00000008
-#define	WT_CACHE_LOCK_RESTART				0x00000002
+#define	WT_CACHE_DRAIN_WAIT				0x00000001
+#define	WT_CACHE_LOCKOUT				0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000002
@@ -418,7 +422,6 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_UNFORMATTED					0x00000002
 #define	WT_VERB_ALL					0x00000002
 #define	WT_VERB_FILEOPS					0x00000001
-#define	WT_WAITING					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_CACHE				0x00000003
@@ -441,11 +444,11 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
-#define	WT_APIMASK_IENV					0x00000003
+#define	WT_APIMASK_IENV					0x00000007
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000003
 #define	WT_APIMASK_WT_PAGE				0x0000000f
-#define	WT_APIMASK_WT_TOC				0x00000003
+#define	WT_APIMASK_WT_TOC				0x00000001
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

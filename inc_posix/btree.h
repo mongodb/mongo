@@ -95,9 +95,7 @@ typedef	struct __wt_indx {
 } WT_INDX;
 
 struct __wt_page {
-	WT_SERIAL serial_private;	/* Private serialization point */
-
-	WT_PAGE volatile *next;		/* Hash queue */
+	WT_PAGE  *next;			/* Hash queue */
 	u_int32_t page_gen;		/* LRU generation number */
 
 	DB	 *db;			/* Page's backing database */
@@ -130,19 +128,14 @@ struct __wt_page {
 	u_int64_t records;		/* Records in this page and below */
 
 	/*
-	 * The flags field is volatile because threads set a PINNED flag before
-	 * letting the cache server run so in-use pages aren't pushed out of the
-	 * cache.
+	 * The drain field is set when the page is being discarded from the
+	 * cache.   Threads acquiring pages must set a hazard pointer before
+	 * checking the drain field, the cache server must set the drain field
+	 * before checking the hazard pointers.
 	 */
-#define	WT_PAGE_PIN_SET(page) do {					\
-	F_SET(page, WT_PINNED);						\
-	WT_MEMORY_FLUSH;						\
-} while (0)
-#define	WT_PAGE_PIN_CLR(page) do {					\
-	F_CLR(page, WT_PINNED);						\
-	WT_MEMORY_FLUSH;						\
-} while (0)
-	u_int32_t volatile flags;
+	u_int32_t drain;		/* Page is being actively drained */
+
+	u_int32_t flags;
 };
 
 /* Macro to walk the indexes of an in-memory page. */

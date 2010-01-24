@@ -80,33 +80,30 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_HIT		    7
 #define	WT_STAT_DB_CACHE_MISS		    8
 #define	WT_STAT_DB_READ_BY_KEY		    9
-#define	WT_STAT_DB_READ_BY_KEY_RESTART	   10
-#define	WT_STAT_DB_READ_BY_RECNO	   11
-#define	WT_STAT_DB_READ_BY_RECNO_RESTART	   12
-#define	WT_STAT_DB_WRITE_BY_KEY		   13
-#define	WT_STAT_DB_WRITE_BY_KEY_RESTART	   14
-#define	WT_STAT_IDB_STATS_TOTAL		   15
+#define	WT_STAT_DB_READ_BY_RECNO	   10
+#define	WT_STAT_DB_WRITE_BY_KEY		   11
+#define	WT_STAT_IDB_STATS_TOTAL		   12
 
 /*
  * Statistics entries for IENV_STATS
  */
 #define	WT_STAT_CACHE_ALLOC		    0
 #define	WT_STAT_CACHE_EVICT		    1
-#define	WT_STAT_CACHE_HIT		    2
-#define	WT_STAT_CACHE_LOCKOUT		    3
-#define	WT_STAT_CACHE_MISS		    4
-#define	WT_STAT_CACHE_WRITE		    5
-#define	WT_STAT_CACHE_WRITE_EVICT	    6
-#define	WT_STAT_DATABASE_OPEN		    7
-#define	WT_STAT_HASH_BUCKETS		    8
-#define	WT_STAT_LONGEST_BUCKET		    9
-#define	WT_STAT_MEMALLOC		   10
-#define	WT_STAT_MEMFREE			   11
-#define	WT_STAT_MTX_LOCK		   12
-#define	WT_STAT_TOTAL_READ_IO		   13
-#define	WT_STAT_TOTAL_WRITE_IO		   14
-#define	WT_STAT_WORKQ_PASSES		   15
-#define	WT_STAT_WORKQ_RESTARTS		   16
+#define	WT_STAT_CACHE_HAZARD_EVICT	    2
+#define	WT_STAT_CACHE_HIT		    3
+#define	WT_STAT_CACHE_LOCKOUT		    4
+#define	WT_STAT_CACHE_MISS		    5
+#define	WT_STAT_CACHE_WRITE		    6
+#define	WT_STAT_CACHE_WRITE_EVICT	    7
+#define	WT_STAT_DATABASE_OPEN		    8
+#define	WT_STAT_HASH_BUCKETS		    9
+#define	WT_STAT_LONGEST_BUCKET		   10
+#define	WT_STAT_MEMALLOC		   11
+#define	WT_STAT_MEMFREE			   12
+#define	WT_STAT_MTX_LOCK		   13
+#define	WT_STAT_TOTAL_READ_IO		   14
+#define	WT_STAT_TOTAL_WRITE_IO		   15
+#define	WT_STAT_WORKQ_PASSES		   16
 #define	WT_STAT_WORKQ_SLEEP		   17
 #define	WT_STAT_WORKQ_YIELD		   18
 #define	WT_STAT_IENV_STATS_TOTAL	   19

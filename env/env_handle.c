@@ -55,6 +55,8 @@ static int
 __wt_env_config_default(ENV *env)
 {
 	env->cachesize = WT_CACHE_DEFAULT_SIZE;
+	env->hazard_max = WT_HAZARD_DEFAULT_MAX;
+	env->toc_max = WT_TOC_DEFAULT_MAX;
 
 	__wt_methods_env_lockout(env);
 	__wt_methods_env_init_transition(env);
@@ -77,9 +79,15 @@ __wt_ienv_config_default(ENV *env)
 
 	ienv->api_gen = WT_TOC_GEN_MIN;		/* API generation */
 
-	TAILQ_INIT(&ienv->tocqh);		/* WT_TOC list */
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
 	TAILQ_INIT(&ienv->fhqh);		/* File list */
+
+	/* WT_TOC and hazard arrays. */
+	WT_RET(__wt_calloc(env, env->toc_max, sizeof(WT_TOC *), &ienv->toc));
+	WT_RET(
+	    __wt_calloc(env, env->toc_max, sizeof(WT_TOC), &ienv->toc_array));
+	WT_RET(__wt_calloc(env,
+	   env->toc_max * env->hazard_max, sizeof(WT_PAGE *), &ienv->hazard));
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_ienv_stats(env, &ienv->stats));
@@ -108,7 +116,10 @@ __wt_ienv_destroy(ENV *env, int refresh)
 		return (0);
 
 	/* Free allocated memory. */
-	__wt_free(env, &ienv->stats, 0);
+	__wt_free(env, ienv->toc, 0);
+	__wt_free(env, ienv->toc_array, 0);
+	__wt_free(env, ienv->hazard, 0);
+	__wt_free(env, ienv->stats, 0);
 
 	/*
 	 * This is the guts of the split between the public/private, ENV/IENV
@@ -125,7 +136,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	}
 
 	/* If we're truly done, discard the actual memory. */
-	__wt_free(NULL, &ienv, sizeof(IENV));
+	__wt_free(NULL, ienv, sizeof(IENV));
 	env->ienv = NULL;
 	return (0);
 }

@@ -38,13 +38,11 @@ extern "C" {
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
-struct __wt_hb;			typedef struct __wt_hb WT_HB;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
 struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
-struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
@@ -59,10 +57,11 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 #include "bitstring.h"
 
 #include "api.h"			/* Internal */
+#include "btree.h"
+#include "debug.h"
+#include "fh.h"
 #include "misc.h"
 #include "mutex.h"
-#include "fh.h"
-#include "btree.h"
 #include "stat.h"
 
 /*******************************************
@@ -71,26 +70,13 @@ struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 /*
  * We pass around WT_TOCs internally in the Btree, (rather than a DB), because
  * the DB's are free-threaded, and the WT_TOCs are per-thread.  WT_TOCs always
- * reference a DB handle, though.  The API generation number can be separately
- * incremented by calls that spend a lot of time in the library.  For example,
- * a bulk load call will increment the generation number on every loop, when it
- * is no longer pinning any pages.
+ * reference a DB handle, though.
  */
-#define	WT_TOC_API_IGNORE(toc) do {					\
-	(toc)->api_gen = WT_TOC_GEN_IGNORE;				\
-	WT_MEMORY_FLUSH;						\
-} while (0)
-#define	WT_TOC_API_RESET(toc) do {					\
-	(toc)->api_gen = (toc)->env->ienv->api_gen;			\
-	WT_MEMORY_FLUSH;						\
-} while (0)
 #define	WT_TOC_DB_INIT(toc, _db, _name) do {				\
-	WT_TOC_API_RESET(toc);						\
 	(toc)->db = (_db);						\
 	(toc)->name = (_name);						\
 } while (0)
 #define	WT_TOC_DB_CLEAR(toc) do {					\
-	WT_TOC_API_IGNORE(toc);						\
 	(toc)->db = NULL;						\
 	(toc)->name = NULL;						\
 } while (0)
@@ -129,16 +115,13 @@ struct __idb {
 /*******************************************
  * Cache object.
  *******************************************/
-struct __wt_hb {
-	WT_SERIAL serial_private;	/* Private serialization field */
-	WT_PAGE *list;			/* Linked list */
-};
 struct __wt_cache {
 	WT_MTX mtx;			/* Cache server mutex */
 
 #define	WT_CACHE_DEFAULT_SIZE	(20)	/* 20MB */
 	u_int64_t bytes_max;		/* Maximum bytes */
 	u_int64_t bytes_alloc;		/* Allocated bytes */
+	u_int32_t pages;		/* Page count */
 
 	/*
 	 * Each in-memory page is in a hash bucket based on its "address".
@@ -153,10 +136,9 @@ struct __wt_cache {
 	 * threads of control using the linked lists even while they are
 	 * being modified.
 	 */
+	WT_PAGE **hb;
 #define	WT_HASH(cache, addr)	((addr) % (cache)->hashsize)
 	u_int32_t hashsize;
-
-	WT_HB *hb;
 
 	u_int32_t flags;
 };
@@ -169,15 +151,8 @@ struct __ienv {
 
 	u_int32_t api_gen;		/* API generation number */
 
-	pthread_t workq_tid;		/* workQ thread ID */
-
 	pthread_t cache_tid;		/* Cache thread ID */
-	WT_SERIAL cache_lockout;	/* Cache lockout */
-
-	TAILQ_HEAD(			/* Locked: TOC list */
-	    __wt_toc_qh, __wt_toc) tocqh;
-	WT_TOC *toc_add;		/* Locked: TOC to add to list */
-	WT_TOC *toc_del;		/* Locked: TOC to delete from list */
+	pthread_t workq_tid;		/* workQ thread ID */
 
 	TAILQ_HEAD(
 	    __wt_db_qh, __idb) dbqh;	/* Locked: database list */
@@ -186,7 +161,37 @@ struct __ienv {
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: file ID counter */
 
-	WT_CACHE cache;			/* Page cache */
+	/*
+	 * WiredTiger allocates space for 50 simultaneous threads of control by
+	 * default.   The Env.toc_max_set method tunes this if the application
+	 * needs more.   Growing the number of threads dynamically is possible,
+	 * but tricky since the workQ is walking the array without locking it.
+	 *
+	 * There's an array of WT_TOC pointers that reference the allocated
+	 * array; we do it that way because we want an easy way for the workQ
+	 * code to avoid walking the entire array when only a few threads are
+	 * running.
+	 */
+#define	WT_TOC_DEFAULT_MAX	50
+	WT_TOC	**toc;			/* TOC reference */
+	u_int32_t toc_cnt;		/* TOC count */
+	void	 *toc_array;		/* TOC array */
+
+	/*
+	 * WiredTiger allocates space for 5 hazard references in each thread of
+	 * control, by default.  The Env.hazard_max_set method tunes this if an
+	 * application needs more, but that shouldn't happen, there's no code
+	 * path that requires more than 5 pages at a time (and if we find one,
+	 * the right change is to increase the default).  The method is there
+	 * just in case an application starts failing in the field.
+	 *
+	 * The hazard array is separate from the WT_TOC array because we want to
+	 * be able to easily copy and search it when draining the cache.
+	 */
+#define	WT_HAZARD_DEFAULT_MAX	5
+	WT_PAGE	**hazard;		/* Hazard references array */
+
+	WT_CACHE  cache;		/* Page cache */
 	u_int32_t page_gen;		/* Page cache LRU generation number */
 
 	WT_STATS *stats;		/* Environment handle statistics */

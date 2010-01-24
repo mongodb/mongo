@@ -73,13 +73,6 @@ extern "C" {
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-#ifdef HAVE_DIAGNOSTIC
-#define	WT_ASSERT(env, e)						\
-	((e) ? (void)0 : __wt_assert(env, #e, __FILE__, __LINE__))
-#else
-#define	WT_ASSERT(ienv, e)
-#endif
-
 #define	WT_DEFAULT_FORMAT(db)						\
 	default:							\
 		return (__wt_database_format(db))

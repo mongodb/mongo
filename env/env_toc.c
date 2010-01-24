@@ -9,8 +9,6 @@
 
 #include "wt_internal.h"
 
-static void __wt_toc_link_op(ENV *, WT_TOC *, int);
-
 /*
  * __wt_env_toc --
  *	WT_TOC constructor.
@@ -18,18 +16,39 @@ static void __wt_toc_link_op(ENV *, WT_TOC *, int);
 int
 __wt_env_toc(ENV *env, WT_TOC **tocp)
 {
+	IENV *ienv;
 	WT_TOC *toc;
+	u_int32_t slot;
 
+	ienv = env->ienv;
 	*tocp = NULL;
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_TOC), &toc));
-	toc->env = env;
+	if (ienv->toc_cnt == env->toc_max - 1) {
+		__wt_api_env_errx(env,
+		    "WiredTiger only configured to support %d thread contexts",
+		    env->toc_max);
+		return (WT_ERROR);
+	}
 
-	/* Initialize the methods. */
+	/*
+	 * The WT_TOC reference list is compact, the WT_TOC array is not.  Find
+	 * the first empty WT_TOC slot.
+	 */
+	for (slot = 0, toc = ienv->toc_array; toc->env != NULL; ++toc, ++slot)
+		;
+
+	/* Clear previous contents of the WT_TOC entry, they get re-used. */
+	memset(toc, 0, sizeof(WT_TOC));
+
+	toc->env = env;
+	toc->hazard = toc->hazard_next = ienv->hazard + slot * env->hazard_max;
+
 	__wt_methods_wt_toc_lockout(toc);
 	__wt_methods_wt_toc_init_transition(toc);
 
-	__wt_toc_link_op(env, toc, 1);		/* Add to the ENV's list */
+	/* Make the entry visible to the workQ. */
+	ienv->toc[ienv->toc_cnt++] = toc;
+	WT_MEMORY_FLUSH;
 
 	*tocp = toc;
 	return (0);
@@ -43,45 +62,30 @@ int
 __wt_wt_toc_close(WT_TOC *toc)
 {
 	ENV *env;
-	int ret;
+	IENV *ienv;
+	WT_TOC **tp;
 
 	env = toc->env;
-	ret = 0;
-
-	__wt_free(env, &toc->key.data, toc->key.data_len);
-	__wt_free(env, &toc->data.data, toc->data.data_len);
-	__wt_free(env, &toc->scratch.data, toc->scratch.data_len);
-
-	__wt_toc_link_op(env, toc, 0);		/* Delete from the ENV's list */
-
-	return (ret);
-}
-
-/*
- * __wt_toc_link_op --
- *	Add/delete the WT_TOC to/from the environment's list of WT_TOCs.
- */
-static void
-__wt_toc_link_op(ENV *env, WT_TOC *toc, int add_op)
-{
-	IENV *ienv;
-
 	ienv = env->ienv;
 
+	__wt_free(env, toc->key.data, toc->key.data_len);
+	__wt_free(env, toc->data.data, toc->data.data_len);
+	__wt_free(env, toc->scratch.data, toc->scratch.data_len);
+
 	/*
-	 * The workQ thread is walking the WT_TOC queue without acquiring any
-	 * kind of lock.  The way we do it is to acquire the IENV mutex and
-	 * set the toc_add/toc_del field, then return, leaving the IENV locked.
-	 * At some point, the workQ thread wakes up, adds/deletes the toc
-	 * to/from the queue, clears the toc_add/toc_del field, and releases
-	 * the mutex.
+	 * Replace the WT_TOC reference we're closing with the last entry in
+	 * the table, then clear the last entry.  As far as the walk of the
+	 * workQ is concerned, it's OK if the WT_TOC appears twice, or if it
+	 * doesn't appear at all, so these lines can race all they want.
 	 */
-	__wt_lock(env, &ienv->mtx);
-	if (add_op)
-		ienv->toc_add = toc;
-	else
-		ienv->toc_del = toc;
+	for (tp = ienv->toc; *tp != toc; ++tp)
+		;
+	--ienv->toc_cnt;
+	*tp = ienv->toc[ienv->toc_cnt];
+	ienv->toc[ienv->toc_cnt] = NULL;
 	WT_MEMORY_FLUSH;
+
+	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -89,7 +93,8 @@ int
 __wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
 {
 	IENV *ienv;
-	WT_TOC *toc;
+	WT_TOC *toc, **tp;
+	WT_PAGE **hp;
 	int do_close;
 
 	ienv = env->ienv;
@@ -97,22 +102,15 @@ __wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
 	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "%s\n", ienv->sep);
-	TAILQ_FOREACH(toc, &ienv->tocqh, q) {
-		fprintf(fp,
-		    "toc: %#lx {\n\tapi_gen: %lu, api_mod: %lu\n\tserial: ",
-		    WT_ADDR_TO_ULONG(toc),
-		    (u_long)toc->api_gen, (u_long)toc->mod_gen);
-		if (toc->serial == NULL) {
+	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
+		fprintf(fp, "toc: %#lx {\n\tserial: ", WT_ADDR_TO_ULONG(toc));
+		if (toc->serial == NULL)
 			fprintf(fp, "none");
-			if (F_ISSET(toc, WT_WAITING))
-				fprintf(fp, " (wait)");
-		} else
+		else
 			fprintf(fp, "%#lx", WT_ADDR_TO_ULONG(toc->serial));
-		if (toc->serial_private != NULL)
-			fprintf(fp, ", private: %#lx: %lu/%lu",
-			    WT_ADDR_TO_ULONG(toc->serial_private),
-			    (u_long)toc->serial_private->api_gen,
-			    (u_long)toc->serial_private->mod_gen);
+		fprintf(fp, "\n\thazard: ");
+		for (hp = toc->hazard; hp < toc->hazard_next; ++hp)
+			fprintf(fp, "%#lx ", WT_ADDR_TO_ULONG(*hp));
 		fprintf(fp, "\n}");
 		if (toc->name != NULL)
 			fprintf(fp, " %s", toc->name);
