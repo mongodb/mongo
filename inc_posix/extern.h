@@ -143,7 +143,13 @@ __wt_api_env_err(ENV *env, int error, const char *fmt, ...);
 void
 __wt_api_env_errx(ENV *env, const char *fmt, ...);
 int
-__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose);
+__wt_env_cache_size_set_verify(ENV *env, u_int32_t cache_size);
+int
+__wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size);
+int
+__wt_env_cache_hazard_size_set_verify(ENV *env, u_int32_t hazard_size);
+int
+__wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size);
 int
 __wt_library_init(void);
 int
@@ -238,6 +244,9 @@ void
 __wt_assert(ENV *env, const char *check, const char *file_name, int line_number);
 int
 __wt_api_args(ENV *env, const char *name);
+int
+__wt_api_arg_min(ENV *env,
+    const char *name, const char *arg_name, u_int32_t v, u_int32_t min);
 int
 __wt_database_format(DB *db);
 int

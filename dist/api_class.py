@@ -75,7 +75,7 @@ methods['env.cache_hash_size_get'] = Api(
 	['init'], [])
 methods['env.cache_hash_size_set'] = Api(
 	'env.cache_hash_size_set',
-	'method, setter',
+	'method, setter, verify',
 	['cache_hash_size/u_int32_t @S'],
 	[],
 	['init'], [])
@@ -88,7 +88,7 @@ methods['env.cache_size_get'] = Api(
 	['init'], [])
 methods['env.cache_size_set'] = Api(
 	'env.cache_size_set',
-	'method, setter',
+	'method, setter, verify',
 	['cache_size/u_int32_t @S'],
 	[],
 	['init'], [])
@@ -169,7 +169,7 @@ methods['env.hazard_size_get'] = Api(
 	['init'], [])
 methods['env.hazard_size_set'] = Api(
 	'env.hazard_size_set',
-	'method, setter',
+	'method, setter, verify',
 	['hazard_size/u_int32_t @S'],
 	[],
 	['init'], ['open'])
@@ -240,7 +240,7 @@ methods['env.toc_size_get'] = Api(
 	['init'], [])
 methods['env.toc_size_set'] = Api(
 	'env.toc_size_set',
-	'method, setter',
+	'method, setter, verify',
 	['toc_size/u_int32_t @S'],
 	[],
 	['init'], ['open'])

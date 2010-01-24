@@ -596,6 +596,8 @@ static int __wt_api_env_cache_hash_size_set(
 	ENV *env,
 	u_int32_t cache_hash_size)
 {
+	WT_RET((__wt_env_cache_hash_size_set_verify(env, cache_hash_size)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	env->cache_hash_size = cache_hash_size;
 	__wt_unlock(&env->ienv->mtx);
@@ -622,6 +624,8 @@ static int __wt_api_env_cache_size_set(
 	ENV *env,
 	u_int32_t cache_size)
 {
+	WT_RET((__wt_env_cache_size_set_verify(env, cache_size)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	env->cache_size = cache_size;
 	__wt_unlock(&env->ienv->mtx);
@@ -752,6 +756,8 @@ static int __wt_api_env_hazard_size_set(
 	ENV *env,
 	u_int32_t hazard_size)
 {
+	WT_RET((__wt_env_hazard_size_set_verify(env, hazard_size)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	env->hazard_size = hazard_size;
 	__wt_unlock(&env->ienv->mtx);
@@ -891,6 +897,8 @@ static int __wt_api_env_toc_size_set(
 	ENV *env,
 	u_int32_t toc_size)
 {
+	WT_RET((__wt_env_toc_size_set_verify(env, toc_size)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	env->toc_size = toc_size;
 	__wt_unlock(&env->ienv->mtx);
