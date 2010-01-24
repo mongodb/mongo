@@ -224,7 +224,7 @@ setup()
 		env->verbose_set(env, 0);
 	}
 	db->errpfx_set(db, progname);
-	assert(env->cachesize_set(env, (u_int32_t)cachesize) == 0);
+	assert(env->cache_size_set(env, (u_int32_t)cachesize) == 0);
 	assert(db->btree_pagesize_set(
 	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
 	if (huffman)
