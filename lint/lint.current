@@ -3,25 +3,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_bulk.c (C)
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  140  Warning 530: Symbol 'dup_data' (line 28) not
+../btree/bt_bulk.c  137  Warning 530: Symbol 'dup_data' (line 28) not
     initialized
 ../btree/bt_bulk.c  28  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  227  Warning 530: Symbol 'dup_key' (line 28) not
+../btree/bt_bulk.c  221  Warning 530: Symbol 'dup_key' (line 28) not
     initialized
 ../btree/bt_bulk.c  28  Info 830: Location cited in prior message
                                        _
 	WT_64_CAST(offpage_item.records) = dup_count,
-../btree/bt_bulk.c  570  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  564  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 	WT_64_CAST(offp.records) = page->records;
-../btree/bt_bulk.c  787  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  781  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                        _
 			WT_64_CAST(parent_offp->records) += increment;
-../btree/bt_bulk.c  830  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  824  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_close.c (C)
@@ -51,18 +51,18 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
 --- Module:   ../btree/bt_key.c (C)
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_key.c  258  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_key.c  256  Info 740: Unusual pointer cast (incompatible indirect
     types)
                             _
 		if (cmp == 0) {
-../btree/bt_key.c  275  Warning 644: Variable 'cmp' (line 218) may not have
+../btree/bt_key.c  273  Warning 644: Variable 'cmp' (line 216) may not have
     been initialized
-../btree/bt_key.c  218  Info 830: Location cited in prior message
+../btree/bt_key.c  216  Info 830: Location cited in prior message
                                          _
 				*ipp = ip;
-../btree/bt_key.c  278  Info 771: Symbol 'ip' (line 215) conceivably not
+../btree/bt_key.c  276  Info 771: Symbol 'ip' (line 213) conceivably not
     initialized
-../btree/bt_key.c  215  Info 830: Location cited in prior message
+../btree/bt_key.c  213  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_misc.c (C)
 
@@ -80,12 +80,12 @@ Warning 528: Symbol '__wt_bt_dump_addr(struct __db *, unsigned int, char *,
                                                                 _
 #... 4_CAST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			if (record_cnt + WT_INDX_OFFP_RECORDS(ip) >= recno)
-../btree/bt_recno.c  101  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_recno.c  100  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 #... AST(((WT_ITEM_OFFP *)WT_ITEM_BYTE((ip)->ditem))->records)
 			record_cnt += WT_INDX_OFFP_RECORDS(ip);
-../btree/bt_recno.c  103  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_recno.c  102  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_ret.c (C)
@@ -239,19 +239,27 @@ _
 --- Module:   ../env/engine.c (C)
 
 --- Module:   ../env/env_cache.c (C)
-                                            _
-	cache->bytes_max = env->cachesize * WT_MEGABYTE;
-../env/env_cache.c  101  Warning 647: Suspicious truncation
+                                                                       _
+	    ienv->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
+../env/env_cache.c  102  Warning 647: Suspicious truncation
+                                                _
+			review_cnt = cache_pages;
+../env/env_cache.c  637  Info 712: Loss of precision (assignment) (unsigned
+    long long to unsigned int)
+                                                     _
+			review_cnt = cache_pages / 20;
+../env/env_cache.c  639  Info 712: Loss of precision (assignment) (unsigned
+    long long to unsigned int)
                                                                    _
 		    sizeof(WT_DRAIN), __wt_cache_drain_compare_gen);
-../env/env_cache.c  673  Warning 668: Possibly passing a null pointer to
+../env/env_cache.c  680  Warning 668: Possibly passing a null pointer to
     function 'qsort(void *, unsigned int, unsigned int, int (*)(const void *,
-    const void *))', arg. no. 1 [Reference: file ../env/env_cache.c: line 597]
-../env/env_cache.c  597  Info 831: Reference cited in prior message
+    const void *))', arg. no. 1 [Reference: file ../env/env_cache.c: line 599]
+../env/env_cache.c  599  Info 831: Reference cited in prior message
 _
 }
-../env/env_cache.c  721  Warning 550: Symbol 'ret' (line 589) not accessed
-../env/env_cache.c  589  Info 830: Location cited in prior message
+../env/env_cache.c  728  Warning 550: Symbol 'ret' (line 591) not accessed
+../env/env_cache.c  591  Info 830: Location cited in prior message
 
 --- Module:   ../env/env_err.c (C)
                                   _
@@ -316,8 +324,8 @@ _
 --- Module:   ../support/api.c (C)
 _
 }
-../support/api.c  1202  Info 715: Symbol 'wt_toc' (line 1200) not referenced
-../support/api.c  1200  Info 830: Location cited in prior message
+../support/api.c  1236  Info 715: Symbol 'wt_toc' (line 1234) not referenced
+../support/api.c  1234  Info 830: Location cited in prior message
 
 --- Module:   ../support/cksum.c (C)
 

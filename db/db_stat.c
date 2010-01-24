@@ -23,7 +23,7 @@ __wt_db_stat_print(DB *db, FILE *stream)
 	idb = db->idb;
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
-	__wt_stat_clear_idb_dstats(idb->dstats);
+	__wt_stat_clear_database_stats(idb->dstats);
 	WT_RET(__wt_bt_stat(db));
 
 	fprintf(stream, "Database statistics: %s\n", idb->dbname);
@@ -54,8 +54,8 @@ __wt_db_stat_clear(DB *db)
 
 	idb = db->idb;
 
-	__wt_stat_clear_idb_stats(idb->stats);
-	__wt_stat_clear_idb_dstats(idb->dstats);
+	__wt_stat_clear_db_stats(idb->stats);
+	__wt_stat_clear_database_stats(idb->dstats);
 	if (idb->fh != NULL)
 		__wt_stat_clear_fh_stats(idb->fh->stats);
 

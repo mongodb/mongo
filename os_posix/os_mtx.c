@@ -84,7 +84,7 @@ __wt_lock(ENV *env, WT_MTX *mtx)
 	}
 
 	mtx->locked = 1;
-	WT_STAT_INCR(env->ienv->stats, MTX_LOCK, "mutex lock calls");
+	WT_STAT_INCR(env->ienv->stats, MTX_LOCK);
 
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;

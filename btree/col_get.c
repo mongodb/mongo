@@ -29,8 +29,7 @@ __wt_db_get_recno(
 
 	idb = db->idb;
 
-	WT_STAT_INCR(idb->stats,
-	    DB_READ_BY_RECNO, "database read-by-recno operations");
+	WT_STAT_INCR(idb->stats, DB_READ_BY_RECNO);
 
 	/* Check for a record past the end of the database. */
 	if (idb->root_page->records < recno)

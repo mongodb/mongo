@@ -119,9 +119,6 @@ struct __wt_cache {
 	WT_MTX mtx;			/* Cache server mutex */
 
 #define	WT_CACHE_SIZE_DEFAULT	(20)	/* 20MB */
-	u_int64_t bytes_max;		/* Maximum bytes */
-	u_int64_t bytes_alloc;		/* Allocated bytes */
-	u_int32_t pages;		/* Page count */
 
 	/*
 	 * Each in-memory page is in a hash bucket based on its "address".

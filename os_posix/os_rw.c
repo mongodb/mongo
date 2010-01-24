@@ -16,8 +16,8 @@
 int
 __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, READ_IO, "read I/Os");
-	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO, "total read I/Os");
+	WT_STAT_INCR(fh->stats, READ_IO);
+	WT_STAT_INCR(env->ienv->stats, TOTAL_READ_IO);
 
 	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
 		__wt_msg(env,
@@ -38,8 +38,8 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 int
 __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 {
-	WT_STAT_INCR(fh->stats, WRITE_IO, "write I/Os");
-	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO, "total write I/Os");
+	WT_STAT_INCR(fh->stats, WRITE_IO);
+	WT_STAT_INCR(env->ienv->stats, TOTAL_WRITE_IO);
 
 	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
 		__wt_msg(env,

@@ -96,8 +96,7 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 		WT_ASSERT(env, size != 0);
 
 		if (env->ienv != NULL && env->ienv->stats != NULL)
-			WT_STAT_INCR(
-			    env->ienv->stats, MEMALLOC, "memory allocations");
+			WT_STAT_INCR(env->ienv->stats, MEMALLOC);
 	}
 
 	if ((p = calloc(number, (size_t)size)) == NULL) {
@@ -148,7 +147,7 @@ __wt_realloc(ENV *env,
 	if (env != NULL) {
 		WT_ASSERT(env, bytes_to_allocate != 0);
 		if (env->ienv != NULL && env->ienv->stats != NULL)
-			WT_STAT_INCR(env->ienv->stats, MEMALLOC, NULL);
+			WT_STAT_INCR(env->ienv->stats, MEMALLOC);
 	}
 
 
@@ -200,7 +199,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMALLOC, NULL);
+		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
 
 	len = strlen(str) + 1;
 	WT_RET(__wt_calloc(env, len, 1, &p));
@@ -225,7 +224,7 @@ __wt_free_worker(ENV *env, void *p_arg, u_int32_t len)
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
-		WT_STAT_INCR(env->ienv->stats, MEMFREE, "memory frees");
+		WT_STAT_INCR(env->ienv->stats, MEMFREE);
 
 	p = *(void **)p_arg;
 	if (p == NULL)			/* ANSI C free semantics */

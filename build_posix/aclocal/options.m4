@@ -52,16 +52,4 @@ notset)	db_cv_enable_smallbuild=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_smallbuild)
 
-AH_TEMPLATE(HAVE_STATISTICS, [Define to 1 for statistics support.])
-AC_MSG_CHECKING(if --disable-statistics option specified)
-AC_ARG_ENABLE(statistics,
-	AC_HELP_STRING([--disable-statistics],
-	    [Do not configure for statistics support.]), r=set, r=notset)
-case "$r" in
-set)	db_cv_disable_statistics=yes;;
-notset)	AC_DEFINE(HAVE_STATISTICS)
-	db_cv_disable_statistics=no;;
-esac
-AC_MSG_RESULT($db_cv_disable_statistics)
-
 ])

@@ -268,18 +268,18 @@ __wt_progress(const char *s, u_int64_t v);
 void
 __wt_toc_serialize_request(WT_TOC *toc, int (*serial)(WT_TOC *), void *args);
 int
+__wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_env_stats(WT_STATS *stats);
+int
+__wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_db_stats(WT_STATS *stats);
+int
+__wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_database_stats(WT_STATS *stats);
+int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_fh_stats(WT_STATS *stats);
-int
-__wt_stat_alloc_idb_dstats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_idb_dstats(WT_STATS *stats);
-int
-__wt_stat_alloc_idb_stats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_idb_stats(WT_STATS *stats);
-int
-__wt_stat_alloc_ienv_stats(ENV *env, WT_STATS **statsp);
-void
-__wt_stat_clear_ienv_stats(WT_STATS *stats);

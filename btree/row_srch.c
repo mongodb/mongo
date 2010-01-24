@@ -30,8 +30,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 
 	idb = db->idb;
 
-	WT_STAT_INCR(idb->stats,
-	    DB_READ_BY_KEY, "database read-by-key operations");
+	WT_STAT_INCR(idb->stats, DB_READ_BY_KEY);
 
 	/*
 	 * Initialize the thread-of-control structure.
@@ -77,8 +76,7 @@ __wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data)
 
 	idb = db->idb;
 
-	WT_STAT_INCR(idb->stats,
-	    DB_WRITE_BY_KEY, "database put-by-key operations");
+	WT_STAT_INCR(idb->stats, DB_WRITE_BY_KEY);
 
 	WT_TOC_DB_INIT(toc, db, "Db.put");
 

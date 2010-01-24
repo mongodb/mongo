@@ -50,16 +50,14 @@ __wt_workq_srvr(void *arg)
 		 * If we didn't find work, yield the processor.  If we
 		 * don't find work for awhile, sleep.
 		 */
-		WT_STAT_INCR(ienv->stats, WORKQ_PASSES, "workQ queue passes");
+		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 		if (notfound++)
 			if (notfound >= 100000) {
-				WT_STAT_INCR(ienv->stats,
-				    WORKQ_SLEEP, "workQ sleeps");
+				WT_STAT_INCR(ienv->stats, WORKQ_SLEEP);
 				__wt_sleep(0, notfound);
 				notfound = 100000;
 			} else {
-				WT_STAT_INCR(ienv->stats,
-				    WORKQ_YIELD, "workQ yields");
+				WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
 				__wt_yield();
 			}
 	}

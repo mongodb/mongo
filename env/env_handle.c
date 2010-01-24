@@ -91,7 +91,7 @@ __wt_ienv_config_default(ENV *env)
 	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
 
 	/* Statistics. */
-	WT_RET(__wt_stat_alloc_ienv_stats(env, &ienv->stats));
+	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
 
 	/* Diagnostic output separator. */
 	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";

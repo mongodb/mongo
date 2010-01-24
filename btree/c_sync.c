@@ -98,7 +98,8 @@ __wt_cache_create(ENV *env)
 	WT_RET(__wt_mtx_init(&cache->mtx));	/* Cache server mutex */
 	__wt_lock(env, &cache->mtx);		/* Blocking mutex */
 
-	cache->bytes_max = env->cache_size * WT_MEGABYTE;
+	WT_STAT_SET(
+	    ienv->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
 
 	/*
 	 * Initialize the cache page queues.  No server support needed, this is
@@ -118,8 +119,7 @@ __wt_cache_create(ENV *env)
 	cache->hash_size = env->cache_hash_size;
 	if (cache->hash_size == WT_CACHE_HASH_SIZE_DEFAULT)
 		cache->hash_size = __wt_prime(env->cache_size * 32);
-	WT_STAT_SET(
-	    ienv->stats, HASH_BUCKETS, "hash buckets", cache->hash_size);
+	WT_STAT_SET(ienv->stats, HASH_BUCKETS, cache->hash_size);
 
 	WT_RET(
 	    __wt_calloc(env, cache->hash_size, sizeof(WT_PAGE *), &cache->hb));
@@ -135,12 +135,14 @@ __wt_cache_create(ENV *env)
 int
 __wt_cache_destroy(ENV *env)
 {
+	IENV *ienv;
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	u_int i;
 	int ret;
 
-	cache = &env->ienv->cache;
+	ienv = env->ienv;
+	cache = &ienv->cache;
 	ret = 0;
 
 	if (!F_ISSET(cache, WT_INITIALIZED))
@@ -161,7 +163,7 @@ __wt_cache_destroy(ENV *env)
 		}
 
 	/* There shouldn't be any allocated bytes. */
-	WT_ASSERT(env, cache->bytes_alloc == 0);
+	WT_ASSERT(env, WT_STAT(ienv->stats, CACHE_BYTES_INUSE) == 0);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->hb, cache->hash_size * sizeof(WT_PAGE *));
@@ -179,13 +181,16 @@ __wt_cache_size_check(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
+	u_int64_t bytes_inuse, bytes_max;
 
 	ienv = env->ienv;
 	cache = &ienv->cache;
 
+	bytes_inuse = WT_STAT(ienv->stats, CACHE_BYTES_INUSE);
+	bytes_max = WT_STAT(ienv->stats, CACHE_BYTES_MAX);
+
 	/* Wake the server if it's sleeping and we need it to run. */
-	if (F_ISSET(cache, WT_SERVER_SLEEPING) &&
-	    cache->bytes_alloc > cache->bytes_max) {
+	if (F_ISSET(cache, WT_SERVER_SLEEPING) && bytes_inuse > bytes_max) {
 		F_CLR(cache, WT_SERVER_SLEEPING);
 		WT_MEMORY_FLUSH;
 		__wt_unlock(&cache->mtx);
@@ -195,17 +200,17 @@ __wt_cache_size_check(ENV *env)
 	 * If we're 10% over the maximum cache, shut out page allocations until
 	 * we drain to at least 5% under the maximum cache.
 	 */
-	if (cache->bytes_alloc > cache->bytes_max + (cache->bytes_max / 10)) {
-		if (!F_ISSET(ienv, WT_CACHE_LOCKOUT)) {
-			F_SET(ienv, WT_CACHE_LOCKOUT);
-			WT_STAT_INCR(
-			    ienv->stats, CACHE_LOCKOUT, "API cache lockout");
+	if (F_ISSET(ienv, WT_CACHE_LOCKOUT)) {
+		if (bytes_inuse <= bytes_max - (bytes_max / 20)) {
+			F_CLR(ienv, WT_CACHE_LOCKOUT);
 			WT_MEMORY_FLUSH;
 		}
-	} else if (F_ISSET(ienv, WT_CACHE_LOCKOUT) &&
-	    cache->bytes_alloc <= cache->bytes_max - (cache->bytes_max / 20)) {
-		F_CLR(ienv, WT_CACHE_LOCKOUT);
-		WT_MEMORY_FLUSH;
+	} else {
+		if (bytes_inuse > bytes_max + (bytes_max / 10)) {
+			F_SET(ienv, WT_CACHE_LOCKOUT);
+			WT_MEMORY_FLUSH;
+			WT_STAT_INCR(ienv->stats, CACHE_LOCKOUT);
+		}
 	}
 }
 
@@ -286,10 +291,8 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	/* Check cache size before any allocation. */
 	WT_CACHE_DRAIN_CHECK(toc);
 
-	WT_STAT_INCR(
-	    env->ienv->stats, CACHE_ALLOC, "pages allocated in the cache");
-	WT_STAT_INCR(
-	    idb->stats, DB_CACHE_ALLOC, "pages allocated in the cache");
+	WT_STAT_INCR(env->ienv->stats, CACHE_ALLOC);
+	WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
 
 	/*
 	 * Allocate memory for the in-memory page information and for the page
@@ -356,8 +359,7 @@ retry:	/* Search for the page in the cache. */
 		if (page->addr == addr && page->db == db)
 			break;
 	if (bucket_cnt > longest_bucket_cnt) {
-		WT_STAT_SET(ienv->stats, LONGEST_BUCKET,
-		    "longest hash bucket chain search", bucket_cnt);
+		WT_STAT_SET(ienv->stats, LONGEST_BUCKET, bucket_cnt);
 		longest_bucket_cnt = bucket_cnt;
 	}
 	if (page != NULL) {
@@ -382,10 +384,8 @@ retry:	/* Search for the page in the cache. */
 			goto retry;
 		}
 
-		WT_STAT_INCR(env->ienv->stats,
-		    CACHE_HIT, "cache hit: reads found in the cache");
-		WT_STAT_INCR(idb->stats,
-		    DB_CACHE_HIT, "cache hit: reads found in the cache");
+		WT_STAT_INCR(env->ienv->stats, CACHE_HIT);
+		WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
 
 		page->page_gen = ++ienv->page_gen;
 		*pagep = page;
@@ -395,10 +395,8 @@ retry:	/* Search for the page in the cache. */
 	/* Check cache size before any allocation. */
 	WT_CACHE_DRAIN_CHECK(toc);
 
-	WT_STAT_INCR(env->ienv->stats,
-	    CACHE_MISS, "cache miss: reads not found in the cache");
-	WT_STAT_INCR(idb->stats,
-	    DB_CACHE_MISS, "cache miss: reads not found in the cache");
+	WT_STAT_INCR(env->ienv->stats, CACHE_MISS);
+	WT_STAT_INCR(idb->stats, DB_CACHE_MISS);
 
 	/*
 	 * Allocate memory for the in-memory page information and for the page
@@ -509,8 +507,8 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	*hb = page;
 
 	/* Increment total cache byte and page count. */
-	cache->bytes_alloc += bytes;
-	++cache->pages;
+	WT_STAT_INCR(ienv->stats, CACHE_PAGES);
+	WT_STAT_INCRV(ienv->stats, CACHE_BYTES_INUSE, bytes);
 
 	return (0);
 }
@@ -587,6 +585,7 @@ __wt_cache_srvr(void *arg)
 	WT_DRAIN *drain, *drainp;
 	WT_PAGE **hazard, *page;
 	WT_TOC *toc;
+	u_int64_t cache_pages;
 	u_int32_t bucket_cnt, drain_len, drain_cnt, drain_elem, hazard_elem;
 	u_int32_t review_cnt;
 	int ret;
@@ -613,10 +612,12 @@ __wt_cache_srvr(void *arg)
 		/*
 		 * If there's no work to do, go to sleep.  We check the workQ's
 		 * cache_lockout field because the workQ wants us to be more
-		 * agressive about cleaning up than we would normally be.
+		 * agressive about cleaning up than just comparing the inuse
+		 * bytes vs. the max bytes.
 		 */
 		if (!F_ISSET(ienv, WT_CACHE_LOCKOUT) &&
-		    cache->bytes_alloc <= cache->bytes_max) {
+		    WT_STAT(ienv->stats, CACHE_BYTES_INUSE) <=
+		    WT_STAT(ienv->stats, CACHE_BYTES_MAX)) {
 			F_SET(cache, WT_SERVER_SLEEPING);
 			WT_MEMORY_FLUSH;
 			__wt_lock(env, &cache->mtx);
@@ -624,18 +625,21 @@ __wt_cache_srvr(void *arg)
 		}
 
 		/*
-		 * If there are less than 20 pages, review them all.  If there
-		 * are more than 20 pages, review 2% up to a max of 100.  (I
-		 * don't know if this is a reasonable configuration; the only
-		 * hard rule is we can't review more pages than there are in
-		 * the cache, because that could result in duplicate entries
-		 * in the drain array, and that will fail.
+		 * Review 2% of the pages in the cache, with a minimum of 20
+		 * pages and a maximum of 100 pages.  (I don't know if this
+		 * is a reasonable configuration; the only hard rule is we
+		 * can't review more pages than there are in the cache, because
+		 * that could result in duplicate entries in the drain array,
+		 * and that will fail.
 		 */
-		if (cache->pages < 20)
-			review_cnt = cache->pages;
-		else  {
-			review_cnt = cache->pages / 20;
-			if (review_cnt > 100)
+		cache_pages = WT_STAT(ienv->stats, CACHE_PAGES);
+		if (cache_pages <= 20)
+			review_cnt = cache_pages;
+		else {
+			review_cnt = cache_pages / 20;
+			if (review_cnt < 20)
+				review_cnt = 20;
+			else if (review_cnt > 100)
 				review_cnt = 100;
 		}
 		if (review_cnt * sizeof(WT_DRAIN) > drain_len)
@@ -753,8 +757,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 		 * put it back into rotation, and remove from the drain list.
 		 */
 		if (hp < hazard + hazard_elem && *hp == page) {
-			WT_STAT_INCR(env->ienv->stats, CACHE_HAZARD_EVICT,
-			    "pages not evicted because of a hazard reference");
+			WT_STAT_INCR(env->ienv->stats, CACHE_HAZARD_EVICT);
 			page->drain = 0;
 			WT_MEMORY_FLUSH;
 
@@ -773,8 +776,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 		 * this with MVCC, so I'm leaving it alone for now.
 		 */
 		if (F_ISSET(page, WT_MODIFIED)) {
-			WT_STAT_INCR(env->ienv->stats, CACHE_WRITE_EVICT,
-			    "dirty pages evicted from the cache");
+			WT_STAT_INCR(env->ienv->stats, CACHE_WRITE_EVICT);
 
 			if ((ret = __wt_cache_write(env, page)) != 0) {
 				__wt_api_env_err(env, ret,
@@ -782,8 +784,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 				return (WT_ERROR);
 			}
 		} else
-			WT_STAT_INCR(env->ienv->stats, CACHE_EVICT,
-			    "clean pages evicted from the cache");
+			WT_STAT_INCR(env->ienv->stats, CACHE_EVICT);
 	}
 
 	/* No pages to drain: confused but done. */
@@ -839,15 +840,18 @@ __wt_cache_discard_serial_func(WT_TOC *toc)
 static void
 __wt_cache_discard(ENV *env, WT_PAGE *page)
 {
+	IENV *ienv;
 	WT_CACHE *cache;
 	WT_PAGE **hb, *tpage;
 
+	ienv = env->ienv;
+
 	WT_ASSERT(env, page->next != (WT_PAGE *)WT_DEBUG_BYTE);
 
-	cache = &env->ienv->cache;
-	WT_ASSERT(env, cache->bytes_alloc >= page->bytes);
-	cache->bytes_alloc -= page->bytes;
-	--cache->pages;
+	cache = &ienv->cache;
+	WT_ASSERT(env, WT_STAT(ienv->stats, CACHE_BYTES_INUSE) >= page->bytes);
+	WT_STAT_DECR(ienv->stats, CACHE_PAGES);
+	WT_STAT_DECRV(ienv->stats, CACHE_BYTES_INUSE, page->bytes);
 
 	/*
 	 * Remove the page in a safe fashion, that is, without causing problems
@@ -898,7 +902,7 @@ __wt_cache_write(ENV *env, WT_PAGE *page)
 
 	F_CLR(page, WT_MODIFIED);
 
-	WT_STAT_INCR(env->ienv->stats, CACHE_WRITE, "writes from the cache");
+	WT_STAT_INCR(env->ienv->stats, CACHE_WRITE);
 
 	return (0);
 }

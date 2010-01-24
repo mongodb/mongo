@@ -46,7 +46,7 @@ __wt_env_stat_clear(ENV *env)
 	TAILQ_FOREACH(idb, &ienv->dbqh, q)
 		WT_TRET(__wt_db_stat_clear(idb->db));
 
-	__wt_stat_clear_ienv_stats(ienv->stats);
+	__wt_stat_clear_env_stats(ienv->stats);
 	return (ret);
 }
 

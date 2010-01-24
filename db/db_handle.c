@@ -66,8 +66,8 @@ __wt_db_config_default(DB *db)
 
 	db->btree_compare = db->btree_compare_dup = __wt_bt_lex_compare;
 
-	WT_RET(__wt_stat_alloc_idb_stats(env, &idb->stats));
-	WT_RET(__wt_stat_alloc_idb_dstats(env, &idb->dstats));
+	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
+	WT_RET(__wt_stat_alloc_database_stats(env, &idb->dstats));
 
 	return (0);
 }
