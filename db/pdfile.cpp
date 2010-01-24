@@ -40,8 +40,47 @@ _ disallow system* manipulations from the database.
 #include "queryutil.h"
 #include "extsort.h"
 #include "curop.h"
+#include "background.h"
 
 namespace mongo {
+
+    map<string, unsigned> BackgroundOperation::dbsInProg;
+    set<string> BackgroundOperation::nsInProg;
+
+    bool BackgroundOperation::inProgForDb(const char *db) {
+        assertInWriteLock();
+        return dbsInProg.count(db) != 0;
+    }
+
+    bool BackgroundOperation::inProgForNs(const char *ns) { 
+        assertInWriteLock();
+        return nsInProg.count(ns) != 0;
+    }
+
+    void BackgroundOperation::assertNoBgOpInProgForDb(const char *db) { 
+        uassert(12586, "cannot perform operation: a background operation is currently running for this database",
+            !inProgForDb(db));
+    }
+
+    void BackgroundOperation::assertNoBgOpInProgForNs(const char *ns) { 
+        uassert(12587, "cannot perform operation: a background operation is currently running for this collection",
+            !inProgForNs(ns));
+    } 
+
+    BackgroundOperation::BackgroundOperation(const char *ns) : _ns(ns) { 
+        assertInWriteLock();
+        dbsInProg[_ns.db]++;
+        assert( nsInProg.count(_ns.ns()) == 0 );
+        nsInProg.insert(_ns.ns());
+    }
+
+    BackgroundOperation::~BackgroundOperation() { 
+        assertInWriteLock();
+        dbsInProg[_ns.db]--;
+        nsInProg.erase(_ns.ns());
+    }
+
+    /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
 
@@ -583,6 +622,8 @@ namespace mongo {
         NamespaceDetails* d = nsdetails(nsToDrop.c_str());
         uassert( 10086 ,  (string)"ns not found: " + nsToDrop , d );
 
+        BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
+
         NamespaceString s(nsToDrop);
         assert( s.db == cc().database()->name );
         if( s.isSystem() ) {
@@ -634,155 +675,24 @@ namespace mongo {
         log(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         assert( d );
+
+        BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
+
         if ( d->nIndexes != 0 ) {
             try { 
-                assert( deleteIndexes(d, name.c_str(), "*", errmsg, result, true) );
+                assert( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
             }
             catch( DBException& ) {
-                uasserted(12503,"drop: deleteIndexes for collection failed - consider trying repair");
+                uasserted(12503,"drop: dropIndexes for collection failed - consider trying repair");
             }
             assert( d->nIndexes == 0 );
         }
-        log(1) << "\t deleteIndexes done" << endl;
+        log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         dropNS(name);        
     }
     
-    /* delete this index.  does NOT clean up the system catalog
-       (system.indexes or system.namespaces) -- only NamespaceIndex.
-    */
-    void IndexDetails::kill_idx() {
-        string ns = indexNamespace(); // e.g. foo.coll.$ts_1
-        
-        // clean up parent namespace index cache
-        NamespaceDetailsTransient::get_w( parentNS().c_str() ).deletedIndex();
-
-        BSONObjBuilder b;
-        b.append("name", indexName().c_str());
-        b.append("ns", parentNS().c_str());
-        BSONObj cond = b.done(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-
-        /* important to catch exception here so we can finish cleanup below. */
-        try { 
-            btreeStore->drop(ns.c_str());
-        }
-        catch(DBException& ) { 
-            log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
-        }
-        head.setInvalid();
-        info.setInvalid();
-
-        // clean up in system.indexes.  we do this last on purpose.  note we have 
-        // to make the cond object before the drop() above though.
-        string system_indexes = cc().database()->name + ".system.indexes";
-        int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
-        wassert( n == 1 );
-    }
-
-    void getKeys( vector< const char * > fieldNames, vector< BSONElement > fixed, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-        BSONObjBuilder b;
-        b.appendNull( "" );
-        BSONElement nullElt = b.done().firstElement();
-        BSONElement arrElt;
-        unsigned arrIdx = ~0;
-        for( unsigned i = 0; i < fieldNames.size(); ++i ) {
-            if ( *fieldNames[ i ] == '\0' )
-                continue;
-            BSONElement e = obj.getFieldDottedOrArray( fieldNames[ i ] );
-            if ( e.eoo() )
-                e = nullElt; // no matching field
-            if ( e.type() != Array )
-                fieldNames[ i ] = ""; // no matching field or non-array match
-            if ( *fieldNames[ i ] == '\0' )
-                fixed[ i ] = e; // no need for further object expansion (though array expansion still possible)
-            if ( e.type() == Array && arrElt.eoo() ) { // we only expand arrays on a single path -- track the path here
-                arrIdx = i;
-                arrElt = e;
-            }
-            // enforce single array path here
-            uassert( 10088 ,  "cannot index parallel arrays", e.type() != Array || e.rawdata() == arrElt.rawdata() );
-        }
-        bool allFound = true; // have we found elements for all field names in the key spec?
-        for( vector< const char * >::const_iterator i = fieldNames.begin(); allFound && i != fieldNames.end(); ++i )
-            if ( **i != '\0' )
-                allFound = false;
-        if ( allFound ) {
-            if ( arrElt.eoo() ) {
-                // no terminal array element to expand
-                BSONObjBuilder b;
-                for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
-                    b.appendAs( *i, "" );
-                keys.insert( b.obj() );
-            } else {
-                // terminal array element to expand, so generate all keys
-                BSONObjIterator i( arrElt.embeddedObject() );
-                if ( i.more() ){
-                    while( i.more() ) {
-                        BSONObjBuilder b;
-                        for( unsigned j = 0; j < fixed.size(); ++j ) {
-                            if ( j == arrIdx )
-                                b.appendAs( i.next(), "" );
-                            else
-                                b.appendAs( fixed[ j ], "" );
-                        }
-                        keys.insert( b.obj() );
-                    }
-                }
-                else if ( fixed.size() > 1 ){
-                    // x : [] - need to insert undefined
-                    BSONObjBuilder b;
-                    for( unsigned j = 0; j < fixed.size(); ++j ) {
-                        if ( j == arrIdx )
-                            b.appendUndefined( "" );
-                        else
-                            b.appendAs( fixed[ j ], "" );
-                    }
-                    keys.insert( b.obj() );
-                }
-            }
-        } else {
-            // nonterminal array element to expand, so recurse
-            assert( !arrElt.eoo() );
-            BSONObjIterator i( arrElt.embeddedObject() );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                if ( e.type() == Object )
-                    getKeys( fieldNames, fixed, e.embeddedObject(), keys );
-            }
-        }
-    }
-
-    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys ) {
-        BSONObjIterator i( keyPattern );
-        vector< const char * > fieldNames;
-        vector< BSONElement > fixed;
-        BSONObjBuilder nullKey;
-        while( i.more() ) {
-            fieldNames.push_back( i.next().fieldName() );
-            fixed.push_back( BSONElement() );
-            nullKey.appendNull( "" );
-        }
-        getKeys( fieldNames, fixed, obj, keys );
-        if ( keys.empty() )
-            keys.insert( nullKey.obj() );
-    }
-
-    /* Pull out the relevant key objects from obj, so we
-       can index them.  Note that the set is multiple elements
-       only when it's a "multikey" array.
-       Keys will be left empty if key not found in the object.
-    */
-    void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        BSONObj keyPattern = info.obj().getObjectField("key"); // e.g., keyPattern == { ts : 1 }
-        if ( keyPattern.objsize() == 0 ) {
-            out() << keyPattern.toString() << endl;
-            out() << info.obj().toString() << endl;
-            assert(false);
-        }
-        mongo::getKeysFromObject( keyPattern, obj, keys );
-    }
-
     int nUnindexes = 0;
 
     void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
@@ -894,60 +804,6 @@ namespace mongo {
         NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
     }
 
-    void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
-        BSONObjSetDefaultOrder::iterator i = l.begin();
-        BSONObjSetDefaultOrder::iterator j = r.begin();
-        while ( 1 ) {
-            if ( i == l.end() )
-                break;
-            while ( j != r.end() && j->woCompare( *i ) < 0 )
-                j++;
-            if ( j == r.end() || i->woCompare(*j) != 0  ) {
-                const BSONObj *jo = &*i;
-                diff.push_back( (BSONObj *) jo );
-            }
-            i++;
-        }
-    }
-
-    struct IndexChanges/*on an update*/ {
-        BSONObjSetDefaultOrder oldkeys;
-        BSONObjSetDefaultOrder newkeys;
-        vector<BSONObj*> removed; // these keys were removed as part of the change
-        vector<BSONObj*> added;   // these keys were added as part of the change
-
-        void dupCheck(IndexDetails& idx) {
-            if( added.empty() || !idx.unique() )
-                return;
-            for( vector<BSONObj*>::iterator i = added.begin(); i != added.end(); i++ )
-                uassert( 11001 , "E11001 duplicate key on update", !idx.hasKey(**i));
-        }
-    };
-
-    inline void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
-        v.resize(d.nIndexes);
-        NamespaceDetails::IndexIterator i = d.ii();
-        while( i.more() ) {
-            int j = i.pos();
-            IndexDetails& idx = i.next();
-            BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }
-            IndexChanges& ch = v[j];
-            idx.getKeysFromObject(oldObj, ch.oldkeys);
-            idx.getKeysFromObject(newObj, ch.newkeys);
-            if( ch.newkeys.size() > 1 ) 
-                d.setIndexIsMultikey(j);
-            setDifference(ch.oldkeys, ch.newkeys, ch.removed);
-            setDifference(ch.newkeys, ch.oldkeys, ch.added);
-        }
-    }
-
-    inline void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d) {
-        NamespaceDetails::IndexIterator i = d.ii();
-        while( i.more() ) {
-            int j = i.pos();
-            v[j].dupCheck(i.next());
-        }
-    }
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
@@ -999,7 +855,8 @@ namespace mongo {
         d->paddingFits();
 
         /* have any index keys changed? */
-        if( d->nIndexes ) {
+        {
+            unsigned keyUpdates = 0;
             for ( int x = 0; x < d->nIndexes; x++ ) {
                 IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
@@ -1013,6 +870,7 @@ namespace mongo {
                 }
                 assert( !dl.isNull() );
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
+                keyUpdates += changes[x].added.size();
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
@@ -1025,11 +883,10 @@ namespace mongo {
                         out() << " caught assertion update index " << idx.indexNamespace() << '\n';
                         problem() << " caught assertion update index " << idx.indexNamespace() << endl;
                     }
-                    if ( cc().database()->profile )
-                        ss << "\n" << changes[x].added.size() << " key updates ";
                 }
-
             }
+            if( keyUpdates && cc().database()->profile )
+                ss << '\n' << keyUpdates << " key updates ";
         }
 
         //	update in place
@@ -1099,8 +956,7 @@ namespace mongo {
         }
     }
 
-    /* _ TODO dropDups 
-     */
+    // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         //        testSorting();
         Timer t;
@@ -1151,9 +1007,9 @@ namespace mongo {
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             ProgressMeter pm2( nkeys , 10 );
             while( i->more() ) { 
+                RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
 
-                //                cout<<"TEMP SORTER next " << d.first.toString() << endl;
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }
@@ -1186,48 +1042,117 @@ namespace mongo {
         return n;
     }
 
-    /* note there are faster ways to build an index in bulk, that can be
-       done eventually */
-    int addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-        bool dupsAllowed = !idx.unique();
-        bool dropDups = idx.dropDups();
+    class BackgroundIndexBuildJob : public BackgroundOperation { 
 
-        int n = 0;
-        auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-        while ( c->ok() ) {
-            BSONObj js = c->current();
-            try { 
-                _indexRecord(d, idxNo, js, c->currLoc(),dupsAllowed);
-                c->advance();
-            } catch( AssertionException& e ) { 
-                if ( dropDups ) {
-                    DiskLoc toDelete = c->currLoc();
-                    c->advance();
-                    theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
-                } else {
-                    _log() << endl;
-                    log(2) << "addExistingToIndex exception " << e.what() << endl;
-                    throw;
-                }
+        unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+            bool dupsAllowed = !idx.unique();
+            bool dropDups = idx.dropDups();
+
+            unsigned long long n = 0;
+            auto_ptr<ClientCursor> cc;
+            {
+                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                cc.reset( new ClientCursor(c, ns, false) );
             }
-            n++;
-        };
-        return n;
-    }
+            CursorId id = cc->cursorid;
 
-    void buildIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+            while ( cc->c->ok() ) {
+                BSONObj js = cc->c->current();
+                try { 
+                    _indexRecord(d, idxNo, js, cc->c->currLoc(), dupsAllowed);
+                    cc->c->advance();
+                } catch( AssertionException& e ) { 
+                    if ( dropDups ) {
+                        DiskLoc toDelete = cc->c->currLoc();
+                        cc->c->advance();
+                        cc->updateLocation();
+                        theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
+                        if( ClientCursor::find(id, false) == 0 ) {
+                            cc.release();
+                            uasserted(12585, "cursor gone during bg index; dropDups");
+                            break;
+                        }
+                    } else {
+                        log() << "background addExistingToIndex exception " << e.what() << endl;
+                        throw;
+                    }
+                }
+                n++;
+
+                if ( n % 128 == 0 && !cc->yield() ) {
+                    cc.release();
+                    uasserted(12584, "cursor gone during bg index");
+                    break;
+                }
+            };
+            return n;
+        }
+
+        /* we do set a flag in the namespace for quick checking, but this is our authoritative info - 
+           that way on a crash/restart, we don't think we are still building one. */
+        set<NamespaceDetails*> bgJobsInProgress;
+
+        void prep(const char *ns, NamespaceDetails *d) {
+            assertInWriteLock();
+            bgJobsInProgress.insert(d);
+            d->backgroundIndexBuildInProgress = 1;
+            d->nIndexes--;
+        }
+        void done(NamespaceDetails *d) {
+            d->nIndexes++;
+            d->backgroundIndexBuildInProgress = 0;
+            assertInWriteLock();
+        }
+
+    public:
+        BackgroundIndexBuildJob(const char *ns) : BackgroundOperation(ns) { }
+
+        unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+            unsigned long long n = 0;
+
+            prep(ns.c_str(), d);
+            assert( idxNo == d->nIndexes );
+            try { 
+                idx.head = BtreeBucket::addBucket(idx);
+                n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+            }
+            catch(...) { 
+                if( cc().database() && nsdetails(ns.c_str()) == d ) {
+                    assert( idxNo == d->nIndexes );
+                    done(d);
+                }
+                else {
+                    log() << "ERROR: db gone during bg index?" << endl;
+                }
+                throw;
+            }
+            assert( idxNo == d->nIndexes );
+            done(d);
+            return n;
+        }
+    };
+
+    // throws DBException
+    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
         Timer t;
 		unsigned long long n;
-        if( 1 ) {
-			//cout << "fastBuild\n";
+
+        BSONObj info = idx.info.obj();
+        bool background = info["background"].trueValue();
+        if( background ) { 
+            log() << "WARNING: background index build not yet implemented" << endl;
+            assert(false);
+        }
+
+        if( !background ) {
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
 		else {
-			cout << "oldBuild\n";
-			idx.head = BtreeBucket::addBucket(idx);
-			n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+            assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
+            BackgroundIndexBuildJob j(ns.c_str());
+            n = j.go(ns, d, idx, idxNo);
 		}
         log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
@@ -1289,17 +1214,6 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), true);
     }
 
-    // should be { <something> : <simpletype[1|-1]>, .keyp.. } 
-    bool validKeyPattern(BSONObj kp) { 
-        BSONObjIterator i(kp);
-        while( i.moreWithEOO() ) { 
-            BSONElement e = i.next();
-            if( e.type() == Object || e.type() == Array ) 
-                return false;
-        }
-        return true;
-    }
-
 #pragma pack(1)
     struct IDToInsert_ { 
         char type;
@@ -1329,6 +1243,27 @@ namespace mongo {
         return loc;
     }
 
+    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection);
+
+    // We are now doing two btree scans for all unique indexes (one here, and one when we've
+    // written the record to the collection.  This could be made more efficient inserting
+    // dummy data here, keeping pointers to the btree nodes holding the dummy data and then
+    // updating the dummy data with the DiskLoc of the real record.    
+    void checkNoIndexConflicts( NamespaceDetails *d, const BSONObj &obj ) {
+        for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
+            if( d->idx(idxNo).unique() ) {
+                IndexDetails& idx = d->idx(idxNo);
+                BSONObjSetDefaultOrder keys;
+                idx.getKeysFromObject(obj, keys);
+                BSONObj order = idx.keyPattern();
+                for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
+                    uassert( 12582, "duplicate key insert for unique index of capped collection",
+                            idx.head.btree()->findSingle(idx, idx.head, *i ).isNull() );
+                }
+            }
+        }        
+    }
+    
     /* note: if god==true, you may pass in obuf of NULL and then populate the returned DiskLoc 
              after the call -- that will prevent a double buffer copy in some cases (btree.cpp).
     */
@@ -1374,57 +1309,14 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
+            /* we can't build a new index for the ns if a build is already in progress in the background - 
+               EVEN IF this is a foreground build.
+               */
+            uassert(12588, "cannot add index with a background operation in progress", 
+                !BackgroundOperation::inProgForNs(tabletoidxns.c_str()));
             BSONObj io((const char *) obuf);
-            const char *name = io.getStringField("name"); // name of the index
-            tabletoidxns = io.getStringField("ns");  // table it indexes
-            uassert( 10096 ,  "invalid ns to index" , tabletoidxns.size() && tabletoidxns.find( '.' ) != string::npos );
-            if ( cc().database()->name != nsToDatabase(tabletoidxns.c_str()) ) {
-                uassert( 10097 , "bad table to index name on add index attempt", false);
+            if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();
-            }
-
-            BSONObj key = io.getObjectField("key");
-            if( !validKeyPattern(key) ) {
-                string s = string("bad index key pattern ") + key.toString();
-                uassert( 10098 , s.c_str(), false);
-            }
-            if ( *name == 0 || tabletoidxns.empty() || key.isEmpty() || key.objsize() > 2048 ) {
-                out() << "user warning: bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
-                    tabletoidxns << "\n  ourns:" << ns;
-                out() << "\n  idxobj:" << io.toString() << endl;
-                string s = "bad add index attempt " + tabletoidxns + " key:" + key.toString();
-                uasserted(12504, s);
-            }
-            tableToIndex = nsdetails(tabletoidxns.c_str());
-            if ( tableToIndex == 0 ) {
-                // try to create it
-                string err;
-                if ( !userCreateNS(tabletoidxns.c_str(), BSONObj(), err, false) ) {
-                    problem() << "ERROR: failed to create collection while adding its index. " << tabletoidxns << endl;
-                    return DiskLoc();
-                }
-                tableToIndex = nsdetails(tabletoidxns.c_str());
-                log() << "info: creating collection " << tabletoidxns << " on add index\n";
-                assert( tableToIndex );
-            }
-            if ( tableToIndex->findIndexByName(name) >= 0 ) {
-                // index already exists.
-                return DiskLoc();
-            }
-            if ( tableToIndex->nIndexes >= NamespaceDetails::NIndexesMax ) {
-                stringstream ss;
-                ss << "add index fails, too many indexes for " << tabletoidxns << " key:" << key.toString();
-                string s = ss.str();
-                log() << s << '\n';
-                uasserted(12505,s);
-            }
-            if ( !god && IndexDetails::isIdIndexPattern( key ) ) {
-                ensureHaveIdIndex( tabletoidxns.c_str() );
-                return DiskLoc();
-            }
-            //indexFullNS = tabletoidxns;
-            //indexFullNS += ".$";
-            //indexFullNS += name; // database.table.$index -- note this doesn't contain jsobjs, it contains BtreeBuckets.
         }
 
         const BSONElement *newId = &writeId;
@@ -1458,6 +1350,13 @@ namespace mongo {
             d->paddingFactor = 1.0;
             lenWHdr = len + Record::HeaderSize;
         }
+        
+        // If the collection is capped, check if the new object will violate a unique index
+        // constraint before allocating space.
+        if ( d->nIndexes && d->capped && !god ) {
+            checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
+        }
+        
         DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
         if ( loc.isNull() ) {
             // out of space
@@ -1521,9 +1420,9 @@ namespace mongo {
             IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str()); // clear transient info caches so they refresh; increments nIndexes
             idx.info = loc;
             try {
-                buildIndex(tabletoidxns, tableToIndex, idx, idxNo);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo);
             } catch( DBException& ) {
-                // save our error msg string as an exception on deleteIndexes will overwrite our message
+                // save our error msg string as an exception on dropIndexes will overwrite our message
                 LastError *le = lastError.get();
                 assert( le );
                 string saveerrmsg = le->msg;
@@ -1533,7 +1432,7 @@ namespace mongo {
                 string name = idx.indexName();
                 BSONObjBuilder b;
                 string errmsg;
-                bool ok = deleteIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
+                bool ok = dropIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
@@ -1549,7 +1448,8 @@ namespace mongo {
             } 
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index
-                if( tableToIndex || d->capped ) { 
+                if( tableToIndex || d->capped ) {
+                    massert( 12583, "unexpected index insertion failure on capped collection", !d->capped );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
                     uassert_nothrow(s.c_str());
@@ -1623,13 +1523,15 @@ namespace mongo {
 
     void dropDatabase(const char *ns) {
         // ns is of the form "<dbname>.$cmd"
-        char cl[256];
-        nsToDatabase(ns, cl);
-        log(1) << "dropDatabase " << cl << endl;
-        assert( cc().database()->name == cl );
+        char db[256];
+        nsToDatabase(ns, db);
+        log(1) << "dropDatabase " << db << endl;
+        assert( cc().database()->name == db );
 
-        closeDatabase( cl );
-        _deleteDataFiles(cl);
+        BackgroundOperation::assertNoBgOpInProgForDb(db);
+
+        closeDatabase( db );
+        _deleteDataFiles(db);
     }
 
     typedef boost::filesystem::path Path;
@@ -1736,6 +1638,8 @@ namespace mongo {
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
 
+        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
+
         boost::intmax_t totalSize = dbSize( dbName );
         boost::intmax_t freeSize = freeSpace();
         if ( freeSize > -1 && freeSize < totalSize ) {
@@ -1815,7 +1719,7 @@ namespace mongo {
 
     NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
-    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result ){
+    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ){
         log(2) << "DatabaseHolder::closeAll path:" << path << endl;
         dbMutex.assertWriteLocked();
         
@@ -1833,7 +1737,10 @@ namespace mongo {
             string name = *i;
             log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             setClient( name.c_str() , path );
-            closeDatabase( name.c_str() , path );
+            if( !force && BackgroundOperation::inProgForDb(name.c_str()) )
+                log() << "WARNING: can't close database " << name << "because a bg job is in progress - try killOp command" << endl;
+            else
+                closeDatabase( name.c_str() , path );
             bb.append( bb.numStr( n++ ).c_str() , name );
         }
         bb.done();

@@ -75,6 +75,10 @@ namespace mongo {
         NamespaceString( const char * ns ) { init(ns); }
         NamespaceString( const string& ns ) { init(ns.c_str()); }
 
+        string ns() const { 
+            return db + '.' + coll;
+        }
+
         bool isSystem() { 
             return strncmp(coll.c_str(), "system.", 7) == 0;
         }
@@ -99,6 +103,10 @@ namespace mongo {
             string s = string(buf) + "$extra";
             massert( 10348 , "ns name too long", s.size() < MaxNsLen);
             return s;
+        }
+        bool isExtra() const { 
+            const char *p = strstr(buf, "$extra");
+            return p && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
         }
 
         void kill() {
@@ -133,8 +141,18 @@ namespace mongo {
             return old + "." + local;
         }
 
+        operator string() const {
+            return (string)buf;
+        }
+
         char buf[MaxNsLen];
     };
+
+}
+
+#include "index.h"
+
+namespace mongo {
 
     /**
        @return true if a client can modify this namespace
@@ -148,115 +166,6 @@ namespace mongo {
     */
     const int Buckets = 19;
     const int MaxBucket = 18;
-
-	/* Maximum # of indexes per collection.  We need to raise this limit at some point.  
-	   (Backward datafile compatibility is main issue with changing.)
-	*/
-//    const int MaxIndexes = 10;
-
-	/* Details about a particular index. There is one of these effectively for each object in 
-	   system.namespaces (although this also includes the head pointer, which is not in that 
-	   collection).
-	 */
-    class IndexDetails {
-    public:
-        DiskLoc head; /* btree head disk location */
-
-        /* Location of index info object. Format:
-
-             { name:"nameofindex", ns:"parentnsname", key: {keypattobject}[, unique: <bool>] }
-
-           This object is in the system.indexes collection.  Note that since we
-           have a pointer to the object here, the object in system.indexes MUST NEVER MOVE.
-        */
-        DiskLoc info;
-
-        /* extract key value from the query object
-           e.g., if key() == { x : 1 },
-                 { x : 70, y : 3 } -> { x : 70 }
-        */
-        BSONObj getKeyFromQuery(const BSONObj& query) const {
-            BSONObj k = keyPattern();
-            BSONObj res = query.extractFieldsUnDotted(k);
-            return res;
-        }
-
-        /* pull out the relevant key objects from obj, so we
-           can index them.  Note that the set is multiple elements
-           only when it's a "multikey" array.
-           keys will be left empty if key not found in the object.
-        */
-        void getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const;
-
-        /* get the key pattern for this object.
-           e.g., { lastname:1, firstname:1 }
-        */
-        BSONObj keyPattern() const {
-            return info.obj().getObjectField("key");
-        }
-
-        /* true if the specified key is in the index */
-        bool hasKey(const BSONObj& key);
-
-        // returns name of this index's storage area
-        // database.table.$index
-        string indexNamespace() const {
-            BSONObj io = info.obj();
-            string s;
-            s.reserve(Namespace::MaxNsLen);
-            s = io.getStringField("ns");
-            assert( !s.empty() );
-            s += ".$";
-            s += io.getStringField("name");
-            return s;
-        }
-
-        string indexName() const { // e.g. "ts_1"
-            BSONObj io = info.obj();
-            return io.getStringField("name");
-        }
-
-        static bool isIdIndexPattern( const BSONObj &pattern ) {
-            BSONObjIterator i(pattern);
-            BSONElement e = i.next();
-            if( strcmp(e.fieldName(), "_id") != 0 ) return false;
-            return i.next().eoo();            
-        }
-        
-        /* returns true if this is the _id index. */
-        bool isIdIndex() const { 
-            return isIdIndexPattern( keyPattern() );
-        }
-
-        /* gets not our namespace name (indexNamespace for that),
-           but the collection we index, its name.
-           */
-        string parentNS() const {
-            BSONObj io = info.obj();
-            return io.getStringField("ns");
-        }
-
-        bool unique() const { 
-            BSONObj io = info.obj();
-            return io["unique"].trueValue() || 
-                /* temp: can we juse make unique:true always be there for _id and get rid of this? */
-                isIdIndex();
-        }
-
-        /* if set, when building index, if any duplicates, drop the duplicating object */
-        bool dropDups() const {
-            return info.obj().getBoolField( "dropDups" );
-        }
-
-        /* delete this index.  does NOT clean up the system catalog
-           (system.indexes or system.namespaces) -- only NamespaceIndex.
-        */
-        void kill_idx();
-
-        operator string() const {
-            return info.obj().toString();
-        }
-    };
 
     extern int bucketSizes[];
 
@@ -285,6 +194,9 @@ namespace mongo {
 
         BOOST_STATIC_ASSERT( NIndexesMax == NIndexesBase + NIndexesExtra );
 
+        /* called when loaded from disk */
+        void onLoad(const Namespace& k);
+
         NamespaceDetails( const DiskLoc &loc, bool _capped ) {
             /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
             firstExtent = lastExtent = capExtent = loc;
@@ -307,6 +219,7 @@ namespace mongo {
             multiKeyIndexBits = 0;
             reservedA = 0;
             extraOffset = 0;
+            backgroundIndexBuildInProgress = 0;
             memset(reserved, 0, sizeof(reserved));
         }
         DiskLoc firstExtent;
@@ -346,8 +259,12 @@ namespace mongo {
         unsigned long long reservedA;
         long long extraOffset; // where the $extra info is located (bytes relative to this)
     public:
-        char reserved[80];
+        int backgroundIndexBuildInProgress; // 1 if in prog
+        char reserved[76];
 
+        /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so, 
+                 this isn't thread safe.  TODO
+        */
         enum NamespaceFlags {
             Flag_HaveIdIndex = 1 << 0, // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
             Flag_CappedDisallowDelete = 1 << 1 // set when deletes not allowed during capped table allocation.
@@ -401,7 +318,7 @@ namespace mongo {
 
         /* multikey indexes are indexes where there are more than one key in the index
              for a single document. see multikey in wiki.
-           for these, we have to do some dedup object on queries.
+           for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) {
             return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0;
@@ -447,6 +364,16 @@ namespace mongo {
             IndexIterator i = ii();
             while( i.more() ) {
                 if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
+                    return i.pos()-1;
+            }
+            return -1;
+        }
+
+        //returns offset in indexes[]
+        int findIndexByKeyPattern(const BSONObj& keyPattern) {
+            IndexIterator i = ii();
+            while( i.more() ) {
+                if( i.next().keyPattern() == keyPattern ) 
                     return i.pos()-1;
             }
             return -1;
@@ -508,7 +435,7 @@ namespace mongo {
         DiskLoc __stdAlloc(int len);
         DiskLoc __capAlloc(int len);
         DiskLoc _alloc(const char *ns, int len);
-        void compact();
+        void compact(); // combine adjacent deleted records
 
         DiskLoc &firstDeletedInCapExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
@@ -563,6 +490,19 @@ namespace mongo {
             if ( !_keysComputed )
                 computeIndexKeys();
             return _indexKeys;
+        }
+
+        /* IndexSpec caching */
+    private:
+        map<const IndexDetails*,IndexSpec> _indexSpecs;
+    public:
+        const IndexSpec& getIndexSpec( const IndexDetails * details ){
+            DEV assertInWriteLock();
+            IndexSpec& spec = _indexSpecs[details];
+            if ( spec.meta.isEmpty() ){
+                spec.reset( details->info );
+            }
+            return spec;
         }
 
         /* query cache (for query optimizer) ------------------------------------- */
@@ -626,9 +566,9 @@ namespace mongo {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
     public:
         NamespaceIndex(const string &dir, const string &database) :
-        ht( 0 ),
-        dir_( dir ),
-        database_( database ) {}
+          ht( 0 ),
+          dir_( dir ),
+          database_( database ) {}
 
         /* returns true if new db will be created if we init lazily */
         bool exists() const;

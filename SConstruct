@@ -293,6 +293,7 @@ def addExtraLibs( s ):
     for x in s.split(","):
         env.Append( CPPPATH=[ x + "/include" ] )
         env.Append( LIBPATH=[ x + "/lib" ] )
+        env.Append( LIBPATH=[ x + "/lib64" ] )
         extraLibPlaces.append( x + "/lib" )
 
 if GetOption( "extrapath" ) is not None:
@@ -313,7 +314,7 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp" ]
 commonFiles += Glob( "util/*.c" )
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp client/parallel.cpp client/quorum.cpp" )
+commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp client/parallel.cpp client/syncclusterconnection.cpp" )
 commonFiles += [ "scripting/engine.cpp" ]
 
 #mmap stuff
@@ -333,7 +334,7 @@ else:
 coreDbFiles = []
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/dbstats.cpp db/database.cpp db/pdfile.cpp db/index.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
 
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
 
@@ -1167,6 +1168,8 @@ def runShellTest( env, target, source ):
     elif target == "smokeJsPerf":
         g = Glob( jsSpec( [ "perf" ] ) )
         spec = [ x.abspath for x in g ]
+    elif target == "smokeJsSlow":
+        spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
     else:
         print( "invalid target for runShellTest()" )
         Exit( 1 )
@@ -1180,6 +1183,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
+    addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
 

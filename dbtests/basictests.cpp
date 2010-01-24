@@ -182,6 +182,51 @@ namespace BasicTests {
         };
 
     }
+
+    class sleeptest {
+    public:
+        void run(){
+            Timer t;
+            sleepsecs( 1 );
+            ASSERT_EQUALS( 1 , t.seconds() );
+
+            t.reset();
+            sleepmicros( 1527123 );
+            ASSERT( t.micros() > 1000000 );
+            ASSERT( t.micros() < 2000000 );
+
+            t.reset();
+            sleepmillis( 1727 );
+            ASSERT( t.millis() >= 1000 );
+            ASSERT( t.millis() <= 2000 );
+
+        }
+        
+    };
+
+    class AssertTests {
+    public:
+
+        int x;
+
+        AssertTests(){
+            x = 0;
+        }
+
+        string foo(){
+            x++;
+            return "";
+        }
+        void run(){
+            uassert( -1 , foo() , 1 );
+            ASSERT_EQUALS( 0 , x );
+            try {
+                uassert( -1 , foo() , 0 );
+            }
+            catch ( ... ){}
+            ASSERT_EQUALS( 1 , x );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -196,6 +241,9 @@ namespace BasicTests {
             add< stringbuildertests::simple2 >();
             add< stringbuildertests::reset1 >();
             add< stringbuildertests::reset2 >();
+
+            add< sleeptest >();
+            add< AssertTests >();
         }
     } myall;
     

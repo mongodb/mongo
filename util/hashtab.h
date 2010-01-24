@@ -38,7 +38,7 @@ namespace mongo {
     class Key,
     class Type
     >
-    class HashTable {
+    class HashTable : boost::noncopyable {
     public:
         const char *name;
         struct Node {
@@ -61,11 +61,16 @@ namespace mongo {
             int i = h % n;
             int start = i;
             int chain = 0;
+            int firstNonUsed = -1;
             while ( 1 ) {
                 if ( !nodes[i].inUse() ) {
-                    return i;
+                    if ( firstNonUsed < 0 )
+                        firstNonUsed = i;
                 }
+
                 if ( nodes[i].hash == h && nodes[i].k == k ) {
+                    if ( chain >= 200 )
+                        out() << "warning: hashtable " << name << " long chain " << endl;
                     found = true;
                     return i;
                 }
@@ -77,11 +82,11 @@ namespace mongo {
                     return -1;
                 }
                 if( chain >= maxChain ) { 
+                    if ( firstNonUsed >= 0 )
+                        return firstNonUsed;
                     out() << "error: hashtable " << name << " max chain n:" << n << endl;
                     return -1;
                 }
-                if ( chain == 200 )
-                    out() << "warning: hashtable " << name << " long chain " << endl;
             }
         }
 
@@ -112,7 +117,7 @@ namespace mongo {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
-//TEMP                nodes[i].k.kill();
+                nodes[i].k.kill();
                 nodes[i].setUnused();
             }
         }
@@ -141,7 +146,17 @@ namespace mongo {
             nodes[i].value = value;
             return true;
         }
-
+        
+        typedef void (*IteratorCallback)( const Key& k , Type& v );
+        
+        void iterAll( IteratorCallback callback ){
+            for ( int i=0; i<n; i++ ){
+                if ( ! nodes[i].inUse() )
+                    continue;
+                callback( nodes[i].k , nodes[i].value );
+            }
+        }
+    
     };
 
 #pragma pack()

@@ -327,6 +327,15 @@ namespace mongo {
                     }
             }
             break;
+
+        case Code:
+            s << ascode();
+            break;
+
+        case Timestamp:
+            s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
+            break;
+
         default:
             stringstream ss;
             ss << "Cannot create a properly formatted JSON string with "
@@ -565,49 +574,6 @@ namespace mongo {
         return -1;
     }
 
-    /** returns a string that when used as a matcher, would match a super set of regex()
-        returns "" for complex regular expressions
-        used to optimize queries in some simple regex cases that start with '^'
-    */
-    string BSONElement::simpleRegex() const {
-
-        string r = "";
-
-        if ( *regexFlags() )
-            return r;
-
-        const char *i = regex();
-        if ( *i != '^' )
-            return r;
-        ++i;
-
-        // Empty string matches everything, won't limit our search.
-        if ( !*i )
-            return r;
-
-        stringstream ss;
-        for( ; *i; ++i ){
-            char c = *i;
-            if ( c == '*' || c == '?' ){
-                r = ss.str();
-                r = r.substr( 0 , r.size() - 1 );
-                break;
-            }
-            else if ( *i == ' ' || (*i>='0'&&*i<='9') || (*i>='@'&&*i<='Z') || (*i>='a'&&*i<='z') ){
-                ss << *i;
-            }
-            else {
-                r = ss.str();
-                break;
-            }
-        }
-
-        if ( r.size() == 0 && *i == 0 )
-            r = ss.str();
-
-        return r;
-    }
-
     void BSONElement::validate() const {
         switch( type() ) {
             case DBRef:
@@ -638,7 +604,7 @@ namespace mongo {
         }
     }
 
-    /* JSMatcher --------------------------------------*/
+    /* Matcher --------------------------------------*/
 
 // If the element is something like:
 //   a : { $gt : 3 }
@@ -1167,6 +1133,37 @@ namespace mongo {
         return b.obj();
     }
 
+    bool BSONObj::okForStorage() const {
+        BSONObjIterator i( *this );
+        while ( i.more() ){
+            BSONElement e = i.next();
+            const char * name = e.fieldName();
+            
+            if ( strchr( name , '.' ) ||
+                 strchr( name , '$' ) ){
+                return false;
+            }
+            
+            if ( e.mayEncapsulate() ){
+                switch ( e.type() ){
+                case Object:
+                case Array:
+                    if ( ! e.embeddedObject().okForStorage() )
+                        return false;
+                    break;
+                case CodeWScope:
+                    if ( ! e.codeWScopeObject().okForStorage() )
+                        return false;
+                    break;
+                default:
+                    uassert( 12579, "unhandled cases in BSONObj okForStorage" , 0 );
+                }
+                
+            }
+        }
+        return true;
+    }
+
     string BSONObj::hexDump() const {
         stringstream ss;
         const char *d = objdata();
@@ -1276,24 +1273,6 @@ namespace mongo {
             assert( !o.woEqual( p ) );
             assert( o.woCompare( p ) < 0 );
 
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^foo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "foo" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^f?oo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "" );
-            }
-            {
-                BSONObjBuilder b;
-                b.appendRegex("r", "^fz?oo");
-                BSONObj o = b.done();
-                assert( o.firstElement().simpleRegex() == "f" );
-            }
         }
         void testoid() {
             OID id;
@@ -1485,7 +1464,7 @@ namespace mongo {
     Labeler::Label SIZE( "$size" );
 
     void BSONElementManipulator::initTimestamp() {
-        massert( 10332 ,  "Expected CurrentTime type", element_.type() == Timestamp );
+        massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
         unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
         if ( timestamp == 0 )
             timestamp = OpTime::now().asDate();

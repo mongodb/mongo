@@ -1,6 +1,6 @@
 // matcher.h
 
-/* JSMatcher is our boolean expression evaluator for "where" clauses */
+/* Matcher is our boolean expression evaluator for "where" clauses */
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -26,7 +26,7 @@
 namespace mongo {
 
     class CoveredIndexMatcher;
-    class JSMatcher;
+    class Matcher;
 
     class RegexMatcher {
     public:
@@ -52,15 +52,15 @@ namespace mongo {
     };
 
     
-    class BasicMatcher {
+    class ElementMatcher {
     public:
     
-        BasicMatcher() {
+        ElementMatcher() {
         }
         
-        BasicMatcher( BSONElement _e , int _op );
+        ElementMatcher( BSONElement _e , int _op );
         
-        BasicMatcher( BSONElement _e , int _op , const BSONObj& array ) : toMatch( _e ) , compareOp( _op ) {
+        ElementMatcher( BSONElement _e , int _op , const BSONObj& array ) : toMatch( _e ) , compareOp( _op ) {
             
             myset.reset( new set<BSONElement,element_lt>() );
             
@@ -71,7 +71,7 @@ namespace mongo {
             }
         }
         
-        ~BasicMatcher();
+        ~ElementMatcher() { }
 
         BSONElement toMatch;
         int compareOp;
@@ -82,11 +82,10 @@ namespace mongo {
         int modm;
         BSONType type;
 
-        shared_ptr<JSMatcher> subMatcher;
+        shared_ptr<Matcher> subMatcher;
     };
 
-// SQL where clause equivalent
-    class Where;
+    class Where; // used for $where javascript eval
     class DiskLoc;
 
     /* Match BSON objects against a query pattern.
@@ -103,16 +102,16 @@ namespace mongo {
 
        TODO: we should rewrite the matcher to be more an AST style.
     */
-    class JSMatcher : boost::noncopyable {
+    class Matcher : boost::noncopyable {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const BasicMatcher& bm, bool isArr = false);
+            int compareOp, const ElementMatcher& bm, bool isArr = false);
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const BasicMatcher&bm);
+            const ElementMatcher&bm);
         
     public:
         static int opDirection(int op) {
@@ -121,9 +120,9 @@ namespace mongo {
 
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
-        JSMatcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj());
+        Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj());
 
-        ~JSMatcher();
+        ~Matcher();
 
         bool matches(const BSONObj& j);
         
@@ -136,16 +135,15 @@ namespace mongo {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
-            basics.push_back( BasicMatcher( e , c ) );
+            basics.push_back( ElementMatcher( e , c ) );
         }
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const BasicMatcher& bm);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
 
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj constrainIndexKey_;
-        vector<BasicMatcher> basics;
-//        int n;                           // # of basicmatcher items
+        vector<ElementMatcher> basics;
         bool haveSize;
         bool all;
         bool hasArray;
@@ -153,6 +151,7 @@ namespace mongo {
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield - 
                      i.e. we stay locked the whole time.
+                     http://www.mongodb.org/display/DOCS/Removing[
         */
         bool _atomic;
 
@@ -173,10 +172,10 @@ namespace mongo {
         bool matches(const BSONObj &key, const DiskLoc &recLoc);
         bool needRecord(){ return _needRecord; }
 
-        JSMatcher& docMatcher() { return _docMatcher; }
+        Matcher& docMatcher() { return _docMatcher; }
     private:
-        JSMatcher _keyMatcher;
-        JSMatcher _docMatcher;
+        Matcher _keyMatcher;
+        Matcher _docMatcher;
         bool _needRecord;
     };
     

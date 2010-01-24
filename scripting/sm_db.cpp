@@ -17,7 +17,7 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include "../client/quorum.h"
+#include "../client/syncclusterconnection.h"
 
 namespace mongo {
 
@@ -101,7 +101,6 @@ namespace mongo {
         *rval = c.toval( &n );
         return JS_TRUE;
     }
-    
 
     JSFunctionSpec internal_cursor_functions[] = {
         { "hasNext" , internal_cursor_hasNext , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
@@ -173,7 +172,7 @@ namespace mongo {
                 }
             }
             else if ( numCommas == 2 ){
-                conn.reset( new QuorumConnection( host ) );
+                conn.reset( new SyncClusterConnection( host ) );
             }
             else {
                 JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
@@ -246,9 +245,9 @@ namespace mongo {
     }
 
     JSBool mongo_update(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( 10242 ,  "mongo_find needs at elast 3 args" , argc >= 3 );
-        uassert( 10243 ,  "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
-        uassert( 10244 ,  "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
+        smuassert( cx ,  "mongo_find needs at elast 3 args" , argc >= 3 );
+        smuassert( cx ,  "2nd param to update has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "3rd param to update has to be an object" , JSVAL_IS_OBJECT( argv[2] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -275,8 +274,8 @@ namespace mongo {
     }
 
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        uassert( 10246 ,  "mongo_insert needs 2 args" , argc == 2 );
-        uassert( 10247 ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "mongo_insert needs 2 args" , argc == 2 );
+        smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -311,8 +310,8 @@ namespace mongo {
     }
 
     JSBool mongo_remove(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        uassert( 10249 ,  "mongo_remove needs 2 arguments" , argc == 2 );
-        uassert( 10250 ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
+        smuassert( cx ,  "mongo_remove needs 2 arguments" , argc == 2 );
+        smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
         Convertor c( cx );
         if ( c.getBoolean( obj , "readOnly" ) ){
@@ -349,7 +348,7 @@ namespace mongo {
      // -------------  db_collection -------------
 
      JSBool db_collection_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){    
-         uassert( 10252 ,  "db_collection_constructor wrong args" , argc == 4 );
+         smuassert( cx ,  "db_collection_constructor wrong args" , argc == 4 );
          assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
          assert( JS_SetProperty( cx , obj , "_db" , &(argv[1]) ) );
          assert( JS_SetProperty( cx , obj , "_shortName" , &(argv[2]) ) );
@@ -432,7 +431,7 @@ namespace mongo {
     
     
     JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        uassert( 10253 ,  "wrong number of arguments to DB" , argc == 2 );
+        smuassert( cx,  "wrong number of arguments to DB" , argc == 2 );
         assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
         assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
 
@@ -484,7 +483,7 @@ namespace mongo {
             oid.init();
         }
         else {
-            uassert( 10254 ,  "object_id_constructor can't take more than 1 param" , argc == 1 );
+            smuassert( cx ,  "object_id_constructor can't take more than 1 param" , argc == 1 );
             string s = c.toString( argv[0] );
 
             try {
@@ -525,6 +524,7 @@ namespace mongo {
         { "toString" , object_id_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
+
 
     // dbpointer
 
@@ -656,7 +656,33 @@ namespace mongo {
         JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
+    
+    JSClass numberlong_class = {
+        "NumberLong" , JSCLASS_HAS_PRIVATE ,
+        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JSCLASS_NO_OPTIONAL_MEMBERS
+    };
+    
+    JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        stringstream ss;
+        ss <<  c.toNumberLongUnsafe( obj );
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+    
+    JSBool numberlong_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        return *rval = c.toval( double( c.toNumberLongUnsafe( obj ) ) );
+    }
 
+    JSFunctionSpec numberlong_functions[] = {
+    { "toString" , numberlong_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { "toNumber" , numberlong_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { 0 }
+    };    
+    
     JSClass minkey_class = {
         "MinKey" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -674,7 +700,7 @@ namespace mongo {
     // dbquery
 
     JSBool dbquery_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        uassert( 10255 ,  "DDQuery needs at least 4 args" , argc >= 4 );
+        smuassert( cx ,  "DDQuery needs at least 4 args" , argc >= 4 );
         
         Convertor c(cx);
         c.setProperty( obj , "_mongo" , argv[0] );
@@ -748,6 +774,7 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        assert( JS_InitClass( cx , global , 0 , &numberlong_class , 0 , 0 , 0 , numberlong_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
@@ -783,6 +810,11 @@ namespace mongo {
             return true;
         }
 
+        if ( JS_InstanceOf( c->_context , o , &numberlong_class , 0 ) ){
+            b.append( name.c_str() , c->toNumberLongUnsafe( o ) );
+            return true;
+        }
+        
         if ( JS_InstanceOf( c->_context , o , &dbpointer_class , 0 ) ){
             b.appendDBRef( name.c_str() , c->getString( o , "ns" ).c_str() , c->toOID( c->getProperty( o , "id" ) ) );
             return true;

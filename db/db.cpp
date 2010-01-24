@@ -103,30 +103,35 @@ namespace mongo {
         cc().clearns();
     }
 
-    MessagingPort *grab = 0;
+    MessagingPort *connGrab = 0;
     void connThread();
 
     class OurListener : public Listener {
     public:
         OurListener(const string &ip, int p) : Listener(ip, p) { }
         virtual void accepted(MessagingPort *mp) {
-            assert( grab == 0 );
+            assert( connGrab == 0 );
             if ( ! connTicketHolder.tryAcquire() ){
                 log() << "connection refused because too many open connections" << endl;
                 // TODO: would be nice if we notified them...
                 mp->shutdown();
                 return;
             }
-            grab = mp;
+            connGrab = mp;
             try {
                 boost::thread thr(connThread);
-                while ( grab )
+                while ( connGrab )
                     sleepmillis(1);
             }
-            catch ( boost::thread_resource_error& e ){
+            catch ( boost::thread_resource_error& ){
                 log() << "can't create new thread, closing connection" << endl;
                 mp->shutdown();
-                grab = 0;
+                connGrab = 0;
+            }
+            catch ( ... ){
+                log() << "unkonwn exception starting connThread" << endl;
+                mp->shutdown();
+                connGrab = 0;
             }
         }
     };
@@ -182,8 +187,8 @@ namespace mongo {
         LastError *le = new LastError();
         lastError.reset(le);
 
-        MessagingPort& dbMsgPort = *grab;
-        grab = 0;
+        MessagingPort& dbMsgPort = *connGrab;
+        connGrab = 0;
         Client& c = cc();
 
         try {
@@ -201,12 +206,12 @@ namespace mongo {
                     break;
                 }
 
-                // a killCursors message shouldn't affect last error
-                if ( m.data->operation() == dbKillCursors ) {
-                    lastError.disable();
-                } else {
-                    lastError.startRequest( m , le );
+                if ( inShutdown() ) {
+                    log() << "got request after shutdown()" << endl;
+                    break;
                 }
+                
+                lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
                 if ( !assembleResponse( m, dbresponse, dbMsgPort.farEnd.sa ) ) {
@@ -225,8 +230,6 @@ namespace mongo {
 
                 if ( dbresponse.response )
                     dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);
-
-                lastError.enable();
             }
 
         }
@@ -329,8 +332,14 @@ namespace mongo {
         return repairDatabase( dbName.c_str(), errmsg );
     }
     
+    extern bool checkNsFilesOnLoad;
+
     void repairDatabases() {
         log(1) << "enter repairDatabases" << endl;
+
+        assert(checkNsFilesOnLoad);
+        checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
+
         dblock lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -368,8 +377,11 @@ namespace mongo {
 
         if ( shouldRepairDatabases ){
             log() << "finished checking dbs" << endl;
+            cc().shutdown();
             dbexit( EXIT_CLEAN );
         }
+
+        checkNsFilesOnLoad = true;
     }
 
     void clearTmpFiles() {
@@ -837,6 +849,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("slave")) {
             slave = SimpleSlave;
         }
+        if (params.count("autoresync")) {
+            autoresync = true;
+        }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();
@@ -854,9 +869,6 @@ int main(int argc, char* argv[], char *envp[] )
             }
         } else if (params.count("arbiter")) {
             uasserted(10999,"specifying --arbiter without --pairwith");
-        }
-        if (params.count("autoresync")) {
-            autoresync = true;
         }
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();

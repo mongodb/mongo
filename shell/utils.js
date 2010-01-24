@@ -1,4 +1,11 @@
 
+__quiet = false;
+
+chatty = function(s){
+    if ( ! __quiet )
+        print( s );
+}
+
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;
@@ -562,10 +569,8 @@ if ( typeof _threadInject != "undefined" ){
         
         runners.forEach( function( x ) { x.start(); } );
         var nFailed = 0;
-        runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );
-        
-        // v8 doesn't like it if we assert before all threads are joined.  For now,
-        // just avoid that possibility by asserting after threads are joined.
+        // v8 doesn't like it if we exit before all threads are joined (SERVER-529)
+        runners.forEach( function( x ) { if( !x.returnData() ) { ++nFailed; } } );        
         assert.eq( 0, nFailed, msg );
     }
 }

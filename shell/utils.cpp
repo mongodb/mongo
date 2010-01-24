@@ -80,6 +80,7 @@ namespace mongo {
             
             string rootname = args.firstElement().valuestrsafe();
             path root( rootname );
+            uassert( 12581, "listFiles: no such directory", boost::filesystem::exists( root ) );
             
             directory_iterator end;
             directory_iterator i( root);

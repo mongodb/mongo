@@ -42,6 +42,7 @@ namespace NamespaceTests {
             }
         protected:
             void create() {
+                NamespaceDetailsTransient::get_w( ns() ).deletedIndex();
                 BSONObjBuilder builder;
                 builder.append( "ns", ns() );
                 builder.append( "name", "testIndex" );
@@ -143,7 +144,7 @@ namespace NamespaceTests {
                 BSONObjSetDefaultOrder keys;
                 id().getKeysFromObject( a.done(), keys );
                 checkSize( 1, keys );
-                assertEquals( e.obj(), *keys.begin() );
+                ASSERT_EQUALS( e.obj(), *keys.begin() );
             }
         private:
             virtual BSONObj key() const {

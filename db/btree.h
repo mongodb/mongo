@@ -257,7 +257,7 @@ namespace mongo {
         virtual void noteLocation(); // updates keyAtKeyOfs...
         virtual void checkLocation();
 
-        /* used for multikey index traversal to avoid sending back dups. see JSMatcher::matches().
+        /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
            if a multikey index traversal:
              if loc has already been sent, returns true.
              otherwise, marks loc as sent.

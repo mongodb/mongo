@@ -184,6 +184,7 @@ namespace mongo {
 #define localtime _localtime_not_threadsafe_
 #define ctime _ctime_is_not_threadsafe_
 
+#if defined(_WIN32) || defined(__sunos__)
     inline void sleepsecs(int s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -212,6 +213,28 @@ namespace mongo {
         }        
         boost::thread::sleep(xt);
     }
+#else
+    inline void sleepsecs(int s) {
+        struct timespec t;
+        t.tv_sec = s;
+        t.tv_nsec = 0;
+        if ( nanosleep( &t , 0 ) ){
+            cout << "nanosleep failed" << endl;
+        }
+    }
+    inline void sleepmicros(int s) {
+        struct timespec t;
+        t.tv_sec = (int)(s / 1000000);
+        t.tv_nsec = s % 1000000;
+        if ( nanosleep( &t , 0 ) ){
+            cout << "nanosleep failed" << endl;
+        }
+    }
+    inline void sleepmillis(int s) {
+        sleepmicros( s * 1000 );
+    }
+#endif
+
 // note this wraps
     inline int tdiff(unsigned told, unsigned tnew) {
         return WrappingInt::diff(tnew, told);

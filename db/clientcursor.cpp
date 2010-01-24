@@ -63,7 +63,7 @@ namespace mongo {
 
     /* todo: this implementation is incomplete.  we use it as a prefix for dropDatabase, which
              works fine as the prefix will end with '.'.  however, when used with drop and
-    		 deleteIndexes, this could take out cursors that belong to something else -- if you
+    		 dropIndexes, this could take out cursors that belong to something else -- if you
     		 drop "foo", currently, this will kill cursors for "foobar".
     */
     void ClientCursor::invalidate(const char *nsPrefix) {
@@ -217,7 +217,7 @@ namespace mongo {
             static bool inEmpty = false;
             if( test && !inEmpty ) { 
                 inEmpty = true;
-                log() << "TEST: manipulate collection during remove" << endl;
+                log() << "TEST: manipulate collection during cc:yield" << endl;
                 if( test == 1 ) 
                     Helpers::emptyCollection(ns.c_str());
                 else if( test == 2 ) {

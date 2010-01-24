@@ -207,7 +207,14 @@ namespace mongo {
                 boost::scoped_array< Local< Value > > argv( new Local< Value >[ config_.args_.size() ] );
                 for( unsigned int i = 0; i < config_.args_.size(); ++i )
                     argv[ i ] = Local< Value >::New( config_.args_[ i ] );
-                Local< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
+                TryCatch try_catch;
+                Handle< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
+                if ( ret.IsEmpty() ) {
+                    string e = toSTLString( &try_catch );
+                    log() << "js thread raised exception: " << e << endl;
+                    // v8 probably does something sane if ret is empty, but not going to assume that for now
+                    ret = v8::Undefined();
+                }
                 config_.returnData_ = Persistent< Value >::New( ret );
             }
         private:
@@ -228,7 +235,7 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
         return v8::Undefined();
     }
     
@@ -237,12 +244,12 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->Set( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
         return v8::Undefined();
     }
 
     JSThreadConfig *thisConfig( const Arguments &args ) {
-        Local< External > c = External::Cast( *(args.This()->Get( v8::String::New( "_JSThreadConfig" ) ) ) );
+        Local< External > c = External::Cast( *(args.This()->GetHiddenValue( v8::String::New( "_JSThreadConfig" ) ) ) );
         JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
         return config;
     }

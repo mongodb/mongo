@@ -12,6 +12,7 @@ jmp_buf jbuf;
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
 #include "../util/unittest.h"
+#include "../db/cmdline.h"
 #include "utils.h"
 
 using namespace std;
@@ -271,10 +272,11 @@ int _main(int argc, char* argv[]) {
     po::options_description hidden_options("Hidden options");
     po::options_description cmdline_options("Command line options");
     po::positional_options_description positional_options;
-
+    
     shell_options.add_options()
         ("shell", "run the shell after executing files")
         ("nodb", "don't connect to mongod on startup - no 'db address' arg expected")
+        ("quiet", "be less chatty" )
         ("port", po::value<string>(&port), "port to connect to")
         ("host", po::value<string>(&dbhost), "server to connect to")
         ("eval", po::value<string>(&script), "evaluate javascript")
@@ -331,6 +333,9 @@ int _main(int argc, char* argv[]) {
         cout << "MongoDB shell version: " << mongo::versionString << endl;
         return mongo::EXIT_CLEAN;
     }
+    if (params.count("quiet")) {
+        mongo::cmdLine.quiet = true;
+    }
 
     /* This is a bit confusing, here are the rules:
      *
@@ -354,13 +359,20 @@ int _main(int argc, char* argv[]) {
         }
     }
     
-    cout << "MongoDB shell version: " << mongo::versionString << endl;
+    if ( ! mongo::cmdLine.quiet ) 
+        cout << "MongoDB shell version: " << mongo::versionString << endl;
 
     mongo::UnitTest::runTests();
 
     if ( !nodb ) { // connect to db
-        cout << "url: " << url << endl;
-        mongo::shellUtils::_dbConnect = (string)"db = connect( \"" + fixHost( url , dbhost , port ) + "\")";
+        if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;
+        
+        stringstream ss;
+        if ( mongo::cmdLine.quiet )
+            ss << "__quiet = true;";
+        ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
+        
+        mongo::shellUtils::_dbConnect = ss.str();
 
         if ( username.size() && password.size() ){
             stringstream ss;

@@ -101,6 +101,7 @@ namespace mongo {
         
         void start( const string& lp , bool append ){
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
+            _append = append;
 
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
@@ -111,7 +112,6 @@ namespace mongo {
             }
             
             _path = lp;
-            _append = append;
             _enabled = 1;
             rotate();
         }

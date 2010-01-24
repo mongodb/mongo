@@ -77,7 +77,8 @@ namespace mongo {
             _size -= m.erase( _todb( ns ) );
         }
 
-        bool closeAll( const string& path , BSONObjBuilder& result );
+        /* force - force close even if something underway - use at shutdown */
+        bool closeAll( const string& path , BSONObjBuilder& result, bool force );
 
         int size(){
             return _size;
@@ -112,21 +113,11 @@ namespace mongo {
 
     extern DatabaseHolder dbHolder;
 
-    inline void resetClient(const char *ns, const string& path=dbpath) {
-        dbMutex.assertAtLeastReadLocked();
-        Database * d = dbHolder.get( ns , path );
-        if ( d ){
-            cc().setns(ns, d);
-            return;
-        }
-        assert(false);
-    }
-
     /* returns true if the database ("database") did not exist, and it was created on this call 
        path - datafiles directory, if not the default, so we can differentiate between db's of the same
               name in different places (for example temp ones on repair).
     */
-    inline bool setClient(const char *ns, const string& path=dbpath, mongolock *lock = 0) {
+    inline bool setClient(const char *ns, const string& path , mongolock *lock ) {
         if( logLevel > 5 )
             log() << "setClient: " << ns << endl;
 
@@ -161,10 +152,6 @@ namespace mongo {
     // shared functionality for removing references to a database from this program instance
     // does not delete the files on disk
     void closeDatabase( const char *cl, const string& path = dbpath );
-
-    inline bool clientIsEmpty() {
-        return !cc().database()->namespaceIndex.allocated();
-    }
 
     struct dbtemprelease {
         string clientname;

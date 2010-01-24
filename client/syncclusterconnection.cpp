@@ -1,13 +1,13 @@
-// quorum.cpp
+// syncclusterconnection.cpp
 
 #include "stdafx.h"
-#include "quorum.h"
+#include "syncclusterconnection.h"
 
 // error codes 8000-8009
 
 namespace mongo {
     
-    QuorumConnection::QuorumConnection( string commaSeperated ){
+    SyncClusterConnection::SyncClusterConnection( string commaSeperated ){
         string::size_type idx;
         while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ){
             string h = commaSeperated.substr( 0 , idx );
@@ -15,27 +15,27 @@ namespace mongo {
             _connect( h );
         }
         _connect( commaSeperated );
-        uassert( 8004 ,  "QuorumConnection needs 3 servers" , _conns.size() == 3 );
+        uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    QuorumConnection::QuorumConnection( string a , string b , string c ){
+    SyncClusterConnection::SyncClusterConnection( string a , string b , string c ){
         // connect to all even if not working
         _connect( a );
         _connect( b );
         _connect( c );
     }
 
-    QuorumConnection::~QuorumConnection(){
+    SyncClusterConnection::~SyncClusterConnection(){
         for ( size_t i=0; i<_conns.size(); i++ )
             delete _conns[i];
         _conns.clear();
     }
 
-    bool QuorumConnection::prepare( string& errmsg ){
+    bool SyncClusterConnection::prepare( string& errmsg ){
         return fsync( errmsg );
     }
     
-    bool QuorumConnection::fsync( string& errmsg ){
+    bool SyncClusterConnection::fsync( string& errmsg ){
         bool ok = true;
         errmsg = "";
         for ( size_t i=0; i<_conns.size(); i++ ){
@@ -55,7 +55,7 @@ namespace mongo {
         return ok;
     }
 
-    void QuorumConnection::_checkLast(){
+    void SyncClusterConnection::_checkLast(){
         vector<BSONObj> all;
         vector<string> errors;
 
@@ -91,22 +91,22 @@ namespace mongo {
 
         if ( ok )
             return;
-        throw UserException( 8001 , (string)"QuorumConnection write op failed: " + err.str() );
+        throw UserException( 8001 , (string)"SyncClusterConnection write op failed: " + err.str() );
     }
 
-    void QuorumConnection::_connect( string host ){
-        log() << "QuorumConnection connecting to: " << host << endl;
+    void SyncClusterConnection::_connect( string host ){
+        log() << "SyncClusterConnection connecting to: " << host << endl;
         DBClientConnection * c = new DBClientConnection( true );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
-            log() << "QuorumConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
+            log() << "SyncClusterConnection connect fail to: " << host << " errmsg: " << errmsg << endl;
         _conns.push_back( c );
     }
 
-    auto_ptr<DBClientCursor> QuorumConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
+    auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                      const BSONObj *fieldsToReturn, int queryOptions){ 
 
-        uassert( 10021 ,  "$cmd not support yet in QuorumConnection::query" , ns.find( "$cmd" ) == string::npos );
+        uassert( 10021 ,  "$cmd not support yet in SyncClusterConnection::query" , ns.find( "$cmd" ) == string::npos );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
@@ -123,16 +123,16 @@ namespace mongo {
         throw UserException( 8002 , "all servers down!" );
     }
     
-    auto_ptr<DBClientCursor> QuorumConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
-        uassert( 10022 , "QuorumConnection::getMore not supported yet" , 0); 
+    auto_ptr<DBClientCursor> SyncClusterConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ){
+        uassert( 10022 , "SyncClusterConnection::getMore not supported yet" , 0); 
         auto_ptr<DBClientCursor> c;
         return c;
     }
     
-    void QuorumConnection::insert( const string &ns, BSONObj obj ){ 
+    void SyncClusterConnection::insert( const string &ns, BSONObj obj ){ 
         string errmsg;
         if ( ! prepare( errmsg ) )
-            throw UserException( 8003 , (string)"QuorumConnection::insert prepare failed: " + errmsg );
+            throw UserException( 8003 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             _conns[i]->insert( ns , obj );
@@ -141,17 +141,17 @@ namespace mongo {
         _checkLast();
     }
         
-    void QuorumConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
-        uassert( 10023 , "QuorumConnection bulk insert not implemented" , 0); 
+    void SyncClusterConnection::insert( const string &ns, const vector< BSONObj >& v ){ 
+        uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0); 
     }
 
-    void QuorumConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }
+    void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }
 
-    void QuorumConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
+    void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
 
-    string QuorumConnection::toString(){ 
+    string SyncClusterConnection::toString(){ 
         stringstream ss;
-        ss << "QuorumConnection [";
+        ss << "SyncClusterConnection [";
         for ( size_t i=0; i<_conns.size(); i++ ){
             if ( i > 0 )
                 ss << ",";

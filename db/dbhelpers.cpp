@@ -145,16 +145,23 @@ namespace mongo {
         return i;
     }
     
-
-    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ){
+    
+    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
+                           bool * nsFound , bool * indexFound ){
         Database *database = c.database();
         assert( database );
         NamespaceDetails *d = database->namespaceIndex.details(ns);
         if ( ! d )
             return false;
+        if ( nsFound )
+            *nsFound = 1;
+        
         int idxNo = d->findIdIndex();
         if ( idxNo < 0 )
             return false;
+        if ( indexFound )
+            *indexFound = 1;
+
         IndexDetails& i = d->idx( idxNo );
         
         BSONObj key = i.getKeyFromQuery( query );
@@ -172,7 +179,7 @@ namespace mongo {
        Returns: true if object exists.
     */
     bool Helpers::getSingleton(const char *ns, BSONObj& result) {
-        DBContext context(ns);
+        Client::Context context(ns);
 
         auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
         if ( !c->ok() )
@@ -184,12 +191,12 @@ namespace mongo {
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
-        DBContext context(ns);
+        Client::Context context(ns);
         updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , true , debug );
     }
 
     void Helpers::emptyCollection(const char *ns) {
-        DBContext context(ns);
+        Client::Context context(ns);
         deleteObjects(ns, BSONObj(), false);
     }
 
@@ -197,7 +204,7 @@ namespace mongo {
         if ( name_.empty() )
             return;
         try {
-            DBContext c( name_.c_str() );
+            Client::Context c( name_.c_str() );
             if ( nsdetails( name_.c_str() ) ) {
                 string errmsg;
                 BSONObjBuilder result;
@@ -213,7 +220,7 @@ namespace mongo {
             name_ = name;
         if ( !key.isEmpty() )
             key_ = key.getOwned();
-        DBContext c( name_.c_str() );
+        Client::Context c( name_.c_str() );
         if ( nsdetails( name_.c_str() ) ) {
             Helpers::emptyCollection( name_.c_str() );
         } else {
@@ -224,13 +231,13 @@ namespace mongo {
     }
     
     bool DbSet::get( const BSONObj &obj ) const {
-        DBContext c( name_.c_str() );
+        Client::Context c( name_.c_str() );
         BSONObj temp;
         return Helpers::findOne( name_.c_str(), obj, temp, true );
     }
     
     void DbSet::set( const BSONObj &obj, bool val ) {
-        DBContext c( name_.c_str() );
+        Client::Context c( name_.c_str() );
         if ( val ) {
             try {
                 BSONObj k = obj;

@@ -65,7 +65,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib"
+				AdditionalDependencies="ws2_32.lib Psapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;c:\Program Files\boost\boost_1_35_0\lib&quot;"
 				IgnoreAllDefaultLibraries="false"
@@ -350,6 +350,18 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\js\js\Debug\js.lib"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\js\js\Release\js.lib"
 				>
 				<FileConfiguration
@@ -362,18 +374,6 @@
 				</FileConfiguration>
 				<FileConfiguration
 					Name="Debug Recstore|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\..\js\js\Debug\js.lib"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -1330,7 +1330,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\client\quorum.cpp"
+				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>
 			<Filter
@@ -1395,6 +1395,10 @@
 			</File>
 			<File
 				RelativePath="..\db\dbmessage.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\extsort.h"
 				>
 			</File>
 			<File
@@ -1511,11 +1515,19 @@
 					>
 				</File>
 				<File
+					RelativePath="..\db\dbstats.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\dbwebserver.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\db\extsort.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\index.cpp"
 					>
 				</File>
 				<File
@@ -1760,7 +1772,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\util\processinfo_none.cpp"
+					RelativePath="..\util\processinfo_win32.cpp"
 					>
 				</File>
 				<File

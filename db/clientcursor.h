@@ -105,7 +105,14 @@ namespace mongo {
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
 
-        ClientCursor() : _idleAgeMillis(0), _pinValue(0), _doingDeletes(false), pos(0) {
+        ClientCursor(auto_ptr<Cursor>& _c, const char *_ns, bool okToTimeout) : 
+            _idleAgeMillis(0), _pinValue(0), 
+            _doingDeletes(false), 
+            ns(_ns), c(_c), 
+            pos(0) 
+        {
+            if( !okToTimeout )
+                noTimeout();
             recursive_boostlock lock(ccmutex);
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );
@@ -120,7 +127,7 @@ namespace mongo {
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
         /* Get rid of cursors for namespaces that begin with nsprefix.
-           Used by drop, deleteIndexes, dropDatabase.
+           Used by drop, dropIndexes, dropDatabase.
         */
         static void invalidate(const char *nsPrefix);
 
@@ -130,7 +137,8 @@ namespace mongo {
          *       we don't do herein as this->matcher (above) is only initialized for true queries/getmore.
          *       (ie not set for remote/update)
          * @return if the cursor is still valid. 
-         *         if false is returned, then this ClientCursor should be considered deleted
+         *         if false is returned, then this ClientCursor should be considered deleted - 
+         *         in fact, the whole database could be gone.
          */
         bool yield();
     private:
@@ -151,7 +159,7 @@ namespace mongo {
             ClientCursor *c = find_inlock(id, warn);
 			// if this asserts, your code was not thread safe - you either need to set no timeout 
 			// for the cursor or keep a ClientCursor::Pointer in scope for it.
-            massert( 12521, "internal error: use of an unlocked ClientCursor", c->_pinValue ); 
+            massert( 12521, "internal error: use of an unlocked ClientCursor", c == 0 || c->_pinValue ); 
             return c;
         }
 
@@ -195,13 +203,13 @@ namespace mongo {
         }
 
         static void idleTimeReport(unsigned millis);
-
+private:
         // cursors normally timeout after an inactivy period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { 
             _pinValue++;
         }
-
+public:
         void setDoingDeletes( bool doingDeletes ){
             _doingDeletes = doingDeletes;
         }

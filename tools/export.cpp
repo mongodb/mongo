@@ -120,7 +120,7 @@ public:
         }
 
         
-        cout << "exported " << num << " records" << endl;
+        cerr << "exported " << num << " records" << endl;
 
         return 0;
     }

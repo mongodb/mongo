@@ -41,4 +41,6 @@ namespace mongo {
         return -1;
     }
 
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+
 }

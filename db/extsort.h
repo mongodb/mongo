@@ -19,11 +19,9 @@
 #pragma once
 
 #include "../stdafx.h"
-
 #include "jsobj.h"
 #include "namespace.h"
-
-#include <map>
+#include "curop.h"
 
 namespace mongo {
 
@@ -52,6 +50,7 @@ namespace mongo {
         public:
             MyCmp( const BSONObj & order = BSONObj() ) : _order( order ){}
             bool operator()( const Data &l, const Data &r ) const {
+                RARELY killCurrentOp.checkForInterrupt();
                 _compares++;
                 int x = l.first.woCompare( r.first , _order );
                 if ( x )

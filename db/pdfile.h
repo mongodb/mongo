@@ -50,7 +50,6 @@ namespace mongo {
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ); 
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication);
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
-    void getKeysFromObject( const BSONObj &keyPattern, const BSONObj &obj, BSONObjSetDefaultOrder &keys );
 
 // -1 if library unavailable.
     boost::intmax_t freeSpace();
@@ -273,7 +272,7 @@ namespace mongo {
             return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
         }
 
-        bool uninitialized() {
+        bool uninitialized() const {
             if ( version == 0 ) return true;
             return false;
         }
@@ -296,6 +295,10 @@ namespace mongo {
                 unusedLength = fileLength - headerSize() - 16;
                 memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
+        }
+        
+        bool isEmpty() const {
+            return uninitialized() || ( unusedLength == fileLength - headerSize() - 16 );
         }
     };
 
@@ -419,7 +422,7 @@ namespace mongo {
     }
 
     inline NamespaceDetails* nsdetails(const char *ns) {
-        // if this faults, did you set the current db first?  (DBContext + dblock)
+        // if this faults, did you set the current db first?  (Client::Context + dblock)
         return nsindex(ns)->details(ns);
     }
 
@@ -440,6 +443,6 @@ namespace mongo {
     
     void ensureHaveIdIndex(const char *ns);
     
-    bool deleteIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
+    bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
         
 } // namespace mongo

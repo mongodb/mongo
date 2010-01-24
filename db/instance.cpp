@@ -35,6 +35,8 @@
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
+#include "dbstats.h"
+#include "background.h"
 
 namespace mongo {
 
@@ -251,6 +253,7 @@ namespace mongo {
 
         // before we lock...
         int op = m.data->operation();
+        globalOpCounters.gotOp( op );
         const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
@@ -433,8 +436,9 @@ namespace mongo {
                 }
                 else {
                     string old_ns = c.ns();
+                    Database * old_db = c.database();
                     lk.releaseAndWriteLock();
-                    resetClient(old_ns.c_str());
+                    Client::Context c( old_ns , old_db );
                     profile(ss.str().c_str(), ms);
                 }
             }
@@ -457,13 +461,18 @@ namespace mongo {
         killCursors(n, (long long *) x);
     }
 
-    /* cl - database name
+    /* db - database name
        path - db directory
     */
-    void closeDatabase( const char *cl, const string& path ) {
+    void closeDatabase( const char *db, const string& path ) {
         Database *database = cc().database();
         assert( database );
-        assert( database->name == cl );
+        assert( database->name == db );
+
+        if( BackgroundOperation::inProgForDb(db) ) { 
+            log() << "warning: bg op in prog during close db? " << db << endl;
+        }
+
 		/*
         if ( string("local") != cl ) {
             DBInfo i(cl);
@@ -471,13 +480,13 @@ namespace mongo {
 			}*/
 
         /* important: kill all open cursors on the database */
-        string prefix(cl);
+        string prefix(db);
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        dbHolder.erase( cl, path );
+        dbHolder.erase( db, path );
         delete database; // closes files
         cc().clearns();
     }
@@ -615,6 +624,8 @@ namespace mongo {
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
         SavedContext c;
+        if ( lastError._get() )
+            lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
@@ -624,6 +635,8 @@ namespace mongo {
 
     void DBDirectClient::say( Message &toSend ) {
         SavedContext c;
+        if ( lastError._get() )
+            lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
     }
@@ -715,7 +728,7 @@ namespace mongo {
 
         /* must do this before unmapping mem or you may get a seg fault */
         log() << "\t shutdown: going to close sockets..." << endl;
-        closeAllSockets();
+        boost::thread close_socket_thread(closeAllSockets);
 
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a

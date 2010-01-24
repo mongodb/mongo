@@ -344,6 +344,7 @@ namespace QueryTests {
             client().dropCollection( "unittests.querytests._UnderscoreNs" );
         }
         void run() {
+            ASSERT( !error() );
             const char *ns = "unittests.querytests._UnderscoreNs";
             ASSERT( client().findOne( ns, "{}" ).isEmpty() );
             client().insert( ns, BSON( "a" << 1 ) );

@@ -26,6 +26,12 @@
 #define assert xassert
 #endif
 
+#define smuassert( cx , msg , val ) \
+  if ( ! ( val ) ){ \
+    JS_ReportError( cx , msg ); \
+    return JS_FALSE; \
+  }
+
 namespace mongo {
 
     string trim( string s ){
@@ -152,6 +158,14 @@ namespace mongo {
             return toString( JS_ValueToString( _context , v ) );
         }
 
+        // NOTE No validation of passed in object
+        long long toNumberLongUnsafe( JSObject *o ) {
+            boost::uint64_t val =
+            ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
+            ( boost::uint32_t)( getNumber( o , "bottom" ) );
+            return val;
+        }
+        
         double toNumber( jsval v ){
             double d;
             uassert( 10214 ,  "not a number" , JS_ValueToNumber( _context , v , &d ) );
@@ -463,7 +477,6 @@ namespace mongo {
                 return JSVAL_NULL;
             case NumberDouble:
             case NumberInt:
-            case NumberLong:
                 return toval( e.number() );
             case Symbol: // TODO: should we make a special class for this
             case String:
@@ -551,7 +564,15 @@ namespace mongo {
                 setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
                 return OBJECT_TO_JSVAL( o );
             }
-
+            case NumberLong: {
+                boost::uint64_t val = (boost::uint64_t)e.numberLong();
+                JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
+                // using 2 doubles here instead of a single double because certain double
+                // bit patterns represent undefined values and sm might trash them
+                setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
+                setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
+                return OBJECT_TO_JSVAL( o );                
+            }
             case DBRef: {
                 JSObject * o = JS_NewObject( _context , &dbpointer_class , 0 , 0 );
                 setProperty( o , "ns" , toval( e.dbrefNS() ) );

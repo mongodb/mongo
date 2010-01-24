@@ -519,12 +519,6 @@ namespace mongo {
             return value();
         }
 
-        /** returns a string that when used as a matcher, would match a super set of regex() 
-			returns "" for complex regular expressions
-			used to optimize queries in some simple regex cases that start with '^'
-		 */
-        string simpleRegex() const;
-
         /** Retrieve the regex flags (options) for a Regex element */
         const char *regexFlags() const {
             const char *p = regex();
@@ -857,6 +851,11 @@ namespace mongo {
         }
 
         bool isValid();
+
+        /** @return if the user is a valid user doc
+            criter: isValid() no . or $ field names
+         */
+        bool okForStorage() const;
 
 		/** @return true if object is empty -- i.e.,  {} */
         bool isEmpty() const {
@@ -1341,6 +1340,9 @@ namespace mongo {
             b.append( val );
         }
 
+        /**
+         * @param time - in millis (but stored in seconds)
+         */
         void appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
             OpTime t( (unsigned) (time / 1000) , inc );
             appendTimestamp( fieldName , t.asDate() );

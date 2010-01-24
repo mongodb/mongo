@@ -136,11 +136,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc;
-        cc.reset( new ClientCursor() );
-        cc->c = creal;
-        cc->ns = ns;
-        cc->noTimeout();
+        auto_ptr<ClientCursor> cc( new ClientCursor(creal, ns, false) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;
@@ -514,10 +510,8 @@ namespace mongo {
             if ( findingStart_ ) {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).
-                findingStartCursor_ = new ClientCursor();
-				findingStartCursor_->noTimeout();
-                findingStartCursor_->c = qp().newReverseCursor();
-                findingStartCursor_->ns = qp().ns();
+                auto_ptr<Cursor> c = qp().newReverseCursor();
+                findingStartCursor_ = new ClientCursor(c, qp().ns(), false);
             } else {
                 c_ = qp().newCursor();
             }
@@ -808,26 +802,35 @@ namespace mongo {
                 uassert( 10110 , "bad query object", false);
             }
             
+            bool idHackWorked = false;
+
             if ( strcmp( query.firstElement().fieldName() , "_id" ) == 0 && query.nFields() == 1 && query.firstElement().isSimpleType() ){
                 nscanned = 1;
 
+                bool nsFound = false;
+                bool indexFound = false;
+
                 BSONObj resObject;
-                bool found = Helpers::findById( c, ns , query , resObject );
-                if ( found ){
-                    n = 1;
-                    fillQueryResultFromObj( bb , filter.get() , resObject );
-                }
-                qr.reset( (QueryResult *) bb.buf() );
-                bb.decouple();
-                qr->setResultFlagsToOk();
-                qr->len = bb.len();
-                ss << " reslen:" << bb.len();
-                qr->setOperation(opReply);
-                qr->cursorId = cursorid;
-                qr->startingFrom = 0;
-                qr->nReturned = n;            
+                bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+                if ( nsFound == false || indexFound == true ){
+                    idHackWorked = true;
+                    if ( found ){
+                        n = 1;
+                        fillQueryResultFromObj( bb , filter.get() , resObject );
+                    }
+                    qr.reset( (QueryResult *) bb.buf() );
+                    bb.decouple();
+                    qr->setResultFlagsToOk();
+                    qr->len = bb.len();
+                    ss << " reslen:" << bb.len();
+                    qr->setOperation(opReply);
+                    qr->cursorId = cursorid;
+                    qr->startingFrom = 0;
+                    qr->nReturned = n;       
+                }     
             }
-            else { // non-simple _id lookup
+            
+            if ( ! idHackWorked ){ // non-simple _id lookup
                 BSONObj oldPlan;
                 if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
                     QueryPlanSet qps( ns, query, order );
@@ -846,15 +849,12 @@ namespace mongo {
                 auto_ptr< Cursor > c = dqo.cursor();
                 log( 5 ) << "   used cursor: " << c.get() << endl;
                 if ( dqo.saveClientCursor() ) {
-                    ClientCursor *cc = new ClientCursor();
-                    if ( queryOptions & QueryOption_NoCursorTimeout )
-                        cc->noTimeout();
-                    cc->c = c;
+                    // the clientcursor now owns the Cursor* and 'c' is released:
+                    ClientCursor *cc = new ClientCursor(c, ns, !(queryOptions & QueryOption_NoCursorTimeout));
                     cursorid = cc->cursorid;
                     cc->query = jsobj.getOwned();
                     DEV out() << "  query has more, cursorid: " << cursorid << endl;
                     cc->matcher = dqo.matcher();
-                    cc->ns = ns;
                     cc->pos = n;
                     cc->filter = filter;
                     cc->originalMessage = m;

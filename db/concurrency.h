@@ -80,7 +80,7 @@ namespace mongo {
         void assertAtLeastReadLocked() { assert(atLeastReadLocked()); }
 
         void lock() { 
-            DEV cout << "LOCK" << endl;
+            //DEV cout << "LOCK" << endl;
             int s = _state.get();
             if( s > 0 ) {
                 _state.set(s+1);
@@ -92,7 +92,7 @@ namespace mongo {
             _minfo.entered();
         }
         void unlock() { 
-            DEV cout << "UNLOCK" << endl;
+            //DEV cout << "UNLOCK" << endl;
             int s = _state.get();
             if( s > 1 ) { 
                 _state.set(s-1);
@@ -121,7 +121,7 @@ namespace mongo {
         }
 
         void lock_shared() { 
-            DEV cout << " LOCKSHARED" << endl;
+            //DEV cout << " LOCKSHARED" << endl;
             int s = _state.get();
             if( s ) {
                 if( s > 0 ) { 
@@ -139,7 +139,7 @@ namespace mongo {
             _m.lock_shared(); 
         }
         void unlock_shared() { 
-            DEV cout << " UNLOCKSHARED" << endl;
+            //DEV cout << " UNLOCKSHARED" << endl;
             int s = _state.get();
             if( s > 0 ) { 
                 assert( s > 1 ); /* we must have done a lock write first to have s > 1 */

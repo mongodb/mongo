@@ -21,8 +21,88 @@
 #include "matcher.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
+#include "../util/unittest.h"
 
 namespace mongo {
+    namespace {
+        /** returns a string that when used as a matcher, would match a super set of regex()
+            returns "" for complex regular expressions
+            used to optimize queries in some simple regex cases that start with '^'
+        */
+        inline string simpleRegexHelper(const char* regex, const char* flags){
+            string r = "";
+
+            bool extended = false;
+            while (*flags){
+                switch (*(flags++)){
+                    case 'm': // multiline
+                        continue;
+                    case 'x': // extended
+                        extended = true;
+                        break;
+                    default:
+                        return r; // cant use index
+                }
+            }
+
+            if ( *(regex++) != '^' )
+                return r;
+
+            stringstream ss;
+
+            while(*regex){
+                char c = *(regex++);
+                if ( c == '*' || c == '?' ){
+                    // These are the only two symbols that make the last char optional
+                    r = ss.str();
+                    r = r.substr( 0 , r.size() - 1 );
+                    return r; //breaking here fails with /^a?/
+                } else if (c == '\\'){
+                    // slash followed by non-alphanumeric represents the following char
+                    c = *(regex++);
+                    if ((c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z') ||
+                        (c >= '0' && c <= '0') ||
+                        (c == '\0'))
+                    {
+                        r = ss.str();
+                        break;
+                    } else {
+                        ss << c;
+                    }
+                } else if (strchr("^$.[|()+{", c)){
+                    // list of "metacharacters" from man pcrepattern
+                    r = ss.str();
+                    break;
+                } else if (extended && c == '#'){
+                    // comment
+                    r = ss.str();
+                    break;
+                } else if (extended && isspace(c)){
+                    continue;
+                } else {
+                    // self-matching char
+                    ss << c;
+                }
+            }
+
+            if ( r.size() == 0 && *regex == 0 )
+                r = ss.str();
+
+            return r;
+        }
+        inline string simpleRegex(const BSONElement& e){
+            switch(e.type()){
+                case RegEx:
+                    return simpleRegexHelper(e.regex(), e.regexFlags());
+                case Object:{
+                    BSONObj o = e.embeddedObject();
+                    return simpleRegexHelper(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
+                }
+                default: assert(false); return ""; //return squashes compiler warning
+            }
+        }
+    }
     
     FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
         if ( !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
@@ -65,8 +145,11 @@ namespace mongo {
 
         if ( e.eoo() )
             return;
-        if ( e.type() == RegEx ) {
-            const string r = e.simpleRegex();
+        if ( e.type() == RegEx
+             || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
+           )
+        {
+            const string r = simpleRegex(e);
             if ( r.size() ) {
                 lower = addObj( BSON( "" << r ) ).firstElement();
                 upper = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
@@ -212,7 +295,7 @@ namespace mongo {
 
             int op = getGtLtOp( e );
             
-            if ( op == BSONObj::Equality ) {
+            if ( op == BSONObj::Equality || op == BSONObj::opREGEX || op == BSONObj::opOPTIONS ) {
                 ranges_[ e.fieldName() ] &= FieldRange( e , optimize );
             }
             else if ( op == BSONObj::opELEM_MATCH ){
@@ -462,4 +545,50 @@ namespace mongo {
         }
     }
     
+    struct SimpleRegexUnitTest : UnitTest {
+        void run(){
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^foo");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "foo" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f?oo");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^fz?oo");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "m");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f", "mi");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "^f \t\vo\n\ro  \\ \\# #comment", "mx");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "foo #" );
+            }
+        }
+    } simple_regex_unittest;
 } // namespace mongo

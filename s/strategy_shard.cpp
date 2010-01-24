@@ -37,6 +37,16 @@ namespace mongo {
                 num++;
             }
             
+            if ( logLevel > 4 ){
+                StringBuilder ss;
+                ss << " shard query servers: " << servers.size() << "\n";
+                for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
+                    const ServerAndQuery& s = *i;
+                    ss << "       " << s.toString() << "\n";
+                }
+                log() << ss.str();
+            }
+
             ClusteredCursor * cursor = 0;
             
             BSONObj sort = query.getSort();
@@ -64,6 +74,8 @@ namespace mongo {
 
             assert( cursor );
             
+            log(5) << "   cursor type: " << cursor->type() << endl;
+
             ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
             if ( ! cc->sendNextBatch( r ) ){
                 delete( cursor );
@@ -141,8 +153,11 @@ namespace mongo {
             if ( multi )
                 uassert( 10202 ,  "can't mix multi and upsert and sharding" , ! upsert );
 
-            if ( upsert && ! manager->hasShardKey( query ) )
+            if ( upsert && !(manager->hasShardKey(toupdate) ||
+                             (toupdate.firstElement().fieldName()[0] == '$' && manager->hasShardKey(query))))
+            {
                 throw UserException( 8012 , "can't upsert something without shard key" );
+            }
 
             bool save = false;
             if ( ! manager->hasShardKey( query ) ){

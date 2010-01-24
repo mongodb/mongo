@@ -19,6 +19,8 @@
 
 #include <iostream>
 #include <stdio.h>
+#include <malloc.h>
+#include <db/jsobj.h>
 
 using namespace std;
 
@@ -90,7 +92,6 @@ namespace mongo {
             return (unsigned long)_rss * 4 * 1024;
         }
         
-    private:
         int _pid; 
         // The process ID.
         
@@ -201,6 +202,14 @@ namespace mongo {
     int ProcessInfo::getResidentSize(){
         LinuxProc p(_pid);
         return (int)( p.getResidentSize() / ( 1024.0 * 1024 ) );
+    }
+
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info){
+        struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
+        info.append("heap_usage_bytes", malloc_info.uordblks);
+
+        LinuxProc p(_pid);
+        info.append("page_faults", (int)p._maj_flt);
     }
 
 }

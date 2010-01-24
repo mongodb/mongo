@@ -547,7 +547,7 @@ DBCollection.prototype.mapReduce = function( map , reduce , optional ){
         Object.extend( c , optional );
     var raw = this._db.runCommand( c );
     if ( ! raw.ok )
-        throw "map reduce failed: " + raw.errmsg;
+        throw "map reduce failed: " + tojson( raw );
     return new MapReduceResult( this._db , raw );
 
 }

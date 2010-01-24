@@ -324,6 +324,27 @@ namespace JsonTests {
             }
         };
 
+        class CodeTests {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.appendCode( "x" , "function(){ return 1; }" );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
+            }
+        };
+
+        class TimestampTests {
+        public:
+            void run(){
+                BSONObjBuilder b;
+                b.appendTimestamp( "x" , 4000 , 10 );
+                BSONObj o = b.obj();
+                ASSERT_EQUALS( "{ \"x\" : { \"t\" : 4000 , \"i\" : 10 } }" , o.jsonString() );
+            }
+        };
+
+
     } // namespace JsonStringTests
 
     namespace FromJsonTests {
@@ -538,11 +559,22 @@ namespace JsonTests {
         class EscapedCharacters : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.append( "a", "\" \\ / \b \f \n \r \t" );
+                b.append( "a", "\" \\ / \b \f \n \r \t \v" );
                 return b.obj();
             }
             virtual string json() const {
-                return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }";
+                return "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t \\v\" }";
+            }
+        };
+
+        class NonEscapedCharacters : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.append( "a", "% { a z $ # '  " );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : \"\\% \\{ \\a \\z \\$ \\# \\' \\ \" }";
             }
         };
 
@@ -1025,6 +1057,9 @@ namespace JsonTests {
             add< JsonStringTests::Regex >();
             add< JsonStringTests::RegexEscape >();
             add< JsonStringTests::RegexManyOptions >();
+            add< JsonStringTests::CodeTests >();
+            add< JsonStringTests::TimestampTests >();
+
             add< FromJsonTests::Empty >();
             add< FromJsonTests::EmptyWithSpace >();
             add< FromJsonTests::SingleString >();
@@ -1041,6 +1076,7 @@ namespace JsonTests {
             add< FromJsonTests::False >();
             add< FromJsonTests::Null >();
             add< FromJsonTests::EscapedCharacters >();
+            add< FromJsonTests::NonEscapedCharacters >();
             add< FromJsonTests::AllowedControlCharacter >();
             add< FromJsonTests::EscapeFieldName >();
             add< FromJsonTests::EscapedUnicodeToUtf8 >();

@@ -873,7 +873,7 @@ namespace mongo {
             return;
         }
 
-        bool empty = clientIsEmpty();
+        bool empty = cc().database()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
@@ -1292,7 +1292,7 @@ namespace mongo {
 		BSONObj user;
 		{
 			dblock lk;
-			DBContext ctxt("local.");
+			Client::Context ctxt("local.");
 			if( !Helpers::findOne("local.system.users", userReplQuery, user) ) { 
 				// try the first user is local
 				if( !Helpers::getSingleton("local.system.users", user) ) {
@@ -1426,7 +1426,7 @@ namespace mongo {
 
         DEV assertInWriteLock();
 
-        DBContext context;
+        Client::Context context;
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.

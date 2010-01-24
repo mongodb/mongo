@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    /* Used for modifiers such as $inc, $set, ... */
+    /* Used for modifiers such as $inc, $set, $push, ... */
     struct Mod {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10
@@ -42,13 +42,13 @@ namespace mongo {
 
         BSONElement elt; // x:5 note: this is the actual element from the updateobj
         int pushStartSize;
-        boost::shared_ptr<JSMatcher> matcher;
+        boost::shared_ptr<Matcher> matcher;
 
         void init( Op o , BSONElement& e ){
             op = o;
             elt = e;
             if ( op == PULL && e.type() == Object )
-                matcher.reset( new JSMatcher( e.embeddedObject() ) );
+                matcher.reset( new Matcher( e.embeddedObject() ) );
         }
 
         void setFieldName( const char * s ){
@@ -146,9 +146,22 @@ namespace mongo {
             bb.append( elt );
             bb.done();
         }
+
+        void _checkForAppending( BSONElement& e ){
+            if ( e.type() == Object ){
+                // this is a tiny bit slow, but rare and important
+                // only when setting something TO an object, not setting something in an object
+                // and it checks for { $set : { x : { 'a.b' : 1 } } } 
+                // which is feel has been common
+                uassert( 12527 , "not okForStorage" , e.embeddedObject().okForStorage() );
+            }
+        }
+        
     };
 
-    class ModSet {
+    class ModState;
+
+    class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
         
@@ -173,7 +186,6 @@ namespace mongo {
         void _appendNewFromMods( const string& root , Mod& m , BSONObjBuilder& b , set<string>& onedownseen );
         
         void appendNewFromMod( Mod& m , BSONObjBuilder& b ){
-            
             switch ( m.op ){
                 
             case Mod::PUSH: { 
@@ -198,6 +210,7 @@ namespace mongo {
                 
             case Mod::INC:
             case Mod::SET: {
+                m._checkForAppending( m.elt );
                 b.appendAs( m.elt, m.shortFieldName );
                 break;
             }
@@ -275,14 +288,17 @@ namespace mongo {
         }
         
     public:
+        
+        ModSet( const BSONObj &from );
 
-        void getMods( const BSONObj &from );
+        auto_ptr<ModState> prepare( const BSONObj& obj ) const;
+
         /**
            will return if can be done in place, or uassert if there is an error
            @return whether or not the mods can be done in place
          */
         bool canApplyInPlaceAndVerify( const BSONObj &obj ) const;
-        void applyModsInPlace( const BSONObj &obj ) const;
+        void applyModsInPlace( BSONObj &obj ) const;
 
         // new recursive version, will replace at some point
         void createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj );
@@ -366,6 +382,14 @@ namespace mongo {
         }
     };
     
-
+    /**
+     * this is used to hold state, meta data while applying a ModSet to a BSONObj
+     * the goal is to make ModSet const so its re-usable
+     */
+    class ModState {
+    public:
+        
+    };
+    
 }
 
