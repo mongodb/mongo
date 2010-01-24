@@ -236,8 +236,6 @@ _
 
 --- Module:   ../db/db_sync.c (C)
 
---- Module:   ../env/engine.c (C)
-
 --- Module:   ../env/env_cache.c (C)
                                                                        _
 	    ienv->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
@@ -290,6 +288,10 @@ _
 ../env/env_msg.c  54  Warning 611: Suspicious cast
 
 --- Module:   ../env/env_open.c (C)
+                                                                         _
+#... o { if ((ret = (__wt_thread_create(&ienv->workq_tid, __wt_workq_srvr, env)
+	WT_ERR(__wt_thread_create(&ienv->workq_tid, __wt_workq_srvr, env));
+../env/env_open.c  35  Error 40: Undeclared identifier '__wt_workq_srvr'
 _
 }
 ../env/env_open.c  42  Info 715: Symbol 'mode' (line 17) not referenced
@@ -301,7 +303,41 @@ _
 
 --- Module:   ../env/env_stat.c (C)
 
---- Module:   ../env/toc.c (C)
+--- Module:   ../env/env_toc.c (C)
+                                    _
+{
+../env/env_toc.c  18  Error 14: Symbol '__wt_env_stat_print(struct __env *,
+    struct __sFILE *)' previously defined (line 162, file ../inc_posix/extern.h)
+../inc_posix/extern.h  162  Info 830: Location cited in prior message
+                         _
+{
+../env/env_toc.c  38  Error 14: Symbol '__wt_env_stat_clear(struct __env *)'
+    previously defined (line 164, file ../inc_posix/extern.h)
+../inc_posix/extern.h  164  Info 830: Location cited in prior message
+                                             _
+{
+../env/env_toc.c  59  Error 14: Symbol '__wt_stat_print(struct __env *, struct
+    __wt_stats *, struct __sFILE *)' previously defined (line 166, file
+    ../inc_posix/extern.h)
+../inc_posix/extern.h  166  Info 830: Location cited in prior message
+
+--- Module:   ../env/env_workq.c (C)
+                                    _
+{
+../env/env_workq.c  18  Error 14: Symbol '__wt_env_stat_print(struct __env *,
+    struct __sFILE *)' previously defined (line 162, file ../inc_posix/extern.h)
+../inc_posix/extern.h  162  Info 830: Location cited in prior message
+                         _
+{
+../env/env_workq.c  38  Error 14: Symbol '__wt_env_stat_clear(struct __env *)'
+    previously defined (line 164, file ../inc_posix/extern.h)
+../inc_posix/extern.h  164  Info 830: Location cited in prior message
+                                             _
+{
+../env/env_workq.c  59  Error 14: Symbol '__wt_stat_print(struct __env *,
+    struct __wt_stats *, struct __sFILE *)' previously defined (line 166, file
+    ../inc_posix/extern.h)
+../inc_posix/extern.h  166  Info 830: Location cited in prior message
 
 --- Module:   ../os_posix/os_abort.c (C)
 
@@ -322,6 +358,18 @@ _
 --- Module:   ../os_posix/os_yield.c (C)
 
 --- Module:   ../support/api.c (C)
+              _
+	ret = __wt_env_toc(env, tocp);
+../support/api.c  869  Info 718: Symbol '__wt_env_toc' undeclared, assumed to
+    return int
+../support/api.c  869  Info 746: call to function '__wt_env_toc()' not made in
+    the presence of a prototype
+              _
+	ret = __wt_wt_toc_close(wt_toc);
+../support/api.c  942  Info 718: Symbol '__wt_wt_toc_close' undeclared, assumed
+    to return int
+../support/api.c  942  Info 746: call to function '__wt_wt_toc_close()' not
+    made in the presence of a prototype
 _
 }
 ../support/api.c  1236  Info 715: Symbol 'wt_toc' (line 1234) not referenced
@@ -353,3 +401,15 @@ Info 765: external 'wiredtiger_err_stream(struct __sFILE *)' (line 13, file
 Info 714: Symbol 'wiredtiger_err_stream(struct __sFILE *)' (line 13, file
     ../env/env_err.c) not referenced
 ../env/env_err.c  13  Info 830: Location cited in prior message
+Warning 526: Symbol '__wt_env_toc()' (line 869, file ../support/api.c) not
+    defined
+../support/api.c  869  Info 830: Location cited in prior message
+Warning 628: no argument information provided for function '__wt_env_toc()'
+    (line 869, file ../support/api.c)
+../support/api.c  869  Info 830: Location cited in prior message
+Warning 526: Symbol '__wt_wt_toc_close()' (line 942, file ../support/api.c) not
+    defined
+../support/api.c  942  Info 830: Location cited in prior message
+Warning 628: no argument information provided for function '__wt_wt_toc_close()'
+    (line 942, file ../support/api.c)
+../support/api.c  942  Info 830: Location cited in prior message

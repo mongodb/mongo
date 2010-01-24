@@ -26,7 +26,6 @@ db/db_huffman.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
-env/engine.c
 env/env_cache.c
 env/env_err.c
 env/env_getset.c
@@ -36,7 +35,8 @@ env/env_init.c
 env/env_msg.c
 env/env_open.c
 env/env_stat.c
-env/toc.c
+env/env_toc.c
+env/env_workq.c
 os_posix/os_abort.c
 os_posix/os_alloc.c
 os_posix/os_filesize.c

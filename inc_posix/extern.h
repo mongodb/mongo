@@ -119,8 +119,6 @@ int
 __wt_db_stat_clear(DB *db);
 int
 __wt_db_sync(DB *db, void (*f)(const char *, u_int64_t));
-void *
-__wt_workq_srvr(void *arg);
 int
 __wt_cache_create(ENV *env);
 int
@@ -172,6 +170,8 @@ int
 __wt_wt_toc_close(WT_TOC *toc);
 int
 __wt_toc_dump(ENV *env, const char *ofile, FILE *fp);
+void *
+__wt_workq_srvr(void *arg);
 void
 __wt_abort();
 int
