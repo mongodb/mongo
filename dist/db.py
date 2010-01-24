@@ -24,7 +24,7 @@ for o, a in opts:
 		pairs = int(a)
 	elif o == "-s":
 		seed = int(a)
-	
+
 random.seed(seed)
 for i in range(pairs):
 	fmt = "%010d\ndata: %0" + str(random.randrange(dmin, dmax)) + "d"

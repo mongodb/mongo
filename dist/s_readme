@@ -17,7 +17,7 @@ test $cnt -eq 1 && exit 0
 
 cat << END_TEXT > $t
 $WIREDTIGER_VERSION_STRING
- 
+
 This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
 
 To view release and installation documentation, load the distribution
