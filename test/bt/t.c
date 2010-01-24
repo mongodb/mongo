@@ -24,9 +24,11 @@ int runs = 0;					/* Runs: default forever */
 int verbose = 0;				/* Verbose debugging */
 
 int a_dump = 0;					/* Dump database */
-int a_stat = 0;					/* Stat output */
 int a_reopen = 0;				/* Sync and reopen database */
 int a_verify = 0;				/* Verify database */
+
+enum {						/* Statistics */
+    STAT_NONE, STAT_ALL, STAT_LOAD, STAT_READ, STAT_WRITE } a_stat = STAT_NONE;
 
 const char *progname;
 
@@ -64,7 +66,7 @@ main(int argc, char *argv[])
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
 	rand_cache = rand_huffman = rand_keys = rand_leaf = rand_node =  1;
-	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:v")) != EOF)
+	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:s:v")) != EOF)
 		switch (ch) {
 		case 'a':
 			switch (optarg[0]) {
@@ -73,9 +75,6 @@ main(int argc, char *argv[])
 				break;
 			case 'r':
 				a_reopen = 1;
-				break;
-			case 's':
-				a_stat = 1;
 				break;
 			case 'v':
 				a_verify = 1;
@@ -110,6 +109,22 @@ main(int argc, char *argv[])
 			break;
 		case 'r':
 			runs = atoi(optarg);
+			break;
+		case 's':
+			switch (optarg[0]) {
+			case 'l':
+				a_stat = STAT_LOAD;
+				break;
+			case 'r':
+				a_stat = STAT_READ;
+				break;
+			case 'w':
+				a_stat = STAT_WRITE;
+				break;
+			default:
+				a_stat = STAT_ALL;
+				break;
+			}
 			break;
 		case 'v':
 			verbose = 1;
@@ -269,7 +284,7 @@ load()
 	if (a_verify)
 		assert(db->verify(db, track, 0) == 0);
 
-	if (a_stat) {
+	if (a_stat == STAT_ALL || a_stat == STAT_LOAD) {
 		(void)printf("\nLoad statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -367,7 +382,7 @@ read_check()
 
 	assert(toc->close(toc, 0) == 0);
 
-	if (a_stat) {
+	if (a_stat == STAT_ALL || a_stat == STAT_READ) {
 		(void)printf("\nRead-check statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -421,7 +436,7 @@ write_check()
 	if (a_verify)
 		assert(db->verify(db, track, 0) == 0);
 
-	if (a_stat) {
+	if (a_stat == STAT_ALL || a_stat == STAT_WRITE) {
 		(void)printf("\nWrite-check statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -499,8 +514,9 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dv] [-a d|r|s|v] [-c cachesize] [-h 0|1] [-k keys] "
-	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs]\n",
+	    "usage: %s [-dv] [-a d|r|v] [-c cachesize] [-h 0|1] [-k keys] "
+	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs] "
+	    "[-s l|r|w|*]\n",
 	    progname);
 	exit(1);
 }
