@@ -749,6 +749,21 @@ namespace JSTests {
             expected << "BinData( type: " << ByteArray << ", base64: \"" << base64 << "\" )";
             ASSERT_EQUALS( expected.str(), s->getString( "q" ) );
             
+            stringstream scriptBuilder;
+            scriptBuilder << "z = { c : new BinData( " << ByteArray << ", \"" << base64 << "\" ) };";
+            string script = scriptBuilder.str();
+            s->invokeSafe( script.c_str(), BSONObj() );
+            out = s->getObject( "z" );
+//            pp( "out" , out["c"] );
+            ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );            
+
+            s->invokeSafe( "a = { f: new BinData( 128, \"\" ) };", BSONObj() );
+            out = s->getObject( "a" );
+            int len = -1;
+            out[ "f" ].binData( len );
+            ASSERT_EQUALS( 0, len );
+            ASSERT_EQUALS( 128, out[ "f" ].binDataType() );
+            
             delete s;
         }
     };

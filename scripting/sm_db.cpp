@@ -591,8 +591,24 @@ namespace mongo {
 
 
     JSBool bindata_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
-        JS_ReportError( cx , "can't create a BinData yet" );
-        return JS_FALSE;            
+        Convertor c( cx );
+        
+        if ( argc == 2 ){
+
+            int type = (int)c.toNumber( argv[ 0 ] );
+            string encoded = c.toString( argv[ 1 ] );
+            string decoded = base64::decode( encoded );
+
+            assert( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
+            c.setProperty( obj, "len", c.toval( decoded.length() ) );
+            c.setProperty( obj, "type", c.toval( type ) );
+
+            return JS_TRUE;
+        }
+        else {
+            JS_ReportError( cx , "BinData needs 2 arguments" );
+            return JS_FALSE;            
+        }
     }
  
     JSBool bindata_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    

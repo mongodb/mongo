@@ -115,5 +115,20 @@ namespace mongo {
     bool isDate( JSContext * cx , JSObject * o );
 
     // JS private data must be 2byte aligned, so we use a holder to refer to an unaligned pointer.
-    struct BinDataHolder { BinDataHolder( const char *c ) : c_( c ) {} const char *c_; };
+    struct BinDataHolder {
+        BinDataHolder( const char *c, int copyLen = -1 ) :
+        c_( const_cast< char * >( c ) ),
+        iFree_( copyLen != -1 ) {
+            if ( copyLen != -1 ) {
+                c_ = (char*)malloc( copyLen );
+                memcpy( c_, c, copyLen );
+            }
+        }
+        ~BinDataHolder() {
+            if ( iFree_ )
+                free( c_ );
+        }
+        char *c_;
+        bool iFree_;
+    };
 }
