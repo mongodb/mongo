@@ -44,6 +44,11 @@ namespace mongo {
         void setLong(long long n) { 
             if( _element.type() == NumberLong ) *reinterpret_cast< long long * >( value() ) = n;
         }
+        void setInt(int n) { 
+            assert( _element.type() == NumberInt );
+            *reinterpret_cast< int * >( value() ) = n;
+        }
+
         
         /** Replace the type and value of the element with the type and value of e,
             preserving the original fieldName */

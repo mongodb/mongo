@@ -101,7 +101,7 @@ namespace mongo {
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
     */
-    UpdateResult updateObjects(const char *ns, BSONObj updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
+    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
 
     // If justOne is true, deletedId is set to the id of the deleted object.
     int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false);
