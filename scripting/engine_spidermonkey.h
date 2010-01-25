@@ -113,5 +113,7 @@ namespace mongo {
 #define JSVAL_IS_OID(v) ( JSVAL_IS_OBJECT( v ) && JS_InstanceOf( cx , JSVAL_TO_OBJECT( v ) , &object_id_class , 0 ) )
     
     bool isDate( JSContext * cx , JSObject * o );
-    
+
+    // JS private data must be 2byte aligned, so we use a holder to refer to an unaligned pointer.
+    struct BinDataHolder { BinDataHolder( const char *c ) : c_( c ) {} const char *c_; };
 }

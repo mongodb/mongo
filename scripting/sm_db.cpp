@@ -18,6 +18,7 @@
 // hacked in right now from engine_spidermonkey.cpp
 
 #include "../client/syncclusterconnection.h"
+#include "util/base64.h"
 
 namespace mongo {
 
@@ -594,14 +595,39 @@ namespace mongo {
         return JS_FALSE;            
     }
  
+    JSBool bindata_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        int type = (int)c.getNumber( obj , "type" );
+        int len = (int)c.getNumber( obj, "len" );
+        void *holder = JS_GetPrivate( cx, obj );
+        assert( holder );
+        const char *data = ( ( BinDataHolder* )( holder ) )->c_;
+        stringstream ss;
+        ss << "BinData( type: " << type << ", base64: \"";
+        base64::encode( ss, (const char *)data, len );
+        ss << "\" )";
+        string ret = ss.str();
+        return *rval = c.toval( ret.c_str() );
+    }
+
+    void bindata_finalize( JSContext * cx , JSObject * obj ){
+        Convertor c(cx);
+        void *holder = JS_GetPrivate( cx, obj );
+        if ( holder ){
+            delete ( BinDataHolder* )holder;
+            assert( JS_SetPrivate( cx , obj , 0 ) );
+        }
+    }    
+    
     JSClass bindata_class = {
         "BinData" , JSCLASS_HAS_PRIVATE ,
         JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
+        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, bindata_finalize,
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
     JSFunctionSpec bindata_functions[] = {
+        { "toString" , bindata_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { 0 }
     };
     
@@ -826,9 +852,11 @@ namespace mongo {
         }
         
         if ( JS_InstanceOf( c->_context , o , &bindata_class , 0 ) ){
+            void *holder = JS_GetPrivate( c->_context , o );
+            const char *data = ( ( BinDataHolder * )( holder ) )->c_;
             b.appendBinData( name.c_str() , 
                              (int)(c->getNumber( o , "len" )) , (BinDataType)((char)(c->getNumber( o , "type" ) ) ) , 
-                             (char*)JS_GetPrivate( c->_context , o ) + 1
+                             data
                              );
             return true;
         }

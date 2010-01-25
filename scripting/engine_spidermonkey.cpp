@@ -586,8 +586,8 @@ namespace mongo {
             case BinData:{
                 JSObject * o = JS_NewObject( _context , &bindata_class , 0 , 0 );
                 int len;
-                void * data = (void*)e.binData( len );
-                assert( JS_SetPrivate( _context , o , data ) );
+                const char * data = e.binData( len );
+                assert( JS_SetPrivate( _context , o , new BinDataHolder( data ) ) );
 
                 setProperty( o , "len" , toval( len ) );
                 setProperty( o , "type" , toval( (int)e.binDataType() ) );

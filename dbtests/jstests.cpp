@@ -25,6 +25,8 @@
 
 #include "dbtests.h"
 
+#include "util/base64.h"
+
 namespace mongo {
     bool dbEval(const char *ns, BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
 } // namespace mongo
@@ -721,7 +723,7 @@ namespace JSTests {
             Scope * s = globalScriptEngine->newScope();
             s->localConnect( "asd" );
             const char * foo = "asdas\0asdasd";
-
+            const char * base64 = "YXNkYXMAYXNkYXNk";
             
             BSONObj in;
             {
@@ -737,13 +739,15 @@ namespace JSTests {
             
             BSONObj out = s->getObject( "y" );
             ASSERT_EQUALS( BinData , out["c"].type() );
-            //blah( "in " , in["b"] );
-            //blah( "out" , out["c"] );
+//            pp( "in " , in["b"] );
+//            pp( "out" , out["c"] );
             ASSERT_EQUALS( 0 , in["b"].woCompare( out["c"] , false ) );
 
             // check that BinData js class is utilized
-            s->invokeSafe( "q = tojson( x.b );", BSONObj() );
-            ASSERT_EQUALS( "BinData", s->getString( "q" ).substr( 0, 7 ) );
+            s->invokeSafe( "q = x.b.toString();", BSONObj() );
+            stringstream expected;
+            expected << "BinData( type: " << ByteArray << ", base64: \"" << base64 << "\" )";
+            ASSERT_EQUALS( expected.str(), s->getString( "q" ) );
             
             delete s;
         }
