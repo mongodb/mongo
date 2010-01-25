@@ -262,6 +262,13 @@ namespace mongo {
         int backgroundIndexBuildInProgress; // 1 if in prog
         char reserved[76];
 
+        /* when a background index build is in progress, we don't count the index in nIndexes until 
+           complete, yet need to still use it in _indexRecord() - thus we use this function for that.
+        */
+        int nIndexesBeingBuilt() const { 
+            return nIndexes + backgroundIndexBuildInProgress;
+        }
+
         /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so, 
                  this isn't thread safe.  TODO
         */

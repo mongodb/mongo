@@ -695,12 +695,12 @@ namespace mongo {
     
     int nUnindexes = 0;
 
-    void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
+    /* unindex all keys in index for this record. */
+    static void _unindexRecord(IndexDetails& id, BSONObj& obj, const DiskLoc& dl, bool logMissing = true) {
         BSONObjSetDefaultOrder keys;
         id.getKeysFromObject(obj, keys);
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             BSONObj j = *i;
-            //		out() << "UNINDEX: j:" << j.toString() << " head:" << id.head.toString() << dl.toString() << endl;
             if ( otherTraceLevel >= 5 ) {
                 out() << "_unindexRecord() " << obj.toString();
                 out() << "\n  unindex:" << j.toString() << endl;
@@ -726,12 +726,11 @@ namespace mongo {
     }
 
     /* unindex all keys in all indexes for this record. */
-    void  unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
-        if ( d->nIndexes == 0 ) return;
+    static void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         BSONObj obj(todelete);
-        NamespaceDetails::IndexIterator i = d->ii();
-        while( i.more() ) {
-            _unindexRecord(i.next(), obj, dl, !noWarn);
+        int n = d->nIndexesBeingBuilt();
+        for ( int i = 0; i < n; i++ ) {
+            _unindexRecord(d->idx(i), obj, dl, !noWarn);
         }
     }
 
@@ -903,10 +902,8 @@ namespace mongo {
         return sz;
     }
 
-    int deb=0;
-
-    /* add keys to indexes for a new record */
-    inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc newRecordLoc, bool dupsAllowed) {
+    /* add keys to index idxNo for a new record */
+    static inline void  _indexRecord(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->idx(idxNo);
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
@@ -916,9 +913,9 @@ namespace mongo {
             if( ++n == 2 ) { 
                 d->setIndexIsMultikey(idxNo);
             }
-            assert( !newRecordLoc.isNull() );
+            assert( !recordLoc.isNull() );
             try {
-                idx.head.btree()->bt_insert(idx.head, newRecordLoc,
+                idx.head.btree()->bt_insert(idx.head, recordLoc,
                                             *i, order, dupsAllowed, idx);
             }
             catch (AssertionException& ) {
@@ -1158,11 +1155,11 @@ namespace mongo {
     }
 
     /* add keys to indexes for a new record */
-    void  indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
+    static void indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
         BSONObj obj((const char *)buf);
 
-        /*UNIQUE*/
-        for ( int i = 0; i < d->nIndexes; i++ ) {
+        int n = d->nIndexesBeingBuilt();
+        for ( int i = 0; i < n; i++ ) {
             try { 
                 bool unique = d->idx(i).unique();
                 _indexRecord(d, i, obj, newRecordLoc, /*dupsAllowed*/!unique);
@@ -1185,7 +1182,7 @@ namespace mongo {
         }
     }
 
-    extern BSONObj id_obj; // { _id : ObjectId("000000000000000000000000") }
+    extern BSONObj id_obj; // { _id : 1 }
 
     void ensureHaveIdIndex(const char *ns) {
         NamespaceDetails *d = nsdetails(ns);

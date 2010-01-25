@@ -229,7 +229,7 @@ namespace mongo {
         log( k == n ) << "killcursors: found " << k << " of " << n << '\n';
     }
 
-    BSONObj id_obj = fromjson("{\"_id\":ObjectId( \"000000000000000000000000\" )}");
+    BSONObj id_obj = fromjson("{\"_id\":1}");
     BSONObj empty_obj = fromjson("{}");
 
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
