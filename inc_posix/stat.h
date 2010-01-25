@@ -65,7 +65,25 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB handle.
  */
-#define	WT_STAT_DB_TOTAL		   20
+#define	WT_STAT_DB_TOTAL		   12
+
+#define	WT_STAT_BULK_DUP_DATA_READ	    0
+#define	WT_STAT_BULK_HUFFMAN_DATA	    1
+#define	WT_STAT_BULK_HUFFMAN_KEY	    2
+#define	WT_STAT_BULK_OVERFLOW_DATA	    3
+#define	WT_STAT_BULK_OVERFLOW_KEY	    4
+#define	WT_STAT_BULK_PAIRS_READ		    5
+#define	WT_STAT_DB_CACHE_ALLOC		    6
+#define	WT_STAT_DB_CACHE_HIT		    7
+#define	WT_STAT_DB_CACHE_MISS		    8
+#define	WT_STAT_DB_READ_BY_KEY		    9
+#define	WT_STAT_DB_READ_BY_RECNO	   10
+#define	WT_STAT_DB_WRITE_BY_KEY		   11
+
+/*
+ * Statistics entries for DB/IDB database.
+ */
+#define	WT_STAT_DATABASE_TOTAL		   20
 
 #define	WT_STAT_BASE_RECNO		    0
 #define	WT_STAT_EXTSIZE			    1
@@ -87,24 +105,6 @@ struct __wt_stats {
 #define	WT_STAT_PAGE_LEAF		   17
 #define	WT_STAT_PAGE_OVERFLOW		   18
 #define	WT_STAT_TREE_LEVEL		   19
-
-/*
- * Statistics entries for DB/IDB database.
- */
-#define	WT_STAT_DATABASE_TOTAL		   12
-
-#define	WT_STAT_BULK_DUP_DATA_READ	    0
-#define	WT_STAT_BULK_HUFFMAN_DATA	    1
-#define	WT_STAT_BULK_HUFFMAN_KEY	    2
-#define	WT_STAT_BULK_OVERFLOW_DATA	    3
-#define	WT_STAT_BULK_OVERFLOW_KEY	    4
-#define	WT_STAT_BULK_PAIRS_READ		    5
-#define	WT_STAT_DB_CACHE_ALLOC		    6
-#define	WT_STAT_DB_CACHE_HIT		    7
-#define	WT_STAT_DB_CACHE_MISS		    8
-#define	WT_STAT_DB_READ_BY_KEY		    9
-#define	WT_STAT_DB_READ_BY_RECNO	   10
-#define	WT_STAT_DB_WRITE_BY_KEY		   11
 
 /*
  * Statistics entries for FH handle.

@@ -22,16 +22,15 @@ __wt_db_stat_print(DB *db, FILE *stream)
 	env = db->env;
 	idb = db->idb;
 
+	fprintf(stream, "Database handle statistics: %s\n", idb->dbname);
+	__wt_stat_print(env, idb->stats, stream);
+
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_database_stats(idb->dstats);
 	WT_RET(__wt_bt_stat(db));
 
 	fprintf(stream, "Database statistics: %s\n", idb->dbname);
 	__wt_stat_print(env, idb->dstats, stream);
-
-	/* Database handle statistics. */
-	fprintf(stream, "Database handle statistics: %s\n", idb->dbname);
-	__wt_stat_print(env, idb->stats, stream);
 
 	/* Underlying file handle statistics. */
 	if (idb->fh != NULL) {

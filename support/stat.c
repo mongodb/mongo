@@ -75,6 +75,55 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 	WT_RET(__wt_calloc(env,
 	    WT_STAT_DB_TOTAL + 1, sizeof(WT_STATS), &stats));
 
+	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
+	    "bulk duplicate data pairs read";
+	stats[WT_STAT_BULK_HUFFMAN_DATA].desc =
+	    "bulk insert huffman data compression";
+	stats[WT_STAT_BULK_HUFFMAN_KEY].desc =
+	    "bulk insert huffman key compression";
+	stats[WT_STAT_BULK_OVERFLOW_DATA].desc =
+	    "bulk overflow data items read";
+	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
+	stats[WT_STAT_BULK_PAIRS_READ].desc = "bulk key/data pairs inserted";
+	stats[WT_STAT_DB_CACHE_ALLOC].desc = "pages allocated in the cache";
+	stats[WT_STAT_DB_CACHE_HIT].desc =
+	    "cache hit: reads found in the cache";
+	stats[WT_STAT_DB_CACHE_MISS].desc =
+	    "cache miss: reads not found in the cache";
+	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
+	stats[WT_STAT_DB_READ_BY_RECNO].desc =
+	    "database read-by-recno operations";
+	stats[WT_STAT_DB_WRITE_BY_KEY].desc = "database put-by-key operations";
+
+	*statsp = stats;
+	return (0);
+}
+
+void
+__wt_stat_clear_db_stats(WT_STATS *stats)
+{
+	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
+	stats[WT_STAT_BULK_HUFFMAN_DATA].v = 0;
+	stats[WT_STAT_BULK_HUFFMAN_KEY].v = 0;
+	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
+	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
+	stats[WT_STAT_BULK_PAIRS_READ].v = 0;
+	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
+	stats[WT_STAT_DB_CACHE_HIT].v = 0;
+	stats[WT_STAT_DB_CACHE_MISS].v = 0;
+	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
+	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
+	stats[WT_STAT_DB_WRITE_BY_KEY].v = 0;
+}
+
+int
+__wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
+{
+	WT_STATS *stats;
+
+	WT_RET(__wt_calloc(env,
+	    WT_STAT_DATABASE_TOTAL + 1, sizeof(WT_STATS), &stats));
+
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_EXTSIZE].desc = "database extent size";
 	stats[WT_STAT_FRAGSIZE].desc = "database fragment size";
@@ -101,7 +150,7 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 }
 
 void
-__wt_stat_clear_db_stats(WT_STATS *stats)
+__wt_stat_clear_database_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_EXTSIZE].v = 0;
@@ -123,55 +172,6 @@ __wt_stat_clear_db_stats(WT_STATS *stats)
 	stats[WT_STAT_PAGE_LEAF].v = 0;
 	stats[WT_STAT_PAGE_OVERFLOW].v = 0;
 	stats[WT_STAT_TREE_LEVEL].v = 0;
-}
-
-int
-__wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
-{
-	WT_STATS *stats;
-
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_DATABASE_TOTAL + 1, sizeof(WT_STATS), &stats));
-
-	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
-	    "bulk duplicate data pairs read";
-	stats[WT_STAT_BULK_HUFFMAN_DATA].desc =
-	    "bulk insert huffman data compression";
-	stats[WT_STAT_BULK_HUFFMAN_KEY].desc =
-	    "bulk insert huffman key compression";
-	stats[WT_STAT_BULK_OVERFLOW_DATA].desc =
-	    "bulk overflow data items read";
-	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
-	stats[WT_STAT_BULK_PAIRS_READ].desc = "bulk key/data pairs inserted";
-	stats[WT_STAT_DB_CACHE_ALLOC].desc = "pages allocated in the cache";
-	stats[WT_STAT_DB_CACHE_HIT].desc =
-	    "cache hit: reads found in the cache";
-	stats[WT_STAT_DB_CACHE_MISS].desc =
-	    "cache miss: reads not found in the cache";
-	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
-	stats[WT_STAT_DB_READ_BY_RECNO].desc =
-	    "database read-by-recno operations";
-	stats[WT_STAT_DB_WRITE_BY_KEY].desc = "database put-by-key operations";
-
-	*statsp = stats;
-	return (0);
-}
-
-void
-__wt_stat_clear_database_stats(WT_STATS *stats)
-{
-	stats[WT_STAT_BULK_DUP_DATA_READ].v = 0;
-	stats[WT_STAT_BULK_HUFFMAN_DATA].v = 0;
-	stats[WT_STAT_BULK_HUFFMAN_KEY].v = 0;
-	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
-	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
-	stats[WT_STAT_BULK_PAIRS_READ].v = 0;
-	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
-	stats[WT_STAT_DB_CACHE_HIT].v = 0;
-	stats[WT_STAT_DB_CACHE_MISS].v = 0;
-	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
-	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
-	stats[WT_STAT_DB_WRITE_BY_KEY].v = 0;
 }
 
 int

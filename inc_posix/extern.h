@@ -147,7 +147,7 @@ __wt_env_cache_size_set_verify(ENV *env, u_int32_t cache_size);
 int
 __wt_env_cache_hash_size_set_verify(ENV *env, u_int32_t hash_size);
 int
-__wt_env_cache_hazard_size_set_verify(ENV *env, u_int32_t hazard_size);
+__wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size);
 int
 __wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size);
 int
