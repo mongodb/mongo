@@ -217,6 +217,7 @@ namespace mongo {
                 return;
             
             clear();
+            _mutex.unlock(); // boost will assert if the mutex is destroyed while locked
         }
 
         void done( const string& pool , Scope * s ){
