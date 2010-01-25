@@ -157,6 +157,7 @@ namespace mongo {
                             size = a_.pendingSize_[ name ];
                         }
                         try {
+                            log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                             long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                             if ( fd <= 0 ) {
                                 stringstream ss;
@@ -180,7 +181,6 @@ namespace mongo {
                                 massert( 10442 ,  "Unable to allocate file of desired size",
                                         1 == write(fd, "", 1) );
                                 lseek(fd, 0, SEEK_SET);
-                                log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                                 Timer t;
                                 long z = 256 * 1024;
                                 char buf[z];
