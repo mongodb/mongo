@@ -158,6 +158,7 @@ namespace mongo {
 
         void run(){
             cout << "AsyncMessageServer starting to listen on: " << _port << endl;
+            boost::thread other(boost::bind(&io_service::run, &_ioservice));
             _ioservice.run();
             cout << "AsyncMessageServer done listening on: " << _port << endl;
         }
