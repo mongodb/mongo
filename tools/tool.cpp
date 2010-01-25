@@ -53,6 +53,8 @@ void mongo::Tool::printHelp(ostream &out) {
 }
 
 int mongo::Tool::main( int argc , char ** argv ){
+    cmdLine.prealloc = false;
+
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 
     _name = argv[0];
