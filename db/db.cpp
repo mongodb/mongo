@@ -58,6 +58,8 @@ namespace mongo {
     extern int diagLogging;
     extern int lenForNewNsFiles;
     extern int lockFile;
+    
+    extern string repairpath;
 
     void setupSignals();
     void closeAllSockets();
@@ -462,10 +464,17 @@ namespace mongo {
 
         show_32_warning();
 
-        stringstream ss;
-        ss << "dbpath (" << dbpath << ") does not exist";
-        massert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
-
+        {
+            stringstream ss;
+            ss << "dbpath (" << dbpath << ") does not exist";
+            massert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
+        }
+        {
+            stringstream ss;
+            ss << "repairpath (" << repairpath << ") does not exist";
+            massert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
+        }
+        
         acquirePathLock();
         remove_all( dbpath + "/_tmp/" );
 
@@ -593,6 +602,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("quiet", "quieter output")
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
         ("logappend" , "appnd to logpath instead of over-writing" )
+        ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
 #ifndef _WIN32
         ("fork" , "fork server process" )
 #endif
@@ -793,6 +803,12 @@ int main(int argc, char* argv[], char *envp[] )
             string lp = params["logpath"].as<string>();
             uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
             initLogging( lp , params.count( "logappend" ) );
+        }
+        if (params.count("repairpath")) {
+            repairpath = params["repairpath"].as<string>();
+            uassert( 12589, "repairpath has to be non-zero", repairpath.size() );
+        } else {
+            repairpath = dbpath;
         }
         if (params.count("nocursors")) {
             useCursors = false;

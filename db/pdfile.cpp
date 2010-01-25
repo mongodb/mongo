@@ -83,6 +83,7 @@ namespace mongo {
     /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
+    string repairpath;
 
     DataFileMgr theDataFileMgr;
     DatabaseHolder dbHolder;
@@ -1571,14 +1572,14 @@ namespace mongo {
 
     // generate a directory name for storing temp data files
     Path uniqueReservedPath( const char *prefix ) {
-        Path dbPath = Path( dbpath );
+        Path repairPath = Path( repairpath );
         Path reservedPath;
         int i = 0;
         bool exists = false;
         do {
             stringstream ss;
             ss << prefix << "_repairDatabase_" << i++;
-            reservedPath = dbPath / ss.str();
+            reservedPath = repairPath / ss.str();
             BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
         } while ( exists );
         return reservedPath;
