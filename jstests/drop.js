@@ -18,4 +18,4 @@ assert.eq( 1, db.system.indexes.find( {ns:"test.jstests_drop"} ).count() , "G" )
 
 // make sure we can still use it
 f.save( {} );
-assert.eq( 1, f.find().hint( {_id:new ObjectId( "000000000000000000000000" )} ).toArray().length , "H" );
+assert.eq( 1, f.find().hint( "_id_" ).toArray().length , "H" );
