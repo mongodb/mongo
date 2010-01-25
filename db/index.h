@@ -21,7 +21,10 @@
 #include "../stdafx.h"
 
 namespace mongo {
-    
+
+    /* precomputed details about an index, used for inserting keys on updates
+       stored/cached in NamespaceDetailsTransient, or can be used standalone
+       */
     class IndexSpec {
     public:
         BSONObj keys;
@@ -36,7 +39,7 @@ namespace mongo {
         }
 
         /**
-           this is a DickLock of an IndexDetails info
+           this is a DiscLoc of an IndexDetails info
            should have a key field 
          */
         IndexSpec( const DiskLoc& loc ){
@@ -57,7 +60,6 @@ namespace mongo {
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
     private:
-
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
         vector<const char*> _fieldNames;
@@ -74,7 +76,7 @@ namespace mongo {
 	   system.namespaces (although this also includes the head pointer, which is not in that 
 	   collection).
 
-       ** MemoryMapped Record  **
+       ** MemoryMapped Record ** (i.e., this is on disk data)
 	 */
     class IndexDetails {
     public:
