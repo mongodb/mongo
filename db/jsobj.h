@@ -509,7 +509,7 @@ namespace mongo {
         BinDataType binDataType() const {
             // BinData: <int len> <byte subtype> <byte[len] data>
             assert( type() == BinData );
-            char c = (value() + 4)[0];
+            unsigned char c = (value() + 4)[0];
             return (BinDataType)c;
         }
 
