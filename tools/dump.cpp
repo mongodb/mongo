@@ -39,7 +39,7 @@ public:
         
         ofstream out;
         out.open( outputFile.string().c_str() , ios_base::out | ios_base::binary  );
-        uassert( 10262 ,  "couldn't open file" , out.good() );
+        ASSERT_STREAM_GOOD( 10262 ,  "couldn't open file" , out );
 
         ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
 

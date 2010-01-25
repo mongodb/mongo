@@ -173,6 +173,10 @@ namespace mongo {
     
 #define ASSERT_ID_DUPKEY 11000
 
+    void streamNotGood( int code , string msg , std::ios& myios );
+
+#define ASSERT_STREAM_GOOD(msgid,msg,stream) (void)( (!!((stream).good())) || (mongo::streamNotGood(msgid, msg, stream), 0) )
+
 } // namespace mongo
 
 #define BOOST_CHECK_EXCEPTION( expression ) \

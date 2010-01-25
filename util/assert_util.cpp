@@ -72,6 +72,15 @@ namespace mongo {
         throw MsgAssertionException(msgid, msg);
     }
 
+    void streamNotGood( int code , string msg , std::ios& myios ){
+        stringstream ss;
+        // errno might not work on all systems for streams
+        // if it doesn't for a system should deal with here
+        ss << msg << " stream invalie: " << OUTPUT_ERRNO;
+        throw UserException( code , ss.str() );
+    }
+    
+    
     boost::mutex *Assertion::_mutex = new boost::mutex();
 
     string Assertion::toString() {
