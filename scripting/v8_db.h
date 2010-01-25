@@ -61,8 +61,9 @@ namespace mongo {
 
     v8::Handle<v8::Value> binDataInit( const v8::Arguments& args );
     v8::Handle<v8::Value> numberLongInit( const v8::Arguments& args );
-    v8::Handle<v8::Value> numberLongToString(const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongToNumber(const v8::Arguments& args);
+    v8::Handle<v8::Value> numberLongValueOf(const v8::Arguments& args);
+    v8::Handle<v8::Value> numberLongToString(const v8::Arguments& args);
     
     v8::Handle<v8::Value> dbQueryInit( const v8::Arguments& args );
     v8::Handle<v8::Value> dbQueryIndexAccess( uint32_t index , const v8::AccessorInfo& info );

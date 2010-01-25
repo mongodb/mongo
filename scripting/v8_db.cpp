@@ -53,8 +53,9 @@ namespace mongo {
         v8::Local<v8::FunctionTemplate> numberLong = FunctionTemplate::New( numberLongInit );
         v8::Local<v8::Template> proto = numberLong->PrototypeTemplate();
         
-        proto->Set( v8::String::New( "toString" ) , FunctionTemplate::New( numberLongToString ) );
+        proto->Set( v8::String::New( "valueOf" ) , FunctionTemplate::New( numberLongValueOf ) );        
         proto->Set( v8::String::New( "toNumber" ) , FunctionTemplate::New( numberLongToNumber ) );        
+        proto->Set( v8::String::New( "toString" ) , FunctionTemplate::New( numberLongToString ) );
         
         return numberLong;
     }
@@ -566,6 +567,25 @@ namespace mongo {
         return it;
     }
 
+    v8::Handle<v8::Value> numberLongValueOf( const v8::Arguments& args ) {
+        
+        if (args.Length() != 0) {
+            return v8::ThrowException( v8::String::New( "toNumber needs 0 arguments" ) );
+        }
+        
+        v8::Handle<v8::Object> it = args.This();
+        
+        unsigned long long val =
+        ( (unsigned long long)( it->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
+        (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
+        
+        return v8::Number::New( double( (long long)val ) );
+    }
+
+    v8::Handle<v8::Value> numberLongToNumber( const v8::Arguments& args ) {
+        return numberLongValueOf( args );
+    }
+
     v8::Handle<v8::Value> numberLongToString( const v8::Arguments& args ) {
         
         if (args.Length() != 0) {
@@ -583,22 +603,7 @@ namespace mongo {
         string ret = ss.str();
         return v8::String::New( ret.c_str() );
     }
-
-    v8::Handle<v8::Value> numberLongToNumber( const v8::Arguments& args ) {
-        
-        if (args.Length() != 0) {
-            return v8::ThrowException( v8::String::New( "toNumber needs 0 arguments" ) );
-        }
-        
-        v8::Handle<v8::Object> it = args.This();
-        
-        unsigned long long val =
-        ( (unsigned long long)( it->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
-        (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
-        
-        return v8::Number::New( double( (long long)val ) );
-    }
-
+    
     v8::Handle<v8::Value> bsonsize( const v8::Arguments& args ) {
         
         if (args.Length() != 1 || !args[ 0 ]->IsObject()) {

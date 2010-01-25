@@ -664,6 +664,15 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
     
+    JSBool numberlong_valueof(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        Convertor c(cx);
+        return *rval = c.toval( double( c.toNumberLongUnsafe( obj ) ) );        
+    }
+    
+    JSBool numberlong_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
+        return numberlong_valueof( cx, obj, argc, argv, rval );
+    }
+
     JSBool numberlong_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
         stringstream ss;
@@ -671,15 +680,11 @@ namespace mongo {
         string ret = ss.str();
         return *rval = c.toval( ret.c_str() );
     }
-    
-    JSBool numberlong_tonumber(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
-        Convertor c(cx);
-        return *rval = c.toval( double( c.toNumberLongUnsafe( obj ) ) );
-    }
 
     JSFunctionSpec numberlong_functions[] = {
-    { "toString" , numberlong_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { "valueOf" , numberlong_valueof , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
     { "toNumber" , numberlong_tonumber , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+    { "toString" , numberlong_tostring , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
     { 0 }
     };    
     
