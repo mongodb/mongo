@@ -9,11 +9,14 @@ t.ensureIndex( { c: 1 }, [ false, "cIndex" ] );
 
 checkIndexes = function( num ) {
 //    printjson( db.system.indexes.find( { ns: "test.jstests_index8" } ).toArray() );
-    indexes = db.system.indexes.find( { ns: "test.jstests_index8" } ).sort( { key: 1 } );
-    assert( !indexes[ 0 ].unique , "A" + num );
-    assert( indexes[ 1 ].unique , "B" + num );
-    assert( !indexes[ 2 ].unique , "C" + num );
-    assert.eq( "cIndex", indexes[ 2 ].name , "D" + num );
+    indexes = db.system.indexes.find( { ns: "test.jstests_index8" } ).sort( { key: 1 } ).toArray();
+    var start = 0;
+    if ( indexes[0].name == "_id_" )
+        start = 1;
+    assert( !indexes[ start ].unique , "A" + num );
+    assert( indexes[ start + 1 ].unique , "B" + num + " " + tojson( indexes[start+1] ) );
+    assert( !indexes[ start + 2 ].unique , "C" + num );
+    assert.eq( "cIndex", indexes[ start + 2 ].name , "D" + num );
 }
 
 checkIndexes( 1 );
