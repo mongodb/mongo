@@ -32,7 +32,6 @@
 using namespace boost;
 using namespace boost::asio;
 using namespace boost::asio::ip;
-//using namespace std;
 
 namespace mongo {
     namespace {
@@ -41,9 +40,12 @@ namespace mongo {
 
     class MessageServerSession : public boost::enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
     public:
-        MessageServerSession( MessageHandler * handler , io_service& ioservice ) : _handler( handler ) , _socket( ioservice ){
-            
-        }
+        MessageServerSession( MessageHandler * handler , io_service& ioservice )
+            : _handler( handler )
+            , _socket( ioservice )
+            , _portCache(0)
+        { }
+
         ~MessageServerSession(){
             cout << "disconnect from: " << _socket.remote_endpoint() << endl;
         }
@@ -117,7 +119,9 @@ namespace mongo {
 
         
         virtual unsigned remotePort(){
-            return _socket.remote_endpoint().port();
+            if (!_portCache)
+                _portCache = _socket.remote_endpoint().port(); //this is expensive
+            return _portCache;
         }
         
     private:        
@@ -134,6 +138,8 @@ namespace mongo {
         MsgData _inHeader;
         Message _cur;
         Message _reply;
+
+        unsigned _portCache;
     };
     
 
