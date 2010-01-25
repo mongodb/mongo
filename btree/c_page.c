@@ -329,7 +329,6 @@ int
 __wt_cache_in(WT_TOC *toc,
     u_int32_t addr, u_int32_t bytes, u_int32_t flags, WT_PAGE **pagep)
 {
-	static u_int longest_bucket_cnt = 0;
 	DB *db;
 	ENV *env;
 	IDB *idb;
@@ -355,13 +354,13 @@ __wt_cache_in(WT_TOC *toc,
 retry:	/* Search for the page in the cache. */
 	for (bucket_cnt = 0,
 	    page = cache->hb[WT_HASH(cache, addr)];
-	    page != NULL; ++bucket_cnt, page = page->next)
+	    page != NULL; page = page->next) {
+		++bucket_cnt;
 		if (page->addr == addr && page->db == db)
 			break;
-	if (bucket_cnt > longest_bucket_cnt) {
-		WT_STAT_SET(ienv->stats, LONGEST_BUCKET, bucket_cnt);
-		longest_bucket_cnt = bucket_cnt;
 	}
+	if (bucket_cnt > WT_STAT(ienv->stats, LONGEST_BUCKET))
+		WT_STAT_SET(ienv->stats, LONGEST_BUCKET, bucket_cnt);
 	if (page != NULL) {
 		/*
 		 * Add the page to the WT_TOC's hazard list and flush the write,
