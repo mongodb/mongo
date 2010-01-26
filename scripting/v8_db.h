@@ -60,6 +60,8 @@ namespace mongo {
     v8::Handle<v8::Value> dbPointerInit( const v8::Arguments& args );
 
     v8::Handle<v8::Value> binDataInit( const v8::Arguments& args );
+    v8::Handle<v8::Value> binDataToString( const v8::Arguments& args );
+
     v8::Handle<v8::Value> numberLongInit( const v8::Arguments& args );
     v8::Handle<v8::Value> numberLongToNumber(const v8::Arguments& args);
     v8::Handle<v8::Value> numberLongValueOf(const v8::Arguments& args);
