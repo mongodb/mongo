@@ -460,6 +460,29 @@ namespace ReplTests {
             BSONObj o_, q_, u_, ou_;            
         };
 
+        class UpdateInc2 : public Base {
+        public:
+            UpdateInc2() :
+            o_( fromjson( "{'_id':1,a:5}" ) ),
+            q_( fromjson( "{a:5}" ) ),
+            u_( fromjson( "{$inc:{a:3},$set:{x:5}}" ) ),
+            ou_( fromjson( "{'_id':1,a:8,x:5}" ) ) {}
+            void doIt() const {
+                client()->update( ns(), q_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( ou_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+            }
+        protected:
+            BSONObj o_, q_, u_, ou_;            
+        };
+
+
         class UpsertInsertIdMod : public Base {
         public:
             UpsertInsertIdMod() :
@@ -1016,6 +1039,7 @@ namespace ReplTests {
             add< Idempotence::UpsertInsertNoMods >();
             add< Idempotence::UpdateSet >();
             add< Idempotence::UpdateInc >();
+            add< Idempotence::UpdateInc2 >();
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();

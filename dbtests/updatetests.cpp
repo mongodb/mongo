@@ -552,7 +552,7 @@ namespace UpdateTests {
                 BSONObj m = morig.copy();
                 ModSet set(m);
 
-                BSONObj out = set.createNewFromMods( in );
+                BSONObj out = set.prepare(in)->createNewFromMods();
                 ASSERT_EQUALS( wanted , out );
             }
         };

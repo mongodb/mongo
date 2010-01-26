@@ -88,10 +88,16 @@ namespace mongo {
             }
         }
     };
+
+    void sighandler(int sig){
+        dbexit(EXIT_CLEAN, (string("recieved signal ") + BSONObjBuilder::numStr(sig)).c_str());
+    }
     
     void init(){
         serverID.init();
         setupSIGTRAPforGDB();
+        signal(SIGTERM, sighandler);
+        signal(SIGINT, sighandler);
     }
 
     void start() {
