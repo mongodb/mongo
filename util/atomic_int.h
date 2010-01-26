@@ -26,9 +26,7 @@ namespace mongo{
 
 
     struct AtomicUInt{
-        AtomicUInt() {
-            x = 0;
-        }
+        AtomicUInt() : x(0) {}
         AtomicUInt(unsigned z) : x(z) { }
         volatile unsigned x;
         operator unsigned() const {
@@ -71,26 +69,26 @@ namespace mongo{
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
     // from boost 1.39 interprocess/detail/atomic.hpp
 
-    inline atomic_int_helper(volatile unsigned *x, int val){
+    inline unsigned atomic_int_helper(volatile unsigned *x, int val){
         int r;
         asm volatile
         (
             "lock\n\t"
             "xadd %1, %0":
-            "+m"( x ), "=r"( r ): // outputs (%0, %1)
+            "+m"( *x ), "=r"( r ): // outputs (%0, %1)
             "1"( val ): // inputs (%2 == %1)
             "memory", "cc" // clobbers
         );
         return r;
     }
     AtomicUInt AtomicUInt::operator++(){
-        return atomic_int_helper(&x, 1)-1;
+        return atomic_int_helper(&x, 1)+1;
     }
     AtomicUInt AtomicUInt::operator++(int){
         return atomic_int_helper(&x, 1);
     }
     AtomicUInt AtomicUInt::operator--(){
-        return atomic_int_helper(&x, -1)+1;
+        return atomic_int_helper(&x, -1)-1;
     }
     AtomicUInt AtomicUInt::operator--(int){
         return atomic_int_helper(&x, -1);
