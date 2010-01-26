@@ -56,6 +56,7 @@ cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log
 touch $RPM_BUILD_ROOT/var/log/mongo
@@ -112,9 +113,9 @@ fi
 #%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
-/etc/sysconfig/mongod
+#/etc/sysconfig/mongod
 #/etc/rc.d/init.d/mongos
-%attr(0755,root,root) %dir /var/mongo
+%attr(0755,root,root) %dir /var/lib/mongo
 %attr(0640,root,root) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo
 
 %files devel
