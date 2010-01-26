@@ -71,6 +71,7 @@ t.a.drop();
 for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
+assert.eq( 100000, f.a.count() );
 
 doParallel( "assert.commandWorked( db.cloneCollection( \"localhost:" + ports[ 0 ] + "\", \"a\", {i:{$gte:0}} ) );" );
 
@@ -96,6 +97,7 @@ t.a.drop();
 for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
+assert.eq( 200000, f.a.count() );
 
 doParallel( "assert.commandFailed( db.runCommand( { cloneCollection: \"jstests_clonecollection.a\", from: \"localhost:" + ports[ 0 ] + "\", logSizeMb:1 } ) );" );
 
@@ -113,6 +115,7 @@ t.a.drop();
 for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
+assert.eq( 200000, f.a.count() );
 
 doParallel( "assert.commandWorked( db.cloneCollection( \"localhost:" + ports[ 0 ] + "\", \"a\" ) );" );
 
