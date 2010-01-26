@@ -714,8 +714,15 @@ namespace mongo {
                 _holder.reset( new Holder( data ) );
             _objdata = data;
             if ( ! isValid() ){
-                log() << "invalid object size: " << objsize() << endl;
-                massert( "Invalid BSONObj spec size" , 0 );
+                stringstream ss;
+                ss << "Invalid BSONObj spec size: " << objsize();
+                try {
+                    BSONElement e = firstElement();
+                    ss << " first element:" << e.toString() << " ";
+                }
+                catch ( ... ){}
+                string s = ss.str();
+                massert( s , 0 );
             }
         }
 #pragma pack(1)
