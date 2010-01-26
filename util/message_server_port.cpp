@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#include "stdafx.h"
+
 #ifndef USE_ASIO
 
 #include "message.h"

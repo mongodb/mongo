@@ -18,7 +18,7 @@
 // hacked in right now from engine_spidermonkey.cpp
 
 #include "../client/syncclusterconnection.h"
-#include "util/base64.h"
+#include "../util/base64.h"
 
 namespace mongo {
 
