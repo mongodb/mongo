@@ -616,6 +616,8 @@ namespace mongo {
         _keysComputed = true;
         _indexKeys.clear();
         NamespaceDetails *d = nsdetails(_ns.c_str());
+        if ( ! d )
+            return;
         NamespaceDetails::IndexIterator i = d->ii();
         while( i.more() )
             i.next().keyPattern().getFieldNames(_indexKeys);

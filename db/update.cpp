@@ -497,8 +497,6 @@ namespace mongo {
             
             BSONObjIterator jt(j);
             Mod::Op op = opFromStr( fn );
-            if ( op == Mod::INC )
-                strcpy((char *) fn, "$set"); // rewrite for op log
 
             while ( jt.more() ) {
                 BSONElement f = jt.next(); // x:44
