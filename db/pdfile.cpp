@@ -1524,38 +1524,48 @@ namespace mongo {
 
     // back up original database files to 'temp' dir
     void _renameForBackup( const char *database, const Path &reservedPath ) {
+        Path newPath( reservedPath );
+        if ( directoryperdb )
+            newPath /= database;
         class Renamer : public FileOp {
         public:
-            Renamer( const Path &reservedPath ) : reservedPath_( reservedPath ) {}
+            Renamer( const Path &newPath ) : newPath_( newPath ) {}
         private:
-            const boost::filesystem::path &reservedPath_;
+            const boost::filesystem::path &newPath_;
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boost::filesystem::rename( p, reservedPath_ / ( p.leaf() + ".bak" ) );
+                boost::filesystem::rename( p, newPath_ / ( p.leaf() + ".bak" ) );
                 return true;
             }
             virtual const char * op() const {
                 return "renaming";
             }
-        } renamer( reservedPath );
+        } renamer( newPath );
         _applyOpToDataFiles( database, renamer, true );
     }
 
     // move temp files to standard data dir
     void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
-        class : public FileOp {
+        Path newPath( dbpath );
+        if ( directoryperdb )
+            newPath /= database;
+        class Replacer : public FileOp {
+        public:
+            Replacer( const Path &newPath ) : newPath_( newPath ) {}
+        private:
+            const boost::filesystem::path &newPath_;
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boost::filesystem::rename( p, boost::filesystem::path(dbpath) / p.leaf() );
+                boost::filesystem::rename( p, newPath_ / p.leaf() );
                 return true;
             }
             virtual const char * op() const {
                 return "renaming";
             }
-        } renamer;
-        _applyOpToDataFiles( database, renamer, true, reservedPathString );
+        } replacer( newPath );
+        _applyOpToDataFiles( database, replacer, true, reservedPathString );
     }
 
     // generate a directory name for storing temp data files
@@ -1639,7 +1649,7 @@ namespace mongo {
 
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
-                                "backup" : "tmp" );
+                                "backup" : "$tmp" );
         BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
         string reservedPathString = reservedPath.native_directory_string();
         assert( setClient( dbName, reservedPathString.c_str() ) );
@@ -1658,10 +1668,12 @@ namespace mongo {
         assert( !setClient( dbName ) );
         closeDatabase( dbName );
 
-        if ( backupOriginalFiles )
+        if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
-        else
+        } else {
             _deleteDataFiles( dbName );
+            BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( Path( dbpath ) / dbName ) );
+        }
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
@@ -1677,6 +1689,8 @@ namespace mongo {
         string c = database;
         c += '.';
         boost::filesystem::path p(path);
+        if ( directoryperdb )
+            p /= database;
         boost::filesystem::path q;
         q = p / (c+"ns");
         bool ok = false;

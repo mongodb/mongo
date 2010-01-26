@@ -390,7 +390,7 @@ namespace mongo {
                 i != boost::filesystem::directory_iterator(); ++i ) {
             string fileName = boost::filesystem::path(*i).leaf();
             if ( boost::filesystem::is_directory( *i ) &&
-                    fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
+                fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );
         }
     }

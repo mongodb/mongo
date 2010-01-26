@@ -655,6 +655,7 @@ namespace mongo {
 
     private:
         boost::filesystem::path path() const;
+        void maybeMkdir() const;
         
         MemoryMappedFile f;
         HashTable<Namespace,NamespaceDetails> *ht;

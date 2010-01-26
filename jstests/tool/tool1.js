@@ -2,8 +2,8 @@
 
 baseName = "jstests_tool_tool1";
 dbPath = "/data/db/" + baseName + "/";
-externalPath = "/data/db/" + baseName + "_external/"
-externalFile = externalPath + "export.json"
+externalPath = "/data/db/" + baseName + "_external/";
+externalFile = externalPath + "export.json";
 
 function fileSize(){
     var l = listFiles( externalPath );
