@@ -10,12 +10,14 @@ var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
 
 m.getDB( baseName ).createCollection( baseName + "1" );
 
-vs = vsize();
-
 stopMongod( port );
 
 var m = startMongoProgram( "mongod", "--port", port, "--dbpath", "/data/db/" + baseName );
 
+size = m.getDBs().totalSize;
+
 m.getDB( baseName ).createCollection( baseName + "2" );
 
-assert.eq( vs, vsize() );
+sleep( 2000 ); // give prealloc a chance
+
+assert.eq( size, m.getDBs().totalSize );
