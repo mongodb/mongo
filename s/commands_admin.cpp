@@ -506,8 +506,7 @@ namespace mongo {
                 
                 if ( host == "localhost" || host.find( "localhost:" ) == 0 ||
                      host == "127.0.0.1" || host.find( "127.0.0.1:" ) == 0 ){
-                    if ( cmdObj["allowLocal"].type() != Bool || 
-                         ! cmdObj["allowLocal"].boolean() ){
+                    if ( ! cmdObj["allowLocal"].trueValue() ){
                         errmsg = 
                             "can't use localhost as a shard since all shards need to communicate.  "
                             "allowLocal to override for testing";
