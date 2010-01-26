@@ -134,7 +134,10 @@ namespace mongo {
         
     };
 
-
+    /**
+     * stores a set of Mods
+     * once created, should never be changed
+     */
     class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
@@ -275,6 +278,9 @@ namespace mongo {
         
     };
 
+    /**
+     * stores any information about a single Mod operating on a single Object
+     */
     class ModState {
     public:
         const Mod * m;
