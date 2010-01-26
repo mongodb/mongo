@@ -20,6 +20,7 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "nonce.h"
+#include "../util/atomic_int.h"
 #include "../util/goodies.h"
 #include "../util/base64.h"
 #include "../util/md5.hpp"
@@ -1410,7 +1411,7 @@ namespace mongo {
     }
     
     void OID::init() {
-        static WrappingInt inc = (unsigned) security.getNonce();
+        static AtomicUInt inc = (unsigned) security.getNonce();
         unsigned t = (unsigned) time(0);
         char *T = (char *) &t;
         data[0] = T[3];
@@ -1420,7 +1421,7 @@ namespace mongo {
 
         (unsigned&) data[4] = _machine;
 
-        int new_inc = inc.atomicIncrement();
+        int new_inc = inc++;
         T = (char *) &new_inc;
         char * raw = (char*)&b;
         raw[0] = T[3];

@@ -18,6 +18,7 @@
  */
 
 #include "stdafx.h"
+#include "../util/atomic_int.h"
 #include "../util/mvar.h"
 #include "../util/thread_pool.h"
 #include <boost/thread.hpp>
@@ -59,18 +60,26 @@ namespace ThreadedTests {
     };
 
     // Tested with up to 30k threads
-    class IsWrappingIntAtomic : public ThreadedTest<> {
+    class IsAtomicUIntAtomic : public ThreadedTest<> {
         static const int iterations = 1000000;
-        WrappingInt target;
+        AtomicUInt target;
 
         void subthread(){
             for(int i=0; i < iterations; i++){
                 //target.x++; // verified to fail with this version
-                target.atomicIncrement();
+                target++;
             }
         }
         void validate(){
             ASSERT_EQUALS(target.x , unsigned(nthreads * iterations));
+
+            AtomicUInt u;
+            ASSERT_EQUALS(0u, u);
+            ASSERT_EQUALS(0u, u++);
+            ASSERT_EQUALS(2u, ++u);
+            ASSERT_EQUALS(2u, u--);
+            ASSERT_EQUALS(0u, --u);
+            ASSERT_EQUALS(0u, u);
         }
     };
 
@@ -99,10 +108,10 @@ namespace ThreadedTests {
         static const int iterations = 10000;
         static const int nThreads = 8;
 
-        WrappingInt counter;
+        AtomicUInt counter;
         void increment(int n){
             for (int i=0; i<n; i++){
-                counter.atomicIncrement();
+                counter++;
             }
         }
 
@@ -111,13 +120,12 @@ namespace ThreadedTests {
             ThreadPool tp(nThreads);
 
             for (int i=0; i < iterations; i++){
-                tp.schedule(&WrappingInt::atomicIncrement, &counter);
                 tp.schedule(&ThreadPoolTest::increment, this, 2);
             }
             
             tp.join();
 
-            ASSERT(counter == (unsigned)(iterations * 3));
+            ASSERT(counter == (unsigned)(iterations * 2));
         }
     };
 
@@ -127,7 +135,7 @@ namespace ThreadedTests {
         }
 
         void setupTests(){
-            add< IsWrappingIntAtomic >();
+            add< IsAtomicUIntAtomic >();
             add< MVarTest >();
             add< ThreadPoolTest >();
         }

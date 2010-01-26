@@ -5,6 +5,7 @@
 #include "namespace.h"
 #include "security.h"
 #include "client.h"
+#include "../util/atomic_int.h"
 
 namespace mongo { 
 
@@ -20,13 +21,13 @@ namespace mongo {
     /* Current operation (for the current Client).
        an embedded member of Client class, and typically used from within the mutex there. */
     class CurOp : boost::noncopyable {
-        static WrappingInt _nextOpNum;
+        static AtomicUInt _nextOpNum;
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
         bool _active;
         Timer _timer;
         int _op;
-        WrappingInt _opNum;
+        AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
         struct sockaddr_in client;
 
@@ -45,7 +46,7 @@ namespace mongo {
     public:
         void reset( const sockaddr_in &_client) { 
             _active = true;
-            _opNum = _nextOpNum.atomicIncrement();
+            _opNum = _nextOpNum++;
             _timer.reset();
             _ns[0] = '?'; // just in case not set later
             _debug.reset();
@@ -57,7 +58,7 @@ namespace mongo {
             return _debug;
         }
 
-        WrappingInt opNum() const { return _opNum; }
+        AtomicUInt opNum() const { return _opNum; }
         bool active() const { return _active; }
 
         int elapsedMillis(){ return _timer.millis(); }
@@ -138,10 +139,10 @@ namespace mongo {
     */
     extern class KillCurrentOp { 
          enum { Off, On, All } state;
-        WrappingInt toKill;
+        AtomicUInt toKill;
     public:
         void killAll() { state = All; }
-        void kill(WrappingInt i) { toKill = i; state = On; }
+        void kill(AtomicUInt i) { toKill = i; state = On; }
 
         void checkForInterrupt() { 
             if( state != Off ) { 

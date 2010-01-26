@@ -18,13 +18,14 @@
 #pragma once
 
 #include "../util/sock.h"
+#include "../util/atomic_int.h"
 
 namespace mongo {
 
     class Message;
     class MessagingPort;
     class PiggyBackData;
-    typedef WrappingInt MSGID;
+    typedef AtomicUInt MSGID;
 
     class Listener {
     public:
