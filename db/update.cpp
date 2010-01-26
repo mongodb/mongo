@@ -266,7 +266,13 @@ namespace mongo {
             switch( m.op ) {
             case Mod::INC:
                 uassert( 10140 ,  "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
-                mss->amIInPlacePossible( e.isNumber() );
+                if ( mss->amIInPlacePossible( e.isNumber() ) ){
+                    // check more typing info here
+                    if ( m.elt.type() != e.type() ){
+                        // if i'm incrememnting with a double, then the storage has to be a double
+                        mss->amIInPlacePossible( m.elt.type() != NumberDouble ); 
+                    }
+                }
                 break;
             case Mod::SET:
                 mss->amIInPlacePossible( m.elt.type() == e.type() &&

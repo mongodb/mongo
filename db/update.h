@@ -26,7 +26,10 @@ namespace mongo {
     class ModState;
     class ModSetState;
 
-    /* Used for modifiers such as $inc, $set, $push, ... */
+    /* Used for modifiers such as $inc, $set, $push, ... 
+     * stores the info about a single operation
+     * once created should never be modified
+     */
     struct Mod {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10
@@ -58,22 +61,25 @@ namespace mongo {
         }
         
         /**
-         * increments in 
+         * @param in incrememnts the actual value inside in
          */
         void incrementMe( BSONElement& in ) const {
             BSONElementManipulator manip( in );
             
-            BSONType a = in.type();
-            BSONType b = elt.type();
-            if ( a == NumberDouble || b == NumberDouble ){
+            switch ( in.type() ){
+            case NumberDouble:
                 manip.setNumber( elt.numberDouble() + in.numberDouble() );
-            }
-            else if ( a == NumberLong || b == NumberLong ){
+                break;
+            case NumberLong:
                 manip.setLong( elt.numberLong() + in.numberLong() );
-            }
-            else {
+                break;
+            case NumberInt:
                 manip.setInt( elt.numberInt() + in.numberInt() );
+                break;
+            default:
+                assert(0);
             }
+            
         }
         
         void appendIncremented( BSONObjBuilder& bb , const BSONElement& in, ModState& ms ) const;
@@ -128,7 +134,10 @@ namespace mongo {
         
     };
 
-
+    /**
+     * stores a set of Mods
+     * once created, should never be changed
+     */
     class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
@@ -269,6 +278,9 @@ namespace mongo {
         
     };
 
+    /**
+     * stores any information about a single Mod operating on a single Object
+     */
     class ModState {
     public:
         const Mod * m;
