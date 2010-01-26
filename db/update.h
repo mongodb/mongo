@@ -32,8 +32,8 @@ namespace mongo {
      */
     struct Mod {
         // See opFromStr below
-        //        0    1    2     3         4     5          6    7      8       9       10
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT  } op;
+        //        0    1    2     3         4     5          6    7      8       9       10    11
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET  } op;
         
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -160,7 +160,7 @@ namespace mongo {
 
             return compareDottedFieldNames( m->first, p->first.c_str() );
         }
-
+        
         bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
             for( string left = EmbeddedBuilder::splitDot( right );
                  left.length() > 0 && left[ left.length() - 1 ] != '.';
@@ -219,6 +219,14 @@ namespace mongo {
                         return Mod::BITOR;
                 }
                 break;
+            }
+            case 'a': {
+                if ( fn[2] == 'd' && fn[3] == 'd' ){
+                    // add
+                    if ( fn[4] == 'T' && fn[5] == 'o' && fn[6] == 'S' && fn[7] == 'e' && fn[8] == 't' && fn[9] == 0 )
+                        return Mod::ADDTOSET;
+                    
+                }
             }
             default: break;
             }

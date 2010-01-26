@@ -18,5 +18,7 @@ res = db._adminCommand( "listDatabases" );
 assert( res.databases.length > 0 , "listDatabases 1" );
 
 print( "BEFORE: " + tojson( before ) );
-print( "AFTER : " + tojson( after ) );
+if ( before.mem.supported ){
+    print( "AFTER : " + tojson( after ) );
+}
 // TODO: add more tests here
