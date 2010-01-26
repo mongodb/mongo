@@ -62,8 +62,9 @@ namespace mongo {
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            cc().shutdown();
             log() << "terminating, shutdown command received" << endl;
-            dbexit( EXIT_CLEAN );
+            dbexit( EXIT_CLEAN ); // this never returns
             return true;
         }
     } cmdShutdown;
