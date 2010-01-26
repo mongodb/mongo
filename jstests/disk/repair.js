@@ -12,18 +12,6 @@ db = m.getDB( baseName );
 db[ baseName ].save( {} );
 db.runCommand( {repairDatabase:1, backupOriginalFiles:true} );
 
-escape = function( s ) {
-    ret = "";
-    for( i in s ) {
-        if ( s[ i ] == "/" ) {
-            ret += "\/";
-        } else {
-            ret += s[ i ];
-        }
-    }
-    return ret;
-}
-
 files = listFiles( dbpath );
 for( f in files ) {
     assert( ! new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ), "backup dir in dbpath" );
