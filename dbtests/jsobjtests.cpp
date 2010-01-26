@@ -1245,6 +1245,40 @@ namespace JsobjTests {
         }
     };
 
+    class InvalidIDFind {
+    public:
+        void run(){
+            BSONObj x = BSON( "_id" << 5 << "t" << 2 );
+            {
+                char * crap = (char*)malloc( x.objsize() );
+                memcpy( crap , x.objdata() , x.objsize() );
+                BSONObj y( crap , false );
+                ASSERT_EQUALS( x , y );
+                free( crap );
+            }
+            
+            {
+                char * crap = (char*)malloc( x.objsize() );
+                memcpy( crap , x.objdata() , x.objsize() );
+                int * foo = (int*)crap;
+                foo[0] = 123123123;
+                int state = 0;
+                try {
+                    BSONObj y( crap , false );
+                    state = 1;
+                }
+                catch ( std::exception& e ){
+                    state = 2;
+                    ASSERT( strstr( e.what() , "_id: 5" ) > 0 );
+                }
+                free( crap );
+                ASSERT_EQUALS( 2 , state );
+            }
+                
+            
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1332,7 +1366,7 @@ namespace JsobjTests {
             add< NumberParsing >();
             add< bson2settest >();
             add< checkForStorageTests >();
-
+            add< InvalidIDFind >();
         }
     } myall;
     

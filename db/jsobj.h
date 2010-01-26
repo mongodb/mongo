@@ -700,6 +700,11 @@ namespace mongo {
             if ( ! isValid() ){
                 stringstream ss;
                 ss << "Invalid BSONObj spec size: " << objsize();
+                try {
+                    BSONElement e = firstElement();
+                    ss << " first element:" << e.toString() << " ";
+                }
+                catch ( ... ){}
                 string s = ss.str();
                 massert( 10334 ,  s , 0 );
             }
