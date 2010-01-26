@@ -2,13 +2,13 @@ Source: mongodb
 Section: devel
 Priority: optional
 Maintainer: Kristina Chodorow <kristina@10gen.com>
-Build-Depends: debhelper (>= 7), libboost-dev, libpcre3, libpcre3-dev, scons, xulrunner-1.9-dev | xulrunner-1.9.1-dev, libboost-thread-dev, libboost-filesystem-dev, libboost-program-options-dev, libboost-date-time-dev
+Build-Depends: debhelper (>= 7), libpcre3, libpcre3-dev, scons, xulrunner-dev, libboost1.35-dev | libboost1.37-dev | libboost1.38-dev | libboost1.40-dev, libboost-thread1.35-dev | libboost-thread1.37-dev | libboost-thread1.38-dev | libboost-thread1.40-dev, libboost-filesystem1.35-dev | libboost-filesystem1.37-dev | libboost-filesystem1.38-dev | libboost-filesystem1.40-dev, libboost-program-options1.35-dev | libboost-program-options1.37-dev | libboost-program-options1.38-dev | libboost-program-options1.40-dev, libboost-date-time1.35-dev | libboost-date-time1.37-dev | libboost-date-time1.38-dev | libboost-date-time1.40-dev
 Standards-Version: 3.8.0
 Homepage: http://www.mongodb.org
 
 Package: mongodb
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, xulrunner-1.9-dev
+Depends: ${shlibs:Depends}, ${misc:Depends}, xulrunner-dev
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage
