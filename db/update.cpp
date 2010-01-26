@@ -590,7 +590,7 @@ namespace mongo {
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
-        bool modsIsIndexed = false;
+        int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ){
             mods.reset( new ModSet( updateobj , NamespaceDetailsTransient::get_w(ns).indexKeys() ) );
             modsIsIndexed = mods->isIndexed();
