@@ -83,6 +83,7 @@ namespace mongo {
     /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
+    bool directoryperdb = false;
     string repairpath;
 
     DataFileMgr theDataFileMgr;
@@ -1498,19 +1499,6 @@ namespace mongo {
         d->nrecords++;
 
         return r;
-    }
-
-    void DataFileMgr::init(const string& path ) {
-        /*	boost::filesystem::path path( dir );
-        	path /= "temp.dat";
-        	string pathString = path.string();
-        	temp.open(pathString.c_str(), 64 * 1024 * 1024);
-        */
-    }
-
-    void pdfileInit() {
-        //	namespaceIndex.init(dbpath);
-        theDataFileMgr.init(dbpath);
     }
 
 } // namespace mongo

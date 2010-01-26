@@ -139,13 +139,11 @@ namespace mongo {
     };
 
     void webServerThread();
-    void pdfileInit();
 
     void listen(int port) {
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
-        pdfileInit();
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
         OurListener l(bind_ip, port);
@@ -599,6 +597,7 @@ int main(int argc, char* argv[], char *envp[] )
          "local ip address to bind listener - all local ips bound by default")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+        ("directoryperdb", po::value<bool>()->default_value(false), "each database will be stored in a separate directory")
         ("quiet", "quieter output")
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
         ("logappend" , "appnd to logpath instead of over-writing" )
@@ -750,6 +749,7 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
         dbpath = params["dbpath"].as<string>();
+        directoryperdb = params["directoryperdb"].as<bool>();
         if (params.count("quiet")) {
             cmdLine.quiet = true;
         }
