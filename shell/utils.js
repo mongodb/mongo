@@ -576,10 +576,10 @@ if ( typeof _threadInject != "undefined" ){
 }
 
 tojson = function( x, indent , nolint ){
-    if ( x == null )
+    if ( x === null )
         return "null";
     
-    if ( x == undefined )
+    if ( x === undefined )
         return "undefined";
     
     if (!indent) 

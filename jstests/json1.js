@@ -5,8 +5,8 @@ assert.eq( tojson( x ) , tojson( y ) , "A" );
 assert.eq( typeof( x.nulls ) , typeof( y.nulls ) , "B" );
 
 // each type is parsed properly
-x = {"x" : null, "y" : true, "z" : 123, "w" : "foo"};
-assert.eq(tojson(x,"",false), '{\n\t"x" : null,\n\t"y" : true,\n\t"z" : 123,\n\t"w" : "foo"\n}' , "C" );
+x = {"x" : null, "y" : true, "z" : 123, "w" : "foo", "a": undefined};
+assert.eq(tojson(x,"",false), '{\n\t"x" : null,\n\t"y" : true,\n\t"z" : 123,\n\t"w" : "foo",\n\t"a" : undefined\n}' , "C" );
 
 x = {"x" : [], "y" : {}};
 assert.eq(tojson(x,"",false), '{\n\t"x" : [ ],\n\t"y" : {\n\t\t\n\t}\n}' , "D" );
