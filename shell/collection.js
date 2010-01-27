@@ -144,7 +144,15 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
     if ( ! _allow_dot ) {
         this._validateForStorage( obj );
     }
-    return this._mongo.insert( this._fullName , obj );
+    if ( typeof( obj._id ) == "undefined" ){
+        var tmp = obj; // don't want to modify input
+        obj = {_id: new ObjectId()};
+        for (var key in tmp){
+            obj[key] = tmp[key];
+        }
+    }
+    this._mongo.insert( this._fullName , obj );
+    return obj._id;
 }
 
 DBCollection.prototype.remove = function( t ){
@@ -311,7 +319,7 @@ DBCollection.prototype.drop = function(){
 
 DBCollection.prototype.findAndModify = function(args){
     var cmd = { findandmodify: this.getName() };
-    for (key in args){
+    for (var key in args){
         cmd[key] = args[key];
     }
 
