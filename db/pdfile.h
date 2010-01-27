@@ -392,6 +392,10 @@ namespace mongo {
     void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const string& path = dbpath );
 
     inline void _deleteDataFiles(const char *database) {
+        if ( directoryperdb ) {
+            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ) );
+            return;
+        }
         class : public FileOp {
             virtual bool apply( const boost::filesystem::path &p ) {
                 return boost::filesystem::remove( p );

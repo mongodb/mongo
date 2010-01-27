@@ -827,7 +827,15 @@ namespace mongo {
             
             a = args.obj();
         }
-        BSONObj out = func( a );
+        
+        BSONObj out;
+        try {
+            out = func( a );
+        }
+        catch ( std::exception& e ){
+            JS_ReportError( cx , e.what() );
+            return JS_FALSE;
+        }
         
         if ( out.isEmpty() ){
             *rval = JSVAL_VOID;

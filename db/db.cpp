@@ -139,13 +139,11 @@ namespace mongo {
     };
 
     void webServerThread();
-    void pdfileInit();
 
     void listen(int port) {
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
-        pdfileInit();
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
         OurListener l(bind_ip, port);
@@ -392,7 +390,7 @@ namespace mongo {
                 i != boost::filesystem::directory_iterator(); ++i ) {
             string fileName = boost::filesystem::path(*i).leaf();
             if ( boost::filesystem::is_directory( *i ) &&
-                    fileName.length() > 2 && fileName.substr( 0, 3 ) == "tmp" )
+                fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );
         }
     }
@@ -599,6 +597,7 @@ int main(int argc, char* argv[], char *envp[] )
          "local ip address to bind listener - all local ips bound by default")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+        ("directoryperdb", "each database will be stored in a separate directory")
         ("quiet", "quieter output")
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
         ("logappend" , "appnd to logpath instead of over-writing" )
@@ -609,6 +608,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
         ("auth", "run with security")
+        ("authWriteOnly", "run with security for writes only")
         ("objcheck", "inspect client data for validity on receipt")
         ("quota", "enable db quota management")
         ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
@@ -750,6 +750,9 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
         dbpath = params["dbpath"].as<string>();
+        if ( params.count("directoryperdb")) {
+            directoryperdb = true;
+        }
         if (params.count("quiet")) {
             cmdLine.quiet = true;
         }
@@ -764,10 +767,15 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("cpu")) {
             cmdLine.cpu = true;
         }
+        if (params.count("authWriteOnly")) {
+            noauth = false;
+            authWriteOnly = true;
+        }
         if (params.count("noauth")) {
             noauth = true;
         }
         if (params.count("auth")) {
+            authWriteOnly = false;
             noauth = false;
         }
         if (params.count("quota")) {

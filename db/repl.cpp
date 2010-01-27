@@ -267,7 +267,7 @@ namespace mongo {
 			   one is not authenticated for admin db to be safe.
 			*/
             AuthenticationInfo *ai = currentClient.get()->ai;
-			bool authed = ai->isAuthorized("admin");
+			bool authed = ai->isReadOnlyAuthorized("admin");
 
             if ( replAllDead ) {
                 result.append("ismaster", 0.0);

@@ -48,10 +48,12 @@ DB.prototype._adminCommand = function( obj ){
     return this.getSisterDB( "admin" ).runCommand( obj );
 }
 
-DB.prototype.addUser = function( username , pass ){
+DB.prototype.addUser = function( username , pass, readOnly ){
+    readOnly = readOnly || false;
     var c = this.getCollection( "system.users" );
     
     var u = c.findOne( { user : username } ) || { user : username };
+    u.readOnly = readOnly;
     u.pwd = hex_md5( username + ":mongo:" + pass );
     print( tojson( u ) );
 

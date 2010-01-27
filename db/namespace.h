@@ -655,6 +655,7 @@ namespace mongo {
 
     private:
         boost::filesystem::path path() const;
+        void maybeMkdir() const;
         
         MemoryMappedFile f;
         HashTable<Namespace,NamespaceDetails> *ht;
@@ -662,7 +663,8 @@ namespace mongo {
         string database_;
     };
 
-    extern string dbpath; // --dbpath parm 
+    extern string dbpath; // --dbpath parm
+    extern bool directoryperdb;
 
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)

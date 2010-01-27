@@ -661,6 +661,22 @@ namespace UpdateTests {
             }
 
         };
+
+        class inc2 : public SingleTest {
+            virtual BSONObj initial(){
+                return BSON( "_id" << 1 << "x" << 1 );
+            }
+            virtual BSONObj mod(){
+                return BSON( "$inc" << BSON( "x" << 2.5 ) );
+            }
+            virtual BSONObj after(){
+                return BSON( "_id" << 1 << "x" << 3.5 );
+            }
+            virtual const char * ns(){
+                return "unittests.inc2";
+            }
+
+        };
             
         class bit1 : public Base {
             const char * ns(){
@@ -758,6 +774,7 @@ namespace UpdateTests {
             add< ModSetTests::push1 >();
             
             add< basic::inc1 >();
+            add< basic::inc2 >();
             add< basic::bit1 >();
             add< basic::unset >();
             add< basic::setswitchint >();

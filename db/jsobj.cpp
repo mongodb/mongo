@@ -414,7 +414,8 @@ namespace mongo {
         default: {
             stringstream ss;
             ss << "BSONElement: bad type " << (int) type();
-            massert( 10320 , ss.str().c_str(),false);
+            string msg = ss.str();
+            massert( 10320 , msg.c_str(),false);
         }
         }
         totalSize =  x + fieldNameSize() + 1; // BSONType

@@ -79,12 +79,19 @@ namespace mongo {
             return ! namespaceIndex.allocated();
         }
 
-        bool exists(int n) { 
+        boost::filesystem::path fileName( int n ) {
             stringstream ss;
             ss << name << '.' << n;
             boost::filesystem::path fullName;
-            fullName = boost::filesystem::path(path) / ss.str();
-            return boost::filesystem::exists(fullName);
+            fullName = boost::filesystem::path(path);
+            if ( directoryperdb )
+                fullName /= name;
+            fullName /= ss.str();
+            return fullName;
+        }
+        
+        bool exists(int n) { 
+            return boost::filesystem::exists( fileName( n ) );
         }
 
         void openAllFiles() { 
@@ -124,10 +131,7 @@ namespace mongo {
                 p = files[n];
             }
             if ( p == 0 ) {
-                stringstream ss;
-                ss << name << '.' << n;
-                boost::filesystem::path fullName;
-                fullName = boost::filesystem::path(path) / ss.str();
+                boost::filesystem::path fullName = fileName( n );
                 string fullNameString = fullName.string();
                 p = new MongoDataFile(n);
                 int minSize = 0;

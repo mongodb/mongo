@@ -27,7 +27,7 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                     "$bitand" , "$bitor" , "$bit" };
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet" };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
     bool Mod::_pullElementMatch( BSONElement& toMatch ) const {
@@ -85,7 +85,7 @@ namespace mongo {
             //Explicit NOOP
             break;
         }
-
+            
         case PUSH: {
             uassert( 10131 ,  "$push can only be applied to an array" , in.type() == Array );
             BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
@@ -102,6 +102,30 @@ namespace mongo {
             bb.done();
             break;
         }
+
+        case ADDTOSET: {
+            uassert( 12592 ,  "$addToSet can only be applied to an array" , in.type() == Array );
+            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjIterator i( in.embeddedObject() );
+            
+            bool found = false;
+            
+            int n=0;
+            while ( i.more() ){
+                BSONElement cur = i.next();
+                bb.append( cur );
+                n++;
+                if ( elt.woCompare( cur , false ) == 0 )
+                    found = true;
+            }
+            
+            if ( ! found )
+                bb.appendAs( elt ,  bb.numStr( n ) );
+            bb.done();
+            break;
+        }
+
+
             
         case PUSH_ALL: {
             uassert( 10132 ,  "$pushAll can only be applied to an array" , in.type() == Array );
@@ -266,17 +290,26 @@ namespace mongo {
             switch( m.op ) {
             case Mod::INC:
                 uassert( 10140 ,  "Cannot apply $inc modifier to non-number", e.isNumber() || e.eoo() );
-                mss->amIInPlacePossible( e.isNumber() );
+                if ( mss->amIInPlacePossible( e.isNumber() ) ){
+                    // check more typing info here
+                    if ( m.elt.type() != e.type() ){
+                        // if i'm incrememnting with a double, then the storage has to be a double
+                        mss->amIInPlacePossible( m.elt.type() != NumberDouble ); 
+                    }
+                }
                 break;
+
             case Mod::SET:
                 mss->amIInPlacePossible( m.elt.type() == e.type() &&
                                          m.elt.valuesize() == e.valuesize() );
                 break;
+            
             case Mod::PUSH:
             case Mod::PUSH_ALL:
                 uassert( 10141 ,  "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
                 mss->amIInPlacePossible( false );
                 break;
+
             case Mod::PULL:
             case Mod::PULL_ALL: {
                 uassert( 10142 ,  "Cannot apply $pull/$pullAll modifier to non-array", e.type() == Array || e.eoo() );
@@ -298,11 +331,29 @@ namespace mongo {
                 }
                 break;
             }
+
             case Mod::POP: {
                 uassert( 10143 ,  "Cannot apply $pop modifier to non-array", e.type() == Array || e.eoo() );
                 mss->amIInPlacePossible( e.embeddedObject().isEmpty() );
                 break;
             }
+                
+            case Mod::ADDTOSET: {
+                uassert( 12591 ,  "Cannot apply $addToSet modifier to non-array", e.type() == Array || e.eoo() );
+
+                BSONObjIterator i( e.embeddedObject() );
+                bool found = false;
+                while( i.more() ) {
+                    BSONElement arrI = i.next();
+                    if ( arrI.woCompare( m.elt , false ) == 0 ){
+                        found = true;
+                        break;
+                    }
+                }
+                mss->amIInPlacePossible( found );
+                break;
+            }
+                
             default:
                 // mods we don't know about shouldn't be done in place
                 mss->amIInPlacePossible( false );
@@ -319,6 +370,7 @@ namespace mongo {
             case Mod::UNSET:
             case Mod::PULL:
             case Mod::PULL_ALL:
+            case Mod::ADDTOSET:
                 // this should have been handled by prepare
                 break;
 
@@ -584,7 +636,7 @@ namespace mongo {
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
-        bool modsIsIndexed = false;
+        int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ){
             mods.reset( new ModSet( updateobj , NamespaceDetailsTransient::get_w(ns).indexKeys() ) );
             modsIsIndexed = mods->isIndexed();

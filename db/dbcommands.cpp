@@ -62,8 +62,9 @@ namespace mongo {
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            cc().shutdown();
             log() << "terminating, shutdown command received" << endl;
-            dbexit( EXIT_CLEAN );
+            dbexit( EXIT_CLEAN ); // this never returns
             return true;
         }
     } cmdShutdown;
@@ -638,6 +639,19 @@ namespace mongo {
                 BSONElement f = jsobj.findElement("index");
                 if ( f.type() == String ) {
                     return dropIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
+                }
+                else if ( f.type() == Object ){
+                    int idxId = d->findIndexByKeyPattern( f.embeddedObject() );
+                    if ( idxId < 0 ){
+                        errmsg = "can't find index with key:";
+                        errmsg += f.embeddedObject();
+                        return false;
+                    }
+                    else {
+                        IndexDetails& ii = d->idx( idxId );
+                        string iName = ii.indexName();
+                        return dropIndexes( d, toDeleteNs.c_str(), iName.c_str() , errmsg, anObjBuilder, false );
+                    }
                 }
                 else {
                     errmsg = "invalid index name spec";
@@ -1430,7 +1444,13 @@ namespace mongo {
         if ( c ){
             string errmsg;
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
+            if ( c->requiresAuth() ) {
+                if ( c->readOnly() ) {
+                    uassert( 12593 , "readOnly unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
+                } else {
+                    uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));                    
+                }
+            }
 
             bool admin = c->adminOnly();
 
