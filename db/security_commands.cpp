@@ -152,7 +152,12 @@ namespace mongo {
             }
 
             AuthenticationInfo *ai = currentClient.get()->ai;
-            ai->authorize(cc().database()->name.c_str());
+            
+            if ( userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean() ) {
+                ai->authorizeReadOnly( cc().database()->name.c_str() );
+            } else {
+                ai->authorize( cc().database()->name.c_str() );
+            }
             return true;
         }
     } cmdAuthenticate;

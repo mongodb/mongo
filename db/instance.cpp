@@ -562,7 +562,7 @@ namespace mongo {
         QueryResult* msgdata;
         try {
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert( 10057 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));
+            uassert( 10057 , "unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid, curop);
         }
         catch ( AssertionException& e ) {

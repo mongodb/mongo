@@ -125,7 +125,7 @@ namespace mongo {
             return say( toSend );
         }
         class AlwaysAuthorized : public AuthenticationInfo {
-            virtual bool isAuthorized( const char *dbname ) {
+            virtual bool _isAuthorized( const char *dbname, int level ) {
                 return true;   
             }
         };

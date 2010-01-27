@@ -1431,7 +1431,13 @@ namespace mongo {
         if ( c ){
             string errmsg;
             AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()) || !c->requiresAuth());
+            if ( c->requiresAuth() ) {
+                if ( c->readOnly() ) {
+                    uassert( 12593 , "readOnly unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
+                } else {
+                    uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));                    
+                }
+            }
 
             bool admin = c->adminOnly();
 

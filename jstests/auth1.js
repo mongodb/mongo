@@ -1,5 +1,3 @@
-
-
 users = db.getCollection( "system.users" );
 users.remove( {} );
 
