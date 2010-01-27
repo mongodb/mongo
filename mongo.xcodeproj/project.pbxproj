@@ -424,6 +424,7 @@
 		938E60AB110F721900A8760A /* perdbpath.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = perdbpath.js; sourceTree = "<group>"; };
 		938E60AC110F734800A8760A /* directoryperdb.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = directoryperdb.js; sourceTree = "<group>"; };
 		938E639B110FC66900A8760A /* auth1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth1.js; sourceTree = "<group>"; };
+		938E63D0110FC96B00A8760A /* auth2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = auth2.js; sourceTree = "<group>"; };
 		93A13A210F4620A500AF1B0D /* commands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = commands.cpp; sourceTree = "<group>"; };
 		93A13A230F4620A500AF1B0D /* config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = config.cpp; sourceTree = "<group>"; };
 		93A13A240F4620A500AF1B0D /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
@@ -1115,6 +1116,7 @@
 		938E639A110FC66900A8760A /* auth */ = {
 			isa = PBXGroup;
 			children = (
+				938E63D0110FC96B00A8760A /* auth2.js */,
 				938E639B110FC66900A8760A /* auth1.js */,
 			);
 			path = auth;

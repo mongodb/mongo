@@ -36,3 +36,9 @@ assert( !db.getLastError() );
 t.save( {} ); // fail
 assert( db.getLastError() );
 assert.eq( 1000, t.count() );
+
+assert.eq( 2, db.system.users.count() );
+assert( !db.getLastError() );
+db.addUser( "a", "b" );
+assert( db.getLastError() );
+assert.eq( 2, db.system.users.count() );

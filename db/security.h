@@ -30,6 +30,7 @@ namespace mongo {
 
     // --noauth cmd line option
     extern bool noauth;
+    extern bool authWriteOnly;
 
     /* for a particular db */
     struct Auth {
@@ -63,6 +64,7 @@ namespace mongo {
         virtual bool _isAuthorized(const char *dbname, int level) { 
             if( m[dbname].level >= level ) return true;
 			if( noauth ) return true;
+            if( authWriteOnly && ( 1 >= level ) ) return true;
 			if( m["admin"].level >= level ) return true;
 			if( m["local"].level >= level ) return true;
 			if( isLocalHost ) { 

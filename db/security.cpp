@@ -25,6 +25,7 @@
 namespace mongo {
 
     bool noauth = true;
+    bool authWriteOnly = false;
 
 	int AuthenticationInfo::warned = 0;
 
