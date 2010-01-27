@@ -16,7 +16,8 @@ typedef struct __wt_drain {
 
 static int  __wt_cache_discard_serial_func(WT_TOC *);
 static int  __wt_cache_in_serial_func(WT_TOC *);
-static int  __wt_cache_drain(WT_TOC *, WT_DRAIN *, size_t, WT_PAGE **, size_t);
+static int  __wt_cache_drain(
+		WT_TOC *, WT_DRAIN *, u_int32_t, WT_PAGE **, u_int32_t);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
 static void __wt_cache_hazard_confirm(ENV *, WT_PAGE *);
