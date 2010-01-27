@@ -30,6 +30,7 @@ namespace mongo {
 
     // --noauth cmd line option
     extern bool noauth;
+    extern bool authWriteOnly;
 
     /* for a particular db */
     struct Auth {
@@ -53,11 +54,19 @@ namespace mongo {
 			assertInWriteLock();
             m[dbname].level = 2;
         }
-        virtual bool isAuthorized(const char *dbname) { 
-            if( m[dbname].level == 2 ) return true;
+        void authorizeReadOnly(const char *dbname) {
+			assertInWriteLock();
+            m[dbname].level = 1;            
+        }
+        bool isAuthorized(const char *dbname) { return _isAuthorized( dbname, 2 ); }
+        bool isReadOnlyAuthorized(const char *dbname) { return _isAuthorized( dbname, 1 ); }
+    protected:
+        virtual bool _isAuthorized(const char *dbname, int level) { 
+            if( m[dbname].level >= level ) return true;
 			if( noauth ) return true;
-			if( m["admin"].level == 2 ) return true;
-			if( m["local"].level == 2 ) return true;
+            if( authWriteOnly && ( 1 >= level ) ) return true;
+			if( m["admin"].level >= level ) return true;
+			if( m["local"].level >= level ) return true;
 			if( isLocalHost ) { 
                 readlock l(""); 
                 Client::Context c("admin.system.users");
