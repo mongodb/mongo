@@ -95,7 +95,7 @@ namespace mongo {
         BSONObjBuilder b;
 
         AuthenticationInfo *ai = cc().ai;
-        if( !ai->isAuthorized("admin") ) { 
+        if( !ai->isReadOnlyAuthorized("admin") ) { 
             BSONObjBuilder b;
             b.append("err", "unauthorized");
         }
