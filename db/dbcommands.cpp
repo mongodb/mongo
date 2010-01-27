@@ -640,6 +640,19 @@ namespace mongo {
                 if ( f.type() == String ) {
                     return dropIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
                 }
+                else if ( f.type() == Object ){
+                    int idxId = d->findIndexByKeyPattern( f.embeddedObject() );
+                    if ( idxId < 0 ){
+                        errmsg = "can't find index with key:";
+                        errmsg += f.embeddedObject();
+                        return false;
+                    }
+                    else {
+                        IndexDetails& ii = d->idx( idxId );
+                        string iName = ii.indexName();
+                        return dropIndexes( d, toDeleteNs.c_str(), iName.c_str() , errmsg, anObjBuilder, false );
+                    }
+                }
                 else {
                     errmsg = "invalid index name spec";
                     return false;
