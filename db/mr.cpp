@@ -547,7 +547,7 @@ namespace mongo {
                 DBDirectClient db;
                 
                 while ( cursor.more() ){
-                    BSONObj t = cursor.next();
+                    BSONObj t = cursor.next().getOwned();
                                         
                     if ( values.size() == 0 ){
                         values.push_back( t );
