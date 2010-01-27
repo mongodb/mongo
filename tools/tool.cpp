@@ -20,7 +20,7 @@ mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
     _options = new po::options_description( "options" );
     _options->add_options()
         ("help","produce help message")
-        ("host,h",po::value<string>(), "mongo host to connect to" )
+        ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
         ("db,d",po::value<string>(), "database to use" )
         ("collection,c",po::value<string>(), "collection to use (some commands)" )
         ("username,u",po::value<string>(), "username" )
