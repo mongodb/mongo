@@ -1181,6 +1181,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
+    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "auth" ) ] )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
@@ -1244,7 +1245,7 @@ def addMongodReqTargets( env, target, source ):
 testEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
 testEnv.AlwaysBuild( "addMongodReqTargets" )
 
-testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeSharding", "smokeTool" ] )
+testEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeAuth", "smokeSharding", "smokeTool" ] )
 testEnv.AlwaysBuild( "smokeAll" )
 
 def addMongodReqNoJsTargets( env, target, source ):
