@@ -26,7 +26,7 @@ namespace mongo {
 
     typedef unsigned long long ScriptingFunction;
     typedef BSONObj (*NativeFunction) ( const BSONObj &args );
-    
+
     class Scope : boost::noncopyable {
     public:
         Scope();
@@ -117,6 +117,8 @@ namespace mongo {
         static int _numScopes;
     };
     
+    void installGlobalUtils( Scope& scope );
+
     class ScriptEngine : boost::noncopyable {
     public:
         ScriptEngine();
@@ -126,6 +128,7 @@ namespace mongo {
             Scope *s = createScope();
             if ( s && _scopeInitCallback )
                 _scopeInitCallback( *s );
+            installGlobalUtils( *s );
             return s;
         }
         

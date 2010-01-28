@@ -34,7 +34,7 @@ Mongo.prototype.getDB = function( name ){
 
 Mongo.prototype.getDBs = function(){
     var res = this.getDB( "admin" ).runCommand( { "listDatabases" : 1 } );
-    assert( res.ok == 1 , "listDatabases failed" );
+    assert( res.ok == 1 , "listDatabases failed:" + tojson( res ) );
     return res;
 }
 
