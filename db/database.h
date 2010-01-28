@@ -36,7 +36,7 @@ namespace mongo {
             : name(nm), path(_path), namespaceIndex( path, name ) {
             
             { // check db name is valid
-                int L = strlen(nm);
+                size_t L = strlen(nm);
                 uassert( 10028 ,  "db name is empty", L > 0 );
                 uassert( 10029 ,  "bad db name [1]", *nm != '.' );
                 uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
@@ -63,8 +63,8 @@ namespace mongo {
         ~Database() {
             magic = 0;
             btreeStore->closeFiles(name, path);
-            int n = files.size();
-            for ( int i = 0; i < n; i++ )
+            size_t n = files.size();
+            for ( size_t i = 0; i < n; i++ )
                 delete files[i];
         }
         

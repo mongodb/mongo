@@ -176,9 +176,9 @@ namespace mongo {
         void setData(int operation, const char *msgtxt) {
             setData(operation, msgtxt, strlen(msgtxt)+1);
         }
-        void setData(int operation, const char *msgdata, int len) {
+        void setData(int operation, const char *msgdata, size_t len) {
             assert(data == 0);
-            int dataLen = len + sizeof(MsgData) - 4;
+            size_t dataLen = len + sizeof(MsgData) - 4;
             MsgData *d = (MsgData *) malloc(dataLen);
             memcpy(d->_data, msgdata, len);
             d->len = fixEndian(dataLen);
