@@ -61,4 +61,13 @@ namespace mongo {
     }
 
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+
+    bool ProcessInfo::blockCheckSupported(){
+        return false;
+    }
+    
+    bool ProcessInfo::blockInMemory( char * start ){
+        assert(0);
+    }
+
 }

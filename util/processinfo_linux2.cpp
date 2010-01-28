@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <db/jsobj.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 using namespace std;
 
@@ -211,5 +213,24 @@ namespace mongo {
         LinuxProc p(_pid);
         info.append("page_faults", (int)p._maj_flt);
     }
+
+    bool ProcessInfo::blockCheckSupported(){
+        return true;
+    }
+    
+    bool ProcessInfo::blockInMemory( char * start ){
+        static long pageSize = 0;
+        if ( pageSize == 0 ){
+            pageSize = sysconf( _SC_PAGESIZE );
+        }
+        start = start - ( (unsigned long long)start % pageSize );
+        unsigned char x = 0;
+        if ( mincore( start , 128 , &x ) ){
+            log() << "mincore failed: " << OUTPUT_ERRNO << endl;
+            return 1;
+        }
+        return x & 0x1;
+    }
+
 
 }
