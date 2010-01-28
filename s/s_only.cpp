@@ -18,6 +18,7 @@
 #include "../stdafx.h"
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
+#include "../db/matcher.h"
 
 namespace mongo {
 
