@@ -415,6 +415,9 @@ def choosePathExist( choices , default=None):
             return c
     return default
 
+def filterExists(paths):
+    return filter(os.path.exists, paths)
+
 if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
@@ -437,8 +440,8 @@ if "darwin" == os.sys.platform:
         if installDir == DEFAULT_INSTALl_DIR and not distBuild:
             installDir = "/usr/64/"
     else:
-        env.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
-        env.Append( LIBPATH=["/sw/lib/", "/opt/local/lib"] )
+        env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+        env.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
 elif "linux2" == os.sys.platform:
     linux = True
@@ -1058,8 +1061,8 @@ elif not onlyServer:
         shellEnv["LINKFLAGS"].remove("-m64")
         shellEnv["CPPPATH"].remove( "/usr/64/include" )
         shellEnv["LIBPATH"].remove( "/usr/64/lib" )
-        shellEnv.Append( CPPPATH=[ "/sw/include" , "/opt/local/include"] )
-        shellEnv.Append( LIBPATH=[ "/sw/lib/", "/opt/local/lib" , "/usr/lib" ] )
+        shellEnv.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+        shellEnv.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib" , "/usr/lib"]) )
 
     l = shellEnv["LIBS"]
     if linux64:
