@@ -187,17 +187,7 @@ namespace mongo {
                     result.appendBool("sharded", false);
                     return passthrough( conf , cmdObj , result);
                 }
-
                 result.appendBool("sharded", true);
-                result.append("ns", fullns);
-                
-                BSONObjBuilder count;
-                BSONObj countCmdObj = BSON("count" << collection << "query" << BSONObj());
-                PRINT(countCmdObj);
-                if (!countCmd.run(ns, countCmdObj, errmsg, count, true))
-                    return false;
-
-                result.append("count", count.obj()["n"].numberInt());
 
                 ChunkManager * cm = conf->getChunkManager( fullns );
                 massert( 12594 ,  "how could chunk manager be null!" , cm );
@@ -206,6 +196,7 @@ namespace mongo {
                 cm->getAllServers(servers);
 
                 BSONObjBuilder shardStats;
+                int count=0;
                 int size=0;
                 int storageSize=0;
                 int nindexes=0;
@@ -218,6 +209,7 @@ namespace mongo {
                     }
                     conn.done();
 
+                    count += res["count"].numberInt();
                     size += res["size"].numberInt();
                     storageSize += res["storageSize"].numberInt();
 
@@ -229,6 +221,8 @@ namespace mongo {
                     shardStats.append(*i, res);
                 }
 
+                result.append("ns", fullns);
+                result.append("count", count);
                 result.append("size", size);
                 result.append("storageSize", storageSize);
                 result.append("nindexes", nindexes);
