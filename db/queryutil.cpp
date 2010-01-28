@@ -107,6 +107,7 @@ namespace mongo {
     FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
         if ( !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
             set< BSONElement, element_lt > vals;
+            uassert( 12580 , "invalid query" , e.type() == Object );
             BSONObjIterator i( e.embeddedObject() );
             while( i.more() )
                 vals.insert( i.next() );
