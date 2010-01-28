@@ -16,7 +16,7 @@
  */
 
 #include "processinfo.h"
-
+#include "log.h"
 
 
 #include <mach/task_info.h>

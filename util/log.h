@@ -18,6 +18,7 @@
 #pragma once
 
 #include <string.h>
+#include <errno.h>
 
 namespace mongo {
 
