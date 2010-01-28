@@ -312,19 +312,6 @@ namespace mongo {
 
         mongolock lk(writeLock);
 
-#if 0
-        /* use this if you only want to process operations for a particular namespace.
-         maybe add to cmd line parms or something fancier.
-         */
-        DbMessage ddd(m);
-        if ( strncmp(ddd.getns(), "clusterstock", 12) != 0 ) {
-            static int q;
-            if ( ++q < 20 )
-                out() << "TEMP skip " << ddd.getns() << endl;
-            goto skip;
-        }
-#endif
-
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
             if ( ! receivedQuery(dbresponse, m, currentOp, true, lk) )
