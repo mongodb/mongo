@@ -27,4 +27,7 @@ namespace mongo {
         auto_ptr<CursorIterator> i;
         return i;
     }
+
+    // need this stub to reduce mongos link dependencies
+    inline Matcher::~Matcher() { assert(!"this shouldn't be called"); }
 }
