@@ -574,9 +574,25 @@ namespace mongo {
 
         /** True if this element may contain subobjects. */
         bool mayEncapsulate() const {
-            return type() == Object ||
-                type() == Array ||
-                type() == CodeWScope;
+            switch ( type() ){
+            case Object:
+            case Array:
+            case CodeWScope:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        /** True if this element can be a BSONObj */
+        bool isABSONObj() const {
+            switch( type() ){
+            case Object:
+            case Array:
+                return true;
+            default:
+                return false;
+            }
         }
 
         Date_t timestampTime() const{
@@ -1665,12 +1681,12 @@ namespace mongo {
 #endif
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() {
-        uassert( 10065 ,  "invalid parameter: expected an object", type()==Object || type()==Array );
+        uassert( 10065 ,  "invalid parameter: expected an object", isABSONObj() );
         return BSONObj(value());
     }
 
     inline BSONObj BSONElement::embeddedObject() const {
-        assert( type()==Object || type()==Array );
+        assert( isABSONObj() );
         return BSONObj(value());
     }
 
