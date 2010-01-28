@@ -15,6 +15,7 @@
  *    limitations under the License.
  */
 
+#include "../stdafx.h"
 #include "processinfo.h"
 #include "log.h"
 
