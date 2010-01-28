@@ -25,6 +25,7 @@
 #include "client.h"
 #include "dbhelpers.h"
 #include "curop.h"
+#include "dbstats.h"
 
 namespace mongo {
 
@@ -391,6 +392,9 @@ namespace mongo {
 			}
 		}
 #endif
+        
+        globalIndexCounters.btree( (char*)this );
+        
         /* binary search for this key */
         bool dupsChecked = false;
         int l=0;

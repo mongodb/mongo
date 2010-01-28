@@ -37,7 +37,55 @@ namespace mongo {
         default: log() << "OpCounters::gotOp unknown op: " << op << endl;
         }
     }
+    
+    IndexCounters::IndexCounters(){
+        _memSupported = _pi.blockCheckSupported();
+        
+        _btreeMemHits = 0;
+        _btreeMemMisses = 0;
+        _btreeAccesses = 0;
+        
+        
+        _maxAllowed = ( numeric_limits< long long >::max() ) / 2;
+        _resets = 0;
 
+        _sampling = 0;
+        _samplingrate = 100;
+    }
+    
+    void IndexCounters::append( BSONObjBuilder& b ){
+        if ( ! _memSupported ){
+            b.append( "note" , "not supported on this platform" );
+            return;
+        }
+
+        BSONObjBuilder bb( b.subobjStart( "btree" ) );
+        if ( _btreeAccesses < ( numeric_limits<int>::max() / 2 ) ){
+            bb.append( "accesses" , (int)_btreeAccesses );
+            bb.append( "hits" , (int)_btreeAccesses );
+            bb.append( "misses" , (int)_btreeAccesses );
+            
+        }
+        else {
+            bb.append( "accesses" , _btreeAccesses );
+            bb.append( "hits" , _btreeAccesses );
+            bb.append( "misses" , _btreeAccesses );
+        }
+        bb.append( "resets" , _resets );
+        
+        bb.append( "missRatio" , (double)_btreeMemMisses / (double)_btreeAccesses );
+        
+        bb.done();
+        
+        if ( _btreeAccesses > _maxAllowed ){
+            _btreeAccesses = 0;
+            _btreeMemMisses = 0;
+            _btreeMemHits = 0;
+            _resets++;
+        }
+    }
+    
 
     OpCounters globalOpCounters;
+    IndexCounters globalIndexCounters;
 }

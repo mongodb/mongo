@@ -3,6 +3,7 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "../util/message.h"
+#include "../util/processinfo.h"
 
 namespace mongo {
 
@@ -38,7 +39,48 @@ namespace mongo {
         int * _delete;
         int * _getmore;
     };
-
+    
     extern OpCounters globalOpCounters;
+
+    class IndexCounters {
+    public:
+        IndexCounters();
+        
+        void btree( char * node ){
+            if ( ! _memSupported )
+                return;
+            if ( _sampling++ % _samplingrate )
+                return;
+            btree( _pi.blockInMemory( node ) );
+        }
+
+        void btree( bool memHit ){
+            if ( memHit )
+                _btreeMemHits++;
+            else
+                _btreeMemMisses++;
+            _btreeAccesses++;
+        }
+        void btreeHit(){ _btreeMemHits++; _btreeAccesses++; }
+        void btreeMiss(){ _btreeMemMisses++; _btreeAccesses++; }
+        
+        void append( BSONObjBuilder& b );
+        
+    private:
+        ProcessInfo _pi;
+        bool _memSupported;
+
+        int _sampling;
+        int _samplingrate;
+        
+        int _resets;
+        long long _maxAllowed;
+        
+        long long _btreeMemMisses;
+        long long _btreeMemHits;
+        long long _btreeAccesses;
+    };
+
+    extern IndexCounters globalIndexCounters;
 
 }

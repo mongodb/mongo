@@ -350,6 +350,7 @@ namespace mongo {
                 bb.append( "available" , connTicketHolder.available() );
                 bb.done();
             }
+
             {
                 BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
                 bb.append("note", "fields vary by platform");
@@ -358,6 +359,13 @@ namespace mongo {
                 bb.done();
             }
 
+
+            {
+                BSONObjBuilder bb( result.subobjStart( "indexCounters" ) );
+                globalIndexCounters.append( bb );
+                bb.done();
+            }
+            
             result.append( "opcounters" , globalOpCounters.getObj() );
             
             return true;
