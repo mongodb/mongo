@@ -72,9 +72,14 @@ namespace mongo {
                 ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
             }
 
-            anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
+            BSONObj tmp = anObjBuilder.asTempObj();
+            bool have_ok = tmp.hasField("ok");
+            bool have_errmsg = tmp.hasField("errmsg");
+
+            if (!have_ok)
+                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
             
-            if ( !ok ) {
+            if ( !ok && !have_errmsg) {
                 anObjBuilder.append("errmsg", errmsg);
                 uassert_nothrow(errmsg.c_str());
             }
