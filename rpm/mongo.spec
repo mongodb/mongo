@@ -56,6 +56,7 @@ cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log
@@ -66,7 +67,7 @@ scons -c
 rm -rf $RPM_BUILD_ROOT
 
 %pre server
-#/usr/sbin/useradd -M -o -r -d /var/mongo -s /bin/bash \
+#/usr/sbin/useradd -M -o -r -d /var/lib/mongo -s /bin/bash \
 #	-c "mongod" mongod > /dev/null 2>&1 || :
 
 %post server
@@ -113,7 +114,7 @@ fi
 #%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
-#/etc/sysconfig/mongod
+/etc/sysconfig/mongod
 #/etc/rc.d/init.d/mongos
 %attr(0755,root,root) %dir /var/lib/mongo
 %attr(0640,root,root) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo
@@ -127,3 +128,5 @@ fi
 * Sat Oct 24 2009 Joe Miklojcik <jmiklojcik@shopwiki.com> - 
 - Wrote mongo.spec.
 
+* Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
+- Minor fixes.
