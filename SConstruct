@@ -315,7 +315,7 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "
                  "util/thread_pool.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/model.cpp client/parallel.cpp client/syncclusterconnection.cpp" )
-commonFiles += [ "scripting/engine.cpp" ]
+commonFiles += [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
 
 #mmap stuff
 

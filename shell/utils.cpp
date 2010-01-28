@@ -18,7 +18,6 @@
 
 #include "../client/dbclient.h"
 #include "../util/processinfo.h"
-#include "../util/md5.hpp"
 #include "utils.h"
 
 extern const char * jsconcatcode_server;
@@ -139,13 +138,6 @@ namespace mongo {
             return b.obj();
         }
 
-        BSONObj JSVersion( const BSONObj& args ){
-            cout << "version: " << versionString << endl;
-            if ( strstr( versionString , "+" ) )
-                printGitVersion();
-            return BSONObj();
-        }
-        
 #ifndef _WIN32
 #include <signal.h>
 #include <fcntl.h>
@@ -474,19 +466,6 @@ namespace mongo {
         void KillMongoProgramInstances() {}        
 #endif
 
-        BSONObj jsmd5( const BSONObj &a ){
-            uassert( 10261 ,  "js md5 needs a string" , a.firstElement().type() == String );
-            const char * s = a.firstElement().valuestrsafe();
-            
-            md5digest d;
-            md5_state_t st;
-            md5_init(&st);
-            md5_append( &st , (const md5_byte_t*)s , strlen( s ) );
-            md5_finish(&st, d);
-            
-            return BSON( "" << digestToString( d ) );
-        }
-        
         unsigned _randomSeed;
         
         BSONObj JSSrand( const BSONObj &a ) {
@@ -512,8 +491,6 @@ namespace mongo {
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
-            scope.injectNative( "version" , JSVersion );
-            scope.injectNative( "hex_md5" , jsmd5 );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
 #if !defined(_WIN32)
