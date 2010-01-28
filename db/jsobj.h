@@ -625,7 +625,7 @@ namespace mongo {
         mutable int fieldNameSize_; // cached value
         int fieldNameSize() const {
             if ( fieldNameSize_ == -1 )
-                fieldNameSize_ = strlen( fieldName() ) + 1;
+                fieldNameSize_ = (int)strlen( fieldName() ) + 1;
             return fieldNameSize_;
         }
         mutable int totalSize; /* caches the computed size */
@@ -1595,8 +1595,8 @@ namespace mongo {
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
             assert( pos < theend );
-            BSONElement e( pos, checkEnd ? theend - pos : -1 );
-            pos += e.size( checkEnd ? theend - pos : -1 );
+            BSONElement e( pos, checkEnd ? (int)(theend - pos) : -1 );
+            pos += e.size( checkEnd ? (int)(theend - pos) : -1 );
             return e;
         }
     private:

@@ -305,14 +305,14 @@ namespace mongo {
 //typedef boostlock lock;
 
     inline bool startsWith(const char *str, const char *prefix) {
-        unsigned l = strlen(prefix);
+        size_t l = strlen(prefix);
         if ( strlen(str) < l ) return false;
         return strncmp(str, prefix, l) == 0;
     }
 
     inline bool endsWith(const char *p, const char *suffix) {
-        int a = strlen(p);
-        int b = strlen(suffix);
+        size_t a = strlen(p);
+        size_t b = strlen(suffix);
         if ( b > a ) return false;
         return strcmp(p + a - b, suffix) == 0;
     }

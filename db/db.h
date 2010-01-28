@@ -74,7 +74,7 @@ namespace mongo {
         void erase( const string& ns , const string& path ){
             dbMutex.assertWriteLocked();
             map<string,Database*>& m = _paths[path];
-            _size -= m.erase( _todb( ns ) );
+            _size -= (int)m.erase( _todb( ns ) );
         }
 
         /* force - force close even if something underway - use at shutdown */
