@@ -1,6 +1,6 @@
 // utils.cpp
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "engine.h"
 #include "../util/md5.hpp"
 

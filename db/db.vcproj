@@ -1888,6 +1888,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath="..\scripting\utils.cpp"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

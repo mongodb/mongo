@@ -1836,6 +1836,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath="..\scripting\utils.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="dbtests"
