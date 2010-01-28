@@ -106,7 +106,7 @@ namespace mongo {
             pageSize = sysconf( _SC_PAGESIZE );
         }
         start = start - ( (unsigned long long)start % pageSize );
-        unsigned char x = 0;
+        char x = 0;
         if ( mincore( start , 128 , &x ) ){
             log() << "mincore failed: " << OUTPUT_ERRNO << endl;
             return 1;
