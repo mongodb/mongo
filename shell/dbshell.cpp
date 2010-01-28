@@ -51,7 +51,8 @@ void shellHistoryAdd( const char * line ){
     if ( strlen(line) == 0 )
         return;
 #ifdef USE_READLINE
-    add_history( line );
+    if ((strstr(line, ".auth")) == NULL)
+        add_history( line );
 #endif
 }
 
