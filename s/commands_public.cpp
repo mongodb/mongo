@@ -173,6 +173,73 @@ namespace mongo {
             }
         } countCmd;
 
+        class CollectionStats : public PublicGridCommand {
+        public:
+            CollectionStats() : PublicGridCommand("collstats") { }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string dbName = getDBName( ns );
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+                
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    result.appendBool("sharded", false);
+                    return passthrough( conf , cmdObj , result);
+                }
+
+                result.appendBool("sharded", true);
+                result.append("ns", fullns);
+                
+                BSONObjBuilder count;
+                BSONObj countCmdObj = BSON("count" << collection << "query" << BSONObj());
+                PRINT(countCmdObj);
+                if (!countCmd.run(ns, countCmdObj, errmsg, count, true))
+                    return false;
+
+                result.append("count", count.obj()["n"].numberInt());
+
+                ChunkManager * cm = conf->getChunkManager( fullns );
+                massert( 12594 ,  "how could chunk manager be null!" , cm );
+
+                set<string> servers;
+                cm->getAllServers(servers);
+
+                BSONObjBuilder shardStats;
+                int size=0;
+                int storageSize=0;
+                int nindexes=0;
+                for ( set<string>::iterator i=servers.begin(); i!=servers.end(); i++ ){
+                    ScopedDbConnection conn( *i );
+                    BSONObj res;
+                    if ( ! conn->runCommand( dbName , cmdObj , res ) ){
+                        errmsg = "failed on shard: " + res.toString();
+                        return false;
+                    }
+                    conn.done();
+
+                    size += res["size"].numberInt();
+                    storageSize += res["storageSize"].numberInt();
+
+                    if (nindexes)
+                        massert(12595, "nindexes should be the same on all shards!", nindexes == res["nindexes"].numberInt());
+                    else
+                        nindexes = res["nindexes"].numberInt();
+
+                    shardStats.append(*i, res);
+                }
+
+                result.append("size", size);
+                result.append("storageSize", storageSize);
+                result.append("nindexes", nindexes);
+
+                result.append("nchunks", cm->numChunks());
+                result.append("shards", shardStats.obj());
+                
+                return true;
+            }
+        } collectionStatsCmd;
+
         class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
             ConvertToCappedCmd() : NotAllowedOnShardedCollectionCmd("convertToCapped"){}
