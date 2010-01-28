@@ -146,7 +146,7 @@ namespace mongo {
             addNewNamespaceToCatalog(ns, j.isEmpty() ? 0 : &j);
 
         long long size = initialExtentSize(128);
-        BSONElement e = j.findElement("size");
+        BSONElement e = j.getField("size");
         if ( e.isNumber() ) {
             size = (long long) e.number();
             size += 256;
@@ -157,10 +157,10 @@ namespace mongo {
 
         bool newCapped = false;
         int mx = 0;
-        e = j.findElement("capped");
+        e = j.getField("capped");
         if ( e.type() == Bool && e.boolean() ) {
             newCapped = true;
-            e = j.findElement("max");
+            e = j.getField("max");
             if ( e.isNumber() ) {
                 mx = (int) e.number();
             }
@@ -168,7 +168,7 @@ namespace mongo {
 
         // $nExtents just for debug/testing.  We create '$nExtents' extents,
         // each of size 'size'.
-        e = j.findElement( "$nExtents" );
+        e = j.getField( "$nExtents" );
         int nExtents = int( e.number() );
         Database *database = cc().database();
         if ( nExtents > 0 ) {
@@ -578,7 +578,7 @@ namespace mongo {
        order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
     */
     auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
-        BSONElement el = order.findElement("$natural"); // e.g., { $natural : -1 }
+        BSONElement el = order.getField("$natural"); // e.g., { $natural : -1 }
 
         if ( el.number() >= 0 )
             return DataFileMgr::findAll(ns, startLoc);

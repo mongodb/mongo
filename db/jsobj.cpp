@@ -811,18 +811,6 @@ namespace mongo {
     }
 
 
-    BSONElement BSONObj::getField(const char *name) const {
-        BSONObjIterator i(*this);
-        while ( i.moreWithEOO() ) {
-            BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-            if ( strcmp(e.fieldName(), name) == 0 )
-                return e;
-        }
-        return nullElement;
-    }
-
     /* return has eoo() true if no match
        supports "." notation to reach into embedded objects
     */

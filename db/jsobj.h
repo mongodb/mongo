@@ -773,14 +773,14 @@ namespace mongo {
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
         */
-        BSONElement getField(const string name) const {
-            return getField( name.c_str() );
-        };
+        BSONElement getField(const char *name) const;
 
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
         */
-        BSONElement getField(const char *name) const; /* return has eoo() true if no match */
+        BSONElement getField(const string name) const {
+            return getField( name.c_str() );
+        };
 
         /** Get the field of the specified name. eoo() is true on the returned 
             element if not found. 
@@ -907,13 +907,9 @@ namespace mongo {
             return BSONElement(objdata() + 4);
         }
 
-		/** @return element with fieldname "name".  returnvalue.eoo() is true if not found */
-        BSONElement findElement(const char *name) const;
-
-		/** @return element with fieldname "name".  returnvalue.eoo() is true if not found */
-        BSONElement findElement(string name) const {
-            return findElement(name.c_str());
-        }
+		/** use getField() instead. */
+        //BSONElement getField(const char *name) const;
+        //BSONElement getField(string name) const {
 
 		/** @return true if field exists in the object */
         bool hasElement(const char *name) const;
@@ -1706,14 +1702,12 @@ namespace mongo {
         return false;
     }
 
-    inline BSONElement BSONObj::findElement(const char *name) const {
-        if ( !isEmpty() ) {
-            BSONObjIterator it(*this);
-            while ( it.moreWithEOO() ) {
-                BSONElement e = it.next();
-                if ( strcmp(name, e.fieldName()) == 0 )
-                    return e;
-            }
+    inline BSONElement BSONObj::getField(const char *name) const {
+        BSONObjIterator i(*this);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if ( strcmp(e.fieldName(), name) == 0 )
+                return e;
         }
         return BSONElement();
     }
@@ -1734,7 +1728,7 @@ namespace mongo {
     }
 
     inline bool BSONObj::getObjectID(BSONElement& e) const { 
-        BSONElement f = findElement("_id");
+        BSONElement f = getField("_id");
         if( !f.eoo() ) { 
             e = f;
             return true;

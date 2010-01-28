@@ -227,7 +227,7 @@ namespace mongo {
         }
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.findElement(name);
+            BSONElement e = cmdObj.getField(name);
             log() << "dropDatabase " << ns << endl;
             int p = (int) e.number();
             if ( p != 1 )
@@ -251,14 +251,14 @@ namespace mongo {
         }
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.findElement(name);
+            BSONElement e = cmdObj.getField(name);
             log() << "repairDatabase " << ns << endl;
             int p = (int) e.number();
             if ( p != 1 )
                 return false;
-            e = cmdObj.findElement( "preserveClonedFilesOnFailure" );
+            e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
-            e = cmdObj.findElement( "backupOriginalFiles" );
+            e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
             return repairDatabase( ns, errmsg, preserveClonedFilesOnFailure, backupOriginalFiles );
         }
@@ -278,7 +278,7 @@ namespace mongo {
         }
         CmdProfile() : Command("profile") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.findElement(name);
+            BSONElement e = cmdObj.getField(name);
             result.append("was", (double) cc().database()->profile);
             int p = (int) e.number();
             bool ok = false;
@@ -537,7 +537,7 @@ namespace mongo {
             return false;
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string nsToDrop = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
+            string nsToDrop = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop.c_str());
             if ( !cmdLine.quiet )
                 log() << "CMD: drop " << nsToDrop << endl;
@@ -570,7 +570,7 @@ namespace mongo {
             return false;
         }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
             string err;
             long long n = runCount(ns.c_str(), cmdObj, err);
             long long nn = n;
@@ -607,7 +607,7 @@ namespace mongo {
             help << "create a collection";
         }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
             string err;
             bool ok = userCreateNS(ns.c_str(), cmdObj, err, true);
             if ( !ok && !err.empty() )
@@ -630,13 +630,13 @@ namespace mongo {
         }
         CmdDropIndexes(const char *cmdname = "dropIndexes") : Command(cmdname) { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
-            BSONElement e = jsobj.findElement(name.c_str());
+            BSONElement e = jsobj.getField(name.c_str());
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             if ( !cmdLine.quiet )
                 log() << "CMD: dropIndexes " << toDeleteNs << endl;
             if ( d ) {
-                BSONElement f = jsobj.findElement("index");
+                BSONElement f = jsobj.getField("index");
                 if ( f.type() == String ) {
                     return dropIndexes( d, toDeleteNs.c_str(), f.valuestr(), errmsg, anObjBuilder, false );
                 }
@@ -686,7 +686,7 @@ namespace mongo {
 
             static DBDirectClient db;
 
-            BSONElement e = jsobj.findElement(name.c_str());
+            BSONElement e = jsobj.getField(name.c_str());
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             log() << "CMD: reIndex " << toDeleteNs << endl;
@@ -1306,7 +1306,7 @@ namespace mongo {
         bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             static DBDirectClient db;
 
-            string ns = cc().database()->name + '.' + cmdObj.findElement(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
             string key = cmdObj["key"].valuestrsafe();
 
             BSONObj keyPattern = BSON( key << 1 );

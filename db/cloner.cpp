@@ -215,7 +215,7 @@ namespace mongo {
 
                 log(2) << "\t cloner got " << collection << endl;
 
-                BSONElement e = collection.findElement("name");
+                BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
                     string s = "bad system.namespaces object " + collection.toString();
                     massert( 10290 , s.c_str(), false);

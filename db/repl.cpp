@@ -983,7 +983,7 @@ namespace mongo {
         string _ns = ns();
         BSONObj last = conn->findOne( _ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
-            BSONElement ts = last.findElement( "ts" );
+            BSONElement ts = last.getField( "ts" );
             massert( 10386 ,  "non Date ts found", ts.type() == Date || ts.type() == Timestamp );
             syncedTo = OpTime( ts.date() );
         }        
@@ -1156,7 +1156,7 @@ namespace mongo {
 
         int n = 0;
         BSONObj op = c->next();
-        BSONElement ts = op.findElement("ts");
+        BSONElement ts = op.getField("ts");
         if ( ts.type() != Date && ts.type() != Timestamp ) {
             string err = op.getStringField("$err");
             if ( !err.empty() ) {
@@ -1262,7 +1262,7 @@ namespace mongo {
 				}
 
                 BSONObj op = c->next();
-                ts = op.findElement("ts");
+                ts = op.getField("ts");
                 assert( ts.type() == Date || ts.type() == Timestamp );
                 OpTime last = nextOpTime;
                 OpTime tmp( ts.date() );
@@ -1368,7 +1368,7 @@ namespace mongo {
         /*
         	// get current mtime at the server.
         	BSONObj o = conn->findOne("admin.$cmd", opTimeQuery);
-        	BSONElement e = o.findElement("optime");
+        	BSONElement e = o.getField("optime");
         	if( e.eoo() ) {
         		log() << "repl:   failed to get cur optime from master" << endl;
         		log() << "        " << o.toString() << endl;

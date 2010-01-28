@@ -578,7 +578,7 @@ namespace mongo {
         for ( int i = 0; i < nIndexes; i++ ) {
             IndexDetails& idx = indexes[i];
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // e.g., { ts : -1 }
-            if ( !idxKey.findElement(fieldName).eoo() )
+            if ( !idxKey.getField(fieldName).eoo() )
                 return i;
         }*/
         return -1;

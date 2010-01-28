@@ -73,7 +73,7 @@ namespace mongo {
 
         BSONObj args;
         {
-            BSONElement argsElement = cmd.findElement("args");
+            BSONElement argsElement = cmd.getField("args");
             if ( argsElement.type() == Array ) {
                 args = argsElement.embeddedObject();
                 if ( edebug ) {
