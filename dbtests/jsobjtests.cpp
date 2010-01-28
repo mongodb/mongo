@@ -251,6 +251,71 @@ namespace JsobjTests {
             }
         };
 
+        class AsTempObj{
+        public:
+            void run(){
+                {
+                    BSONObjBuilder bb;
+                    bb << "a" << 1;
+                    BSONObj tmp = bb.asTempObj();
+                    ASSERT(tmp.objsize() == 4+(1+2+4)+1);
+                    ASSERT(tmp.valid());
+                    ASSERT(tmp.hasField("a"));
+                    ASSERT(!tmp.hasField("b"));
+                    ASSERT(tmp == BSON("a" << 1));
+                    
+                    bb << "b" << 2;
+                    BSONObj obj = bb.obj();
+                    ASSERT(obj.objsize() == 4+(1+2+4)+(1+2+4)+1);
+                    ASSERT(obj.valid());
+                    ASSERT(obj.hasField("a"));
+                    ASSERT(obj.hasField("b"));
+                    ASSERT(obj == BSON("a" << 1 << "b" << 2));
+                }
+                {
+                    BSONObjBuilder bb;
+                    bb << "a" << GT << 1;
+                    BSONObj tmp = bb.asTempObj();
+                    ASSERT(tmp.objsize() == 4+(1+2+(4+1+4+4+1))+1);
+                    ASSERT(tmp.valid());
+                    ASSERT(tmp.hasField("a"));
+                    ASSERT(!tmp.hasField("b"));
+                    ASSERT(tmp == BSON("a" << BSON("$gt" << 1)));
+                    
+                    bb << "b" << LT << 2;
+                    BSONObj obj = bb.obj();
+                    ASSERT(obj.objsize() == 4+(1+2+(4+1+4+4+1))+(1+2+(4+1+4+4+1))+1);
+                    ASSERT(obj.valid());
+                    ASSERT(obj.hasField("a"));
+                    ASSERT(obj.hasField("b"));
+                    ASSERT(obj == BSON("a" << BSON("$gt" << 1)
+                                    << "b" << BSON("$lt" << 2)));
+                }
+                {
+                    BSONObjBuilder bb(32);
+                    bb << "a" << 1;
+                    BSONObj tmp = bb.asTempObj();
+                    ASSERT(tmp.objsize() == 4+(1+2+4)+1);
+                    ASSERT(tmp.valid());
+                    ASSERT(tmp.hasField("a"));
+                    ASSERT(!tmp.hasField("b"));
+                    ASSERT(tmp == BSON("a" << 1));
+
+                    //force a realloc
+                    BSONArrayBuilder arr;
+                    for (int i=0; i < 10000; i++){
+                        arr << i;
+                    }
+                    bb << "b" << arr.arr();
+                    BSONObj obj = bb.obj();
+                    ASSERT(obj.valid());
+                    ASSERT(obj.hasField("a"));
+                    ASSERT(obj.hasField("b"));
+                    ASSERT(obj.objdata() != tmp.objdata());
+                }
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -1298,6 +1363,7 @@ namespace JsobjTests {
             add< BSONObjTests::MultiKeySortOrder > ();
             add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
+            add< BSONObjTests::AsTempObj >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

@@ -1452,6 +1452,16 @@ namespace mongo {
             return BSONObj(_done());
         }
 
+        /** Peek at what is in the builder, but leave the builder ready for more appends.
+            The returned object is only valid until the next modification or destruction of the builder.
+            Intended use case: append a field if not already there.
+        */
+        BSONObj asTempObj() {
+            BSONObj temp(_done());
+            b.setlen(b.len()-1); //next append should overwrite the EOO
+            return temp;
+        }
+
         /* assume ownership of the buffer - you must then free it (with free()) */
         char* decouple(int& l) {
             char *x = _done();
