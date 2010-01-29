@@ -21,7 +21,7 @@
 
 namespace mongo {
 
-#if defined(_DEBUG) && !defined(_WIN32)
+#if defined(USE_GDBSERVER)
     /* Magic gdb trampoline
      * Do not call directly! call setupSIGTRAPforGDB()
      * Assumptions:
