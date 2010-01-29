@@ -1405,7 +1405,7 @@ namespace mongo {
         stringstream ss;
         ss << "JS Error: " << message;
 
-        if ( report ){
+        if ( report && report->filename ){
             ss << " " << report->filename << ":" << report->lineno;
         }
 
