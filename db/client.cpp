@@ -34,11 +34,13 @@ namespace mongo {
 
     Client::Client(const char *desc) : 
       _curOp(new CurOp()),
-      _database(0), _ns("")/*, _nsstr("")*/ 
-      ,_shutdown(false),
+      _context(0),
+      //_database(0), _ns("")/*, _nsstr("")*/ 
+      _shutdown(false),
       _desc(desc),
-      _god(0)
-    { 
+      _god(0),
+      _prevDB( 0 )
+    {
         ai = new AuthenticationInfo(); 
         boostlock bl(clientsMutex);
         clients.insert(this);
@@ -49,9 +51,11 @@ namespace mongo {
         delete ai; 
         ai = 0;
         _god = 0;
-        if ( !_shutdown ) {
+
+        if ( _context )
+            cout << "ERROR: Client::~Client _context should be NULL" << endl;
+        if ( !_shutdown ) 
             cout << "ERROR: Client::shutdown not called!" << endl;
-        }
     }
 
     bool Client::shutdown(){
@@ -69,7 +73,7 @@ namespace mongo {
             for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
                 string ns = *i;
                 dblock l;
-                setClient( ns.c_str() );
+                Client::Context ctx( ns );
                 if ( ! nsdetails( ns.c_str() ) )
                     continue;
                 try {
@@ -91,9 +95,31 @@ namespace mongo {
     AtomicUInt CurOp::_nextOpNum;
     
     Client::Context::Context( string ns , Database * db )
-        : _client( currentClient.get() ) {
+        : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
+          _path( dbpath ) , _lock(0) , _justCreated(false) {
         assert( db && db->isOk() );
-        _client->setns( ns.c_str() , db );
+        _ns = ns;
+        _db = db;
+        _client->_context = this;
+    }
+
+    void Client::Context::_finishInit(){
+        dbMutex.assertAtLeastReadLocked();
+        
+        _db = dbHolder.get( _ns , _path );
+        if ( _db ){
+            _justCreated = false;
+        }
+        else {
+            // we need to be in a write lock since we're going to create the DB object
+            if ( _lock )
+                _lock->releaseAndWriteLock();
+            assertInWriteLock();
+            
+            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
+        }
+        
+        _client->_context = this;
     }
 
 }

@@ -28,14 +28,14 @@ namespace BtreeTests {
 
     class Base {
     public:
-        Base() {
+        Base() : 
+            _context( ns() ) {
+            
             {
                 bool f = false;
                 assert( f = true );
                 massert( 10402 , "assert is misdefined", f);
             }
-
-            setClient( ns() );
             BSONObjBuilder builder;
             builder.append( "ns", ns() );
             builder.append( "name", "testIndex" );
@@ -100,6 +100,7 @@ namespace BtreeTests {
         }
     private:
         dblock lk_;
+        Client::Context _context;
         IndexDetails idx_;
     };
 

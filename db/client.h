@@ -39,9 +39,6 @@ namespace mongo {
 
     extern boost::thread_specific_ptr<Client> currentClient;
 
-    bool setClient(const char *ns, const string& path=dbpath, mongolock *lock = 0);
-
-
     class Client : boost::noncopyable { 
     public:
         static boost::mutex clientsMutex;
@@ -57,30 +54,40 @@ namespace mongo {
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
-        class Context {
+        class Context : boost::noncopyable{
             Client * _client;
-            Database * _olddb;
-            string _oldns;
+            Context * _oldContext;
+            
+            string _path;
+            mongolock * _lock;
+            bool _justCreated;
+
+            string _ns;
+            Database * _db;
+
+            /**
+             * at this point _client, _oldContext and _ns have to be set
+             * _db should not have been touched
+             * this will set _db and create if needed
+             * will also set _client->_context to this
+             */
+            void _finishInit();
+
+            
         public:
-            Context(const char *ns) 
-                : _client( currentClient.get() ) {
-                _olddb = _client->_database;
-                _oldns = _client->_ns;
-                setClient(ns);
-            }
-            Context(string ns) 
-                : _client( currentClient.get() ){
-                _olddb = _client->_database;
-                _oldns = _client->_ns;
-                setClient(ns.c_str());
+            Context(const string& ns, string path=dbpath, mongolock * lock = 0 ) 
+                : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
+                  _path( path ) , _lock( lock ) ,
+                  _ns( ns ){
+                _finishInit();
             }
             
             /* this version saves the context but doesn't yet set the new one: */
             Context() 
-                : _client( currentClient.get() ) {
-                _olddb = _client->database();
-                _oldns = _client->ns();        
-
+                : _client( currentClient.get() ) , _oldContext( _client->_context ), 
+                  _path( dbpath ) , _lock(0) , _justCreated(false){
+                _client->_context = this;
+                clear();
             }
             
             /**
@@ -91,37 +98,80 @@ namespace mongo {
 
             ~Context() {
                 DEV assert( _client == currentClient.get() );
-                _client->setns( _oldns.c_str(), _olddb );
+                _client->_context = _oldContext; // note: _oldContext may be null
+                _client->_prevDB = _db;
+            }
+            
+            Database* db() const {
+                return _db;
             }
 
-        };
+            const char * ns() const {
+                return _ns.c_str();
+            }
+            
+            bool justCreated() const {
+                return _justCreated;
+            }
 
+            bool equals( const string& ns , const string& path=dbpath ) const {
+                return _ns == ns && _path == path;
+            }
+
+            bool inDB( const string& db , const string& path=dbpath ) const {
+                if ( _path != path )
+                    return false;
+                
+                if ( db == _ns )
+                    return true;
+
+                string::size_type idx = _ns.find( db );
+                if ( idx != 0 )
+                    return false;
+                
+                return  _ns[db.size()] == '.';
+            }
+
+            void clear(){
+                _ns = "";
+                _db = 0;
+            }
+
+            /**
+             * call before unlocking, so clear any non-thread safe state
+             */
+            void unlocked(){
+                _db = 0;
+            }
+
+            /**
+             * call after going back into the lock, will re-establish non-thread safe stuff
+             */
+            void relocked(){
+                _finishInit();
+            }
+        };
+        
     private:
         CurOp * const _curOp;
-        Database *_database;
-        Namespace _ns;
-        //NamespaceString _nsstr;
+        Context * _context;
         bool _shutdown;
         list<string> _tempCollections;
         const char *_desc;
         bool _god;
+
+        Database * _prevDB;
     public:
         AuthenticationInfo *ai;
         Top top;
 
         CurOp* curop() { return _curOp; }
-        Database* database() { 
-            return _database; 
-        }
-        const char *ns() { return _ns.buf; }
-
-        void setns(const char *ns, Database *db) { 
-            _database = db;
-            _ns = ns;
-            //_nsstr = ns;
-        }
-        void clearns() { setns("", 0); }
-
+        
+        Context* getContext(){ return _context; }
+        Database* database() {  return _context ? _context->db() : 0; }
+        const char *ns() { return _context->ns(); }
+        Database* prevDatabase(){ return _prevDB; }
+        
         Client(const char *desc);
         ~Client();
 
@@ -185,7 +235,8 @@ namespace mongo {
             /* this is defensive; as we were unlocked for a moment above, 
                the Database object we reference could have been deleted:
             */
-            cc().clearns();
+            assert( ! cc().getContext() );
+            //cc().clearns();
         }
     }
     

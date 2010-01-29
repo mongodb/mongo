@@ -31,10 +31,9 @@ namespace QueryTests {
 
     class Base {
         dblock lk;
+        Client::Context _context;
     public:
-        Base() {
-            dblock lk;
-            setClient( ns() );
+        Base() : _context( ns() ){
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
@@ -608,7 +607,7 @@ namespace QueryTests {
     public:
         void run() {
             dblock lk;
-            setClient( "unittests.DirectLocking" );
+            Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
             ASSERT_EQUALS( "unittests", cc().database()->name );
         }
@@ -725,7 +724,7 @@ namespace QueryTests {
             string err;
 
             writelock lk("");            
-            setClient( "unittests" );
+            Client::Context ctx( "unittests" );
 
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
             for ( int i=0; i<100; i++ ){
@@ -770,7 +769,7 @@ namespace QueryTests {
 
         void run(){
             writelock lk("");
-            setClient( "unittests" );
+            Client::Context ctx( "unittests" );
             
             for ( int i=0; i<50; i++ ){
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -836,7 +835,7 @@ namespace QueryTests {
 
         void run(){
             writelock lk("");
-            setClient( "unittests" );
+            Client::Context ctx( "unittests" );
 
             for ( int i=0; i<1000; i++ ){
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -860,7 +859,7 @@ namespace QueryTests {
 
         void run(){
             writelock lk("");
-            setClient( "unittests" );
+            Client::Context ctx( "unittests" );
             
             for ( int i=0; i<1000; i++ ){
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );

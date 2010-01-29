@@ -67,6 +67,7 @@ namespace mongo {
             if( authWriteOnly && ( 1 >= level ) ) return true;
 			if( m["admin"].level >= level ) return true;
 			if( m["local"].level >= level ) return true;
+            if( cc().isGod() ) return true;
 			if( isLocalHost ) { 
                 readlock l(""); 
                 Client::Context c("admin.system.users");

@@ -316,8 +316,7 @@ namespace QueryOptimizerTests {
     namespace QueryPlanTests {
         class Base {
         public:
-            Base() : indexNum_( 0 ) {
-                setClient( ns() );
+            Base() : _ctx( ns() ) , indexNum_( 0 ) {
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
             }
@@ -357,6 +356,7 @@ namespace QueryOptimizerTests {
             }
         private:
             dblock lk_;
+            Client::Context _ctx;
             int indexNum_;
             static DBDirectClient client_;
         };
@@ -595,8 +595,7 @@ namespace QueryOptimizerTests {
     namespace QueryPlanSetTests {
         class Base {
         public:
-            Base() {
-                setClient( ns() );
+            Base() : _context( ns() ){
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
             }
@@ -625,6 +624,7 @@ namespace QueryOptimizerTests {
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
         private:
             dblock lk_;
+            Client::Context _context;
         };
         
         class NoIndexes : public Base {

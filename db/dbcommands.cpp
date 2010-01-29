@@ -761,8 +761,8 @@ namespace mongo {
                 b.append( "name", i->c_str() );
                 boost::intmax_t size = dbSize( i->c_str() );
                 b.append( "sizeOnDisk", (double) size );
-                setClient( i->c_str() );
-                b.appendBool( "empty", cc().database()->isEmpty() );
+                Client::Context ctx( *i );
+                b.appendBool( "empty", ctx.db()->isEmpty() );
                 totalSize += size;
                 dbInfos.push_back( b.obj() );
 
@@ -780,8 +780,8 @@ namespace mongo {
 
                 BSONObjBuilder b;
                 b << "name" << name << "sizeOnDisk" << double( 1 );
-                setClient( name.c_str() );
-                b.appendBool( "empty", cc().database()->isEmpty() );
+                Client::Context ctx( name );
+                b.appendBool( "empty", ctx.db()->isEmpty() );
 
                 dbInfos.push_back( b.obj() );
             }
@@ -927,9 +927,10 @@ namespace mongo {
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            Client::Context ctx( ns );
+            
             auto_ptr< Cursor > c;
             if ( min.isEmpty() && max.isEmpty() ) {
-                setClient( ns );
                 c = theDataFileMgr.findAll( ns );
             } else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";
@@ -1039,7 +1040,6 @@ namespace mongo {
 
             string fromNs = string( realDbName ) + "." + from;
             string toNs = string( realDbName ) + "." + to;
-            massert( 10300 ,  "source collection " + fromNs + " does not exist", !setClient( fromNs.c_str() ) );
             NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
             massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
             long long excessSize = nsd->datasize - size * 2;
@@ -1061,7 +1061,7 @@ namespace mongo {
             }
 
             DBDirectClient client;
-            setClient( toNs.c_str() );
+            Client::Context ctx( toNs );
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", double( size ) );

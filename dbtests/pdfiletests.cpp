@@ -31,8 +31,7 @@ namespace PdfileTests {
 
         class Base {
         public:
-            Base() {
-                setClient( ns() );
+            Base() : _context( ns() ){
             }
             virtual ~Base() {
                 if ( !nsd() )
@@ -99,6 +98,7 @@ namespace PdfileTests {
             }
         private:
             dblock lk_;
+            Client::Context _context;
         };
 
         class Empty : public Base {
@@ -269,8 +269,7 @@ namespace PdfileTests {
     namespace Insert {
         class Base {
         public:
-            Base() {
-                setClient( ns() );
+            Base() : _context( ns() ){
             }
             virtual ~Base() {
                 if ( !nsd() )
@@ -287,6 +286,7 @@ namespace PdfileTests {
             }
         private:
             dblock lk_;
+            Client::Context _context;
         };
         
         class UpdateDate : public Base {

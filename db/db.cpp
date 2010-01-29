@@ -69,7 +69,10 @@ namespace mongo {
 
     const char *ourgetns() { 
         Client *c = currentClient.get();
-        return c ? c->ns() : "";
+        if ( ! c )
+            return "";
+        Client::Context* cc = c->getContext();
+        return cc ? cc->ns() : "";
     }
 
     struct MyStartupTests {
@@ -82,7 +85,7 @@ namespace mongo {
 
     void testTheDb() {
         OpDebug debug;
-        setClient("sys.unittest.pdfile");
+        Client::Context ctx("sys.unittest.pdfile");
 
         /* this is not validly formatted, if you query this namespace bad things will happen */
         theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
@@ -101,8 +104,6 @@ namespace mongo {
             c->advance();
         }
         out() << endl;
-
-        cc().clearns();
     }
 
     MessagingPort *connGrab = 0;
@@ -346,7 +347,7 @@ namespace mongo {
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
             log(1) << "\t" << dbName << endl;
-            assert( !setClient( dbName.c_str() ) );
+            Client::Context ctx( dbName );
             MongoDataFile *p = cc().database()->getFile( 0 );
             MDFHeader *h = p->getHeader();
             if ( !h->currentVersion() || forceRepair ) {
@@ -394,8 +395,9 @@ namespace mongo {
                 boost::filesystem::remove_all( *i );
         }
     }
-
+    
     void clearTmpCollections() {
+        Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
         auto_ptr< DBClientCursor > c = cli.query( "local.system.namespaces", Query( fromjson( "{name:/^local.temp./}" ) ) );
@@ -408,7 +410,7 @@ namespace mongo {
             cli.dropCollection( *i );
         }
     }
-
+    
     /**
      * does background async flushes of mmapped files
      */

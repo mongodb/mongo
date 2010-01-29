@@ -541,12 +541,13 @@ namespace mongo {
         BSONObj o = jsobj();
         log( 1 ) << "Saving repl source: " << o << endl;
 
-        OpDebug debug;
-        setClient("local.sources");
-        UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
-        assert( ! res.mod );
-        assert( res.num == 1 );
-        cc().clearns();
+        {
+            OpDebug debug;
+            Client::Context ctx("local.sources");
+            UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
+            assert( ! res.mod );
+            assert( res.num == 1 );
+        }
 
         if ( replacing ) {
             /* if we were in "replace" mode, we now have synced up with the replacement,
@@ -578,13 +579,13 @@ namespace mongo {
        and cursor in effect.
     */
     void ReplSource::loadAll(SourceVector &v) {
+        Client::Context ctx("local.sources");
         SourceVector old = v;
         v.clear();
 
         bool gotPairWith = false;
 
         if ( !cmdLine.source.empty() ) {
-            setClient("local.sources");
             // --source <host> specified.
             // check that no items are in sources other than that
             // add if missing
@@ -626,7 +627,6 @@ namespace mongo {
         
         if ( replPair ) {
             const string &remote = replPair->remote;
-            setClient( "local.sources" );
             // --pairwith host specified.
             // check that no items are in sources other than that
             // add if missing
@@ -652,7 +652,6 @@ namespace mongo {
             }
         }
 
-        setClient("local.sources");
         auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
         while ( c->ok() ) {
             ReplSource tmp(c->current());
@@ -668,7 +667,6 @@ namespace mongo {
             addSourceToList(v, tmp, c->current(), old);
             c->advance();
         }
-        cc().clearns();
 
         if ( !gotPairWith && replPair ) {
             /* add the --pairwith server */
@@ -732,7 +730,7 @@ namespace mongo {
     string ReplSource::resyncDrop( const char *db, const char *requester ) {
         log() << "resync: dropping database " << db << endl;
         string dummyns = string( db ) + ".";
-        setClient(dummyns.c_str());        
+        Client::Context ctx(dummyns);
         assert( cc().database()->name == db );
         dropDatabase(dummyns.c_str());
         return dummyns;
@@ -741,7 +739,7 @@ namespace mongo {
     /* grab initial copy of a database from the master */
     bool ReplSource::resync(string db) {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
-        setClient( dummyNs.c_str() );
+        Client::Context ctx( dummyNs );
         {
             log() << "resync: cloning database " << db << endl;
             ReplInfo r("resync: cloning a database");
@@ -864,29 +862,21 @@ namespace mongo {
             throw SyncException();
         }
         
-        bool justCreated;
-        try {
-            justCreated = setClient(ns);
-        } catch ( AssertionException& ) {
-            problem() << "skipping bad(?) op in oplog, setClient() failed, ns: '" << ns << "'\n";
-            addDbNextPass.erase(clientName);
-            return;
-        }
+        Client::Context ctx( ns );
 
-        bool empty = cc().database()->isEmpty();
+        bool empty = ctx.db()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
-        log( 6 ) << "ns: " << ns << ", justCreated: " << justCreated << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
-
-	// always apply admin command command
-	// this is a bit hacky -- the semantics of replication/commands aren't well specified
-	if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
-	  applyOperation( op );
-      cc().clearns();
-	  return;
-	}
+        log( 6 ) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
         
-        if ( justCreated || empty || incompleteClone ) {
+        // always apply admin command command
+        // this is a bit hacky -- the semantics of replication/commands aren't well specified
+        if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
+            applyOperation( op );
+            return;
+        }
+        
+        if ( ctx.justCreated() || empty || incompleteClone ) {
             // we must add to incomplete list now that setClient has been called
             incompleteCloneDbs.insert( clientName );
             if ( nClonedThisPass ) {
@@ -901,9 +891,9 @@ namespace mongo {
                     log() << "An earlier initial clone of '" << clientName << "' did not complete, now resyncing." << endl;
                 }
                 save();
-                setClient( ns );
+                Client::Context ctx(ns);
                 nClonedThisPass++;
-                resync(cc().database()->name);
+                resync(ctx.db()->name);
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
             }
@@ -927,7 +917,6 @@ namespace mongo {
             }
             addDbNextPass.erase( clientName );
         }
-        cc().clearns();
     }
 
     BSONObj ReplSource::idForOp( const BSONObj &op, bool &mod ) {
@@ -990,7 +979,7 @@ namespace mongo {
     }
     
     OpTime ReplSource::nextLastSavedLocalTs() const {
-        setClient( "local.oplog.$main" );
+        Client::Context ctx( "local.oplog.$main" );
         auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         if ( c->ok() )
             return OpTime( c->current().getField( "ts" ).date() );        
@@ -1015,7 +1004,7 @@ namespace mongo {
     }
     
     bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
-        setClient( "local.oplog.$main" );
+        Client::Context ctx( "local.oplog.$main" );
         auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         OpTime newTail;
         for( ; localLog->ok(); localLog->advance() ) {
@@ -1385,7 +1374,7 @@ namespace mongo {
 
 // cached copies of these...so don't rename them
     NamespaceDetails *localOplogMainDetails = 0;
-    Database *localOplogClient = 0;
+    Database *localOplogDB = 0;
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( master ) {
@@ -1447,14 +1436,14 @@ namespace mongo {
         Record *r;
         if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
             if ( localOplogMainDetails == 0 ) {
-                setClient("local.");
-                localOplogClient = cc().database();
+                Client::Context ctx("local.");
+                localOplogDB = ctx.db();
                 localOplogMainDetails = nsdetails(logNS);
             }
-            cc().setns("", localOplogClient); // database = localOplogClient;
+            Client::Context ctx( "" , localOplogDB );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         } else {
-            setClient( logNS );
+            Client::Context ctx( logNS );
             assert( nsdetails( logNS ) );
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
@@ -1640,7 +1629,7 @@ namespace mongo {
         dblock lk;
 
         const char * ns = "local.oplog.$main";
-        setClient(ns);
+        Client::Context ctx(ns);
         
         if ( nsdetails( ns ) )
             return;
@@ -1673,7 +1662,6 @@ namespace mongo {
         BSONObj o = b.done();
         userCreateNS(ns, o, err, false);
         logOp( "n", "dummy", BSONObj() );
-        cc().clearns();
     }
     
     void startReplication() {

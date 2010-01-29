@@ -30,9 +30,9 @@ namespace NamespaceTests {
     namespace IndexDetailsTests {
         class Base {
             dblock lk;
+            Client::Context _context;
         public:
-            Base() {
-                setClient( ns() );
+            Base() : _context(ns()){
             }
             virtual ~Base() {
                 if ( id_.info.isNull() )
@@ -571,9 +571,11 @@ namespace NamespaceTests {
     namespace NamespaceDetailsTests {
 
         class Base {
+            const char *ns_;
             dblock lk;
+            Client::Context _context;
         public:
-            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) {}
+            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
             virtual ~Base() {
                 if ( !nsd() )
                     return;
@@ -585,7 +587,6 @@ namespace NamespaceTests {
         protected:
             void create() {
                 dblock lk;
-                setClient( ns() );
                 string err;
                 ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
             }
@@ -627,8 +628,6 @@ namespace NamespaceTests {
                 b.append( "a", as );
                 return b.obj();
             }
-        private:
-            const char *ns_;
         };
 
         class Create : public Base {

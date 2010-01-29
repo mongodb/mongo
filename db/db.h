@@ -49,7 +49,7 @@ namespace mongo {
     public:
         DatabaseHolder() : _size(0){
         }
-
+        
         Database * get( const string& ns , const string& path ){
             dbMutex.assertAtLeastReadLocked();
             map<string,Database*>& m = _paths[path];
@@ -71,6 +71,26 @@ namespace mongo {
             d = db;
         }
         
+        Database* getOrCreate( const string& ns , const string& path , bool& justCreated ){
+            dbMutex.assertWriteLocked();
+            map<string,Database*>& m = _paths[path];
+            
+            string dbname = _todb( ns );
+
+            Database* & db = m[dbname];
+            if ( db ){
+                justCreated = false;
+                return db;
+            }
+            
+            log(1) << "Accessing: " << dbname << " for the first time" << endl;
+            db = new Database( dbname.c_str() , justCreated , path );
+            return db;
+        }
+        
+
+
+
         void erase( const string& ns , const string& path ){
             dbMutex.assertWriteLocked();
             map<string,Database*>& m = _paths[path];
@@ -113,80 +133,41 @@ namespace mongo {
 
     extern DatabaseHolder dbHolder;
 
-    /* returns true if the database ("database") did not exist, and it was created on this call 
-       path - datafiles directory, if not the default, so we can differentiate between db's of the same
-              name in different places (for example temp ones on repair).
-    */
-    inline bool setClient(const char *ns, const string& path , mongolock *lock ) {
-        if( logLevel > 5 )
-            log() << "setClient: " << ns << endl;
-
-        dbMutex.assertAtLeastReadLocked();
-
-        Client& c = cc();
-        c.top.clientStart( ns );
-
-        Database * db = dbHolder.get( ns , path );
-        if ( db ){
-            c.setns(ns, db );
-            return false;
-        }
-
-        if( lock )
-            lock->releaseAndWriteLock();
-
-        assertInWriteLock();
-        
-        char cl[256];
-        nsToDatabase(ns, cl);
-        bool justCreated;
-        Database *newdb = new Database(cl, justCreated, path);
-        dbHolder.put(ns,path,newdb);
-        c.setns(ns, newdb);
-
-        newdb->finishInit();
-
-        return justCreated;
-    }
-
     // shared functionality for removing references to a database from this program instance
     // does not delete the files on disk
     void closeDatabase( const char *cl, const string& path = dbpath );
-
+    
     struct dbtemprelease {
-        string clientname;
-        string clientpath;
-        int locktype;
+        Client::Context * _context;
+        int _locktype;
+        
         dbtemprelease() {
-            Client& client = cc();
-            Database *database = client.database();
-            if ( database ) {
-                clientname = database->name;
-                clientpath = database->path;
-            }
-            client.top.clientStop();
-            locktype = dbMutex.getState();
-            assert( locktype );
-            if ( locktype > 0 ) {
-				massert( 10298 , "can't temprelease nested write lock", locktype == 1);
+            _context = cc().getContext();
+            _locktype = dbMutex.getState();
+            assert( _locktype );
+            
+            if ( _locktype > 0 ) {
+				massert( 10298 , "can't temprelease nested write lock", _locktype == 1);
+                if ( _context ) _context->unlocked();
                 dbMutex.unlock();
 			}
             else {
-				massert( 10299 , "can't temprelease nested read lock", locktype == -1);
+				massert( 10299 , "can't temprelease nested read lock", _locktype == -1);
+                if ( _context ) _context->unlocked();
                 dbMutex.unlock_shared();
 			}
+
         }
         ~dbtemprelease() {
-            if ( locktype > 0 )
+            if ( _locktype > 0 )
                 dbMutex.lock();
             else
                 dbMutex.lock_shared();
-            if ( clientname.empty() )
-                cc().setns("", 0);
-            else
-                setClient(clientname.c_str(), clientpath.c_str());
+            
+            if ( _context ) _context->relocked();
         }
     };
+
 
     /**
        only does a temp release if we're not nested and have a lock

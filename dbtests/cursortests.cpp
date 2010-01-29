@@ -42,7 +42,7 @@ namespace CursorTests {
                 BoundList b;
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 1 ), BSON( "" << 2 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 4 ), BSON( "" << 6 ) ) );
-                setClient( ns );
+                Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 1, 2, 4, 5, 6 };
@@ -72,7 +72,7 @@ namespace CursorTests {
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << -50 ), BSON( "" << 2 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 40 ), BSON( "" << 60 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 109 ), BSON( "" << 200 ) ) );
-                setClient( ns );
+                Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, 1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
                 double expected[] = { 0, 1, 2, 109 };
@@ -99,7 +99,7 @@ namespace CursorTests {
                 BoundList b;
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 6 ), BSON( "" << 4 ) ) );
                 b.push_back( pair< BSONObj, BSONObj >( BSON( "" << 2 ), BSON( "" << 1 ) ) );
-                setClient( ns );
+                Client::Context ctx( ns );
                 BtreeCursor c( nsdetails( ns ), 1, nsdetails( ns )->idx(1), b, -1 );
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
                 double expected[] = { 6, 5, 4, 2, 1 };

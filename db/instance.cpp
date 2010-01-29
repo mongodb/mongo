@@ -176,6 +176,8 @@ namespace mongo {
         QueryResult* msgdata;
 
         Client& c = cc();
+        
+        Client::Context ctx( q.ns, dbpath, &lock );
 
         try {
             if (q.fields.get() && q.fields->errmsg)
@@ -192,7 +194,6 @@ namespace mongo {
                 }
             }
 
-            setClient( q.ns, dbpath, &lock );
             c.top.setRead();
             c.curop()->setNS(q.ns);
             msgdata = runQuery(m, q, op ).release();
@@ -290,7 +291,6 @@ namespace mongo {
         }
 
         Client& c = cc();
-        c.clearns();
         
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
@@ -414,7 +414,7 @@ namespace mongo {
             ss << ' ' << ms << "ms";
             mongo::log() << ss.str() << endl;
         }
-        Database *database = c.database();
+        Database *database = c.prevDatabase();
         if ( database && database->profile >= 1 ) {
             if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
                 // performance profiling is on
@@ -422,10 +422,8 @@ namespace mongo {
                     out() << "warning: not profiling because recursive lock" << endl;
                 }
                 else {
-                    string old_ns = c.ns();
-                    Database * old_db = c.database();
                     lk.releaseAndWriteLock();
-                    Client::Context c( old_ns , old_db );
+                    Client::Context c( "" , database );
                     profile(ss.str().c_str(), ms);
                 }
             }
@@ -452,19 +450,17 @@ namespace mongo {
        path - db directory
     */
     void closeDatabase( const char *db, const string& path ) {
-        Database *database = cc().database();
-        assert( database );
+        assertInWriteLock();
+        
+        Client::Context * ctx = cc().getContext();
+        assert( ctx );
+        assert( ctx->inDB( db , path ) );
+        Database *database = ctx->db();
         assert( database->name == db );
 
         if( BackgroundOperation::inProgForDb(db) ) { 
             log() << "warning: bg op in prog during close db? " << db << endl;
         }
-
-		/*
-        if ( string("local") != cl ) {
-            DBInfo i(cl);
-            i.dbDropped();
-			}*/
 
         /* important: kill all open cursors on the database */
         string prefix(db);
@@ -475,7 +471,7 @@ namespace mongo {
 
         dbHolder.erase( db, path );
         delete database; // closes files
-        cc().clearns();
+        ctx->clear();
     }
 
     void receivedUpdate(Message& m, CurOp& op) {
@@ -483,9 +479,6 @@ namespace mongo {
         const char *ns = d.getns();
         assert(*ns);
         uassert( 10054 ,  "not master", isMasterNs( ns ) );
-        setClient(ns);
-        Client& client = cc();
-        client.top.setWrite();
         op.debug().str << ns << ' ';
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
@@ -502,9 +495,13 @@ namespace mongo {
             string s = query.toString();
             /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
             op.debug().str << " query: " << s;
-            CurOp& currentOp = *client.curop();
-            currentOp.setQuery(query);
+            op.setQuery(query);
         }        
+
+        Client::Context ctx( ns );
+        Client& client = cc();
+        client.top.setWrite();
+
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
         /* TODO FIX: recordUpdate should take a long int for parm #2 */
         recordUpdate( res.existing , (int) res.num ); // for getlasterror
@@ -515,7 +512,7 @@ namespace mongo {
         const char *ns = d.getns();
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
-        setClient(ns);
+        Client::Context ctx(ns);
         Client& client = cc();
         client.top.setWrite();
         int flags = d.pullInt();
@@ -540,7 +537,7 @@ namespace mongo {
         const char *ns = d.getns();
         StringBuilder& ss = curop.debug().str;
         ss << ns;
-        setClient(ns);
+        Client::Context ctx(ns);
         cc().top.setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
@@ -572,7 +569,7 @@ namespace mongo {
 		const char *ns = d.getns();
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
-		setClient(ns);
+        Client::Context ctx(ns);
         cc().top.setWrite();
         op.debug().str << ns;
 		
@@ -618,7 +615,6 @@ namespace mongo {
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk ) {
-        SavedContext c;
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
@@ -629,7 +625,6 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend ) {
-        SavedContext c;
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
@@ -646,8 +641,6 @@ namespace mongo {
         //throw UserException( (string)"yay:" + ns );
     }
 
-
-    DBDirectClient::AlwaysAuthorized DBDirectClient::SavedContext::always;
 
     DBClientBase * createDirectClient(){
         return new DBDirectClient();

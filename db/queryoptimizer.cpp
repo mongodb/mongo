@@ -558,7 +558,7 @@ namespace mongo {
             return 0;
         }
         
-        setClient( ns );
+        Client::Context ctx( ns );
         IndexDetails *id = 0;
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {

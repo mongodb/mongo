@@ -623,7 +623,7 @@ namespace Plan {
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
-            setClient( ns_.c_str() );
+            Client::Context ctx( ns_ );
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
             hintElt_ = hint_.firstElement();
         }
@@ -646,9 +646,9 @@ namespace Plan {
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
-            setClient( ns_.c_str() );
         }
         void run() {
+            Client::Context ctx( ns_ );
             for( int i = 0; i < 10000; ++i )
                 QueryPlanSet s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
         }
@@ -665,9 +665,9 @@ namespace Plan {
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
             lk_.reset( new dblock );
-            setClient( ns_.c_str() );
         }
         void run() {
+            Client::Context ctx( ns_.c_str() );
             for( int i = 0; i < 10000; ++i )
                 QueryPlanSet s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
         }

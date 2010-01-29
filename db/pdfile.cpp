@@ -1654,11 +1654,16 @@ namespace mongo {
                                 "backup" : "$tmp" );
         BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
         string reservedPathString = reservedPath.native_directory_string();
-        assert( setClient( dbName, reservedPathString.c_str() ) );
-
-        bool res = cloneFrom(localhost.c_str(), errmsg, dbName, 
-                             /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
-        closeDatabase( dbName, reservedPathString.c_str() );
+        
+        bool res;
+        { // clone to temp location, which effectively does repair
+            Client::Context ctx( dbName, reservedPathString );
+            assert( ctx.justCreated() );
+            
+            res = cloneFrom(localhost.c_str(), errmsg, dbName, 
+                                 /*logForReplication=*/false, /*slaveok*/false, /*replauth*/false, /*snapshot*/false);
+            closeDatabase( dbName, reservedPathString.c_str() );
+        }
 
         if ( !res ) {
             problem() << "clone failed for " << dbName << " with error: " << errmsg << endl;
@@ -1667,7 +1672,7 @@ namespace mongo {
             return false;
         }
 
-        assert( !setClient( dbName ) );
+        Client::Context ctx( dbName );
         closeDatabase( dbName );
 
         if ( backupOriginalFiles ) {
@@ -1738,7 +1743,7 @@ namespace mongo {
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
             log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
-            setClient( name.c_str() , path );
+            Client::Context ctx( name , path );
             if( !force && BackgroundOperation::inProgForDb(name.c_str()) )
                 log() << "WARNING: can't close database " << name << "because a bg job is in progress - try killOp command" << endl;
             else

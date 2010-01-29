@@ -462,7 +462,7 @@ namespace mongo {
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
              were to clone it would get a different point-in-time and not match.
              */
-            setClient( collection.c_str() );
+            Client::Context ctx( collection );
             
             log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << " logSizeMb: " << logSizeMb << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
             
@@ -506,7 +506,7 @@ namespace mongo {
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
              were to clone it would get a different point-in-time and not match.
              */
-            setClient( collection.c_str() );
+            Client::Context ctx(collection);
             
             log() << "startCloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
@@ -562,7 +562,7 @@ namespace mongo {
                 cursorId = cursorIdToken._numberLong();
             }
             
-            setClient( collection.c_str() );
+            Client::Context ctx( collection );
             
             log() << "finishCloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
@@ -601,9 +601,8 @@ namespace mongo {
                 errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
                 return false;
             }
-            setClient(todb.c_str());
+            Client::Context ctx(todb);
             bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
-            cc().clearns();
             return res;
         }
     } cmdcopydb;
@@ -631,16 +630,19 @@ namespace mongo {
                 return false;
             }
             
-            setClient( source.c_str() );
-            NamespaceDetails *nsd = nsdetails( source.c_str() );
-            uassert( 10026 ,  "source namespace does not exist", nsd );
-            bool capped = nsd->capped;
+            bool capped = false;
             long long size = 0;
-            if ( capped )
-                for( DiskLoc i = nsd->firstExtent; !i.isNull(); i = i.ext()->xnext )
-                    size += i.ext()->length;
+            {
+                Client::Context ctx( source );
+                NamespaceDetails *nsd = nsdetails( source.c_str() );
+                uassert( 10026 ,  "source namespace does not exist", nsd );
+                capped = nsd->capped;
+                if ( capped )
+                    for( DiskLoc i = nsd->firstExtent; !i.isNull(); i = i.ext()->xnext )
+                        size += i.ext()->length;
+            }
             
-            setClient( target.c_str() );
+            Client::Context ctx( target );
             
             if ( nsdetails( target.c_str() ) ){
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );
@@ -715,8 +717,10 @@ namespace mongo {
                 theDataFileMgr.insert( targetIndexes.c_str(), n );
             }
 
-            setClient( source.c_str() );
-            dropCollection( source, errmsg, result );
+            {
+                Client::Context ctx( source );
+                dropCollection( source, errmsg, result );
+            }
             return true;
         }
     } cmdrenamecollection;
