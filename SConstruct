@@ -40,6 +40,14 @@ AddOption('--distname',
           metavar='DIR',
           help='dist name (0.8.0)')
 
+AddOption('--distmod',
+          dest='distmod',
+          type='string',
+          nargs=1,
+          action='store',
+          metavar='DIR',
+          help='additional piece for full dist name')
+
 
 AddOption( "--64",
            dest="force64",
@@ -1320,6 +1328,11 @@ def getSystemInstallName():
             n = n + "-" + str( settings.distmod )
     except:
         pass
+
+        
+    dn = GetOption( "distmod" )
+    if dn and len(dn) > 0:
+        n = n + "-" + dn
 
     return n
 
