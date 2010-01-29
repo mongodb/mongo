@@ -184,6 +184,20 @@ AddOption( "--extralib",
            action="store",
            help="comma seperated list of libraries  (--extralib js_static,readline" )
 
+AddOption( "--staticlib",
+           dest="staticlib",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
+
+AddOption( "--staticlibpath",
+           dest="staticlibpath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma seperated list of dirs to search for staticlib arguments" )
+
 AddOption( "--cxx",
            dest="cxx",
            type="string",
@@ -897,6 +911,35 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
     if freebsd:
         myCheckLib( "execinfo", True )
         env.Append( LIBS=[ "execinfo" ] )
+
+    # Handle staticlib,staticlibpath options.
+    staticlibfiles = []
+    if GetOption( "staticlib" ) is not None:
+        # FIXME: probably this loop ought to do something clever
+        # depending on whether we want to use 32bit or 64bit
+        # libraries.  For now, we sort of rely on the user supplying a
+        # sensible staticlibpath option. (myCheckLib implements an
+        # analogous search, but it also does other things I don't
+        # understand, so I'm not using it.)
+        if GetOption ( "staticlibpath" ) is not None:
+            dirs = GetOption ( "staticlibpath" ).split( "," )
+        else:
+            dirs = [ "/usr/lib64", "/usr/lib" ]
+
+        for l in GetOption( "staticlib" ).split( "," ):
+            removeIfInList(myenv["LIBS"], l)
+            found = False
+            for d in dirs:
+                f=  "%s/lib%s.a" % ( d, l )
+                if os.path.exists( f ):
+                    staticlibfiles.append(f)
+                    found = True
+                    break
+            if not found:
+                raise "can't find a static %s" % l
+
+    myenv.Append(LINKCOM=" $STATICFILES")
+    myenv.Append(STATICFILES=staticlibfiles)
 
     return conf.Finish()
 
