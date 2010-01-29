@@ -26,15 +26,16 @@ DBCollection.prototype.getName = function(){
     return this._shortName;
 }
 
-DBCollection.prototype.help = function(){
+DBCollection.prototype.help = function() {
     print("DBCollection help");
     print("\tdb.foo.count()");
     print("\tdb.foo.dataSize()");
-    print("\tdb.foo.distinct( key ) - eg. db.foo.distinct( 'x' )" );
+    print("\tdb.foo.distinct( key ) - eg. db.foo.distinct( 'x' )");
     print("\tdb.foo.drop() drop the collection");
     print("\tdb.foo.dropIndex(name)");
     print("\tdb.foo.dropIndexes()");
     print("\tdb.foo.ensureIndex(keypattern,options) - options should be an object with these possible fields: name, unique, dropDups");
+    print("\tdb.foo.reIndex()");
     print("\tdb.foo.find( [query] , [fields]) - first parameter is an optional query filter. second parameter is optional set of fields to return.");
     print("\t                                   e.g. db.foo.find( { x : 77 } , { name : 1 , x : 1 } )");
     print("\tdb.foo.find(...).count()");
@@ -46,8 +47,8 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.getDB() get DB object associated with collection");
     print("\tdb.foo.getIndexes()");
     print("\tdb.foo.group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
-    print("\tdb.foo.mapReduce( mapFunction , reduceFunction , <optional params> )" );
-    print("\tdb.foo.remove(query)" );
+    print("\tdb.foo.mapReduce( mapFunction , reduceFunction , <optional params> )");
+    print("\tdb.foo.remove(query)");
     print("\tdb.foo.renameCollection( newName , <dropTarget> ) renames the collection.");
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.stats()");
@@ -56,7 +57,7 @@ DBCollection.prototype.help = function(){
     print("\tdb.foo.totalSize() - storage allocated for all data and indexes");
     print("\tdb.foo.update(query, object[, upsert_bool, multi_bool])");
     print("\tdb.foo.validate() - SLOW");
-    print("\tdb.foo.getShardVersion() - only for use with sharding" );
+    print("\tdb.foo.getShardVersion() - only for use with sharding");
 }
 
 DBCollection.prototype.getFullName = function(){
@@ -283,12 +284,8 @@ DBCollection.prototype.resetIndexCache = function(){
     this._indexCache = {};
 }
 
-DBCollection.prototype.reIndex = function(){
-    var specs = this.getIndexSpecs();
-    this.dropIndexes();
-    for ( var i = 0; i < specs.length; ++i ){
-        this.ensureIndex( specs[i].key, [ specs[i].unique, specs[i].name ] );
-    }
+DBCollection.prototype.reIndex = function() {
+    return this._db.runCommand({ reIndex: this.getName() });
 }
 
 DBCollection.prototype.dropIndexes = function(){

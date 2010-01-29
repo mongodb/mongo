@@ -495,7 +495,9 @@ namespace mongo {
             /* assuming here that id index is not multikey: */
             d->multiKeyIndexBits = 0;
             assureSysIndexesEmptied(ns, idIndex);
-            anObjBuilder.append("msg", "non-_id indexes dropped for collection");
+            anObjBuilder.append("msg", mayDeleteIdIndex ? 
+                "indexes dropped for collection" : 
+                "non-_id indexes dropped for collection");
         }
         else {
             // delete just one index

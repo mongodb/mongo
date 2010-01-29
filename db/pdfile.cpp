@@ -730,9 +730,12 @@ namespace mongo {
     /* unindex all keys in all indexes for this record. */
     static void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
         BSONObj obj(todelete);
-        int n = d->nIndexesBeingBuilt();
-        for ( int i = 0; i < n; i++ ) {
+        int n = d->nIndexes;
+        for ( int i = 0; i < n; i++ )
             _unindexRecord(d->idx(i), obj, dl, !noWarn);
+        if( d->backgroundIndexBuildInProgress ) {
+            // always pass nowarn here, as this one may be missing for valid reasons as we are concurrently building it
+            _unindexRecord(d->idx(n), obj, dl, false); 
         }
     }
 
