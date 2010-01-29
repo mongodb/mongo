@@ -47,7 +47,25 @@ to develop mongo client software.
 scons --prefix=$RPM_BUILD_ROOT/usr all
 # XXX really should have shared library here
 
+%build mostlystatic
+scons --prefix=$RPM_BUILD_ROOT/usr --extralib=nspr4 --staticlib=boost_system-mt,boost_thread-mt,boost_filesystem-mt,boost_program_options-mt,js  install
+
 %install
+scons --prefix=$RPM_BUILD_ROOT/usr install
+mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
+cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
+mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
+cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+mkdir -p $RPM_BUILD_ROOT/etc
+cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
+mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
+cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
+mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
+mkdir -p $RPM_BUILD_ROOT/var/log
+touch $RPM_BUILD_ROOT/var/log/mongo
+
+%install mostlystatic
 scons --prefix=$RPM_BUILD_ROOT/usr install
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
