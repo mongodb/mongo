@@ -700,9 +700,13 @@ def getGitBranch():
 def getGitBranchString( prefix="" , postfix="" ):
     t = re.compile( '[/\\\]' ).split( os.getcwd() )
     if len(t) > 2 and t[len(t)-1] == "mongo":
-        t = re.compile( ".*_([vV]\d+\.\d+)$" ).match( t[len(t)-2] )
-        if t is not None:
-            return prefix + t.group(1).lower() + postfix
+        par = t[len(t)-2]
+        m = re.compile( ".*_([vV]\d+\.\d+)$" ).match( par )
+        if m is not None:
+            return prefix + m.group(1).lower() + postfix
+        if par.index("Nightly") > 0:
+            return ""
+
 
     b = getGitBranch()
     if b == None or b == "master":
