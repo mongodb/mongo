@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_vrfy_sizes(DB *);
+static int __wt_bt_open_verify(DB *);
 
 /*
  * __wt_bt_open --
@@ -28,7 +28,7 @@ __wt_bt_open(DB *db, int ok_create)
 	ret = 0;
 
 	/* Check page size configuration. */
-	WT_RET(__wt_bt_vrfy_sizes(db));
+	WT_RET(__wt_bt_open_verify(db));
 
 	/* Open the fle. */
 	WT_RET(__wt_open(env, idb->dbname, idb->mode, ok_create, &idb->fh));
@@ -45,11 +45,12 @@ err:	WT_TRET(toc->close(toc, 0));
 }
 
 /*
- * __wt_bt_vrfy_sizes --
- *	Verify any configured sizes, and set the defaults.
+ * __wt_bt_open_verify --
+ *	Verify anything we can't verify before we're about to open the file;
+ *	set defaults as necessary.
  */
 static int
-__wt_bt_vrfy_sizes(DB *db)
+__wt_bt_open_verify(DB *db)
 {
 	/*
 	 * The application can set lots of sizes.  It's complicated enough
