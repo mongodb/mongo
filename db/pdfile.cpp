@@ -1157,14 +1157,12 @@ namespace mongo {
     }
 
     /* add keys to indexes for a new record */
-    static void indexRecord(NamespaceDetails *d, const void *buf, int len, DiskLoc newRecordLoc) {
-        BSONObj obj((const char *)buf);
-
+    static void indexRecord(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
         int n = d->nIndexesBeingBuilt();
         for ( int i = 0; i < n; i++ ) {
             try { 
                 bool unique = d->idx(i).unique();
-                _indexRecord(d, i, obj, newRecordLoc, /*dupsAllowed*/!unique);
+                _indexRecord(d, i, obj, loc, /*dupsAllowed*/!unique);
             }
             catch( DBException& ) { 
                 /* try to roll back previously added index entries
@@ -1173,7 +1171,7 @@ namespace mongo {
                 */
                 for( int j = 0; j <= i; j++ ) { 
                     try {
-                        _unindexRecord(d->idx(j), obj, newRecordLoc, false);
+                        _unindexRecord(d->idx(j), obj, loc, false);
                     }
                     catch(...) { 
                         log(3) << "unindex fails on rollback after unique failure\n";
@@ -1443,7 +1441,8 @@ namespace mongo {
         /* add this record to our indexes */
         if ( d->nIndexes ) {
             try { 
-                indexRecord(d, r->data/*buf*/, len, loc);
+                BSONObj obj(r->data);
+                indexRecord(d, obj, loc);
             } 
             catch( AssertionException& e ) { 
                 // should be a dup key error on _id index
