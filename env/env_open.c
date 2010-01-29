@@ -25,7 +25,7 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	/* Create the cache. */
 	WT_RET(__wt_cache_create(env));
 
-	/* Turn on the methods that require open. */
+	/* Transition to the open state. */
 	__wt_methods_env_open_transition(env);
 
 	/* Start worker threads. */
