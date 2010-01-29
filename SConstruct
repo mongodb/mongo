@@ -216,6 +216,12 @@ AddOption( "--pg",
            nargs=0,
            action="store" )
 
+AddOption( "--gdbserver",
+           dest="gdbserver",
+           type="string",
+           nargs=0,
+           action="store" )
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -638,6 +644,9 @@ if nix:
 
     if GetOption( "profile" ) is not None:
         env.Append( LIBS=[ "profiler" ] )
+
+    if GetOption( "gdbserver" ) is not None:
+        env.Append( CPPDEFINES=["USE_GDBSERVER"] )
 
     # pre-compiled headers
     if False and 'Gch' in dir( env ):
