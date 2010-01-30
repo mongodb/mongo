@@ -293,6 +293,7 @@ namespace mongo {
 
             void dump(){
                 writelock l(_state.setup.incLong);
+                Client::Context ctx(_state.setup.incLong);
                     
                 for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
                     list<BSONObj>& all = i->second;
