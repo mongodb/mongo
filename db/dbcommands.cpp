@@ -882,6 +882,8 @@ namespace mongo {
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
+            
+            Client::Context ctx( ns );
 
             IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
             if ( id == 0 )
