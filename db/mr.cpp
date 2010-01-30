@@ -224,6 +224,7 @@ namespace mongo {
                 db.dropCollection( setup.incLong );
                 
                 writelock l( setup.incLong );
+                Client::Context ctx( setup.incLong );
                 string err;
                 assert( userCreateNS( setup.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) );
 
@@ -237,6 +238,7 @@ namespace mongo {
                 BSONObj res = reduceValues( values , scope.get() , reduce , 1 , finalize );
                 
                 writelock l( setup.tempLong );
+                Client::Context ctx( setup.incLong );
                 theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
             }
 
@@ -495,9 +497,9 @@ namespace mongo {
             virtual bool slaveOk() { return true; }
 
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                dbtemprelease temprlease; // we don't touch the db directly
-                                    
-                string dbname = cc().database()->name;
+                string dbname = cc().database()->name; // this has to come before dbtemprelease
+                dbtemprelease temprelease; // we don't touch the db directly
+
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
                 MRSetup mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
