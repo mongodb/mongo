@@ -76,7 +76,7 @@ namespace mongo {
 					return false;
 				if( warned == 0 ) {
 					warned++;
-					log() << "warning: no users configured in admin.system.users, allowing localhost access" << endl;
+					log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
 				}
 				return true;
 			}
