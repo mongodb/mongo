@@ -232,11 +232,8 @@ namespace mongo {
             dbMutex.unlock_shared();
             dbMutex.lock();
 
-            /* this is defensive; as we were unlocked for a moment above, 
-               the Database object we reference could have been deleted:
-            */
-            assert( ! cc().getContext() );
-            //cc().clearns();
+            if ( cc().getContext() )
+                cc().getContext()->unlocked();
         }
     }
     
