@@ -419,7 +419,7 @@ namespace mongo {
             if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
                 // performance profiling is on
                 if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
-                    log(1) << "warning: not profiling because recursive lock" << endl;
+                    mongo::log(1) << "warning: not profiling because recursive lock" << endl;
                 }
                 else {
                     lk.releaseAndWriteLock();
