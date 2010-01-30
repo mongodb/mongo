@@ -423,8 +423,15 @@ namespace mongo {
                 }
                 else {
                     lk.releaseAndWriteLock();
-                    Client::Context c( "" , database );
-                    profile(ss.str().c_str(), ms);
+                    if ( database->isOk() ){
+                        Client::Context c( "" , database );
+                        profile(ss.str().c_str(), ms);
+                    }
+                    else {
+                        // this means this either caused the db to be closed
+                        // or someone else closed it
+                        // either way, we're not going to profile
+                    }
                 }
             }
         }
