@@ -18,7 +18,6 @@
 
 #include "../stdafx.h"
 #include "../util/message.h"
-#include "../util/top.h"
 #include "boost/version.hpp"
 #include "concurrency.h"
 #include "pdfile.h"

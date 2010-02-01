@@ -27,7 +27,7 @@
 #include "../stdafx.h"
 #include "namespace.h"
 #include "lasterror.h"
-#include "../util/top.h"
+#include "stats/top.h"
 
 namespace mongo { 
 
