@@ -107,9 +107,7 @@ test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
 tar xzf tarball.tgz
 mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_NAME"-"$MONGO_VERSION"
 if [ "$MODE" = "commit" ]; then 
-  sed "1s/([^)]*)/($MONGO_VERSION)/" mongo/debian/changelog > mongo/debian/changelog.TMP
-  mv mongo/debian/changelog.TMP mongo/debian/changelog
-  #cat mongo/debian/changelog
+  ( cd ./mongo && ./buildscripts/frob_version.py "$MONGO_VERSION" )
 fi
 """
     deb_prereq_commands = """
