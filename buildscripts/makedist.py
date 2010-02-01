@@ -467,7 +467,7 @@ class Builder (EC2InstanceBuilder, SshableBuilder, BaseBuilder):
 def main():
 #    checkEnvironment()
 
-    (kwargs, (distro, version, arch, mongoversion)) = processArguments()
+    (kwargs, (rootdir, distro, version, arch, mongoversion)) = processArguments()
     try:
         import settings
         if "makedist" in dir ( settings ):
@@ -490,7 +490,7 @@ def main():
     if len([True for x in os.environ["PATH"].split(":") if x.find(os.environ["EC2_HOME"]) > -1]) == 0:
         os.environ["PATH"]=os.environ["EC2_HOME"]+"/bin:"+os.environ["PATH"]
 
-    kwargs["localdir"] = "%s/%s/%s"  % (distro, version, arch)
+    kwargs["localdir"] = "%s/%s/%s/%s"  % (rootdir, distro, version, arch)
     kwargs["distro"] = distro
     kwargs["version"] = version
     kwargs["arch"] = arch
