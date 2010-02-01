@@ -436,8 +436,8 @@ namespace mongo {
             string s = toSTLString( value );
             if ( s.size() && s[0] == '/' ){
                 s = s.substr( 1 );
-                string r = s.substr( 0 , s.find( "/" ) );
-                string o = s.substr( s.find( "/" ) + 1 );
+                string r = s.substr( 0 , s.rfind( "/" ) );
+                string o = s.substr( s.rfind( "/" ) + 1 );
                 b.appendRegex( sname.c_str() , r.c_str() , o.c_str() );
             }
             else if ( value->ToObject()->GetPrototype()->IsObject() &&
