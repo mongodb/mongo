@@ -1136,6 +1136,7 @@ namespace mongo {
     class GroupCommand : public Command {
     public:
         GroupCommand() : Command("group"){}
+        virtual bool readOnly() { return true; }
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream &help ) const {
             help << "see http://www.mongodb.org/display/DOCS/Aggregation";
