@@ -167,6 +167,7 @@ namespace mongo {
                 break;
             
             case mongo::jstNULL:
+            case mongo::Undefined: // duplicate sm behavior
                 o->Set( v8::String::New( f.fieldName() ) , v8::Null() );
                 break;
             
@@ -234,10 +235,6 @@ namespace mongo {
                 break;
             }
 
-            case mongo::Undefined:
-                o->Set( v8::String::New( f.fieldName() ), v8::Undefined() );
-                break;
-
             case mongo::DBRef: {
                 v8::Function* dbPointer = getNamedCons( "DBPointer" );
                 v8::Handle<v8::Value> argv[2];
@@ -301,6 +298,7 @@ namespace mongo {
 
         case mongo::EOO:            
         case mongo::jstNULL:
+        case mongo::Undefined: // duplicate sm behavior
             return v8::Null();
             
         case mongo::RegEx: {
@@ -360,9 +358,6 @@ namespace mongo {
             return sub;
         }
                 
-        case mongo::Undefined:
-            return v8::Undefined();
-
         case mongo::DBRef: {
             v8::Function* dbPointer = getNamedCons( "DBPointer" );
             v8::Handle<v8::Value> argv[2];
