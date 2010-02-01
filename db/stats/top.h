@@ -23,15 +23,56 @@
 
 namespace mongo {
 
+    /**
+     * tracks usage by collection
+     */
+    class Top {
+
+    public:
+        struct UsageData {
+            long long time;
+            long long count;
+            UsageData() : time(0) , count(0){}
+            void inc( long long micros ){
+                count++;
+                time += micros;
+            }
+        };
+
+        struct CollectionData {
+            UsageData total;
+            
+            UsageData readLock;
+            UsageData writeLock;
+
+            UsageData queries;
+            UsageData getmore;
+            UsageData insert;
+            UsageData update;
+            UsageData remove;
+        };
+
+        typedef map<string,CollectionData> UsageMap;
+        
+    public:
+        void record( const string& ns , int op , int lockType , long long micros );
+
+        static Top global;
+
+    private:
+        boost::mutex _lock;
+        UsageMap _usage;
+    };
+
     /* Records per namespace utilization of the mongod process.
        No two functions of this class may be called concurrently.
     */
-    class Top {
+    class TopOld {
         typedef boost::posix_time::ptime T;
         typedef boost::posix_time::time_duration D;
         typedef boost::tuple< D, int, int, int > UsageData;
     public:
-        Top() : _read(false), _write(false) { }
+        TopOld() : _read(false), _write(false) { }
         
         /* these are used to record activity: */
         

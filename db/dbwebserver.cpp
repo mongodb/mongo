@@ -72,11 +72,12 @@ namespace mongo {
             return;*/
         Client::initThread("stats");
         unsigned long long timeLastPass = 0;
+
         while ( 1 ) {
             {
                 /* todo: do we even need readlock here?  if so for what? */
                 readlock lk("");
-                Top::completeSnapshot();
+                //Top::completeSnapshot();
                 q = (q+1)%NStats;
                 Timing timing;
                 dbMutex.info().getTimingInfo(timing.start, timing.timeLocked);
@@ -136,6 +137,7 @@ namespace mongo {
             if ( !seemCaughtUp ) ss << "</b>";
             ss << '\n';
 
+            /*
             ss << "\n<b>DBTOP</b>\n";
             ss << "<table border=1><tr align='left'><th>Namespace</th><th>%</th><th>Reads</th><th>Writes</th><th>Calls</th><th>Time</th>";
             vector< Top::Usage > usage;
@@ -144,7 +146,7 @@ namespace mongo {
                 ss << setprecision( 2 ) << fixed << "<tr><td>" << i->ns << "</td><td>" << i->pct << "</td><td>"
                    << i->reads << "</td><td>" << i->writes << "</td><td>" << i->calls << "</td><td>" << i->time << "</td></tr>\n";
             ss << "</table>";
-            
+            */
             ss << "\n<b>dt\ttlocked</b>\n";
             unsigned i = q;
             while ( 1 ) {
