@@ -103,7 +103,7 @@ namespace mongo {
                     _releasedEarly.set(false);
                     return;
                 }
-                assert(false); // attempt to unlock when wasn't in a write lock
+                massert( 12597, "internal error: attempt to unlock when wasn't in a write lock", false);
             }
             _state.set(0);
             _minfo.leaving();
@@ -220,8 +220,10 @@ namespace mongo {
             dbMutex.lock();
         }
         ~writelock() { 
-            dbunlocking_write();
-            dbMutex.unlock();
+            DESTRUCTOR_GUARD(
+                dbunlocking_write();
+                dbMutex.unlock();
+            );
         }
     };
     
@@ -230,10 +232,12 @@ namespace mongo {
             dbMutex.lock_shared();
         }
         ~readlock() { 
-            dbunlocking_read();
-            dbMutex.unlock_shared();
+            DESTRUCTOR_GUARD(
+                dbunlocking_read();
+                dbMutex.unlock_shared();
+            );
         }
-    };
+    };	
     
     class mongolock {
         bool _writelock;
@@ -246,14 +250,15 @@ namespace mongo {
                 dbMutex.lock_shared();
         }
         ~mongolock() { 
-            if( _writelock ) { 
-                dbunlocking_write();
-                dbMutex.unlock();
-            }
-            else {
-                dbunlocking_read();
-                dbMutex.unlock_shared();
-            }
+            DESTRUCTOR_GUARD(
+                if( _writelock ) { 
+                    dbunlocking_write();
+                    dbMutex.unlock();
+                } else {
+                    dbunlocking_read();
+                    dbMutex.unlock_shared();
+                }
+            );
         }
         /* this unlocks, does NOT upgrade. that works for our current usage */
         void releaseAndWriteLock();

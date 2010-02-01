@@ -3,8 +3,8 @@
 port = allocatePorts( 1 )[ 0 ];
 baseName = "jstests_auth_auth1";
 
-//m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-//db = m.getDB( "test" );
+m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+db = m.getDB( "test" );
 
 t = db[ baseName ];
 t.drop();
@@ -61,9 +61,9 @@ assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count()
 
 assert.eq( 1000, t.group( p ).length );
 
-//var p = { key : { i : true } , 
-//    reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
-//initial: { count: 0 }
-//};
-//
-//assert.throws( t.group( p ) );
+var p = { key : { i : true } , 
+    reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
+initial: { count: 0 }
+};
+
+assert.throws( function() { t.group( p ) } );
