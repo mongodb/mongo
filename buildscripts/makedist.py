@@ -12,7 +12,7 @@
 #     "EC2_HOME": "/path/to/ec2-api-tools",
 #     # The EC2 tools won't run at all unless this variable is set to a directory
 #     # relative to which a "bin/java" exists.
-#     "JAVA_HOME" : "/usr", 
+#     "JAVA_HOME" : "/usr",
 #     # All the ec2-api-tools take these two as arguments.
 #     # Alternatively, you can set the environment variables EC2_PRIVATE_KEY and EC2_CERT
 #     # respectively, leave these two out of settings.py, and let the ec2 tools default.
@@ -106,7 +106,7 @@ esac
 test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
 tar xzf tarball.tgz
 mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_NAME"-"$MONGO_VERSION"
-if [ "$MODE" = "commit" ]; then 
+if [ "$MODE" = "commit" ]; then
   ( cd ./mongo && ./buildscripts/frob_version.py "$MONGO_VERSION" )
 fi
 """
@@ -251,7 +251,7 @@ class BaseBuilder(object):
 
         #FIXME: clean this tempfile up after use.
         if "localscript" in kwargs:
-            self.localscript = kwargs["localscript"] 
+            self.localscript = kwargs["localscript"]
         else:
             fh = None
             name = None
