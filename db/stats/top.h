@@ -56,9 +56,14 @@ namespace mongo {
         
     public:
         void record( const string& ns , int op , int lockType , long long micros );
-
+        void append( BSONObjBuilder& b );
+        
+    public: // static stuff
         static Top global;
-
+        
+        void append( BSONObjBuilder& b , const char * name , const UsageData& map );
+        void append( BSONObjBuilder& b , const UsageMap& map );
+        
     private:
         boost::mutex _lock;
         UsageMap _usage;

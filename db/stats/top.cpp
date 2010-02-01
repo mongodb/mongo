@@ -48,6 +48,39 @@ namespace mongo {
 
     }
 
+    void Top::append( BSONObjBuilder& b ){
+        boostlock lk( _lock );
+        append( b , _usage );
+    }
+
+    void Top::append( BSONObjBuilder& b , const char * name , const UsageData& map ){
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        bb.appendIntOrLL( "time" , map.time );
+        bb.appendIntOrLL( "count" , map.count );
+        bb.done();
+    }
+
+    void Top::append( BSONObjBuilder& b , const UsageMap& map ){
+        for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ){
+            BSONObjBuilder bb( b.subobjStart( i->first.c_str() ) );
+            
+            const CollectionData& coll = i->second;
+            
+            append( b , "total" , coll.total );
+            
+            append( b , "readLock" , coll.readLock );
+            append( b , "writeLock" , coll.writeLock );
+
+            append( b , "queries" , coll.queries );
+            append( b , "getmore" , coll.getmore );
+            append( b , "insert" , coll.insert );
+            append( b , "update" , coll.update );
+            append( b , "remove" , coll.remove );
+
+            bb.done();
+        }
+    }
+
     class TopCmd : public Command {
     public:
         TopCmd() : Command( "top" ){}
@@ -56,9 +89,13 @@ namespace mongo {
         virtual bool readOnly(){ return true; }
         virtual bool adminOnly(){ return true; }
         virtual void help( stringstream& help ) const { help << "usage by collection"; }
-        
+
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            result.append( "blah" , "glarb" );
+            {
+                BSONObjBuilder b( result.subobjStart( "totals" ) );
+                Top::global.append( b );
+                b.done();
+            }
             return true;
         }
         
