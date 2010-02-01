@@ -111,8 +111,15 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        // We need at least read only access to run db.eval - auth for eval'd writes will be checked
+        // as they are requested.
+        virtual bool requiresAuth() {
+            return false;
+        }
         CmdEval() : Command("$eval") { }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            AuthenticationInfo *ai = currentClient.get()->ai;
+            uassert( 12596 , "$eval readOnly unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
             return dbEval(ns, cmdObj, result, errmsg);
         }
     } cmdeval;
