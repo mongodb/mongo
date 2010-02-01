@@ -25,7 +25,7 @@
 #include "client.h"
 #include "dbhelpers.h"
 #include "curop.h"
-#include "dbstats.h"
+#include "stats/counters.h"
 
 namespace mongo {
 

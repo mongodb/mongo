@@ -159,7 +159,7 @@ namespace mongo {
         list<string> _tempCollections;
         const char *_desc;
         bool _god;
-
+        
         Database * _prevDB;
     public:
         AuthenticationInfo *ai;

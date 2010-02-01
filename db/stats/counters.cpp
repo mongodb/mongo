@@ -1,7 +1,8 @@
-// dbstats.cpp
+// counters.cpp
 
-#include "stdafx.h"
-#include "dbstats.h"
+#include "../../stdafx.h"
+#include "../jsobj.h"
+#include "counters.h"
 
 namespace mongo {
 

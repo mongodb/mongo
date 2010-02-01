@@ -36,7 +36,7 @@
 #include "security.h"
 #include "queryoptimizer.h"
 #include "../scripting/engine.h"
-#include "dbstats.h"
+#include "stats/counters.h"
 #include "background.h"
 
 namespace mongo {

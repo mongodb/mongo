@@ -35,7 +35,7 @@
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
-#include "dbstats.h"
+#include "stats/counters.h"
 #include "background.h"
 
 namespace mongo {
