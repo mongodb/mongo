@@ -923,7 +923,11 @@ namespace mongo {
                 idx.head.btree()->bt_insert(idx.head, recordLoc,
                                             *i, order, dupsAllowed, idx);
             }
-            catch (AssertionException& ) {
+            catch (AssertionException& e) {
+                if( e.code == 10287 && idxNo == d->nIndexes ) { 
+                    DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
+                    continue;
+                }
                 if( !dupsAllowed ) {
                     // dup key exception, presumably.
                     throw;
