@@ -1439,6 +1439,13 @@ def checkGlibc(target,source,env):
 
 allBinaries = []
 
+def registerInstallFile(env, dirname, files):
+    if type( files ) != types.ListType :
+        files = [ files ]
+
+    for f in files:
+        env.Append(REGISTERED_INSTALLS=[dirname + '/' + os.path.basename(str(f)) ])
+    
 def installBinary( e , name ):
     global allBinaries
 
@@ -1446,11 +1453,16 @@ def installBinary( e , name ):
         e.Alias( name , name + ".exe" )
         name += ".exe"
 
-    inst = e.Install( installDir + "/bin" , name )
+    bindir = installDir+'/bin'
+    registerInstallFile(e, bindir, name)
+    inst = e.Install(bindir, name )
 
     fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
+
+
+
     if solaris or linux:
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
 
@@ -1459,6 +1471,11 @@ def installBinary( e , name ):
 
     if nix:
         e.AddPostAction( inst , e.Action( 'chmod 755 ' + fullInstallName ) )
+
+def installFile ( e, dirname, filename ):
+    registerInstallFile(e, dirname, filename)
+    e.Install(dirname, filename)
+        
 
 installBinary( env , "mongodump" )
 installBinary( env , "mongorestore" )
@@ -1486,19 +1503,19 @@ env.Alias( "all" , allBinaries )
 
 #headers
 for id in [ "", "util/", "db/" , "client/" ]:
-    env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
+    installFile(env, installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix, clientLibName )
+installFile(env, installDir + "/" + nixLibPrefix, clientLibName )
 if usejvm:
-    env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
+    installFile(env, installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
 
 #textfiles
 if distBuild or release:
     #don't want to install these /usr/local/ for example
-    env.Install( installDir , "distsrc/README" )
-    env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
-    env.Install( installDir , "distsrc/GNU-AGPL-3.0" )
+    installFile(env, installDir , "distsrc/README" )
+    installFile(env, installDir , "distsrc/THIRD-PARTY-NOTICES" )
+    installFile(env, installDir , "distsrc/GNU-AGPL-3.0" )
 
 #final alias
 env.Alias( "install" , installDir )
@@ -1508,6 +1525,19 @@ if windows:
     env.Alias( "mongoclient" , "mongoclient.lib" )
 else:
     env.Alias( "mongoclient" , "libmongoclient.a" )
+
+
+#  ---- Uninstall ----
+# Note: order matters here: this code must run after all uses of
+# registerInstallFiles in order for uninstall to work right.
+for f in env["REGISTERED_INSTALLS"]:
+    name = "uninstall"+f
+    # In principle, we could tidy up the file system some by trying an
+    # rmdir on each directory up the absolute path for each file we
+    # delete, but it's not clear how to teach SCons to do that.  At
+    # present we make a few subdirectories of <prefix>/include/.
+    env.Command(name, f, [Delete("$SOURCE"),])
+    env.Alias("uninstall", name)
 
 
 #  ---- CONVENIENCE ----
@@ -1611,3 +1641,4 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+print env["REGISTERED_INSTALLS"]
