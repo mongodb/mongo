@@ -103,7 +103,7 @@ namespace mongo {
                     _releasedEarly.set(false);
                     return;
                 }
-                massert( 12597, "internal error: attempt to unlock when wasn't in a write lock", false);
+                massert( 12599, "internal error: attempt to unlock when wasn't in a write lock", false);
             }
             _state.set(0);
             _minfo.leaving();
