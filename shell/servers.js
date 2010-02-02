@@ -322,6 +322,7 @@ MongodRunner.prototype.start = function( reuseData ) {
     if ( this.extraArgs_ ) {
         args = args.concat( this.extraArgs_ );
     }
+    removeFile( this.dbpath_ + "/mongod.lock" );
     if ( reuseData ) {
         return startMongoProgram.apply( null, args );
     } else {
