@@ -36,8 +36,6 @@ namespace mongo {
     inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
 
     inline int pipe(int fds[2]) { return _pipe(fds, 1024, _O_TEXT | _O_NOINHERIT); }
-#else
-    inline void closesocket(int sock) { close(sock); }
 #endif
 
     namespace shellUtils {
@@ -180,7 +178,7 @@ namespace mongo {
                 sockets.push_back( s );
             }
             for( vector< int >::const_iterator i = sockets.begin(); i != sockets.end(); ++i )
-                assert( 0 == closesocket( *i ) );
+                closesocket( *i );
             
             sort( ports.begin(), ports.end() );
             for( unsigned i = 1; i < ports.size(); ++i )
@@ -410,7 +408,7 @@ namespace mongo {
             }
 #else
             int ignore;
-            return (pid_ == waitpid(pid, &ignore, (block ? 0 : WNOHANG)));
+            return (pid == waitpid(pid, &ignore, (block ? 0 : WNOHANG)));
 #endif
         }
         BSONObj StartMongoProgram( const BSONObj &a ) {
@@ -454,7 +452,7 @@ namespace mongo {
                 }
             }
 #else
-            assert( 0 == kill( pid, signal ) );
+            assert( 0 == kill( pid, sig ) );
 #endif
         }
             
