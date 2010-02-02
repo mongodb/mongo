@@ -194,8 +194,7 @@ namespace mongo {
                 }
             }
 
-            c.top.setRead();
-            c.curop()->setNS(q.ns);
+            c.curop()->setRead();
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
@@ -299,16 +298,13 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client);
-        currentOp.setOp(op);
+        currentOp.reset(client,op);
         
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
-
-        Timer t( currentOp.startTime() );
 
         mongolock lk(writeLock);
 
@@ -347,7 +343,6 @@ namespace mongo {
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
-            currentOp.setNS(ns);
             AuthenticationInfo *ai = currentClient.get()->ai;
             if( !ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
@@ -403,40 +398,32 @@ namespace mongo {
             }
             else {
                 out() << "    operation isn't supported: " << op << endl;
-                currentOp.setActive(false);
+                currentOp.done();
                 assert(false);
             }
         }
-        int ms = t.millis();
+        currentOp.done();
+        int ms = currentOp.totalTimeMillis();
+        
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
         if ( log || ms > logThreshold ) {
             ss << ' ' << ms << "ms";
             mongo::log() << ss.str() << endl;
         }
-        Database *database = c.prevDatabase();
-        if ( database && database->profile >= 1 ) {
-            if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
-                // performance profiling is on
-                if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
-                    mongo::log(1) << "warning: not profiling because recursive lock" << endl;
-                }
-                else {
-                    lk.releaseAndWriteLock();
-                    if ( database->isOk() ){
-                        Client::Context c( "" , database );
-                        profile(ss.str().c_str(), ms);
-                    }
-                    else {
-                        // this means this either caused the db to be closed
-                        // or someone else closed it
-                        // either way, we're not going to profile
-                    }
-                }
+        
+        if ( currentOp.shouldDBProfile( ms ) ){
+            // performance profiling is on
+            if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
+                mongo::log(1) << "warning: not profiling because recursive lock" << endl;
+            }
+            else {
+                lk.releaseAndWriteLock();
+                Client::Context c( currentOp.getNS() );
+                profile(ss.str().c_str(), ms);
             }
         }
 
-        currentOp.setActive(false);
         return true;
     } /* assembleResponse() */
 
@@ -506,8 +493,7 @@ namespace mongo {
         }        
 
         Client::Context ctx( ns );
-        Client& client = cc();
-        client.top.setWrite();
+        op.setWrite();
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
         /* TODO FIX: recordUpdate should take a long int for parm #2 */
@@ -520,8 +506,7 @@ namespace mongo {
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        Client& client = cc();
-        client.top.setWrite();
+        op.setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -529,8 +514,7 @@ namespace mongo {
         {
             string s = pattern.toString();
             op.debug().str << " query: " << s;
-            CurOp& currentOp = *client.curop();
-            currentOp.setQuery(pattern);
+            op.setQuery(pattern);
         }        
         int n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
@@ -545,7 +529,7 @@ namespace mongo {
         StringBuilder& ss = curop.debug().str;
         ss << ns;
         Client::Context ctx(ns);
-        cc().top.setRead();
+        curop.setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         ss << " cid:" << cursorid;
@@ -577,7 +561,7 @@ namespace mongo {
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        cc().top.setWrite();
+        op.setWrite();
         op.debug().str << ns;
 		
         while ( d.moreJSObjs() ) {

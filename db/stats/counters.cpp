@@ -61,17 +61,10 @@ namespace mongo {
         }
 
         BSONObjBuilder bb( b.subobjStart( "btree" ) );
-        if ( _btreeAccesses < ( numeric_limits<int>::max() / 2 ) ){
-            bb.append( "accesses" , (int)_btreeAccesses );
-            bb.append( "hits" , (int)_btreeMemHits);
-            bb.append( "misses" , (int)_btreeMemMisses );
-            
-        }
-        else {
-            bb.append( "accesses" , _btreeAccesses );
-            bb.append( "hits" , _btreeMemHits );
-            bb.append( "misses" , _btreeMemMisses );
-        }
+        bb.appendIntOrLL( "accesses" , _btreeAccesses );
+        bb.appendIntOrLL( "hits" , _btreeMemHits );
+        bb.appendIntOrLL( "misses" , _btreeMemMisses );
+
         bb.append( "resets" , _resets );
         
         bb.append( "missRatio" , (double)_btreeMemMisses / (double)_btreeAccesses );

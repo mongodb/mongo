@@ -38,8 +38,7 @@ namespace mongo {
       //_database(0), _ns("")/*, _nsstr("")*/ 
       _shutdown(false),
       _desc(desc),
-      _god(0),
-      _prevDB( 0 )
+      _god(0)
     {
         ai = new AuthenticationInfo(); 
         boostlock bl(clientsMutex);
@@ -120,6 +119,13 @@ namespace mongo {
         }
         
         _client->_context = this;
+        _client->_curOp->enter( this );
+    }
+
+    Client::Context::~Context() {
+        DEV assert( _client == currentClient.get() );
+        _client->_curOp->leave( this );
+        _client->_context = _oldContext; // note: _oldContext may be null
     }
 
 }

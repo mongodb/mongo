@@ -23,15 +23,77 @@
 
 namespace mongo {
 
+    /**
+     * tracks usage by collection
+     */
+    class Top {
+
+    public:
+        class UsageData {
+        public:
+            UsageData() : time(0) , count(0){}
+            UsageData( UsageData& older , UsageData& newer );
+            long long time;
+            long long count;
+
+            void inc( long long micros ){
+                count++;
+                time += micros;
+            }
+        };
+
+        class CollectionData {
+        public:
+            /**
+             * constructs a diff
+             */
+            CollectionData(){}
+            CollectionData( CollectionData& older , CollectionData& newer );
+            
+            UsageData total;
+            
+            UsageData readLock;
+            UsageData writeLock;
+
+            UsageData queries;
+            UsageData getmore;
+            UsageData insert;
+            UsageData update;
+            UsageData remove;
+        };
+
+        typedef map<string,CollectionData> UsageMap;
+        
+    public:
+        void record( const string& ns , int op , int lockType , long long micros );
+        void append( BSONObjBuilder& b );
+        UsageMap cloneMap();
+        CollectionData getGlobalData(){ return _global; }
+        
+    public: // static stuff
+        static Top global;
+        
+        void append( BSONObjBuilder& b , const char * name , const UsageData& map );
+        void append( BSONObjBuilder& b , const UsageMap& map );
+        
+    private:
+        
+        void _record( CollectionData& c , int op , int lockType , long long micros );
+
+        boost::mutex _lock;
+        CollectionData _global;
+        UsageMap _usage;
+    };
+
     /* Records per namespace utilization of the mongod process.
        No two functions of this class may be called concurrently.
     */
-    class Top {
+    class TopOld {
         typedef boost::posix_time::ptime T;
         typedef boost::posix_time::time_duration D;
         typedef boost::tuple< D, int, int, int > UsageData;
     public:
-        Top() : _read(false), _write(false) { }
+        TopOld() : _read(false), _write(false) { }
         
         /* these are used to record activity: */
         

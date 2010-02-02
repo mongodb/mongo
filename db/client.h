@@ -83,6 +83,7 @@ namespace mongo {
             }
             
             /* this version saves the context but doesn't yet set the new one: */
+
             Context() 
                 : _client( currentClient.get() ) , _oldContext( _client->_context ), 
                   _path( dbpath ) , _lock(0) , _justCreated(false){
@@ -95,12 +96,8 @@ namespace mongo {
              * if someone closes that db.  this checks that the DB is still valid
              */
             Context( string ns , Database * db );
-
-            ~Context() {
-                DEV assert( _client == currentClient.get() );
-                _client->_context = _oldContext; // note: _oldContext may be null
-                _client->_prevDB = _db;
-            }
+            
+            ~Context();
             
             Database* db() const {
                 return _db;
@@ -150,6 +147,8 @@ namespace mongo {
             void relocked(){
                 _finishInit();
             }
+
+            friend class CurOp;
         };
         
     private:
@@ -159,18 +158,15 @@ namespace mongo {
         list<string> _tempCollections;
         const char *_desc;
         bool _god;
-        
-        Database * _prevDB;
+
     public:
         AuthenticationInfo *ai;
-        Top top;
 
         CurOp* curop() { return _curOp; }
         
         Context* getContext(){ return _context; }
         Database* database() {  return _context ? _context->db() : 0; }
         const char *ns() { return _context->ns(); }
-        Database* prevDatabase(){ return _prevDB; }
         
         Client(const char *desc);
         ~Client();

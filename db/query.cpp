@@ -759,7 +759,7 @@ namespace mongo {
         int queryOptions = q.queryOptions;
         BSONObj snapshotHint;
         
-        Timer t;
+        Timer t(curop.startTime());
         if( logLevel >= 2 )
             log() << "runQuery: " << ns << jsobj << endl;
         
