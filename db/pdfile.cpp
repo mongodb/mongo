@@ -1070,12 +1070,17 @@ namespace mongo {
                 } catch( AssertionException& e ) { 
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->c->currLoc();
-                        cc->c->advance();
+                        bool ok = cc->c->advance();
                         cc->updateLocation();
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true );
                         if( ClientCursor::find(id, false) == 0 ) {
                             cc.release();
-                            uasserted(12585, "cursor gone during bg index; dropDups");
+                            if( !ok ) { 
+                                /* we were already at the end. normal. */
+                            }
+                            else {
+                                uasserted(12585, "cursor gone during bg index; dropDups");
+                            }
                             break;
                         }
                     } else {

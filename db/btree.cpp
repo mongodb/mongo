@@ -359,7 +359,7 @@ namespace mongo {
 
     string BtreeBucket::dupKeyError( const IndexDetails& idx , const BSONObj& key ){
         stringstream ss;
-        ss << "E11000 duplicate key error";
+        ss << "E11000 duplicate key error ";
         ss << "index: " << idx.indexNamespace() << "  ";
         ss << "dup key: " << key;
         return ss.str();
@@ -812,7 +812,7 @@ found:
             }
 
             DEV { 
-                out() << "_insert(): key already exists in index (ok for backgroudn:true)\n";
+                out() << "_insert(): key already exists in index (ok for background:true)\n";
                 out() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
                 out() << "  " << key.toString() << '\n';
                 out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
