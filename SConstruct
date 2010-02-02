@@ -573,6 +573,7 @@ elif "win32" == os.sys.platform:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
+        env.Append( LINKFLAGS=" /incremental:yes /debug " )
 
     env.Append( LIBPATH=[ boostDir + "/Lib" ] )
     if force64:
