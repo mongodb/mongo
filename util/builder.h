@@ -197,7 +197,7 @@ namespace mongo {
         }
         
         string str(){
-            return string(_buf.data,0,_buf.l);
+            return string(_buf.data, _buf.l);
         }
 
     private:
