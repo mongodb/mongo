@@ -1238,6 +1238,8 @@ def runShellTest( env, target, source ):
         spec = [ x.abspath for x in g ]
     elif target == "smokeJsSlow":
         spec = [x.abspath for x in Glob(jsSpec(["slow/*"]))]
+    elif target == "smokeParallel":
+        spec = [x.abspath for x in Glob(jsSpec(["parallel/*"]))]
     else:
         print( "invalid target for runShellTest()" )
         Exit( 1 )
@@ -1250,6 +1252,7 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "auth" ) ] )
+    addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ], runShellTest )
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest("smokeJsSlow", [add_exe("mongo")], runShellTest)
@@ -1611,3 +1614,11 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
+# --- an uninstall target ---
+if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
+    SetOption("clean", 1)
+    # By inspection, changing COMMAND_LINE_TARGETS here doesn't do
+    # what we want, but changing BUILD_TARGETS does.
+    BUILD_TARGETS.remove("uninstall")
+    BUILD_TARGETS.append("install")

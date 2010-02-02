@@ -821,18 +821,19 @@ namespace mongo {
     }
 
     DBClientCursor::~DBClientCursor() {
-        if ( cursorId && _ownCursor ) {
-            BufBuilder b;
-            b.append( (int)0 ); // reserved
-            b.append( (int)1 ); // number
-            b.append( cursorId );
+        DESTRUCTOR_GUARD (
+            if ( cursorId && _ownCursor ) {
+                BufBuilder b;
+                b.append( (int)0 ); // reserved
+                b.append( (int)1 ); // number
+                b.append( cursorId );
 
-            Message m;
-            m.setData( dbKillCursors , b.buf() , b.len() );
+                Message m;
+                m.setData( dbKillCursors , b.buf() , b.len() );
 
-            connector->sayPiggyBack( m );
-        }
-
+                connector->sayPiggyBack( m );
+            }
+        );
     }
 
     /* --- class dbclientpaired --- */
