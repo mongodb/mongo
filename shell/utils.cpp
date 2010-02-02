@@ -233,7 +233,7 @@ namespace mongo {
                 assert( !program.empty() );
                 boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
 #ifdef _WIN32
-                programPath.replace_extension("exe");
+                programPath = change_extension(programPath, ".exe");
 #endif
                 massert( 10435 ,  "couldn't find " + programPath.native_file_string(), boost::filesystem::exists( programPath ) );
                 
