@@ -226,6 +226,8 @@ doTest4 = function( signal ) {
     // now can only talk to arbiter
     pair.start( true );
     pair.waitForSteadyState( [ 1, 1 ], null, true );
+
+    ports.forEach( function( x ) { stopMongoProgram( x ); } );
 }
 
 doTest1();
