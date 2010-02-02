@@ -66,4 +66,4 @@ var p = { key : { i : true } ,
 initial: { count: 0 }
 };
 
-assert.throws( function() { t.group( p ) } );
+assert.throws( function() { return t.group( p ) }, "write reduce didn't fail" );

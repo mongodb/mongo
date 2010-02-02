@@ -612,8 +612,8 @@ namespace mongo {
                         return;
                     }
                     case InExtent: {
-                        if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
-                            findingStart_ = false; // found first recort out of query range, so scan normally
+                        if ( matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
+                            findingStart_ = false; // found first record in query range, so scan normally
                             c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
                             return;
                         }
