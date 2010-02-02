@@ -129,6 +129,24 @@ namespace mongo {
             ret.appendArray( "", lst.done() );
             return ret.obj();
         }
+
+
+        BSONObj removeFile(const BSONObj& args){
+            uassert( 12597 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
+            
+            bool found = false;
+            
+            path root( args.firstElement().valuestrsafe() );
+            if ( boost::filesystem::exists( root ) ){
+                found = true;
+                boost::filesystem::remove_all( root );
+            }
+
+            BSONObjBuilder b;
+            b.appendBool( "removed" , found );
+            return b.obj();
+        }
+
         
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
@@ -577,6 +595,7 @@ namespace mongo {
         
         void installShellUtils( Scope& scope ){
             scope.injectNative( "listFiles" , listFiles );
+            scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );

@@ -591,6 +591,8 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
 }
 
 ReplTest.prototype.start = function( master , options , restart ){
+    var lockFile = this.getPath( master ) + "/mongod.lock";
+    removeFile( lockFile );
     var o = this.getOptions( master , options , restart );
     if ( restart )
         return startMongoProgram.apply( null , o );
