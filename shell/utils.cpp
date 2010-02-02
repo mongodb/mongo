@@ -10,10 +10,18 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <fcntl.h>
 
-#ifndef _WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
+#ifdef _WIN32
+# include <Windows.h>
+# include <io.h>
+# define SIGKILL 9
+#else
+# include <sys/socket.h>
+# include <netinet/in.h>
+# include <signal.h>
+# include <sys/stat.h>
+# include <sys/wait.h>
 #endif
 
 #include "../client/dbclient.h"
@@ -23,6 +31,12 @@
 extern const char * jsconcatcode_server;
 
 namespace mongo {
+#ifdef _WIN32
+    inline int close(int fd) { return _close(fd); }
+    inline int read(int fd, void* buf, size_t size) { return _read(fd, buf, size); }
+
+    inline int pipe(int fds[2]) { return _pipe(fds, 1024, _O_TEXT | _O_NOINHERIT); }
+#endif
 
     namespace shellUtils {
         
@@ -115,6 +129,24 @@ namespace mongo {
             ret.appendArray( "", lst.done() );
             return ret.obj();
         }
+
+
+        BSONObj removeFile(const BSONObj& args){
+            uassert( 12597 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
+            
+            bool found = false;
+            
+            path root( args.firstElement().valuestrsafe() );
+            if ( boost::filesystem::exists( root ) ){
+                found = true;
+                boost::filesystem::remove_all( root );
+            }
+
+            BSONObjBuilder b;
+            b.appendBool( "removed" , found );
+            return b.obj();
+        }
+
         
         BSONObj Quit(const BSONObj& args) {
             // If not arguments are given first element will be EOO, which
@@ -138,12 +170,6 @@ namespace mongo {
             return b.obj();
         }
 
-#ifndef _WIN32
-#include <signal.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-        
         BSONObj AllocatePorts( const BSONObj &args ) {
             uassert( 10259 ,  "allocatePorts takes exactly 1 argument", args.nFields() == 1 );
             uassert( 10260 ,  "allocatePorts needs to be passed an integer", args.firstElement().isNumber() );
@@ -170,7 +196,7 @@ namespace mongo {
                 sockets.push_back( s );
             }
             for( vector< int >::const_iterator i = sockets.begin(); i != sockets.end(); ++i )
-                assert( 0 == close( *i ) );
+                closesocket( *i );
             
             sort( ports.begin(), ports.end() );
             for( unsigned i = 1; i < ports.size(); ++i )
@@ -182,6 +208,9 @@ namespace mongo {
 
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
+#ifdef _WIN32
+        map< pid_t, HANDLE > handles;
+#endif
         
         char *copyString( const char *original ) {
             char *ret = reinterpret_cast< char * >( malloc( strlen( original ) + 1 ) );
@@ -191,7 +220,7 @@ namespace mongo {
         
         boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
         stringstream mongoProgramOutput_;
-        
+
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
             boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
             stringstream buf;
@@ -221,6 +250,9 @@ namespace mongo {
                 
                 assert( !program.empty() );
                 boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
+#ifdef _WIN32
+                programPath = change_extension(programPath, ".exe");
+#endif
                 massert( 10435 ,  "couldn't find " + programPath.native_file_string(), boost::filesystem::exists( programPath ) );
                 
                 port_ = -1;
@@ -269,16 +301,7 @@ namespace mongo {
                 assert( pipe( pipeEnds ) != -1 );
                 
                 fflush( 0 );
-                pid_ = fork();
-                assert( pid_ != -1 );
-                
-                if ( pid_ == 0 ) {
-                    
-                    assert( dup2( pipeEnds[ 1 ], STDOUT_FILENO ) != -1 );
-                    assert( dup2( pipeEnds[ 1 ], STDERR_FILENO ) != -1 );
-                    execvp( argv_[ 0 ], argv_ );
-                    massert( 10436 ,  "Unable to start program" , 0 );
-                }
+                launch_process(argv_, pipeEnds[1]); //sets pid_
                 
                 cout << "shell: started mongo program";
                 int i = 0;
@@ -332,8 +355,80 @@ namespace mongo {
                     start = buf + strlen( buf );
                 }        
             }
+            void launch_process(char** argv, int child_stdout){
+#ifdef _WIN32
+                stringstream ss;
+                for (int i=0; argv[i]; i++){
+                    if (i) ss << ' ';
+                    ss << '"' << argv[i] << '"';
+                }
+
+                string args = ss.str();
+
+                boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
+                for (size_t i=0; i < args.size()+1; i++)
+                    args_tchar[i] = args[i];
+
+                HANDLE h = (HANDLE)_get_osfhandle(child_stdout);
+                assert(h != INVALID_HANDLE_VALUE);
+                assert(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 1));
+
+                STARTUPINFO si;
+                ZeroMemory(&si, sizeof(si));
+                si.cb = sizeof(si);
+                si.hStdError = h;
+                si.hStdOutput = h;
+                si.dwFlags |= STARTF_USESTDHANDLES;
+
+                PROCESS_INFORMATION pi;
+                ZeroMemory(&pi, sizeof(pi));
+
+                bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi);
+                assert(success);
+
+                CloseHandle(pi.hThread);
+
+                pid_ = pi.dwProcessId;
+                handles.insert( make_pair( pid_, pi.hProcess ) );
+
+#else
+
+                pid_ = fork();
+                assert( pid_ != -1 );
+                
+                if ( pid_ == 0 ) {
+                    
+                    assert( dup2( child_stdout, STDOUT_FILENO ) != -1 );
+                    assert( dup2( child_stdout, STDERR_FILENO ) != -1 );
+                    execvp( argv[ 0 ], argv );
+                    massert( 10436 ,  "Unable to start program" , 0 );
+                }
+#endif
+            }
         };
         
+        //returns true if process exited
+        bool wait_for_pid(pid_t pid, bool block=true){
+#ifdef _WIN32
+            assert(handles.count(pid));
+            HANDLE h = handles[pid];
+
+            if (block)
+                WaitForSingleObject(h, INFINITE);
+
+            DWORD ignore;
+            if(GetExitCodeProcess(h, &ignore)){
+                CloseHandle(h);
+                handles.erase(pid);
+                return true;
+            }else{
+                return false;
+            }
+#else
+            int ignore;
+            return (pid == waitpid(pid, &ignore, (block ? 0 : WNOHANG)));
+#endif
+        }
         BSONObj StartMongoProgram( const BSONObj &a ) {
             MongoProgramRunner r( a );
             r.start();
@@ -345,8 +440,7 @@ namespace mongo {
             MongoProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            int temp;
-            waitpid( r.pid() , &temp , 0 );
+            wait_for_pid(r.pid());
             shells.erase( r.pid() );
             return BSON( string( "" ) << int( r.pid() ) );
         }
@@ -360,6 +454,26 @@ namespace mongo {
             boost::filesystem::create_directory( path );    
             return undefined_;
         }
+
+        inline void kill_wrapper(pid_t pid, int sig, int port){
+#ifdef _WIN32
+            if (sig == SIGKILL){
+                assert( handles.count(pid) );
+                assert( ! TerminateProcess(handles[pid], 1) );
+            }else{
+                DBClientConnection conn;
+                conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
+                try {
+                    conn.simpleCommand("admin", NULL, "shutdown");
+                } catch (...) {
+                    //Do nothing. This command never returns data to the client and the driver doesn't like that.
+                }
+            }
+#else
+            assert( 0 == kill( pid, sig ) );
+#endif
+        }
+            
         
         void killDb( int port, pid_t _pid, int signal ) {
             pid_t pid;
@@ -373,7 +487,7 @@ namespace mongo {
                 pid = _pid;
             }
             
-            assert( 0 == kill( pid, signal ) );
+            kill_wrapper( pid, signal, port );
             
             int i = 0;
             for( ; i < 65; ++i ) {
@@ -382,11 +496,9 @@ namespace mongo {
                     time_t_to_String(time(0), now);
                     now[ 20 ] = 0;
                     cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
-                    assert( 0 == kill( pid, SIGKILL ) );
+                    kill_wrapper( pid, SIGKILL, port );
                 }        
-                int temp;
-                int ret = waitpid( pid, &temp, WNOHANG );
-                if ( ret == pid )
+                if(wait_for_pid(pid, false))
                     break;
                 sleepms( 1000 );
             }
@@ -461,17 +573,12 @@ namespace mongo {
             }
         }
 
-#else
-        MongoProgramScope::~MongoProgramScope() {}
-        void KillMongoProgramInstances() {}        
-#endif
-
         unsigned _randomSeed;
         
         BSONObj JSSrand( const BSONObj &a ) {
             uassert( 12518, "srand requires a single numeric argument",
                     a.nFields() == 1 && a.firstElement().isNumber() );
-            _randomSeed = a.firstElement().numberLong(); // grab least significant digits
+            _randomSeed = (unsigned)a.firstElement().numberLong(); // grab least significant digits
             return undefined_;
         }
         
@@ -488,12 +595,12 @@ namespace mongo {
         
         void installShellUtils( Scope& scope ){
             scope.injectNative( "listFiles" , listFiles );
+            scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
-#if !defined(_WIN32)
             scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
@@ -502,7 +609,6 @@ namespace mongo {
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
-#endif
         }
 
         void initScope( Scope &scope ) {
