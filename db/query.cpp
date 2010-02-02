@@ -472,6 +472,8 @@ namespace mongo {
         return res->count();
     }
 
+    int _findingStartInitialTimeout = 5; // configurable for testing
+    
     // Implements database 'query' requests using the query optimizer's QueryOp interface
     class UserQueryOp : public QueryOp {
     public:
@@ -583,7 +585,7 @@ namespace mongo {
                         }
                         findingStartCursor_->c->advance();
                         RARELY {
-                            if ( findingStartTimer_.seconds() > 5 ) {
+                            if ( findingStartTimer_.seconds() >= _findingStartInitialTimeout ) {
                                 createClientCursor( startLoc( findingStartCursor_->c->currLoc() ) );
                                 findingStartMode_ = FindExtent;
                                 return;
