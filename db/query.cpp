@@ -475,6 +475,8 @@ namespace mongo {
     // Implements database 'query' requests using the query optimizer's QueryOp interface
     class UserQueryOp : public QueryOp {
     public:
+        enum FindingStartMode { Initial, FindExtent, InExtent };
+        
         UserQueryOp( int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
                    bool explain, FieldMatcher *filter, int queryOptions ) :
             b_( 32768 ),
@@ -491,11 +493,12 @@ namespace mongo {
             soSize_(),
             saveClientCursor_(),
             findingStart_( (queryOptions & QueryOption_OplogReplay) != 0 ),
-            findingStartCursor_()
+            findingStartCursor_(),
+            findingStartMode_()
         {
             uassert( 10105 , "bad skip value in query", ntoskip >= 0);
         }
-
+        
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
@@ -512,6 +515,8 @@ namespace mongo {
                 // oplog (can take quite a while with large oplogs).
                 auto_ptr<Cursor> c = qp().newReverseCursor();
                 findingStartCursor_ = new ClientCursor(c, qp().ns(), false);
+                findingStartTimer_.reset();
+                findingStartMode_ = Initial;
             } else {
                 c_ = qp().newCursor();
             }
@@ -524,25 +529,99 @@ namespace mongo {
                 wantMore_ = false;
             }
         }
+        
+        DiskLoc startLoc( const DiskLoc &rec ) {
+            Extent *e = rec.rec()->myExtent( rec );
+            if ( e->myLoc != qp().nsd()->capExtent )
+                return e->firstRecord;
+            // Likely we are on the fresh side of capExtent, so return first fresh record.
+            // If we are on the stale side of capExtent, then the collection is small and it
+            // doesn't matter if we start the extent scan with capFirstNewRecord.
+            return qp().nsd()->capFirstNewRecord;
+        }
+        
+        DiskLoc prevLoc( const DiskLoc &rec ) {
+            Extent *e = rec.rec()->myExtent( rec );
+            if ( e->xprev.isNull() )
+                e = qp().nsd()->lastExtent.ext();
+            else
+                e = e->xprev.ext();
+            if ( e->myLoc != qp().nsd()->capExtent )
+                return e->firstRecord;
+            return DiskLoc(); // reached beginning of collection
+        }
+        
+        void createClientCursor( const DiskLoc &startLoc ) {
+            auto_ptr<Cursor> c = qp().newCursor( startLoc );
+            findingStartCursor_ = new ClientCursor(c, qp().ns(), false);            
+        }
+        
+        void maybeRelease() {
+            RARELY {
+                CursorId id = findingStartCursor_->cursorid;
+                findingStartCursor_->updateLocation();
+                {
+                    dbtemprelease t;
+                }   
+                findingStartCursor_ = ClientCursor::find( id, false );
+            }                                            
+        }
+        
         virtual void next() {
             if ( findingStart_ ) {
                 if ( !findingStartCursor_ || !findingStartCursor_->c->ok() ) {
                     findingStart_ = false;
-                    c_ = qp().newCursor();
-                } else if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
-                    findingStart_ = false;
-                    c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
-                } else {
-                    findingStartCursor_->c->advance();
-                    RARELY {
-                        CursorId id = findingStartCursor_->cursorid;
-                        findingStartCursor_->updateLocation();
-                        {
-                            dbtemprelease t;
-                        }
-                        findingStartCursor_ = ClientCursor::find( id, false );
-                    }
+                    c_ = qp().newCursor(); // on error, start from beginning
                     return;
+                }
+                switch( findingStartMode_ ) {
+                    case Initial: {
+                        if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
+                            findingStart_ = false; // found first recort out of query range, so scan normally
+                            c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
+                            return;
+                        }
+                        findingStartCursor_->c->advance();
+                        RARELY {
+                            if ( findingStartTimer_.seconds() > 5 ) {
+                                createClientCursor( startLoc( findingStartCursor_->c->currLoc() ) );
+                                findingStartMode_ = FindExtent;
+                                return;
+                            }
+                        }
+                        maybeRelease();
+                        return;
+                    }
+                    case FindExtent: {
+                        if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
+                            findingStartMode_ = InExtent;
+                            return;
+                        }
+                        DiskLoc prev = prevLoc( findingStartCursor_->c->currLoc() );
+                        if ( prev.isNull() ) { // no previous extent, just start a regular scan from beginning
+                            findingStart_ = false;
+                            c_ = qp().newCursor();
+                            return;
+                        }
+                        // There might be a more efficient implementation than creating new cursor & client cursor each time,
+                        // not worrying about that for now
+                        createClientCursor( prev );
+                        maybeRelease();
+                        return;
+                    }
+                    case InExtent: {
+                        if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
+                            findingStart_ = false; // found first recort out of query range, so scan normally
+                            c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
+                            return;
+                        }
+                        findingStartCursor_->c->advance();
+                        maybeRelease();
+                        return;
+                    }
+                    default: {
+                        massert( 12600, "invalid findingStartMode_", false );
+                    }
                 }
             }
             
@@ -663,6 +742,8 @@ namespace mongo {
         auto_ptr< ScanAndOrder > so_;
         bool findingStart_;
         ClientCursor * findingStartCursor_;
+        Timer findingStartTimer_;
+        FindingStartMode findingStartMode_;
     };
     
     /* run a query -- includes checking for and running a Command */
