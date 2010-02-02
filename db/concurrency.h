@@ -51,6 +51,9 @@ namespace mongo {
             s = start;
             tl = timeLocked;
         }
+        unsigned long long getTimeLocked() const {
+            return timeLocked;
+        }
     };
 
 #if BOOST_VERSION >= 103500
