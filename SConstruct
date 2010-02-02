@@ -1611,3 +1611,11 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
+# --- an uninstall target ---
+if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
+    SetOption("clean", 1)
+    # By inspection, changing COMMAND_LINE_TARGETS here doesn't do
+    # what we want, but changing BUILD_TARGETS does.
+    BUILD_TARGETS.remove("uninstall")
+    BUILD_TARGETS.append("install")
