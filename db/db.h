@@ -84,6 +84,7 @@ namespace mongo {
             
             log(1) << "Accessing: " << dbname << " for the first time" << endl;
             db = new Database( dbname.c_str() , justCreated , path );
+            _size++;
             return db;
         }
         
