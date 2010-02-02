@@ -7,35 +7,61 @@
 
 namespace mongo {
     
+    Top::UsageData::UsageData( UsageData& older , UsageData& newer )
+        : time(newer.time-older.time) , 
+          count(newer.count-older.count) 
+    {
+        
+    }
+
+    Top::CollectionData::CollectionData( CollectionData& older , CollectionData& newer )
+        : total( older.total , newer.total ) , 
+          readLock( older.readLock , newer.readLock ) ,
+          writeLock( older.writeLock , newer.writeLock ) ,
+          queries( older.queries , newer.queries ) ,
+          getmore( older.getmore , newer.getmore ) ,
+          insert( older.insert , newer.insert ) ,
+          update( older.update , newer.update ) ,
+          remove( older.remove , newer.remove )
+    {
+        
+    }
+
+
     void Top::record( const string& ns , int op , int lockType , long long micros ){
         boostlock lk(_lock);
 
         CollectionData& coll = _usage[ns];
-        coll.total.inc( micros );
+        _record( coll , op , lockType , micros );
+        _record( _global , op , lockType , micros );
+    }
+    
+    void Top::_record( CollectionData& c , int op , int lockType , long long micros ){
+        c.total.inc( micros );
         
         if ( lockType > 0 )
-            coll.writeLock.inc( micros );
+            c.writeLock.inc( micros );
         else if ( lockType < 0 )
-            coll.readLock.inc( micros );
+            c.readLock.inc( micros );
         
         switch ( op ){
         case 0:
             // use 0 for unknown, non-specific
             break;
         case dbUpdate:
-            coll.update.inc( micros );
+            c.update.inc( micros );
             break;
         case dbInsert:
-            coll.insert.inc( micros );
+            c.insert.inc( micros );
             break;
         case dbQuery:
-            coll.queries.inc( micros );
+            c.queries.inc( micros );
             break;
         case dbGetMore:
-            coll.getmore.inc( micros );
+            c.getmore.inc( micros );
             break;
         case dbDelete:
-            coll.remove.inc( micros );
+            c.remove.inc( micros );
             break;
         case opReply: 
         case dbMsg:
@@ -46,6 +72,12 @@ namespace mongo {
             log() << "unknown op in Top::record: " << op << endl;
         }
 
+    }
+
+    Top::UsageMap Top::cloneMap(){
+        boostlock lk(_lock);
+        UsageMap x = _usage;
+        return x;
     }
 
     void Top::append( BSONObjBuilder& b ){

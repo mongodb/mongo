@@ -29,17 +29,27 @@ namespace mongo {
     class Top {
 
     public:
-        struct UsageData {
+        class UsageData {
+        public:
+            UsageData() : time(0) , count(0){}
+            UsageData( UsageData& older , UsageData& newer );
             long long time;
             long long count;
-            UsageData() : time(0) , count(0){}
+
             void inc( long long micros ){
                 count++;
                 time += micros;
             }
         };
 
-        struct CollectionData {
+        class CollectionData {
+        public:
+            /**
+             * constructs a diff
+             */
+            CollectionData(){}
+            CollectionData( CollectionData& older , CollectionData& newer );
+            
             UsageData total;
             
             UsageData readLock;
@@ -57,6 +67,8 @@ namespace mongo {
     public:
         void record( const string& ns , int op , int lockType , long long micros );
         void append( BSONObjBuilder& b );
+        UsageMap cloneMap();
+        CollectionData getGlobalData(){ return _global; }
         
     public: // static stuff
         static Top global;
@@ -65,7 +77,11 @@ namespace mongo {
         void append( BSONObjBuilder& b , const UsageMap& map );
         
     private:
+        
+        void _record( CollectionData& c , int op , int lockType , long long micros );
+
         boost::mutex _lock;
+        CollectionData _global;
         UsageMap _usage;
     };
 

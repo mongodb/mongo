@@ -40,6 +40,7 @@
 #include "../scripting/engine.h"
 #include "module.h"
 #include "cmdline.h"
+#include "stats/snapshots.h"
 
 namespace mongo {
 
@@ -515,6 +516,7 @@ namespace mongo {
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
+        snapshotThread.go();
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
