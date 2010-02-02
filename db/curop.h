@@ -125,7 +125,7 @@ namespace mongo {
         }
         
         unsigned long long totalTimeMicros() const {
-            massert( 12596 , "CurOp not marked done yet" , ! _active );
+            massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - _start;
         }
 
