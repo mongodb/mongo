@@ -50,6 +50,7 @@ namespace mongo {
         auto_ptr< Cursor > newReverseCursor() const;
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
+        NamespaceDetails *nsd() const { return d; }
         BSONObj query() const { return fbs_.query(); }
         BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return fbs_.simplifiedQuery( fields ); }
         const FieldRange &range( const char *fieldName ) const { return fbs_.range( fieldName ); }
