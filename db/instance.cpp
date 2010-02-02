@@ -753,7 +753,7 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
-        if ( boost::filesystem::file_size( name ) > 0 ){
+        if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
             cout << "************** \n" 
                  << "old lock file: " << lockFile << ".  probably means unclean shutdown\n"
                  << "reccomend removing file and running --repair\n" 
