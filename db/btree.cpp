@@ -25,7 +25,7 @@
 #include "client.h"
 #include "dbhelpers.h"
 #include "curop.h"
-#include "dbstats.h"
+#include "stats/counters.h"
 
 namespace mongo {
 
@@ -811,13 +811,16 @@ found:
                 return 0;
             }
 
-            out() << "_insert(): key already exists in index\n";
-            out() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
-            out() << "  " << key.toString() << '\n';
-            out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
-            out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
-            out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
-            massert( 10287 , "btree: key+recloc already in index", false);
+            DEV { 
+                out() << "_insert(): key already exists in index (ok for backgroudn:true)\n";
+                out() << "  " << idx.indexNamespace().c_str() << " thisLoc:" << thisLoc.toString() << '\n';
+                out() << "  " << key.toString() << '\n';
+                out() << "  " << "recordLoc:" << recordLoc.toString() << " pos:" << pos << endl;
+                out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
+                out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
+            }
+            // we don't use massert() here as that does logging and this is 'benign' - see catches in indexRecord()
+            throw MsgAssertionException(10287, "btree: key+recloc already in index");
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;

@@ -18,7 +18,6 @@
 #include "stdafx.h"
 #include "goodies.h"
 #include "unittest.h"
-#include "top.h"
 #include "file_allocator.h"
 #include "optime.h"
 

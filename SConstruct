@@ -338,7 +338,7 @@ if GetOption( "extralib" ) is not None:
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/top.cpp" , "util/message.cpp" , 
+commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp" ]
 commonFiles += Glob( "util/*.c" )
@@ -362,9 +362,10 @@ else:
 coreDbFiles = []
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/dbstats.cpp db/database.cpp db/pdfile.cpp db/index.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/index.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
 
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
+serverOnlyFiles += Glob( "db/stats/*.cpp" )
 
 if usesm:
     commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
@@ -1613,3 +1614,11 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
+# --- an uninstall target ---
+if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
+    SetOption("clean", 1)
+    # By inspection, changing COMMAND_LINE_TARGETS here doesn't do
+    # what we want, but changing BUILD_TARGETS does.
+    BUILD_TARGETS.remove("uninstall")
+    BUILD_TARGETS.append("install")

@@ -1,9 +1,9 @@
-// dbstats.h
+// counters.h
 
-#include "../stdafx.h"
-#include "jsobj.h"
-#include "../util/message.h"
-#include "../util/processinfo.h"
+#include "../../stdafx.h"
+#include "../jsobj.h"
+#include "../../util/message.h"
+#include "../../util/processinfo.h"
 
 namespace mongo {
 
