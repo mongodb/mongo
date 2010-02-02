@@ -161,7 +161,8 @@ int mongo::Tool::main( int argc , char ** argv ){
     
     if ( currentClient.get() )
         currentClient->shutdown();
-    
+
+    dbexit( EXIT_CLEAN );
     return ret;
 }
 

@@ -755,7 +755,7 @@ namespace mongo {
 
         if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
             cout << "************** \n" 
-                 << "old lock file: " << lockFile << ".  probably means unclean shutdown\n"
+                 << "old lock file: " << name << ".  probably means unclean shutdown\n"
                  << "reccomend removing file and running --repair\n" 
                  << "see: http://dochub.mongodb.org/core/repair for more information\n"
                  << "*************" << endl;
