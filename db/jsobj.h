@@ -1205,6 +1205,13 @@ namespace mongo {
             b.append((char) (val?1:0));
         }
 
+        /** Append a boolean element */
+        void append(const char *fieldName, bool val) {
+            b.append((char) Bool);
+            b.append(fieldName);
+            b.append((char) (val?1:0));            
+        }
+        
         /** Append a 32 bit integer element */
         void append(const char *fieldName, int n) {
             b.append((char) NumberInt);
