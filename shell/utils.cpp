@@ -422,9 +422,9 @@ namespace mongo {
 
         inline void kill_wrapper(pid_t pid, int sig, int port){
 #ifdef _WIN32
-            if (sig == SIGKILL){
+            if (sig == SIGKILL || port == 0){
                 assert( handles.count(pid) );
-                assert( ! TerminateProcess(handles[pid], 1) );
+                TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
             }else{
                 DBClientConnection conn;
                 conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
