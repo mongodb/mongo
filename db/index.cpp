@@ -30,7 +30,7 @@ namespace mongo {
         b.append("ns", ns);
         b.append("name", idxName); // e.g.: { name: "ts_1", ns: "foo.coll" }
         BSONObj cond = b.done();
-        return deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        return (int) deleteObjects(system_indexes.c_str(), cond, false, false, true);
     }
 
     /* this is just an attempt to clean up old orphaned stuff on a delete all indexes 
@@ -45,7 +45,7 @@ namespace mongo {
             b.append("name", BSON( "$ne" << idIndex->indexName().c_str() ));
         }
         BSONObj cond = b.done();
-        int n = deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        int n = (int) deleteObjects(system_indexes.c_str(), cond, false, false, true);
         if( n ) { 
             log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
         }

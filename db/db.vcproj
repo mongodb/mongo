@@ -1345,22 +1345,6 @@
 				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>
-			<Filter
-				Name="btree related"
-				>
-				<File
-					RelativePath=".\btree.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\btree.h"
-					>
-				</File>
-				<File
-					RelativePath=".\btreecursor.cpp"
-					>
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
 			Name="db"
@@ -1543,10 +1527,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\dbstats.cpp"
-					>
-				</File>
-				<File
 					RelativePath=".\dbwebserver.cpp"
 					>
 				</File>
@@ -1672,10 +1652,6 @@
 				</File>
 				<File
 					RelativePath=".\tests.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\util\top.cpp"
 					>
 				</File>
 				<File
@@ -1890,6 +1866,38 @@
 			</File>
 			<File
 				RelativePath="..\scripting\utils.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="stats"
+			>
+			<File
+				RelativePath=".\stats\counters.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\stats\snapshots.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\stats\top.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="btree related"
+			>
+			<File
+				RelativePath=".\btree.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\btree.h"
+				>
+			</File>
+			<File
+				RelativePath=".\btreecursor.cpp"
 				>
 			</File>
 		</Filter>

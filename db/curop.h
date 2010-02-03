@@ -130,12 +130,12 @@ namespace mongo {
         }
 
         int totalTimeMillis() const {
-            return totalTimeMicros() / 1000;
+            return (int) (totalTimeMicros() / 1000);
         }
 
         int elapsedSeconds() const {
             unsigned long long total = curTimeMicros64() - _start;
-            return total / 1000000;
+            return (int) (total / 1000000);
         }
 
         void setQuery(const BSONObj& query) { 

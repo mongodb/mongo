@@ -477,7 +477,7 @@ namespace mongo {
         op.setWrite();
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        recordUpdate( res.existing , res.num ); // for getlasterror
+        recordUpdate( res.existing , (int) res.num ); // for getlasterror
     }
 
     void receivedDelete(Message& m, CurOp& op) {
@@ -497,7 +497,7 @@ namespace mongo {
             op.setQuery(pattern);
         }        
         long long n = deleteObjects(ns, pattern, justOne, true);
-        recordDelete( n );
+        recordDelete( (int) n );
     }
     
     QueryResult* emptyMoreResult(long long);

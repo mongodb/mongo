@@ -64,8 +64,8 @@ namespace mongo {
             return _newer->_totalWriteLockedTime - _older->_totalWriteLockedTime;
         }
         double percentWriteLocked() const {
-            double e = elapsed();
-            double w = timeInWriteLock();
+            double e = (double) elapsed();
+            double w = (double) timeInWriteLock();
             return w/e;
         }
 

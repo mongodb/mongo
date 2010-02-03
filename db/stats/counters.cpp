@@ -1,6 +1,6 @@
 // counters.cpp
 
-#include "../../stdafx.h"
+#include "stdafx.h"
 #include "../jsobj.h"
 #include "counters.h"
 
