@@ -979,12 +979,12 @@ namespace mongo {
         }
         
         int duration = t.millis();
-        Database *database = c.database();
-        if ( (database && database->profile) || duration >= 100 ) {
+        bool dbprofile = curop.shouldDBProfile( duration );
+        if ( dbprofile || duration >= cmdLine.slowMS ) {
             ss << " nscanned:" << nscanned << ' ';
             if ( ntoskip )
                 ss << " ntoskip:" << ntoskip;
-            if ( database && database->profile )
+            if ( dbprofile )
                 ss << " \nquery: ";
             ss << jsobj << ' ';
         }
