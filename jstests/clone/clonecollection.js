@@ -102,7 +102,7 @@ assert.eq( 200000, f.a.count() );
 doParallel( "assert.commandFailed( db.runCommand( { cloneCollection: \"jstests_clonecollection.a\", from: \"localhost:" + ports[ 0 ] + "\", logSizeMb:1 } ) );" );
 
 sleep( 200 );
-for( i = 200000; i < 250000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -120,12 +120,12 @@ assert.eq( 200000, f.a.count() );
 doParallel( "assert.commandWorked( db.cloneCollection( \"localhost:" + ports[ 0 ] + "\", \"a\" ) );" );
 
 sleep( 200 );
-for( i = 200000; i < 250000; ++i ) {
+for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
 waitParallel();
-assert.eq( 250000, t.a.find().count() );
+assert.eq( 210000, t.a.find().count() );
     
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();
