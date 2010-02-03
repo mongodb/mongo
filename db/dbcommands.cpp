@@ -329,8 +329,8 @@ namespace mongo {
                 
                 ProcessInfo p;
                 if ( p.supported() ){
-                    t.append( "resident" , p.getResidentSize() );
-                    t.append( "virtual" , p.getVirtualMemorySize() );
+                    t.appendIntOrLL( "resident" , p.getResidentSize() );
+                    t.appendIntOrLL( "virtual" , p.getVirtualMemorySize() );
                     t.appendBool( "supported" , true );
                 }
                 else {
@@ -338,7 +338,7 @@ namespace mongo {
                     t.appendBool( "supported" , false );
                 }
                     
-                t.append( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                t.appendIntOrLL( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
 
                 t.done();
                     
@@ -1136,6 +1136,7 @@ namespace mongo {
     class GroupCommand : public Command {
     public:
         GroupCommand() : Command("group"){}
+        virtual bool readOnly() { return true; }
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream &help ) const {
             help << "see http://www.mongodb.org/display/DOCS/Aggregation";
@@ -1451,9 +1452,12 @@ namespace mongo {
         bool ok = false;
 
         BSONElement e = jsobj.firstElement();
-
+        
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
+            mongolock lk(!c->readOnly());
+            Client::Context ctx( ns , dbpath , &lk );
+
             string errmsg;
             AuthenticationInfo *ai = currentClient.get()->ai;
             if ( c->requiresAuth() ) {
@@ -1463,7 +1467,7 @@ namespace mongo {
                     uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));                    
                 }
             }
-
+            
             bool admin = c->adminOnly();
 
             if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 

@@ -27,6 +27,7 @@
 #include "replset.h"
 #include "instance.h"
 #include "security.h"
+#include "stats/snapshots.h"
 
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -61,48 +62,6 @@ namespace mongo {
         }
         unsigned long long start, timeLocked;
     };
-    Timing tlast;
-    const int NStats = 32;
-    string lockStats[NStats];
-    unsigned q = 0;
-
-    void statsThread() {
-        /*cout << "TEMP disabled statsthread" << endl;
-        if( 1 ) 
-            return;*/
-        Client::initThread("stats");
-        unsigned long long timeLastPass = 0;
-        while ( 1 ) {
-            {
-                /* todo: do we even need readlock here?  if so for what? */
-                readlock lk("");
-                Top::completeSnapshot();
-                q = (q+1)%NStats;
-                Timing timing;
-                dbMutex.info().getTimingInfo(timing.start, timing.timeLocked);
-                unsigned long long now = curTimeMicros64();
-                if ( timeLastPass ) {
-                    unsigned long long dt = now - timeLastPass;
-                    unsigned long long dlocked = timing.timeLocked - tlast.timeLocked;
-                    {
-                        stringstream ss;
-                        ss << dt / 1000 << '\t';
-                        ss << dlocked / 1000 << '\t';
-                        if ( dt )
-                            ss << (dlocked*100)/dt << '%';
-                        string s = ss.str();
-                        if ( cmdLine.cpu )
-                            log() << "cpu: " << s << endl;
-                        lockStats[q] = s;
-                        ClientCursor::idleTimeReport( (unsigned) ((dt - dlocked)/1000) );
-                    }
-                }
-                timeLastPass = now;
-                tlast = timing;
-            }
-            sleepsecs(4);
-        }
-    }
 
     bool _bold;
     string bold(bool x) {
@@ -118,10 +77,7 @@ namespace mongo {
         // caller locks
         void doLockedStuff(stringstream& ss) {
             ss << "# databases: " << dbHolder.size() << '\n';
-            if ( cc().database() ) {
-                ss << "curclient: " << cc().database()->name; // TODO: isn't this useless?
-                ss << '\n';
-            }
+
             ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
             ss << "\n<b>replication</b>\n";
             ss << "master: " << master << '\n';
@@ -135,24 +91,56 @@ namespace mongo {
             ss <<   "initialSyncCompleted: " << seemCaughtUp;
             if ( !seemCaughtUp ) ss << "</b>";
             ss << '\n';
-
-            ss << "\n<b>DBTOP</b>\n";
-            ss << "<table border=1><tr align='left'><th>Namespace</th><th>%</th><th>Reads</th><th>Writes</th><th>Calls</th><th>Time</th>";
-            vector< Top::Usage > usage;
-            Top::usage( usage );
-            for( vector< Top::Usage >::iterator i = usage.begin(); i != usage.end(); ++i )
-                ss << setprecision( 2 ) << fixed << "<tr><td>" << i->ns << "</td><td>" << i->pct << "</td><td>"
-                   << i->reads << "</td><td>" << i->writes << "</td><td>" << i->calls << "</td><td>" << i->time << "</td></tr>\n";
-            ss << "</table>";
             
-            ss << "\n<b>dt\ttlocked</b>\n";
-            unsigned i = q;
-            while ( 1 ) {
-                ss << lockStats[i] << '\n';
-                i = (i-1)%NStats;
-                if ( i == q )
-                    break;
+            auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
+            if ( delta.get() ){
+                ss << "\n<b>DBTOP  (occurences|percent of elapsed)</b>\n";
+                ss << "<table border=1>";
+                ss << "<tr align='left'>";
+                ss << "<th>NS</th> <th>total</th> <th>Reads</th><th>Writes</th> <th>Queries</th><th>GetMores</th><th>Inserts</th><th>Updates</th><th>Removes</th> ";
+                ss << "</tr>";
+                
+                display( ss , delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
+                
+                Top::UsageMap usage = delta->collectionUsageDiff();
+                for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ){
+                    display( ss , delta->elapsed() , i->first , i->second );
+                }
+                
+                ss << "</table>";
             }
+
+
+            statsSnapshots.outputLockInfoHTML( ss );
+
+        }
+
+        void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
+            ss << "<td>";
+            ss << usage.count;
+            ss << "|";
+            double per = 100 * ((double)usage.time)/elapsed;
+            ss << setprecision(2) << fixed << per << "%";
+            ss << "</td>";
+        }
+
+        void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ){
+            if ( ns != "GLOBAL" && data.total.count == 0 )
+                return;
+            ss << "<tr><th>" << ns << "</th>";
+            
+            display( ss , elapsed , data.total );
+
+            display( ss , elapsed , data.readLock );
+            display( ss , elapsed , data.writeLock );
+
+            display( ss , elapsed , data.queries );
+            display( ss , elapsed , data.getmore );
+            display( ss , elapsed , data.insert );
+            display( ss , elapsed , data.update );
+            display( ss , elapsed , data.remove );
+            
+            ss << "</tr>";
         }
 
         void doUnlockedStuff(stringstream& ss) {
@@ -481,7 +469,6 @@ namespace mongo {
     DBDirectClient DbWebServer::db;
 
     void webServerThread() {
-        boost::thread thr(statsThread);
         Client::initThread("websvr");
         DbWebServer mini;
         int p = cmdLine.port + 1000;

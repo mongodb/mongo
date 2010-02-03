@@ -1205,6 +1205,13 @@ namespace mongo {
             b.append((char) (val?1:0));
         }
 
+        /** Append a boolean element */
+        void append(const char *fieldName, bool val) {
+            b.append((char) Bool);
+            b.append(fieldName);
+            b.append((char) (val?1:0));            
+        }
+        
         /** Append a 32 bit integer element */
         void append(const char *fieldName, int n) {
             b.append((char) NumberInt);
@@ -1231,7 +1238,17 @@ namespace mongo {
             append( fieldName.c_str() , n );
         }
 
-
+        /** appends a number.  if n < max(int)/2 then uses int, otherwise long long */
+        void appendIntOrLL( const string& fieldName , long long n ){
+            long long x = n;
+            if ( x < 0 )
+                x = x * -1;
+            if ( x < ( numeric_limits<int>::max() / 2 ) )
+                append( fieldName.c_str() , (int)n );
+            else
+                append( fieldName.c_str() , n );
+        }
+        
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {
             b.append((char) NumberDouble);

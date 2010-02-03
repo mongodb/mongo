@@ -188,3 +188,12 @@ namespace mongo {
 	} catch ( ... ) { \
 		massert( 10437 ,  "unknown boost failed" , false );   \
 	}
+
+#define DESTRUCTOR_GUARD( expression ) \
+    try { \
+        expression; \
+    } catch ( const std::exception &e ) { \
+        problem() << "caught exception (" << e.what() << ") in destructor (" << __FUNCTION__ << ")" << endl; \
+    } catch ( ... ) { \
+        problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
+    }

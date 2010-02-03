@@ -609,3 +609,10 @@ ReplTest.prototype.stop = function( master , signal ){
     }
     stopMongod( this.getPort( master ) , signal || 15 );
 }
+
+allocatePorts = function( n ) {
+    var ret = [];
+    for( var i = 35000; i < 35000 + n; ++i )
+        ret.push( i );
+    return ret;
+}

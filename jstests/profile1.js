@@ -13,6 +13,8 @@ var capped_size = db.system.profile.storageSize();
 assert.gt(capped_size, 999, "D");
 assert.lt(capped_size, 2000, "E");
 
+db.foo.findOne()
+
 assert.eq( 4 , db.system.profile.find().count() , "E2" );
 
 /* Make sure we can't drop if profiling is still on */

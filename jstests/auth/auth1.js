@@ -20,11 +20,22 @@ assert.throws( function() { t.findOne() }, [], "read without login" );
 
 assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
 
-for( i = 0; i < 1000; ++i ) {
+for( i = 0; i < 999; ++i ) {
     t.save( {i:i} );
 }
-assert.eq( 1000, t.count() );
-assert.eq( 1000, t.find().toArray().length );
+assert.eq( 999, t.count() );
+assert.eq( 999, t.find().toArray().length );
+
+assert.eq( 999, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:999} ) } );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+
+var p = { key : { i : true } , 
+    reduce : function(obj,prev) { prev.count++; },
+initial: { count: 0 }
+};
+
+assert.eq( 1000, t.group( p ).length );
 
 assert( db.auth( "guest", "guest" ), "auth failed 2" );
 
@@ -42,3 +53,18 @@ assert( !db.getLastError() );
 db.addUser( "a", "b" );
 assert( db.getLastError() );
 assert.eq( 2, db.system.users.count() );
+
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].find().toArray().length; } ) );
+db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1} ) } );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+
+assert.eq( 1000, t.group( p ).length );
+
+var p = { key : { i : true } , 
+    reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
+initial: { count: 0 }
+};
+
+assert.throws( function() { return t.group( p ) }, "write reduce didn't fail" );
+

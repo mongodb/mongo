@@ -82,21 +82,6 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
 DAEMONUSER=${DAEMONUSER:-mongodb}
 DAEMON_OPTS=${DAEMON_OPTS:-"--dbpath $DATA --logpath $LOGFILE run"}
 
-# Check that the user exists (if we set a user)
-# Does the user exist?
-if [ -z "$DAEMONUSER" ]; then
-        log_failure_msg "The variable DAEMONUSER is unset or empty."
-	exit 1
-else
-    # Ensure the user exists.
-    if getent passwd | grep -q "^$DAEMONUSER:"; then
-        true 	# pass
-    else
-        log_failure_msg "The user $DAEMONUSER, required to run $NAME does not exist."
-        exit 1
-    fi
-fi
-
 set -e
 
 
@@ -134,18 +119,10 @@ start_server() {
 
 stop_server() {
 # Stop the process using the wrapper
-        if [ -z "$DAEMONUSER" ] ; then
-            start-stop-daemon --stop --quiet --pidfile $PIDFILE
-            rm $PIDFILE
-            errcode=$?
-        else
-# if we are using a daemonuser then look for process that match
             start-stop-daemon --stop --quiet --pidfile $PIDFILE \
                         --user $DAEMONUSER \
                         --exec $DAEMON
             errcode=$?
-        fi
-
 	return $errcode
 }
 

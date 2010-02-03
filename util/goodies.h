@@ -497,5 +497,5 @@ namespace mongo {
     private:
         TicketHolder * _holder;
     };
-
+    
 } // namespace mongo

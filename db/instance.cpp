@@ -164,10 +164,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(DbResponse& dbresponse, Message& m, 
-                              CurOp& op, bool logit, 
-                              mongolock& lock
-      ) {
+    static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m ){
         bool ok = true;
         MSGID responseTo = m.data->id;
 
@@ -175,27 +172,13 @@ namespace mongo {
         QueryMessage q(d);
         QueryResult* msgdata;
 
-        Client& c = cc();
+        CurOp& op = *(c.curop());
         
-        Client::Context ctx( q.ns, dbpath, &lock );
-
         try {
             if (q.fields.get() && q.fields->errmsg)
                 uassert( 10053 , q.fields->errmsg, false);
 
-            /* note these are logged BEFORE authentication -- which is sort of ok */
-            if ( _diaglog.level && logit ) {
-                if ( strstr(q.ns, ".$cmd") ) {
-                    /* $cmd queries are "commands" and usually best treated as write operations */
-                    OPWRITE;
-                }
-                else {
-                    OPREAD;
-                }
-            }
-
-            c.top.setRead();
-            c.curop()->setNS(q.ns);
+            c.curop()->setRead();
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
@@ -232,14 +215,9 @@ namespace mongo {
         resp->setData(msgdata, true); // transport will free
         dbresponse.response = resp;
         dbresponse.responseTo = responseTo;
-        Database *database = c.database();
-        if ( database ) {
-            if ( database->profile )
-                op.debug().str << " bytes:" << resp->data->dataLen();
-        }
-        else {
-            if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
-                log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
+        
+        if ( op.shouldDBProfile( 0 ) ){
+            op.debug().str << " bytes:" << resp->data->dataLen();
         }
 
         return ok;
@@ -290,6 +268,13 @@ namespace mongo {
             return true;
         }
 
+        if ( writeLock ){
+            OPWRITE;
+        }
+        else {
+            OPREAD;
+        }
+
         Client& c = cc();
         
         auto_ptr<CurOp> nestedOp;
@@ -299,8 +284,7 @@ namespace mongo {
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
-        currentOp.reset(client);
-        currentOp.setOp(op);
+        currentOp.reset(client,op);
         
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
@@ -308,24 +292,21 @@ namespace mongo {
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
 
-        Timer t( currentOp.startTime() );
-
-        mongolock lk(writeLock);
-
         if ( op == dbQuery ) {
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(dbresponse, m, currentOp, true, lk) )
+            if ( ! receivedQuery(c , dbresponse, m ) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
+            mongolock lk(writeLock);
             // does its own authorization processing.
-            OPREAD;
             DEV log = true;
             ss << "getmore ";
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
                 log = true;
         }
         else if ( op == dbMsg ) {
+            mongolock lk(writeLock);
 			/* deprecated / rarely used.  intended for connection diagnostics. */
             ss << "msg ";
             char *p = m.data->_data;
@@ -344,16 +325,14 @@ namespace mongo {
                 return false;
         }
         else {
+            mongolock lk(writeLock);
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
-            currentOp.setNS(ns);
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            if( !ai->isAuthorized(cl) ) { 
+            if( !c.ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
             else if ( op == dbInsert ) {
-                OPWRITE;
                 try {
                     ss << "insert ";
                     receivedInsert(m, currentOp);
@@ -365,7 +344,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbUpdate ) {
-                OPWRITE;
                 try {
                     ss << "update ";
                     receivedUpdate(m, currentOp);
@@ -377,7 +355,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbDelete ) {
-                OPWRITE;
                 try {
                     ss << "remove ";
                     receivedDelete(m, currentOp);
@@ -389,7 +366,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbKillCursors ) {
-                OPREAD;
                 try {
                     logThreshold = 10;
                     ss << "killcursors ";
@@ -403,40 +379,32 @@ namespace mongo {
             }
             else {
                 out() << "    operation isn't supported: " << op << endl;
-                currentOp.setActive(false);
+                currentOp.done();
                 assert(false);
             }
         }
-        int ms = t.millis();
+        currentOp.done();
+        int ms = currentOp.totalTimeMillis();
+        
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
         if ( log || ms > logThreshold ) {
             ss << ' ' << ms << "ms";
             mongo::log() << ss.str() << endl;
         }
-        Database *database = c.prevDatabase();
-        if ( database && database->profile >= 1 ) {
-            if ( database->profile >= 2 || ms >= cmdLine.slowMS ) {
-                // performance profiling is on
-                if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
-                    mongo::log(1) << "warning: not profiling because recursive lock" << endl;
-                }
-                else {
-                    lk.releaseAndWriteLock();
-                    if ( database->isOk() ){
-                        Client::Context c( "" , database );
-                        profile(ss.str().c_str(), ms);
-                    }
-                    else {
-                        // this means this either caused the db to be closed
-                        // or someone else closed it
-                        // either way, we're not going to profile
-                    }
-                }
+        
+        if ( currentOp.shouldDBProfile( ms ) ){
+            // performance profiling is on
+            if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
+                mongo::log(1) << "warning: not profiling because recursive lock" << endl;
+            }
+            else {
+                mongolock lk(true);
+                Client::Context c( currentOp.getNS() );
+                profile(ss.str().c_str(), ms);
             }
         }
 
-        currentOp.setActive(false);
         return true;
     } /* assembleResponse() */
 
@@ -506,12 +474,10 @@ namespace mongo {
         }        
 
         Client::Context ctx( ns );
-        Client& client = cc();
-        client.top.setWrite();
+        op.setWrite();
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        /* TODO FIX: recordUpdate should take a long int for parm #2 */
-        recordUpdate( res.existing , (int) res.num ); // for getlasterror
+        recordUpdate( res.existing , res.num ); // for getlasterror
     }
 
     void receivedDelete(Message& m, CurOp& op) {
@@ -520,8 +486,7 @@ namespace mongo {
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        Client& client = cc();
-        client.top.setWrite();
+        op.setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -529,10 +494,9 @@ namespace mongo {
         {
             string s = pattern.toString();
             op.debug().str << " query: " << s;
-            CurOp& currentOp = *client.curop();
-            currentOp.setQuery(pattern);
+            op.setQuery(pattern);
         }        
-        int n = deleteObjects(ns, pattern, justOne, true);
+        long long n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
     }
     
@@ -545,7 +509,7 @@ namespace mongo {
         StringBuilder& ss = curop.debug().str;
         ss << ns;
         Client::Context ctx(ns);
-        cc().top.setRead();
+        curop.setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         ss << " cid:" << cursorid;
@@ -577,7 +541,7 @@ namespace mongo {
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        cc().top.setWrite();
+        op.setWrite();
         op.debug().str << ns;
 		
         while ( d.moreJSObjs() ) {

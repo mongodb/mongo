@@ -30,7 +30,7 @@ namespace mongo {
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         /* todo: nObjects should be 64 bit */
-        int nObjects;
+        long long nObjects;
         int nPrev;
         bool valid;
         bool overridenById;
@@ -40,12 +40,12 @@ namespace mongo {
             code = _code;
             msg = _msg;
         }
-        void recordUpdate( bool _updatedExisting, int nChanged ) {
+        void recordUpdate( bool _updatedExisting, long long nChanged ) {
             reset( true );
             nObjects = nChanged;
             updatedExisting = _updatedExisting ? True : False;
         }
-        void recordDelete( int nDeleted ) {
+        void recordDelete( long long nDeleted ) {
             reset( true );
             nObjects = nDeleted;
         }

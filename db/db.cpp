@@ -40,6 +40,7 @@
 #include "../scripting/engine.h"
 #include "module.h"
 #include "cmdline.h"
+#include "stats/snapshots.h"
 
 namespace mongo {
 
@@ -515,6 +516,7 @@ namespace mongo {
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
+        snapshotThread.go();
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -1068,6 +1070,14 @@ namespace mongo {
         exitCleanly();
     }
 
+    // this will be called in certain c++ error cases, for example if there are two active
+    // exceptions
+    void myterminate() {
+        rawOut( "terminate() called, printing stack:\n" );
+        printStackTrace();
+        abort();
+    }
+    
     void setupSignals() {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
@@ -1083,6 +1093,8 @@ namespace mongo {
         sigaddset( &asyncSignals, SIGTERM );
         assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
+        
+        set_terminate( myterminate );
     }
 
 #else

@@ -6,13 +6,13 @@ if ( typeof( _startMongoProgram ) == "undefined" ){
     print( "no fork support" );
 }
 else {
-    spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "sleep( 2000 ); db.getCollection( \"" + baseName + "\" ).save( {a:1} );" );
+    spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "sleep( 2000 ); db.getCollection( '" + baseName + "' ).save( {a:1} );" );
     
     assert.soon( function() { return 1 == t.count(); } );
     
     stopMongoProgramByPid( spawn );
     
-    spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "print( \"I am a shell\" );" );
+    spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "print( 'I am a shell' );" );
     
     spawn = startMongoProgramNoConnect( "mongo", "--port", myPort() );
     

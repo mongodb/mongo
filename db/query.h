@@ -77,7 +77,7 @@ namespace mongo {
     struct UpdateResult {
         bool existing;
         bool mod;
-        unsigned long long num;
+        long long num;
 
         UpdateResult( bool e, bool m, unsigned long long n )
             : existing(e) , mod(m), num(n ){}
@@ -104,7 +104,7 @@ namespace mongo {
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
 
     // If justOne is true, deletedId is set to the id of the deleted object.
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false);
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop = false, bool god=false);
 
     long long runCount(const char *ns, const BSONObj& cmd, string& err);
     

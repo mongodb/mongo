@@ -1,5 +1,7 @@
 // utils.cpp
 
+#include "../stdafx.h"
+
 #include <boost/thread/xtime.hpp>
 
 #include <cstring>
@@ -13,7 +15,6 @@
 #include <fcntl.h>
 
 #ifdef _WIN32
-# include <Windows.h>
 # include <io.h>
 # define SIGKILL 9
 #else
@@ -170,42 +171,6 @@ namespace mongo {
             return b.obj();
         }
 
-        BSONObj AllocatePorts( const BSONObj &args ) {
-            uassert( 10259 ,  "allocatePorts takes exactly 1 argument", args.nFields() == 1 );
-            uassert( 10260 ,  "allocatePorts needs to be passed an integer", args.firstElement().isNumber() );
-            
-            int n = int( args.firstElement().number() );
-            
-            vector< int > ports;
-            vector< int > sockets;
-            for( int i = 0; i < n; ++i ) {
-                int s = socket( AF_INET, SOCK_STREAM, 0 );
-                assert( s );
-                
-                sockaddr_in address;
-                memset(address.sin_zero, 0, sizeof(address.sin_zero));
-                address.sin_family = AF_INET;
-                address.sin_port = 0;
-                address.sin_addr.s_addr = inet_addr( "127.0.0.1" );
-                assert( 0 == ::bind( s, (sockaddr*)&address, sizeof( address ) ) );
-                
-                sockaddr_in newAddress;
-                socklen_t len = sizeof( newAddress );
-                assert( 0 == getsockname( s, (sockaddr*)&newAddress, &len ) );
-                ports.push_back( ntohs( newAddress.sin_port ) );
-                sockets.push_back( s );
-            }
-            for( vector< int >::const_iterator i = sockets.begin(); i != sockets.end(); ++i )
-                closesocket( *i );
-            
-            sort( ports.begin(), ports.end() );
-            for( unsigned i = 1; i < ports.size(); ++i )
-                massert( 10434 ,  "duplicate ports allocated", ports[ i - 1 ] != ports[ i ] );
-            BSONObjBuilder b;
-            b.append( "", ports );
-            return b.obj();
-        }
-
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
 #ifdef _WIN32
@@ -232,9 +197,14 @@ namespace mongo {
             mongoProgramOutput_ << buf.str() << endl;
         }
         
+        // only returns last 10000 characters
         BSONObj RawMongoProgramOutput( const BSONObj &args ) {
             boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            return BSON( "" << mongoProgramOutput_.str() );
+            string out = mongoProgramOutput_.str();
+            size_t len = out.length();
+            if ( len > 10000 )
+                out = out.substr( len - 10000, 10000 );
+            return BSON( "" << out );
         }
                 
         class MongoProgramRunner {
@@ -457,9 +427,9 @@ namespace mongo {
 
         inline void kill_wrapper(pid_t pid, int sig, int port){
 #ifdef _WIN32
-            if (sig == SIGKILL){
+            if (sig == SIGKILL || port == 0){
                 assert( handles.count(pid) );
-                assert( ! TerminateProcess(handles[pid], 1) );
+                TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
             }else{
                 DBClientConnection conn;
                 conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
@@ -601,7 +571,6 @@ namespace mongo {
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
-            scope.injectNative( "allocatePorts", AllocatePorts );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
