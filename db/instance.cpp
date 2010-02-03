@@ -164,10 +164,8 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(DbResponse& dbresponse, Message& m, 
-                              CurOp& op, bool logit, 
-                              mongolock& lock
-      ) {
+    static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m, 
+                              bool logit, mongolock& lock ){
         bool ok = true;
         MSGID responseTo = m.data->id;
 
@@ -175,7 +173,7 @@ namespace mongo {
         QueryMessage q(d);
         QueryResult* msgdata;
 
-        Client& c = cc();
+        CurOp& op = *(c.curop());
         
         Client::Context ctx( q.ns, dbpath, &lock );
 
@@ -231,14 +229,9 @@ namespace mongo {
         resp->setData(msgdata, true); // transport will free
         dbresponse.response = resp;
         dbresponse.responseTo = responseTo;
-        Database *database = c.database();
-        if ( database ) {
-            if ( database->profile )
-                op.debug().str << " bytes:" << resp->data->dataLen();
-        }
-        else {
-            if ( strstr(q.ns, "$cmd") == 0 ) // (this condition is normal for $cmd dropDatabase)
-                log() << "ERROR: receiveQuery: database is null; ns=" << q.ns << endl;
+        
+        if ( op.shouldDBProfile( 0 ) ){
+            op.debug().str << " bytes:" << resp->data->dataLen();
         }
 
         return ok;
@@ -306,14 +299,14 @@ namespace mongo {
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
 
-        mongolock lk(writeLock);
-
         if ( op == dbQuery ) {
+            mongolock lk(writeLock);
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(dbresponse, m, currentOp, true, lk) )
+            if ( ! receivedQuery(c , dbresponse, m, true, lk) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
+            mongolock lk(writeLock);
             // does its own authorization processing.
             OPREAD;
             DEV log = true;
@@ -322,6 +315,7 @@ namespace mongo {
                 log = true;
         }
         else if ( op == dbMsg ) {
+            mongolock lk(writeLock);
 			/* deprecated / rarely used.  intended for connection diagnostics. */
             ss << "msg ";
             char *p = m.data->_data;
@@ -340,6 +334,7 @@ namespace mongo {
                 return false;
         }
         else {
+            mongolock lk(writeLock);
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
@@ -418,7 +413,7 @@ namespace mongo {
                 mongo::log(1) << "warning: not profiling because recursive lock" << endl;
             }
             else {
-                lk.releaseAndWriteLock();
+                mongolock lk(true);
                 Client::Context c( currentOp.getNS() );
                 profile(ss.str().c_str(), ms);
             }
