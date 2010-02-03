@@ -59,6 +59,7 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
         }
 
+    public:
         void enter( Client::Context * context ){
             setNS( context->ns() );
             if ( context->_db && context->_db->profile > _dbprofile )
@@ -71,7 +72,6 @@ namespace mongo {
             _checkpoint = now;
         }
         
-    public:
         void reset( const sockaddr_in & client, int op ) { 
             _reset();
             _start = curTimeMicros64();
