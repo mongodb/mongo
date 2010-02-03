@@ -62,7 +62,7 @@ doTest = function( nSlave, opIdMem ) {
     disconnect();    
     pair.waitForSteadyState( [ 1, 1 ], null, true );
     
-    // left will become slave
+    // left will become slave (b/c both completed initial sync)
     for( i = 0; i < nSlave; ++i ) {
         write( pair.left(), i, i );
     }    

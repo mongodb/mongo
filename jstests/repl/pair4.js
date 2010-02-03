@@ -134,6 +134,7 @@ doTest = function( recover, newMaster, newSlave ) {
     
 }
 
+// right will be master on recovery b/c both sides will have completed initial sync
 debug( "basic test" );
 doTest( function() {
        connect();
