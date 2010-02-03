@@ -67,3 +67,4 @@ initial: { count: 0 }
 };
 
 assert.throws( function() { return t.group( p ) }, "write reduce didn't fail" );
+

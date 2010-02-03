@@ -1,9 +1,9 @@
 // test --authWrite mode
 
-port = allocatePorts( 1 )[ 0 ];
+ports = allocatePorts( 2 );
 baseName = "jstests_auth_auth2";
 
-m = startMongod( "--authWriteOnly", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongod( "--authWriteOnly", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( "test" );
 
 t = db[ baseName ];
@@ -33,3 +33,7 @@ assert( !db.getLastError() );
 db.addUser( "a", "b" );
 assert( db.getLastError() );
 assert.eq( 0, db.system.users.count() );
+
+m2 = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_copy", "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+assert.commandWorked( m2.getDB( "test" ).copyDatabase( "test", "test", "localhost:" + ports[ 0 ] ) );
+assert.eq( 1000, m2.getDB( "test" )[ baseName ].count() );
