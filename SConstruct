@@ -1193,7 +1193,7 @@ def ensureTestDirs():
 
 def netstat():
     from subprocess import call
-    call( [ "netstat", "atp" ] )
+    call( [ "netstat", "-atp" ] )
 
 def testSetup( env , target , source ):
     ensureTestDirs()

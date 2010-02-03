@@ -183,6 +183,8 @@ namespace mongo {
         Extent* allocExtent( const char *ns, int size, bool capped ) { 
             Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
             if( e ) return e;
+            // print extents
+            DataFileMgr::printExtents( ns );
             return suitableFile( size )->createExtent( ns, size, capped );
         }
         

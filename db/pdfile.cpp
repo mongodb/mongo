@@ -352,6 +352,7 @@ namespace mongo {
                 out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
             log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
+            printStackTrace();
             return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header->unused.getOfs();
@@ -368,6 +369,15 @@ namespace mongo {
         return e;
     }
 
+    void DataFileMgr::printExtents( const char *ns ) {
+        NamespaceDetails *nsd = nsdetails( ns );
+        if ( !nsd )
+            return;
+        for( DiskLoc ext = nsd->firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
+            log() << "ext: " << ext << " length: " << ext.ext()->length << endl;
+        }            
+    }
+            
     Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) { 
         string s = cc().database()->name + ".$freelist";
         NamespaceDetails *f = nsdetails(s.c_str());

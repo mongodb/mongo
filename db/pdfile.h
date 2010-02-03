@@ -96,6 +96,7 @@ namespace mongo {
 
         /* see if we can find an extent of the right size in the freelist. */
         static Extent* allocFromFreeList(const char *ns, int approxSize, bool capped = false);
+        static void printExtents( const char *ns );
 
         /** @return DiskLoc where item ends up */
         const DiskLoc update(

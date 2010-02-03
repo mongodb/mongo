@@ -59,19 +59,19 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
         }
 
+    public:
         void enter( Client::Context * context ){
             setNS( context->ns() );
             if ( context->_db && context->_db->profile > _dbprofile )
                 _dbprofile = context->_db->profile;
         }
-
+        
         void leave( Client::Context * context ){
             unsigned long long now = curTimeMicros64();
             Top::global.record( _ns , _op , _lockType , now - _checkpoint );
             _checkpoint = now;
         }
         
-    public:
         void reset( const sockaddr_in & client, int op ) { 
             _reset();
             _start = curTimeMicros64();
