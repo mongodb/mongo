@@ -316,6 +316,48 @@ namespace JsobjTests {
             }
         };
 
+        struct AppendIntOrLL{
+            void run(){
+                const long long billion = 1000*1000*1000;
+                BSONObjBuilder b;
+                b.appendIntOrLL("i1",  1);
+                b.appendIntOrLL("i2", -1);
+                b.appendIntOrLL("i3",  1*billion);
+                b.appendIntOrLL("i4", -1*billion);
+
+                b.appendIntOrLL("L1",  2*billion);
+                b.appendIntOrLL("L2", -2*billion);
+                b.appendIntOrLL("L3",  4*billion);
+                b.appendIntOrLL("L4", -4*billion);
+                b.appendIntOrLL("L5",  16*billion);
+                b.appendIntOrLL("L6", -16*billion);
+
+                BSONObj o = b.obj();
+
+                ASSERT(o["i1"].type() == NumberInt);
+                ASSERT(o["i1"].number() == 1);
+                ASSERT(o["i2"].type() == NumberInt);
+                ASSERT(o["i2"].number() == -1);
+                ASSERT(o["i3"].type() == NumberInt);
+                ASSERT(o["i3"].number() == 1*billion);
+                ASSERT(o["i4"].type() == NumberInt);
+                ASSERT(o["i4"].number() == -1*billion);
+
+                ASSERT(o["L1"].type() == NumberLong);
+                ASSERT(o["L1"].number() == 2*billion);
+                ASSERT(o["L2"].type() == NumberLong);
+                ASSERT(o["L2"].number() == -2*billion);
+                ASSERT(o["L3"].type() == NumberLong);
+                ASSERT(o["L3"].number() == 4*billion);
+                ASSERT(o["L4"].type() == NumberLong);
+                ASSERT(o["L4"].number() == -4*billion);
+                ASSERT(o["L5"].type() == NumberLong);
+                ASSERT(o["L5"].number() == 16*billion);
+                ASSERT(o["L6"].type() == NumberLong);
+                ASSERT(o["L6"].number() == -16*billion);
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -1364,6 +1406,7 @@ namespace JsobjTests {
             add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();
             add< BSONObjTests::AsTempObj >();
+            add< BSONObjTests::AppendIntOrLL >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();
