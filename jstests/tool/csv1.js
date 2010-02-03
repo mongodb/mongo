@@ -17,8 +17,7 @@ c.drop()
 assert.eq( 0 , c.count() , "after drop" )
 
 t.runTool( "import" , "--file" , t.extFile , "-d" , t.baseName , "-c" , "foo" , "--type" , "csv" , "-f" , "a,b,c" );
-assert.soon( "c.findOne()" , "no data after sleep" );
-assert.eq( 2 , c.count() , "after restore 2" );
+assert.soon( "2 == c.count()" , "restore 2" );
 
 a = c.find().sort( { a : 1 } ).toArray();
 delete a[0]._id
