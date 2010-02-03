@@ -165,7 +165,7 @@ namespace mongo {
     }
 
     static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m, 
-                              bool logit, mongolock& lock ){
+                              mongolock& lock ){
         bool ok = true;
         MSGID responseTo = m.data->id;
 
@@ -180,17 +180,6 @@ namespace mongo {
         try {
             if (q.fields.get() && q.fields->errmsg)
                 uassert( 10053 , q.fields->errmsg, false);
-
-            /* note these are logged BEFORE authentication -- which is sort of ok */
-            if ( _diaglog.level && logit ) {
-                if ( strstr(q.ns, ".$cmd") ) {
-                    /* $cmd queries are "commands" and usually best treated as write operations */
-                    OPWRITE;
-                }
-                else {
-                    OPREAD;
-                }
-            }
 
             c.curop()->setRead();
             msgdata = runQuery(m, q, op ).release();
@@ -282,6 +271,13 @@ namespace mongo {
             return true;
         }
 
+        if ( writeLock ){
+            OPWRITE;
+        }
+        else {
+            OPREAD;
+        }
+
         Client& c = cc();
         
         auto_ptr<CurOp> nestedOp;
@@ -301,14 +297,14 @@ namespace mongo {
 
         if ( op == dbQuery ) {
             mongolock lk(writeLock);
+            
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(c , dbresponse, m, true, lk) )
+            if ( ! receivedQuery(c , dbresponse, m, lk) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
             mongolock lk(writeLock);
             // does its own authorization processing.
-            OPREAD;
             DEV log = true;
             ss << "getmore ";
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
@@ -343,7 +339,6 @@ namespace mongo {
                 uassert_nothrow("unauthorized");
             }
             else if ( op == dbInsert ) {
-                OPWRITE;
                 try {
                     ss << "insert ";
                     receivedInsert(m, currentOp);
@@ -355,7 +350,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbUpdate ) {
-                OPWRITE;
                 try {
                     ss << "update ";
                     receivedUpdate(m, currentOp);
@@ -367,7 +361,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbDelete ) {
-                OPWRITE;
                 try {
                     ss << "remove ";
                     receivedDelete(m, currentOp);
@@ -379,7 +372,6 @@ namespace mongo {
                 }
             }
             else if ( op == dbKillCursors ) {
-                OPREAD;
                 try {
                     logThreshold = 10;
                     ss << "killcursors ";
