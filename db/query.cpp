@@ -104,7 +104,7 @@ namespace mongo {
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
     */
-    int deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db 
@@ -124,7 +124,7 @@ namespace mongo {
             return 0;
         uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
 
-        int nDeleted = 0;
+        long long nDeleted = 0;
         QueryPlanSet s( ns, pattern, BSONObj() );
         int best = 0;
         DeleteOp original( justOne, best );

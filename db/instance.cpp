@@ -329,8 +329,7 @@ namespace mongo {
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            if( !ai->isAuthorized(cl) ) { 
+            if( !c.ai->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
             else if ( op == dbInsert ) {
@@ -478,8 +477,7 @@ namespace mongo {
         op.setWrite();
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        /* TODO FIX: recordUpdate should take a long int for parm #2 */
-        recordUpdate( res.existing , (int) res.num ); // for getlasterror
+        recordUpdate( res.existing , res.num ); // for getlasterror
     }
 
     void receivedDelete(Message& m, CurOp& op) {
@@ -498,7 +496,7 @@ namespace mongo {
             op.debug().str << " query: " << s;
             op.setQuery(pattern);
         }        
-        int n = deleteObjects(ns, pattern, justOne, true);
+        long long n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( n );
     }
     
