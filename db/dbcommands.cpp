@@ -1452,9 +1452,12 @@ namespace mongo {
         bool ok = false;
 
         BSONElement e = jsobj.firstElement();
-
+        
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
+            mongolock lk(!c->readOnly());
+            Client::Context ctx( ns , dbpath , &lk );
+
             string errmsg;
             AuthenticationInfo *ai = currentClient.get()->ai;
             if ( c->requiresAuth() ) {
@@ -1464,7 +1467,7 @@ namespace mongo {
                     uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));                    
                 }
             }
-
+            
             bool admin = c->adminOnly();
 
             if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 

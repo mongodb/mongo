@@ -164,8 +164,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m, 
-                              mongolock& lock ){
+    static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m ){
         bool ok = true;
         MSGID responseTo = m.data->id;
 
@@ -175,8 +174,6 @@ namespace mongo {
 
         CurOp& op = *(c.curop());
         
-        Client::Context ctx( q.ns, dbpath, &lock );
-
         try {
             if (q.fields.get() && q.fields->errmsg)
                 uassert( 10053 , q.fields->errmsg, false);
@@ -296,10 +293,8 @@ namespace mongo {
         bool log = logLevel >= 1;
 
         if ( op == dbQuery ) {
-            mongolock lk(writeLock);
-            
             // receivedQuery() does its own authorization processing.
-            if ( ! receivedQuery(c , dbresponse, m, lk) )
+            if ( ! receivedQuery(c , dbresponse, m ) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
