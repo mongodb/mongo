@@ -149,7 +149,7 @@ rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
 
     old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
     new_deb_boost_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev" ]
-    common_deb_prereqs = [ "build-essential", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
+    common_deb_prereqs = [ "build-essential", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
     centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
     fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
