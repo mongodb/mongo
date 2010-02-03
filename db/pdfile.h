@@ -98,8 +98,10 @@ namespace mongo {
         static Extent* allocFromFreeList(const char *ns, int approxSize, bool capped = false);
 
         /** @return DiskLoc where item ends up */
-        const DiskLoc update(
+        const DiskLoc updateRecord(
             const char *ns,
+            NamespaceDetails *d,
+            NamespaceDetailsTransient *nsdt,
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, OpDebug& debug);
         // The object o may be updated if modified on insert.                                

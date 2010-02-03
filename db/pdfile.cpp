@@ -811,19 +811,20 @@ namespace mongo {
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
-    const DiskLoc DataFileMgr::update(const char *ns,
-                                       Record *toupdate, const DiskLoc& dl,
-                                       const char *_buf, int _len, OpDebug& debug)
+    const DiskLoc DataFileMgr::updateRecord(
+        const char *ns,
+        NamespaceDetails *d,
+        NamespaceDetailsTransient *nsdt,
+        Record *toupdate, const DiskLoc& dl,
+        const char *_buf, int _len, OpDebug& debug)
     {
         StringBuilder& ss = debug.str;
         dassert( toupdate == dl.rec() );
 
-        NamespaceDetails *d = nsdetails(ns);
-
         BSONObj objOld(toupdate);
         BSONObj objNew(_buf);
-        assert( objNew.objsize() == _len );
-        assert( objNew.objdata() == _buf );
+        DEV assert( objNew.objsize() == _len );
+        DEV assert( objNew.objdata() == _buf );
 
         if( !objNew.hasElement("_id") && objOld.hasElement("_id") ) {
             /* add back the old _id value if the update removes it.  Note this implementation is slow 
@@ -855,7 +856,7 @@ namespace mongo {
             return insert(ns, objNew.objdata(), objNew.objsize(), false);
         }
 
-        NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+        nsdt->notifyOfWriteOp();
         d->paddingFits();
 
         /* have any index keys changed? */

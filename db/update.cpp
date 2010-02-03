@@ -627,6 +627,12 @@ namespace mongo {
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
         int profile = cc().database()->profile;
         StringBuilder& ss = debug.str;
+
+        /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
+        /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
+        NamespaceDetails *d = nsdetails(ns);
+        NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
+        /* end note */
         
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
@@ -641,7 +647,6 @@ namespace mongo {
             mods.reset( new ModSet( updateobj , NamespaceDetailsTransient::get_w(ns).indexKeys() ) );
             modsIsIndexed = mods->isIndexed();
         }
-
 
         set<DiskLoc> seenObjects;
         
@@ -717,8 +722,8 @@ namespace mongo {
                 } 
                 else {
                     BSONObj newObj = mss->createNewFromMods();
-                    uassert( 12522 , "$ operator made objcet too large" , newObj.isValid() );
-                    DiskLoc newLoc = theDataFileMgr.update(ns, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                    uassert( 12522 , "$ operator made object too large" , newObj.isValid() );
+                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
                     if ( newLoc != loc || modsIsIndexed ){
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
@@ -753,7 +758,7 @@ namespace mongo {
 
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
-            theDataFileMgr.update(ns, r, loc , updateobj.objdata(), updateobj.objsize(), debug);
+            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug);
             if ( logop )
                 logOp("u", ns, updateobj, &pattern );
             return UpdateResult( 1 , 0 , 1 );
