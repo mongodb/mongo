@@ -38,7 +38,8 @@ doTest = function( signal ) {
 
     rp = new ReplPair( l, r, a );
     rp.start();
-    rp.waitForSteadyState( [ 1, 0 ], rp.right().host );
+    rp.waitForSteadyState( [ 1, 0 ] );
+    rightMaster = ( rp.master().host == rp.right().host );
     
     checkWrite( rp.master(), rp.slave() );
 
@@ -51,16 +52,26 @@ doTest = function( signal ) {
     rp.killNode( rp.master(), signal );
     rp.killNode( rp.arbiter(), signal );
     
-    o = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ] );
-    r = new MongodRunner( ports[ 3 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
+    if ( rightMaster ) {
+        o = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 3 ], "127.0.0.1:" + ports[ 0 ] );
+        r = new MongodRunner( ports[ 3 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
+        rp = new ReplPair( o, r, a );
+        resetDbpath( "/data/db/" + baseName + "-left" );
+    } else {
+        l = new MongodRunner( ports[ 1 ], "/data/db/" + baseName + "-left", "127.0.0.1:" + ports[ 2 ], "127.0.0.1:" + ports[ 0 ] );
+        o = new MongodRunner( ports[ 2 ], "/data/db/" + baseName + "-right", "127.0.0.1:" + ports[ 1 ], "127.0.0.1:" + ports[ 0 ] );        
+        rp = new ReplPair( l, o, a );
+        resetDbpath( "/data/db/" + baseName + "-right" );
+    }
 
-    rp = new ReplPair( o, r, a );
-    resetDbpath( "/data/db/" + baseName + "-left" );
     rp.start( true );
-    rp.waitForSteadyState( [ 1, 0 ], rp.right().host );
+    rp.waitForSteadyState( [ 1, 0 ] );
+
+    rp.slave().setSlaveOk();
+    assert.eq( 2, rp.master().getDB( baseName ).z.find().toArray().length );
+    assert.eq( 2, rp.slave().getDB( baseName ).z.find().toArray().length );
 
     checkWrite( rp.master(), rp.slave() );
-    rp.slave().setSlaveOk();
     assert.eq( 3, rp.slave().getDB( baseName ).z.find().toArray().length );
 
     ports.forEach( function( x ) { stopMongod( x ); } );
