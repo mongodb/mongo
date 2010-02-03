@@ -133,18 +133,18 @@ rpmbuild -ba /usr/src/redhat/SPECS/mongo.spec
 """ 
     # FIXME: this is clean, but adds 40 minutes or so to the build process.
     old_rpm_precommands = """
-yum install -y bzip2-devel python-devel libicu-devel chrpath zlib-devel
+yum install -y bzip2-devel python-devel libicu-devel chrpath zlib-devel nspr-devel readline-devel ncurses-devel
+wget ftp://194.199.20.114/linux/EPEL/5Client/SRPMS/js-1.70-8.el5.src.rpm
+rpm -ivh js-1.70-8.el5.src.rpm
+sed -i 's/XCFLAGS.*$/XCFLAGS=\"%{optflags} -fPIC -DJS_C_STRINGS_ARE_UTF8\" \\\\/' /usr/src/redhat/SPECS/js.spec
+rpmbuild -ba /usr/src/redhat/SPECS/js.spec
+rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-1.70-8.x86_64.rpm
+rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
 wget ftp://195.220.108.108/linux/sourceforge/g/project/gr/gridiron2/support-files/FC10%20source%20RPMs/boost-1.38.0-1.fc10.src.rpm
 rpm -ivh boost-1.38.0-1.fc10.src.rpm
 rpmbuild -ba /usr/src/redhat/SPECS/boost.spec
 rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-1.38.0-1.x86_64.rpm
 rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
-wget ftp://194.199.20.114/linux/EPEL/5Client/SRPMS/js-1.70-8.el5.src.rpm
-rpm -ivh js-1.70-8.el5.src.rpm
-sed -i 's/XCFLAGS.*$/XCFLAGS="%{optflags} -fPIC -DJS_C_STRINGS_ARE_UTF8" \' /usr/src/redhat/SPECS/js.spec
-rpmbuild -ba /usr/src/redhat/SPECS/js.spec
-rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-1.70-8.x86_64.rpm
-rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
 """
 
     old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
@@ -161,7 +161,9 @@ rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
     # platforms.  If you change the structure, remember to also change
     # the definition of lookup() below.
     configuration = (("ami",
-                      ((("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
+                      ((("ubuntu", "10.04", "x86_64"), "ami-818965e8"),
+                       (("ubuntu", "10.04", "x86"), "ami-ef8d6186"),
+                       (("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
                        (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
                        (("ubuntu", "9.04", "x86_64"), "ami-eef61587"),
                        (("ubuntu", "9.04", "x86"), "ami-ccf615a5"),
@@ -182,6 +184,7 @@ rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
                      ("prereqs",
                       ((("ubuntu", "9.04", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("ubuntu", "9.10", "*"), new_deb_boost_prereqs + common_deb_prereqs),
+                       (("ubuntu", "10.04", "*"), new_deb_boost_prereqs + common_deb_prereqs),                       
                        (("debian", "5.0", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("fedora", "8", "*"), fedora_prereqs),
                        (("centos", "5.4", "*"), centos_preqres))),
@@ -194,6 +197,7 @@ rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
                        (("fedora", "*", "*"), old_rpm_precommands + rpm_prereq_commands + get_mongo_commands + rpm_build_commands))),
                      ("login",
                       ((("debian", "*", "*"), "root"),
+                       (("ubuntu", "10.04", "*"), "ubuntu"),
                        (("ubuntu", "9.10", "*"), "ubuntu"),
                        (("ubuntu", "9.04", "*"), "root"),
                        (("centos", "*", "*"), "root"))),
@@ -251,7 +255,7 @@ class BaseBuilder(object):
         self.localgpgdir = kwargs["localgpgdir"] if "localgpgdir" in kwargs else os.path.expanduser("~/.gnupg")
         self.remotegpgdir = kwargs["remotegpgdir"]  if "remotegpgdir" in kwargs else ".gnupg"
 
-        #FIXME: clean this tempfile up after use.
+        #FIXME: clean this crud.
         if "localscript" in kwargs:
             self.localscript = kwargs["localscript"]
         else:
@@ -268,7 +272,6 @@ class BaseBuilder(object):
         self.remotescript = kwargs["remotescript"] if "remotescript" in kwargs else "makedist.sh"
 
         self.prereqs=self.default("prereqs")
-        #print self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.arch)
         self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.arch)) + self.default("commands")
         self.products=self.default("products")
 
