@@ -329,8 +329,8 @@ namespace mongo {
                 
                 ProcessInfo p;
                 if ( p.supported() ){
-                    t.append( "resident" , p.getResidentSize() );
-                    t.append( "virtual" , p.getVirtualMemorySize() );
+                    t.appendIntOrLL( "resident" , p.getResidentSize() );
+                    t.appendIntOrLL( "virtual" , p.getVirtualMemorySize() );
                     t.appendBool( "supported" , true );
                 }
                 else {
@@ -338,7 +338,7 @@ namespace mongo {
                     t.appendBool( "supported" , false );
                 }
                     
-                t.append( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                t.appendIntOrLL( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
 
                 t.done();
                     
