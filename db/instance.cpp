@@ -468,7 +468,10 @@ namespace mongo {
         bool multi = flags & UpdateOption_Multi;
         {
             string s = query.toString();
-            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. */
+            /* todo: we shouldn't do all this ss stuff when we don't need it, it will slow us down. 
+               instead, let's just story the query BSON in the debug object, and it can toString() 
+               lazily
+            */
             op.debug().str << " query: " << s;
             op.setQuery(query);
         }        
