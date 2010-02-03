@@ -197,9 +197,14 @@ namespace mongo {
             mongoProgramOutput_ << buf.str() << endl;
         }
         
+        // only returns last 10000 characters
         BSONObj RawMongoProgramOutput( const BSONObj &args ) {
             boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            return BSON( "" << mongoProgramOutput_.str() );
+            string out = mongoProgramOutput_.str();
+            size_t len = out.length();
+            if ( len > 10000 )
+                out = out.substr( len - 10000, 10000 );
+            return BSON( "" << out );
         }
                 
         class MongoProgramRunner {
