@@ -43,7 +43,7 @@ namespace mongo {
             if ( ! f && level ){
                 log() << "diagLogging = " << level << endl;
                 stringstream ss;
-                ss << "diaglog." << hex << time(0);
+                ss << dbpath << "/diaglog." << hex << time(0);
                 string name = ss.str();
                 f = new ofstream(name.c_str(), ios::out | ios::binary);
                 if ( ! f->good() ) {
