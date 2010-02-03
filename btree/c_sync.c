@@ -938,37 +938,27 @@ __wt_cache_hazard_confirm(ENV *env, WT_PAGE *page)
 int
 __wt_cache_dump(ENV *env, const char *ofile, FILE *fp)
 {
+	IENV *ienv;
 	WT_CACHE *cache;
 	WT_PAGE *page;
-	u_long page_total;
 	u_int32_t i;
-	int do_close, page_count;
-	char *sep;
+	int do_close;
+
+	ienv = env->ienv;
+	cache = &ienv->cache;
 
 	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
 
-	fprintf(fp, "Cache dump: ==================\n");
-	page_total = 0;
-	cache = &env->ienv->cache;
-	for (i = 0; i < cache->hash_size; ++i) {
-		sep = "";
-		page_count = 0;
-		for (page = cache->hb[i]; page != NULL; page = page->next) {
-			++page_total;
-			if (page_count == 0) {
-				fprintf(fp, "hash bucket %3d: ", i);
-				page_count = 1;
-			}
-			fprintf(fp, "%s%#lx/%lu", sep,
-			    WT_ADDR_TO_ULONG(page), (u_long)page->addr);
-			sep = ", ";
-		}
-		if (page_count != 0)
-			fprintf(fp, "\n");
-	}
+	fprintf(fp, "Cache dump (%llu pages): ==================\n",
+	    WT_STAT(ienv->stats, CACHE_PAGES));
 
-	fprintf(fp, "total pages: %lu\n", page_total);
-	fprintf(fp, "==============================\n");
+	for (i = 0; i < cache->hash_size; ++i) {
+		fprintf(fp, "hash bucket %d:\n", i);
+		for (page = cache->hb[i]; page != NULL; page = page->next)
+			fprintf(fp, "\t%#lx {addr: %lu, bytes: %lu}\n",
+			    WT_ADDR_TO_ULONG(page), (u_long)page->addr,
+			    (u_long)page->bytes);
+	}
 
 	if (do_close)
 		(void)fclose(fp);
