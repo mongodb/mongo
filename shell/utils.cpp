@@ -1,5 +1,7 @@
 // utils.cpp
 
+#include "../stdafx.h"
+
 #include <boost/thread/xtime.hpp>
 
 #include <cstring>
@@ -13,7 +15,6 @@
 #include <fcntl.h>
 
 #ifdef _WIN32
-# include <Windows.h>
 # include <io.h>
 # define SIGKILL 9
 #else
