@@ -1194,7 +1194,7 @@ def ensureTestDirs():
 
 def netstat():
     from subprocess import call
-    call( [ "netstat", "-ap" ] )
+    call( [ "netstat", "-apvne" ] )
 
 def testSetup( env , target , source ):
     ensureTestDirs()
