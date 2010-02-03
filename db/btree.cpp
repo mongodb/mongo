@@ -692,8 +692,7 @@ found:
 
     /* start a new index off, empty */
     DiskLoc BtreeBucket::addBucket(IndexDetails& id) {
-        string ns = id.indexNamespace();
-        DiskLoc loc = btreeStore->insert(ns.c_str(), 0, BucketSize, true);
+        DiskLoc loc = btreeStore->insert(id.indexNamespace().c_str(), 0, BucketSize, true);
         BtreeBucket *b = loc.btreemod();
         b->init();
         return loc;
