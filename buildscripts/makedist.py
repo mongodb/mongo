@@ -376,7 +376,13 @@ class EC2InstanceBuilder (BaseBuilder):
             proc = subprocess.Popen(["ec2-describe-instances", "-K", self.pkey, "-C", self.cert, self.ident], stdout=subprocess.PIPE)
             try:
                 proc.stdout.readline() #discard line 1
-                self.hostname = proc.stdout.readline().split()[3]
+                line = proc.stdout.readline()
+                if line:
+                    fields = line.split()
+                    if len(fields) > 2:
+                        self.hostname = fields[3]
+                    else:
+                        raise SimpleError("trouble parsing ec2-describe-instances output\n%s", line)
             finally:
                 r = proc.wait()
                 if r != 0 and numtries >= giveup:
