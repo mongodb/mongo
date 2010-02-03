@@ -150,6 +150,7 @@ namespace mongo {
             _start = _checkpoint = curTimeMicros64();
             _active = false;
             _reset();
+            _op = 0;
             // These addresses should never be written to again.  The zeroes are
             // placed here as a precaution because currentOp may be accessed
             // without the db mutex.
