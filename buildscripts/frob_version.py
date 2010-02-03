@@ -37,24 +37,20 @@ def frob_rpm_spec(version):
                         o.write(line)
         os.rename(o.name, fname)
 
-## I (RMK) don't yet know what-all cares about the versionString
-## inside the mongo code, so I'm not actually doing this yet.
-
-# def frob_stdafx_cpp(version):
-#     fname = 'stdafx.cpp'
-#     with opentemp(fname) as o:
-#         with open(fname) as i:
-#             frobbed = False
-#             for line in i:
-#                 if frobbed:
-#                     o.write(line)
-#                 else:
-#                     if re.search(r'const.*char.*versionString\[\]', line):
-#                         pass
-#                         # FIXME: implement
-#                     else:
-#                         o.write(line)
-#         os.rename(o.name, fname)
+def frob_stdafx_cpp(version):
+    fname = 'stdafx.cpp'
+    with opentemp(fname) as o:
+        with open(fname) as i:
+            frobbed = False
+            for line in i:
+                if frobbed:
+                    o.write(line)
+                else:
+                    if re.search(r'const.*char.*versionString\[\].*=', line):
+                        o.write('    const char versionString[] = "%s";' version)
+                    else:
+                        o.write(line)
+        os.rename(o.name, fname)
 
 (progname, version) = sys.argv
 if version is None:
@@ -62,3 +58,6 @@ if version is None:
     sys.exit(1)
 frob_debian_changelog(version)
 frob_rpm_spec(version)
+## I don't yet know what-all cares about the versionString inside the
+## mongo code, so I'm not actually calling this yet.
+# frob_stdafx_cpp(version)

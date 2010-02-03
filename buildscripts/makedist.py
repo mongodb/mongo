@@ -165,6 +165,8 @@ rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
                        (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
                        (("ubuntu", "9.04", "x86_64"), "ami-eef61587"),
                        (("ubuntu", "9.04", "x86"), "ami-ccf615a5"),
+                       (("debian", "5.0", "x86"), "ami-dcf615b5"),
+                       (("debian", "5.0", "x86_64"), "ami-f0f61599"),
                        (("centos", "5.4", "x86"), "ami-f8b35e91"),
                        (("centos", "5.4", "x86_64"), "ami-ccb35ea5"),
                        (("fedora", "8", "x86_64"), "ami-2547a34c"),
@@ -552,8 +554,8 @@ def processArguments():
             raise SimpleError("this shouldn't happen: non-option returned from getopt()")
         
     if "help" in kwargs:
-        print "Usage: %s [OPTIONS] distro distro-version architecture mongo-version" % sys.argv[0]
-        print """Build some packages on new EC2 AMI instances.
+        print "Usage: %s [OPTIONS] DIRECTORY DISTRO DISTRO-VERSION ARCHITECTURE MONGO-VERSION" % sys.argv[0]
+        print """Build some packages on new EC2 AMI instances, leave packages under DIRECTORY.
 Options:"""
         for t in flagspec:
             print "%-20s\t%s." % ("-%s, --%s%s:" % (t[0], t[1], ("="+t[4]) if t[4] else ""), t[3])
