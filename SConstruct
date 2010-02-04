@@ -706,7 +706,7 @@ def getGitBranchString( prefix="" , postfix="" ):
         m = re.compile( ".*_([vV]\d+\.\d+)$" ).match( par )
         if m is not None:
             return prefix + m.group(1).lower() + postfix
-        if par.index("Nightly") > 0:
+        if par.find("Nightly") > 0:
             return ""
 
 
