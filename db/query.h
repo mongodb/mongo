@@ -22,7 +22,7 @@
 #include "../util/message.h"
 #include "dbmessage.h"
 #include "jsobj.h"
-#include "storage.h"
+#include "diskloc.h"
 
 /* db request message format
 

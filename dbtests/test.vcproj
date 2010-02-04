@@ -1398,6 +1398,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\diskloc.h"
+				>
+			</File>
+			<File
 				RelativePath="..\db\extsort.h"
 				>
 			</File>

@@ -27,7 +27,7 @@
 
 #include "../stdafx.h"
 #include "../util/mmap.h"
-#include "storage.h"
+#include "diskloc.h"
 #include "jsobjmanipulator.h"
 #include "namespace.h"
 #include "client.h"

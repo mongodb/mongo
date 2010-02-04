@@ -21,7 +21,7 @@
 #include "../stdafx.h"
 #include "jsobj.h"
 #include "queryutil.h"
-#include "storage.h"
+#include "diskloc.h"
 #include "../util/hashtab.h"
 #include "../util/mmap.h"
 

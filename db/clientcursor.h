@@ -28,7 +28,7 @@
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/message.h"
-#include "storage.h"
+#include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
 

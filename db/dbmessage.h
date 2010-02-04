@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "storage.h"
+#include "diskloc.h"
 #include "jsobj.h"
 #include "namespace.h"
 #include "../util/message.h"

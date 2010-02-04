@@ -22,7 +22,7 @@
 #include "matcher.h"
 #include "../util/goodies.h"
 #include "../util/unittest.h"
-#include "storage.h"
+#include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"
 #include "client.h"

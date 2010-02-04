@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "storage.h"
+#include "diskloc.h"
 
 namespace mongo { 
 

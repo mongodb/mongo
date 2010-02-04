@@ -19,7 +19,7 @@
 #include "../stdafx.h"
 
 #include "jsobj.h"
-#include "storage.h"
+#include "diskloc.h"
 
 namespace mongo {
     

@@ -1402,6 +1402,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\diskloc.h"
+				>
+			</File>
+			<File
 				RelativePath=".\index.h"
 				>
 			</File>
