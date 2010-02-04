@@ -22,6 +22,10 @@ namespace mongo {
     class MemoryMappedFile {
     public:
 
+        enum Options {
+            SEQUENTIAL = 1
+        };
+
         MemoryMappedFile();
         ~MemoryMappedFile(); /* closes the file if open */
         void close();
@@ -32,7 +36,7 @@ namespace mongo {
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
         */
-        void* map(const char *filename, long &length);
+        void* map(const char *filename, long &length, int options = 0 );
 
         void flush(bool sync);
 
