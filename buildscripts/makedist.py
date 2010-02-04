@@ -282,7 +282,7 @@ class BaseBuilder(object):
         return Configurator.findOrDefault(kwargs, what, self.distro, self.version, self.arch)
 
     def runLocally(self, argv):
-        print argv
+        print "running %s" % argv
         r = subprocess.Popen(argv).wait()
         if r != 0:
             raise SimpleError("subcommand %s exited %d", argv, r)
@@ -346,18 +346,20 @@ class EC2InstanceBuilder (BaseBuilder):
         self.cert=kwargs["cert"]
         self.pkey=kwargs["pkey"]
         self.sshkey=kwargs["sshkey"]
+        self.use_internal_name = True if "use-internal-name" in kwargs else False
         self.terminate=False if "no-terminate" in kwargs else True
 
     def start(self):
         "Fire up a fresh EC2 instance."
-        cmd = ["ec2-run-instances",
-               self.ami,
-               "-K", self.pkey,
-               "-C", self.cert,
-               "-k", self.sshkey,
-               "-t", self.mtype,
-               "-g", "buildbot-slave", "-g", "dist-slave", "-g", "default"]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        argv = ["ec2-run-instances",
+                self.ami,
+                "-K", self.pkey,
+                "-C", self.cert,
+                "-k", self.sshkey,
+                "-t", self.mtype,
+                "-g", "buildbot-slave", "-g", "dist-slave", "-g", "default"]
+        print "running %s" % argv
+        proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
         try:
             # for the moment, we only really care about the instance
             # identifier, in the second line of output:
@@ -365,6 +367,8 @@ class EC2InstanceBuilder (BaseBuilder):
             self.ident = proc.stdout.readline().split()[1]
             if self.ident == "":
                 raise SimpleError("ident is empty")
+            else:
+                print "Instance id: %s" % self.ident
         finally:
             r = proc.wait()
             if r != 0:
@@ -375,18 +379,23 @@ class EC2InstanceBuilder (BaseBuilder):
         # Note: it seems there can be a time interval after
         # ec2-run-instance finishes during which EC2 will tell us that
         # the instance ID doesn't exist.  This is sort of bad.
-        self.hostname = "pending"
+        state = "pending"
         numtries = 0
         giveup = 5
-        while self.hostname == "pending":
-            proc = subprocess.Popen(["ec2-describe-instances", "-K", self.pkey, "-C", self.cert, self.ident], stdout=subprocess.PIPE)
+        while state == "pending":
+            argv = ["ec2-describe-instances", "-K", self.pkey, "-C", self.cert, self.ident]
+            proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
             try:
                 proc.stdout.readline() #discard line 1
                 line = proc.stdout.readline()
                 if line:
                     fields = line.split()
                     if len(fields) > 2:
-                        self.hostname = fields[3]
+                        state = fields[3]
+                        if self.use_internal_name:
+                            self.hostname = fields[4]
+                        else:
+                            self.hostname = fields[3]
                     else:
                         raise SimpleError("trouble parsing ec2-describe-instances output\n%s", line)
             finally:
@@ -433,6 +442,9 @@ class SshableBuilder (BaseBuilder):
                 try:
                     s.connect((self.hostname, 22))
                     self.sshwait = False
+                    print "connected on port 22 (ssh)"
+                    time.sleep(5) # arbitrary timeout, in case the
+                                  # remote sshd is slow.
                 except socket.error, err:
                     pass
             finally:
@@ -513,10 +525,11 @@ def main():
 # def checkEnvironment():
 
 def processArguments():
-    # flagspec [ (short, long, argument?, description)* ]
+    # flagspec [ (short, long, argument?, description, argname)* ]
     flagspec = [ ("?", "usage", False, "Print a (useless) usage message", None),
                  ("h", "help", False, "Print a help message and exit", None),
                  ("N", "no-terminate", False, "Leave the EC2 instance running at the end of the job", None),
+                 ("I", "use-internal-name", False, "Use the EC2 internal hostname for sshing", None),
                  # These get defaulted, but the user might want to override them.
                  ("A", "ami", True, "EC2 AMI id to use", "ID"),
                  ("l", "login", True, "User account for ssh access to host", "LOGIN"),
