@@ -175,5 +175,14 @@ namespace mongo {
     void rotateLogs( int signal ){
         loggingManager.rotate();
     }
+
+    string errnostring( const char * prefix ){
+        stringstream ss;
+        if ( prefix )
+            ss << prefix << ": ";
+        ss << OUTPUT_ERRNO;
+        return ss.str();
+    }
+
 }
 
