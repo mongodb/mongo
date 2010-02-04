@@ -635,7 +635,7 @@ namespace mongo {
 
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
         /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
-        NamespaceDetails *d = nsdetails(ns);
+        NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
         NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
         /* end note */
         
@@ -649,7 +649,7 @@ namespace mongo {
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ){
-            if( d->backgroundIndexBuildInProgress ) { 
+            if( d && d->backgroundIndexBuildInProgress ) { 
                 set<string> bgKeys;
                 d->backgroundIdx().keyPattern().getFieldNames(bgKeys);
                 mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys) );
@@ -736,7 +736,7 @@ namespace mongo {
                     BSONObj newObj = mss->createNewFromMods();
                     uassert( 12522 , "$ operator made object too large" , newObj.isValid() );
                     DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
-                    if ( newLoc != loc || modsIsIndexed ){
+                    if ( newLoc != loc || modsIsIndexed ) {
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
                     }
