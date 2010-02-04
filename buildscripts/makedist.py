@@ -46,6 +46,7 @@
 # The implementations of steps 1, 2, 4, 5, 6, and 7 will depend on the
 # distro of host we're talking to (Ubuntu, CentOS, Debian, etc.).
 
+from __future__ import with_statement
 import subprocess
 import sys
 import getopt
