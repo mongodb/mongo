@@ -100,6 +100,20 @@ namespace mongo {
 
     bool doesOpGetAResponse( int op );
 
+    inline const char * opToString( int op ){
+        switch ( op ){
+        case opReply: return "reply";
+        case dbMsg: return "msg";
+        case dbUpdate: return "update";
+        case dbInsert: return "insert";
+        case dbQuery: return "query";
+        case dbGetMore: return "getmore";
+        case dbDelete: return "remove";
+        case dbKillCursors: return "killcursors";
+        default: assert(0); return "";
+        }
+    }
+
     struct MsgData {
         int len; /* len of the msg, including this field */
         MSGID id; /* request/reply id's match... */

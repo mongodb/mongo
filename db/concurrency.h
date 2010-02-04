@@ -29,7 +29,7 @@ namespace mongo {
         int locked;
 
     public:
-        MutexInfo() : locked(0) {
+        MutexInfo() : timeLocked(0) , locked(0) {
             start = curTimeMicros64();
         }
         void entered() {

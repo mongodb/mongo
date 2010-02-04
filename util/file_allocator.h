@@ -186,13 +186,14 @@ namespace mongo {
                                 char buf[z];
                                 memset(buf, 0, z);
                                 long left = size;
-                                while ( 1 ) {
-                                    if ( left <= z ) {
-                                        massert( 10443 ,  "write failed", left == write(fd, buf, left) );
-                                        break;
-                                    }
-                                    massert( 10444 ,  "write failed", z == write(fd, buf, z) );
-                                    left -= z;
+                                while ( left > 0 ) {
+                                    long towrite = left;
+                                    if ( towrite > z )
+                                        towrite = z;
+                                    
+                                    int written = write( fd , buf , towrite );
+                                    massert( 10443 , errnostring("write failed" ), written > 0 );
+                                    left -= written;
                                 }
                                 log() << "done allocating datafile " << name << ", size: " << size/1024/1024 << "MB, took " << ((double)t.millis())/1000.0 << " secs" << endl;
                             }                            

@@ -25,7 +25,8 @@
 #include "client.h"
 #include "curop.h"
 #include "json.h"
- 
+#include "security.h"
+
 namespace mongo {
 
     boost::mutex Client::clientsMutex;
@@ -40,15 +41,12 @@ namespace mongo {
       _desc(desc),
       _god(0)
     {
-        ai = new AuthenticationInfo(); 
         boostlock bl(clientsMutex);
         clients.insert(this);
     }
 
     Client::~Client() { 
         delete _curOp;
-        delete ai; 
-        ai = 0;
         _god = 0;
 
         if ( _context )
@@ -100,10 +98,12 @@ namespace mongo {
         _ns = ns;
         _db = db;
         _client->_context = this;
+        _auth();
     }
 
-    void Client::Context::_finishInit(){
-        dbMutex.assertAtLeastReadLocked();
+    void Client::Context::_finishInit( bool doauth ){
+        int lockState = dbMutex.getState();
+        assert( lockState );
         
         _db = dbHolder.get( _ns , _path );
         if ( _db ){
@@ -120,6 +120,20 @@ namespace mongo {
         
         _client->_context = this;
         _client->_curOp->enter( this );
+        if ( doauth )
+            _auth( lockState );
+    }
+
+    void Client::Context::_auth( int lockState ){
+        if ( _client->_ai.isAuthorizedForLock( _db->name , lockState ) )
+            return;
+
+        // before we assert, do a little cleanup
+        _client->_context = _oldContext; // note: _oldContext may be null
+        
+        stringstream ss;
+        ss << "unauthorized for db [" << _db->name << "] lock type: " << lockState << endl;
+        massert( 10057 , ss.str() , 0 );
     }
 
     Client::Context::~Context() {

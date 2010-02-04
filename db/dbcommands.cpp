@@ -1431,9 +1431,11 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+        string dbname = nsToDatabase( ns );
+
         if( logLevel >= 1 ) 
             log() << "run command " << ns << ' ' << _cmdobj << endl;
-
+        
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
@@ -1449,25 +1451,29 @@ namespace mongo {
             }
         }
 
+        Client& client = cc();
         bool ok = false;
 
         BSONElement e = jsobj.firstElement();
         
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
-            mongolock lk(!c->readOnly());
-            Client::Context ctx( ns , dbpath , &lk );
-
             string errmsg;
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            if ( c->requiresAuth() ) {
-                if ( c->readOnly() ) {
-                    uassert( 12593 , "readOnly unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
-                } else {
-                    uassert( 10045 , "unauthorized", ai->isAuthorized(cc().database()->name.c_str()));                    
-                }
+            AuthenticationInfo *ai = client.getAuthenticationInfo();
+            
+            bool needWriteLock = ! c->readOnly();
+            
+            if ( ! c->requiresAuth() && 
+                 ( ai->isAuthorizedReads( dbname ) && 
+                   ! ai->isAuthorized( dbname ) ) ){
+                // this means that they can read, but not write
+                // so only get a read lock
+                needWriteLock = false;
             }
             
+            mongolock lk( needWriteLock );
+            Client::Context ctx( ns , dbpath , &lk , c->requiresAuth() );
+
             bool admin = c->adminOnly();
 
             if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 

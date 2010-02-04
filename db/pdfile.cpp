@@ -104,10 +104,13 @@ namespace mongo {
         stringstream ss;
         Client * c = currentClient.get();
         if ( c ){
-            Database *database = c->database();
-            if ( database ) {
-                ss << database->name << ' ';
-                ss << cc().ns() << ' ';
+            Client::Context * cx = c->getContext();
+            if ( cx ){
+                Database *database = cx->db();
+                if ( database ) {
+                    ss << database->name << ' ';
+                    ss << cx->ns() << ' ';
+                }
             }
         }
         return ss.str();
@@ -1739,7 +1742,7 @@ namespace mongo {
     NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
     bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ){
-        log(2) << "DatabaseHolder::closeAll path:" << path << endl;
+        log() << "DatabaseHolder::closeAll path:" << path << endl;
         dbMutex.assertWriteLocked();
         
         map<string,Database*>& m = _paths[path];

@@ -47,7 +47,7 @@ def frob_stdafx_cpp(version):
                     o.write(line)
                 else:
                     if re.search(r'const.*char.*versionString\[\].*=', line):
-                        o.write('    const char versionString[] = "%s";' version)
+                        o.write('    const char versionString[] = "%s";' % version)
                     else:
                         o.write(line)
         os.rename(o.name, fname)

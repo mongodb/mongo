@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../stdafx.h"
+#include "security.h"
 #include "namespace.h"
 #include "lasterror.h"
 #include "stats/top.h"
@@ -71,15 +72,15 @@ namespace mongo {
              * this will set _db and create if needed
              * will also set _client->_context to this
              */
-            void _finishInit();
-
+            void _finishInit( bool doauth=true);
             
+            void _auth( int lockState = dbMutex.getState() );
         public:
-            Context(const string& ns, string path=dbpath, mongolock * lock = 0 ) 
+            Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true ) 
                 : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
                   _path( path ) , _lock( lock ) ,
                   _ns( ns ){
-                _finishInit();
+                _finishInit( doauth );
             }
             
             /* this version saves the context but doesn't yet set the new one: */
@@ -98,6 +99,8 @@ namespace mongo {
             Context( string ns , Database * db );
             
             ~Context();
+            
+            Client* getClient() const { return _client; }
             
             Database* db() const {
                 return _db;
@@ -158,9 +161,12 @@ namespace mongo {
         list<string> _tempCollections;
         const char *_desc;
         bool _god;
+        AuthenticationInfo _ai;
 
     public:
-        AuthenticationInfo *ai;
+        
+        AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
+        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
 
         CurOp* curop() { return _curOp; }
         
