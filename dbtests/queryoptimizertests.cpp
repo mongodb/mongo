@@ -30,7 +30,7 @@
 namespace mongo {
     extern BSONObj id_obj;
     auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q ){
-        CurOp op;
+        CurOp op( &(cc()) );
         return runQuery( m , q , op );
     }
 } // namespace mongo
