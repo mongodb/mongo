@@ -535,7 +535,10 @@ namespace mongo {
        { $pullAll : { a:[99,1010] } }
        NOTE: MODIFIES source from object!
     */
-    ModSet::ModSet(const BSONObj &from , const set<string>& idxKeys )
+    ModSet::ModSet(
+        const BSONObj &from , 
+        const set<string>& idxKeys,
+        const set<string> *backgroundKeys)
         : _isIndexed(0) {
         
         BSONObjIterator it(from);
@@ -566,8 +569,10 @@ namespace mongo {
                 m.init( op , f );
                 m.setFieldName( f.fieldName() );
                 
-                if ( m.isIndexed( idxKeys ) )
+                if ( m.isIndexed( idxKeys ) ||
+                    (backgroundKeys && m.isIndexed(*backgroundKeys)) ) {
                     _isIndexed++;
+                }
 
                 _mods[m.fieldName] = m;
             }
@@ -644,7 +649,14 @@ namespace mongo {
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ){
-            mods.reset( new ModSet( updateobj , NamespaceDetailsTransient::get_w(ns).indexKeys() ) );
+            if( d->backgroundIndexBuildInProgress ) { 
+                set<string> bgKeys;
+                d->backgroundIdx().keyPattern().getFieldNames(bgKeys);
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys) );
+            }
+            else {
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys()) );
+            }
             modsIsIndexed = mods->isIndexed();
         }
 

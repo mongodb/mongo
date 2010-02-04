@@ -636,7 +636,7 @@ namespace mongo {
         while( i.more() )
             i.next().keyPattern().getFieldNames(_indexKeys);
     }
-    
+
     void NamespaceDetailsTransient::cllStart( int logSizeMb ) {
         assertInWriteLock();
         _cll_ns = "local.temp.oplog." + _ns;

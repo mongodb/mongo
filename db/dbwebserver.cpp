@@ -100,11 +100,11 @@ namespace mongo {
                 ss << "<th>NS</th> <th>total</th> <th>Reads</th><th>Writes</th> <th>Queries</th><th>GetMores</th><th>Inserts</th><th>Updates</th><th>Removes</th> ";
                 ss << "</tr>";
                 
-                display( ss , delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
+                display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
                 
                 Top::UsageMap usage = delta->collectionUsageDiff();
                 for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ){
-                    display( ss , delta->elapsed() , i->first , i->second );
+                    display( ss , (double) delta->elapsed() , i->first , i->second );
                 }
                 
                 ss << "</table>";

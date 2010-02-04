@@ -1402,6 +1402,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\index.h"
+				>
+			</File>
+			<File
 				RelativePath=".\introspect.h"
 				>
 			</File>
@@ -1471,6 +1475,10 @@
 			</File>
 			<File
 				RelativePath="..\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\update.h"
 				>
 			</File>
 			<Filter

@@ -21,6 +21,7 @@
 #include "index.h"
 #include "btree.h"
 #include "query.h"
+#include "background.h"
 
 namespace mongo {
 
@@ -209,27 +210,27 @@ namespace mongo {
     }
 
     void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
-        v.resize(d.nIndexes);
+        int z = d.nIndexesBeingBuilt();
+        v.resize(z);
         NamespaceDetails::IndexIterator i = d.ii();
-        while( i.more() ) {
-            int j = i.pos();
-            IndexDetails& idx = i.next();
+        for( int i = 0; i < z; i++ ) {
+            IndexDetails& idx = d.idx(i);
             BSONObj idxKey = idx.info.obj().getObjectField("key"); // eg { ts : 1 }
-            IndexChanges& ch = v[j];
+            IndexChanges& ch = v[i];
             idx.getKeysFromObject(oldObj, ch.oldkeys);
             idx.getKeysFromObject(newObj, ch.newkeys);
             if( ch.newkeys.size() > 1 ) 
-                d.setIndexIsMultikey(j);
+                d.setIndexIsMultikey(i);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
         }
     }
 
-    void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d) {
-        NamespaceDetails::IndexIterator i = d.ii();
-        while( i.more() ) {
-            int j = i.pos();
-            v[j].dupCheck(i.next());
+    void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc) {
+        int z = d.nIndexesBeingBuilt();
+        for( int i = 0; i < z; i++ ) {
+            IndexDetails& idx = d.idx(i);
+            v[i].dupCheck(idx, curObjLoc);
         }
     }
 
@@ -271,6 +272,12 @@ namespace mongo {
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
         uassert(10097, "bad table to index name on add index attempt", 
             cc().database()->name == nsToDatabase(sourceNS.c_str()));
+
+        /* we can't build a new index for the ns if a build is already in progress in the background - 
+           EVEN IF this is a foreground build.
+           */
+        uassert(12588, "cannot add index with a background operation in progress", 
+            !BackgroundOperation::inProgForNs(sourceNS.c_str()));
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);

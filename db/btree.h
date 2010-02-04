@@ -28,8 +28,8 @@ namespace mongo {
 #pragma pack(1)
 
     struct _KeyNode {
-        DiskLoc prevChildBucket;
-        DiskLoc recordLoc;
+        DiskLoc prevChildBucket; // the lchild
+        DiskLoc recordLoc; // location of the record associated with the key
         short keyDataOfs() const {
             return (short) _kdo;
         }
@@ -183,6 +183,11 @@ namespace mongo {
            likewise below in bt_insert() etc.
         */
         bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
+
+        bool wouldCreateDup(
+            const IndexDetails& idx, DiskLoc thisLoc, 
+            const BSONObj& key, BSONObj order,
+            DiskLoc self); 
 
         static DiskLoc addBucket(IndexDetails&); /* start a new index off, empty */
         
@@ -368,6 +373,9 @@ namespace mongo {
 
     inline bool IndexDetails::hasKey(const BSONObj& key) { 
         return head.btree()->exists(*this, head, key, keyPattern());
+    }
+    inline bool IndexDetails::wouldCreateDup(const BSONObj& key, DiskLoc self) { 
+        return head.btree()->wouldCreateDup(*this, head, key, keyPattern(), self);
     }
 
     /* build btree from the bottom up */
