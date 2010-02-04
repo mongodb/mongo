@@ -289,8 +289,6 @@ if GetOption( "cxx" ) is not None:
     env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
 
-print 'C++ compiler and version:', env['CXX'], env['CXXVERSION']
-
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
 env.Append( CPPDEFINES=[ "_SCONS" ] )
