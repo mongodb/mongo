@@ -135,7 +135,7 @@ public:
 
         istream * in = &cin;
 
-        ifstream file( filename.c_str() , ios_base::in | ios_base::binary);
+        ifstream file( filename.c_str() , ios_base::in);
 
         if ( filename.size() > 0 && filename != "-" ){
             if ( ! exists( filename ) ){
