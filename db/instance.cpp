@@ -357,6 +357,7 @@ namespace mongo {
                 }
             }
         }
+        currentOp.ensureStarted();
         currentOp.done();
         int ms = currentOp.totalTimeMillis();
         
