@@ -81,9 +81,9 @@ namespace mongo {
     }
 
     void IndexSpec::_init(){
-        assert( keys.objsize() );
+        assert( keyPattern.objsize() );
         
-        BSONObjIterator i( keys );
+        BSONObjIterator i( keyPattern );
         BSONObjBuilder nullKeyB;
         while( i.more() ) {
             _fieldNames.push_back( i.next().fieldName() );

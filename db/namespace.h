@@ -510,7 +510,7 @@ namespace mongo {
         const IndexSpec& getIndexSpec( const IndexDetails * details ){
             DEV assertInWriteLock();
             IndexSpec& spec = _indexSpecs[details];
-            if ( spec.meta.isEmpty() ){
+            if ( spec.info.isEmpty() ){
                 spec.reset( details->info );
             }
             return spec;
