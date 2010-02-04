@@ -27,14 +27,14 @@ namespace mongo {
        */
     class IndexSpec {
     public:
-        BSONObj keys;
-        BSONObj meta;
+        BSONObj keyPattern; // e.g., { name : 1 }
+        BSONObj info; // this is the same as IndexDetails::info.obj()
         
         IndexSpec(){
         }
 
         IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
-            : keys(k) , meta(m){
+            : keyPattern(k) , info(m){
             _init();
         }
 
@@ -47,12 +47,11 @@ namespace mongo {
         }
         
         void reset( const DiskLoc& loc ){
-            meta = loc.obj();
-            keys = meta["key"].embeddedObjectUserCheck();
-            if ( keys.objsize() == 0 ) {
-                out() << meta.toString() << endl;
+            info = loc.obj();
+            keyPattern = info["key"].embeddedObjectUserCheck();
+            if ( keyPattern.objsize() == 0 ) {
+                out() << info.toString() << endl;
                 assert(false);
-                
             }
             _init();
         }
