@@ -847,7 +847,7 @@ namespace mongo {
         */
         vector<IndexChanges> changes;
         getIndexChanges(changes, *d, objNew, objOld);
-        dupCheck(changes, *d);
+        dupCheck(changes, *d, dl);
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
@@ -865,7 +865,8 @@ namespace mongo {
         /* have any index keys changed? */
         {
             unsigned keyUpdates = 0;
-            for ( int x = 0; x < d->nIndexes; x++ ) {
+            int z = d->nIndexesBeingBuilt();
+            for ( int x = 0; x < z; x++ ) {
                 IndexDetails& idx = d->idx(x);
                 for ( unsigned i = 0; i < changes[x].removed.size(); i++ ) {
                     try {
@@ -968,7 +969,8 @@ namespace mongo {
 
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
-        //        testSorting();
+        assert( d->backgroundIndexBuildInProgress == 0 );
+
         Timer t;
 
         log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
@@ -1023,12 +1025,15 @@ namespace mongo {
                 try { 
                     btBuilder.addKey(d.first, d.second);
                 }
-                catch( AssertionException& ) { 
+                catch( AssertionException& e ) { 
                     if ( dupsAllowed ){
                         // unknow exception??
                         throw;
                     }
                     
+                    if( e.interrupted() )
+                        throw;
+
                     if ( ! dropDups )
                         throw;
 
@@ -1072,6 +1077,9 @@ namespace mongo {
                     _indexRecord(d, idxNo, js, cc->c->currLoc(), dupsAllowed);
                     cc->c->advance();
                 } catch( AssertionException& e ) { 
+                    if( e.interrupted() )
+                        throw;
+
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->c->currLoc();
                         bool ok = cc->c->advance();
@@ -1155,17 +1163,16 @@ namespace mongo {
 
         BSONObj info = idx.info.obj();
         bool background = info["background"].trueValue();
-        if( background ) { 
-            log() << "WARNING: background index build not yet implemented" << endl;
-            assert(false);
+        if( background ) {
+            log(2) << "buildAnIndex: background=true\n";
         }
 
+        assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         if( !background ) {
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
 		else {
-            assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
 		}
@@ -1322,11 +1329,6 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
-            /* we can't build a new index for the ns if a build is already in progress in the background - 
-               EVEN IF this is a foreground build.
-               */
-            uassert(12588, "cannot add index with a background operation in progress", 
-                !BackgroundOperation::inProgForNs(tabletoidxns.c_str()));
             BSONObj io((const char *) obuf);
             if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();

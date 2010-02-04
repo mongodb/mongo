@@ -357,6 +357,33 @@ namespace mongo {
         return false;
     }
 
+    /* @param self - don't complain about ourself already being in the index case.
+       @return true = there is a duplicate.
+    */
+    bool BtreeBucket::wouldCreateDup(
+        const IndexDetails& idx, DiskLoc thisLoc, 
+        const BSONObj& key, BSONObj order,
+        DiskLoc self) 
+    { 
+        int pos;
+        bool found;
+        DiskLoc b = locate(idx, thisLoc, key, order, pos, found, minDiskLoc);
+
+        while ( !b.isNull() ) {
+            // we skip unused keys
+            BtreeBucket *bucket = b.btree();
+            _KeyNode& kn = bucket->k(pos);
+            if ( kn.isUsed() ) {
+                if( bucket->keyAt(pos).woEqual(key) )
+                    return kn.recordLoc != self;
+                break;
+            }
+            b = bucket->advance(b, pos, 1, "BtreeBucket::dupCheck");
+        }
+
+        return false;
+    }
+
     string BtreeBucket::dupKeyError( const IndexDetails& idx , const BSONObj& key ){
         stringstream ss;
         ss << "E11000 duplicate key error ";

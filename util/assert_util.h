@@ -91,6 +91,11 @@ namespace mongo {
         }
         virtual int getCode(){ return code; }
         virtual const char* what() const throw() { return msg.c_str(); }
+
+        /* true if an interrupted exception - see KillCurrentOp */
+        bool interrupted() { 
+            return code == 11600 || code == 11601;
+        }
     };
 
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */

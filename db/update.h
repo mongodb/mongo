@@ -236,7 +236,10 @@ namespace mongo {
         
     public:
         
-        ModSet( const BSONObj &from , const set<string>& idxKeys = set<string>() );
+        ModSet( const BSONObj &from , 
+            const set<string>& idxKeys = set<string>(),
+            const set<string>* backgroundKeys = 0
+            );
 
         /**
          * creates a ModSetState suitable for operation on obj

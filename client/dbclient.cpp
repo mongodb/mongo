@@ -562,7 +562,7 @@ namespace mongo {
     void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert , bool multi ) {
 
         BufBuilder b;
-        b.append( (int)0 ); // reserverd
+        b.append( (int)0 ); // reserved
         b.append( ns );
 
         int flags = 0;
