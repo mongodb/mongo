@@ -277,7 +277,7 @@ namespace mongo {
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
         if ( currentOpP->active() ){
-            nestedOp.reset( new CurOp() );
+            nestedOp.reset( new CurOp( &c , currentOpP ) );
             currentOpP = nestedOp.get();
         }
         CurOp& currentOp = *currentOpP;
@@ -285,25 +285,23 @@ namespace mongo {
         
         OpDebug& debug = currentOp.debug();
         StringBuilder& ss = debug.str;
+        ss << opToString( op ) << " ";
 
         int logThreshold = cmdLine.slowMS;
         bool log = logLevel >= 1;
-
+        
         if ( op == dbQuery ) {
             if ( ! receivedQuery(c , dbresponse, m ) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
-            mongolock lk(writeLock);
             DEV log = true;
-            ss << "getmore ";
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
                 log = true;
         }
         else if ( op == dbMsg ) {
             mongolock lk(writeLock);
 			/* deprecated / rarely used.  intended for connection diagnostics. */
-            ss << "msg ";
             char *p = m.data->_data;
             int len = strlen(p);
             if ( len > 400 )
@@ -327,19 +325,21 @@ namespace mongo {
                 uassert_nothrow("unauthorized");
             }
             else {
-                mongolock lk(writeLock);
-                ss << opToString( op ) << " ";
                 try {
                     if ( op == dbInsert ) {
+                        mongolock lk(writeLock);
                         receivedInsert(m, currentOp);
                     }
                     else if ( op == dbUpdate ) {
                         receivedUpdate(m, currentOp);
                     }
                     else if ( op == dbDelete ) {
+                        mongolock lk(writeLock);
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
+                        mongolock lk(writeLock);
+                        currentOp.ensureStarted();
                         logThreshold = 10;
                         ss << "killcursors ";
                         receivedKillCursors(m);
@@ -450,6 +450,7 @@ namespace mongo {
             op.setQuery(query);
         }        
 
+        mongolock lk(1);
         Client::Context ctx( ns );
         op.setWrite();
 
@@ -485,6 +486,7 @@ namespace mongo {
         const char *ns = d.getns();
         StringBuilder& ss = curop.debug().str;
         ss << ns;
+        mongolock lk(false);
         Client::Context ctx(ns);
         curop.setRead();
         int ntoreturn = d.pullInt();

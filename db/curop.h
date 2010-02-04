@@ -24,6 +24,9 @@ namespace mongo {
         static AtomicUInt _nextOpNum;
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
         
+        Client * _client;
+        CurOp * _wrapped;
+
         unsigned long long _start;
         unsigned long long _checkpoint;
         unsigned long long _end;
@@ -34,7 +37,7 @@ namespace mongo {
         int _dbprofile; // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
-        struct sockaddr_in _client;
+        struct sockaddr_in _remote;
         
         char _queryBuf[256];
         bool haveQuery() const { return *((int *) _queryBuf) != 0; }
@@ -60,7 +63,12 @@ namespace mongo {
         }
 
     public:
+        void ensureStarted(){
+            if ( _start == 0 )
+                _start = _checkpoint = curTimeMicros64();            
+        }
         void enter( Client::Context * context ){
+            ensureStarted();
             setNS( context->ns() );
             if ( context->_db && context->_db->profile > _dbprofile )
                 _dbprofile = context->_db->profile;
@@ -72,16 +80,15 @@ namespace mongo {
             _checkpoint = now;
         }
         
-        void reset( const sockaddr_in & client, int op ) { 
+        void reset( const sockaddr_in & remote, int op ) { 
             _reset();
-            _start = curTimeMicros64();
-            _checkpoint = _start;
+            _start = _checkpoint = 0;
             _active = true;
             _opNum = _nextOpNum++;
             _ns[0] = '?'; // just in case not set later
             _debug.reset();
             resetQuery();
-            _client = client;
+            _remote = remote;
             _op = op;
         }
 
@@ -115,7 +122,8 @@ namespace mongo {
         bool active() const { return _active; }
 
         /** micros */
-        unsigned long long startTime(){
+        unsigned long long startTime() const {
+            assert(_start);
             return _start;
         }
 
@@ -126,16 +134,20 @@ namespace mongo {
         
         unsigned long long totalTimeMicros() const {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
-            return _end - _start;
+            return _end - startTime();
         }
 
         int totalTimeMillis() const {
             return (int) (totalTimeMicros() / 1000);
         }
 
+        int elapsedMillis() const {
+            unsigned long long total = curTimeMicros64() - startTime();
+            return (int) (total / 1000);
+        }
+
         int elapsedSeconds() const {
-            unsigned long long total = curTimeMicros64() - _start;
-            return (int) (total / 1000000);
+            return elapsedMillis() / 1000;
         }
 
         void setQuery(const BSONObj& query) { 
@@ -146,8 +158,13 @@ namespace mongo {
             memcpy(_queryBuf, query.objdata(), query.objsize());
         }
 
-        CurOp() { 
-            _start = _checkpoint = curTimeMicros64();
+        CurOp( Client * client , CurOp * wrapped = 0 ) { 
+            _client = client;
+            _wrapped = wrapped;
+            if ( _wrapped ){
+                _client->_curOp = this;
+            }
+            _start = _checkpoint = 0;
             _active = false;
             _reset();
             _op = 0;
@@ -156,6 +173,11 @@ namespace mongo {
             // without the db mutex.
             memset(_ns, 0, sizeof(_ns));
             memset(_queryBuf, 0, sizeof(_queryBuf));
+        }
+        
+        ~CurOp(){
+            if ( _wrapped )
+                _client->_curOp = _wrapped;
         }
 
         BSONObj info() { 
@@ -192,7 +214,7 @@ namespace mongo {
             }
             // b.append("inLock",  ??
             stringstream clientStr;
-            clientStr << inet_ntoa( _client.sin_addr ) << ":" << ntohs( _client.sin_port );
+            clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
             b.append("client", clientStr.str());
             return b.obj();
         }

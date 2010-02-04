@@ -155,7 +155,7 @@ namespace mongo {
         };
         
     private:
-        CurOp * const _curOp;
+        CurOp * _curOp;
         Context * _context;
         bool _shutdown;
         list<string> _tempCollections;
@@ -195,6 +195,8 @@ namespace mongo {
         bool shutdown();
 
         bool isGod() const { return _god; }
+
+        friend class CurOp;
     };
     
     inline Client& cc() { 

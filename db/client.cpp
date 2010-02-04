@@ -34,13 +34,12 @@ namespace mongo {
     boost::thread_specific_ptr<Client> currentClient;
 
     Client::Client(const char *desc) : 
-      _curOp(new CurOp()),
       _context(0),
-      //_database(0), _ns("")/*, _nsstr("")*/ 
       _shutdown(false),
       _desc(desc),
       _god(0)
     {
+        _curOp = new CurOp( this );
         boostlock bl(clientsMutex);
         clients.insert(this);
     }

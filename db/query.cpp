@@ -759,7 +759,6 @@ namespace mongo {
         int queryOptions = q.queryOptions;
         BSONObj snapshotHint;
         
-        Timer t(curop.startTime());
         if( logLevel >= 2 )
             log() << "runQuery: " << ns << jsobj << endl;
         
@@ -955,7 +954,7 @@ namespace mongo {
                     builder.append("n", n);
                     if ( dqo.scanAndOrderRequired() )
                         builder.append("scanAndOrder", true);
-                    builder.append("millis", t.millis());
+                    builder.append("millis", curop.elapsedMillis());
                     if ( !oldPlan.isEmpty() )
                         builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
                     if ( hint.eoo() )
@@ -976,7 +975,7 @@ namespace mongo {
             }
         } // end else for regular query
         
-        int duration = t.millis();
+        int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
         if ( dbprofile || duration >= cmdLine.slowMS ) {
             ss << " nscanned:" << nscanned << ' ';
