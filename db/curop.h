@@ -3,9 +3,9 @@
 #pragma once
 
 #include "namespace.h"
-#include "security.h"
 #include "client.h"
 #include "../util/atomic_int.h"
+#include "db.h"
 
 namespace mongo { 
 
@@ -159,8 +159,7 @@ namespace mongo {
         }
 
         BSONObj info() { 
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            if( !ai->isAuthorized("admin") ) { 
+            if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) { 
                 BSONObjBuilder b;
                 b.append("err", "unauthorized");
                 return b.obj();

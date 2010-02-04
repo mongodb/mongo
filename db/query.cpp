@@ -804,8 +804,6 @@ namespace mongo {
         else { /* regular query */
             mongolock lk(false); // read lock
             Client::Context ctx( ns , dbpath , &lk );
-            AuthenticationInfo *ai = c.ai;
-            uassert( 10106 , "unauthorized", ai->isReadOnlyAuthorized(ctx.db()->name.c_str()));
 
 			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 

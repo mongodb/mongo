@@ -104,10 +104,13 @@ namespace mongo {
         stringstream ss;
         Client * c = currentClient.get();
         if ( c ){
-            Database *database = c->database();
-            if ( database ) {
-                ss << database->name << ' ';
-                ss << cc().ns() << ' ';
+            Client::Context * cx = c->getContext();
+            if ( cx ){
+                Database *database = cx->db();
+                if ( database ) {
+                    ss << database->name << ' ';
+                    ss << cx->ns() << ' ';
+                }
             }
         }
         return ss.str();

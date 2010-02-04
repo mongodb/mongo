@@ -94,8 +94,7 @@ namespace mongo {
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         BSONObjBuilder b;
 
-        AuthenticationInfo *ai = cc().ai;
-        if( !ai->isReadOnlyAuthorized("admin") ) { 
+        if( ! cc().isAdmin() ){
             BSONObjBuilder b;
             b.append("err", "unauthorized");
         }
@@ -123,8 +122,7 @@ namespace mongo {
     
     void killOp( Message &m, DbResponse &dbresponse ) {
         BSONObj obj;
-        AuthenticationInfo *ai = currentClient.get()->ai;
-        if( !ai->isAuthorized("admin") ) { 
+        if( ! cc().isAdmin() ){
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         /*else if( !dbMutexInfo.isLocked() ) 
@@ -147,8 +145,7 @@ namespace mongo {
 
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        AuthenticationInfo *ai = currentClient.get()->ai;
-        if( !ai->isAuthorized("admin") || strncmp(ns, "admin.", 6) != 0 ) { 
+        if( ! cc().isAdmin() || strncmp(ns, "admin.", 6) != 0 ) { 
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
         else {
@@ -293,13 +290,11 @@ namespace mongo {
         bool log = logLevel >= 1;
 
         if ( op == dbQuery ) {
-            // receivedQuery() does its own authorization processing.
             if ( ! receivedQuery(c , dbresponse, m ) )
                 log = true;
         }
         else if ( op == dbGetMore ) {
             mongolock lk(writeLock);
-            // does its own authorization processing.
             DEV log = true;
             ss << "getmore ";
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
@@ -325,62 +320,41 @@ namespace mongo {
                 return false;
         }
         else {
-            mongolock lk(writeLock);
             const char *ns = m.data->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
-            if( !c.ai->isAuthorized(cl) ) { 
+            if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) { 
                 uassert_nothrow("unauthorized");
             }
-            else if ( op == dbInsert ) {
+            else {
+                mongolock lk(writeLock);
+                ss << opToString( op ) << " ";
                 try {
-                    ss << "insert ";
-                    receivedInsert(m, currentOp);
+                    if ( op == dbInsert ) {
+                        receivedInsert(m, currentOp);
+                    }
+                    else if ( op == dbUpdate ) {
+                        receivedUpdate(m, currentOp);
+                    }
+                    else if ( op == dbDelete ) {
+                        receivedDelete(m, currentOp);
+                    }
+                    else if ( op == dbKillCursors ) {
+                        logThreshold = 10;
+                        ss << "killcursors ";
+                        receivedKillCursors(m);
+                    }
+                    else {
+                        out() << "    operation isn't supported: " << op << endl;
+                        currentOp.done();
+                        log = true;
+                    }
                 }
                 catch ( AssertionException& e ) {
-                    LOGSOME problem() << " Caught Assertion insert, continuing\n";
-                    ss << " exception " << e.toString();
-                    log = true;
-                }
-            }
-            else if ( op == dbUpdate ) {
-                try {
-                    ss << "update ";
-                    receivedUpdate(m, currentOp);
-                }
-                catch ( AssertionException& e ) {
-                    LOGSOME problem() << " Caught Assertion update, continuing" << endl;
-                    ss << " exception " << e.toString();
-                    log = true;
-                }
-            }
-            else if ( op == dbDelete ) {
-                try {
-                    ss << "remove ";
-                    receivedDelete(m, currentOp);
-                }
-                catch ( AssertionException& e ) {
-                    LOGSOME problem() << " Caught Assertion receivedDelete, continuing" << endl;
-                    ss << " exception " << e.toString();
-                    log = true;
-                }
-            }
-            else if ( op == dbKillCursors ) {
-                try {
-                    logThreshold = 10;
-                    ss << "killcursors ";
-                    receivedKillCursors(m);
-                }
-                catch ( AssertionException& e ) {
-                    problem() << " Caught Assertion in kill cursors, continuing" << endl;
+                    problem() << " Caught Assertion in " << opToString(op) << " , continuing" << endl;
                     ss << " exception " + e.toString();
                     log = true;
                 }
-            }
-            else {
-                out() << "    operation isn't supported: " << op << endl;
-                currentOp.done();
-                assert(false);
             }
         }
         currentOp.done();
@@ -519,8 +493,6 @@ namespace mongo {
         ss << " ntoreturn:" << ntoreturn;
         QueryResult* msgdata;
         try {
-            AuthenticationInfo *ai = currentClient.get()->ai;
-            uassert( 10057 , "unauthorized", ai->isReadOnlyAuthorized(cc().database()->name.c_str()));
             msgdata = getMore(ns, ntoreturn, cursorid, curop);
         }
         catch ( AssertionException& e ) {

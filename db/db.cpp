@@ -195,7 +195,7 @@ namespace mongo {
 
         try {
 
-            c.ai->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            c.getAuthenticationInfo()->isLocalHost = dbMsgPort.farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
@@ -337,8 +337,9 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;
 
     void repairDatabases() {
+        Client::GodScope gs;
         log(1) << "enter repairDatabases" << endl;
-
+        
         assert(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 

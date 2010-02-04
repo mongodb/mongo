@@ -21,13 +21,45 @@
 #include "instance.h"
 #include "client.h"
 #include "curop.h"
+#include "db.h"
+#include "dbhelpers.h"
 
 namespace mongo {
 
     bool noauth = true;
     bool authWriteOnly = false;
-
+    
 	int AuthenticationInfo::warned = 0;
+
+    void AuthenticationInfo::print(){
+        cout << "AuthenticationInfo: " << this << "\n";
+        for ( map<string,Auth>::iterator i=m.begin(); i!=m.end(); i++ ){
+            cout << "\t" << i->first << "\t" << i->second.level << "\n";
+        }
+        cout << "END" << endl;
+    }
+
+
+    bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) {
+        if ( cc().isGod() ){
+            return true;
+        }
+        
+        if ( isLocalHost ){
+            readlock l(""); 
+            Client::GodScope gs;
+            Client::Context c("admin.system.users");
+            BSONObj result;
+            if( ! Helpers::getSingleton("admin.system.users", result) ){
+                if( warned == 0 ) {
+                    warned++;
+                    log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
 
 } // namespace mongo
 
