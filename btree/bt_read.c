@@ -936,32 +936,26 @@ __wt_cache_hazard_confirm(ENV *env, WT_PAGE *page)
  *	Dump a cache.
  */
 int
-__wt_cache_dump(ENV *env, const char *ofile, FILE *fp)
+__wt_cache_dump(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
 	WT_PAGE *page;
 	u_int32_t i;
-	int do_close;
 
 	ienv = env->ienv;
 	cache = &ienv->cache;
 
-	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
-
-	fprintf(fp, "Cache dump (%llu pages): ==================\n",
+	__wt_msg(env, "cache dump (%llu pages): ==================",
 	    WT_STAT(ienv->stats, CACHE_PAGES));
 
 	for (i = 0; i < cache->hash_size; ++i) {
-		fprintf(fp, "hash bucket %d:\n", i);
+		__wt_msg(env, "hash bucket %d:", i);
 		for (page = cache->hb[i]; page != NULL; page = page->next)
-			fprintf(fp, "\t%#lx {addr: %lu, bytes: %lu}\n",
+			__wt_msg(env, "\t%#lx {addr: %lu, bytes: %lu}",
 			    WT_ADDR_TO_ULONG(page), (u_long)page->addr,
 			    (u_long)page->bytes);
 	}
-
-	if (do_close)
-		(void)fclose(fp);
 
 	return (0);
 }
