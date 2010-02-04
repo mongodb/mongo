@@ -1740,7 +1740,7 @@ namespace mongo {
     NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
     
     bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ){
-        log(2) << "DatabaseHolder::closeAll path:" << path << endl;
+        log() << "DatabaseHolder::closeAll path:" << path << endl;
         dbMutex.assertWriteLocked();
         
         map<string,Database*>& m = _paths[path];

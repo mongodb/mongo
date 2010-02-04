@@ -4,9 +4,9 @@ t.save( { x : 1 } );
 
 before = db._adminCommand( "serverStatus" )
 if ( before.mem.supported ){
-    db._adminCommand( "closeAllDatabases" );
+    cmdres = db._adminCommand( "closeAllDatabases" );
     after = db._adminCommand( "serverStatus" );
-    assert( before.mem.mapped > after.mem.mapped , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) );
+    assert( before.mem.mapped > after.mem.mapped , "closeAllDatabases does something before:" + tojson( before ) + " after:" + tojson( after ) + "\n cmd res:" + tojson( cmdres ) );
 }
 else {
     print( "can't test serverStatus on this machine" );
