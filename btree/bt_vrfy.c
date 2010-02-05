@@ -17,7 +17,7 @@ typedef struct {
 	u_int32_t frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
-	FILE *fp;				/* Dump file stream */
+	FILE	*stream;			/* Dump file stream */
 
 	void (*f)(const char *s, u_int64_t);	/* Progress callback */
 	u_int64_t fcnt;				/* Progress counter */
@@ -58,7 +58,8 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_db_verify_int(WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *fp)
+__wt_db_verify_int(
+    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream)
 {
 	DB *db;
 	ENV *env;
@@ -73,8 +74,8 @@ __wt_db_verify_int(WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *fp)
 	ret = 0;
 
 	memset(&vstuff, 0, sizeof(vstuff));
+	vstuff.stream = stream;
 	vstuff.f = f;
-	vstuff.fp = fp;
 
 	/*
 	 * If we don't have a root page yet, read the database description
@@ -699,6 +700,11 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	WT_ILLEGAL_FORMAT(db);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Optionally dump the page in debugging mode. */
+	if (vs != NULL && vs->stream != NULL)
+		return (__wt_bt_debug_page(toc, page, NULL, vs->stream, 0));
+#endif
 	return (0);
 }
 
@@ -992,12 +998,6 @@ err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
 	__wt_free(env, _a.item_comp.data, _a.item_comp.data_len);
 	__wt_free(env, _b.item_comp.data, _b.item_comp.data_len);
 	__wt_free(env, _c.item_comp.data, _c.item_comp.data_len);
-
-#ifdef HAVE_DIAGNOSTIC
-	/* Optionally dump the page in debugging mode. */
-	if (ret == 0 && vs != NULL && vs->fp != NULL)
-		ret = __wt_bt_debug_page(toc, page, NULL, vs->fp, 0);
-#endif
 
 	return (ret);
 }
