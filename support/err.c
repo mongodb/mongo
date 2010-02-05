@@ -48,10 +48,6 @@ __wt_msg_call(void *cb, void *handle,
 		(void)snprintf(s + len,
 		    sizeof(s) - len, ": %s", wiredtiger_strerror(error));
 
-	/*lint -e611
-	 *
-	 * lint worries about this cast.
-	 */
 	((void (*)(void *, const char *))cb)(handle, s);
 }
 
