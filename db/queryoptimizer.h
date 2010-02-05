@@ -144,6 +144,7 @@ namespace mongo {
             static void nextOp( QueryOp &op );
         };
         const char *ns;
+        BSONObj query_;
         FieldRangeSet fbs_;
         PlanSet plans_;
         bool mayRecordPlan_;
@@ -158,5 +159,12 @@ namespace mongo {
 
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
+
+    inline bool isSimpleIdQuery( const BSONObj& query ){
+        return 
+            strcmp( query.firstElement().fieldName() , "_id" ) == 0 && 
+            query.nFields() == 1 && 
+            query.firstElement().isSimpleType();
+    }
         
 } // namespace mongo

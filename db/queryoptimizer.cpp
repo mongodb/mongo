@@ -213,6 +213,7 @@ namespace mongo {
     
     QueryPlanSet::QueryPlanSet( const char *_ns, const BSONObj &query, const BSONObj &order, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max ) :
     ns(_ns),
+    query_( query.getOwned() ),
     fbs_( _ns, query ),
     mayRecordPlan_( true ),
     usingPrerecordedPlan_( false ),
@@ -296,6 +297,16 @@ namespace mongo {
             massert( 10367 ,  errmsg, idx );
             plans_.push_back( PlanPtr( new QueryPlan( d, d->idxNo(*idx), fbs_, order_, min_, max_ ) ) );
             return;
+        }
+
+        if ( isSimpleIdQuery( query_ ) ){
+            int idx = d->findIdIndex();
+            if ( idx >= 0 ){
+                usingPrerecordedPlan_ = true;
+                mayRecordPlan_ = false;
+                plans_.push_back( PlanPtr( new QueryPlan( d , idx , fbs_ , order_ ) ) );
+                return;
+            }
         }
         
         if ( honorRecordedPlan_ ) {

@@ -884,7 +884,7 @@ namespace mongo {
             
             bool idHackWorked = false;
 
-            if ( strcmp( query.firstElement().fieldName() , "_id" ) == 0 && query.nFields() == 1 && query.firstElement().isSimpleType() ){
+            if ( isSimpleIdQuery( query ) ){
                 nscanned = 1;
 
                 bool nsFound = false;
