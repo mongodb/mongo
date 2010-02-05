@@ -79,15 +79,15 @@ namespace mongo {
             }
             return 0;
         }
-        
-#ifdef madvise
+
+#if defined(__sunos__)
+#warning madvise not supported on solaris yet
+#else
         if ( options & SEQUENTIAL ){
             if ( madvise( view , length , MADV_SEQUENTIAL ) ){
                 out() << " madvise failed for " << filename << " " << OUTPUT_ERRNO << endl;
             }
         }
-#else
-        log() << "warning: madvise doesn't seem to exists on your platform" << endl;
 #endif
         return view;
     }
