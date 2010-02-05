@@ -23,11 +23,12 @@ typedef struct {
 	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
-static int __wt_bt_verify_item(WT_TOC *, WT_PAGE *, VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, VSTUFF *);
 static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, VSTUFF *);
 static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, VSTUFF *);
-static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, VSTUFF *);
+static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, VSTUFF *);
+static int __wt_bt_verify_page_fixed(WT_TOC *, WT_PAGE *, VSTUFF *);
+static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -36,7 +37,20 @@ static int __wt_bt_verify_ovfl(WT_TOC *, WT_ITEM_OVFL *, VSTUFF *);
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
 {
-	return (__wt_db_verify_int(db, f, NULL));
+	ENV *env;
+	WT_TOC *toc;
+	int ret;
+
+	env = db->env;
+
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.verify");
+
+	ret = __wt_db_verify_int(toc, f, NULL);
+
+	WT_TRET(toc->close(toc, 0));
+
+	return (ret);
 }
 
 /*
@@ -44,25 +58,23 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp)
+__wt_db_verify_int(WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *fp)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_PAGE *page;
-	WT_TOC *toc;
 	VSTUFF vstuff;
+	WT_PAGE *page;
 	int ret;
 
-	env = db->env;
+	env = toc->env;
+	db = toc->db;
 	idb = db->idb;
 	ret = 0;
 
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.f = f;
 	vstuff.fp = fp;
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.verify");
 
 	/*
 	 * If we don't have a root page yet, read the database description
@@ -98,26 +110,25 @@ __wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp)
 	WT_ERR(bit_alloc(env, (int)vstuff.frags, &vstuff.fragbits));
 
 	/* Check for one-page databases. */
-	if (idb->root_page->hdr->type == WT_PAGE_LEAF) {
+	switch (idb->root_page->hdr->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		WT_TRET(__wt_bt_verify_level(
+		    toc, idb->root_page->addr, 0, &vstuff));
+		break;
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
 		ret = __wt_bt_verify_page(toc, page, &vstuff);
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
-	} else {
-		/*
-		 * Construct an OFFP for __wt_bt_verify_level -- the addr
-		 * is correct, but the level is not.   We don't store the
-		 * level in the DESC structure, so there's no way to know
-		 * what the correct level is yet.
-		 */
-		WT_TRET(__wt_bt_verify_level(
-		    toc, idb->root_page->addr, 0, &vstuff));
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (vstuff.fragbits != NULL)
 		__wt_free(env, vstuff.fragbits, 0);
-	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
 }
@@ -141,9 +152,9 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 	addr_arg = WT_ADDR_INVALID;
 	ret = 0;
 
-	/* Callers pass us a reference to an on-page WT_ITEM_OFFP_INTL/LEAF. */
-
 	/*
+	 * Callers pass us a reference to an on-page WT_ITEM_OFF_INT/LEAF.
+	 *
 	 * The plan is pretty simple.  We read through the levels of the tree,
 	 * from top to bottom (root level to leaf level), and from left to
 	 * right (smallest to greatest), verifying each page as we go.  First
@@ -225,26 +236,41 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 	 * get the next page we're verifying.
 	 */
 	for (first = 1, page = prev = NULL;
-	    addr != WT_ADDR_INVALID;
-	    addr = hdr->nextaddr, prev = page, page = NULL) {
-		/* Get the next page and set the address. */
+	    addr != WT_ADDR_INVALID; addr = hdr->nextaddr) {
+		/* Discard any previous page and get the next page. */
+		if (prev != NULL)
+			WT_ERR(__wt_bt_page_out(toc, prev, 0));
+		prev = page;
+		page = NULL;
 		WT_ERR(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
 
 		/* Verify the page. */
 		WT_ERR(__wt_bt_verify_page(toc, page, vs));
 
-		/*
-		 * If we're walking an internal page, we'll want to descend
-		 * to the first offpage in this level, save the address and
-		 * level information for the next iteration.
-		 */
 		hdr = page->hdr;
 		if (first) {
 			first = 0;
-			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT)
+
+			/*
+			 * If we're walking an internal level, we'll want to
+			 * descend to the first offpage in this level.  Save
+			 * away the address and level information for our next
+			 * iteration.
+			 */
+			switch (hdr->type) {
+			case WT_PAGE_COL_INT:
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_ROW_INT:
 				__wt_bt_first_offp(
 				    page, &addr_arg, &isleaf_arg);
+				break;
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_VAR:
+			case WT_PAGE_DUP_LEAF:
+			case WT_PAGE_ROW_LEAF:
+				break;
+			WT_ILLEGAL_FORMAT(db);
+			}
 
 			/*
 			 * Set the comparison function -- tucked away here
@@ -252,11 +278,22 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 			 * page looks like, and we don't want to set it every
 			 * time through the loop.
 			 */
-			if (hdr->type == WT_PAGE_DUP_INT ||
-			    hdr->type == WT_PAGE_DUP_LEAF)
+			switch (hdr->type) {
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_DUP_LEAF:
 				func = db->btree_compare_dup;
-			else
+				break;
+			case WT_PAGE_ROW_INT:
+			case WT_PAGE_ROW_LEAF:
 				func = db->btree_compare;
+				break;
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_INT:
+			case WT_PAGE_COL_VAR:
+				func = NULL;
+				break;
+			WT_ILLEGAL_FORMAT(db);
+			}
 		}
 
 		/*
@@ -269,15 +306,16 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		/* Verify its connections. */
 		WT_ERR(__wt_bt_verify_connections(toc, page, vs));
 
-		if (prev == NULL)
+		/*
+		 * If we have a previous page, and the tree has sorted items,
+		 * there's one more check, the last key of the previous page
+		 * against the first key of this page.
+		 *
+		 * The keys we're going to compare may need to be instantiated.
+		 */
+		if (func == NULL || prev == NULL)
 			continue;
 
-		/*
-		 * If we have a previous page, there's one more check, the last
-		 * key of the previous page against the first key of this page.
-		 *
-		 * The two keys we're going to compare may be overflow keys.
-		 */
 		prev_indx = prev->indx + (prev->indx_count - 1);
 		if (WT_INDX_NEED_PROCESS(prev_indx))
 			WT_ERR(__wt_bt_key_to_indx(toc, prev, prev_indx));
@@ -289,11 +327,9 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 			    "the first key on page at addr %lu does not sort "
 			    "after the last key on the previous page",
 			    (u_long)addr);
+			ret = WT_ERROR;
 			goto err;
 		}
-
-		/* We're done with the previous page. */
-		WT_ERR(__wt_bt_page_out(toc, prev, 0));
 	}
 
 err:	if (prev != NULL)
@@ -315,7 +351,7 @@ static int
 __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
-	WT_ITEM_OFFP *offp;
+	WT_OFF *offp;
 	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
@@ -333,9 +369,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * This function implements most of the connection checking in the
 	 * tree, but not all of it -- see the comment at the beginning of
 	 * the __wt_bt_verify_level function for details.
+	 *
+	 * Root pages are special cases, they shouldn't point to anything.
 	 */
-
-	/* Root pages are special cases, they shouldn't point to anything. */
 	if (hdr->prntaddr == WT_ADDR_INVALID) {
 		if (hdr->prevaddr != WT_ADDR_INVALID ||
 		    hdr->nextaddr != WT_ADDR_INVALID) {
@@ -351,7 +387,8 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		 * record (which we've already read in) points to the right
 		 * place.
 		 */
-		if (hdr->type == WT_PAGE_INT) {
+		if (hdr->type == WT_PAGE_COL_INT ||
+		    hdr->type == WT_PAGE_ROW_INT) {
 			WT_RET(__wt_bt_desc_read(toc, &root_addr));
 			if (root_addr != addr) {
 				__wt_db_errx(db,
@@ -383,14 +420,21 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		}
 	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, 0, 1, &parent));
 
-	/*
-	 * Search the parent for the reference to this page -- because we've
-	 * already verified this page, we can build the in-memory page info,
-	 * and use it in the search.
-	 */
-	WT_INDX_FOREACH(parent, parent_indx, i)
-		if (WT_INDX_OFFP_ADDR(parent_indx) == addr)
-			break;
+	/* Search the parent for the reference to the child page. */
+	switch (parent->hdr->type) {
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_INDX_FOREACH(parent, parent_indx, i)
+			if (WT_INDX_ITEM_OFF_ADDR(parent_indx) == addr)
+				break;
+		break;
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(parent, parent_indx, i)
+			if (WT_INDX_OFF_ADDR(parent_indx) == addr)
+				break;
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
 	if (parent_indx == NULL) {
 		__wt_db_errx(db,
 		    "parent of page at addr %lu doesn't reference it",
@@ -399,21 +443,45 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	}
 
 	/* Check that the record counts are correct. */
-	offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(parent_indx->ditem);
-	if (child->records != WT_64_CAST(offp->records)) {
+	switch (parent->hdr->type) {
+	case WT_PAGE_COL_INT:
+		offp = (WT_OFF *)parent_indx->page_data;
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		offp = (WT_OFF *)WT_ITEM_BYTE(parent_indx->page_data);
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
+	if (child->records != WT_RECORDS(offp)) {
 		__wt_db_errx(db,
 		    "parent of page at addr %lu has incorrect record count "
 		    "(parent: %llu, child: %llu)",
-		    (u_long)addr, WT_64_CAST(offp->records), child->records);
+		    (u_long)addr, WT_RECORDS(offp), child->records);
 		goto err_set;
 	}
 
-	/* Set the comparison function. */
-	if (hdr->type == WT_PAGE_DUP_INT ||
-	    hdr->type == WT_PAGE_DUP_LEAF)
+	/*
+	 * The only remaining work is to compare the sort order of the keys on
+	 * the parent and child pages.  If the pages aren't sorted (that is, if
+	 * it's a column store), we're done.  Otherwise, choose a comparison
+	 * function.
+	 */
+	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		goto done;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
 		func = db->btree_compare_dup;
-	else
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
 		func = db->btree_compare;
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
 
 	/*
 	 * Confirm the parent's key is less than or equal to the first key
@@ -511,6 +579,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 err_set:	ret = WT_ERROR;
 	}
 
+done:
 err:	if (parent != NULL)
 		WT_TRET(__wt_bt_page_out(toc, parent, 0));
 
@@ -535,6 +604,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	hdr = page->hdr;
 	addr = page->addr;
 
+	/* Report progress every 10 pages. */
 	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 10 == 0)
 		vs->f("Db.verify", vs->fcnt);
 
@@ -561,6 +631,14 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 
 	/* Check the page type. */
 	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		break;
 	case WT_PAGE_OVFL:
 		if (hdr->u.entries == 0) {
 			__wt_db_errx(db,
@@ -568,12 +646,8 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-		/* FALLTHROUGH */
-	case WT_PAGE_INT:
-	case WT_PAGE_LEAF:
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
 		break;
+	case WT_PAGE_INVALID:
 	default:
 		__wt_db_errx(db,
 		    "page at addr %lu has an invalid type of %lu",
@@ -581,13 +655,22 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		return (WT_ERROR);
 	}
 
-	if (hdr->unused[0] != '\0' ||
-	    hdr->unused[1] != '\0' || hdr->unused[2] != '\0') {
+	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
 		__wt_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
 		return (WT_ERROR);
 	}
+
+	if (hdr->flags != 0)
+		if (hdr->type != WT_PAGE_COL_INT ||
+		    hdr->flags != WT_OFFPAGE_REF_LEAF) {
+			__wt_db_errx(db,
+			    "page at addr %lu has an invalid flags field "
+			    "of %#lx",
+			    (u_long)addr, (u_long)hdr->flags);
+			return (WT_ERROR);
+		}
 
 	/*
 	 * Don't verify the checksum -- it verified when we first read the
@@ -599,18 +682,32 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		WT_RET(__wt_bt_desc_verify(db, page));
 
 	/* Verify the items on the page. */
-	if (hdr->type != WT_PAGE_OVFL)
-		WT_RET(__wt_bt_verify_item(toc, page, vs));
+	switch (hdr->type) {
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		WT_RET(__wt_bt_verify_page_item(toc, page, vs));
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+		WT_RET(__wt_bt_verify_page_fixed(toc, page, vs));
+		break;
+	case WT_PAGE_OVFL:
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
 
 	return (0);
 }
 
 /*
- * __wt_bt_verify_item --
- *	Walk the items on a page and verify them.
+ * __wt_bt_verify_page_item --
+ *	Walk a page of WT_ITEMs, and verify them.
  */
 static int
-__wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+__wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -624,6 +721,8 @@ __wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
+	WT_OVFL *ovflp;
+	WT_OFF *offp;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
 	u_int32_t addr, i, item_num, item_len, item_type;
@@ -639,10 +738,10 @@ __wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 	addr = page->addr;
 
 	/*
-	 * We have 3 key/data items we track -- the last key, the last data
-	 * item, and the current item.   They're stored in the _a, _b, and
-	 * _c structures (it doesn't matter which) -- what matters is which
-	 * item is referenced by current, last_data or last_key.
+	 * We have a maximum of 3 key/data items we track -- the last key, the
+	 * last data item, and the current item.   They're stored in the _a,
+	 * _b, and _c structures (it doesn't matter which) -- what matters is
+	 * which item is referenced by current, last_data or last_key.
 	 */
 	WT_CLEAR(_a);
 	current = &_a;
@@ -652,50 +751,62 @@ __wt_bt_verify_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 	last_key = &_c;
 
 	/* Set the comparison function. */
-	if (hdr->type == WT_PAGE_DUP_INT ||
-	    hdr->type == WT_PAGE_DUP_LEAF)
+	switch (hdr->type) {
+	case WT_PAGE_COL_VAR:
+		func = NULL;
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
 		func = db->btree_compare_dup;
-	else
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
 		func = db->btree_compare;
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
 
 	item_num = 0;
 	WT_ITEM_FOREACH(page, item, i) {
 		++item_num;
-		item_type = WT_ITEM_TYPE(item);
-		item_len = WT_ITEM_LEN(item);
 
 		/* Check if this item is entirely on the page. */
 		if ((u_int8_t *)item + sizeof(WT_ITEM) > end)
 			goto eop;
 
+		item_type = WT_ITEM_TYPE(item);
+		item_len = WT_ITEM_LEN(item);
+
 		/* Check the item's type. */
 		switch (item_type) {
 		case WT_ITEM_KEY:
 		case WT_ITEM_KEY_OVFL:
-			if (hdr->type != WT_PAGE_INT &&
-			    hdr->type != WT_PAGE_LEAF &&
-			    hdr->type != WT_PAGE_DUP_INT)
+			if (hdr->type != WT_PAGE_DUP_INT &&
+			    hdr->type != WT_PAGE_ROW_INT &&
+			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DATA:
 		case WT_ITEM_DATA_OVFL:
-			if (hdr->type != WT_PAGE_LEAF)
+			if (hdr->type != WT_PAGE_COL_VAR &&
+			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-			if (hdr->type != WT_PAGE_LEAF &&
-			    hdr->type != WT_PAGE_DUP_LEAF)
+			if (hdr->type != WT_PAGE_DUP_LEAF &&
+			    hdr->type != WT_PAGE_ROW_LEAF)
 				goto item_vs_page;
 			break;
-		case WT_ITEM_OFFP_INTL:
-		case WT_ITEM_OFFP_LEAF:
-			if (hdr->type != WT_PAGE_INT &&
-			    hdr->type != WT_PAGE_LEAF &&
-			    hdr->type != WT_PAGE_DUP_INT) {
+		case WT_ITEM_OFF_INT:
+		case WT_ITEM_OFF_LEAF:
+			if (hdr->type != WT_PAGE_DUP_INT &&
+			    hdr->type != WT_PAGE_ROW_INT &&
+			    hdr->type != WT_PAGE_ROW_LEAF) {
 item_vs_page:			__wt_db_errx(db,
-				    "item %lu on page at addr %lu is a %s "
-				    "type on a %s page",
+				    "illegal item and page type combination "
+				    "(item %lu on page at addr %lu is a %s "
+				    "item on a %s page)",
 				    (u_long)item_num, (u_long)addr,
 				    __wt_bt_item_type(item),
 				    __wt_bt_hdr_type(hdr));
@@ -720,12 +831,12 @@ item_vs_page:			__wt_db_errx(db,
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			if (item_len != sizeof(WT_ITEM_OVFL))
+			if (item_len != sizeof(WT_OVFL))
 				goto item_len;
 			break;
-		case WT_ITEM_OFFP_INTL:
-		case WT_ITEM_OFFP_LEAF:
-			if (item_len != sizeof(WT_ITEM_OFFP)) {
+		case WT_ITEM_OFF_INT:
+		case WT_ITEM_OFF_LEAF:
+			if (item_len != sizeof(WT_OFF)) {
 item_len:			__wt_db_errx(db,
 				    "item %lu on page at addr %lu has an "
 				    "incorrect length",
@@ -747,25 +858,52 @@ eop:			__wt_db_errx(db,
 		}
 
 		/*
-		 * When walking the whole file, verify off-page and overflow
-		 * references.
+		 * When walking the whole file, verify off-page duplicate trees
+		 * (any off-page reference on a row store leaf page) as well as
+		 * overflow references.
+		 *
+		 * Check to see if addresses are past EOF; the check is simple
+		 * and won't catch edge cases where the page starts before the
+		 * EOF, but extends past EOF.  That's OK, those are not likely
+		 * cases, and we'll fail when we try and read the page.
 		 */
 		if (vs != NULL && vs->fragbits != NULL)
 			switch (item_type) {
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
-				WT_ERR(__wt_bt_verify_ovfl(toc,
-				    (WT_ITEM_OVFL *)WT_ITEM_BYTE(item), vs));
+				ovflp = (WT_OVFL *)WT_ITEM_BYTE(item);
+				if (WT_ADDR_TO_OFF(db, ovflp->addr) +
+				    WT_OVFL_BYTES(db, ovflp->len) >
+				    idb->fh->file_size)
+					goto eof;
+				WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
 				break;
-			case WT_ITEM_OFFP_INTL:
-			case WT_ITEM_OFFP_LEAF:
-				if (hdr->type == WT_PAGE_LEAF)
-					WT_ERR(__wt_bt_verify_level(toc,
-					    ((WT_ITEM_OFFP *)
-					    WT_ITEM_BYTE(item))->addr,
-					    item_type == WT_ITEM_OFFP_LEAF ?
-					    1 : 0, vs));
+			case WT_ITEM_OFF_INT:
+				if (hdr->type != WT_PAGE_ROW_LEAF)
+					break;
+				offp = (WT_OFF *)WT_ITEM_BYTE(item);
+				if (WT_ADDR_TO_OFF(db, offp->addr) +
+				    db->intlsize > idb->fh->file_size)
+					goto eof;
+				WT_ERR(__wt_bt_verify_level(
+				    toc, offp->addr, 0, vs));
+				break;
+			case WT_ITEM_OFF_LEAF:
+				if (hdr->type != WT_PAGE_ROW_LEAF)
+					break;
+				offp = (WT_OFF *)WT_ITEM_BYTE(item);
+				if (WT_ADDR_TO_OFF(db, offp->addr) +
+				    db->leafsize > idb->fh->file_size) {
+eof:					__wt_db_errx(db,
+					    "off-page reference in item %lu on "
+					    "page at addr %lu extends past the "
+					    "end of the file",
+					    (u_long)item_num, (u_long)addr);
+					goto err_set;
+				}
+				WT_ERR(__wt_bt_verify_level(
+				    toc, offp->addr, 1, vs));
 				break;
 			default:
 				break;
@@ -774,8 +912,8 @@ eop:			__wt_db_errx(db,
 		/* Some items aren't sorted on the page, so we're done. */
 		if (item_type == WT_ITEM_DATA ||
 		    item_type == WT_ITEM_DATA_OVFL ||
-		    item_type == WT_ITEM_OFFP_INTL ||
-		    item_type == WT_ITEM_OFFP_LEAF)
+		    item_type == WT_ITEM_OFF_INT ||
+		    item_type == WT_ITEM_OFF_LEAF)
 			continue;
 
 		/* Get a DBT that represents this item. */
@@ -790,7 +928,7 @@ eop:			__wt_db_errx(db,
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
 			current->item = &current->item_ovfl;
-			WT_ERR(__wt_bt_ovfl_to_dbt(toc, (WT_ITEM_OVFL *)
+			WT_ERR(__wt_bt_ovfl_to_dbt(toc, (WT_OVFL *)
 			    WT_ITEM_BYTE(item), current->item));
 			break;
 		default:
@@ -858,10 +996,58 @@ err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (ret == 0 && vs != NULL && vs->fp != NULL)
-		ret = __wt_bt_dump_page(db, page, NULL, vs->fp, 0);
+		ret = __wt_bt_debug_page(toc, page, NULL, vs->fp, 0);
 #endif
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_verify_page_fixed --
+ *	Walk a page of fixed-size objects and verify them.
+ */
+static int
+__wt_bt_verify_page_fixed(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+{
+	DB *db;
+	IDB *idb;
+	WT_OFF *offp;
+	WT_PAGE_HDR *hdr;
+	u_int8_t *end;
+	u_int32_t addr, i, entry_num;
+
+	db = toc->db;
+	idb = db->idb;
+	hdr = page->hdr;
+	end = (u_int8_t *)hdr + page->bytes;
+	addr = page->addr;
+
+	entry_num = 0;
+	WT_OFF_FOREACH(page, offp, i) {
+		++entry_num;
+
+		/* Check if this entry is entirely on the page. */
+		if ((u_int8_t *)offp + sizeof(WT_OFF) > end) {
+			__wt_db_errx(db,
+			    "offpage reference %lu on page at addr %lu extends "
+			    "past the end of the page",
+			    (u_long)entry_num, (u_long)addr);
+			return (WT_ERROR);
+		}
+
+		/* Check if the reference is past the end-of-file. */
+		if (WT_ADDR_TO_OFF(db, offp->addr) +
+		    (F_ISSET(hdr, WT_OFFPAGE_REF_LEAF) ?
+		    db->leafsize : db->intlsize) > idb->fh->file_size) {
+			__wt_db_errx(db,
+			    "off-page reference in object %lu on page at "
+			    "addr %lu extends past the end of the file",
+			    (u_long)entry_num, (u_long)addr);
+			return (WT_ERROR);
+		}
+	}
+
+	return (0);
 }
 
 /*
@@ -869,16 +1055,16 @@ err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
  *	Verify an overflow item.
  */
 static int
-__wt_bt_verify_ovfl(WT_TOC *toc, WT_ITEM_OVFL *ovfl, VSTUFF *vs)
+__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
 {
-	WT_PAGE *ovfl_page;
+	WT_PAGE *pagep;
 	int ret;
 
-	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+	WT_RET(__wt_bt_ovfl_in(toc, ovflp->addr, ovflp->len, &pagep));
 
-	ret = __wt_bt_verify_page(toc, ovfl_page, vs);
+	ret = __wt_bt_verify_page(toc, pagep, vs);
 
-	WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+	WT_TRET(__wt_bt_page_out(toc, pagep, 0));
 
 	return (ret);
 }
