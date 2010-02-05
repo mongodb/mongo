@@ -96,11 +96,16 @@ export MONGO_URL="%s"
 export MODE="%s"
 export ARCH="%s"
 export DATE="%s"
+export DISTRO_VERSION="%s"
+export PRODUCT_DIR="%s"
+# the following are derived from the preceding
+export MONGO_WORKDIR="$MONGO_NAME-$DATE"
 """
     get_mongo_commands = """
 case "$MODE" in
   "release")
     # TODO: some Unixes don't ship with wget.  Add support other http clients.
+    # Or just use git for this...
     wget -Otarball.tgz "$MONGO_URL"
     ;;
   "commit")
@@ -113,9 +118,9 @@ esac
 # Ensure that there's just one toplevel directory in the tarball.
 test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
 tar xzf tarball.tgz
-mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_NAME"-"$DATE"
+mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_WORKDIR"
 if [ "$MODE" = "commit" ]; then
-  ( cd "$MONGO_NAME"-"$DATE" && python ./buildscripts/frob_version.py "$DATE" )
+  ( cd "$MONGO_WORKDIR" && python ./buildscripts/frob_version.py "$DATE" ) || exit 1
 fi
 """
     deb_prereq_commands = """
@@ -125,24 +130,22 @@ apt-get update
 apt-get install -y $PREREQS
 """
     deb_build_commands="""
-mkdir -p apt/binary-$ARCH
-mkdir -p apt/source
-( cd "$MONGO_NAME"-"$DATE";
-debuild -us -uc )
-mv mongodb_*.deb apt/binary-$ARCH
-mv mongodb_*.dsc apt/source
-mv mongodb_*.tar.gz apt/source
-( cd apt;
-dpkg-scanpackages binary-$ARCH /dev/null | gzip -9c > binary-$ARCH/Packages.gz;
-dpkg-scansources source /dev/null | gzip -9c > source/Sources.gz )
+mkdir -p "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH
+mkdir -p "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
+( cd "$MONGO_WORKDIR"; debuild ) || exit 1
+mv mongodb_*.deb "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH
+mv mongodb_*.dsc "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
+mv mongodb_*.tar.gz "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
+( dpkg-scanpackages "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH /dev/null | gzip -9c > "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH/Packages.gz;
+dpkg-scansources "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source /dev/null | gzip -9c > "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source/Sources.gz )
 """
     rpm_prereq_commands = """
 rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/x86_64/epel-release-5-3.noarch.rpm
 yum -y install $PREREQS
 RPMBUILDROOT=/usr/src/redhat
 for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p "$RPMBUILDROOT"/$d; done
-cp -v "$MONGO_NAME"-"$MONGO_VERSION"/rpm/mongo.spec "$RPMBUILDROOT"/SPECS
-tar -cpzf "$RPMBUILDROOT"/SOURCES/"$MONGO_NAME"-"$MONGO_VERSION".tar.gz "$MONGO_NAME"-"$MONGO_VERSION"
+cp -v "$MONGO_WORKDIR"/rpm/mongo.spec "$RPMBUILDROOT"/SPECS
+tar -cpzf "$RPMBUILDROOT"/SOURCES/"$MONGO_WORKDIR".tar.gz "$MONGO_WORKDIR"
 """
     rpm_build_commands="""
 rpmbuild -ba /usr/src/redhat/SPECS/mongo.spec
@@ -170,19 +173,22 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
     centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
     fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
 
-    deb_products = ["apt"]
-    rpm_products = ["*.rpm"] # FIXME: is this correct?
+    deb_productdir = "dists"
+    rpm_productdir = "/usr/src/redhat" # FIXME: is this correct?
 
     # So here's a tree of data for the details that differ among
     # platforms.  If you change the structure, remember to also change
     # the definition of lookup() below.
     configuration = (("ami",
-                      ((("ubuntu", "10.04", "x86_64"), "ami-818965e8"),
-                       (("ubuntu", "10.04", "x86"), "ami-ef8d6186"),
+                      ((("ubuntu", "10.4", "x86_64"), "ami-818965e8"),
+                       (("ubuntu", "10.4", "x86"), "ami-ef8d6186"),
                        (("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
                        (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
-                       (("ubuntu", "9.04", "x86_64"), "ami-eef61587"),
-                       (("ubuntu", "9.04", "x86"), "ami-ccf615a5"),
+                       (("ubuntu", "9.4", "x86_64"), "ami-eef61587"),
+                       (("ubuntu", "9.4", "x86"), "ami-ccf615a5"),
+                       # Doesn't work: boost too old.
+                       #(("ubuntu", "8.4", "x86"), "ami59b35f30"),
+                       #(("ubuntu", "8.4", "x86_64"), "ami-27b35f4e"),
                        (("debian", "5.0", "x86"), "ami-dcf615b5"),
                        (("debian", "5.0", "x86_64"), "ami-f0f61599"),
                        (("centos", "5.4", "x86"), "ami-f8b35e91"),
@@ -192,15 +198,17 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                      ("mtype",
                       ((("*", "*", "x86"), "m1.small"),
                        (("*", "*", "x86_64"), "m1.large"))),
-                     ("products",
-                      ((("ubuntu", "*", "*"), deb_products),
-                       (("debian", "*", "*"), deb_products),
-                       (("fedora", "*", "*"), rpm_products),
-                       (("centos", "*", "*"), rpm_products))),
+                     ("productdir",
+                      ((("ubuntu", "*", "*"), deb_productdir),
+                       (("debian", "*", "*"), deb_productdir),
+                       (("fedora", "*", "*"), rpm_productdir),
+                       (("centos", "*", "*"), rpm_productdir))),
                      ("prereqs",
-                      ((("ubuntu", "9.04", "*"), old_deb_boost_prereqs + common_deb_prereqs),
+                      ((("ubuntu", "9.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("ubuntu", "9.10", "*"), new_deb_boost_prereqs + common_deb_prereqs),
-                       (("ubuntu", "10.04", "*"), new_deb_boost_prereqs + common_deb_prereqs),                       
+                       (("ubuntu", "10.4", "*"), new_deb_boost_prereqs + common_deb_prereqs),
+                       # Doesn't work: boost too old.
+                       #(("ubuntu", "8.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("debian", "5.0", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("fedora", "8", "*"), fedora_prereqs),
                        (("centos", "5.4", "*"), centos_preqres))),
@@ -212,10 +220,14 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                        (("centos", "*", "*"), old_rpm_precommands + rpm_prereq_commands + get_mongo_commands + rpm_build_commands),
                        (("fedora", "*", "*"), old_rpm_precommands + rpm_prereq_commands + get_mongo_commands + rpm_build_commands))),
                      ("login",
+                      # ...er... this might rather depend on the ami
+                      # than the distro tuple...
                       ((("debian", "*", "*"), "root"),
-                       (("ubuntu", "10.04", "*"), "ubuntu"),
+                       (("ubuntu", "10.4", "*"), "ubuntu"),
                        (("ubuntu", "9.10", "*"), "ubuntu"),
-                       (("ubuntu", "9.04", "*"), "root"),
+                       (("ubuntu", "9.4", "*"), "root"),
+                       # Doesn't work: boost too old.
+                       #(("ubuntu", "8.4", "*"), "ubuntu"),
                        (("centos", "*", "*"), "root"))),
                      # What do they call this architecture on this architecture...?
                      ("distarch",
@@ -297,9 +309,10 @@ class BaseBuilder(object):
         self.remotescript = kwargs["remotescript"] if "remotescript" in kwargs else "makedist.sh"
 
         self.prereqs=self.default("prereqs")
+        self.productdir=self.default("productdir")
         date=time.strftime("%Y%m%d")
-        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, date)) + self.default("commands")
-        self.products=self.default("products")
+        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, date, self.version, self.productdir)) + self.default("commands")
+
 
     def default(self, what):
         return Configurator.default(what, self.distro, self.version, self.arch)
@@ -329,8 +342,7 @@ class BaseBuilder(object):
         with open(self.localscript, "w") as f:
             f.write(self.commands)
     def sendConfigs(self):
-        # Maybe also send these over, for signing, eventually.
-        # (self.localgpgdir, self.remotegpgdir)
+        self.sendFiles([(self.localgpgdir, self.remotegpgdir)])
         self.sendFiles([(self.localscript, self.remotescript)])
     def doBuild(self):
         # TODO: abstract out the "sudo" here into a more general "run
@@ -340,7 +352,7 @@ class BaseBuilder(object):
         # build-deps.).
         self.runRemotely((["sudo"] if self.login != "root" else [])+ ["sh", "-x", self.remotescript])
     def recvDists(self):
-        self.recvFiles([(remote,self.localdir) for remote in self.products])
+        self.recvFiles([(self.productdir,self.localdir)])
     def cleanup(self):
         os.unlink(self.localscript)
 
@@ -419,6 +431,10 @@ class EC2InstanceBuilder (BaseBuilder):
                     fields = line.split()
                     if len(fields) > 2:
                         state = fields[3]
+                        # Sometimes, ec2 hosts die before we get to do
+                        # anything with them.
+                        if state == "terminated":
+                            raise SimpleError("ec2 host %s died suddenly; check the aws management panel?" % self.ident)
                         if self.use_internal_name:
                             self.hostname = fields[4]
                         else:
@@ -470,7 +486,7 @@ class SshableBuilder (BaseBuilder):
                     s.connect((self.hostname, 22))
                     self.sshwait = False
                     print "connected on port 22 (ssh)"
-                    time.sleep(5) # arbitrary timeout, in case the
+                    time.sleep(15) # arbitrary timeout, in case the
                                   # remote sshd is slow.
                 except socket.error, err:
                     pass
