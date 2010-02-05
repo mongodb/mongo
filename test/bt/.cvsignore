@@ -1,4 +1,5 @@
 .cvsignore
 a.db
+flexlint.out
 ht
 t
