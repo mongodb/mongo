@@ -64,6 +64,12 @@ class SimpleError(Exception):
     def __str__(self):
         return self.args[0] % self.args[1:]
 
+class SubcommandError(SimpleError):
+    def __init__(self, *args):
+        self.status = args[2]
+        super(SubcommandError, self).__init__(*args)
+
+    
 # For mistakes implementing this program.
 class Bug(SimpleError):
     def __init__(self, *args):
@@ -89,6 +95,7 @@ export MONGO_VERSION="%s"
 export MONGO_URL="%s"
 export MODE="%s"
 export ARCH="%s"
+export DATE="%s"
 """
     get_mongo_commands = """
 case "$MODE" in
@@ -106,9 +113,9 @@ esac
 # Ensure that there's just one toplevel directory in the tarball.
 test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
 tar xzf tarball.tgz
-mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_NAME"-"$MONGO_VERSION"
+mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_NAME"-"$DATE"
 if [ "$MODE" = "commit" ]; then
-  ( cd ./mongo && ./buildscripts/frob_version.py "$MONGO_VERSION" )
+  ( cd "$MONGO_NAME"-"$DATE" && python ./buildscripts/frob_version.py "$DATE" )
 fi
 """
     deb_prereq_commands = """
@@ -118,8 +125,16 @@ apt-get update
 apt-get install -y $PREREQS
 """
     deb_build_commands="""
-cd "$MONGO_NAME"-"$MONGO_VERSION"
-debuild -us -uc
+mkdir -p apt/binary-$ARCH
+mkdir -p apt/source
+( cd "$MONGO_NAME"-"$DATE";
+debuild -us -uc )
+mv mongodb_*.deb apt/binary-$ARCH
+mv mongodb_*.dsc apt/source
+mv mongodb_*.tar.gz apt/source
+( cd apt;
+dpkg-scanpackages binary-$ARCH /dev/null | gzip -9c > binary-$ARCH/Packages.gz;
+dpkg-scansources source /dev/null | gzip -9c > source/Sources.gz )
 """
     rpm_prereq_commands = """
 rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/x86_64/epel-release-5-3.noarch.rpm
@@ -150,13 +165,13 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
 
     old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
     new_deb_boost_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev" ]
-    common_deb_prereqs = [ "build-essential", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
+    common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
     centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
     fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
 
-    deb_products = ["*.deb", "*.changes", "*.build", "*.dsc"]
-    rpm_products = ["*."]
+    deb_products = ["apt"]
+    rpm_products = ["*.rpm"] # FIXME: is this correct?
 
     # So here's a tree of data for the details that differ among
     # platforms.  If you change the structure, remember to also change
@@ -202,8 +217,16 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                        (("ubuntu", "9.10", "*"), "ubuntu"),
                        (("ubuntu", "9.04", "*"), "root"),
                        (("centos", "*", "*"), "root"))),
-                      # This is ridiculous, but it's already the case
-                      # that different distributions have different names for the package.
+                     # What do they call this architecture on this architecture...?
+                     ("distarch",
+                      ((("debian", "*", "x86_64"), "amd64"),
+                       (("ubuntu", "*", "x86_64"), "amd64"),
+                       (("debian", "*", "x86"), "i386"),
+                       (("ubuntu", "*", "x86"), "i386"),
+                       (("*", "*", "x86_64"), "x86_64"),
+                       (("*", "*", "x86"), "x86"))),
+                     # This is ridiculous, but it's already the case
+                     # that different distributions have different names for the package.
                      ("mongoname",
                       ((("debian", "*", "*"), "mongodb"),
                        (("ubuntu", "*", "*"), "mongodb"),
@@ -242,6 +265,7 @@ class BaseBuilder(object):
         self.distro=kwargs["distro"]
         self.version=kwargs["version"]
         self.arch=kwargs["arch"]
+        self.distarch=self.default("distarch")
         self.mode="commit" if "commit" in kwargs else "release"
         self.mongoversion=(kwargs["mongoversion"][:6] if "commit" in kwargs else kwargs["mongoversion"])
 
@@ -273,7 +297,8 @@ class BaseBuilder(object):
         self.remotescript = kwargs["remotescript"] if "remotescript" in kwargs else "makedist.sh"
 
         self.prereqs=self.default("prereqs")
-        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.arch)) + self.default("commands")
+        date=time.strftime("%Y%m%d")
+        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, date)) + self.default("commands")
         self.products=self.default("products")
 
     def default(self, what):
@@ -285,7 +310,7 @@ class BaseBuilder(object):
         print "running %s" % argv
         r = subprocess.Popen(argv).wait()
         if r != 0:
-            raise SimpleError("subcommand %s exited %d", argv, r)
+            raise SubcommandError("subcommand %s exited %d", argv, r)
         
     def do(self):
         # KLUDGE: this mkdir() shouldn't really be here, but if we're
@@ -304,7 +329,9 @@ class BaseBuilder(object):
         with open(self.localscript, "w") as f:
             f.write(self.commands)
     def sendConfigs(self):
-        self.sendFiles([(self.localgpgdir, self.remotegpgdir), (self.localscript, self.remotescript)])
+        # Maybe also send these over, for signing, eventually.
+        # (self.localgpgdir, self.remotegpgdir)
+        self.sendFiles([(self.localscript, self.remotescript)])
     def doBuild(self):
         # TODO: abstract out the "sudo" here into a more general "run
         # a command as root" mechanism.  (Also, maybe figure out how
@@ -480,7 +507,37 @@ class SshableBuilder (BaseBuilder):
                              "." if localfile is None else localfile ])
 
 class Builder (EC2InstanceBuilder, SshableBuilder, BaseBuilder):
-    pass
+    def __init__(self, **kwargs):
+        self.retries = 3 # Arbitrary.
+        super(Builder,self).__init__(**kwargs)
+
+#     # Good grief.  ssh'ing to EC2 sometimes doesn't work, but it's
+#     # intermittent.  Retry everything a few times.
+#     def sendFiles(self, files):
+#         for i in range(self.retries):
+#             try:
+#                 super(Builder, self).sendFiles(files)
+#                 break
+#             except SubcommandError, err:
+#                 if err.status == 255 and i == self.retries-1:
+#                     raise err
+#     def recvFiles(self, files):
+#         for i in range(self.retries):
+#             try:
+#                 super(Builder, self).recvFiles(files)
+#                 break
+#             except SubcommandError, err:
+#                 if err.status == 255 and i == self.retries-1:
+#                     raise err
+#     def runRemotely(self, argv):
+#         for i in range(self.retries):
+#             try:
+#                 super(Builder, self).runRemotely(argv)
+#                 break
+#             except SubcommandError, err:
+#                 if err.status == 255 and i == self.retries-1:
+#                     raise err
+
 
 # export EC2_HOME=/Users/kreuter/mongo/ec2-api-tools-1.3-46266 
 # export PATH=$EC2_HOME/bin:$PATH
@@ -490,6 +547,12 @@ def main():
 #    checkEnvironment()
 
     (kwargs, (rootdir, distro, version, arch, mongoversion)) = processArguments()
+    # FIXME: there are a few other characters that we can't use in
+    # file names on Windows, in case this program really needs to run
+    # there.
+    distro = distro.replace('/', '-').replace('\\', '-')
+    version = version.replace('/', '-').replace('\\', '-')
+    arch = arch.replace('/', '-').replace('\\', '-')     
     try:
         import settings
         if "makedist" in dir ( settings ):
@@ -512,7 +575,11 @@ def main():
     if len([True for x in os.environ["PATH"].split(":") if x.find(os.environ["EC2_HOME"]) > -1]) == 0:
         os.environ["PATH"]=os.environ["EC2_HOME"]+"/bin:"+os.environ["PATH"]
 
-    kwargs["localdir"] = "%s/%s/%s/%s"  % (rootdir, distro, version, arch)
+    if "subdirs" in kwargs:
+        kwargs["localdir"] = "%s/%s/%s/%s" % (rootdir, distro, version, arch)
+    else:
+        kwargs["localdir"] = rootdir
+
     kwargs["distro"] = distro
     kwargs["version"] = version
     kwargs["arch"] = arch
@@ -529,6 +596,7 @@ def processArguments():
     flagspec = [ ("?", "usage", False, "Print a (useless) usage message", None),
                  ("h", "help", False, "Print a help message and exit", None),
                  ("N", "no-terminate", False, "Leave the EC2 instance running at the end of the job", None),
+                 ("S", "subdirs", False, "Create subdirectories of the output directory based on distro name, version, and architecture.", None),
                  ("I", "use-internal-name", False, "Use the EC2 internal hostname for sshing", None),
                  # These get defaulted, but the user might want to override them.
                  ("A", "ami", True, "EC2 AMI id to use", "ID"),
