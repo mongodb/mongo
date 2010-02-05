@@ -370,8 +370,8 @@ namespace mongo {
         
         if ( currentOp.shouldDBProfile( ms ) ){
             // performance profiling is on
-            if ( dbMutex.getState() > 1 || dbMutex.getState() < -1 ){
-                mongo::log(1) << "warning: not profiling because recursive lock" << endl;
+            if ( dbMutex.getState() < 0 ){
+                mongo::log(1) << "warning: not profiling because recursive read lock" << endl;
             }
             else {
                 mongolock lk(true);
