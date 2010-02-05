@@ -26,7 +26,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	DBT local_key, local_data;
 	IDB *idb;
 	WT_ITEM *item;
-	WT_ITEM_OVFL *ovfl;
+	WT_OVFL *ovfl;
 	WT_PAGE *ovfl_page;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
@@ -73,9 +73,10 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	/*
 	 * Handle the data item.
 	 */
-	item = ip->ditem;
 	switch (page->hdr->type) {
-	case WT_PAGE_LEAF:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
+		item = ip->page_data;
 		if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
 		    idb->huffman_data == NULL) {
@@ -93,6 +94,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 		    WT_ITEM_BYTE(item), WT_ITEM_LEN(item), WT_DATA));
 		break;
 	case WT_PAGE_DUP_LEAF:
+		item = ip->page_data;
 		if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DUP &&
 		    idb->huffman_data == NULL) {
@@ -109,11 +111,11 @@ __wt_bt_dbt_return(WT_TOC *toc,
 		WT_RET(__wt_bt_dbt_copyout(toc, data,
 		    &toc->data, ip->data, ip->size, WT_DATA));
 		break;
-	WT_DEFAULT_FORMAT(db);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	if (0) {
-overflow:	ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
+overflow:	ovfl = (WT_OVFL *)WT_ITEM_BYTE(ip->page_data);
 		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
 		ret = __wt_bt_dbt_copyout(toc, data,
 		    &toc->data, WT_PAGE_BYTE(ovfl_page), ovfl->len, WT_DATA);

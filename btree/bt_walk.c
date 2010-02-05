@@ -39,7 +39,7 @@ __wt_bt_stat(DB *db)
 		return (0);
 
 	/* Check for one-page databases. */
-	ret = page->hdr->type == WT_PAGE_LEAF ?
+	ret = page->hdr->type == WT_PAGE_ROW_LEAF ?
 	    __wt_bt_stat_page(toc, page) :
 	    __wt_bt_stat_level(toc, page->addr, 0);
 
@@ -55,13 +55,15 @@ __wt_bt_stat(DB *db)
 static int
 __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 {
+	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int32_t addr_arg;
 	int first, isleaf_arg, ret;
 
-	idb = toc->db->idb;
+	db = toc->db;
+	idb = db->idb;
 	isleaf_arg = ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
@@ -80,10 +82,20 @@ __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 		addr = hdr->nextaddr;
 		if (first) {
 			first = 0;
-			if (hdr->type == WT_PAGE_INT ||
-			    hdr->type == WT_PAGE_DUP_INT)
+			switch (hdr->type) {
+			case WT_PAGE_COL_INT:
+			case WT_PAGE_DUP_INT:
+			case WT_PAGE_ROW_INT:
 				__wt_bt_first_offp(
 				    page, &addr_arg, &isleaf_arg);
+				break;
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_VAR:
+			case WT_PAGE_DUP_LEAF:
+			case WT_PAGE_ROW_LEAF:
+				break;
+			WT_ILLEGAL_FORMAT(db);
+			}
 		}
 
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
@@ -127,30 +139,38 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 	/* Count the free space. */
 	WT_STAT_INCRV(idb->dstats, PAGE_FREE, page->space_avail);
 
-	/* Count the page type. */
+	/* Count the page type, and count items on leaf pages. */
 	switch (hdr->type) {
-	case WT_PAGE_INT:
-		WT_STAT_INCR(idb->dstats, PAGE_INTERNAL);
-		break;
+	case WT_PAGE_COL_INT:
+		WT_STAT_INCR(idb->dstats, PAGE_COL_INTERNAL);
+		return (0);
+	case WT_PAGE_COL_FIX:
+		WT_STAT_INCR(idb->dstats, PAGE_COL_FIXED);
+		WT_STAT_INCRV(idb->dstats, ITEM_TOTAL_DATA, hdr->u.entries);
+		return (0);
+	case WT_PAGE_COL_VAR:
+		WT_STAT_INCR(idb->dstats, PAGE_COL_VARIABLE);
+		WT_STAT_INCRV(idb->dstats, ITEM_TOTAL_DATA, hdr->u.entries);
+		return (0);
 	case WT_PAGE_DUP_INT:
 		WT_STAT_INCR(idb->dstats, PAGE_DUP_INTERNAL);
-		break;
-	case WT_PAGE_LEAF:
-		WT_STAT_INCR(idb->dstats, PAGE_LEAF);
-		break;
+		return (0);
 	case WT_PAGE_DUP_LEAF:
 		WT_STAT_INCR(idb->dstats, PAGE_DUP_LEAF);
 		break;
+	case WT_PAGE_ROW_INT:
+		WT_STAT_INCR(idb->dstats, PAGE_INTERNAL);
+		return (0);
+	case WT_PAGE_ROW_LEAF:
+		WT_STAT_INCR(idb->dstats, PAGE_LEAF);
+		break;
 	case WT_PAGE_OVFL:
 		WT_STAT_INCR(idb->dstats, PAGE_OVERFLOW);
-		break;
-	WT_DEFAULT_FORMAT(db);
+		return (0);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
-	/* Count the items on leaf pages. */
-	if (hdr->type != WT_PAGE_LEAF && hdr->type != WT_PAGE_DUP_LEAF)
-		return (0);
-
+	/* Row store leaf and duplicate leaf pages require counting. */
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
 		case WT_ITEM_KEY_OVFL:
@@ -176,17 +196,14 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DATA);
 			break;
-		case WT_ITEM_OFFP_INTL:
-		case WT_ITEM_OFFP_LEAF:
-			if (hdr->type != WT_PAGE_LEAF)
-				break;
+		case WT_ITEM_OFF_INT:
+		case WT_ITEM_OFF_LEAF:
+			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);
 			WT_RET(__wt_bt_stat_level(toc,
-			    ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr,
-			    WT_ITEM_TYPE(item) ==
-			    WT_ITEM_OFFP_LEAF ? 1 : 0));
+			    ((WT_OFF *)WT_ITEM_BYTE(item))->addr,
+			    WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0));
 			break;
-		default:
-			break;
+		WT_ILLEGAL_FORMAT(db);
 		}
 	}
 

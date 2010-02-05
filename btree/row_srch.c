@@ -45,7 +45,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	 * The Db.get method can only return single key/data pairs.
 	 * If that's not what we found, we're done.
 	 */
-	type = WT_ITEM_TYPE(ip->ditem);
+	type = WT_ITEM_TYPE(ip->page_data);
 	if (type != WT_ITEM_DATA && type != WT_ITEM_DATA_OVFL) {
 		__wt_db_errx(db,
 		    "the Db.get method cannot return keys with duplicate "
@@ -127,7 +127,7 @@ __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 	DB *db;
 	IDB *idb;
 	WT_ITEM *item;
-	WT_ITEM_OVFL *ovfl;
+	WT_OVFL *ovfl;
 	WT_PAGE *page_ovfl;
 	u_int32_t psize;
 	void *pdata;
@@ -143,28 +143,28 @@ __wt_bt_page_put(WT_TOC *toc, DBT *data, WT_PAGE *page, WT_INDX *ip)
 		data = &toc->scratch;
 	}
 
-	item = ip->ditem;
+	item = ip->page_data;
 	page_ovfl = NULL;
 	switch (page->hdr->type) {
-	case WT_PAGE_LEAF:
-		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
-			pdata = WT_ITEM_BYTE(item);
-			psize = WT_ITEM_LEN(item);
-			break;
-		}
-		goto overflow;
 	case WT_PAGE_DUP_LEAF:
 		if (WT_ITEM_TYPE(item) == WT_ITEM_DUP) {
 			pdata = ip->data;
 			psize = ip->size;
 			break;
 		}
-overflow:	ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(ip->ditem);
+		goto overflow;
+	case WT_PAGE_ROW_LEAF:
+		if (WT_ITEM_TYPE(item) == WT_ITEM_DATA) {
+			pdata = WT_ITEM_BYTE(item);
+			psize = WT_ITEM_LEN(item);
+			break;
+		}
+overflow:	ovfl = (WT_OVFL *)WT_ITEM_BYTE(ip->page_data);
 		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &page_ovfl));
 		pdata = WT_PAGE_BYTE(page_ovfl);
 		psize = ovfl->len;
 		break;
-	WT_DEFAULT_FORMAT(db);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
@@ -220,7 +220,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 
 	if ((page = idb->root_page) == NULL)
 		return (WT_NOTFOUND);
-	isleaf = page->hdr->type == WT_PAGE_LEAF ? 1 : 0;
+	isleaf = page->hdr->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
 	/* Search the tree. */
 	for (put_page = 0;; put_page = 1) {
@@ -286,9 +286,9 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			 */
 			ip = page->indx + (base == 0 ? base : base - 1);
 		}
-		addr = WT_INDX_OFFP_ADDR(ip);
+		addr = WT_INDX_ITEM_OFF_ADDR(ip);
 		next_isleaf =
-		    WT_ITEM_TYPE(ip->ditem) == WT_ITEM_OFFP_LEAF ? 1 : 0;
+		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
 		if (put_page)

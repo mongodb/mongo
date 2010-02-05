@@ -83,7 +83,7 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB database.
  */
-#define	WT_STAT_DATABASE_TOTAL		   20
+#define	WT_STAT_DATABASE_TOTAL		   23
 
 #define	WT_STAT_BASE_RECNO		    0
 #define	WT_STAT_EXTSIZE			    1
@@ -98,13 +98,16 @@ struct __wt_stats {
 #define	WT_STAT_MAGIC			   10
 #define	WT_STAT_MAJOR			   11
 #define	WT_STAT_MINOR			   12
-#define	WT_STAT_PAGE_DUP_INTERNAL	   13
-#define	WT_STAT_PAGE_DUP_LEAF		   14
-#define	WT_STAT_PAGE_FREE		   15
-#define	WT_STAT_PAGE_INTERNAL		   16
-#define	WT_STAT_PAGE_LEAF		   17
-#define	WT_STAT_PAGE_OVERFLOW		   18
-#define	WT_STAT_TREE_LEVEL		   19
+#define	WT_STAT_PAGE_COL_FIXED		   13
+#define	WT_STAT_PAGE_COL_INTERNAL	   14
+#define	WT_STAT_PAGE_COL_VARIABLE	   15
+#define	WT_STAT_PAGE_DUP_INTERNAL	   16
+#define	WT_STAT_PAGE_DUP_LEAF		   17
+#define	WT_STAT_PAGE_FREE		   18
+#define	WT_STAT_PAGE_INTERNAL		   19
+#define	WT_STAT_PAGE_LEAF		   20
+#define	WT_STAT_PAGE_OVERFLOW		   21
+#define	WT_STAT_TREE_LEVEL		   22
 
 /*
  * Statistics entries for FH handle.

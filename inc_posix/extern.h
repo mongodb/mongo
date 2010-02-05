@@ -11,19 +11,18 @@ __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_diag_set_fp(const char *ofile, FILE **fpp, int *close_varp);
 int
-__wt_bt_dump_debug(DB *db, char *ofile, FILE *fp);
+__wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
-__wt_bt_dump_page(DB *db, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
+__wt_bt_debug_page(
+    WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
 void
-__wt_bt_dump_dbt(const char *tag, DBT *dbt, FILE *fp);
+__wt_bt_debug_dbt(const char *tag, DBT *dbt, FILE *fp);
 void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
 void
 __wt_bt_desc_stats(DB *db, WT_PAGE *page);
 int
 __wt_bt_desc_verify(DB *db, WT_PAGE *page);
-void
-__wt_bt_desc_dump(WT_PAGE *page, FILE *fp);
 int
 __wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp);
 int
@@ -43,7 +42,7 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
 __wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp);
 void
-__wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr);
+__wt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *addr);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
@@ -57,9 +56,9 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
 int
 __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp);
 int
-__wt_bt_ovfl_copy(WT_TOC *toc, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy);
+__wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy);
 int
-__wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_ITEM_OVFL *ovfl, DBT *copy);
+__wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy);
 int
 __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep);
 int
@@ -72,8 +71,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_page_inmem_append(DB *db,
-    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item);
+__wt_bt_page_inmem_append(DB *db, WT_PAGE *page, WT_ITEM *key, void *page_data);
 int
 __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip);
 int
@@ -89,7 +87,7 @@ __wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t));
 int
-__wt_db_verify_int(DB *db, void (*f)(const char *s, u_int64_t), FILE *fp);
+__wt_db_verify_int(WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *fp);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 void
@@ -98,6 +96,9 @@ void
 __wt_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
+int
+__wt_db_column_set_verify(DB *db,
+    u_int32_t fixed_len, const char *dictionary, u_int32_t flags);
 int
 __wt_env_db(ENV *env, DB **dbp);
 int
@@ -137,7 +138,7 @@ __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 void *
 __wt_cache_srvr(void *arg);
 int
-__wt_cache_dump(ENV *env, const char *ofile, FILE *fp);
+__wt_cache_dump(ENV *env);
 void
 __wt_api_env_err(ENV *env, int error, const char *fmt, ...);
 void

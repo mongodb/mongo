@@ -69,7 +69,7 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
  *	to an internal page.
  */
 int
-__wt_bt_ovfl_copy(WT_TOC *toc, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
+__wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
 {
 	DBT dbt;
 	WT_PAGE *ovfl_page;
@@ -99,7 +99,7 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_ITEM_OVFL *from, WT_ITEM_OVFL *copy)
  *	Copy an overflow item into allocated memory in a DBT.
  */
 int
-__wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_ITEM_OVFL *ovfl, DBT *copy)
+__wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy)
 {
 	DB *db;
 	WT_PAGE *ovfl_page;

@@ -17,14 +17,15 @@ int
 __wt_bt_build_verify(void)
 {
 	static const struct {
-		u_int s, c;
+		u_int s, c, align;
 		char *name;
 	} list[] = {
-		{ sizeof(WT_ITEM), WT_ITEM_SIZE, "WT_ITEM" },
-		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, "WT_PAGE_DESC" },
-		{ sizeof(WT_PAGE_HDR), WT_PAGE_HDR_SIZE, "WT_PAGE_HDR" },
-		{ sizeof(WT_ITEM_OFFP), WT_ITEM_OFFP_SIZE, "WT_ITEM_OFFP" },
-		{ sizeof(WT_ITEM_OVFL), WT_ITEM_OVFL_SIZE, "WT_ITEM_OVFL" }
+		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
+		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, 0, "WT_PAGE_DESC" },
+		{ sizeof(WT_PAGE_HDR),
+		    WT_PAGE_HDR_SIZE, sizeof(u_int32_t), "WT_PAGE_HDR" },
+		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
+		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" }
 	}, *lp;
 
 	/*
@@ -40,11 +41,14 @@ __wt_bt_build_verify(void)
 		    lp->name, lp->c, lp->s);
 		return (WT_ERROR);
 	}
-	if (WT_ALIGN(
-	    sizeof(WT_PAGE_HDR), sizeof(u_int32_t)) != WT_PAGE_HDR_SIZE) {
+
+	/* There are also structures that must be aligned correctly. */
+	for (lp = list; lp < list + sizeof(list) / sizeof(list[0]); ++lp) {
+		if (lp->align == 0 || WT_ALIGN(lp->s, lp->align) == lp->s)
+			continue;
 		__wt_api_env_errx(NULL,
-		    "Build verification failed, the WT_PAGE_HDR structure"
-		    " isn't aligned correctly");
+		    "Build verification failed, the %s structure is not"
+		    " correctly aligned", lp->name);
 		return (WT_ERROR);
 	}
 
@@ -85,19 +89,30 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 /*
  * __wt_bt_first_offp --
  *	In a couple of places in the code, we're trying to walk down the
- *	internal pages from the root, and we need to get the WT_ITEM_OFFP
- *	information for the first key/WT_ITEM_OFFP pair on the page.
+ *	internal pages from the root, and we need to get the WT_OFF
+ *	information for the first key/WT_OFF pair on the page.
  */
 void
 __wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp)
 {
 	WT_ITEM *item;
+	WT_PAGE_HDR *hdr;
 
-	item = (WT_ITEM *)WT_PAGE_BYTE(page);
-	item = WT_ITEM_NEXT(item);
+	hdr = page->hdr;
+	switch (hdr->type) {
+	case WT_PAGE_COL_INT:
+		*addrp = ((WT_OFF *)WT_PAGE_BYTE(page))-> addr;
+		*isleafp = F_ISSET(hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		item = (WT_ITEM *)WT_PAGE_BYTE(page);
+		item = WT_ITEM_NEXT(item);
 
-	*addrp = ((WT_ITEM_OFFP *)WT_ITEM_BYTE(item))->addr;
-	*isleafp = WT_ITEM_TYPE(item) == WT_ITEM_OFFP_LEAF ? 1 : 0;
+		*addrp = ((WT_OFF *)WT_ITEM_BYTE(item))->addr;
+		*isleafp = WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0;
+		break;
+	}
 }
 
 /*
@@ -106,7 +121,7 @@ __wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp)
  *	address positioned one past the last used byte on the page.
  */
 void
-__wt_set_ff_and_sa_from_addr(DB *db, WT_PAGE *page, u_int8_t *addr)
+__wt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *addr)
 {
 	page->first_free = addr;
 	page->space_avail = page->bytes - (u_int)(addr - (u_int8_t *)page->hdr);
@@ -120,18 +135,24 @@ const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 {
 	switch (hdr->type) {
-	case WT_PAGE_INVALID:
-		return ("invalid");
-	case WT_PAGE_OVFL:
-		return ("overflow");
-	case WT_PAGE_INT:
-		return ("primary internal");
-	case WT_PAGE_LEAF:
-		return ("primary leaf");
+	case WT_PAGE_COL_FIX:
+		return ("column fixed-length leaf");
+	case WT_PAGE_COL_INT:
+		return ("column internal");
+	case WT_PAGE_COL_VAR:
+		return ("column variable-length leaf");
 	case WT_PAGE_DUP_INT:
 		return ("duplicate internal");
 	case WT_PAGE_DUP_LEAF:
 		return ("duplicate leaf");
+	case WT_PAGE_OVFL:
+		return ("overflow");
+	case WT_PAGE_ROW_INT:
+		return ("row internal");
+	case WT_PAGE_ROW_LEAF:
+		return ("row leaf");
+	case WT_PAGE_INVALID:
+		return ("invalid");
 	default:
 		break;
 	}
@@ -146,22 +167,22 @@ const char *
 __wt_bt_item_type(WT_ITEM *item)
 {
 	switch (WT_ITEM_TYPE(item)) {
-	case WT_ITEM_KEY:
-		return ("key");
 	case WT_ITEM_DATA:
 		return ("data");
-	case WT_ITEM_DUP:
-		return ("duplicate");
-	case WT_ITEM_KEY_OVFL:
-		return ("key-overflow");
 	case WT_ITEM_DATA_OVFL:
 		return ("data-overflow");
+	case WT_ITEM_DUP:
+		return ("duplicate");
 	case WT_ITEM_DUP_OVFL:
 		return ("duplicate-overflow");
-	case WT_ITEM_OFFP_INTL:
-		return ("offpage-tree");
-	case WT_ITEM_OFFP_LEAF:
-		return ("offpage-leaf");
+	case WT_ITEM_KEY:
+		return ("key");
+	case WT_ITEM_KEY_OVFL:
+		return ("key-overflow");
+	case WT_ITEM_OFF_INT:
+		return ("offpage tree");
+	case WT_ITEM_OFF_LEAF:
+		return ("offpage leaf");
 	default:
 		break;
 	}

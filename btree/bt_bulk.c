@@ -8,6 +8,10 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_bulk_fix(DB *,
+    void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
+static int __wt_bt_bulk_var(DB *, u_int32_t,
+    void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
@@ -21,12 +25,96 @@ int
 __wt_db_bulk_load(DB *db, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
-	DBT *key, *data, key_copy, data_copy, key_compress, data_compress;
+	IDB *idb;
+
+	idb = db->idb;
+
+	if (F_ISSET(idb, WT_COLUMN))
+		WT_DB_FCHK(db, "DB.bulk_load", flags, 0);
+
+	/*
+	 * There are two styles of bulk-load: variable length pages or
+	 * fixed-length pages.
+	 */
+	if (F_ISSET(idb, WT_COLUMN) && db->fixed_len != 0)
+		return (__wt_bt_bulk_fix(db, f, cb));
+
+	return (__wt_bt_bulk_var(db, flags, f, cb));
+
+}
+
+/*
+ * __wt_bt_bulk_fix
+ *	Db.bulk_load method for column store, fixed-length database pages.
+ */
+static int
+__wt_bt_bulk_fix(DB *db,
+    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
+{
+	DBT *key, *data;
+	ENV *env;
+	WT_PAGE *page;
+	WT_TOC *toc;
+	u_int64_t insert_cnt;
+	int ret;
+
+	env = db->env;
+	insert_cnt = 0;
+
+	WT_RET(env->toc(env, 0, &toc));
+	WT_TOC_DB_INIT(toc, db, "Db.bulk_load");
+
+	/*
+	 * Allocate our first page -- we do this before we look at any keys
+	 * because the first key/data items may be overflow items, in which
+	 * case we would allocate page 0 as an overflow page, which is, for
+	 * lack of a better phrase, "bad".
+	 */
+	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
+	page->hdr->type = WT_PAGE_COL_FIX;
+
+	while ((ret = cb(db, &key, &data)) == 0)
+		if (key != NULL) {
+			__wt_db_errx(db,
+			    "recno database keys are implied and "
+			    "so should not be returned by the bulk "
+			    "load input routine");
+			ret = WT_ERROR;
+			goto err;
+		}
+
+	/* Get a permanent root page reference. */
+	WT_TRET(__wt_bt_root_page(toc));
+
+	/* Wrap up reporting. */
+	if (f != NULL)
+		f("Db.bulk_load", insert_cnt);
+
+	if (0) {
+err:		if (page != NULL)
+			(void)__wt_bt_page_out(toc, page, 0);
+	}
+
+	WT_TRET(toc->close(toc, 0));
+
+	return (ret == 1 ? 0 : ret);
+}
+
+/*
+ * __wt_bt_bulk_var --
+ *	Db.bulk_load method for row or column store variable-length database
+ *	pages.
+ */
+static int
+__wt_bt_bulk_var(DB *db, u_int32_t flags,
+    void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
+{
+	DBT *key, *data, key_copy, data_copy, key_comp, data_comp;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
 	IDB *idb;
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
-	WT_ITEM_OVFL key_ovfl, data_ovfl;
+	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
 	WT_TOC *toc;
 	u_int64_t insert_cnt;
@@ -37,16 +125,14 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	idb = db->idb;
 	ret = 0;
 
-	WT_ASSERT(env, LF_ISSET(WT_SORTED_INPUT));
-
 	dup_space = dup_count = 0;
 	insert_cnt = 0;
 
 	lastkey = &lastkey_std;
-	WT_CLEAR(data_compress);
+	WT_CLEAR(data_comp);
 	WT_CLEAR(data_copy);
 	WT_CLEAR(data_item);
-	WT_CLEAR(key_compress);
+	WT_CLEAR(key_comp);
 	WT_CLEAR(key_copy);
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_ovfl);
@@ -62,14 +148,26 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	 * lack of a better phrase, "bad".
 	 */
 	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
-	page->hdr->type = WT_PAGE_LEAF;
+	page->hdr->type =
+	    F_ISSET(idb, WT_COLUMN) ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 
 	while ((ret = cb(db, &key, &data)) == 0) {
-		if (key->size == 0) {
-			__wt_db_errx(db, "zero-length keys are not supported");
-			ret = WT_ERROR;
-			goto err;
-		}
+		if (F_ISSET(idb, WT_COLUMN) ) {
+			if (key != NULL) {
+				__wt_db_errx(db,
+				    "recno database keys are implied and "
+				    "so should not be returned by the bulk "
+				    "load input routine");
+				ret = WT_ERROR;
+				goto err;
+			}
+		} else
+			if (key->size == 0) {
+				__wt_db_errx(db,
+				    "zero-length keys are not supported");
+				ret = WT_ERROR;
+				goto err;
+			}
 
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
@@ -79,32 +177,42 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
 		 * copy them carefully, all we want is a pointer and a length.
+		 * Then, optionally compress using a Huffman engine.
+		 *
+		 * We don't have a key to store on the page if we're building a
+		 * column store, and we don't store the key on the page in the
+		 * case of a row store duplicate data item.  The check from here
+		 * on is if "key == NULL" for both cases, that is, there's no
+		 * key to store.
 		 */
-		key_copy.data = key->data;
-		key_copy.size = key->size;
-		key = &key_copy;
+		if (key != NULL) {
+			key_copy.data = key->data;
+			key_copy.size = key->size;
+			key = &key_copy;
+
+			if (idb->huffman_key != NULL) {
+				WT_RET(__wt_huffman_encode(idb->huffman_key,
+				    key->data, key->size, &key_comp.data,
+				    &key_comp.data_len, &key_comp.size));
+				if (key->size > key_comp.size)
+					WT_STAT_INCRV(
+					    idb->stats, BULK_HUFFMAN_KEY,
+					    key->size - key_comp.size);
+				key = &key_comp;
+			}
+		}
+
 		data_copy.data = data->data;
 		data_copy.size = data->size;
 		data = &data_copy;
-
-		/* Optional Huffman compression. */
-		if (idb->huffman_key != NULL) {
-			WT_RET(__wt_huffman_encode(idb->huffman_key,
-			    key->data, key->size, &key_compress.data,
-			    &key_compress.data_len, &key_compress.size));
-			if (key->size > key_compress.size)
-				WT_STAT_INCRV(idb->stats, BULK_HUFFMAN_KEY,
-				    key->size - key_compress.size);
-			key = &key_compress;
-		}
 		if (idb->huffman_data != NULL) {
 			WT_RET(__wt_huffman_encode(idb->huffman_data,
-			    data->data, data->size, &data_compress.data,
-			    &data_compress.data_len, &data_compress.size));
-			if (data->size > data_compress.size)
+			    data->data, data->size, &data_comp.data,
+			    &data_comp.data_len, &data_comp.size));
+			if (data->size > data_comp.size)
 				WT_STAT_INCRV(idb->stats, BULK_HUFFMAN_DATA,
-				    data->size - data_compress.size);
-			data = &data_compress;
+				    data->size - data_comp.size);
+			data = &data_comp;
 		}
 
 skip_read:	/*
@@ -114,9 +222,7 @@ skip_read:	/*
 
 		/*
 		 * Check for duplicate data; we don't store the key on the page
-		 * in the case of a duplicate.   The check through the rest of
-		 * this code is if "key" is NULL, it means we aren't going to
-		 * store anything for this key.
+		 * in the case of a duplicate.
 		 *
 		 * !!!
 		 * Do a fast check of the old and new sizes -- note checking
@@ -172,12 +278,14 @@ skip_read:	/*
 			data = &data_copy;
 
 			WT_ITEM_TYPE_SET(&data_item,
-			    key == NULL ? WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
+			    key == NULL && !F_ISSET(idb, WT_COLUMN) ?
+			    WT_ITEM_DUP_OVFL : WT_ITEM_DATA_OVFL);
 
 			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_DATA);
 		} else
 			WT_ITEM_TYPE_SET(&data_item,
-			    key == NULL ? WT_ITEM_DUP : WT_ITEM_DATA);
+			    key == NULL && !F_ISSET(idb, WT_COLUMN) ?
+			    WT_ITEM_DUP : WT_ITEM_DATA);
 
 		/*
 		 * We now have the key/data items to store on the page.  If
@@ -187,7 +295,8 @@ skip_read:	/*
 		if ((key == NULL ? 0 : WT_ITEM_SPACE_REQ(key->size)) +
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
 			WT_ERR(__wt_bt_page_alloc(toc, 1, &next));
-			next->hdr->type = WT_PAGE_LEAF;
+			next->hdr->type = F_ISSET(idb, WT_COLUMN) ?
+			    WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
 			next->hdr->prevaddr = page->addr;
 			page->hdr->nextaddr = next->addr;
 
@@ -256,8 +365,7 @@ skip_read:	/*
 			 * sets the page's parent address, which is the same for
 			 * the newly allocated page.
 			 */
-			WT_ERR(
-			    __wt_bt_promote(toc, page, page->records, NULL));
+			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
 
@@ -265,9 +373,10 @@ skip_read:	/*
 			page = next;
 		}
 
+		++page->records;
+
 		/* Copy the key item onto the page. */
 		if (key != NULL) {
-			++page->records;
 			++page->hdr->u.entries;
 
 			WT_ITEM_LEN_SET(&key_item, key->size);
@@ -379,8 +488,8 @@ err:		if (page != NULL)
 			(void)__wt_bt_page_out(toc, page, 0);
 	}
 
-	__wt_free(env, data_compress.data, data_compress.data_len);
-	__wt_free(env, key_compress.data, key_compress.data_len);
+	__wt_free(env, data_comp.data, data_comp.data_len);
+	__wt_free(env, key_comp.data, key_comp.data_len);
 	__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.data_len);
 
 	WT_TRET(toc->close(toc, 0));
@@ -402,8 +511,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	DBT *key, *data;
 	IDB *idb;
 	WT_ITEM data_item;
-	WT_ITEM_OFFP offpage_item;
-	WT_ITEM_OVFL data_local;
+	WT_OFF offpage_item;
+	WT_OVFL data_local;
 	WT_PAGE *next, *page;
 	u_int32_t len, root_addr;
 	u_int8_t *p;
@@ -455,7 +564,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	page->records = dup_count;
 	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
 	memcpy(page->first_free, dup_data, (size_t)len);
-	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page) + len);
+	__wt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page) + len);
 
 	/*
 	 * Unless we have enough duplicates to split this page, it will be the
@@ -466,7 +575,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	/*
 	 * Reset the caller's page entry count.   Once we know the final root
 	 * page and record count we'll replace the duplicate set with a single
-	 * WT_ITEM_OFFP structure, that is, we've replaced dup_count entries
+	 * WT_OFF structure, that is, we've replaced dup_count entries
 	 * with a single entry.
 	 */
 	leaf_page->hdr->u.entries -= (dup_count - 1);
@@ -555,76 +664,95 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 		ret = tret;
 
 	/*
-	 * Replace the caller's duplicate set with a WT_ITEM_OFFP structure,
+	 * Replace the caller's duplicate set with a WT_OFF structure,
 	 * and reset the caller's page information.
 	 */
-	WT_ITEM_LEN_SET(&data_item, sizeof(WT_ITEM_OFFP));
+	WT_ITEM_LEN_SET(&data_item, sizeof(WT_OFF));
 	WT_ITEM_TYPE_SET(&data_item,
-	    root_addr == page->addr ? WT_ITEM_OFFP_LEAF : WT_ITEM_OFFP_INTL);
-	WT_64_CAST(offpage_item.records) = dup_count,
+	    root_addr == page->addr ? WT_ITEM_OFF_LEAF : WT_ITEM_OFF_INT);
+	WT_RECORDS(&offpage_item) = dup_count,
 	offpage_item.addr = root_addr;
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
 	memcpy(p + sizeof(data_item), &offpage_item, sizeof(offpage_item));
-	__wt_set_ff_and_sa_from_addr(db, leaf_page,
-	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP)));
+	__wt_set_ff_and_sa_from_addr(leaf_page,
+	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
 	return (ret);
 }
 
 /*
  * __wt_bt_promote --
- *	Promote the first item on a page to a parent.
+ *	Promote the first WT_ITEM on a variable length page to a parent.
  */
 static int
 __wt_bt_promote(
     WT_TOC *toc, WT_PAGE *page, u_int64_t increment, u_int32_t *root_addrp)
 {
 	DB *db;
-	DBT key;
+	DBT *key, key_build;
 	WT_INDX *ip;
-	WT_ITEM *key_item, item, *parent_key, *parent_data;
-	WT_ITEM_OFFP offp, *parent_offp;
-	WT_ITEM_OVFL tmp_ovfl;
+	WT_ITEM *key_item, item, *parent_key;
+	WT_OFF off, *offp;
+	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	u_int32_t parent_addr, tmp_root_addr;
 	int need_promotion, ret, root_split;
+	void *parent_data;
 
 	db = toc->db;
 
-	WT_CLEAR(key);
 	WT_CLEAR(item);
+
 	if (root_addrp == NULL)
 		root_addrp = &tmp_root_addr;
 	next = parent = NULL;
 
 	/*
-	 * Get a copy of the first key on the page -- it might be an overflow
-	 * item, in which case we need to make a copy for the database.  Most
-	 * versions of Berkeley DB tried to reference count overflow items if
-	 * they were promoted to internal pages.  That turned out to be hard
-	 * to get right, so I'm not doing it again.
+	 * If it's a row store, get a copy of the first item on the page -- it
+	 * might be an overflow item, in which case we need to make a copy for
+	 * the database.  Most versions of Berkeley DB tried to reference count
+	 * overflow items if they were promoted to internal pages.  That turned
+	 * out to be hard to get right, so I'm not doing it again.
+	 *
+	 * If it's a column store page, we don't promote a key at all.
 	 */
-	key_item = (WT_ITEM *)WT_PAGE_BYTE(page);
-	switch (WT_ITEM_TYPE(key_item)) {
-	case WT_ITEM_DUP:
-	case WT_ITEM_KEY:
-		key.data = WT_ITEM_BYTE(key_item);
-		key.size = WT_ITEM_LEN(key_item);
-		WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
-		WT_ITEM_LEN_SET(&item, key.size);
+	switch (page->hdr->type) {
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		key = &key_build;
+		WT_CLEAR(key_build);
+
+		key_item = (WT_ITEM *)WT_PAGE_BYTE(page);
+		switch (WT_ITEM_TYPE(key_item)) {
+		case WT_ITEM_DUP:
+		case WT_ITEM_KEY:
+			key->data = WT_ITEM_BYTE(key_item);
+			key->size = WT_ITEM_LEN(key_item);
+			WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY);
+			WT_ITEM_LEN_SET(&item, key->size);
+			break;
+		case WT_ITEM_DUP_OVFL:
+		case WT_ITEM_KEY_OVFL:
+			WT_CLEAR(tmp_ovfl);
+			WT_RET(__wt_bt_ovfl_copy(toc,
+			    (WT_OVFL *)WT_ITEM_BYTE(key_item), &tmp_ovfl));
+			key->data = &tmp_ovfl;
+			key->size = sizeof(tmp_ovfl);
+			WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
+			WT_ITEM_LEN_SET(&item, sizeof(tmp_ovfl));
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
 		break;
-	case WT_ITEM_DUP_OVFL:
-	case WT_ITEM_KEY_OVFL:
-		WT_CLEAR(tmp_ovfl);
-		WT_RET(__wt_bt_ovfl_copy(toc,
-		    (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item), &tmp_ovfl));
-		key.data = &tmp_ovfl;
-		key.size = sizeof(tmp_ovfl);
-		WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
-		WT_ITEM_LEN_SET(&item, sizeof(tmp_ovfl));
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		key = NULL;
 		break;
-	WT_DEFAULT_FORMAT(db);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
@@ -688,10 +816,22 @@ __wt_bt_promote(
 	parent_addr = page->hdr->prntaddr;
 	if (parent_addr == WT_ADDR_INVALID) {
 split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
-		next->hdr->type =
-		    page->hdr->type == WT_PAGE_INT ||
-		    page->hdr->type == WT_PAGE_LEAF ?
-		    WT_PAGE_INT : WT_PAGE_DUP_INT;
+		switch (page->hdr->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_VAR:
+			next->hdr->type = WT_PAGE_COL_INT;
+			break;
+		case WT_PAGE_DUP_INT:
+		case WT_PAGE_DUP_LEAF:
+			next->hdr->type = WT_PAGE_DUP_INT;
+			break;
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			next->hdr->type = WT_PAGE_ROW_INT;
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
 
 		/*
 		 * Case #1 -- it's a modified root split, so if we're in the
@@ -741,7 +881,9 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		 *
 		 * Update the returned database level.
 		 */
-		if (root_split && next->hdr->type == WT_PAGE_INT)
+		if (root_split &&
+		   (next->hdr->type == WT_PAGE_COL_INT ||
+		   next->hdr->type == WT_PAGE_ROW_INT))
 			WT_ERR(__wt_bt_desc_write(toc, *root_addrp));
 
 		/* There's a new parent page, update the page's parent ref. */
@@ -755,39 +897,73 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 	}
 
 	/*
-	 * See if both chunks will fit (if they don't, we have to split).
-	 * We don't check for overflow keys: if the key was an overflow,
+	 * See if the promoted data will fit (if they don't, we have to split).
+	 * We don't need to check for overflow keys: if the key was an overflow,
 	 * we already created a smaller, on-page version of it.
+	 *
+	 * If there's room, copy the promoted data onto the parent's page.
 	 */
-	if (parent->space_avail <
-	    WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP)) +
-	    WT_ITEM_SPACE_REQ(key.size))
-		goto split;
+	switch (parent->hdr->type) {
+	case WT_PAGE_COL_INT:
+		if (parent->space_avail < sizeof(WT_OFF))
+			goto split;
 
-	/* Store the key. */
-	++parent->hdr->u.entries;
-	parent_key = (WT_ITEM *)parent->first_free;
-	memcpy(parent->first_free, &item, sizeof(item));
-	memcpy(parent->first_free + sizeof(item), key.data, key.size);
-	parent->first_free += WT_ITEM_SPACE_REQ(key.size);
-	parent->space_avail -= WT_ITEM_SPACE_REQ(key.size);
+		parent_key = NULL;
 
-	/* Create the OFFP reference. */
-	WT_ITEM_LEN_SET(&item, sizeof(WT_ITEM_OFFP));
-	WT_ITEM_TYPE_SET(&item,
-	    page->hdr->type == WT_PAGE_INT ||
-	    page->hdr->type == WT_PAGE_DUP_INT ?
-	    WT_ITEM_OFFP_INTL : WT_ITEM_OFFP_LEAF);
-	WT_64_CAST(offp.records) = page->records;
-	offp.addr = page->addr;
+		/* Create the WT_OFF reference. */
+		off.addr = page->addr;
+		WT_RECORDS(&off) = page->records;
 
-	/* Store the data item. */
-	++parent->hdr->u.entries;
-	parent_data = (WT_ITEM *)parent->first_free;
-	memcpy(parent->first_free, &item, sizeof(item));
-	memcpy(parent->first_free + sizeof(item), &offp, sizeof(offp));
-	parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
-	parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_ITEM_OFFP));
+		/* Store the data item. */
+		++parent->hdr->u.entries;
+		parent_data = parent->first_free;
+		memcpy(parent->first_free, &off, sizeof(off));
+		parent->first_free += sizeof(WT_OFF);
+		parent->space_avail -= sizeof(WT_OFF);
+
+		/*
+		 * Set the WT_OFFPAGE_REF_LEAF flag in the on-disk page, as
+		 * necessary.
+		 */
+		if (parent->hdr->u.entries == 1 &&
+		    (page->hdr->type == WT_PAGE_COL_FIX ||
+		    page->hdr->type == WT_PAGE_COL_VAR))
+			F_SET(parent->hdr, WT_OFFPAGE_REF_LEAF);
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		if (parent->space_avail <
+		    WT_ITEM_SPACE_REQ(sizeof(WT_OFF)) +
+		    WT_ITEM_SPACE_REQ(key->size))
+			goto split;
+
+		/* Store the key. */
+		++parent->hdr->u.entries;
+		parent_key = (WT_ITEM *)parent->first_free;
+		memcpy(parent->first_free, &item, sizeof(item));
+		memcpy(parent->first_free + sizeof(item), key->data, key->size);
+		parent->first_free += WT_ITEM_SPACE_REQ(key->size);
+		parent->space_avail -= WT_ITEM_SPACE_REQ(key->size);
+
+		/* Create the WT_ITEM(WT_OFF) reference. */
+		WT_ITEM_LEN_SET(&item, sizeof(WT_OFF));
+		WT_ITEM_TYPE_SET(&item,
+		    page->hdr->type == WT_PAGE_DUP_INT ||
+		    page->hdr->type == WT_PAGE_ROW_INT ?
+		    WT_ITEM_OFF_INT : WT_ITEM_OFF_LEAF);
+		WT_RECORDS(&off) = page->records;
+		off.addr = page->addr;
+
+		/* Store the data item. */
+		++parent->hdr->u.entries;
+		parent_data = parent->first_free;
+		memcpy(parent->first_free, &item, sizeof(item));
+		memcpy(parent->first_free + sizeof(item), &off, sizeof(off));
+		parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
+		parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
 
 	/* Append the new parent key index to the in-memory page structures. */
 	WT_ERR(__wt_bt_page_inmem_append(db, parent, parent_key, parent_data));
@@ -820,8 +996,16 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 			 * in each parent page.
 			 */
 			ip = parent->indx + (parent->indx_count - 1);
-			parent_offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(ip->ditem);
-			WT_64_CAST(parent_offp->records) += increment;
+			switch (parent->hdr->type) {
+			case WT_PAGE_COL_INT:
+				offp = (WT_OFF *)ip->page_data;
+				break;
+			case WT_PAGE_ROW_INT:
+				offp = (WT_OFF *)WT_ITEM_BYTE(ip->page_data);
+				break;
+			WT_ILLEGAL_FORMAT(db);
+			}
+			WT_RECORDS(offp) += increment;
 			parent->records += increment;
 		}
 

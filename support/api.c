@@ -268,6 +268,34 @@ static int __wt_api_db_close(
 	return (__wt_db_close(db));
 }
 
+static int __wt_api_db_column_set(
+	DB *db,
+	u_int32_t fixed_len,
+	const char *dictionary,
+	u_int32_t flags);
+static int __wt_api_db_column_set(
+	DB *db,
+	u_int32_t fixed_len,
+	const char *dictionary,
+	u_int32_t flags)
+{
+	ENV *env;
+
+	env = db->env;
+
+	WT_ENV_FCHK(env, "DB.column_set",
+	    flags, WT_APIMASK_DB_COLUMN_SET);
+
+	WT_RET((__wt_db_column_set_verify(db, fixed_len, dictionary, flags)));
+
+	__wt_lock(env, &env->ienv->mtx);
+	db->fixed_len = fixed_len;
+	db->dictionary = dictionary;
+	db->flags = flags;
+	__wt_unlock(&env->ienv->mtx);
+	return (0);
+}
+
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
@@ -994,6 +1022,9 @@ __wt_methods_db_lockout(DB *db)
 	db->bulk_load = (int (*)
 	    (DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout;
+	db->column_set = (int (*)
+	    (DB *, u_int32_t , const char *, u_int32_t ))
+	    __wt_db_lockout;
 	db->dump = (int (*)
 	    (DB *, FILE *, u_int32_t ))
 	    __wt_db_lockout;
@@ -1060,6 +1091,7 @@ __wt_methods_db_init_transition(DB *db)
 	db->btree_pagesize_get = __wt_api_db_btree_pagesize_get;
 	db->btree_pagesize_set = __wt_api_db_btree_pagesize_set;
 	db->close = __wt_api_db_close;
+	db->column_set = __wt_api_db_column_set;
 	db->errcall_get = __wt_api_db_errcall_get;
 	db->errcall_set = __wt_api_db_errcall_set;
 	db->errfile_get = __wt_api_db_errfile_get;
@@ -1090,6 +1122,9 @@ __wt_methods_db_open_transition(DB *db)
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
 	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    __wt_db_lockout;
+	db->column_set = (int (*)
+	    (DB *, u_int32_t , const char *, u_int32_t ))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
 	    (DB *, u_int8_t const *, u_int , u_int32_t ))

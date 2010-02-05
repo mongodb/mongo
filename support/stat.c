@@ -137,11 +137,16 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_MAGIC].desc = "magic number";
 	stats[WT_STAT_MAJOR].desc = "major version number";
 	stats[WT_STAT_MINOR].desc = "minor version number";
+	stats[WT_STAT_PAGE_COL_FIXED].desc =
+	    "column-store fixed-size leaf pages";
+	stats[WT_STAT_PAGE_COL_INTERNAL].desc = "column-store internal pages";
+	stats[WT_STAT_PAGE_COL_VARIABLE].desc =
+	    "column-store variable-size leaf pages";
 	stats[WT_STAT_PAGE_DUP_INTERNAL].desc = "duplicate internal pages";
 	stats[WT_STAT_PAGE_DUP_LEAF].desc = "duplicate leaf pages";
 	stats[WT_STAT_PAGE_FREE].desc = "unused on-page space in bytes";
-	stats[WT_STAT_PAGE_INTERNAL].desc = "primary internal pages";
-	stats[WT_STAT_PAGE_LEAF].desc = "primary leaf pages";
+	stats[WT_STAT_PAGE_INTERNAL].desc = "row-store internal pages";
+	stats[WT_STAT_PAGE_LEAF].desc = "row-store leaf pages";
 	stats[WT_STAT_PAGE_OVERFLOW].desc = "overflow pages";
 	stats[WT_STAT_TREE_LEVEL].desc = "number of levels in the Btree";
 
@@ -165,6 +170,9 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_MAGIC].v = 0;
 	stats[WT_STAT_MAJOR].v = 0;
 	stats[WT_STAT_MINOR].v = 0;
+	stats[WT_STAT_PAGE_COL_FIXED].v = 0;
+	stats[WT_STAT_PAGE_COL_INTERNAL].v = 0;
+	stats[WT_STAT_PAGE_COL_VARIABLE].v = 0;
 	stats[WT_STAT_PAGE_DUP_INTERNAL].v = 0;
 	stats[WT_STAT_PAGE_DUP_LEAF].v = 0;
 	stats[WT_STAT_PAGE_FREE].v = 0;

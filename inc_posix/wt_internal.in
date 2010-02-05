@@ -38,17 +38,11 @@ extern "C" {
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
-struct __wt_item;		typedef struct __wt_item WT_ITEM;
-struct __wt_item_offp;		typedef struct __wt_item_offp WT_ITEM_OFFP;
-struct __wt_item_ovfl;		typedef struct __wt_item_ovfl WT_ITEM_OVFL;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
 struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
-struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
-struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
-struct __wt_workq;		typedef struct __wt_workq WT_WORKQ;
 
 /*******************************************
  * Internal include files.
@@ -110,6 +104,8 @@ struct __idb {
 
 	WT_STATS *stats;		/* Database handle statistics */
 	WT_STATS *dstats;		/* Database file statistics */
+
+	u_int32_t flags;
 };
 
 /*******************************************
@@ -177,17 +173,17 @@ struct __ienv {
 	void	 *toc_array;		/* TOC array */
 
 	/*
-	 * WiredTiger allocates space for 5 hazard references in each thread of
+	 * WiredTiger allocates space for 10 hazard references in each thread of
 	 * control, by default.  The Env.hazard_max_set method tunes this if an
 	 * application needs more, but that shouldn't happen, there's no code
-	 * path that requires more than 5 pages at a time (and if we find one,
+	 * path that requires more than 10 pages at a time (and if we find one,
 	 * the right change is to increase the default).  The method is there
 	 * just in case an application starts failing in the field.
 	 *
 	 * The hazard array is separate from the WT_TOC array because we want to
 	 * be able to easily copy and search it when draining the cache.
 	 */
-#define	WT_HAZARD_SIZE_DEFAULT	5
+#define	WT_HAZARD_SIZE_DEFAULT	10
 	WT_PAGE	**hazard;		/* Hazard references array */
 
 	WT_CACHE  cache;		/* Page cache */

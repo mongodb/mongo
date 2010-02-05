@@ -103,7 +103,6 @@ struct __wt_toc {
 	int	 serial_ret;		/* Serialization function return */
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
-	WT_PAGE	**hazard_next;		/* Next hazard reference */
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -116,7 +115,7 @@ struct __wt_toc {
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 */
 
-	u_int32_t flags;
+	 u_int32_t flags;
 };
 
 /*******************************************
@@ -127,6 +126,8 @@ struct __db {
 	IDB	*idb;			/* Private object */
 
 	void	*app_private;		/* Application-private information */
+
+	u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -147,6 +148,9 @@ struct __db {
 	u_int32_t intlsize;
 	u_int32_t leafsize;
 	u_int32_t extsize;
+
+	u_int32_t fixed_len;
+	const char *dictionary;
 
 	void (*errcall)(const DB *, const char *);
 
@@ -203,6 +207,9 @@ struct __db {
 
 	int (*close)(
 	    DB *, u_int32_t );
+
+	int (*column_set)(
+	    DB *, u_int32_t , const char *, u_int32_t );
 
 	int (*dump)(
 	    DB *, FILE *, u_int32_t );
@@ -413,9 +420,10 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_ASCII_ENGLISH				0x00000008
 #define	WT_CACHE_DRAIN_WAIT				0x00000001
 #define	WT_CACHE_LOCKOUT				0x00000004
+#define	WT_COLUMN					0x00000002
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DUPLICATES					0x00000002
+#define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN					0x00000002
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
@@ -423,9 +431,9 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_MODIFIED					0x00000008
 #define	WT_PINNED					0x00000004
 #define	WT_PRINTABLES					0x00000001
+#define	WT_REPEAT_COMP					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SERVER_SLEEPING				0x00000001
-#define	WT_SORTED_INPUT					0x00000001
 #define	WT_TELEPHONE					0x00000001
 #define	WT_UNFORMATTED					0x00000002
 #define	WT_VERB_ALL					0x00000002
@@ -433,8 +441,9 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_CACHE				0x00000003
-#define	WT_APIMASK_DB_BULK_LOAD				0x00000003
+#define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000000
+#define	WT_APIMASK_DB_COLUMN_SET			0x00000001
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_GET_RECNO				0x00000000
@@ -452,6 +461,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
+#define	WT_APIMASK_IDB					0x00000003
 #define	WT_APIMASK_IENV					0x00000007
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_INDX				0x00000003

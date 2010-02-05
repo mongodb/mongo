@@ -354,9 +354,7 @@ methods['db.bulk_load'] = Api(
 	['flags/u_int32_t @S',
 	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
-	[
-	'DUPLICATES',
-	'SORTED_INPUT' ],
+	[ 'DUPLICATES' ],
 	['open'], [])
 
 methods['db.close'] = Api(
@@ -365,6 +363,15 @@ methods['db.close'] = Api(
 	['flags/u_int32_t @S'],
 	['__NONE__'],
 	['init'], [])
+
+methods['db.column_set'] = Api(
+	'db.column_set',
+	'method, setter, verify',
+	['fixed_len/u_int32_t @S',
+	 'dictionary/const char *@S',
+	 'flags/u_int32_t @S'],
+	[ 'REPEAT_COMP' ],
+	['init'], ['open'])
 
 methods['db.dump'] = Api(
 	'db.dump',
@@ -507,6 +514,9 @@ flags['wiredtiger_env_init'] = [ ]
 flags['cache'] = [
 	'INITIALIZED',
 	'SERVER_SLEEPING' ]
+flags['idb'] = [
+	'COLUMN',
+	'REPEAT_COMP' ]
 flags['ienv'] = [
 	'CACHE_LOCKOUT',
 	'WORKQ_RUN',

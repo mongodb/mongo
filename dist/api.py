@@ -118,10 +118,14 @@ def func_struct_variable_all(handle, f):
 # func_struct_variable
 #	Output include file getter/setter variables for a method.
 def func_struct_variable(args, f):
+	# Put blanks between each function's variables.
 	f.write('\n')
+
+	# Flags to the setter don't get propagated into the structure.
 	for l in args:
-		f.write('\t' + l.split
-		    ('/')[1].replace('@S', l.split('/')[0]) + ';\n')
+		if not l.count('flags'):
+			f.write('\t' + l.split
+			    ('/')[1].replace('@S', l.split('/')[0]) + ';\n')
 
 # func_method_decl --
 #	Generate the API methods declaration.

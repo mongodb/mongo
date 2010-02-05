@@ -101,6 +101,12 @@ idb_stats['DB_WRITE_BY_KEY'] = Stat(
 idb_dstats = {}
 idb_dstats['BASE_RECNO'] = Stat(
 	[], 'base record number')
+idb_dstats['PAGE_COL_INTERNAL'] = Stat(
+	[], 'column-store internal pages')
+idb_dstats['PAGE_COL_FIXED'] = Stat(
+	[], 'column-store fixed-size leaf pages')
+idb_dstats['PAGE_COL_VARIABLE'] = Stat(
+	[], 'column-store variable-size leaf pages')
 idb_dstats['EXTSIZE'] = Stat(
 	[], 'database extent size')
 idb_dstats['FRAGSIZE'] = Stat(
@@ -132,9 +138,9 @@ idb_dstats['PAGE_DUP_LEAF'] = Stat(
 idb_dstats['PAGE_FREE'] = Stat(
 	[], 'unused on-page space in bytes')
 idb_dstats['PAGE_INTERNAL'] = Stat(
-	[], 'primary internal pages')
+	[], 'row-store internal pages')
 idb_dstats['PAGE_LEAF'] = Stat(
-	[], 'primary leaf pages')
+	[], 'row-store leaf pages')
 idb_dstats['PAGE_OVERFLOW'] = Stat(
 	[], 'overflow pages')
 idb_dstats['TREE_LEVEL'] = Stat(
