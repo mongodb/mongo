@@ -18,12 +18,14 @@ static int  __wt_cache_discard_serial_func(WT_TOC *);
 static int  __wt_cache_in_serial_func(WT_TOC *);
 static int  __wt_cache_drain(
 		WT_TOC *, WT_DRAIN *, u_int32_t, WT_PAGE **, u_int32_t);
+static void __wt_cache_hazard_check(ENV *, WT_PAGE *);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
-static void __wt_cache_hazard_confirm(ENV *, WT_PAGE *);
 static int  __wt_cache_drain_compare_gen(const void *a, const void *b);
 static int  __wt_cache_drain_compare_page(const void *a, const void *b);
 static int  __wt_cache_hazard_compare(const void *a, const void *b);
+static int  __wt_hazard_clear(WT_TOC *, WT_PAGE *);
+static int  __wt_hazard_set(WT_TOC *, WT_PAGE *);
 
 /*
  * Page-in serialization support.
@@ -82,6 +84,55 @@ typedef struct {
 		F_CLR(toc, WT_CACHE_DRAIN_WAIT);			\
 	}								\
 } while (0)
+
+/*
+ * __wt_hazard_set --
+ *	Set a hazard reference.
+ */
+static void
+__wt_hazard_set(WT_TOC *toc, WT_PAGE *page)
+{
+	ENV *env;
+	WT_PAGE **hp;
+
+	env = toc->env;
+
+	/* Set the caller's hazard pointer. */
+	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
+		if (*hp == NULL) {
+			*hp = page;
+			WT_MEMORY_FLUSH;
+			return;
+		}
+	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
+}
+
+/*
+ * __wt_hazard_clear --
+ *	Clear a hazard reference.
+ */
+static void
+__wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
+{
+	ENV *env;
+	WT_PAGE **hp;
+
+	env = toc->env;
+
+	/* Clear the caller's hazard pointer. */
+	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
+		if (*hp == page) {
+			*hp = NULL;
+			/*
+			 * We don't have to flush memory here for correctness,
+			 * but that gives the drain thread immediate access to
+			 * the buffer.
+			 */
+			WT_MEMORY_FLUSH;
+			return;
+		}
+	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
+}
 
 /*
  * __wt_cache_create --
@@ -248,18 +299,15 @@ retry:		for (page = cache->hb[i]; page != NULL; page = page->next) {
 			 * Get a hazard reference so the page can't be discarded
 			 * underfoot.
 			 */
-			*toc->hazard_next++ = page;
-			WT_MEMORY_FLUSH;
+			__wt_hazard_set(toc, page);
 			if (page->drain) {
-				*--toc->hazard_next = NULL;
-				WT_MEMORY_FLUSH;
+				__wt_hazard_clear(toc, page);
 				__wt_sleep(0, 100000);
 				goto retry;
 			}
 
 			WT_RET(__wt_cache_write(env, page));
-			*--toc->hazard_next = NULL;
-			WT_MEMORY_FLUSH;
+			__wt_hazard_clear(toc, page);
 
 			if (f != NULL && ++fcnt % 10 == 0)
 				f("Db.sync", fcnt);
@@ -375,11 +423,9 @@ retry:	/* Search for the page in the cache. */
 		 * and sleep, and the I/O thread could wake us when the page is
 		 * ready.
 		 */
-		*toc->hazard_next++ = page;
-		WT_MEMORY_FLUSH;
+		__wt_hazard_set(toc, page);
 		if (page->drain) {
-			*--toc->hazard_next = NULL;
-			WT_MEMORY_FLUSH;
+			__wt_hazard_clear(toc, page);
 			__wt_sleep(0, 100000);
 			goto retry;
 		}
@@ -494,8 +540,7 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	 * don't need to do any further checking, no possible cache walk can
 	 * find the page without also finding our hazard reference.
 	 */
-	*toc->hazard_next++ = page;
-	WT_MEMORY_FLUSH;
+	__wt_hazard_set(toc, page);
 
 	/*
 	 * Insert as the head of the linked list.  The insert has to be thread
@@ -532,9 +577,14 @@ __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 	if (LF_ISSET(WT_MODIFIED))
 		F_SET(page, WT_MODIFIED);
 
-	/* Unformatted pages are discarded as soon as they're returned. */
+	/*
+	 * Unformatted pages were never linked on the cache chains, and are
+	 * discarded as soon as they're returned.
+	 */
 	if (F_ISSET(page, WT_UNFORMATTED))
 		__wt_bt_page_recycle(env, page);
+	else
+		__wt_hazard_clear(toc, page);
 
 	return (0);
 }
@@ -826,7 +876,7 @@ __wt_cache_discard_serial_func(WT_TOC *toc)
 	for (drain_cnt = 0; drain_cnt < drain_elem; ++drain_cnt, ++drain)
 		if ((page = drain->page) != NULL) {
 #ifdef HAVE_DIAGNOSTIC
-			__wt_cache_hazard_confirm(env, page);
+			__wt_cache_hazard_check(env, page);
 #endif
 			__wt_cache_discard(env, page);
 		}
@@ -909,26 +959,22 @@ __wt_cache_write(ENV *env, WT_PAGE *page)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_cache_hazard_confirm --
- *	Confirm a page isn't on the hazard list.
+ * __wt_cache_hazard_check --
+ *	Return if a page is or isn't on the hazard list.
  */
 static void
-__wt_cache_hazard_confirm(ENV *env, WT_PAGE *page)
+__wt_cache_hazard_check(ENV *env, WT_PAGE *page)
 {
 	IENV *ienv;
-	WT_PAGE **p;
+	WT_PAGE **hp;
 	WT_TOC **tp, *toc;
 
 	ienv = env->ienv;
 
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp)
-		for (p = toc->hazard; p < toc->hazard_next; ++p)
-			if (*p == page) {
-				fprintf(stderr,
-				    "%#lx: freeing hazard page\n",
-				    WT_ADDR_TO_ULONG(page));
-				break;
-			}
+		for (hp = toc->hazard;
+		    hp < toc->hazard + toc->env->hazard_size; ++hp)
+			WT_ASSERT(env, *hp != page);
 }
 
 /*

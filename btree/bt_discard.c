@@ -9,9 +9,10 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_intl(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_leaf(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_col_leaf(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_fixed_int(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
 /*
  * __wt_bt_page_alloc --
@@ -37,7 +38,7 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
 	/* Set the space-available and first-free byte. */
-	__wt_set_ff_and_sa_from_addr(db, page, WT_PAGE_BYTE(page));
+	__wt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
 
 	/* If we're allocating page 0, initialize the WT_PAGE_DESC structure. */
 	if (page->addr == 0)
@@ -81,27 +82,9 @@ __wt_bt_page_in(
 int
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
-	WT_PAGE **hp;
-
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
-	/* Discard the caller's hazard pointer. */
-	for (hp = toc->hazard; hp < toc->hazard_next; ++hp)
-		if (*hp == page)
-			break;
-	WT_ASSERT(toc->env, hp < toc->hazard_next);
-	--toc->hazard_next;
-	*hp = *toc->hazard_next;
-	*toc->hazard_next = NULL;
-
-	/*
-	 * We don't have to flush memory here for correctness, but doing so
-	 * gives the cache drain code immediate access to the buffer.
-	 */
-	WT_MEMORY_FLUSH;
-
-	/* We don't have to call the cache code unless the page was modified. */
-	return (flags == 0 ? 0 : __wt_cache_out(toc, page, flags));
+	return (__wt_cache_out(toc, page, flags));
 }
 
 /*
@@ -149,30 +132,38 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	hdr = page->hdr;
 	ret = 0;
 
-	/* Figure out how many indexes we'll need for this page. */
+	/*
+	 * Figure out how many indexes we'll need for this page.
+	 *
+	 * Track the most indexes we find on internal pages, used if we
+	 * allocate new internal pages.
+	 */
 	switch (hdr->type) {
-	case WT_PAGE_INT:
+	case WT_PAGE_COL_INT:
+		nindx = hdr->u.entries;
+		if (idb->indx_size_hint < nindx)
+			idb->indx_size_hint = nindx;
+		break;
 	case WT_PAGE_DUP_INT:
-		/*
-		 * Track the most indexes we find on an internal page in this
-		 * database, used if we allocate new internal pages.
-		 */
+	case WT_PAGE_ROW_INT:
 		nindx = hdr->u.entries / 2;
 		if (idb->indx_size_hint < nindx)
 			idb->indx_size_hint = nindx;
 		break;
-	case WT_PAGE_LEAF:
-		nindx = hdr->u.entries / 2;
-		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
 		nindx = hdr->u.entries;
 		break;
-	WT_DEFAULT_FORMAT(db);
+	case WT_PAGE_ROW_LEAF:
+		nindx = hdr->u.entries / 2;
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
 	/*
 	 * We may be passed a page with a too-small indx array -- in that case,
-	 * build one of the appropriate size.   We can simply free the indx
+	 * allocate one of the appropriate size.   We can simply free the indx
 	 * array, as any allocated memory in the array  will have have already
 	 * been freed.
 	 */
@@ -185,34 +176,37 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	}
 
 	switch (hdr->type) {
-	case WT_PAGE_INT:
+	case WT_PAGE_COL_INT:
+		ret = __wt_bt_page_inmem_fixed_int(db, page);
+		break;
 	case WT_PAGE_DUP_INT:
-		ret = __wt_bt_page_inmem_intl(db, page);
+	case WT_PAGE_ROW_INT:
+		ret = __wt_bt_page_inmem_item_int(db, page);
 		break;
-	case WT_PAGE_LEAF:
-		ret = __wt_bt_page_inmem_leaf(db, page);
-		break;
+	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
-		ret = __wt_bt_page_inmem_dup_leaf(db, page);
+		ret = __wt_bt_page_inmem_col_leaf(db, page);
 		break;
-	WT_DEFAULT_FORMAT(db);
+	case WT_PAGE_ROW_LEAF:
+		ret = __wt_bt_page_inmem_row_leaf(db, page);
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 	return (ret);
 }
 
 /*
  * __wt_bt_page_inmem_append --
- *	Append a new WT_ITEM_KEY/WT_ITEM_OFFP pair to an internal page's
- *	in-memory information.
+ *	Append a new WT_ITEM_KEY/WT_OFF pair to an internal page's in-memory
+ *	information.
  */
 int
-__wt_bt_page_inmem_append(DB *db,
-    WT_PAGE *page, WT_ITEM *key_item, WT_ITEM *data_item)
+__wt_bt_page_inmem_append(DB *db, WT_PAGE *page, WT_ITEM *key, void *page_data)
 {
 	ENV *env;
 	IDB *idb;
 	WT_INDX *indx;
-	WT_ITEM_OVFL *ovfl;
+	WT_OVFL *ovfl;
 	u_int32_t bytes, n;
 
 	env = db->env;
@@ -233,42 +227,51 @@ __wt_bt_page_inmem_append(DB *db,
 		    &bytes, n * sizeof(page->indx[0]), &page->indx)));
 		page->indx_size = n;
 	}
+
+	/* Add in the new index entry. */
 	indx = page->indx + page->indx_count;
 	++page->indx_count;
 
-	switch (WT_ITEM_TYPE(key_item)) {
-	case WT_ITEM_KEY:
-		indx->data = WT_ITEM_BYTE(key_item);
-		indx->size = WT_ITEM_LEN(key_item);
-		break;
-	case WT_ITEM_KEY_OVFL:
-		ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(key_item);
-		indx->size = ovfl->len;
-		break;
-	WT_DEFAULT_FORMAT(db);
+	/*
+	 * If there's a key, fill it in.  On-page keys are directly referenced.
+	 * Overflow keys, we grab the size but otherwise leave them alone.
+	 */
+	if (key != NULL) {
+		switch (WT_ITEM_TYPE(key)) {
+		case WT_ITEM_KEY:
+			indx->data = WT_ITEM_BYTE(key);
+			indx->size = WT_ITEM_LEN(key);
+			break;
+		case WT_ITEM_KEY_OVFL:
+			ovfl = (WT_OVFL *)WT_ITEM_BYTE(key);
+			indx->size = ovfl->len;
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
+
+		if (idb->huffman_key != NULL)
+			F_SET(indx, WT_HUFFMAN);
 	}
 
-	if (idb->huffman_key != NULL)
-		F_SET(indx, WT_HUFFMAN);
-
-	indx->ditem = data_item;
+	/* Fill in the on-page data. */
+	indx->page_data = page_data;
 
 	return (0);
 }
 
 /*
- * __wt_bt_page_inmem_intl --
- *	Build in-memory index for primary and off-page duplicate tree internal
- *	pages.
+ * __wt_bt_page_inmem_item_int --
+ *	Build in-memory index for row store and off-page duplicate tree
+ *	internal pages.
  */
 static int
-__wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
-	WT_ITEM_OFFP *offp;
-	WT_ITEM_OVFL *ovfl;
+	WT_OFF *offp;
+	WT_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i;
@@ -294,52 +297,88 @@ __wt_bt_page_inmem_intl(DB *db, WT_PAGE *page)
 				F_SET(indx, WT_HUFFMAN);
 			break;
 		case WT_ITEM_KEY_OVFL:
-			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
+			ovfl = (WT_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
 			if (idb->huffman_key != NULL)
 				F_SET(indx, WT_HUFFMAN);
 			break;
-		case WT_ITEM_OFFP_INTL:
-		case WT_ITEM_OFFP_LEAF:
-			offp = (WT_ITEM_OFFP *)WT_ITEM_BYTE(item);
-			records += WT_64_CAST(offp->records);
-			indx->ditem = item;
+		case WT_ITEM_OFF_INT:
+		case WT_ITEM_OFF_LEAF:
+			offp = (WT_OFF *)WT_ITEM_BYTE(item);
+			records += WT_RECORDS(offp);
+			indx->page_data = item;
 			++indx;
 			break;
-		WT_DEFAULT_FORMAT(db);
+		WT_ILLEGAL_FORMAT(db);
 		}
 
 	page->indx_count = hdr->u.entries / 2;
 	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
 /*
- * __wt_bt_page_inmem_leaf --
- *	Build in-memory index for primary leaf pages.
+ * __wt_bt_page_inmem_fixed_int --
+ *	Build in-memory index for column store internal pages.
  */
 static int
-__wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_fixed_int(DB *db, WT_PAGE *page)
+{
+	WT_INDX *indx;
+	WT_OFF *offp;
+	WT_PAGE_HDR *hdr;
+	u_int64_t records;
+	u_int32_t i;
+
+	hdr = page->hdr;
+	indx = page->indx;
+	records = 0;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains WT_OFF structures.
+	 */
+	WT_OFF_FOREACH(page, offp, i) {
+		indx->page_data = offp;
+		++indx;
+		records += WT_RECORDS(offp);
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = records;
+
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
+	return (0);
+}
+
+/*
+ * __wt_bt_page_inmem_row_leaf --
+ *	Build in-memory index for row store leaf pages.
+ */
+static int
+__wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_INDX *indx;
 	WT_ITEM *item;
-	WT_ITEM_OVFL *ovfl;
 	u_int32_t i, indx_count;
+	u_int64_t records;
 
 	idb = db->idb;
+	records = 0;
 
 	/*
-	 * Walk the page, building indices and finding the end of the page.
+	 * Walk a row-store page of WT_ITEMs, building indices and finding the
+	 * end of the page.
 	 *
-	 *	The page contains sorted key/data sets.  Keys are on-page
-	 *	(WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.  The data
-	 *	sets are either: a single on-page (WT_ITEM_DATA) or overflow
-	 *	(WT_ITEM_DATA_OVFL) item; a group of duplicate data items
-	 *	where each duplicate is an on-page (WT_ITEM_DUP) or overflow
-	 *	(WT_ITEM_DUP_OVFL) item; an offpage reference (WT_ITEM_OFFPAGE).
+	 * The page contains key/data pairs.  Keys are on-page (WT_ITEM_KEY) or
+	 * overflow (WT_ITEM_KEY_OVFL) items.  The data sets are either: a
+	 * single on-page (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item;
+	 * a group of duplicate data items where each duplicate is an on-page
+	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
+	 * reference (WT_ITEM_OFF_LEAF or WT_ITEM_OFF_INT).
 	 */
 	indx = NULL;
 	indx_count = 0;
@@ -350,7 +389,6 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 				indx = page->indx;
 			else
 				++indx;
-
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
 			if (idb->huffman_key != NULL)
@@ -363,9 +401,7 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 				indx = page->indx;
 			else
 				++indx;
-
-			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
-			indx->size = ovfl->len;
+			indx->size = ((WT_OVFL *)WT_ITEM_BYTE(item))->len;
 			if (idb->huffman_key != NULL)
 				F_SET(indx, WT_HUFFMAN);
 
@@ -375,35 +411,40 @@ __wt_bt_page_inmem_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP:
 		case WT_ITEM_DUP_OVFL:
-		case WT_ITEM_OFFP_INTL:
-		case WT_ITEM_OFFP_LEAF:
 			/*
-			 * BUG!!!
-			 * Can indx->ditem ever be NULL here?
+			 * The page_data field references the first of the
+			 * duplicate data sets, only set it if it hasn't yet
+			 * been set.
 			 */
-			if (indx->ditem == NULL)
-				indx->ditem = item;
+			if (indx->page_data == NULL)
+				indx->page_data = item;
+			++records;
 			break;
-		WT_DEFAULT_FORMAT(db);
+		case WT_ITEM_OFF_INT:
+		case WT_ITEM_OFF_LEAF:
+			indx->page_data = item;
+			records += WT_INDX_ITEM_OFF_RECORDS(indx);
+			break;
+		WT_ILLEGAL_FORMAT(db);
 		}
 
 	page->indx_count = indx_count;
-	page->records = indx_count;
+	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
 /*
- * __wt_bt_page_inmem_dup_leaf --
- *	Build in-memory index for off-page duplicate tree leaf pages.
+ * __wt_bt_page_inmem_col_leaf --
+ *	Build in-memory index for variable-length, data-only leaf pages.
  */
 static int
-__wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_col_leaf(DB *db, WT_PAGE *page)
 {
 	WT_INDX *indx;
 	WT_ITEM *item;
-	WT_ITEM_OVFL *ovfl;
+	WT_OVFL *ovfl;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 
@@ -418,24 +459,26 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	indx = page->indx;
 	WT_ITEM_FOREACH(page, item, i) {
 		switch (WT_ITEM_TYPE(item)) {
+		case WT_ITEM_DATA:
 		case WT_ITEM_DUP:
 			indx->data = WT_ITEM_BYTE(item);
 			indx->size = WT_ITEM_LEN(item);
 			break;
 		case WT_ITEM_DATA_OVFL:
-			ovfl = (WT_ITEM_OVFL *)WT_ITEM_BYTE(item);
+		case WT_ITEM_DUP_OVFL:
+			ovfl = (WT_OVFL *)WT_ITEM_BYTE(item);
 			indx->size = ovfl->len;
 			break;
-		WT_DEFAULT_FORMAT(db);
+		WT_ILLEGAL_FORMAT(db);
 		}
-		indx->ditem = item;
+		indx->page_data = item;
 		++indx;
 	}
 
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
 
-	__wt_set_ff_and_sa_from_addr(db, page, (u_int8_t *)item);
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -470,7 +513,7 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip)
 	is_overflow = ip->data == NULL ? 1 : 0;
 	if (is_overflow) {
 		WT_RET(__wt_bt_ovfl_in(
-		    toc, WT_INDX_OVFL_ADDR(ip), ip->size, &ovfl_page));
+		    toc, WT_INDX_ITEM_OVFL_ADDR(ip), ip->size, &ovfl_page));
 		p = WT_PAGE_BYTE(ovfl_page);
 	} else
 		p = ip->data;
