@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    string sayClientState();
+
     /* mutex time stats */
     class MutexInfo {
         unsigned long long start, enter, timeLocked; // all in microseconds
@@ -89,7 +91,7 @@ namespace mongo {
                 _state.set(s+1);
                 return;
             }
-            massert( 10293 , "internal error: locks are not upgradeable", s == 0 );
+            massert( 10293 , (string)"internal error: locks are not upgradeable: " + sayClientState() , s == 0 );
             _state.set(1);
             _m.lock(); 
             _minfo.entered();

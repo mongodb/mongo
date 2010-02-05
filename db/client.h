@@ -197,6 +197,8 @@ namespace mongo {
         bool isGod() const { return _god; }
 
         friend class CurOp;
+
+        string toString() const;
     };
     
     inline Client& cc() { 
@@ -240,6 +242,8 @@ namespace mongo {
                 cc().getContext()->unlocked();
         }
     }
+
+    string sayClientState();
     
 };
 

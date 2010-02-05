@@ -141,4 +141,18 @@ namespace mongo {
         _client->_context = _oldContext; // note: _oldContext may be null
     }
 
+    string Client::toString() const {
+        stringstream ss;
+        if ( _curOp )
+            ss << _curOp->infoNoauth().jsonString();
+        return ss.str();
+    }
+
+    string sayClientState(){
+        Client* c = currentClient.get();
+        if ( ! c )
+            return "no client";
+        return c->toString();
+    }
+
 }
