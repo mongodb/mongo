@@ -192,8 +192,9 @@ namespace mongo {
         BSONObj infoNoauth() {
             BSONObjBuilder b;
             b.append("opid", _opNum);
-            b.append("active", _active);
-            if( _active ) 
+            bool a = _active && _start;
+            b.append("active", a);
+            if( a ) 
                 b.append("secs_running", elapsedSeconds() );
             if( _op == 2004 ) 
                 b.append("op", "query");
