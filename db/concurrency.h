@@ -17,11 +17,20 @@
 #include <boost/thread/shared_mutex.hpp>
 #undef assert
 #define assert xassert
+#define HAVE_READLOCK
 #else
 #warning built with boost version 1.34 or older limited concurrency
 #endif
 
 namespace mongo {
+
+    inline bool readLockSupported(){
+#ifdef HAVE_READLOCK
+        return true;
+#else
+        return false;
+#endif
+    }
 
     string sayClientState();
 
@@ -58,7 +67,7 @@ namespace mongo {
         }
     };
 
-#if BOOST_VERSION >= 103500
+#ifdef HAVE_READLOCK
 //#if 0
     class MongoMutex {
         MutexInfo _minfo;
@@ -170,7 +179,7 @@ namespace mongo {
     public:
         MongoMutex() { }
         void lock() { 
-#if BOOST_VERSION >= 103500
+#ifdef HAVE_READLOCK
             m.lock();
 #else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
@@ -187,7 +196,7 @@ namespace mongo {
 
         void _unlock() {
             _minfo.leaving();
-#if BOOST_VERSION >= 103500
+#ifdef HAVE_READLOCK
             m.unlock();
 #else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
