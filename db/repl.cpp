@@ -1585,7 +1585,8 @@ namespace mongo {
                 stringstream ss;
                 ss << "repl: sleep " << s << "sec before next pass";
                 string msg = ss.str();
-                log() << msg << endl;
+                if ( ! cmdLine.quiet )
+                    log() << msg << endl;
                 ReplInfo r(msg.c_str());
                 sleepsecs(s);
             }
