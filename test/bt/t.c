@@ -41,6 +41,7 @@ FILE *logfp;
 char *logfile;
 
 void	data_set(int, void *, u_int32_t *, int);
+int	dtype_arg(void);
 void	key_set(int, void *, u_int32_t *);
 int	load(void);
 void	progress(const char *, u_int64_t);
@@ -202,16 +203,21 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
-		if (rand_huffman &&
-		    (dtype == TYPE_COLUMN_VAR || dtype == TYPE_ROW))
-			huffman = rand() % 2;
+		switch (dtype) {
+		case TYPE_ROW:
+		case TYPE_COLUMN_VAR:
+			if (rand_huffman)
+				huffman = rand() % 2;
+			break;
+		case TYPE_COLUMN_FIX:
+			break;
+		}
 
 		(void)printf(
 		    "%s: %4d { -t %c -c %2d -h %d -k %7d -l %6d -n %6d "
 		    "-R %010u }\n\t",
-		    progname, run_cnt,
-		    dtype == TYPE_COLUMN_VAR ? 'c' : 'r',
-		    cachesize, huffman, keys, leafsize, nodesize, r);
+		    progname, run_cnt, dtype_arg(), cachesize,
+		    huffman, keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		setup();
@@ -380,8 +386,8 @@ read_check_col()
 		}
 
 		/*
-		 * Get local copies of the key/data pair, and check to see
-		 * if the retrieved key/data pair is the same.
+		 * Get local copies of the data, and check to see the retrieved
+		 * data is the same.
 		 */
 		data_set(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
@@ -420,9 +426,6 @@ read_check_row()
 
 	assert(env->toc(env, 0, &toc) == 0);
 
-	if (dtype != TYPE_ROW)
-		goto recno;
-
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
 		cnt += rand() % 37 + 1;
@@ -460,7 +463,7 @@ read_check_row()
 		}
 	}
 
-recno:	/* Check a random subset of the records using the record number. */
+	/* Check a random subset of the records using the record number. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
 		cnt += rand() % 41 + 1;
 		if (cnt > keys)
@@ -625,6 +628,19 @@ progress(const char *s, u_int64_t i)
 	*p = '\0';
 	(void)printf("%s", msg);
 	(void)fflush(stdout);
+}
+
+int
+dtype_arg()
+{
+	switch (dtype) {
+	case TYPE_COLUMN_FIX:
+		return 'f';
+	case TYPE_COLUMN_VAR:
+		return 'c';
+	case TYPE_ROW:
+		return 'r';
+	}
 }
 
 void
