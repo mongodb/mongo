@@ -94,8 +94,7 @@ main(int argc, char *argv[])
 			goto err;
 		}
 
-		if ((ret = db->bulk_load(db,
-		    WT_DUPLICATES | WT_SORTED_INPUT,
+		if ((ret = db->bulk_load(db, WT_DUPLICATES,
 		    verbose ? __wt_progress : NULL, bulk_callback)) != 0) {
 			fprintf(stderr, "%s: Db.bulk_load: %s\n",
 			    progname, wiredtiger_strerror(ret));
