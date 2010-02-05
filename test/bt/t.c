@@ -23,12 +23,14 @@ int nodesize = 0;				/* Node page size */
 int runs = 0;					/* Runs: default forever */
 int verbose = 0;				/* Verbose debugging */
 
-int a_dump = 0;					/* Dump database */
-int a_reopen = 0;				/* Sync and reopen database */
-int a_verify = 0;				/* Verify database */
+int op_dump = 0;				/* Dump database */
+int op_reopen = 0;				/* Sync and reopen database */
+int op_verify = 0;				/* Verify database */
 
 enum {						/* Statistics */
-    STAT_NONE, STAT_ALL, STAT_LOAD, STAT_READ, STAT_WRITE } a_stat = STAT_NONE;
+    STAT_NONE, STAT_ALL, STAT_LOAD, STAT_READ, STAT_WRITE } stat_op = STAT_NONE;
+enum {						/* Database type */
+    TYPE_COLUMN_FIX, TYPE_COLUMN_VAR, TYPE_ROW } dtype;
 
 const char *progname;
 
@@ -55,6 +57,7 @@ main(int argc, char *argv[])
 	u_int r;
 	int ch, i, ret, run_cnt;
 	int rand_cache, rand_huffman, rand_keys, rand_leaf, rand_node;
+	int rand_type;
 
 	(void)putenv("MALLOC_OPTIONS=AJZ");
 	ret = 0;
@@ -65,19 +68,20 @@ main(int argc, char *argv[])
 		++progname;
 
 	r = 0xdeadbeef ^ (u_int)time(NULL);
-	rand_cache = rand_huffman = rand_keys = rand_leaf = rand_node =  1;
-	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:s:v")) != EOF)
+	rand_cache =
+	    rand_huffman = rand_keys = rand_leaf = rand_node = rand_type = 1;
+	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:s:t:v")) != EOF)
 		switch (ch) {
 		case 'a':
 			switch (optarg[0]) {
 			case 'd':
-				a_dump = 1;
+				op_dump = 1;
 				break;
 			case 'r':
-				a_reopen = 1;
+				op_reopen = 1;
 				break;
 			case 'v':
-				a_verify = 1;
+				op_verify = 1;
 				break;
 			}
 			break;
@@ -113,19 +117,36 @@ main(int argc, char *argv[])
 		case 's':
 			switch (optarg[0]) {
 			case 'l':
-				a_stat = STAT_LOAD;
+				stat_op = STAT_LOAD;
 				break;
 			case 'r':
-				a_stat = STAT_READ;
+				stat_op = STAT_READ;
 				break;
 			case 'w':
-				a_stat = STAT_WRITE;
+				stat_op = STAT_WRITE;
 				break;
 			default:
-				a_stat = STAT_ALL;
+				stat_op = STAT_ALL;
 				break;
 			}
 			break;
+		case 't':
+			switch (optarg[0]) {
+			case 'f':
+				rand_type = 0;
+				dtype = TYPE_COLUMN_FIX;
+				break;
+			case 'v':
+				rand_type = 0;
+				dtype = TYPE_COLUMN_VAR;
+				break;
+			case 'r':
+			default:
+				rand_type = 0;
+				dtype = TYPE_ROW;
+				break;
+			}
+				
 		case 'v':
 			verbose = 1;
 			break;
@@ -151,6 +172,17 @@ main(int argc, char *argv[])
 
 		srand(r);
 
+		/* If no database type, pick one. */
+		if (rand_type == 1)
+			switch (rand() % 2) {
+			case 0:
+				dtype = TYPE_COLUMN_VAR;
+				break;
+			default:
+				dtype = TYPE_ROW;
+				break;
+			}
+
 		/* If no number of keys, choose up to 1M. */
 		if (rand_keys)
 			keys = 1 + rand() % 999999;
@@ -170,14 +202,16 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
-		if (rand_huffman)
+		if (rand_huffman &&
+		    (dtype == TYPE_COLUMN_VAR || dtype == TYPE_ROW))
 			huffman = rand() % 2;
 
 		(void)printf(
-		    "%s: %4d { -c %2d -h %d -k %7d -l %6d -n %6d "
+		    "%s: %4d { -t %c -c %2d -h %d -k %7d -l %6d -n %6d "
 		    "-R %010u }\n\t",
-		    progname, run_cnt, cachesize, huffman, keys,
-		    leafsize, nodesize, r);
+		    progname, run_cnt,
+		    dtype == TYPE_COLUMN_VAR ? 'c' : 'r',
+		    cachesize, huffman, keys, leafsize, nodesize, r);
 		(void)fflush(stdout);
 
 		setup();
@@ -185,19 +219,27 @@ main(int argc, char *argv[])
 			goto err;
 
 #if 1
-		if (a_reopen) {
+		if (op_reopen) {
 			teardown();
 			setup();
 		}
-		if (write_check() != 0)
+		if (dtype == TYPE_ROW && write_check() != 0)
 			goto err;
 
-		if (a_reopen) {
+		if (op_reopen) {
 			teardown();
 			setup();
 		}
-		if (read_check() != 0)
-			goto err;
+		switch (dtype) {
+		case TYPE_ROW:
+			if (read_check_row() != 0)
+				goto err;
+			break;
+		case TYPE_COLUMN_VAR:
+			if (read_check_col() != 0)
+				goto err;
+			break;
+		}
 #endif
 		teardown();
 
@@ -227,6 +269,16 @@ setup()
 	assert(env->cache_size_set(env, (u_int32_t)cachesize) == 0);
 	assert(db->btree_pagesize_set(
 	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
+	switch (dtype) {
+	case TYPE_COLUMN_FIX:
+		assert(db->column_set(db, 0, NULL, 0) == 0);
+		break;
+	case TYPE_COLUMN_VAR:
+		assert(db->column_set(db, 0, NULL, 0) == 0);
+		break;
+	case TYPE_ROW:
+		break;
+	}
 	if (huffman)
 		assert(db->huffman_set(db, NULL, 0,
 		    WT_ASCII_ENGLISH|WT_HUFFMAN_DATA|WT_HUFFMAN_KEY) == 0);
@@ -247,10 +299,13 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	if (++keys_cnt == keys + 1)
 		return (1);
 
-	key_set(keys_cnt, &key.data, &key.size);
+	if (dtype == TYPE_ROW) {
+		key_set(keys_cnt, &key.data, &key.size);
+		*keyp = &key;
+	} else
+		*keyp = NULL;
 	data_set(keys_cnt, &data.data, &data.size, 0);
     
-	*keyp = &key;
 	*datap = &data;
 
 	return (0);
@@ -264,12 +319,12 @@ load()
 	keys_cnt = 0;
 
 	assert(db->bulk_load(db,
-	    WT_DUPLICATES | WT_SORTED_INPUT, track, cb_bulk) == 0);
+	    dtype == TYPE_ROW ? WT_DUPLICATES : 0, track, cb_bulk) == 0);
 
-	if (a_reopen)
+	if (op_reopen)
 		assert(db->sync(db, track, 0) == 0);
 
-	if (a_dump) {
+	if (op_dump) {
 		progress("debug dump", 0);
 		assert((fp = fopen(MYDUMP, "w")) != NULL);
 		assert(db->dump(db, fp, WT_DEBUG) == 0);
@@ -281,10 +336,10 @@ load()
 		assert(fclose(fp) == 0);
 	}
 
-	if (a_verify)
+	if (op_verify)
 		assert(db->verify(db, track, 0) == 0);
 
-	if (a_stat == STAT_ALL || a_stat == STAT_LOAD) {
+	if (stat_op == STAT_ALL || stat_op == STAT_LOAD) {
 		(void)printf("\nLoad statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -293,7 +348,65 @@ load()
 }
 
 int
-read_check()
+read_check_col()
+{
+	DBT data;
+	WT_TOC *toc;
+	u_int64_t cnt, last_cnt;
+	u_int32_t dlen;
+	char *dbuf;
+	int ret;
+
+	memset(&data, 0, sizeof(data));
+
+	assert(env->toc(env, 0, &toc) == 0);
+
+	/* Check a random subset of the records using the record number. */
+	for (last_cnt = cnt = 0; cnt < keys;) {
+		cnt += rand() % 41 + 1;
+		if (cnt > keys)
+			cnt = keys;
+		if (cnt - last_cnt > 1000) {
+			progress("recno read-check", cnt);
+			last_cnt = cnt;
+		}
+
+		/* Retrieve the key/data pair by record number. */
+		if ((ret = db->get_recno(
+		    db, toc, (u_int64_t)cnt, NULL, NULL, &data, 0)) != 0) {
+			env->err(env,
+			    ret, "read_col: get by record failed: %d", cnt);
+			assert(0);
+		}
+
+		/*
+		 * Get local copies of the key/data pair, and check to see
+		 * if the retrieved key/data pair is the same.
+		 */
+		data_set(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
+		if (dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
+			env->errx(env,
+			    "read_col: get by record number %d:"
+			    "\n\tdata: expected {%s}, got {%.*s}",
+			    cnt,
+			    dbuf, (int)data.size, (char *)data.data);
+			assert(0);
+		}
+	}
+
+	assert(toc->close(toc, 0) == 0);
+
+	if (stat_op == STAT_ALL || stat_op == STAT_READ) {
+		(void)printf("\nRead-check statistics:\n");
+		assert(env->stat_print(env, stdout, 0) == 0);
+	}
+
+	return (0);
+}
+
+
+int
+read_check_row()
 {
 	DBT key, data;
 	WT_TOC *toc;
@@ -306,6 +419,9 @@ read_check()
 	memset(&data, 0, sizeof(data));
 
 	assert(env->toc(env, 0, &toc) == 0);
+
+	if (dtype != TYPE_ROW)
+		goto recno;
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
@@ -320,7 +436,7 @@ read_check()
 		/* Retrieve the key/data pair by key. */
 		key_set(cnt, &key.data, &key.size);
 		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret, "get by key failed: {%.*s}",
+			env->err(env, ret, "read_row: get by key failed: {%.*s}",
 			    (int)key.size, (char *)key.data);
 			assert(0);
 		}
@@ -334,7 +450,7 @@ read_check()
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
-			    "get by key:"
+			    "read_row: get by key:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
 			    cnt,
@@ -344,7 +460,7 @@ read_check()
 		}
 	}
 
-	/* Check a random subset of the records using the record number. */
+recno:	/* Check a random subset of the records using the record number. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
 		cnt += rand() % 41 + 1;
 		if (cnt > keys)
@@ -357,7 +473,8 @@ read_check()
 		/* Retrieve the key/data pair by record number. */
 		if ((ret = db->get_recno(
 		    db, toc, (u_int64_t)cnt, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret, "get by record failed: %d", cnt);
+			env->err(env,
+			    ret, "read_row: get by record failed: %d", cnt);
 			assert(0);
 		}
 
@@ -370,7 +487,7 @@ read_check()
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
-			    "get by record number %d:"
+			    "read_row: get by record number %d:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
 			    cnt,
@@ -382,7 +499,7 @@ read_check()
 
 	assert(toc->close(toc, 0) == 0);
 
-	if (a_stat == STAT_ALL || a_stat == STAT_READ) {
+	if (stat_op == STAT_ALL || stat_op == STAT_READ) {
 		(void)printf("\nRead-check statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -418,14 +535,14 @@ write_check()
 		/* Retrieve the key/data pair by key. */
 		key_set(cnt, &key.data, &key.size);
 		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret, "get by key failed: {%.*s}",
+			env->err(env, ret, "write: get by key failed: {%.*s}",
 			    (int)key.size, (char *)key.data);
 			assert(0);
 		}
 
 		/* Overwrite the key/data pair. */
 		if ((ret = db->put(db, toc, &key, &data, 0)) != 0) {
-			env->err(env, ret, "put by key failed: {%.*s}",
+			env->err(env, ret, "write: put by key failed: {%.*s}",
 			    (int)key.size, (char *)key.data);
 			assert(0);
 		}
@@ -433,10 +550,10 @@ write_check()
 
 	assert(toc->close(toc, 0) == 0);
 
-	if (a_verify)
+	if (op_verify)
 		assert(db->verify(db, track, 0) == 0);
 
-	if (a_stat == STAT_ALL || a_stat == STAT_WRITE) {
+	if (stat_op == STAT_ALL || stat_op == STAT_WRITE) {
 		(void)printf("\nWrite-check statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
@@ -516,7 +633,7 @@ usage()
 	(void)fprintf(stderr,
 	    "usage: %s [-dv] [-a d|r|v] [-c cachesize] [-h 0|1] [-k keys] "
 	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs] "
-	    "[-s l|r|w|*]\n",
+	    "[-s l|r|w|*] [-t f|r|v]\n",
 	    progname);
 	exit(1);
 }
