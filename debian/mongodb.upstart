@@ -7,4 +7,4 @@ end script
 
 start on runlevel [345]
 
-exec /usr/bin/mongod --logappend --dbpath /var/lib/mongodb --logpath /var/log/mongodb/mongodb.log
+exec /usr/bin/mongod --config /etc/mongodb.conf
