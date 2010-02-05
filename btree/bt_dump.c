@@ -38,7 +38,12 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
-		ret = __wt_bt_debug_dump(toc, NULL, stream);
+		/*
+		 * We use the verification code to do debugging dumps because
+		 * if we're dumping in debugging mode, we want to confirm the
+		 * page is OK before walking it.
+		 */
+		ret = __wt_db_verify_int(toc, NULL, stream);
 #else
 		__wt_db_errx(db, "library not built for debugging");
 		ret = WT_ERROR;
