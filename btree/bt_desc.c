@@ -88,36 +88,6 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 	    desc.unused[6] != 0 ? WT_ERROR : 0);
 }
 
-#ifdef HAVE_DIAGNOSTIC
-/*
- * __wt_bt_desc_dump --
- *	Verify the database description on page 0.
- */
-void
-__wt_bt_desc_dump(WT_PAGE *page, FILE *fp)
-{
-	WT_PAGE_DESC desc;
-
-	memcpy(
-	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
-
-	fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
-	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
-	fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %llu\n",
-	    (u_long)desc.intlsize,
-	    (u_long)desc.leafsize, desc.base_recno);
-	if (desc.root_addr == WT_ADDR_INVALID)
-		fprintf(fp, "root addr (none), ");
-	else
-		fprintf(fp, "root addr %lu, ", (u_long)desc.root_addr);
-	if (desc.free_addr == WT_ADDR_INVALID)
-		fprintf(fp, "free addr (none), ");
-	else
-		fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
-	fprintf(fp, "\n");
-}
-#endif
-
 /*
  * __wt_bt_desc_read --
  *	Read the descriptor structure from page 0, and update the DB handle
