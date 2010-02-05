@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import with_statement
 import tempfile
 import sys
 import re
