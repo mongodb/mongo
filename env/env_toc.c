@@ -23,6 +23,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	ienv = env->ienv;
 	*tocp = NULL;
 
+	/* Check to see if there's an available WT_TOC slot. */
 	if (ienv->toc_cnt == env->toc_size - 1) {
 		__wt_api_env_errx(env,
 		    "WiredTiger only configured to support %d thread contexts",
@@ -41,7 +42,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	memset(toc, 0, sizeof(WT_TOC));
 
 	toc->env = env;
-	toc->hazard = toc->hazard_next = ienv->hazard + slot * env->hazard_size;
+	toc->hazard = ienv->hazard + slot * env->hazard_size;
 
 	__wt_methods_wt_toc_lockout(toc);
 	__wt_methods_wt_toc_init_transition(toc);
@@ -83,6 +84,10 @@ __wt_wt_toc_close(WT_TOC *toc)
 	--ienv->toc_cnt;
 	*tp = ienv->toc[ienv->toc_cnt];
 	ienv->toc[ienv->toc_cnt] = NULL;
+
+	/* Make the WT_TOC array entry available for re-use. */
+	toc->env = NULL;
+
 	WT_MEMORY_FLUSH;
 
 	return (0);
@@ -109,7 +114,8 @@ __wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
 		else
 			fprintf(fp, "%#lx", WT_ADDR_TO_ULONG(toc->serial));
 		fprintf(fp, "\n\thazard: ");
-		for (hp = toc->hazard; hp < toc->hazard_next; ++hp)
+		for (hp = toc->hazard;
+		    hp < toc->hazard + env->hazard_size; ++hp)
 			fprintf(fp, "%#lx ", WT_ADDR_TO_ULONG(*hp));
 		fprintf(fp, "\n}");
 		if (toc->name != NULL)
