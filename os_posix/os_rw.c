@@ -27,7 +27,9 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 	if (pread(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_api_env_err(env, errno, "Read error; file %s", fh->name);
+	__wt_api_env_err(env, errno,
+	    "%s read error: attempt to read %lu bytes at offset %lu",
+	    fh->name, (u_long)bytes, (u_long)offset);
 	return (WT_ERROR);
 }
 
@@ -49,6 +51,8 @@ __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) == (ssize_t)bytes)
 		return (0);
 
-	__wt_api_env_err(env, errno, "Write error; file %s", fh->name);
+	__wt_api_env_err(env, errno,
+	    "%s write error: attempt to write %lu bytes at offset %lu",
+	    fh->name, (u_long)bytes, (u_long)offset);
 	return (WT_ERROR);
 }
