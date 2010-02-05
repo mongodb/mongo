@@ -641,7 +641,7 @@ if nix:
     env.Append( LIBS=[] )
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check" );
+        env.Append( CPPFLAGS=" -O0 -fstack-protector " );
     else:
         env.Append( CPPFLAGS=" -O3" )
 
