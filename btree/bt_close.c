@@ -32,7 +32,7 @@ __wt_bt_close(DB *db)
 	/*
 	 * Discard any pinned root page.  We have a direct reference but we
 	 * have to get another one, otherwise the hazard pointers won't be
-	 * set.
+	 * set/cleared appropriately.
 	 */
 	if (idb->root_page != NULL) {
 		isleaf = idb->root_page->addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
