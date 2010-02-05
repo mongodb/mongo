@@ -115,7 +115,7 @@ int
 __wt_api_arg_min(ENV *env,
     const char *name, const char *arg_name, u_int32_t v, u_int32_t min)
 {
-	if (v > min)
+	if (v >= min)
 		return (0);
 
 	__wt_api_env_errx(env,
