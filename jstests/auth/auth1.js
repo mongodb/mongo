@@ -23,43 +23,45 @@ assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
 for( i = 0; i < 999; ++i ) {
     t.save( {i:i} );
 }
-assert.eq( 999, t.count() );
-assert.eq( 999, t.find().toArray().length );
+assert.eq( 999, t.count() , "A1" );
+assert.eq( 999, t.find().toArray().length , "A2" );
 
-assert.eq( 999, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+assert.eq( 999, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "A3" );
 db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:999} ) } );
-assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "A4" );
 
 var p = { key : { i : true } , 
     reduce : function(obj,prev) { prev.count++; },
 initial: { count: 0 }
 };
 
-assert.eq( 1000, t.group( p ).length );
+assert.eq( 1000, t.group( p ).length , "A5" );
 
 assert( db.auth( "guest", "guest" ), "auth failed 2" );
 
-assert.eq( 1000, t.count() );
-assert.eq( 1000, t.find().toArray().length ); // make sure we have a getMore in play
-assert.commandWorked( db.runCommand( {ismaster:1} ) );
+assert.eq( 1000, t.count() , "B1" );
+assert.eq( 1000, t.find().toArray().length , "B2" ); // make sure we have a getMore in play
+assert.commandWorked( db.runCommand( {ismaster:1} ) , "B3" );
 
-assert( !db.getLastError() );
+db.eval( "print( 'YOYO' ); " )
+assert( !db.getLastError() , "B4" );
 t.save( {} ); // fail
-assert( db.getLastError() );
-assert.eq( 1000, t.count() );
+assert.eq( 1000 , t.count() , "B5-" )
+assert( db.getLastError() , "B5: " + tojson( db.getLastErrorObj() ) );
+assert.eq( 1000, t.count() , "B6" );
 
-assert.eq( 2, db.system.users.count() );
-assert( !db.getLastError() );
+assert.eq( 2, db.system.users.count() , "B7" );
+assert( !db.getLastError() , "B8" );
 db.addUser( "a", "b" );
-assert( db.getLastError() );
-assert.eq( 2, db.system.users.count() );
+assert( db.getLastError() , "B9" );
+assert.eq( 2, db.system.users.count() , "B10");
 
-assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
-assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].find().toArray().length; } ) );
-db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1} ) } );
-assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C1" );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].find().toArray().length; } ) , "C2" );
+db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1} ) } , "C3" );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C4" );
 
-assert.eq( 1000, t.group( p ).length );
+assert.eq( 1000, t.group( p ).length , "C5" );
 
 var p = { key : { i : true } , 
     reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
