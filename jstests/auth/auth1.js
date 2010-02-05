@@ -43,10 +43,8 @@ assert.eq( 1000, t.count() , "B1" );
 assert.eq( 1000, t.find().toArray().length , "B2" ); // make sure we have a getMore in play
 assert.commandWorked( db.runCommand( {ismaster:1} ) , "B3" );
 
-db.eval( "print( 'YOYO' ); " )
 assert( !db.getLastError() , "B4" );
 t.save( {} ); // fail
-assert.eq( 1000 , t.count() , "B5-" )
 assert( db.getLastError() , "B5: " + tojson( db.getLastErrorObj() ) );
 assert.eq( 1000, t.count() , "B6" );
 
