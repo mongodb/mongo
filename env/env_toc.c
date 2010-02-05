@@ -95,35 +95,36 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 #ifdef HAVE_DIAGNOSTIC
 int
-__wt_toc_dump(ENV *env, const char *ofile, FILE *fp)
+__wt_toc_dump(ENV *env)
 {
 	IENV *ienv;
+	WT_MBUF mb;
 	WT_TOC *toc, **tp;
 	WT_PAGE **hp;
-	int do_close;
 
 	ienv = env->ienv;
+	__wt_mb_init(env, &mb);
 
-	WT_RET(__wt_diag_set_fp(ofile, &fp, &do_close));
-
-	fprintf(fp, "%s\n", ienv->sep);
+	__wt_mb_add(&mb, "%s\n", ienv->sep);
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
-		fprintf(fp, "toc: %#lx {\n\tserial: ", WT_ADDR_TO_ULONG(toc));
+		__wt_mb_add(&mb,
+		    "toc: %#lx {\n\tserial: ", WT_ADDR_TO_ULONG(toc));
 		if (toc->serial == NULL)
-			fprintf(fp, "none");
+			__wt_mb_add(&mb, "none");
 		else
-			fprintf(fp, "%#lx", WT_ADDR_TO_ULONG(toc->serial));
-		fprintf(fp, "\n\thazard: ");
+			__wt_mb_add(&mb,
+			    "%#lx", WT_ADDR_TO_ULONG(toc->serial));
+		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = toc->hazard;
 		    hp < toc->hazard + env->hazard_size; ++hp)
-			fprintf(fp, "%#lx ", WT_ADDR_TO_ULONG(*hp));
-		fprintf(fp, "\n}");
+			__wt_mb_add(&mb, "%#lx ", WT_ADDR_TO_ULONG(*hp));
+		__wt_mb_add(&mb, "\n}");
 		if (toc->name != NULL)
-			fprintf(fp, " %s", toc->name);
-		fprintf(fp, "\n");
+			__wt_mb_add(&mb, " %s", toc->name);
+		__wt_mb_write(&mb);
 	}
-	if (do_close)
-		(void)fclose(fp);
+
+	__wt_mb_discard(&mb);
 	return (0);
 }
 #endif

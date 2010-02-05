@@ -87,7 +87,8 @@ __wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t));
 int
-__wt_db_verify_int(WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *fp);
+__wt_db_verify_int(
+    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 void
@@ -161,6 +162,14 @@ int
 __wt_ienv_destroy(ENV *env, int refresh);
 void
 __wt_msg(ENV *env, const char *fmt, ...);
+void
+__wt_mb_init(ENV *env, WT_MBUF *mbp);
+void
+__wt_mb_discard(WT_MBUF *mbp);
+void
+__wt_mb_add(WT_MBUF *mbp, const char *fmt, ...);
+void
+__wt_mb_write(WT_MBUF *mbp);
 int
 __wt_env_open(ENV *env, const char *home, mode_t mode);
 int
@@ -176,7 +185,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp);
 int
 __wt_wt_toc_close(WT_TOC *toc);
 int
-__wt_toc_dump(ENV *env, const char *ofile, FILE *fp);
+__wt_toc_dump(ENV *env);
 void *
 __wt_workq_srvr(void *arg);
 void
