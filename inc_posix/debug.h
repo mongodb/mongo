@@ -39,9 +39,9 @@ extern "C" {
 typedef struct __wt_mbuf {
 	ENV	 *env;			/* Enclosing environment */
 
-	char	 *first;		/* Allocated message buffer */
-	char	 *next;			/* Next available byte of the buffer */
-	u_int32_t len;			/* Allocated length of the buffer */
+	char  *first;			/* Allocated message buffer */
+	char  *next;			/* Next available byte of the buffer */
+	size_t len;			/* Allocated length of the buffer */
 } WT_MBUF;
 
 #if defined(__cplusplus)

@@ -114,7 +114,7 @@ __wt_mb_add(WT_MBUF *mbp, const char *fmt, ...)
 		 * Format the user's information.  If it doesn't fit into the
 		 * buffer we have, re-allocate enough memory and try again.
 		 */
-		len = (size_t)vsnprintf(mbp->next, remain, fmt, ap);
+		len = vsnprintf(mbp->next, remain, fmt, ap);
 		if (len < remain) {
 			mbp->next += len;
 			break;
