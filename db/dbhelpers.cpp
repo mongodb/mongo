@@ -104,13 +104,13 @@ namespace mongo {
         return true;
     }
 
-    bool Helpers::findById(const char *ns, BSONObj query, BSONObj& result ){
+    int Helpers::findById(const char *ns, BSONObj query, BSONObj& result ){
         NamespaceDetails *d = nsdetails(ns);
         if ( ! d )
-            return false;
+            return -1;
         int idxNo = d->findIdIndex();
         if ( idxNo < 0 )
-            return false;
+            return -1;
         IndexDetails& i = d->idx( idxNo );
         
         BSONObj key = i.getKeyFromQuery( query );

@@ -49,7 +49,12 @@ namespace mongo {
         */
         static bool findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex = false);
         
-        static bool findById(const char *ns, BSONObj query, BSONObj& result );
+        /**
+           -1 no index
+           0 not found
+           1 found
+         */
+        static int findById(const char *ns, BSONObj query, BSONObj& result );
 
         /* Get/put the first object from a collection.  Generally only useful if the collection
            only ever has a single object -- which is a "singleton collection".
