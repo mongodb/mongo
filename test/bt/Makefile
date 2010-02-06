@@ -10,4 +10,4 @@ t: t.o ${LIB}
 clean:
 	rm -f t
 	rm -f a.* *.o *.core
-	rm -f DUMP flexlint.out memory.out
+	rm -f DUMP LOG flexlint.out memory.out
