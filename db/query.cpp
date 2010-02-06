@@ -504,14 +504,6 @@ namespace mongo {
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
             
-            // findingStart mode is used to find the first operation of interest when
-            // we are scanning through a repl log.  For efficiency in the common case,
-            // where the first operation of interest is closer to the tail than the head,
-            // we start from the tail of the log and work backwards until we find the
-            // first operation of interest.  Then we scan forward from that first operation,
-            // actually returning results to the client.  During the findingStart phase,
-            // we release the db mutex occasionally to avoid blocking the db process for
-            // an extended period of time.
             if ( findingStart_ ) {
                 // Use a ClientCursor here so we can release db mutex while scanning
                 // oplog (can take quite a while with large oplogs).
@@ -553,7 +545,7 @@ namespace mongo {
             return DiskLoc(); // reached beginning of collection
         }
         
-        void createClientCursor( const DiskLoc &startLoc ) {
+        void createClientCursor( const DiskLoc &startLoc = DiskLoc() ) {
             auto_ptr<Cursor> c = qp().newCursor( startLoc );
             findingStartCursor_ = new ClientCursor(c, qp().ns(), false);            
         }
@@ -579,7 +571,7 @@ namespace mongo {
                 switch( findingStartMode_ ) {
                     case Initial: {
                         if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
-                            findingStart_ = false; // found first recort out of query range, so scan normally
+                            findingStart_ = false; // found first record out of query range, so scan normally
                             c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
                             return;
                         }
@@ -600,9 +592,9 @@ namespace mongo {
                             return;
                         }
                         DiskLoc prev = prevLoc( findingStartCursor_->c->currLoc() );
-                        if ( prev.isNull() ) { // no previous extent, just start a regular scan from beginning
-                            findingStart_ = false;
-                            c_ = qp().newCursor();
+                        if ( prev.isNull() ) { // hit beginning, so start scanning from here
+                            createClientCursor();
+                            findingStartMode_ = InExtent;
                             return;
                         }
                         // There might be a more efficient implementation than creating new cursor & client cursor each time,
