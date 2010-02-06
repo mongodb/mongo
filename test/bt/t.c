@@ -15,11 +15,13 @@
 #define	MYPRINT	"a.print"
 
 int cachesize = 0;				/* Cache size */
+int fixed_len = 0;				/* Fixed length */
 int huffman = 0;				/* Compress */
 int keys = 0;					/* Keys */
 int keys_cnt = 0;				/* Count of keys loaded */
 int leafsize = 0;				/* Leaf page size */
 int nodesize = 0;				/* Node page size */
+int repeat_compress = 0;			/* Repeat compression */
 int runs = 0;					/* Runs: default forever */
 int verbose = 0;				/* Verbose debugging */
 
@@ -40,7 +42,8 @@ DB *db;
 FILE *logfp;
 char *logfile;
 
-void	data_set(int, void *, u_int32_t *, int);
+void	data_set_fix(int, void *, u_int32_t *);
+void	data_set_var(int, void *, u_int32_t *, int);
 int	dtype_arg(void);
 void	key_set(int, void *, u_int32_t *);
 int	load(void);
@@ -55,10 +58,10 @@ int	write_check(void);
 int
 main(int argc, char *argv[])
 {
-	u_int r;
+	u_int rand_seed;
 	int ch, i, ret, run_cnt;
-	int rand_cache, rand_huffman, rand_keys, rand_leaf, rand_node;
-	int rand_type;
+	int rand_cache, rand_fixed_len, rand_huffman, rand_keys, rand_leaf;
+	int rand_node, rand_repeat_compress, rand_type;
 
 	(void)putenv("MALLOC_OPTIONS=AJZ");
 	ret = 0;
@@ -68,10 +71,10 @@ main(int argc, char *argv[])
 	else
 		++progname;
 
-	r = 0xdeadbeef ^ (u_int)time(NULL);
-	rand_cache =
-	    rand_huffman = rand_keys = rand_leaf = rand_node = rand_type = 1;
-	while ((ch = getopt(argc, argv, "a:c:h:k:L:l:n:R:r:s:t:v")) != EOF)
+	rand_seed = 0xdeadbeef ^ (u_int)time(NULL);
+	rand_cache = rand_fixed_len = rand_huffman = rand_keys =
+	    rand_leaf = rand_node = rand_repeat_compress = rand_type = 1;
+	while ((ch = getopt(argc, argv, "a:Cc:f:h:k:L:l:n:R:r:s:t:v")) != EOF)
 		switch (ch) {
 		case 'a':
 			switch (optarg[0]) {
@@ -84,12 +87,23 @@ main(int argc, char *argv[])
 			case 'v':
 				op_verify = 1;
 				break;
+			default:
+				usage();
+				break;
 			}
+			break;
+		case 'C':
+			rand_repeat_compress = 0;
+			repeat_compress = 1;
 			break;
 		case 'c':
 			rand_cache = 0;
 			cachesize = atoi(optarg);
 			break;
+		case 'f':
+			rand_fixed_len = rand_type = 0;
+			dtype = TYPE_COLUMN_FIX;
+			fixed_len = atoi(optarg);
 		case 'h':
 			rand_huffman = 0;
 			huffman = atoi(optarg);
@@ -110,7 +124,7 @@ main(int argc, char *argv[])
 			nodesize = atoi(optarg);
 			break;
 		case 'R':
-			r = (u_int)strtoul(optarg, NULL, 0);
+			rand_seed = (u_int)strtoul(optarg, NULL, 0);
 			break;
 		case 'r':
 			runs = atoi(optarg);
@@ -133,19 +147,16 @@ main(int argc, char *argv[])
 			break;
 		case 't':
 			switch (optarg[0]) {
-			case 'f':
+			case 'r':
 				rand_type = 0;
-				dtype = TYPE_COLUMN_FIX;
+				dtype = TYPE_ROW;
 				break;
 			case 'v':
 				rand_type = 0;
 				dtype = TYPE_COLUMN_VAR;
 				break;
-			case 'r':
 			default:
-				rand_type = 0;
-				dtype = TYPE_ROW;
-				break;
+				usage();
 			}
 				
 		case 'v':
@@ -157,6 +168,9 @@ main(int argc, char *argv[])
 		}
 	argc -= optind;
 	argv += optind;
+
+	if (argc != 0)
+		usage();
 
 	printf("t: process %lu\n", (u_long)getpid());
 	for (run_cnt = 1; runs == 0 || run_cnt < runs + 1; ++run_cnt) {
@@ -171,18 +185,36 @@ main(int argc, char *argv[])
 			return (EXIT_FAILURE);
 		}
 
-		srand(r);
+		srand(rand_seed);
 
 		/* If no database type, pick one. */
 		if (rand_type == 1)
-			switch (rand() % 2) {
-			case 0:
+			switch (rand() % 3) {
+			case 2:
+				dtype = TYPE_COLUMN_FIX;
+				break;
+			case 1:
 				dtype = TYPE_COLUMN_VAR;
 				break;
-			default:
+			case 0:
 				dtype = TYPE_ROW;
 				break;
 			}
+
+		/* Data type-specific information. */
+		switch (dtype) {
+		case TYPE_ROW:
+		case TYPE_COLUMN_VAR:
+			if (rand_huffman)
+				huffman = rand() % 2;
+			break;
+		case TYPE_COLUMN_FIX:
+			if (rand_fixed_len)
+				fixed_len = rand() % 34;
+			if (rand_repeat_compress)
+				repeat_compress = rand() % 2;
+			break;
+		}
 
 		/* If no number of keys, choose up to 1M. */
 		if (rand_keys)
@@ -203,21 +235,20 @@ main(int argc, char *argv[])
 			for (nodesize = 512, i = rand() % 9; i > 0; --i)
 				nodesize *= 2;
 
+		printf("%s: %4d { ", progname, run_cnt);
 		switch (dtype) {
-		case TYPE_ROW:
-		case TYPE_COLUMN_VAR:
-			if (rand_huffman)
-				huffman = rand() % 2;
-			break;
 		case TYPE_COLUMN_FIX:
+			printf("-f %d ", fixed_len);
+			break;
+		case TYPE_COLUMN_VAR:
+			printf("-tv ");
+			break;
+		case TYPE_ROW:
+			printf("-tr ");
 			break;
 		}
-
-		(void)printf(
-		    "%s: %4d { -t %c -c %2d -h %d -k %7d -l %6d -n %6d "
-		    "-R %010u }\n\t",
-		    progname, run_cnt, dtype_arg(), cachesize,
-		    huffman, keys, leafsize, nodesize, r);
+		printf("-c %2d -h %d -k %7d -l %6d -n %6d -R %010u }\n\t",
+		    cachesize, huffman, keys, leafsize, nodesize, rand_seed);
 		(void)fflush(stdout);
 
 		setup();
@@ -252,7 +283,7 @@ main(int argc, char *argv[])
 		progress(NULL, 0);
 		(void)printf("OK\r");
 
-		r = rand() ^ time(NULL);
+		rand_seed = rand() ^ time(NULL);
 	}
 
 	return (EXIT_SUCCESS);
@@ -277,7 +308,8 @@ setup()
 	    db, 0, (u_int32_t)nodesize, (u_int32_t)leafsize, 0) == 0);
 	switch (dtype) {
 	case TYPE_COLUMN_FIX:
-		assert(db->column_set(db, 0, NULL, 0) == 0);
+		assert(db->column_set(db, fixed_len, NULL,
+		    repeat_compress ? WT_REPEAT_COMP : 0) == 0);
 		break;
 	case TYPE_COLUMN_VAR:
 		assert(db->column_set(db, 0, NULL, 0) == 0);
@@ -310,7 +342,11 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		*keyp = &key;
 	} else
 		*keyp = NULL;
-	data_set(keys_cnt, &data.data, &data.size, 0);
+
+	if (dtype == TYPE_COLUMN_FIX)
+		data_set_fix(keys_cnt, &data.data, &data.size);
+	else
+		data_set_var(keys_cnt, &data.data, &data.size, 0);
     
 	*datap = &data;
 
@@ -330,6 +366,9 @@ load()
 	if (op_reopen)
 		assert(db->sync(db, track, 0) == 0);
 
+	if (op_verify)
+		assert(db->verify(db, track, 0) == 0);
+
 	if (op_dump) {
 		progress("debug dump", 0);
 		assert((fp = fopen(MYDUMP, "w")) != NULL);
@@ -341,9 +380,6 @@ load()
 		assert(db->dump(db, fp, WT_PRINTABLES) == 0);
 		assert(fclose(fp) == 0);
 	}
-
-	if (op_verify)
-		assert(db->verify(db, track, 0) == 0);
 
 	if (stat_op == STAT_ALL || stat_op == STAT_LOAD) {
 		(void)printf("\nLoad statistics:\n");
@@ -389,7 +425,7 @@ read_check_col()
 		 * Get local copies of the data, and check to see the retrieved
 		 * data is the same.
 		 */
-		data_set(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
+		data_set_var(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
 			    "read_col: get by record number %d:"
@@ -449,7 +485,7 @@ read_check_row()
 		 * if the retrieved key/data pair is the same.
 		 */
 		key_set(cnt, &kbuf, &klen);
-		data_set(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
+		data_set_var(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
@@ -486,7 +522,7 @@ read_check_row()
 		 * if the retrieved key/data pair is the same.
 		 */
 		key_set(cnt, &kbuf, &klen);
-		data_set(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
+		data_set_var(cnt, &dbuf, &dlen, atoi((char *)data.data + 11));
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
@@ -577,7 +613,31 @@ key_set(int cnt, void *kbufp, u_int32_t *klenp)
 }
 
 void
-data_set(int cnt, void *dbufp, u_int32_t *dlenp, int dlen)
+data_set_fix(int cnt, void *dbufp, u_int32_t *dlenp)
+{
+	static char dbuf[128];
+	int ch;
+
+	switch (repeat_compress ? rand() % 2 : cnt % 10) {
+	case 9: ch = 'j'; break;
+	case 8: ch = 'i'; break;
+	case 7: ch = 'h'; break;
+	case 6: ch = 'g'; break;
+	case 5: ch = 'f'; break;
+	case 4: ch = 'e'; break;
+	case 3: ch = 'd'; break;
+	case 2: ch = 'c'; break;
+	case 1: ch = 'b'; break;
+	case 0: ch = 'a'; break;
+	}
+	memset(dbuf, ch, fixed_len);
+		
+	*(char **)dbufp = dbuf;
+	*dlenp = fixed_len;
+}
+
+void
+data_set_var(int cnt, void *dbufp, u_int32_t *dlenp, int dlen)
 {
 	static char dbuf[512];
 
@@ -630,26 +690,13 @@ progress(const char *s, u_int64_t i)
 	(void)fflush(stdout);
 }
 
-int
-dtype_arg()
-{
-	switch (dtype) {
-	case TYPE_COLUMN_FIX:
-		return 'f';
-	case TYPE_COLUMN_VAR:
-		return 'c';
-	case TYPE_ROW:
-		return 'r';
-	}
-}
-
 void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-dv] [-a d|r|v] [-c cachesize] [-h 0|1] [-k keys] "
-	    "[-L logfile] [-l leafsize] [-n nodesize] [-R rand] [-r runs] "
-	    "[-s l|r|w|*] [-t f|r|v]\n",
+	    "usage: %s [-Cdv] [-a d|r|v] [-c cachesize] [-f length ] [-h 0|1] "
+	    "[-k keys] [-L logfile] [-l leafsize] [-n nodesize] [-R rand] "
+	    "[-r runs] [-s l|r|w|*] [-t r|v]\n",
 	    progname);
 	exit(1);
 }
