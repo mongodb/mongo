@@ -170,7 +170,7 @@ struct __wt_page {
 struct __wt_page_desc {
 #define	WT_BTREE_MAGIC		120897
 	u_int32_t magic;		/* 00-03: Magic number */
-#define	WT_BTREE_MAJOR_VERSION	1
+#define	WT_BTREE_MAJOR_VERSION	0
 	u_int16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
 	u_int16_t minorv;		/* 06-07: Minor version */
@@ -179,7 +179,15 @@ struct __wt_page_desc {
 	u_int64_t base_recno;		/* 16-23: Base record number */
 	u_int32_t root_addr;		/* 24-27: Root address */
 	u_int32_t free_addr;		/* 28-31: Freelist address */
-	u_int32_t unused[8];		/* 32-63: Spare */
+
+#define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
+#define	WT_PAGE_DESC_MASK	0x01	/* Valid bit mask */
+	u_int32_t flags;		/* 32-35: Flags */
+
+	u_int8_t  fixed_len;		/* 36:	  Fixed length byte count */
+	u_int8_t  unused1[3];		/* 37-39: Spare */
+
+	u_int32_t unused2[6];		/* 40-63: Spare */
 };
 /*
  * WT_PAGE_DESC_SIZE is the expected structure size --  we check at startup to
@@ -382,15 +390,12 @@ struct __wt_item {
 #define	WT_ITEM_NEXT(item)						\
 	((WT_ITEM *)((u_int8_t *)(item) + WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item))))
 
-/* WT_ITEM_FOREACH is a for loop that walks the items on a page */
+/* WT_ITEM_FOREACH is a loop that walks the items on a page */
 #define	WT_ITEM_FOREACH(page, item, i)					\
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
-/* WT_OFF_FOREACH is a for loop that walks offpage references on a page */
-#define	WT_OFF_FOREACH(page, offp, i)					\
-	for ((offp) = (WT_OFF *)WT_PAGE_BYTE(page),			\
-	    (i) = (page)->hdr->u.entries; (i) > 0; ++(offp), --(i))
+
 /*
  * Btree internal items and offpage duplicates reference another page.
  *
@@ -428,6 +433,11 @@ struct __wt_off {
  */
 #define	WT_OFF_SIZE	12
 
+/* WT_OFF_FOREACH is a loop that walks offpage references on a page */
+#define	WT_OFF_FOREACH(page, offp, i)					\
+	for ((offp) = (WT_OFF *)WT_PAGE_BYTE(page),			\
+	    (i) = (page)->hdr->u.entries; (i) > 0; ++(offp), --(i))
+
 /*
  * Btree overflow items reference another page, and so the data is another
  * structure.
@@ -441,6 +451,28 @@ struct __wt_ovfl {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OVFL_SIZE	8
+
+/* WT_FIX_FOREACH is a loop that walks fixed-length references on a page. */
+#define	WT_FIX_FOREACH(db, page, p, i)					\
+	for ((p) = WT_PAGE_BYTE(page),					\
+	    (i) = (page)->hdr->u.entries;				\
+	    (i) > 0; --(i), p = (u_int8_t *)p + (db)->fixed_len)
+/*
+ * WT_FIX_REPEAT_FOREACH is a loop that walks fixed-length, repeat-counted
+ * references on a page.
+ */
+#define	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
+	for ((p) = WT_PAGE_BYTE(page),					\
+	   (i) = (page)->hdr->u.entries; (i) > 0;			\
+	   (i) -= *(u_int16_t *)p,					\
+	   p = (u_int8_t *)p + (db)->fixed_len + sizeof(u_int16_t))
+/*
+ * WT_FIX_REPEAT_ITERATE is a loop that walks fixed-length, repeat-counted
+ * references on a page, visiting each entry the appropriate number of times.
+ */
+#define	WT_FIX_REPEAT_ITERATE(db, page, p, i, j)			\
+	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
+		for ((j) = *(u_int16_t *)p; (j) > 0; --(j))
 
 #if defined(__cplusplus)
 }

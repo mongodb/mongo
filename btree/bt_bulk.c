@@ -53,13 +53,22 @@ __wt_bt_bulk_fix(DB *db,
 {
 	DBT *key, *data;
 	ENV *env;
-	WT_PAGE *page;
+	IDB *idb;
+	WT_PAGE *page, *next;
 	WT_TOC *toc;
+	u_int len;
 	u_int64_t insert_cnt;
+	u_int16_t *last_repeat;
+	u_int8_t *last_data;
 	int ret;
 
 	env = db->env;
+	idb = db->idb;
 	insert_cnt = 0;
+
+	/* Figure out how large is the chunk we're storing on the page. */
+	len = db->fixed_len +
+	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
 
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.bulk_load");
@@ -73,15 +82,100 @@ __wt_bt_bulk_fix(DB *db,
 	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
 	page->hdr->type = WT_PAGE_COL_FIX;
 
-	while ((ret = cb(db, &key, &data)) == 0)
+	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
 			__wt_db_errx(db,
-			    "recno database keys are implied and "
+			    "column database keys are implied and "
 			    "so should not be returned by the bulk "
 			    "load input routine");
 			ret = WT_ERROR;
 			goto err;
 		}
+		if (data->size != db->fixed_len) {
+			__wt_db_errx(db,
+			    "length of %lu does not match the fixed-length "
+			    "configuration for this database of %lu",
+			    (u_long)data->size, (u_long)db->fixed_len);
+			ret = WT_ERROR;
+			goto err;
+		}
+
+		/* Report on progress every 100 inserts. */
+		if (f != NULL && ++insert_cnt % 100 == 0)
+			f("Db.bulk_load", insert_cnt);
+		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
+
+		/*
+		 * If doing repeat compression, check to see if this record
+		 * matches the last data inserted.   If there's a match try
+		 * and increment that item's repeat count instead of entering
+		 * new data.
+		 */
+		if (F_ISSET(idb, WT_REPEAT_COMP) && page->hdr->u.entries != 0) {
+			if (*last_repeat < UINT16_MAX &&
+			    memcmp(last_data, data->data, data->size) == 0) {
+				++*last_repeat;
+				++page->records;
+				++page->hdr->u.entries;
+				continue;
+			}
+		}
+
+		/*
+		 * We now have the data item to store on the page.  If there
+		 * is insufficient space on the current page, allocate a new
+		 * one.
+		 */
+		if (len > page->space_avail) {
+			WT_ERR(__wt_bt_page_alloc(toc, 1, &next));
+			next->hdr->type = WT_PAGE_COL_FIX;
+			next->hdr->prevaddr = page->addr;
+			page->hdr->nextaddr = next->addr;
+
+			/*
+			 * If we've finished with a page, promote its first key
+			 * to its parent and write it.   The promotion function
+			 * sets the page's parent address, which is the same for
+			 * the newly allocated page.
+			 */
+			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
+			next->hdr->prntaddr = page->hdr->prntaddr;
+			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+
+			/* Switch to the next page. */
+			page = next;
+		}
+
+		++page->records;
+		++page->hdr->u.entries;
+
+		/*
+		 * Copy the data item onto the page -- if we're doing repeat
+		 * compression, track the location of the item for comparison.
+		 */
+		if (F_ISSET(idb, WT_REPEAT_COMP)) {
+			last_repeat = (u_int16_t *)page->first_free;
+			*last_repeat = 1;
+			page->first_free += sizeof(u_int16_t);
+			page->space_avail -= sizeof(u_int16_t);
+			last_data = page->first_free;
+		}
+		memcpy(page->first_free, data->data, data->size);
+		page->first_free += data->size;
+		page->space_avail -= data->size;
+	}
+
+	/* A ret of 1 just means we've reached the end of the input. */
+	if (ret == 1) {
+		ret = 0;
+
+		/* Promote a key from any partially-filled page and write it. */
+		if (page != NULL) {
+			ret = __wt_bt_promote(toc, page, page->records, NULL);
+			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			page = NULL;
+		}
+	}
 
 	/* Get a permanent root page reference. */
 	WT_TRET(__wt_bt_root_page(toc));
@@ -155,7 +249,7 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 		if (F_ISSET(idb, WT_COLUMN) ) {
 			if (key != NULL) {
 				__wt_db_errx(db,
-				    "recno database keys are implied and "
+				    "column database keys are implied and "
 				    "so should not be returned by the bulk "
 				    "load input routine");
 				ret = WT_ERROR;

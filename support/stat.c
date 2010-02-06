@@ -126,6 +126,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_EXTSIZE].desc = "database extent size";
+	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
 	stats[WT_STAT_FRAGSIZE].desc = "database fragment size";
 	stats[WT_STAT_INTLSIZE].desc = "internal page size";
 	stats[WT_STAT_ITEM_DATA_OVFL].desc = "overflow data items";
@@ -159,6 +160,7 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
 	stats[WT_STAT_EXTSIZE].v = 0;
+	stats[WT_STAT_FIXED_LEN].v = 0;
 	stats[WT_STAT_FRAGSIZE].v = 0;
 	stats[WT_STAT_INTLSIZE].v = 0;
 	stats[WT_STAT_ITEM_DATA_OVFL].v = 0;

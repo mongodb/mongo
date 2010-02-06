@@ -27,7 +27,8 @@ static int __wt_bt_verify_checkfrag(DB *, VSTUFF *);
 static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, VSTUFF *);
 static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, VSTUFF *);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, VSTUFF *);
-static int __wt_bt_verify_page_fixed(WT_TOC *, WT_PAGE *, VSTUFF *);
+static int __wt_bt_verify_page_col_fix(WT_TOC *, WT_PAGE *);
+static int __wt_bt_verify_page_col_int(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
 
 /*
@@ -117,6 +118,7 @@ __wt_db_verify_int(
 		WT_TRET(__wt_bt_verify_level(
 		    toc, idb->root_page->addr, 0, &vstuff));
 		break;
+	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
@@ -691,9 +693,11 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_bt_verify_page_item(toc, page, vs));
 		break;
-	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_bt_verify_page_fixed(toc, page, vs));
+		WT_RET(__wt_bt_verify_page_col_int(toc, page));
+		break;
+	case WT_PAGE_COL_FIX:
+		WT_RET(__wt_bt_verify_page_col_fix(toc, page));
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -1003,11 +1007,11 @@ err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.data_len);
 }
 
 /*
- * __wt_bt_verify_page_fixed --
- *	Walk a page of fixed-size objects and verify them.
+ * __wt_bt_verify_page_col_int --
+ *	Walk a WT_PAGE_COL_INT page and verify it.
  */
 static int
-__wt_bt_verify_page_fixed(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+__wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	IDB *idb;
@@ -1044,6 +1048,65 @@ __wt_bt_verify_page_fixed(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 			    "addr %lu extends past the end of the file",
 			    (u_long)entry_num, (u_long)addr);
 			return (WT_ERROR);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_bt_verify_page_col_fix --
+ *	Walk a WT_PAGE_COL_FIX page and verify it.
+ */
+static int
+__wt_bt_verify_page_col_fix(WT_TOC *toc, WT_PAGE *page)
+{
+	DB *db;
+	IDB *idb;
+	u_int len;
+	u_int32_t addr, i, entry_num;
+	u_int8_t *end, *p;
+
+	db = toc->db;
+	idb = db->idb;
+	end = (u_int8_t *)page->hdr + page->bytes;
+	addr = page->addr;
+
+	if (F_ISSET(idb, WT_REPEAT_COMP)) {
+		len = db->fixed_len + sizeof(u_int16_t);
+
+		entry_num = 0;
+		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
+			++entry_num;
+
+			/* Check if this entry is entirely on the page. */
+			if (p + len > end)
+				goto eop;
+
+			/* Count must be non-zero. */
+			if (*(u_int16_t *)p == 0) {
+				__wt_db_errx(db,
+				    "fixed-length entry %lu on page at addr "
+				    "%lu has a repeat count of 0",
+				    (u_long)entry_num, (u_long)addr);
+				return (WT_ERROR);
+			}
+		}
+	} else {
+		len = db->fixed_len;
+
+		entry_num = 0;
+		WT_FIX_FOREACH(db, page, p, i) {
+			++entry_num;
+
+			/* Check if this entry is entirely on the page. */
+			if (p + len > end) {
+eop:				__wt_db_errx(db,
+				    "fixed-length entry %lu on page at addr "
+				    "%lu extends past the end of the page",
+				    (u_long)entry_num, (u_long)addr);
+				return (WT_ERROR);
+			}
 		}
 	}
 

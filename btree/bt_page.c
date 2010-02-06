@@ -9,8 +9,9 @@
 
 #include "wt_internal.h"
 
+static int __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_col_int(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_col_leaf(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_fixed_int(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
 
@@ -176,8 +177,11 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	}
 
 	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+		ret = __wt_bt_page_inmem_col_fix(db, page);
+		break;
 	case WT_PAGE_COL_INT:
-		ret = __wt_bt_page_inmem_fixed_int(db, page);
+		ret = __wt_bt_page_inmem_col_int(db, page);
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -320,40 +324,6 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_page_inmem_fixed_int --
- *	Build in-memory index for column store internal pages.
- */
-static int
-__wt_bt_page_inmem_fixed_int(DB *db, WT_PAGE *page)
-{
-	WT_INDX *indx;
-	WT_OFF *offp;
-	WT_PAGE_HDR *hdr;
-	u_int64_t records;
-	u_int32_t i;
-
-	hdr = page->hdr;
-	indx = page->indx;
-	records = 0;
-
-	/*
-	 * Walk the page, building indices and finding the end of the page.
-	 * The page contains WT_OFF structures.
-	 */
-	WT_OFF_FOREACH(page, offp, i) {
-		indx->page_data = offp;
-		++indx;
-		records += WT_RECORDS(offp);
-	}
-
-	page->indx_count = hdr->u.entries;
-	page->records = records;
-
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
-	return (0);
-}
-
-/*
  * __wt_bt_page_inmem_row_leaf --
  *	Build in-memory index for row store leaf pages.
  */
@@ -436,6 +406,40 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 }
 
 /*
+ * __wt_bt_page_inmem_col_int --
+ *	Build in-memory index for column store internal pages.
+ */
+static int
+__wt_bt_page_inmem_col_int(DB *db, WT_PAGE *page)
+{
+	WT_INDX *indx;
+	WT_OFF *offp;
+	WT_PAGE_HDR *hdr;
+	u_int64_t records;
+	u_int32_t i;
+
+	hdr = page->hdr;
+	indx = page->indx;
+	records = 0;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains WT_OFF structures.
+	 */
+	WT_OFF_FOREACH(page, offp, i) {
+		indx->page_data = offp;
+		++indx;
+		records += WT_RECORDS(offp);
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = records;
+
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
+	return (0);
+}
+
+/*
  * __wt_bt_page_inmem_col_leaf --
  *	Build in-memory index for variable-length, data-only leaf pages.
  */
@@ -479,6 +483,40 @@ __wt_bt_page_inmem_col_leaf(DB *db, WT_PAGE *page)
 	page->records = hdr->u.entries;
 
 	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	return (0);
+}
+
+/*
+ * __wt_bt_page_inmem_col_fix --
+ *	Build in-memory index for column store fixed-length leaf pages.
+ */
+static int
+__wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
+{
+	WT_INDX *indx;
+	WT_PAGE_HDR *hdr;
+	u_int64_t records;
+	u_int32_t i;
+	u_int8_t *p;
+
+	hdr = page->hdr;
+	indx = page->indx;
+	records = 0;
+
+	/*
+	 * Walk the page, building indices and finding the end of the page.
+	 * The page contains fixed-length objects.
+	 */
+	WT_FIX_FOREACH(db, page, p, i) {
+		indx->page_data = p;
+		++indx;
+		++records;
+	}
+
+	page->indx_count = hdr->u.entries;
+	page->records = records;
+
+	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)p);
 	return (0);
 }
 

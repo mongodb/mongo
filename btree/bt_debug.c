@@ -14,7 +14,8 @@ static int  __wt_bt_debug_addr(WT_TOC *, u_int32_t, char *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
-static void __wt_bt_debug_page_fixed(WT_PAGE *, FILE *);
+static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
+static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *, int);
 
 int
@@ -185,8 +186,10 @@ __wt_bt_debug_page(
 		ret = __wt_bt_debug_page_item(toc, page, fp, inmemory);
 		break;
 	case WT_PAGE_COL_FIX:
+		__wt_bt_debug_page_col_fix(db, page, fp);
+		break;
 	case WT_PAGE_COL_INT:
-		__wt_bt_debug_page_fixed(page, fp);
+		__wt_bt_debug_page_col_int(page, fp);
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -214,20 +217,21 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	memcpy(
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
-	fprintf(fp, "magic: %#lx, major: %lu, minor: %lu\n",
+	fprintf(fp, "\tdescription record: {\n"),
+	fprintf(fp, "\tmagic: %#lx, major: %lu, minor: %lu\n",
 	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
-	fprintf(fp, "intlsize: %lu, leafsize: %lu, base record: %llu\n",
-	    (u_long)desc.intlsize,
-	    (u_long)desc.leafsize, desc.base_recno);
+	fprintf(fp, "\tintlsize: %lu, leafsize: %lu, base record: %llu\n",
+	    (u_long)desc.intlsize, (u_long)desc.leafsize, desc.base_recno);
+	fprintf(fp, "\tfixed_len: %lu\n", (u_long)desc.fixed_len);
 	if (desc.root_addr == WT_ADDR_INVALID)
-		fprintf(fp, "root addr (none), ");
+		fprintf(fp, "\troot addr (none), ");
 	else
-		fprintf(fp, "root addr %lu, ", (u_long)desc.root_addr);
+		fprintf(fp, "\troot addr %lu, ", (u_long)desc.root_addr);
 	if (desc.free_addr == WT_ADDR_INVALID)
 		fprintf(fp, "free addr (none), ");
 	else
 		fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
-	fprintf(fp, "\n");
+	fprintf(fp, "\n\t}\n");
 }
 
 /*
@@ -280,11 +284,11 @@ __wt_bt_debug_page_item(WT_TOC *toc, WT_PAGE *page, FILE *fp, int inmemory)
 }
 
 /*
- * __wt_bt_debug_page_fixed --
- *	Dump a page of fixed-length objects.
+ * __wt_bt_debug_page_col_int --
+ *	Dump a WT_PAGE_COL_INT page.
  */
 static void
-__wt_bt_debug_page_fixed(WT_PAGE *page, FILE *fp)
+__wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
 	WT_OFF *offp;
 	u_int32_t i;
@@ -295,8 +299,38 @@ __wt_bt_debug_page_fixed(WT_PAGE *page, FILE *fp)
 
 	ref = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? "leaf" : "tree";
 	WT_OFF_FOREACH(page, offp, i)
-		fprintf(fp, "offpage %s { addr: %lu, records %llu }\n",
+		fprintf(fp, "\toffpage %s { addr: %lu, records %llu }\n",
 		    ref, (u_long)offp->addr, WT_RECORDS(offp));
+}
+
+/*
+ * __wt_bt_debug_page_col_fix --
+ *	Dump a WT_PAGE_COL_FIX page.
+ */
+static void
+__wt_bt_debug_page_col_fix(DB *db, WT_PAGE *page, FILE *fp)
+{
+	IDB *idb;
+	u_int32_t i;
+	u_int8_t *p;
+
+	if (fp == NULL)				/* Callable from a debugger. */
+		fp = stdout;
+
+	idb = db->idb;
+
+	if (F_ISSET(idb, WT_REPEAT_COMP))
+		WT_FIX_REPEAT_FOREACH(db, page, p, i) {
+			fprintf(fp, "\trepeat %lu {", (u_long)*(u_int16_t *)p);
+			__wt_bt_print(p + sizeof(u_int16_t), db->fixed_len, fp);
+			fprintf(fp, "}\n");
+		}
+	else
+		WT_FIX_FOREACH(db, page, p, i) {
+			fprintf(fp, "\t{");
+			__wt_bt_print(p, db->fixed_len, fp);
+			fprintf(fp, "}\n");
+		}
 }
 
 /*

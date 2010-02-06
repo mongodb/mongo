@@ -281,6 +281,22 @@ static int
 __wt_bt_dump_page_fixed(
     WT_TOC *toc, WT_PAGE *page, FILE *stream, u_int32_t flags)
 {
+	DB *db;
+	IDB *idb;
+	u_int32_t i, j;
+	u_int8_t *p;
+	void (*func)(u_int8_t *, u_int32_t, FILE *);
+
+	db = toc->db;
+	idb = db->idb;
+	func = flags == WT_PRINTABLES ? __wt_bt_print_nl : __wt_bt_hexprint;
+
+	if (F_ISSET(idb, WT_REPEAT_COMP))
+		WT_FIX_REPEAT_ITERATE(db, page, p, i, j)
+			func(p + sizeof(u_int16_t), db->fixed_len, stream);
+	else
+		WT_FIX_FOREACH(db, page, p, i)
+			func(p, db->fixed_len, stream);
 	return (0);
 }
 

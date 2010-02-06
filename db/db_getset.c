@@ -47,6 +47,16 @@ __wt_db_column_set_verify(DB *db,
 		F_SET(idb, WT_REPEAT_COMP);
 	}
 
+	/*
+	 * We limit the size of fixed-length objects to 64 bytes, just so we
+	 * don't have to deal with objects bigger than the page size.
+	 */
+	if (fixed_len > 64) {
+		__wt_db_errx(db,
+		    "Fixed-length objects are limited to 64 bytes in size");
+		return (WT_ERROR);
+	}
+
 	/* Side-effect: this call means we're doing a column store. */
 	F_SET(idb, WT_COLUMN);
 	return (0);
