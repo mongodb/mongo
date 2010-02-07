@@ -185,8 +185,9 @@ namespace mongo {
             _storedNames.insert( n.valuestr() );
             
         }
-        
-        db->ensureIndex( coll, BSON( "_id" << 1 ) , true );
+
+        if ( dbMutex.getState() > 0 )
+            db->ensureIndex( coll, BSON( "_id" << 1 ) , true );
 
         // --- remove things from scope that were removed
 
