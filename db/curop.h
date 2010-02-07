@@ -122,8 +122,8 @@ namespace mongo {
         bool active() const { return _active; }
 
         /** micros */
-        unsigned long long startTime() const {
-            assert(_start);
+        unsigned long long startTime() {
+            ensureStarted();
             return _start;
         }
 
@@ -132,21 +132,21 @@ namespace mongo {
             _end = curTimeMicros64();
         }
         
-        unsigned long long totalTimeMicros() const {
+        unsigned long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
         }
 
-        int totalTimeMillis() const {
+        int totalTimeMillis() {
             return (int) (totalTimeMicros() / 1000);
         }
 
-        int elapsedMillis() const {
+        int elapsedMillis() {
             unsigned long long total = curTimeMicros64() - startTime();
             return (int) (total / 1000);
         }
 
-        int elapsedSeconds() const {
+        int elapsedSeconds() {
             return elapsedMillis() / 1000;
         }
 
