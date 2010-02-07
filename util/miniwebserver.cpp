@@ -203,7 +203,7 @@ namespace mongo {
     
     void MiniWebServer::run() {
         SockAddr from;
-        while ( 1 ) {
+        while ( ! inShutdown() ) {
             int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
             if ( s < 0 ) {
                 if ( errno == ECONNABORTED ) {
