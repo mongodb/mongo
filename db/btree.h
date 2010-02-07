@@ -89,7 +89,7 @@ namespace mongo {
         void modified(const DiskLoc& thisLoc);
         KeyNode keyNode(int i) const {
             if ( i >= n ){
-                massert( 13000 , (string)"invalid keyNode: " +  BSON( "i" << i << "n" << n ).jsonString() , i < n );
+                massert( (string)"invalid keyNode: " +  BSON( "i" << i << "n" << n ).jsonString() , i < n );
             }
             return KeyNode(*this, k(i));
         }
