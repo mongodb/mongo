@@ -55,10 +55,6 @@ namespace mongo {
     bool master = false; // true means keep an op log
     bool autoresync = false;
     
-    /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    MongoMutex &dbMutex( *(new MongoMutex) );
-//    MutexInfo dbMutexInfo;
-
     string dbExecCommand;
 
     string bind_ip = "";
