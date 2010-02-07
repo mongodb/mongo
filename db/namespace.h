@@ -432,7 +432,7 @@ namespace mongo {
 
         void checkMigrate();
 
-        long long storageSize();
+        long long storageSize( int * numExtents = 0 );
 
     private:
         bool cappedMayDelete() const {

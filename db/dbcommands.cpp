@@ -990,11 +990,16 @@ namespace mongo {
 
             result.append( "ns" , ns.c_str() );
 
-            result.append( "count" , nsd->nrecords );
-            result.append( "size" , nsd->datasize );
-            result.append( "storageSize" , nsd->storageSize() );
+            result.appendIntOrLL( "count" , nsd->nrecords );
+            result.appendIntOrLL( "size" , nsd->datasize );
+            int numExtents;
+            result.appendIntOrLL( "storageSize" , nsd->storageSize( &numExtents ) );
+            result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
-
+            result.append( "lastExtentSize" , nsd->lastExtentSize );
+            result.append( "paddingFactor" , nsd->paddingFactor );
+            result.append( "flags" , nsd->flags );
+            
             if ( nsd->capped ){
                 result.append( "capped" , nsd->capped );
                 result.append( "max" , nsd->max );
