@@ -35,3 +35,8 @@ assert.eq( 22 , db.eval( "return bar(5);"  ) , "exec - 3 " );
 assert( s.getIndexKeys().length > 0 , "no indexes" );
 assert( s.getIndexKeys()[0]._id , "no _id index" );
 
+assert.eq( "undefined" , db.eval( function(){ return typeof(zzz); } ) , "C1" );
+s.save( { _id : "zzz" , value : 5 } )
+assert.eq( "number" , db.eval( function(){ return typeof(zzz); } ) , "C2" );
+s.remove( { _id : "zzz" } );
+assert.eq( "undefined" , db.eval( function(){ return typeof(zzz); } ) , "C3" );

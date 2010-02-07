@@ -164,9 +164,12 @@ namespace mongo {
         _loadedVersion = _lastVersion;
 
         string coll = _localDBName + ".system.js";
-
+        
         static DBClientBase * db = createDirectClient();
         auto_ptr<DBClientCursor> c = db->query( coll , Query() );
+        
+        set<string> thisTime;
+        
         while ( c->more() ){
             BSONObj o = c->next();
 
@@ -177,10 +180,30 @@ namespace mongo {
             uassert( 10210 ,  "value has to be set" , v.type() != EOO );
             
             setElement( n.valuestr() , v );
+
+            thisTime.insert( n.valuestr() );
+            _storedNames.insert( n.valuestr() );
+            
         }
         
         db->ensureIndex( coll, BSON( "_id" << 1 ) , true );
+
+        // --- remove things from scope that were removed
+
+        list<string> toremove;
+
+        for ( set<string>::iterator i=_storedNames.begin(); i!=_storedNames.end(); i++ ){
+            string n = *i;
+            if ( thisTime.count( n ) == 0 )
+                toremove.push_back( n );
+        }
         
+        for ( list<string>::iterator i=toremove.begin(); i!=toremove.end(); i++ ){
+            string n = *i;
+            _storedNames.erase( n );
+            execSetup( (string)"delete " + n , "clean up scope" );
+        }
+
     }
 
     ScriptingFunction Scope::createFunction( const char * code ){
