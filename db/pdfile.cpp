@@ -94,7 +94,8 @@ namespace mongo {
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
-        if ( !strstr( ns, ".system." ) && !strstr( ns, ".$freelist" ) ) {
+        if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
+             strstr( ns, ".$freelist" ) == 0 ){
             log( 1 ) << "adding _id index for new collection" << endl;
             ensureHaveIdIndex( ns );
         }        

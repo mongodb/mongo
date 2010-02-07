@@ -186,9 +186,6 @@ namespace mongo {
             
         }
 
-        if ( thisTime.size() > 0 && dbMutex.getState() >= 0 )
-            db->ensureIndex( coll, BSON( "_id" << 1 ) , true );
-
         // --- remove things from scope that were removed
 
         list<string> toremove;
