@@ -178,7 +178,9 @@ namespace mongo {
             
             setElement( n.valuestr() , v );
         }
-
+        
+        db->ensureIndex( coll, BSON( "_id" << 1 ) , true );
+        
     }
 
     ScriptingFunction Scope::createFunction( const char * code ){
