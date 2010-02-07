@@ -695,7 +695,19 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
+        bool oldFile = false;
+
         if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
+            oldFile = true;
+        }
+        
+        lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
+        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+
+        if ( oldFile ){
+            // we check this here because we want to see if we can get the lock
+            // if we can't, then its probably just another mongod running
             cout << "************** \n" 
                  << "old lock file: " << name << ".  probably means unclean shutdown\n"
                  << "reccomend removing file and running --repair\n" 
@@ -703,11 +715,8 @@ namespace mongo {
                  << "*************" << endl;
             uassert( 12596 , "old lock file" , 0 );
         }
-        
-        lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
-        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
-        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
-        
+
+
         stringstream ss;
         ss << getpid() << endl;
         string s = ss.str();
