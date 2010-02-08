@@ -58,6 +58,7 @@ install: build
 	dh_installdirs
 
 	scons --prefix=$(CURDIR)/debian/mongodb/usr install
+	mkdir -p $(CURDIR)/debian/etc
 	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb/etc/mongodb.conf 
 
 # Build architecture-independent files here.
