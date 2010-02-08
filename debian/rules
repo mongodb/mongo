@@ -26,6 +26,7 @@ build-stamp: configure-stamp
         # Add here commands to compile the package.
 	scons 
         #docbook-to-man debian/mongodb.sgml > mongodb.1
+	ls debian/*.1 > debian/mongodb.manpages
 
 	touch $@
 
@@ -49,17 +50,24 @@ clean:
 	rm -rf tools/*.o
 	rm -rf shell/*.o
 	rm -rf .sconf_temp
-	dh_clean 
+	rm -f buildscripts/*.pyc 
+	rm -f *.pyc
+	rm -f buildinfo.cpp
+	dh_clean debian/files
 
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k 
+	dh_prep
 	dh_installdirs
 
 	scons --prefix=$(CURDIR)/debian/mongodb/usr install
 	mkdir -p $(CURDIR)/debian/mongodb/etc
 	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb/etc/mongodb.conf 
+
+	mkdir -p $(CURDIR)/debian/mongodb/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides \
+		$(CURDIR)/debian/mongodb/usr/share/lintian/overrides/mongodb
 
 # Build architecture-independent files here.
 binary-indep: build install
