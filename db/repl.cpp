@@ -253,6 +253,35 @@ namespace mongo {
         }
     } cmdResync;
     
+    bool anyReplEnabled(){
+        return replPair || slave || master;
+    }
+
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed ){
+        
+        if ( replAllDead ) {
+            result.append("ismaster", 0.0);
+            if( authed ) { 
+                if ( replPair )
+                    result.append("remote", replPair->remote);
+                result.append("info", replAllDead);
+            }
+        }
+        else if ( replPair ) {
+            result.append("ismaster", replPair->state);
+            if( authed ) {
+                result.append("remote", replPair->remote);
+                if ( !replPair->info.empty() )
+                    result.append("info", replPair->info);
+            }
+        }
+        else {
+            result.append("ismaster", slave ? 0 : 1);
+            result.append("msg", "not paired");
+        }
+        
+    }
+
     class CmdIsMaster : public Command {
     public:
         virtual bool requiresAuth() { return false; }
@@ -266,29 +295,9 @@ namespace mongo {
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
 			   one is not authenticated for admin db to be safe.
 			*/
-			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
-
-            if ( replAllDead ) {
-                result.append("ismaster", 0.0);
-				if( authed ) { 
-					if ( replPair )
-						result.append("remote", replPair->remote);
-					result.append("info", replAllDead);
-				}
-            }
-            else if ( replPair ) {
-                result.append("ismaster", replPair->state);
-				if( authed ) {
-					result.append("remote", replPair->remote);
-					if ( !replPair->info.empty() )
-						result.append("info", replPair->info);
-				}
-			}
-            else {
-                result.append("ismaster", slave ? 0 : 1);
-				result.append("msg", "not paired");
-            }
             
+			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
+            appendReplicationInfo( result , authed );
             return true;
         }
     } cmdismaster;

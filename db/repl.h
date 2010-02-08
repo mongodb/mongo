@@ -312,4 +312,7 @@ namespace mongo {
         int maxMem_;
     };
     
+    bool anyReplEnabled();
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed );
+    
 } // namespace mongo
