@@ -448,7 +448,7 @@ namespace mongo {
         
         if ( cur == 0 ){
             ScopedDbConnection conn( _primary );
-            conn->insert( "config.version" , BSON( "version" << VERSION ) );
+            conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             pool.flush();
             assert( VERSION == dbConfigVersion( conn.conn() ) );
             conn.done();
