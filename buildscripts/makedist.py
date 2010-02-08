@@ -186,6 +186,8 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                        (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
                        (("ubuntu", "9.4", "x86_64"), "ami-eef61587"),
                        (("ubuntu", "9.4", "x86"), "ami-ccf615a5"),
+                       (("ubuntu", "8.10", "x86"), "ami-c0f615a9"),
+                       (("ubuntu", "8.10", "x86_64"), "ami-e2f6158b"),
                        # Doesn't work: boost too old.
                        #(("ubuntu", "8.4", "x86"), "ami59b35f30"),
                        #(("ubuntu", "8.4", "x86_64"), "ami-27b35f4e"),
@@ -207,6 +209,7 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                       ((("ubuntu", "9.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("ubuntu", "9.10", "*"), new_deb_boost_prereqs + common_deb_prereqs),
                        (("ubuntu", "10.4", "*"), new_deb_boost_prereqs + common_deb_prereqs),
+                       (("ubuntu", "8.10", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        # Doesn't work: boost too old.
                        #(("ubuntu", "8.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
                        (("debian", "5.0", "*"), old_deb_boost_prereqs + common_deb_prereqs),
@@ -226,6 +229,7 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                        (("ubuntu", "10.4", "*"), "ubuntu"),
                        (("ubuntu", "9.10", "*"), "ubuntu"),
                        (("ubuntu", "9.4", "*"), "root"),
+                       (("ubuntu", "8.10", "*"), "root"),
                        # Doesn't work: boost too old.
                        #(("ubuntu", "8.4", "*"), "ubuntu"),
                        (("centos", "*", "*"), "root"))),
@@ -292,20 +296,10 @@ class BaseBuilder(object):
         self.localgpgdir = kwargs["localgpgdir"] if "localgpgdir" in kwargs else os.path.expanduser("~/.gnupg")
         self.remotegpgdir = kwargs["remotegpgdir"]  if "remotegpgdir" in kwargs else ".gnupg"
 
-        #FIXME: clean this crud.
         if "localscript" in kwargs:
             self.localscript = kwargs["localscript"]
         else:
-            fh = None
-            name = None
-            try:
-                (fh, name) = tempfile.mkstemp('', "makedist.", ".")
-                self.localscript = name
-            finally:
-                if fh is not None:
-                    os.close(fh)
-            if name is None:
-                raise SimpleError("problem creating tempfile, maybe?")
+            self.localscript = None
         self.remotescript = kwargs["remotescript"] if "remotescript" in kwargs else "makedist.sh"
 
         self.prereqs=self.default("prereqs")
@@ -339,6 +333,17 @@ class BaseBuilder(object):
             self.cleanup()
 
     def generateConfigs(self):
+        if self.localscript == None:
+            fh = None
+            name = None
+            try:
+                (fh, name) = tempfile.mkstemp('', "makedist.", ".")
+                self.localscript = name
+            finally:
+                if fh is not None:
+                    os.close(fh)
+            if name is None:
+                raise SimpleError("problem creating tempfile, maybe?")
         with open(self.localscript, "w") as f:
             f.write(self.commands)
     def sendConfigs(self):
