@@ -1,6 +1,6 @@
 // common.cpp
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "concurrency.h"
 
 /**
