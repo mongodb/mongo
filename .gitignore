@@ -38,6 +38,7 @@ config.log
 settings.py
 buildinfo.cpp
 tags
+TAGS
 
 #temp dirs
 dump
