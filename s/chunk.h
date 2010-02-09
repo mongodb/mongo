@@ -61,27 +61,27 @@ namespace mongo {
             _max = o;
         }
 
-        string getShard(){
+        string getShard() const{
             return _shard;
         }
         void setShard( string shard );
 
-        bool contains( const BSONObj& obj );
+        bool contains( const BSONObj& obj ) const;
 
         string toString() const;
         operator string() const { return toString(); }
 
-        bool operator==(const Chunk& s);
+        bool operator==(const Chunk& s) const;
         
-        bool operator!=(const Chunk& s){
+        bool operator!=(const Chunk& s) const{
             return ! ( *this == s );
         }
         
-        void getFilter( BSONObjBuilder& b );
-        BSONObj getFilter(){ BSONObjBuilder b; getFilter( b ); return b.obj(); }
+        void getFilter( BSONObjBuilder& b ) const;
+        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
             
 
-        BSONObj pickSplitPoint();
+        BSONObj pickSplitPoint() const;
         Chunk * split();
         Chunk * split( const BSONObj& middle );
 
@@ -89,9 +89,9 @@ namespace mongo {
          * @return size of shard in bytes
          *  talks to mongod to do this
          */
-        long getPhysicalSize();
+        long getPhysicalSize() const;
         
-        long countObjects( const BSONObj& filter = BSONObj() );
+        long countObjects( const BSONObj& filter = BSONObj() ) const;
         
         /**
          * if the amount of data written nears the max size of a shard
@@ -126,7 +126,7 @@ namespace mongo {
         // main shard info
         
         ChunkManager * _manager;
-        ShardKeyPattern skey();
+        ShardKeyPattern skey() const;
 
         string _ns;
         BSONObj _min;

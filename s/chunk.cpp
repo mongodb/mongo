@@ -41,13 +41,13 @@ namespace mongo {
         _markModified();
     }
     
-    bool Chunk::contains( const BSONObj& obj ){
+    bool Chunk::contains( const BSONObj& obj ) const{
         return
             _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
 
-    BSONObj Chunk::pickSplitPoint(){
+    BSONObj Chunk::pickSplitPoint() const{
         int sort = 0;
         
         if ( _manager->getShardKey().globalMin().woCompare( getMin() ) == 0 ){
@@ -268,7 +268,7 @@ namespace mongo {
         return true;
     }
 
-    long Chunk::getPhysicalSize(){
+    long Chunk::getPhysicalSize() const{
         ScopedDbConnection conn( getShard() );
         
         BSONObj result;
@@ -283,7 +283,7 @@ namespace mongo {
     }
 
     
-    long Chunk::countObjects( const BSONObj& filter ){
+    long Chunk::countObjects( const BSONObj& filter ) const{
         ScopedDbConnection conn( getShard() );
         
         BSONObj f = getFilter();
@@ -297,14 +297,14 @@ namespace mongo {
         return (long)n;
     }
     
-    bool Chunk::operator==( const Chunk& s ){
+    bool Chunk::operator==( const Chunk& s ) const{
         return 
             _manager->getShardKey().compare( _min , s._min ) == 0 &&
             _manager->getShardKey().compare( _max , s._max ) == 0
             ;
     }
 
-    void Chunk::getFilter( BSONObjBuilder& b ){
+    void Chunk::getFilter( BSONObjBuilder& b ) const{
         _manager->_key.getFilter( b , _min , _max );
     }
     
@@ -383,7 +383,7 @@ namespace mongo {
     }
     
     
-    ShardKeyPattern Chunk::skey(){
+    ShardKeyPattern Chunk::skey() const{
         return _manager->getShardKey();
     }
 
