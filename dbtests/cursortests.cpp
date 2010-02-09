@@ -112,7 +112,7 @@ namespace CursorTests {
             }
         };
      
-    } // namespace MultiBtreeCursorTests
+    } // namespace BtreeCursorTests
     
     class All : public Suite {
     public:

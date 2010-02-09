@@ -187,6 +187,7 @@ namespace mongo {
         bool exists(const IndexDetails& idx, DiskLoc thisLoc, const BSONObj& key, BSONObj order);
 
         static DiskLoc addBucket(IndexDetails&); /* start a new index off, empty */
+        void deallocBucket(const DiskLoc &thisLoc); // clear bucket memory, placeholder for deallocation
         
         static void renameIndexNamespace(const char *oldNs, const char *newNs);
 
