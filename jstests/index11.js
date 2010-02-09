@@ -42,7 +42,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     doParallel( fullName + ".ensureIndex( {i:1}, {background:true} )" );
     try {
         // wait for indexing to start
-        assert.soon( function() { return 2 == db.system.indexes.count( {ns:"test."+baseName} ) }, 30000, 50 );
+        assert.soon( function() { return 2 == db.system.indexes.count( {ns:"test."+baseName} ) }, "no index created", 30000, 50 );
         assert.eq( size, t.count() );
         assert.eq( 100, t.findOne( {i:100} ).i );
         q = t.find();
