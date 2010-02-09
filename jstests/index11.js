@@ -21,6 +21,8 @@ waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 }
 
+print( "host" );
+print( db.getMongo().host );
 size = 500000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
