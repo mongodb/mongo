@@ -238,6 +238,8 @@ public:
         }
 
         cout << "imported " << num << " objects" << endl;
+
+        conn().getLastErr();
         
         if ( errors == 0 )
             return 0;
