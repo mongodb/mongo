@@ -82,6 +82,20 @@ namespace ClientTests {
 
     };
 
+    class CS_10 : public Base {
+    public:
+        CS_10() : Base( "CS_10" ) {}
+        void run() {
+            string longs( 770, 'c' );
+            for( int i = 0; i < 11; ++i )
+                db.insert( ns(), BSON( "a" << i << "b" << longs ) );
+            db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            
+            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ), 2 );
+            ASSERT_EQUALS( 11, c->itcount() );
+        }
+    };
+    
 
     class All : public Suite {
     public:
@@ -92,6 +106,7 @@ namespace ClientTests {
             add<DropIndex>();
             add<ReIndex>();
             add<ReIndex2>();
+            add<CS_10>();
         }
         
     } all;
