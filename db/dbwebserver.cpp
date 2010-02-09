@@ -80,8 +80,8 @@ namespace mongo {
 
             ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
             ss << "\n<b>replication</b>\n";
-            ss << "master: " << master << '\n';
-            ss << "slave:  " << slave << '\n';
+            ss << "master: " << replSettings.master << '\n';
+            ss << "slave:  " << replSettings.slave << '\n';
             if ( replPair ) {
                 ss << "replpair:\n";
                 ss << replPair->getInfo();

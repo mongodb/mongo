@@ -111,7 +111,7 @@ namespace mongo {
        If 'client' is not specified, the current client is used.
     */
     inline bool isMaster( const char *client = 0 ) {
-		if( !slave ) 
+		if( ! replSettings.slave ) 
 			return true;
 
         if ( !client ) {
@@ -128,7 +128,7 @@ namespace mongo {
 				return true;
 		}
         else { 
-            if( master ) {
+            if( replSettings.master ) {
                 // if running with --master --slave, allow.  note that master is also true 
                 // for repl pairs so the check for replPair above is important.
                 return true;

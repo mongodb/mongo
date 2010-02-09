@@ -582,7 +582,7 @@ namespace mongo {
         }
         virtual bool slaveOk() {
             // ok on --slave setups, not ok for nonmaster of a repl pair (unless override)
-            return slave == SimpleSlave;
+            return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() {
             return true;

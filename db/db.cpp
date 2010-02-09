@@ -55,7 +55,6 @@ namespace mongo {
 
     extern string bind_ip;
     extern char *appsrvPath;
-    extern bool autoresync;
     extern int diagLogging;
     extern int lenForNewNsFiles;
     extern int lockFile;
@@ -462,7 +461,7 @@ namespace mongo {
         bool is32bit = sizeof(int*) == 4;
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << cmdLine.port << " dbpath = " << dbpath
-              <<  " master = " << master << " slave = " << (int) slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
+              <<  " master = " << replSettings.master << " slave = " << (int) replSettings.slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
 
         show_32_warning();
 
@@ -867,13 +866,13 @@ int main(int argc, char* argv[], char *envp[] )
             startService = true;
         }
         if (params.count("master")) {
-            master = true;
+            replSettings.master = true;
         }
         if (params.count("slave")) {
-            slave = SimpleSlave;
+            replSettings.slave = SimpleSlave;
         }
         if (params.count("autoresync")) {
-            autoresync = true;
+            replSettings.autoresync = true;
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -908,8 +907,8 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("opIdMem")) {
             long x = params["opIdMem"].as<long>();
             uassert( 10036 , "bad --opIdMem arg", x > 0);
-            opIdMem = x;
-            assert(opIdMem > 0);
+            replSettings.opIdMem = x;
+            assert(replSettings.opIdMem > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
