@@ -1192,13 +1192,8 @@ def ensureTestDirs():
     ensureDir( "/data/" )
     ensureDir( "/data/db/" )
 
-def netstat():
-    from subprocess import call
-    call( [ "netstat", "-apvne" ] )
-
 def testSetup( env , target , source ):
     ensureTestDirs()
-    netstat()
 
 if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
     ensureDir( "/tmp/unittest/" );

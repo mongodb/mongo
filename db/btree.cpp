@@ -475,7 +475,7 @@ namespace mongo {
     }
 
     void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
-        ClientCursor::informAboutToDeleteBucket(thisLoc);
+        ClientCursor::informAboutToDeleteBucket(thisLoc); // slow...
         assert( !isHead() );
 
         BtreeBucket *p = parent.btreemod();
