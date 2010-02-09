@@ -155,4 +155,49 @@ namespace mongo {
         return c->toString();
     }
 
+    void curopWaitingForLock(){
+        cc().curop()->waitingForLock();
+    }
+    void curopGotLock(){
+        cc().curop()->gotLock();
+    }
+
+    BSONObj CurOp::infoNoauth() {
+        BSONObjBuilder b;
+        b.append("opid", _opNum);
+        bool a = _active && _start;
+        b.append("active", a);
+        if ( _lockType )
+            b.append("lockType" , _lockType > 0 ? "write" : "read"  );
+        b.append("waitingForLock" , _waitingForLock );
+        
+        if( a ){
+            b.append("secs_running", elapsedSeconds() );
+        }
+        
+        if( _op == 2004 ) 
+            b.append("op", "query");
+        else if( _op == 2005 )
+            b.append("op", "getMore");
+        else if( _op == 2001 )
+            b.append("op", "update");
+        else if( _op == 2002 )
+            b.append("op", "insert");
+        else if( _op == 2006 )
+            b.append("op", "delete");
+        else
+            b.append("op", _op);
+        
+        b.append("ns", _ns);
+        
+        if( haveQuery() ) {
+            b.append("query", query());
+        }
+        // b.append("inLock",  ??
+        stringstream clientStr;
+        clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
+        b.append("client", clientStr.str());
+        return b.obj();
+    }
+
 }

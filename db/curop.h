@@ -34,6 +34,7 @@ namespace mongo {
         bool _active;
         int _op;
         int _lockType; // see concurrency.h for values
+        bool _waitingForLock;
         int _dbprofile; // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
@@ -56,6 +57,7 @@ namespace mongo {
             _lockType = 0;
             _dbprofile = 0;
             _end = 0;
+            _waitingForLock = false;
         }
 
         void setNS(const char *ns) {
@@ -97,6 +99,13 @@ namespace mongo {
         }
         void setWrite(){
             _lockType = 1;
+        }
+
+        void waitingForLock(){
+            _waitingForLock = true;
+        }
+        void gotLock(){
+            _waitingForLock = false;
         }
 
         OpDebug& debug(){
@@ -189,36 +198,7 @@ namespace mongo {
             return infoNoauth();
         }
         
-        BSONObj infoNoauth() {
-            BSONObjBuilder b;
-            b.append("opid", _opNum);
-            bool a = _active && _start;
-            b.append("active", a);
-            if( a ) 
-                b.append("secs_running", elapsedSeconds() );
-            if( _op == 2004 ) 
-                b.append("op", "query");
-            else if( _op == 2005 )
-                b.append("op", "getMore");
-            else if( _op == 2001 )
-                b.append("op", "update");
-            else if( _op == 2002 )
-                b.append("op", "insert");
-            else if( _op == 2006 )
-                b.append("op", "delete");
-            else
-                b.append("op", _op);
-            b.append("ns", _ns);
-
-            if( haveQuery() ) {
-                b.append("query", query());
-            }
-            // b.append("inLock",  ??
-            stringstream clientStr;
-            clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
-            b.append("client", clientStr.str());
-            return b.obj();
-        }
+        BSONObj infoNoauth();
 
         friend class Client;
     };
