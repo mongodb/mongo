@@ -101,7 +101,7 @@ namespace mongo {
         long long n = 0;
         time_t saveLast = time( 0 );
         while ( 1 ) {
-            {
+            if( !c->moreInCurrentBatch() || n % 128 == 127 /*yield some*/ ) {
                 dbtemprelease r;
                 if ( !c->more() )
                     break;
@@ -111,7 +111,7 @@ namespace mongo {
             /* assure object is valid.  note this will slow us down a little. */
             if ( !tmp.valid() ) {
                 stringstream ss;
-                ss << "skipping corrupt object from " << from_collection;
+                ss << "Cloner: skipping corrupt object from " << from_collection;
                 BSONElement e = tmp.firstElement();
                 try {
                     e.validate();
