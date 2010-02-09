@@ -205,6 +205,13 @@ namespace mongo {
 		/** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
 
+        /** If true, there is more in our local buffers to be fetched via next(). Returns 
+            false when a getMore request back to server would be required.  You can use this 
+            if you want to exhaust whatever data has been fetched to the client already but 
+            then perhaps stop.
+        */
+        bool moreInCurrentBatch() { return pos < nReturned; }
+
         /** next
 		   @return next object in the result cursor.
            on an error at the remote server, you will get back:
