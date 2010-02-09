@@ -218,4 +218,22 @@ namespace mongo {
         static unsigned long long NextSequenceNumber;
     };
 
+    // like BSONObjCmp. for use as an STL comparison functor
+    // key-order in "order" argument must match key-order in shardkey
+    class ChunkCmp {
+    public:
+        ChunkCmp( const BSONObj &order = BSONObj() ) : _cmp( order ) {}
+        bool operator()( const Chunk &l, const Chunk &r ) const {
+            return _cmp(l.getMin(), r.getMin());
+        }
+
+        bool operator()( const Chunk *l, const Chunk *r ) const {
+            return operator()(*l, *r);
+        }
+    private:
+        BSONObjCmp _cmp;
+    };
+
+
+
 } // namespace mongo
