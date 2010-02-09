@@ -110,7 +110,9 @@ namespace mongo {
         case dbGetMore: return "getmore";
         case dbDelete: return "remove";
         case dbKillCursors: return "killcursors";
-        default: assert(0); return "";
+        default: 
+            assert(0); 
+            return "";
         }
     }
 

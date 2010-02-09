@@ -41,15 +41,8 @@ namespace mongo {
         struct sockaddr_in _remote;
         
         char _queryBuf[256];
-        bool haveQuery() const { return *((int *) _queryBuf) != 0; }
+
         void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
-        BSONObj query() {
-            if( *((int *) _queryBuf) == 1 ) { 
-                return _tooBig;
-            }
-            BSONObj o(_queryBuf);
-            return o;
-        }
         
         OpDebug _debug;
 
@@ -65,6 +58,17 @@ namespace mongo {
         }
 
     public:
+
+        bool haveQuery() const { return *((int *) _queryBuf) != 0; }
+
+        BSONObj query() {
+            if( *((int *) _queryBuf) == 1 ) { 
+                return _tooBig;
+            }
+            BSONObj o(_queryBuf);
+            return o;
+        }
+
         void ensureStarted(){
             if ( _start == 0 )
                 _start = _checkpoint = curTimeMicros64();            
@@ -129,6 +133,9 @@ namespace mongo {
         
         AtomicUInt opNum() const { return _opNum; }
         bool active() const { return _active; }
+        int getLockType() const { return _lockType; }
+        bool isWaitingForLock() const { return _waitingForLock; } 
+        int getOp() const { return _op; }
 
         /** micros */
         unsigned long long startTime() {
@@ -199,6 +206,12 @@ namespace mongo {
         }
         
         BSONObj infoNoauth();
+
+        string getRemoteString(){
+            stringstream ss;
+            ss << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
+            return ss.str();
+        }
 
         friend class Client;
     };

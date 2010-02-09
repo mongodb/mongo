@@ -143,6 +143,16 @@ namespace mongo {
             ss << "</tr>";
         }
 
+        void tablecell( stringstream& ss , bool b ){
+            ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
+        }
+        
+
+        template< typename T> 
+        void tablecell( stringstream& ss , const T& t ){
+            ss << "<td>" << t << "</td>";
+        }
+        
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
             ss << mongodVersion() << "\n";
@@ -166,21 +176,45 @@ namespace mongo {
             ss << "\nreplInfo:  " << replInfo << "\n\n";
 
             ss << "Clients:\n";
-            ss << "<table border=1><tr align='left'><th>Thread</th><th>Current op</th>\n";
+            ss << "<table border=1>";
+            ss << "<tr align='left'>"
+               << "<th>Thread</th>" 
+             
+               << "<th>OpId</th>" 
+               << "<th>Active</th>" 
+               << "<th>LockType</th>"
+               << "<th>Waiting</th>"
+               << "<th>SecsRunning</th>"
+               << "<th>Op</th>"
+               << "<th>NameSpace</th>"
+               << "<th>Query</th>"
+               << "<th>client</th>"
+
+               << "</tr>\n";
             {
                 boostlock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     CurOp& co = *(c->curop());
-                    ss << "<tr><td>" << c->desc() << "</td><td";
-                    BSONObj info = co.infoNoauth();
-                    /*
-                    if( info.getIntField("inLock") > 0 )
-                        ss << "style='color:red'";
-                    else if( info.getIntField("inLock") < 0 ) 
-                        ss << "style='color:green'";
-                        */
-                    ss << ">" << info << "</td></tr>\n";
+                    ss << "<tr><td>" << c->desc() << "</td>";
+                    
+                    tablecell( ss , co.opNum() );
+                    tablecell( ss , co.active() );
+                    tablecell( ss , co.getLockType() );
+                    tablecell( ss , co.isWaitingForLock() );
+                    if ( co.active() )
+                        tablecell( ss , co.elapsedSeconds() );
+                    else
+                        tablecell( ss , "" );
+                    tablecell( ss , co.getOp() );
+                    tablecell( ss , co.getNS() );
+                    if ( co.haveQuery() )
+                        tablecell( ss , co.query() );
+                    else
+                        tablecell( ss , "" );
+                    tablecell( ss , co.getRemoteString() );
+
+                    ss << "</tr>";
                 }
             }
             ss << "</table>\n";
