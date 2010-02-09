@@ -21,8 +21,8 @@
 #
 ### BEGIN INIT INFO
 # Provides:          mongodb
-# Required-Start:    $network $local_fs
-# Required-Stop:
+# Required-Start:    $network $local_fs $remote_fs
+# Required-Stop:     $network $local_fs $remote_fs
 # Should-Start:      $named
 # Should-Stop:
 # Default-Start:     2 3 4 5
@@ -50,9 +50,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/bin/mongod
 DESC=database
 
-# Default defaults.  Can be overridden by the /etc/default/$NAME,
-# below.
+# Default defaults.  Can be overridden by the /etc/default/$NAME
 NAME=mongodb
+CONF=/etc/mongodb.conf
 DATA=/var/lib/mongodb
 LOGDIR=/var/log/mongodb
 PIDFILE=/var/run/$NAME.pid
@@ -74,6 +74,7 @@ fi
 
 . /lib/lsb/init-functions
 
+STARTTIME=1
 DIETIME=10                   # Time to wait for the server to die, in seconds
                             # If this value is set too low you might not
                             # let some servers to die gracefully and
@@ -81,6 +82,7 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
 
 DAEMONUSER=${DAEMONUSER:-mongodb}
 DAEMON_OPTS=${DAEMON_OPTS:-"--dbpath $DATA --logpath $LOGFILE run"}
+DAEMON_OPTS="$DAEMON_OPTS --config $CONF"
 
 set -e
 
