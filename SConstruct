@@ -1276,7 +1276,7 @@ def startMongodForTests( env, target, source ):
     global mongod
     if mongodForTests:
         return
-    mongodForTestsPort = "40000"
+    mongodForTestsPort = "32000"
     import os
     ensureTestDirs()
     dirName = "/data/db/sconsTests/"
