@@ -5,7 +5,9 @@
 
 *~
 *.o
+*.obj
 *.aps
+*.ilk
 *.tar.gz
 *.suo
 *.ncb
