@@ -588,6 +588,7 @@ namespace mongo {
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
                 if ( !_dbAuth.empty() ) {
+                    installGlobalUtils( scope );
                     uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
                 }
             }
