@@ -1318,8 +1318,8 @@ namespace mongo {
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
                also if this is an addIndex, those checks should happen before this!
             */
-            // This creates first file in the database.
-            cc().database()->newestFile()->createExtent(ns, initialExtentSize(len));
+            // This may create first file in the database.
+            cc().database()->allocExtent(ns, initialExtentSize(len), false);
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);
