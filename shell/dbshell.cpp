@@ -251,6 +251,8 @@ bool fileExists( string file ){
     }
 }
 
+// Temporary code for debugging SERVER-500
+#include "util/file.h"
 void printFile( const char *name ) {
 #if defined(__linux__)
     int f = open( name, O_RDONLY );
