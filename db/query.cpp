@@ -800,7 +800,7 @@ namespace mongo {
 			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
 			   query the nonmaster member of a replica pair.
 			*/
-            uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || slave == SimpleSlave );
+            uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
 
             BSONElement hint;
             BSONObj min;

@@ -51,10 +51,6 @@ namespace mongo {
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
-    SlaveTypes slave = NotSlave;
-    bool master = false; // true means keep an op log
-    bool autoresync = false;
-    
     string dbExecCommand;
 
     string bind_ip = "";
@@ -62,8 +58,6 @@ namespace mongo {
     char *appsrvPath = null;
 
     DiagLog _diaglog;
-
-    int opIdMem = 100000000;
 
     bool useCursors = true;
     bool useHints = true;

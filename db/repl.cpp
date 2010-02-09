@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+    ReplSettings replSettings;
+
     void ensureHaveIdIndex(const char *ns);
 
     /* if 1 sync() is running */
@@ -63,7 +65,6 @@ namespace mongo {
     */
     const char *replAllDead = 0;
 
-    extern bool autoresync;
     time_t lastForcedResync = 0;
     
     IdTracker &idTracker = *( new IdTracker() );
@@ -254,7 +255,7 @@ namespace mongo {
     } cmdResync;
     
     bool anyReplEnabled(){
-        return replPair || slave || master;
+        return replPair || replSettings.slave || replSettings.master;
     }
 
     void appendReplicationInfo( BSONObjBuilder& result , bool authed ){
@@ -276,7 +277,7 @@ namespace mongo {
             }
         }
         else {
-            result.append("ismaster", slave ? 0 : 1);
+            result.append("ismaster", replSettings.slave ? 0 : 1);
             result.append("msg", "not paired");
         }
         
@@ -1384,7 +1385,7 @@ namespace mongo {
     Database *localOplogDB = 0;
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
-        if ( master ) {
+        if ( replSettings.master ) {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
             char cl[ 256 ];
             nsToDatabase( ns, cl );
@@ -1554,7 +1555,7 @@ namespace mongo {
             {
                 dblock lk;
                 if ( replAllDead ) {
-                    if ( !autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
+                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) )
                         break;
                 }
                 assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
@@ -1678,7 +1679,7 @@ namespace mongo {
            */
         //boost::thread tempt(tempThread);
 
-        if ( !slave && !master && !replPair )
+        if ( !replSettings.slave && !replSettings.master && !replPair )
             return;
 
         {
@@ -1686,20 +1687,20 @@ namespace mongo {
             pairSync->init();
         }
 
-        if ( slave || replPair ) {
-            if ( slave ) {
-				assert( slave == SimpleSlave );
+        if ( replSettings.slave || replPair ) {
+            if ( replSettings.slave ) {
+				assert( replSettings.slave == SimpleSlave );
                 log(1) << "slave=true" << endl;
 			}
 			else
-				slave = ReplPairSlave;
+				replSettings.slave = ReplPairSlave;
             boost::thread repl_thread(replSlaveThread);
         }
 
-        if ( master || replPair ) {
-            if ( master  )
+        if ( replSettings.master || replPair ) {
+            if ( replSettings.master )
                 log(1) << "master=true" << endl;
-            master = true;
+            replSettings.master = true;
             createOplog();
         }
     }
