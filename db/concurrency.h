@@ -161,6 +161,23 @@ namespace mongo {
             _m.lock_shared(); 
             curopGotLock();
         }
+        
+        bool lock_shared_try( int millis ) {
+            int s = _state.get();
+            if ( s ){
+                // we already have a lock, so no need to try
+                lock_shared();
+                return true;
+            }
+            
+            boost::system_time until = get_system_time();
+            until += boost::posix_time::milliseconds(2);
+            bool got = _m.timed_lock_shared( until );
+            if ( got )
+                _state.set(-1);
+            return got;
+        }
+        
         void unlock_shared() { 
             //DEV cout << " UNLOCKSHARED" << endl;
             int s = _state.get();
@@ -177,6 +194,7 @@ namespace mongo {
             _state.set(0);
             _m.unlock_shared(); 
         }
+        
         MutexInfo& info() { return _minfo; }
     };
 #else
@@ -220,6 +238,18 @@ namespace mongo {
         }
 
         void lock_shared() { lock(); }
+        bool lock_shared_try( int millis ) {
+            while ( millis-- ){
+                if ( getState() ){
+                    sleepmillis(1);
+                    continue;
+                }
+                lock_shared();
+                return true;
+            }
+            return false;
+        }
+                    
         void unlock_shared() { unlock(); }
         MutexInfo& info() { return _minfo; }
         void assertWriteLocked() { 
@@ -261,6 +291,22 @@ namespace mongo {
             );
         }
     };	
+
+    struct readlocktry {
+        readlocktry( const string&ns , int tryms ){
+            _got = dbMutex.lock_shared_try( tryms );
+        }
+        ~readlocktry() {
+            if ( _got ){
+                dbunlocking_read();
+                dbMutex.unlock_shared();
+            }
+        }
+        bool got(){
+            return _got;
+        }
+        bool _got;
+    };
     
     class mongolock {
         bool _writelock;

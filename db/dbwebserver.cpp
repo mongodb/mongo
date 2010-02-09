@@ -316,23 +316,18 @@ namespace mongo {
 
             doUnlockedStuff(ss);
 
-            int n = 2000;
-            Timer t;
-            while ( 1 ) {
-                if ( !dbMutex.info().isLocked() ) {
-                    {
-                        readlock lk("");
-                        ss << "time to get dblock: " << t.millis() << "ms\n";
-                        doLockedStuff(ss);
-                    }
-                    break;
+            {
+                Timer t;
+                readlocktry lk( "" , 2000 );
+                if ( lk.got() ){
+                    ss << "time to get dblock: " << t.millis() << "ms\n";
+                    doLockedStuff(ss);
                 }
-                sleepmillis(1);
-                if ( --n < 0 ) {
+                else {
                     ss << "\n<b>timed out getting dblock</b>\n";
-                    break;
                 }
             }
+            
 
             ss << "</pre></body></html>";
             responseMsg = ss.str();

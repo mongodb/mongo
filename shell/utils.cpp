@@ -361,6 +361,11 @@ namespace mongo {
                 pid_ = pi.dwProcessId;
                 handles.insert( make_pair( pid_, pi.hProcess ) );
 
+                PRINTFL;
+                PRINT(argv_[0]);
+                PRINT(pid_);
+                PRINT(pi.hProcess);
+
 #else
 
                 pid_ = fork();
@@ -382,6 +387,10 @@ namespace mongo {
 #ifdef _WIN32
             assert(handles.count(pid));
             HANDLE h = handles[pid];
+            PRINTFL;
+            PRINT(pid);
+            PRINT(h);
+            PRINT(block);
 
             if (block)
                 WaitForSingleObject(h, INFINITE);
@@ -390,8 +399,10 @@ namespace mongo {
             if(GetExitCodeProcess(h, &ignore)){
                 CloseHandle(h);
                 handles.erase(pid);
+                PRINT("finished");
                 return true;
             }else{
+                PRINT("running");
                 return false;
             }
 #else
@@ -431,6 +442,12 @@ namespace mongo {
                 assert( handles.count(pid) );
                 TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
             }else{
+                PRINTFL;
+                PRINT(sig);
+                PRINT(port);
+                PRINT(pid);
+                PRINT(handles.count(pid));
+                PRINT(handles[pid]);
                 DBClientConnection conn;
                 conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
                 try {
