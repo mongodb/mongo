@@ -365,8 +365,13 @@ namespace mongo {
             }
             else {
                 mongolock lk(true);
-                Client::Context c( currentOp.getNS() );
-                profile(ss.str().c_str(), ms);
+                if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ){
+                    Client::Context c( currentOp.getNS() );
+                    profile(ss.str().c_str(), ms);
+                }
+                else {
+                    mongo::log() << "warning: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
+                }
             }
         }
 
