@@ -98,7 +98,7 @@ namespace mongo {
      */
     class SerialServerClusteredCursor : public ClusteredCursor {
     public:
-        SerialServerClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , int sortOrder=0);
+        SerialServerClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , int sortOrder=0);
         virtual bool more();
         virtual BSONObj next();
         virtual string type() const { return "SerialServer"; }
@@ -116,8 +116,8 @@ namespace mongo {
      */        
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
-        ParallelSortClusteredCursor( set<ServerAndQuery> servers , QueryMessage& q , const BSONObj& sortKey );
-        ParallelSortClusteredCursor( set<ServerAndQuery> servers , const string& ns , 
+        ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
+        ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns , 
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();

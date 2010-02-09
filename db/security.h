@@ -29,7 +29,6 @@ namespace mongo {
 
     // --noauth cmd line option
     extern bool noauth;
-    extern bool authWriteOnly;
 
     /* for a particular db */
     struct Auth {
@@ -67,7 +66,6 @@ namespace mongo {
         bool _isAuthorized(const string& dbname, int level) { 
             if( m[dbname].level >= level ) return true;
 			if( noauth ) return true;
-            if( authWriteOnly && ( 1 >= level ) ) return true;
 			if( m["admin"].level >= level ) return true;
 			if( m["local"].level >= level ) return true;
             return _isAuthorizedSpecialChecks( dbname );

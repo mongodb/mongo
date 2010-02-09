@@ -475,7 +475,7 @@ namespace mongo {
     }
 
     void BtreeBucket::delBucket(const DiskLoc& thisLoc, IndexDetails& id) {
-        ClientCursor::informAboutToDeleteBucket(thisLoc);
+        ClientCursor::informAboutToDeleteBucket(thisLoc); // slow...
         assert( !isHead() );
 
         BtreeBucket *p = parent.btreemod();
@@ -497,6 +497,10 @@ namespace mongo {
             assert(false);
         }
 found:
+        deallocBucket( thisLoc );
+    }
+    
+    void BtreeBucket::deallocBucket(const DiskLoc &thisLoc) {
 #if 1
         /* as a temporary defensive measure, we zap the whole bucket, AND don't truly delete
            it (meaning it is ineligible for reuse).
@@ -1037,20 +1041,27 @@ namespace mongo {
                 BSONObj k; 
                 DiskLoc r;
                 x->popBack(r,k);
-                if( x->n == 0 )
-                    log() << "warning: empty bucket on BtreeBuild " << k.toString() << endl;
+                bool keepX = ( x->n != 0 );
+                DiskLoc keepLoc = keepX ? xloc : x->nextChild;
 
-                if ( ! up->_pushBack(r, k, order, xloc) ){
+                if ( ! up->_pushBack(r, k, order, keepLoc) ){
                     // current bucket full
                     DiskLoc n = BtreeBucket::addBucket(idx);
                     up->tempNext() = n;
                     upLoc = n; 
                     up = upLoc.btreemod();
-                    up->pushBack(r, k, order, xloc);
+                    up->pushBack(r, k, order, keepLoc);
                 }
 
-                xloc = x->tempNext(); /* get next in chain at current level */
-                x->parent = upLoc;
+                DiskLoc nextLoc = x->tempNext(); /* get next in chain at current level */
+                if ( keepX ) {
+                    x->parent = upLoc;                
+                } else {
+                    if ( !x->nextChild.isNull() )
+                        x->nextChild.btreemod()->parent = upLoc;
+                    x->deallocBucket( xloc );
+                }
+                xloc = nextLoc;
             }
             
             loc = upStart;

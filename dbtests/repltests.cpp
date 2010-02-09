@@ -41,13 +41,13 @@ namespace ReplTests {
         Client::Context _context;
     public:
         Base() : _context( ns() ){
-            master = true;
+            replSettings.master = true;
             createOplog();
             ensureHaveIdIndex( ns() );
         }
         ~Base() {
             try {
-                master = false;
+                replSettings.master = false;
                 deleteAll( ns() );
                 deleteAll( cllNS() );
             } catch ( ... ) {

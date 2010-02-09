@@ -31,8 +31,28 @@
 #include "btree.h"
 #include "curop.h"
 #include "../util/background.h"
+#include "../scripting/engine.h"
 
 namespace mongo {
+
+    class FeaturesCmd : public Command {
+    public:
+        FeaturesCmd() : Command( "features" ){}
+
+        virtual bool slaveOk(){ return true; }
+        virtual bool readOnly(){ return true; }
+
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            result.append( "readlock" , readLockSupported() );
+            if ( globalScriptEngine ){
+                BSONObjBuilder bb( result.subobjStart( "js" ) );
+                result.append( "utf8" , globalScriptEngine->utf8Ok() );
+                bb.done();
+            }
+            return true;
+        }
+        
+    } featuresCmd;
 
     class CleanCmd : public Command {
     public:
@@ -283,6 +303,8 @@ namespace mongo {
         class LockDBJob : public BackgroundJob { 
         protected:
             void run() { 
+                Client::initThread("fsyncjob");
+                Client& c = cc();
                 {
                     boostlock lk(lockedForWritingMutex);
                     lockedForWriting++;
@@ -302,6 +324,7 @@ namespace mongo {
                     boostlock lk(lockedForWritingMutex);
                     lockedForWriting--;
                 }
+                c.shutdown();
             }
         public:
             bool& _ready;

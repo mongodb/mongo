@@ -1,4 +1,20 @@
 // curop.h
+/*
+ *    Copyright (C) 2010 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 
 #pragma once
 
@@ -34,21 +50,15 @@ namespace mongo {
         bool _active;
         int _op;
         int _lockType; // see concurrency.h for values
+        bool _waitingForLock;
         int _dbprofile; // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
         struct sockaddr_in _remote;
         
         char _queryBuf[256];
-        bool haveQuery() const { return *((int *) _queryBuf) != 0; }
+
         void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
-        BSONObj query() {
-            if( *((int *) _queryBuf) == 1 ) { 
-                return _tooBig;
-            }
-            BSONObj o(_queryBuf);
-            return o;
-        }
         
         OpDebug _debug;
 
@@ -56,6 +66,7 @@ namespace mongo {
             _lockType = 0;
             _dbprofile = 0;
             _end = 0;
+            _waitingForLock = false;
         }
 
         void setNS(const char *ns) {
@@ -63,6 +74,17 @@ namespace mongo {
         }
 
     public:
+
+        bool haveQuery() const { return *((int *) _queryBuf) != 0; }
+
+        BSONObj query() {
+            if( *((int *) _queryBuf) == 1 ) { 
+                return _tooBig;
+            }
+            BSONObj o(_queryBuf);
+            return o;
+        }
+
         void ensureStarted(){
             if ( _start == 0 )
                 _start = _checkpoint = curTimeMicros64();            
@@ -99,6 +121,13 @@ namespace mongo {
             _lockType = 1;
         }
 
+        void waitingForLock(){
+            _waitingForLock = true;
+        }
+        void gotLock(){
+            _waitingForLock = false;
+        }
+
         OpDebug& debug(){
             return _debug;
         }
@@ -119,11 +148,18 @@ namespace mongo {
         }
         
         AtomicUInt opNum() const { return _opNum; }
-        bool active() const { return _active; }
 
+        /** if this op is running */
+        bool active() const { return _active; }
+        
+        int getLockType() const { return _lockType; }
+        bool isWaitingForLock() const { return _waitingForLock; } 
+        int getOp() const { return _op; }
+        
+        
         /** micros */
-        unsigned long long startTime() const {
-            assert(_start);
+        unsigned long long startTime() {
+            ensureStarted();
             return _start;
         }
 
@@ -132,21 +168,21 @@ namespace mongo {
             _end = curTimeMicros64();
         }
         
-        unsigned long long totalTimeMicros() const {
+        unsigned long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
         }
 
-        int totalTimeMillis() const {
+        int totalTimeMillis() {
             return (int) (totalTimeMicros() / 1000);
         }
 
-        int elapsedMillis() const {
+        int elapsedMillis() {
             unsigned long long total = curTimeMicros64() - startTime();
             return (int) (total / 1000);
         }
 
-        int elapsedSeconds() const {
+        int elapsedSeconds() {
             return elapsedMillis() / 1000;
         }
 
@@ -189,35 +225,12 @@ namespace mongo {
             return infoNoauth();
         }
         
-        BSONObj infoNoauth() {
-            BSONObjBuilder b;
-            b.append("opid", _opNum);
-            bool a = _active && _start;
-            b.append("active", a);
-            if( a ) 
-                b.append("secs_running", elapsedSeconds() );
-            if( _op == 2004 ) 
-                b.append("op", "query");
-            else if( _op == 2005 )
-                b.append("op", "getMore");
-            else if( _op == 2001 )
-                b.append("op", "update");
-            else if( _op == 2002 )
-                b.append("op", "insert");
-            else if( _op == 2006 )
-                b.append("op", "delete");
-            else
-                b.append("op", _op);
-            b.append("ns", _ns);
+        BSONObj infoNoauth();
 
-            if( haveQuery() ) {
-                b.append("query", query());
-            }
-            // b.append("inLock",  ??
-            stringstream clientStr;
-            clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
-            b.append("client", clientStr.str());
-            return b.obj();
+        string getRemoteString(){
+            stringstream ss;
+            ss << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
+            return ss.str();
         }
 
         friend class Client;

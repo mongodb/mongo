@@ -46,14 +46,27 @@ namespace mongo {
        --slave cmd line setting -> SimpleSlave
 	*/
 	typedef enum { NotSlave=0, SimpleSlave, ReplPairSlave } SlaveTypes;
-	extern SlaveTypes slave;
 
-	/* true means we are master and doing replication.  if we are not writing to oplog (no --master or repl pairing), 
-	   this won't be true.
-	*/
-    extern bool master;
+    class ReplSettings {
+    public:
+        SlaveTypes slave;
 
-    extern int opIdMem;
+        /* true means we are master and doing replication.  if we are not writing to oplog (no --master or repl pairing), 
+           this won't be true.
+        */
+        bool master;
+
+        int opIdMem;
+
+        bool autoresync;
+
+        ReplSettings()
+            : slave(NotSlave) , master(false) , opIdMem(100000000) , autoresync(false) {
+        }
+
+    };
+
+    extern ReplSettings replSettings;
     
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication, 
 				   bool slaveOk, bool useReplAuth, bool snapshot);
@@ -239,9 +252,9 @@ namespace mongo {
         dbIds_( "local.temp.replIds" ),
         dbModIds_( "local.temp.replModIds" ),
         inMem_( true ),
-        maxMem_( opIdMem ) {
+        maxMem_( replSettings.opIdMem ) {
         }
-        void reset( int maxMem = opIdMem ) {
+        void reset( int maxMem = replSettings.opIdMem ) {
             memIds_.reset();
             memModIds_.reset();
             dbIds_.reset();
@@ -311,5 +324,8 @@ namespace mongo {
         bool inMem_;
         int maxMem_;
     };
+    
+    bool anyReplEnabled();
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed );
     
 } // namespace mongo

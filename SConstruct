@@ -337,7 +337,7 @@ if GetOption( "extralib" ) is not None:
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "stdafx.cpp buildinfo.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
+commonFiles = Split( "stdafx.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/commands.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp" ]
@@ -641,7 +641,7 @@ if nix:
     env.Append( LIBS=[] )
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector -fstack-check" );
+        env.Append( CPPFLAGS=" -O0 -fstack-protector " );
     else:
         env.Append( CPPFLAGS=" -O3" )
 
@@ -1192,13 +1192,8 @@ def ensureTestDirs():
     ensureDir( "/data/" )
     ensureDir( "/data/db/" )
 
-def netstat():
-    from subprocess import call
-    call( [ "netstat", "-apvne" ] )
-
 def testSetup( env , target , source ):
     ensureTestDirs()
-    netstat()
 
 if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
     ensureDir( "/tmp/unittest/" );
@@ -1276,7 +1271,7 @@ def startMongodForTests( env, target, source ):
     global mongod
     if mongodForTests:
         return
-    mongodForTestsPort = "40000"
+    mongodForTestsPort = "32000"
     import os
     ensureTestDirs()
     dirName = "/data/db/sconsTests/"

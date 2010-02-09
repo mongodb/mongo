@@ -40,6 +40,7 @@ config.log
 settings.py
 buildinfo.cpp
 tags
+TAGS
 
 #temp dirs
 dump
@@ -91,7 +92,8 @@ clientTest
 build-stamp
 configure-stamp
 debian/mongodb
-debian/mongodb.*
+# This was inserted 2009-08-16, nobody knows why.
+#debian/mongodb.*
 
 #osx
 .DS_Store

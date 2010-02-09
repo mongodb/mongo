@@ -48,6 +48,17 @@ namespace mongo {
     public:
         DatabaseHolder() : _size(0){
         }
+
+        bool isLoaded( const string& ns , const string& path ){
+            dbMutex.assertAtLeastReadLocked();
+            map<string,Database*>& m = _paths[path];
+            
+            string db = _todb( ns );
+
+            map<string,Database*>::iterator it = m.find(db);
+            return it != m.end();
+        }
+
         
         Database * get( const string& ns , const string& path ){
             dbMutex.assertAtLeastReadLocked();
@@ -116,7 +127,7 @@ namespace mongo {
                 }
             }
         }
-        
+
     private:
         
         string _todb( const string& ns ){

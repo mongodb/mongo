@@ -584,15 +584,21 @@ namespace mongo {
         return -1;
     }
     
-    long long NamespaceDetails::storageSize(){
+    long long NamespaceDetails::storageSize( int * numExtents ){
         Extent * e = firstExtent.ext();
         assert( e );
         
         long long total = 0;
+        int n = 0;
         while ( e ){
-                total += e->length;
-                e = e->getNextExtent();
+            total += e->length;
+            e = e->getNextExtent();
+            n++;
         }
+        
+        if ( numExtents )
+            *numExtents = n;
+        
         return total;
     }
     

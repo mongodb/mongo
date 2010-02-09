@@ -1,3 +1,19 @@
+/*
+ *    Copyright (C) 2010 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 // client.cpp
 
 #include "stdafx.h"
@@ -82,6 +98,20 @@ namespace ClientTests {
 
     };
 
+    class CS_10 : public Base {
+    public:
+        CS_10() : Base( "CS_10" ) {}
+        void run() {
+            string longs( 770, 'c' );
+            for( int i = 0; i < 11; ++i )
+                db.insert( ns(), BSON( "a" << i << "b" << longs ) );
+            db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            
+            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ), 2 );
+            ASSERT_EQUALS( 11, c->itcount() );
+        }
+    };
+    
 
     class All : public Suite {
     public:
@@ -92,6 +122,7 @@ namespace ClientTests {
             add<DropIndex>();
             add<ReIndex>();
             add<ReIndex2>();
+            add<CS_10>();
         }
         
     } all;

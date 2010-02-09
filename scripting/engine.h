@@ -111,6 +111,7 @@ namespace mongo {
 
         string _localDBName;
         long long _loadedVersion;
+        set<string> _storedNames;
         static long long _lastVersion;
         map<string,ScriptingFunction> _cachedFunctions;
 

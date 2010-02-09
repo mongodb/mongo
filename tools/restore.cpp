@@ -56,6 +56,7 @@ public:
          * .bson file, or a single .bson file itself (a collection).
          */
         drillDown(root, _db != "", _coll != "");
+        conn().getLastError();
         return EXIT_CLEAN;
     }
 

@@ -1,4 +1,20 @@
 // utils.cpp
+/*
+ *    Copyright 2010 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 
 #include "../stdafx.h"
 
@@ -361,6 +377,11 @@ namespace mongo {
                 pid_ = pi.dwProcessId;
                 handles.insert( make_pair( pid_, pi.hProcess ) );
 
+                PRINTFL;
+                PRINT(argv_[0]);
+                PRINT(pid_);
+                PRINT(pi.hProcess);
+
 #else
 
                 pid_ = fork();
@@ -382,6 +403,10 @@ namespace mongo {
 #ifdef _WIN32
             assert(handles.count(pid));
             HANDLE h = handles[pid];
+            PRINTFL;
+            PRINT(pid);
+            PRINT(h);
+            PRINT(block);
 
             if (block)
                 WaitForSingleObject(h, INFINITE);
@@ -390,8 +415,10 @@ namespace mongo {
             if(GetExitCodeProcess(h, &ignore)){
                 CloseHandle(h);
                 handles.erase(pid);
+                PRINT("finished");
                 return true;
             }else{
+                PRINT("running");
                 return false;
             }
 #else
@@ -431,6 +458,12 @@ namespace mongo {
                 assert( handles.count(pid) );
                 TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
             }else{
+                PRINTFL;
+                PRINT(sig);
+                PRINT(port);
+                PRINT(pid);
+                PRINT(handles.count(pid));
+                PRINT(handles[pid]);
                 DBClientConnection conn;
                 conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
                 try {
@@ -588,6 +621,7 @@ namespace mongo {
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
                 if ( !_dbAuth.empty() ) {
+                    installGlobalUtils( scope );
                     uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
                 }
             }

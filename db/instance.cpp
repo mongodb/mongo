@@ -51,14 +51,6 @@ namespace mongo {
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
-    SlaveTypes slave = NotSlave;
-    bool master = false; // true means keep an op log
-    bool autoresync = false;
-    
-    /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    MongoMutex &dbMutex( *(new MongoMutex) );
-//    MutexInfo dbMutexInfo;
-
     string dbExecCommand;
 
     string bind_ip = "";
@@ -66,8 +58,6 @@ namespace mongo {
     char *appsrvPath = null;
 
     DiagLog _diaglog;
-
-    int opIdMem = 100000000;
 
     bool useCursors = true;
     bool useHints = true;
@@ -99,13 +89,19 @@ namespace mongo {
             b.append("err", "unauthorized");
         }
         else {
+            DbMessage d(m);
+            QueryMessage q(d);
+            bool all = q.query["$all"].trueValue();
             vector<BSONObj> vals;
             {
+                Client& me = cc();
                 boostlock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
+                    if ( c == &me )
+                        continue;
                     CurOp& co = *(c->curop());
-                    if( co.active() )
+                    if( all || co.active() )
                         vals.push_back( co.infoNoauth() );
                 }
             }
@@ -116,7 +112,7 @@ namespace mongo {
                 b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
             }
         }
-
+        
         replyToQuery(0, m, dbresponse, b.obj());
     }
     
@@ -375,8 +371,13 @@ namespace mongo {
             }
             else {
                 mongolock lk(true);
-                Client::Context c( currentOp.getNS() );
-                profile(ss.str().c_str(), ms);
+                if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ){
+                    Client::Context c( currentOp.getNS() );
+                    profile(ss.str().c_str(), ms);
+                }
+                else {
+                    mongo::log() << "warning: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
+                }
             }
         }
 
@@ -695,7 +696,19 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
 
+        bool oldFile = false;
+
         if ( boost::filesystem::exists( name ) && boost::filesystem::file_size( name ) > 0 ){
+            oldFile = true;
+        }
+        
+        lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
+        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+
+        if ( oldFile ){
+            // we check this here because we want to see if we can get the lock
+            // if we can't, then its probably just another mongod running
             cout << "************** \n" 
                  << "old lock file: " << name << ".  probably means unclean shutdown\n"
                  << "reccomend removing file and running --repair\n" 
@@ -703,11 +716,8 @@ namespace mongo {
                  << "*************" << endl;
             uassert( 12596 , "old lock file" , 0 );
         }
-        
-        lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
-        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
-        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
-        
+
+
         stringstream ss;
         ss << getpid() << endl;
         string s = ss.str();

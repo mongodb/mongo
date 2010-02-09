@@ -88,7 +88,9 @@ namespace mongo {
     protected:
         void modified(const DiskLoc& thisLoc);
         KeyNode keyNode(int i) const {
-            assert( i < n );
+            if ( i >= n ){
+                massert( 13000 , (string)"invalid keyNode: " +  BSON( "i" << i << "n" << n ).jsonString() , i < n );
+            }
             return KeyNode(*this, k(i));
         }
 
@@ -190,6 +192,7 @@ namespace mongo {
             DiskLoc self); 
 
         static DiskLoc addBucket(IndexDetails&); /* start a new index off, empty */
+        void deallocBucket(const DiskLoc &thisLoc); // clear bucket memory, placeholder for deallocation
         
         static void renameIndexNamespace(const char *oldNs, const char *newNs);
 

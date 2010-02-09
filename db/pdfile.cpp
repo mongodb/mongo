@@ -94,7 +94,8 @@ namespace mongo {
     extern int otherTraceLevel;
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
-        if ( !strstr( ns, ".system." ) && !strstr( ns, ".$freelist" ) ) {
+        if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
+             strstr( ns, ".$freelist" ) == 0 ){
             log( 1 ) << "adding _id index for new collection" << endl;
             ensureHaveIdIndex( ns );
         }        
@@ -1317,8 +1318,8 @@ namespace mongo {
             /* todo: shouldn't be in the namespace catalog until after the allocations here work.
                also if this is an addIndex, those checks should happen before this!
             */
-            // This creates first file in the database.
-            cc().database()->newestFile()->createExtent(ns, initialExtentSize(len));
+            // This may create first file in the database.
+            cc().database()->allocExtent(ns, initialExtentSize(len), false);
             d = nsdetails(ns);
             if ( !god )
                 ensureIdIndexForNewNs(ns);

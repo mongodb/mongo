@@ -222,9 +222,8 @@ namespace mongo {
         qr->startingFrom = startingFrom;
         qr->nReturned = nReturned;
         b.decouple();
-        Message *resp = new Message();
-        resp->setData(qr, true); // transport will free
-        p->reply(requestMsg, *resp, requestMsg.data->id);
+        Message resp(qr, true);
+        p->reply(requestMsg, resp, requestMsg.data->id);
     }
 
 } // namespace mongo

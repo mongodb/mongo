@@ -305,6 +305,8 @@ namespace mongo {
             started = time(0);
         }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
+			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
             result.append("uptime",(double) (time(0)-started));
             
@@ -323,8 +325,8 @@ namespace mongo {
                 result.append( "globalLock" , t.obj() );
             }
             
-            {
-
+            if ( authed ){
+                
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
                 
                 ProcessInfo p;
@@ -350,8 +352,8 @@ namespace mongo {
                 bb.append( "available" , connTicketHolder.available() );
                 bb.done();
             }
-
-            {
+            
+            if ( authed ){
                 BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
                 bb.append("note", "fields vary by platform");
                 ProcessInfo p;
@@ -366,8 +368,17 @@ namespace mongo {
                 bb.done();
             }
             
+            if ( anyReplEnabled() ){
+                BSONObjBuilder bb( result.subobjStart( "repl" ) );
+                appendReplicationInfo( bb , authed );
+                bb.done();
+            }
+            
             result.append( "opcounters" , globalOpCounters.getObj() );
             
+            if ( ! authed )
+                result.append( "note" , "run against admin for more info" );
+
             return true;
         }
         time_t started;
@@ -571,7 +582,7 @@ namespace mongo {
         }
         virtual bool slaveOk() {
             // ok on --slave setups, not ok for nonmaster of a repl pair (unless override)
-            return slave == SimpleSlave;
+            return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() {
             return true;
@@ -990,11 +1001,16 @@ namespace mongo {
 
             result.append( "ns" , ns.c_str() );
 
-            result.append( "count" , nsd->nrecords );
-            result.append( "size" , nsd->datasize );
-            result.append( "storageSize" , nsd->storageSize() );
+            result.appendIntOrLL( "count" , nsd->nrecords );
+            result.appendIntOrLL( "size" , nsd->datasize );
+            int numExtents;
+            result.appendIntOrLL( "storageSize" , nsd->storageSize( &numExtents ) );
+            result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
-
+            result.append( "lastExtentSize" , nsd->lastExtentSize );
+            result.append( "paddingFactor" , nsd->paddingFactor );
+            result.append( "flags" , nsd->flags );
+            
             if ( nsd->capped ){
                 result.append( "capped" , nsd->capped );
                 result.append( "max" , nsd->max );
