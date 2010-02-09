@@ -613,7 +613,6 @@ int main(int argc, char* argv[], char *envp[] )
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
         ("auth", "run with security")
-        ("authWriteOnly", "run with security for writes only")
         ("objcheck", "inspect client data for validity on receipt")
         ("quota", "enable db quota management")
         ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
@@ -772,15 +771,10 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("cpu")) {
             cmdLine.cpu = true;
         }
-        if (params.count("authWriteOnly")) {
-            noauth = false;
-            authWriteOnly = true;
-        }
         if (params.count("noauth")) {
             noauth = true;
         }
         if (params.count("auth")) {
-            authWriteOnly = false;
             noauth = false;
         }
         if (params.count("quota")) {
