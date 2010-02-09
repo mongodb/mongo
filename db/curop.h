@@ -148,11 +148,15 @@ namespace mongo {
         }
         
         AtomicUInt opNum() const { return _opNum; }
+
+        /** if this op is running */
         bool active() const { return _active; }
+        
         int getLockType() const { return _lockType; }
         bool isWaitingForLock() const { return _waitingForLock; } 
         int getOp() const { return _op; }
-
+        
+        
         /** micros */
         unsigned long long startTime() {
             ensureStarted();

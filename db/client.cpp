@@ -209,6 +209,10 @@ namespace mongo {
         stringstream clientStr;
         clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
         b.append("client", clientStr.str());
+
+        if ( _client )
+            b.append( "desc" , _client->desc() );
+
         return b.obj();
     }
 

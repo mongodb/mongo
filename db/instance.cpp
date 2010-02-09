@@ -89,13 +89,19 @@ namespace mongo {
             b.append("err", "unauthorized");
         }
         else {
+            DbMessage d(m);
+            QueryMessage q(d);
+            bool all = q.query["$all"].trueValue();
             vector<BSONObj> vals;
             {
+                Client& me = cc();
                 boostlock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
+                    if ( c == &me )
+                        continue;
                     CurOp& co = *(c->curop());
-                    if( co.active() )
+                    if( all || co.active() )
                         vals.push_back( co.infoNoauth() );
                 }
             }
@@ -106,7 +112,7 @@ namespace mongo {
                 b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
             }
         }
-
+        
         replyToQuery(0, m, dbresponse, b.obj());
     }
     
