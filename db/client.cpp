@@ -156,10 +156,22 @@ namespace mongo {
     }
 
     void curopWaitingForLock(){
-        cc().curop()->waitingForLock();
+        Client * c = currentClient.get();
+        if ( c ){
+            CurOp * co = c->curop();
+            if ( co ){
+                co->waitingForLock();
+            }
+        }
     }
     void curopGotLock(){
-        cc().curop()->gotLock();
+        Client * c = currentClient.get();
+        if ( c ){
+            CurOp * co = c->curop();
+            if ( co ){
+                co->gotLock();
+            }
+        }
     }
 
     BSONObj CurOp::infoNoauth() {

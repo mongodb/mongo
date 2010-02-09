@@ -303,6 +303,8 @@ namespace mongo {
         class LockDBJob : public BackgroundJob { 
         protected:
             void run() { 
+                Client::initThread("fsyncjob");
+                Client& c = cc();
                 {
                     boostlock lk(lockedForWritingMutex);
                     lockedForWriting++;
@@ -322,6 +324,7 @@ namespace mongo {
                     boostlock lk(lockedForWritingMutex);
                     lockedForWriting--;
                 }
+                c.shutdown();
             }
         public:
             bool& _ready;
