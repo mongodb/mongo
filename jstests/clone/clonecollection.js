@@ -101,7 +101,7 @@ assert.eq( 200000, f.a.count() );
 
 doParallel( "assert.commandFailed( db.runCommand( { cloneCollection: \"jstests_clonecollection.a\", from: \"localhost:" + ports[ 0 ] + "\", logSizeMb:1 } ) );" );
 
-sleep( 200 );
+sleep( 100 );
 for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
