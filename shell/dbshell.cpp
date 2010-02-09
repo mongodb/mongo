@@ -251,24 +251,6 @@ bool fileExists( string file ){
     }
 }
 
-// Temporary code for debugging SERVER-500
-#include "util/file.h"
-void printFile( const char *name ) {
-#if defined(__linux__)
-    int f = open( name, O_RDONLY );
-    if ( f <= 0 ) {
-        cout << "couldn't open " << name << ' ' << OUTPUT_ERRNO << endl;
-    }
-    cout << "file: " << name << endl;
-    char data[ 129 ];
-    memset( data, 0, 129 );
-    while( read( f, data, 128 ) ) {
-        cout << data << endl;
-        memset( data, 0, 129 );
-    }
-#endif
-}
-
 int _main(int argc, char* argv[]) {
     setupSignals();
 
@@ -414,9 +396,6 @@ int _main(int argc, char* argv[]) {
     for (size_t i = 0; i < files.size(); i++) {
         mongo::shellUtils::MongoProgramScope s;
 
-        printFile( "/proc/net/tcp" );
-        printFile( "/proc/net/udp" );
-        
         if ( files.size() > 1 )
             cout << "loading file: " << files[i] << endl;
 
