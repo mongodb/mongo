@@ -92,9 +92,9 @@ struct __wt_toc {
 	 */
 	ENV	*env;			/* Operation environment */
 
-	DB	 *db;			/* Current database */
-	DBT	  key, data;		/* Returned key/data pairs */
-	DBT	  scratch;		/* Temporary use by anybody */
+	DB	*db;			/* Current database */
+	DBT	 key, data;		/* Returned key/data pairs */
+	DBT	 scratch;		/* Temporary use by anybody */
 
 	/* WT_TOC serialization request. */
 	int (*
