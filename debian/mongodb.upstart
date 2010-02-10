@@ -7,4 +7,4 @@ end script
 
 start on runlevel [345]
 
-exec /usr/bin/mongod --config /etc/mongodb.conf
+exec  su -c "/usr/bin/mongod --config /etc/mongodb.conf" -s "/bin/sh" mongodb
