@@ -79,7 +79,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     }
     print( "indexing finished too soon, retrying..." );
     size *= 2;
-    assert( size < 5000000, "unable to run checks in parallel with index creation" );
+    assert( size < 20000000, "unable to run checks in parallel with index creation" );
 }
 
 waitParallel();
