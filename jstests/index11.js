@@ -21,6 +21,9 @@ waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 }
 
+// waiting on SERVER-620
+if ( 0 ) {
+
 print( "host" );
 print( db.getMongo().host );
 size = 500000;
@@ -93,3 +96,5 @@ assert( !db.getLastError() );
 t.dropIndex( {i:1} );
 printjson( db.getLastError() );
 assert( !db.getLastError() );
+
+}
