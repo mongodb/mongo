@@ -367,7 +367,7 @@ namespace mongo {
         if ( currentOp.shouldDBProfile( ms ) ){
             // performance profiling is on
             if ( dbMutex.getState() < 0 ){
-                mongo::log(1) << "warning: not profiling because recursive read lock" << endl;
+                mongo::log(1) << "note: not profiling because recursive read lock" << endl;
             }
             else {
                 mongolock lk(true);
@@ -376,7 +376,7 @@ namespace mongo {
                     profile(ss.str().c_str(), ms);
                 }
                 else {
-                    mongo::log() << "warning: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
+                    mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
                 }
             }
         }
