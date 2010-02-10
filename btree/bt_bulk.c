@@ -117,6 +117,7 @@ __wt_bt_bulk_fix(DB *db,
 				++*last_repeat;
 				++page->records;
 				++page->hdr->u.entries;
+				WT_STAT_INCR(idb->stats, BULK_REPEAT_COUNT);
 				continue;
 			}
 		}

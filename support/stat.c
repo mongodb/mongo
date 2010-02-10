@@ -85,6 +85,8 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 	    "bulk overflow data items read";
 	stats[WT_STAT_BULK_OVERFLOW_KEY].desc = "bulk overflow key items read";
 	stats[WT_STAT_BULK_PAIRS_READ].desc = "bulk key/data pairs inserted";
+	stats[WT_STAT_BULK_REPEAT_COUNT].desc =
+	    "bulk insert repeat count compression";
 	stats[WT_STAT_DB_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_DB_CACHE_HIT].desc =
 	    "cache hit: reads found in the cache";
@@ -108,6 +110,7 @@ __wt_stat_clear_db_stats(WT_STATS *stats)
 	stats[WT_STAT_BULK_OVERFLOW_DATA].v = 0;
 	stats[WT_STAT_BULK_OVERFLOW_KEY].v = 0;
 	stats[WT_STAT_BULK_PAIRS_READ].v = 0;
+	stats[WT_STAT_BULK_REPEAT_COUNT].v = 0;
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
