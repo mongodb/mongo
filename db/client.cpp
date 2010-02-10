@@ -156,12 +156,12 @@ namespace mongo {
         return c->toString();
     }
     
-    void curopWaitingForLock(){
+    void curopWaitingForLock( int type ){
         Client * c = currentClient.get();
         assert( c );
         CurOp * co = c->curop();
         if ( co ){
-            co->waitingForLock();
+            co->waitingForLock( type );
         }
     }
     void curopGotLock(){
