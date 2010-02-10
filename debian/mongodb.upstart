@@ -1,0 +1,10 @@
+# Ubuntu upstart file at /etc/init/mongodb.conf
+
+pre-start script
+    mkdir -p /var/lib/mongodb/
+    mkdir -p /var/log/mongodb/
+end script
+
+start on runlevel [345]
+
+exec /usr/bin/mongod --config /etc/mongodb.conf
