@@ -210,7 +210,7 @@ main(int argc, char *argv[])
 			break;
 		case TYPE_COLUMN_FIX:
 			if (rand_fixed_len)
-				fixed_len = rand() % 34;
+				fixed_len = rand() % 34 + 1;
 			if (rand_repeat_compress)
 				repeat_compress = rand() % 2;
 			break;
