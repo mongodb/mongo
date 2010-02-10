@@ -114,15 +114,12 @@ namespace mongo {
             _op = op;
         }
 
-        void setRead(){
-            _lockType = -1;
-        }
-        void setWrite(){
-            _lockType = 1;
-        }
-
-        void waitingForLock(){
+        void waitingForLock( int type ){
             _waitingForLock = true;
+            if ( type > 0 )
+                _lockType = 1;
+            else
+                _lockType = -1;
         }
         void gotLock(){
             _waitingForLock = false;

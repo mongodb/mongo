@@ -56,7 +56,8 @@ namespace mongo {
 
     bool Client::shutdown(){
         _shutdown = true;
-
+        if ( inShutdown() )
+            return false;
         {
             boostlock bl(clientsMutex);
             clients.erase(this);
@@ -154,23 +155,21 @@ namespace mongo {
             return "no client";
         return c->toString();
     }
-
-    void curopWaitingForLock(){
+    
+    void curopWaitingForLock( int type ){
         Client * c = currentClient.get();
-        if ( c ){
-            CurOp * co = c->curop();
-            if ( co ){
-                co->waitingForLock();
-            }
+        assert( c );
+        CurOp * co = c->curop();
+        if ( co ){
+            co->waitingForLock( type );
         }
     }
     void curopGotLock(){
         Client * c = currentClient.get();
-        if ( c ){
-            CurOp * co = c->curop();
-            if ( co ){
-                co->gotLock();
-            }
+        assert(c);
+        CurOp * co = c->curop();
+        if ( co ){
+            co->gotLock();
         }
     }
 

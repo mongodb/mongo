@@ -258,7 +258,7 @@ namespace mongo {
         return replPair || replSettings.slave || replSettings.master;
     }
 
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed ){
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
         if ( replAllDead ) {
             result.append("ismaster", 0.0);
@@ -281,6 +281,20 @@ namespace mongo {
             result.append("msg", "not paired");
         }
         
+        if ( level ){
+            BSONObjBuilder sources( result.subarrayStart( "sources" ) );
+            
+            readlock lk( "local.sources" );
+            Client::Context ctx( "local.sources" );
+            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            int n = 0;
+            while ( c->ok() ){
+                sources.append( BSONObjBuilder::numStr( n++ ) , c->current() );
+                c->advance();
+            }
+            
+            sources.done();
+        }
     }
 
     class CmdIsMaster : public Command {
@@ -1597,11 +1611,10 @@ namespace mongo {
 
     void replSlaveThread() {
         sleepsecs(1);
-
+        Client::initThread("replslave");
+            
         {
             dblock lk;
-
-            Client::initThread("replslave");
             cc().getAuthenticationInfo()->authorize("admin");
         
             BSONObj obj;
