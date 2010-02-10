@@ -370,7 +370,7 @@ namespace mongo {
             
             if ( anyReplEnabled() ){
                 BSONObjBuilder bb( result.subobjStart( "repl" ) );
-                appendReplicationInfo( bb , authed );
+                appendReplicationInfo( bb , authed , cmdObj["repl"].numberInt() );
                 bb.done();
             }
             
