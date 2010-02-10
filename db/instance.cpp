@@ -624,6 +624,7 @@ namespace mongo {
 
     /* not using log() herein in case we are already locked */
     void dbexit( ExitCode rc, const char *why) {        
+        Client * c = currentClient.get();
         {
             boostlock lk( exitMutex );
             if ( numExitCalls++ > 0 ) {
@@ -634,6 +635,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "dbexit: " << why << "; exiting immediately" << endl;
                 tryToOutputFatal( ss.str() );
+                if ( c ) c->shutdown();
                 ::exit( rc );                
             }
         }
@@ -650,6 +652,7 @@ namespace mongo {
         }
         
         tryToOutputFatal( "dbexit: really exiting now\n" );
+        if ( c ) c->shutdown();
         ::exit(rc);
     }
     

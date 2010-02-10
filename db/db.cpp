@@ -1061,6 +1061,7 @@ namespace mongo {
         int x;
         sigwait( &asyncSignals, &x );
         log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
+        Client::initThread( "interruptThread" );
         exitCleanly();
     }
 
