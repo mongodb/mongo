@@ -89,3 +89,7 @@ assert.eq( 1, t.count( {i:-2} ) );
 assert.eq( 1, t.count( {i:-50} ) );
 assert.eq( 1, t.count( {i:size+2} ) );
 assert.eq( 0, t.count( {i:40} ) );
+assert( !db.getLastError() );
+t.dropIndex( {i:1} );
+printjson( db.getLastError() );
+assert( !db.getLastError() );
