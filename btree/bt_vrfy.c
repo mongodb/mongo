@@ -109,7 +109,7 @@ __wt_db_verify_int(
 		__wt_db_errx(db, "file is too large to verify");
 		goto err;
 	}
-	WT_ERR(bit_alloc(env, (int)vstuff.frags, &vstuff.fragbits));
+	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
 
 	/* Check for one-page databases. */
 	switch (idb->root_page->hdr->type) {
@@ -414,7 +414,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 */
 	frags = WT_OFF_TO_ADDR(db, db->intlsize);
 	for (i = 0; i < frags; ++i)
-		if (!bit_test(vs->fragbits, (int)hdr->prntaddr + i)) {
+		if (!bit_test(vs->fragbits, hdr->prntaddr + i)) {
 			__wt_db_errx(db,
 			    "parent of page at addr %lu not found on internal "
 			    "page links",
@@ -618,13 +618,13 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	if (vs != NULL && vs->fragbits != NULL) {
 		frags = WT_OFF_TO_ADDR(db, page->bytes);
 		for (i = 0; i < frags; ++i)
-			if (bit_test(vs->fragbits, (int)addr + i)) {
+			if (bit_test(vs->fragbits, addr + i)) {
 				__wt_db_errx(db,
 				    "page at addr %lu already verified",
 				    (u_long)addr);
 				return (WT_ERROR);
 			}
-		bit_nset(vs->fragbits, addr, (int)addr + (frags - 1));
+		bit_nset(vs->fragbits, addr, addr + (frags - 1));
 	}
 
 	/*
@@ -1145,7 +1145,7 @@ __wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
 
 	/* Check for page fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(vs->fragbits, (int)vs->frags, &ffc);
+		bit_ffc(vs->fragbits, vs->frags, &ffc);
 		if (ffc != -1) {
 			bit_set(vs->fragbits, ffc);
 			if (ffc_start == -1) {
