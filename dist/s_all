@@ -10,6 +10,7 @@ python api_flags.py			# Build API flags include file
 python api.py				# Build API methods
 python api_err.py			# Build error return API
 python stat.py				# Build statistics support
+python serial.py			# Build serial function support
 
 sh ./s_prototypes			# Build prototypes include file
 sh ./s_readme				# Build README file

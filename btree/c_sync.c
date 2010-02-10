@@ -9,11 +9,6 @@
 
 #include "wt_internal.h"
 
-typedef struct __wt_drain {
-	WT_PAGE	 *page;				/* Page reference */
-	u_int32_t gen;				/* Generation */
-} WT_DRAIN;
-
 static int  __wt_cache_discard_serial_func(WT_TOC *);
 static int  __wt_cache_in_serial_func(WT_TOC *);
 static int  __wt_cache_drain(
@@ -26,48 +21,6 @@ static int  __wt_cache_drain_compare_page(const void *a, const void *b);
 static int  __wt_cache_hazard_compare(const void *a, const void *b);
 static void __wt_hazard_clear(WT_TOC *, WT_PAGE *);
 static void __wt_hazard_set(WT_TOC *, WT_PAGE *);
-
-/*
- * Page-in serialization support.
- */
-typedef struct {
-	WT_PAGE  *page;				/* Allocated page */
-	u_int32_t addr;				/* File address */
-	u_int32_t bytes;			/* Bytes */
-} __wt_in_args;
-#define	__wt_cache_in_serial(toc, _page, _addr, _bytes) do {		\
-	__wt_in_args _args;						\
-	_args.page = _page;						\
-	_args.addr = _addr;						\
-	_args.bytes = _bytes;						\
-	__wt_toc_serialize_request(					\
-	    toc, __wt_cache_in_serial_func, &_args);			\
-} while (0);
-#define	__wt_cache_in_unpack(toc, _page, _addr, _bytes) do {		\
-	_page =	((__wt_in_args *)(toc)->serial_args)->page;		\
-	_addr = ((__wt_in_args *)(toc)->serial_args)->addr;		\
-	_bytes = ((__wt_in_args *)(toc)->serial_args)->bytes;		\
-} while (0)
-
-/*
- * Page discard serialization support.
- */
-typedef struct {
-	WT_DRAIN *drain;			/* Drain list */
-	u_int32_t drain_elem;			/* Elements to review */
-} __wt_discard_args;
-#define	__wt_cache_discard_serial(toc, _drain, _drain_elem) do {	\
-	__wt_discard_args _args;					\
-	_args.drain = _drain;						\
-	_args.drain_elem = _drain_elem;					\
-	__wt_toc_serialize_request(toc,					\
-	    __wt_cache_discard_serial_func, &_args);			\
-} while (0)
-#define	__wt_cache_discard_unpack(toc, _drain, _drain_elem) do {	\
-	_drain = ((__wt_discard_args *)(toc)->serial_args)->_drain;	\
-	_drain_elem =							\
-	    ((__wt_discard_args *)(toc)->serial_args)->drain_elem;	\
-} while (0)
 
 /*
  * WT_CACHE_DRAIN_CHECK --

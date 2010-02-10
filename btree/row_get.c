@@ -93,31 +93,6 @@ err:	WT_TOC_DB_CLEAR(toc);
 }
 
 /*
- * Page modification serialization support.
- */
-typedef struct {
-	WT_PAGE  *page;				/* Leaf page to modify */
-	WT_PAGE  *page_ovfl;			/* Overflow page to modify */
-	DBT *from;				/* Source data */
-	void *to;				/* Target data */
-} __wt_put_args;
-#define	__wt_put_serial(toc, _page, _page_ovfl, _from, _to) do {	\
-	__wt_put_args _args;						\
-	_args.page = _page;						\
-	_args.page_ovfl = _page_ovfl;					\
-	_args.from = _from;						\
-	_args.to = _to;							\
-	__wt_toc_serialize_request(toc,	__wt_put_serial_func, &_args);	\
-} while (0);
-#define	__wt_put_unpack(toc, _page, _page_ovfl, _from, _to) do {	\
-	_page =	((__wt_put_args *)(toc)->serial_args)->page;		\
-	_page_ovfl =							\
-	    ((__wt_put_args *)(toc)->serial_args)->page_ovfl;		\
-	_from = ((__wt_put_args *)(toc)->serial_args)->from;		\
-	_to = ((__wt_put_args *)(toc)->serial_args)->to;		\
-} while (0)
-
-/*
  * __wt_bt_page_put --
  *	Insert data onto a page.
  */
@@ -173,7 +148,7 @@ overflow:	ovfl = (WT_OVFL *)WT_ITEM_BYTE(ip->page_data);
 	 */
 	WT_ASSERT(toc->env, data->size == psize);
 
-	__wt_put_serial(toc, page, page_ovfl, data, pdata);
+	__wt_put_serial(toc, ip, data->data, data->size);
 
 	return (toc->serial_ret);
 }
@@ -185,12 +160,14 @@ overflow:	ovfl = (WT_OVFL *)WT_ITEM_BYTE(ip->page_data);
 static int
 __wt_put_serial_func(WT_TOC *toc)
 {
-	WT_PAGE *page, *page_ovfl;
-	DBT *from;
-	void *to;
+	WT_PAGE *page;
+	WT_INDX *ip;
+	void *data;
+	u_int32_t size;
 
-	__wt_put_unpack(toc, page, page_ovfl, from, to);
+	__wt_put_unpack(toc, ip, data, size);
 
+#if 0
 	memcpy(to, from->data, from->size);
 
 	if (page_ovfl != NULL)
@@ -198,6 +175,7 @@ __wt_put_serial_func(WT_TOC *toc)
 	WT_RET(
 	    __wt_bt_page_out(toc, page, page_ovfl == NULL ? WT_MODIFIED : 0));
 
+#endif
 	return (0);
 }
 

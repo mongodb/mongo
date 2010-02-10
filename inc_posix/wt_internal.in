@@ -45,12 +45,15 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 
 /*******************************************
- * Internal include files.
+ * External include files.
  *******************************************/
-#include "queue.h"			/* External */
+#include "queue.h"
 #include "bitstring.h"
 
-#include "api.h"			/* Internal */
+/*******************************************
+ * Internal include files.
+ *******************************************/
+#include "api.h"
 #include "btree.h"
 #include "debug.h"
 #include "fh.h"
@@ -109,7 +112,7 @@ struct __idb {
 };
 
 /*******************************************
- * Cache object.
+ * Cache support.
  *******************************************/
 struct __wt_cache {
 	WT_MTX mtx;			/* Cache server mutex */
@@ -137,6 +140,11 @@ struct __wt_cache {
 
 	u_int32_t flags;
 };
+
+typedef struct __wt_drain {
+	WT_PAGE	 *page;				/* Page reference */
+	u_int32_t gen;				/* Generation */
+} WT_DRAIN;
 
 /*******************************************
  * Environment handle information that doesn't persist.
@@ -197,6 +205,7 @@ struct __ienv {
 	u_int32_t flags;
 };
 
+#include "serial.h"
 #include "extern.h"
 
 #if defined(__cplusplus)
