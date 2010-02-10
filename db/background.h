@@ -39,6 +39,7 @@ namespace mongo {
         static bool inProgForNs(const char *ns);
         static void assertNoBgOpInProgForDb(const char *db);
         static void assertNoBgOpInProgForNs(const char *ns);
+        static void dump(stringstream&);
 
         /* check for in progress before instantiating */
         BackgroundOperation(const char *ns);
