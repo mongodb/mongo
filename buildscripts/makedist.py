@@ -95,11 +95,11 @@ export MONGO_VERSION="%s"
 export MONGO_URL="%s"
 export MODE="%s"
 export ARCH="%s"
-export DATE="%s"
+export PKG_VERSION="%s"
 export DISTRO_VERSION="%s"
 export PRODUCT_DIR="%s"
 # the following are derived from the preceding
-export MONGO_WORKDIR="$MONGO_NAME-$DATE"
+export MONGO_WORKDIR="$MONGO_NAME-$PKG_VERSION"
 """
     get_mongo_commands = """
 case "$MODE" in
@@ -120,7 +120,7 @@ test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
 tar xzf tarball.tgz
 mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_WORKDIR"
 if [ "$MODE" = "commit" ]; then
-  ( cd "$MONGO_WORKDIR" && python ./buildscripts/frob_version.py "$DATE" ) || exit 1
+  ( cd "$MONGO_WORKDIR" && python ./buildscripts/frob_version.py "$PKG_VERSION" ) || exit 1
 fi
 """
     deb_prereq_commands = """
@@ -304,8 +304,8 @@ class BaseBuilder(object):
 
         self.prereqs=self.default("prereqs")
         self.productdir=self.default("productdir")
-        date=time.strftime("%Y%m%d")
-        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, date, self.version, self.productdir)) + self.default("commands")
+        self.pkgversion = kwargs["pkgversion"] if "pkgversion" in kwargs else time.strftime("%Y%m%d")
+        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, self.pkgversion, self.version, self.productdir)) + self.default("commands")
 
 
     def default(self, what):
@@ -575,6 +575,7 @@ def main():
     version = version.replace('/', '-').replace('\\', '-')
     arch = arch.replace('/', '-').replace('\\', '-')     
     try:
+        sys.path+=['.', '..', '../..']
         import settings
         if "makedist" in dir ( settings ):
             for key in ["EC2_HOME", "JAVA_HOME"]:
@@ -618,20 +619,25 @@ def processArguments():
                  ("h", "help", False, "Print a help message and exit", None),
                  ("N", "no-terminate", False, "Leave the EC2 instance running at the end of the job", None),
                  ("S", "subdirs", False, "Create subdirectories of the output directory based on distro name, version, and architecture.", None),
+                 ("c", "commit", False, "Treat the version argument as git commit id rather than released version", None),
+                 ("V", "pkgversion", True, "Use STRING as the package version number, rather than the date", "STRING"),
                  ("I", "use-internal-name", False, "Use the EC2 internal hostname for sshing", None),
+                 (None, "localgpgdir", True, "Local gnupg \"homedir\" containing key for signing dist", "DIR"),
+
                  # These get defaulted, but the user might want to override them.
                  ("A", "ami", True, "EC2 AMI id to use", "ID"),
                  ("l", "login", True, "User account for ssh access to host", "LOGIN"),
 
+                 
+
                  # These get read from settings.py, but the user might
                  # want to override them.
                  ("C", "cert", True, "EC2 X.509 certificate file", "FILE"),
-                 ("c", "commit", False, "Treat the version argument as git commit id rather than released version", None),
                  ("F", "sshkeyfile", True, "ssh key file name", "FILE"),
                  ("K", "pkey", True, "EC2 X.509 PEM file", "FILE"),
                  ("k", "sshkey", True, "ssh key identifier (in EC2's namespace)", "STRING"),
                  ("t", "mtype", True, "EC2 machine type", "STRING") ]
-    shortopts = "".join([t[0] + (":" if t[2] else "") for t in flagspec])
+    shortopts = "".join([t[0] + (":" if t[2] else "") for t in flagspec if t[0] is not None])
     longopts = [t[1] + ("=" if t[2] else "") for t in flagspec]
 
     try:
@@ -664,7 +670,7 @@ def processArguments():
         print """Build some packages on new EC2 AMI instances, leave packages under DIRECTORY.
 Options:"""
         for t in flagspec:
-            print "%-20s\t%s." % ("-%s, --%s%s:" % (t[0], t[1], ("="+t[4]) if t[4] else ""), t[3])
+            print "%-20s\t%s." % ("%4s--%s%s:" % ("-%s, " % t[0] if t[0] else "", t[1], ("="+t[4]) if t[4] else ""), t[3])
         print """
 Mandatory arguments to long options are also mandatory for short
 options.  Some EC2 arguments default to (and override) environment
