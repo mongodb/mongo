@@ -20,6 +20,7 @@ import urllib
 import urllib2
 import buildscripts
 import buildscripts.bb
+from buildscripts import utils
 
 buildscripts.bb.checkOk()
 
@@ -1278,14 +1279,12 @@ def startMongodForTests( env, target, source ):
     ensureDir( dirName )
     from subprocess import Popen
     mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName, "--nohttpinterface" ] )
-    # Wait for mongod to start
-    import time
-    time.sleep( 5 )
-    if mongodForTests.poll() is not None:
+
+    if not utils.didMongodStart( 32000 ):
         print( "Failed to start mongod" )
         mongodForTests = None
         Exit( 1 )
-
+        
 def stopMongodForTests():
     global mongodForTests
     if not mongodForTests:
