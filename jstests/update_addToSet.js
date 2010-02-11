@@ -15,4 +15,5 @@ t.update( {} , { $addToSet : { a : 3 } } );
 assert.eq( o , t.findOne() , "A3" );
 
 
-t.update( {} , { $addToSet : { a : { $each : [ 3 , 5 , 6 ] } } } );
+// SERVER-628
+// t.update( {} , { $addToSet : { a : { $each : [ 3 , 5 , 6 ] } } } );
