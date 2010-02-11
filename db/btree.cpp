@@ -42,6 +42,11 @@ namespace mongo {
     const int split_debug = 0;
     const int insert_debug = 0;
 
+    static void alreadyInIndex() { 
+        // we don't use massert() here as that does logging and this is 'benign' - see catches in _indexRecord()
+        throw MsgAssertionException(10287, "btree: key+recloc already in index");
+    }
+
     /* BucketBasics --------------------------------------------------- */
 
     inline void BucketBasics::modified(const DiskLoc& thisLoc) {
@@ -438,12 +443,19 @@ namespace mongo {
                         // coding effort in here to make this particularly fast
                         if( !dupsChecked ) { 
                             dupsChecked = true;
-                            if( idx.head.btree()->exists(idx, idx.head, key, order) )
-                                uasserted( ASSERT_ID_DUPKEY , dupKeyError( idx , key ) );
+                            if( idx.head.btree()->exists(idx, idx.head, key, order) ) {
+                                if( idx.head.btree()->wouldCreateDup(idx, idx.head, key, order, recordLoc) )
+                                    uasserted( ASSERT_ID_DUPKEY , dupKeyError( idx , key ) );
+                                else
+                                    alreadyInIndex();
+                            }
                         }
                     }
-                    else
+                    else {
+                        if( M.recordLoc == recordLoc ) 
+                            alreadyInIndex();
                         uasserted( ASSERT_ID_DUPKEY , dupKeyError( idx , key ) );
+                    }
                 }
 
                 // dup keys allowed.  use recordLoc as if it is part of the key
@@ -850,8 +862,7 @@ found:
                 out() << "  old l r: " << childForPos(pos).toString() << ' ' << childForPos(pos+1).toString() << endl;
                 out() << "  new l r: " << lChild.toString() << ' ' << rChild.toString() << endl;
             }
-            // we don't use massert() here as that does logging and this is 'benign' - see catches in indexRecord()
-            throw MsgAssertionException(10287, "btree: key+recloc already in index");
+            alreadyInIndex();
         }
 
         DEBUGGING out() << "TEMP: key: " << key.toString() << endl;
