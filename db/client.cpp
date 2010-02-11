@@ -186,18 +186,7 @@ namespace mongo {
             b.append("secs_running", elapsedSeconds() );
         }
         
-        if( _op == 2004 ) 
-            b.append("op", "query");
-        else if( _op == 2005 )
-            b.append("op", "getMore");
-        else if( _op == 2001 )
-            b.append("op", "update");
-        else if( _op == 2002 )
-            b.append("op", "insert");
-        else if( _op == 2006 )
-            b.append("op", "delete");
-        else
-            b.append("op", _op);
+        b.append( "op" , opToString( _op ) );
         
         b.append("ns", _ns);
         
