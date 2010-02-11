@@ -309,6 +309,7 @@ namespace mongo {
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
             result.append("uptime",(double) (time(0)-started));
+            result.appendDate( "localTime" , jsTime() );
             
             {
                 BSONObjBuilder t;
