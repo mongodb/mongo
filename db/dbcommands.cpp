@@ -320,7 +320,7 @@ namespace mongo {
                 double tl = (double) timeLocked;
                 t.append("totalTime", tt);
                 t.append("lockTime", tl);
-                t.append("ratio", tl/tt);
+                t.append("ratio", (tt ? tl/tt : 0));
                 
                 result.append( "globalLock" , t.obj() );
             }

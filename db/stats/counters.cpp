@@ -91,7 +91,7 @@ namespace mongo {
 
         bb.append( "resets" , _resets );
         
-        bb.append( "missRatio" , (double)_btreeMemMisses / (double)_btreeAccesses );
+        bb.append( "missRatio" , (_btreeAccesses ? (_btreeMemMisses / (double)_btreeAccesses) : 0) );
         
         bb.done();
         
