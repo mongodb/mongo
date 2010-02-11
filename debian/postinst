@@ -29,11 +29,11 @@ case "$1" in
 
 	# create db -- note: this should agree with dbpath in mongodb.conf
 	mkdir -p /var/lib/mongodb
-	chown mongodb:mongodb /var/lib/mongodb
+	chown -R mongodb:mongodb /var/lib/mongodb
 
 	# create logdir -- note: this should agree with logpath in mongodb.conf
 	mkdir -p /var/log/mongodb
-	chown mongodb:mongodb /var/log/mongodb
+	chown -R mongodb:mongodb /var/log/mongodb
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
