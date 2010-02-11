@@ -102,6 +102,7 @@ namespace mongo {
 
     inline const char * opToString( int op ){
         switch ( op ){
+        case 0: return "none";
         case opReply: return "reply";
         case dbMsg: return "msg";
         case dbUpdate: return "update";
@@ -111,6 +112,7 @@ namespace mongo {
         case dbDelete: return "remove";
         case dbKillCursors: return "killcursors";
         default: 
+            PRINT(op);
             assert(0); 
             return "";
         }
