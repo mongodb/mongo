@@ -333,7 +333,6 @@ namespace mongo {
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
-                        mongolock lk(writeLock);
                         currentOp.ensureStarted();
                         logThreshold = 10;
                         ss << "killcursors ";
