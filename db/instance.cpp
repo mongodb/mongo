@@ -221,13 +221,14 @@ namespace mongo {
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
 
         bool writeLock = true;
-
+        
         // before we lock...
         int op = m.data->operation();
-        globalOpCounters.gotOp( op );
+        bool isCommand = false;
         const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
+                isCommand = true;
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -252,6 +253,8 @@ namespace mongo {
         else if( op == dbGetMore ) {
             writeLock = false;
         }
+
+        globalOpCounters.gotOp( op , isCommand );
         
         if ( handlePossibleShardedMessage( m , dbresponse ) ){
             /* important to do this before we lock
@@ -333,7 +336,6 @@ namespace mongo {
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
-                        mongolock lk(writeLock);
                         currentOp.ensureStarted();
                         logThreshold = 10;
                         ss << "killcursors ";

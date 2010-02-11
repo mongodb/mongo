@@ -39,6 +39,7 @@
 #include "repl.h"
 #include "../util/message.h"
 #include "../client/dbclient.h"
+#include "../client/connpool.h"
 #include "pdfile.h"
 #include "query.h"
 #include "db.h"
@@ -289,7 +290,34 @@ namespace mongo {
             auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ){
-                sources.append( BSONObjBuilder::numStr( n++ ) , c->current() );
+                BSONObj s = c->current();
+                
+                BSONObjBuilder bb;
+                bb.append( s["host"] );
+                string sourcename = s["source"].valuestr();
+                if ( sourcename != "main" )
+                    bb.append( s["source"] );
+                
+                {
+                    BSONElement e = s["syncedTo"];
+                    BSONObjBuilder t( bb.subobjStart( "syncedTo" ) );
+                    t.appendDate( "time" , e.timestampTime() );
+                    t.append( "inc" , e.timestampInc() );
+                    t.done();
+                }
+                
+                if ( level > 1 ){
+                    ScopedDbConnection conn( s["host"].valuestr() );
+                    BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
+                    BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
+                    bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
+                    bb.appendDate( "masterLast" , last["ts"].timestampTime() );
+                    double lag = last["ts"].timestampTime() - s["syncedTo"].timestampTime();
+                    bb.append( "lagSeconds" , lag / 1000 );
+                    conn.done();
+                }
+
+                sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );
                 c->advance();
             }
             
