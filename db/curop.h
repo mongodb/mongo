@@ -49,6 +49,7 @@ namespace mongo {
 
         bool _active;
         int _op;
+        bool _command;
         int _lockType; // see concurrency.h for values
         bool _waitingForLock;
         int _dbprofile; // 0=off, 1=slow, 2=all
@@ -63,6 +64,7 @@ namespace mongo {
         OpDebug _debug;
 
         void _reset(){
+            _command = false;
             _lockType = 0;
             _dbprofile = 0;
             _end = 0;
@@ -98,7 +100,7 @@ namespace mongo {
 
         void leave( Client::Context * context ){
             unsigned long long now = curTimeMicros64();
-            Top::global.record( _ns , _op , _lockType , now - _checkpoint );
+            Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
             _checkpoint = now;
         }
         
@@ -112,6 +114,10 @@ namespace mongo {
             resetQuery();
             _remote = remote;
             _op = op;
+        }
+        
+        void markCommand(){
+            _command = true;
         }
 
         void waitingForLock( int type ){

@@ -38,21 +38,22 @@ namespace mongo {
           getmore( older.getmore , newer.getmore ) ,
           insert( older.insert , newer.insert ) ,
           update( older.update , newer.update ) ,
-          remove( older.remove , newer.remove )
+          remove( older.remove , newer.remove ),
+          commands( older.commands , newer.commands ) 
     {
         
     }
 
 
-    void Top::record( const string& ns , int op , int lockType , long long micros ){
+    void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
         boostlock lk(_lock);
 
         CollectionData& coll = _usage[ns];
-        _record( coll , op , lockType , micros );
-        _record( _global , op , lockType , micros );
+        _record( coll , op , lockType , micros , command );
+        _record( _global , op , lockType , micros , command );
     }
     
-    void Top::_record( CollectionData& c , int op , int lockType , long long micros ){
+    void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
         c.total.inc( micros );
         
         if ( lockType > 0 )
@@ -71,7 +72,10 @@ namespace mongo {
             c.insert.inc( micros );
             break;
         case dbQuery:
-            c.queries.inc( micros );
+            if ( command )
+                c.commands.inc( micros );
+            else
+                c.queries.inc( micros );
             break;
         case dbGetMore:
             c.getmore.inc( micros );
@@ -124,7 +128,8 @@ namespace mongo {
             append( b , "insert" , coll.insert );
             append( b , "update" , coll.update );
             append( b , "remove" , coll.remove );
-
+            append( b , "commands" , coll.commands );
+            
             bb.done();
         }
     }

@@ -200,7 +200,7 @@ namespace mongo {
 
         if ( _client )
             b.append( "desc" , _client->desc() );
-
+        
         return b.obj();
     }
 

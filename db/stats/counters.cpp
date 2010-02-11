@@ -31,6 +31,7 @@ namespace mongo {
         b.append( "update" , zero );
         b.append( "delete" , zero );
         b.append( "getmore" , zero );
+        b.append( "command" , zero );
         _obj = b.obj();
 
         _insert = (int*)_obj["insert"].value();
@@ -38,12 +39,19 @@ namespace mongo {
         _update = (int*)_obj["update"].value();
         _delete = (int*)_obj["delete"].value();
         _getmore = (int*)_obj["getmore"].value();
+        _command = (int*)_obj["command"].value();
     }
 
-    void OpCounters::gotOp( int op ){
+    void OpCounters::gotOp( int op , bool isCommand ){
         switch ( op ){
         case dbInsert: gotInsert(); break;
-        case dbQuery: gotQuery(); break;
+        case dbQuery: 
+            if ( isCommand )
+                gotCommand();
+            else 
+                gotQuery(); 
+            break;
+            
         case dbUpdate: gotUpdate(); break;
         case dbDelete: gotDelete(); break;
         case dbGetMore: gotGetMore(); break;

@@ -780,6 +780,7 @@ namespace mongo {
         Client& c = cc();
         /* we assume you are using findOne() for running a cmd... */
         if ( ntoreturn == 1 && runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
+            curop.markCommand();
             n = 1;
             qr.reset( (QueryResult *) bb.buf() );
             bb.decouple();
