@@ -307,6 +307,7 @@ namespace mongo {
                 }
                 
                 if ( level > 1 ){
+                    dbtemprelease unlock;
                     ScopedDbConnection conn( s["host"].valuestr() );
                     BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
                     BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
