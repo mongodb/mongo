@@ -39,7 +39,7 @@ namespace mongo {
               _secsToSleep(1) , _token( "" ) , _name( "" ) {
             
             add_options()
-                ( "mms-url" , po::value<string>()->default_value("http://mms.10gen.com/ping?") , "url for mongo monitoring server" )
+                ( "mms-url" , po::value<string>()->default_value("http://mms.10gen.com/ping") , "url for mongo monitoring server" )
                 ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
                 ( "mms-name" , po::value<string>() , "server name for mongo monitoring server" )
                 ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval (in seconds) for mongo monitoring server" )
