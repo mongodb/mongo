@@ -34,19 +34,21 @@ namespace mongo {
     public:
 
         MMS()
-            : Module( "mms" ) , _baseurl( "http://mms.10gen.com/ping?" ) , 
+            : Module( "mms" ) , _baseurl( "" ) ,
               _secsToSleep(1) , _token( "" ) , _name( "" ) {
             
             add_options()
+                ( "mms-url" , po::value<string>()->default_value("http://mms.10gen.com/ping?") , "url for mongo monitoring server" )
                 ( "mms-token" , po::value<string>() , "account token for mongo monitoring server" )
-                ( "mms-name" , po::value<string>() , "server name mongo monitoring server" )
-                ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval for mongo monitoring server" )
+                ( "mms-name" , po::value<string>() , "server name for mongo monitoring server" )
+                ( "mms-interval" , po::value<int>()->default_value(30) , "ping interval (in seconds) for mongo monitoring server" )
                 ;
         }    
         
         ~MMS(){}
         
         void config( program_options::variables_map& params ){
+            _baseurl = params["mms-url"].as<string>();
             if ( params.count( "mms-token" ) ){
                 _token = params["mms-token"].as<string>();
             }
