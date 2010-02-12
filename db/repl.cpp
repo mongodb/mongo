@@ -313,7 +313,7 @@ namespace mongo {
                     BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
                     bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
                     bb.appendDate( "masterLast" , last["ts"].timestampTime() );
-                    double lag = last["ts"].timestampTime() - s["syncedTo"].timestampTime();
+                    double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
                     bb.append( "lagSeconds" , lag / 1000 );
                     conn.done();
                 }
