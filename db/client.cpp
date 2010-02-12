@@ -109,13 +109,19 @@ namespace mongo {
         if ( _db ){
             _justCreated = false;
         }
+        else if ( dbMutex.getState() > 0 ){
+            // already in a write lock
+            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
+            assert( _db );
+        }
         else {
+            // we have a read lock, but need to get a write lock for a bit
+            // we need to be in a write lock since we're going to create the DB object
+            // to do that, we're going to unlock, then get a write lock
+            // this is so that if this is the first query and its long doesn't block db
+            // we just have to check that the db wasn't closed in the interim where we unlock
             for ( int x=0; x<2; x++ ){
-                { //   we need to be in a write lock since we're going to create the DB object
-                    // to do that, we're going to unlock, then get a write lock
-                    // this is so that if this is the first query and its long doesn't block db
-                    // we just have to check that the db wasn't closed in the interim where we unlock
-                    
+                {                     
                     dbtemprelease unlock;
                     writelock lk( _ns );
                     dbHolder.getOrCreate( _ns , _path , _justCreated );
