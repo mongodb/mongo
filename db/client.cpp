@@ -51,7 +51,7 @@ namespace mongo {
         if ( _context )
             cout << "ERROR: Client::~Client _context should be NULL" << endl;
         if ( !_shutdown ) 
-            cout << "ERROR: Client::shutdown not called!" << endl;
+            cout << "ERROR: Client::shutdown not called: " << _desc << endl;
     }
 
     bool Client::shutdown(){
