@@ -225,30 +225,34 @@ namespace mongo {
                 
         class MongoProgramRunner {
             char **argv_;
+            BSONObj args_;
             int port_;
             int pipe_;
             pid_t pid_;
+            boost::filesystem::path programPath_;
         public:
             pid_t pid() const { return pid_; }
-            MongoProgramRunner( const BSONObj &args ) {
+            MongoProgramRunner( const BSONObj &args , bool isMongoProgram=true)
+                :args_(args)
+            {
                 assert( args.nFields() > 0 );
+
                 string program( args.firstElement().valuestrsafe() );
-                
                 assert( !program.empty() );
-                boost::filesystem::path programPath = ( boost::filesystem::path( argv0 ) ).branch_path() / program;
+                programPath_ = program;
+
+                argv_ = new char *[ args.nFields() + 1 ];
+                if (isMongoProgram){
+                    programPath_ = boost::filesystem::initial_path() / programPath_;
 #ifdef _WIN32
-                programPath = change_extension(programPath, ".exe");
+                    programPath_ = change_extension(programPath_, ".exe");
 #endif
-                massert( 10435 ,  "couldn't find " + programPath.native_file_string(), boost::filesystem::exists( programPath ) );
+                    massert( 10435 ,  "couldn't find " + programPath_.native_file_string(), boost::filesystem::exists( programPath_ ) );
+                }
+
+                argv_[ 0 ] = copyString( programPath_.native_file_string().c_str() );
                 
                 port_ = -1;
-                argv_ = new char *[ args.nFields() + 1 ];
-                {
-                    string s = programPath.native_file_string();
-                    if ( s == program )
-                        s = "./" + s;
-                    argv_[ 0 ] = copyString( s.c_str() );
-                }
                 
                 BSONObjIterator j( args );
                 j.next();
