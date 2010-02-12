@@ -1095,6 +1095,7 @@ namespace mongo {
 #else
 void ctrlCTerminate() {
     log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
+    Client::initThread( "ctrlCTerminate" );
     exitCleanly();
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
