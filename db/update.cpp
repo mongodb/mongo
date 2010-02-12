@@ -789,10 +789,7 @@ namespace mongo {
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
                 /* upsert of an $inc. build a default */
-                ModSet mods(updateobj);
-                 
-                BSONObj newObj = mods.createNewFromQuery( patternOrig );
-
+                BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 if ( profile )
                     ss << " fastmodinsert ";
                 theDataFileMgr.insert(ns, newObj);
