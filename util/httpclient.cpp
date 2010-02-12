@@ -73,7 +73,13 @@ namespace mongo {
             ss << "Host: " << host << "\r\n";
             ss << "Connection: Close\r\n";
             ss << "User-Agent: mongodb http client\r\n";
+            if ( body ) {
+                ss << "Content-Length: " << strlen( body ) << "\r\n";
+            }
             ss << "\r\n";
+            if ( body ) {
+                ss << body;
+            }
 
             req = ss.str();
         }
