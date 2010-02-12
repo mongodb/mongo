@@ -50,6 +50,14 @@ namespace mongo {
             return false;
         }
 
+        /**
+           true if don't need any lock or Client::Context setup
+           use with caution
+         */
+        virtual bool noLocking() {
+            return false;
+        }
+
         /* Return true if only the admin ns has privileges to run this command. */
         virtual bool adminOnly() {
             return false;
@@ -93,18 +101,6 @@ namespace mongo {
         Command(const char *_name);
         virtual ~Command() {}
 
-        /** 
-         * this handles
-          - auth
-          - locking
-          - context
-          then calls run()
-         */
-        bool exec( Client& client , int queryOptions , 
-                   const char *ns, BSONObj& cmdObj, 
-                   BSONObjBuilder& result, 
-                   bool fromRepl);
-
     protected:
         BSONObj getQuery( const BSONObj& cmdObj ){
             if ( cmdObj["query"].type() == Object )
@@ -123,5 +119,6 @@ namespace mongo {
     };
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
+
 
 } // namespace mongo

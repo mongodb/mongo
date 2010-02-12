@@ -1440,6 +1440,107 @@ namespace mongo {
         return Command::readOnly( e.fieldName() );
     }
 
+    /** 
+     * this handles
+     - auth
+     - locking
+     - context
+     then calls run()
+    */
+    bool execCommand( Command * c ,
+                      Client& client , int queryOptions , 
+                      const char *ns, BSONObj& cmdObj , 
+                      BSONObjBuilder& result, 
+                      bool fromRepl ){
+        
+        string dbname = nsToDatabase( ns );
+        
+        AuthenticationInfo *ai = client.getAuthenticationInfo();    
+
+        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost ) { 
+            result.append( "errmsg" , 
+                           "unauthorized: this command must run from localhost when running db without auth" );
+            log() << "command denied: " << cmdObj.toString() << endl;
+            return false;
+        }
+        
+
+        if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
+            result.append( "errmsg" ,  "access denied" );
+            log() << "command denied: " << cmdObj.toString() << endl;
+            return false;
+        }        
+
+        if ( cmdObj["help"].trueValue() ){
+            stringstream ss;
+            ss << "help for: " << c->name << " ";
+            c->help( ss );
+            result.append( "help" , ss.str() );
+            return true;
+        } 
+
+        bool canRunHere = 
+            isMaster() ||
+            c->slaveOk() ||
+            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
+            fromRepl;
+
+        if ( ! canRunHere ){
+            result.append( "errmsg" , "not master" );
+            return false;
+        }
+        
+        if ( c->noLocking() ){
+            // we also trust that this won't crash
+            string errmsg;
+            int ok = c->run( ns , cmdObj , errmsg , result , fromRepl );
+            if ( ! ok )
+                result.append( "errmsg" , errmsg );
+            return ok;
+        }
+     
+        bool needWriteLock = ! c->readOnly();
+        
+        if ( ! c->requiresAuth() && 
+             ( ai->isAuthorizedReads( dbname ) && 
+               ! ai->isAuthorized( dbname ) ) ){
+            // this means that they can read, but not write
+            // so only get a read lock
+            needWriteLock = false;
+        }
+        
+        if ( ! needWriteLock ){
+            assert( ! c->logTheOp() );
+        }
+
+        mongolock lk( needWriteLock );
+        Client::Context ctx( ns , dbpath , &lk , c->requiresAuth() );
+        
+        if ( c->adminOnly() )
+            log( 2 ) << "command: " << cmdObj << endl;
+        
+        try {
+            string errmsg;
+            if ( ! c->run(ns, cmdObj, errmsg, result, fromRepl ) ){
+                result.append( "errmsg" , errmsg );
+                return false;
+            }
+        }
+        catch ( AssertionException& e ){
+            stringstream ss;
+            ss << "assertion: " << e.what();
+            result.append( "errmsg" , ss.str() );
+            return false;
+        }
+        
+        if ( c->logTheOp() && ! fromRepl ){
+            logOp("c", ns, cmdObj);
+        }
+        
+        return true;
+    }
+
+
     /* TODO make these all command objects -- legacy stuff here
 
        usage:
@@ -1475,7 +1576,7 @@ namespace mongo {
         
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
-            ok = c->exec( client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
+            ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
         else {
             anObjBuilder.append("errmsg", "no such cmd");
