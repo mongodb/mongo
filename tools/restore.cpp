@@ -142,7 +142,8 @@ public:
         long long num = 0;
 
         const int BUF_SIZE = 1024 * 1024 * 5;
-        char * buf = (char*)malloc( BUF_SIZE );
+        boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
+        char * buf = buf_holder.get();
 
         ProgressMeter m( fileLength );
 
@@ -164,8 +165,6 @@ public:
 
             m.hit( o.objsize() );
         }
-
-        free( buf );
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
         out() << "\t "  << m.hits() << " objects" << endl;

@@ -145,7 +145,7 @@ map< Connection, bool > seen;
 map< Connection, int > bytesRemainingInMessage;
 map< Connection, boost::shared_ptr< BufBuilder > > messageBuilder;
 map< Connection, unsigned > expectedSeq;
-map< Connection, DBClientConnection* > forwarder;
+map< Connection, boost::shared_ptr<DBClientConnection> > forwarder;
 map< Connection, long long > lastCursor;
 map< Connection, map< long long, long long > > mapCursor;
 
@@ -297,11 +297,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     if ( !forwardAddress.empty() ) {
         if ( m.data->operation() != mongo::opReply ) {
-            DBClientConnection *conn = forwarder[ c ];
+            boost::shared_ptr<DBClientConnection> conn = forwarder[ c ];
             if ( !conn ) {
-                // These won't get freed on error, oh well hopefully we'll just
-                // abort in that case anyway.
-                conn = new DBClientConnection( true );
+                conn.reset(new DBClientConnection( true ));
                 conn->connect( forwardAddress );
                 forwarder[ c ] = conn;
             }
@@ -455,9 +453,6 @@ int main(int argc, char **argv){
 
     pcap_freecode(&fp);
     pcap_close(handle);
-
-    for( map< Connection, DBClientConnection* >::iterator i = forwarder.begin(); i != forwarder.end(); ++i )
-        free( i->second );
 
     return 0;
 }

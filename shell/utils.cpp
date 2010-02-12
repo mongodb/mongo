@@ -298,7 +298,7 @@ namespace mongo {
                 i = 0;
                 while( argv_[ i ] )
                     free( argv_[ i++ ] );
-                free( argv_ );
+                delete[] argv_;
 
                 if ( port_ > 0 )
                     dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
