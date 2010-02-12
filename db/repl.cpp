@@ -647,8 +647,8 @@ namespace mongo {
                 n++;
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != cmdLine.source ) {
-                    log() << "--source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
-                    log() << "terminating after 30 seconds" << endl;
+                    log() << "repl: --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "repl: terminating mongod after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
@@ -1388,7 +1388,7 @@ namespace mongo {
         }
 
         if ( !connect() ) {
-			log() << "repl:  can't connect to sync source" << endl;
+			log(4) << "repl:  can't connect to sync source" << endl;
             if ( replPair && paired ) {
                 assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
                 replPair->arbitrate();
