@@ -39,6 +39,7 @@
 #include "repl.h"
 #include "../util/message.h"
 #include "../client/dbclient.h"
+#include "../client/connpool.h"
 #include "pdfile.h"
 #include "query.h"
 #include "db.h"
@@ -258,7 +259,7 @@ namespace mongo {
         return replPair || replSettings.slave || replSettings.master;
     }
 
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed ){
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
         if ( replAllDead ) {
             result.append("ismaster", 0.0);
@@ -281,6 +282,48 @@ namespace mongo {
             result.append("msg", "not paired");
         }
         
+        if ( level ){
+            BSONObjBuilder sources( result.subarrayStart( "sources" ) );
+            
+            readlock lk( "local.sources" );
+            Client::Context ctx( "local.sources" );
+            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            int n = 0;
+            while ( c->ok() ){
+                BSONObj s = c->current();
+                
+                BSONObjBuilder bb;
+                bb.append( s["host"] );
+                string sourcename = s["source"].valuestr();
+                if ( sourcename != "main" )
+                    bb.append( s["source"] );
+                
+                {
+                    BSONElement e = s["syncedTo"];
+                    BSONObjBuilder t( bb.subobjStart( "syncedTo" ) );
+                    t.appendDate( "time" , e.timestampTime() );
+                    t.append( "inc" , e.timestampInc() );
+                    t.done();
+                }
+                
+                if ( level > 1 ){
+                    dbtemprelease unlock;
+                    ScopedDbConnection conn( s["host"].valuestr() );
+                    BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
+                    BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
+                    bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
+                    bb.appendDate( "masterLast" , last["ts"].timestampTime() );
+                    double lag = last["ts"].timestampTime() - s["syncedTo"].timestampTime();
+                    bb.append( "lagSeconds" , lag / 1000 );
+                    conn.done();
+                }
+
+                sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );
+                c->advance();
+            }
+            
+            sources.done();
+        }
     }
 
     class CmdIsMaster : public Command {
@@ -1597,11 +1640,10 @@ namespace mongo {
 
     void replSlaveThread() {
         sleepsecs(1);
-
+        Client::initThread("replslave");
+            
         {
             dblock lk;
-
-            Client::initThread("replslave");
             cc().getAuthenticationInfo()->authorize("admin");
         
             BSONObj obj;

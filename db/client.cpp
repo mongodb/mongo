@@ -56,7 +56,8 @@ namespace mongo {
 
     bool Client::shutdown(){
         _shutdown = true;
-
+        if ( inShutdown() )
+            return false;
         {
             boostlock bl(clientsMutex);
             clients.erase(this);
@@ -154,23 +155,21 @@ namespace mongo {
             return "no client";
         return c->toString();
     }
-
-    void curopWaitingForLock(){
+    
+    void curopWaitingForLock( int type ){
         Client * c = currentClient.get();
-        if ( c ){
-            CurOp * co = c->curop();
-            if ( co ){
-                co->waitingForLock();
-            }
+        assert( c );
+        CurOp * co = c->curop();
+        if ( co ){
+            co->waitingForLock( type );
         }
     }
     void curopGotLock(){
         Client * c = currentClient.get();
-        if ( c ){
-            CurOp * co = c->curop();
-            if ( co ){
-                co->gotLock();
-            }
+        assert(c);
+        CurOp * co = c->curop();
+        if ( co ){
+            co->gotLock();
         }
     }
 
@@ -187,18 +186,7 @@ namespace mongo {
             b.append("secs_running", elapsedSeconds() );
         }
         
-        if( _op == 2004 ) 
-            b.append("op", "query");
-        else if( _op == 2005 )
-            b.append("op", "getMore");
-        else if( _op == 2001 )
-            b.append("op", "update");
-        else if( _op == 2002 )
-            b.append("op", "insert");
-        else if( _op == 2006 )
-            b.append("op", "delete");
-        else
-            b.append("op", _op);
+        b.append( "op" , opToString( _op ) );
         
         b.append("ns", _ns);
         
@@ -212,7 +200,7 @@ namespace mongo {
 
         if ( _client )
             b.append( "desc" , _client->desc() );
-
+        
         return b.obj();
     }
 

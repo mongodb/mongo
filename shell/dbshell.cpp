@@ -472,9 +472,15 @@ int _main(int argc, char* argv[]) {
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
 
                 if ( cmd.find( "\"" ) == string::npos ){
-                    scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
-                    if ( scope->getBoolean( "__iscmd__" )  ){
-                        scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
+                    try {
+                        scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
+                        if ( scope->getBoolean( "__iscmd__" )  ){
+                            scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
+                            wascmd = true;
+                        }
+                    }
+                    catch ( std::exception& e ){
+                        cout << "error2:" << e.what() << endl;    
                         wascmd = true;
                     }
                 }

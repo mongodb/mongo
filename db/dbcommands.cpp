@@ -309,6 +309,7 @@ namespace mongo {
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
             result.append("uptime",(double) (time(0)-started));
+            result.appendDate( "localTime" , jsTime() );
             
             {
                 BSONObjBuilder t;
@@ -320,7 +321,7 @@ namespace mongo {
                 double tl = (double) timeLocked;
                 t.append("totalTime", tt);
                 t.append("lockTime", tl);
-                t.append("ratio", tl/tt);
+                t.append("ratio", (tt ? tl/tt : 0));
                 
                 result.append( "globalLock" , t.obj() );
             }
@@ -370,7 +371,7 @@ namespace mongo {
             
             if ( anyReplEnabled() ){
                 BSONObjBuilder bb( result.subobjStart( "repl" ) );
-                appendReplicationInfo( bb , authed );
+                appendReplicationInfo( bb , authed , cmdObj["repl"].numberInt() );
                 bb.done();
             }
             

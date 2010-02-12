@@ -50,7 +50,7 @@ namespace mongo {
 
     string sayClientState();
     
-    void curopWaitingForLock();
+    void curopWaitingForLock( int type );
     void curopGotLock();
 
     /* mutex time stats */
@@ -122,7 +122,7 @@ namespace mongo {
             massert( 10293 , (string)"internal error: locks are not upgradeable: " + sayClientState() , s == 0 );
             _state.set(1);
 
-            curopWaitingForLock();
+            curopWaitingForLock( 1 );
             _m.lock(); 
             curopGotLock();
 
@@ -173,7 +173,7 @@ namespace mongo {
                 }
             }
             _state.set(-1);
-            curopWaitingForLock();
+            curopWaitingForLock( -1 );
             _m.lock_shared(); 
             curopGotLock();
         }

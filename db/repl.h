@@ -326,6 +326,6 @@ namespace mongo {
     };
     
     bool anyReplEnabled();
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed );
+    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level = 0 );
     
 } // namespace mongo

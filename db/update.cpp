@@ -633,6 +633,9 @@ namespace mongo {
         int profile = cc().database()->profile;
         StringBuilder& ss = debug.str;
 
+        if ( logLevel > 2 )
+            ss << " update: " << updateobj;
+        
         /* idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case */
         /* NOTE: when yield() is added herein, these must be refreshed after each call to yield! */
         NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...

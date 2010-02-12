@@ -60,12 +60,13 @@ namespace mongo {
             UsageData insert;
             UsageData update;
             UsageData remove;
+            UsageData commands;
         };
 
         typedef map<string,CollectionData> UsageMap;
         
     public:
-        void record( const string& ns , int op , int lockType , long long micros );
+        void record( const string& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
         UsageMap cloneMap();
         CollectionData getGlobalData(){ return _global; }
@@ -78,7 +79,7 @@ namespace mongo {
         
     private:
         
-        void _record( CollectionData& c , int op , int lockType , long long micros );
+        void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
         boost::mutex _lock;
         CollectionData _global;

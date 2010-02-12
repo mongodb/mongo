@@ -49,7 +49,7 @@ namespace mongo {
 
     bool BackgroundOperation::inProgForDb(const char *db) {
         assertInWriteLock();
-        return dbsInProg.count(db) != 0;
+        return dbsInProg[db] != 0;
     }
 
     bool BackgroundOperation::inProgForNs(const char *ns) { 
@@ -78,6 +78,18 @@ namespace mongo {
         assertInWriteLock();
         dbsInProg[_ns.db]--;
         nsInProg.erase(_ns.ns());
+    }
+
+    void BackgroundOperation::dump(stringstream& ss) {
+        if( nsInProg.size() ) { 
+            ss << "\n<b>Background Jobs in Progress</b>\n";
+            for( set<string>::iterator i = nsInProg.begin(); i != nsInProg.end(); i++ )
+                ss << "  " << *i << '\n';
+        }
+        for( map<string,unsigned>::iterator i = dbsInProg.begin(); i != dbsInProg.end(); i++ ) { 
+            if( i->second ) 
+                ss << "database " << i->first << ": " << i->second << '\n';
+        }
     }
 
     /* ----------------------------------------- */
@@ -1756,17 +1768,23 @@ namespace mongo {
         
         BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
         int n = 0;
+        int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
             log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             Client::Context ctx( name , path );
-            if( !force && BackgroundOperation::inProgForDb(name.c_str()) )
-                log() << "WARNING: can't close database " << name << "because a bg job is in progress - try killOp command" << endl;
-            else
+            if( !force && BackgroundOperation::inProgForDb(name.c_str()) ) {
+                log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
+                nNotClosed++;
+            }
+            else {
                 closeDatabase( name.c_str() , path );
-            bb.append( bb.numStr( n++ ).c_str() , name );
+                bb.append( bb.numStr( n++ ).c_str() , name );
+            }
         }
         bb.done();
+        if( nNotClosed )
+            result.append("nNotClosed", nNotClosed);
         
         return true;
     }

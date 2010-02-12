@@ -28,6 +28,7 @@
 #include "instance.h"
 #include "security.h"
 #include "stats/snapshots.h"
+#include "background.h"
 
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -110,9 +111,9 @@ namespace mongo {
                 ss << "</table>";
             }
 
-
             statsSnapshots.outputLockInfoHTML( ss );
 
+            BackgroundOperation::dump(ss);
         }
 
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){

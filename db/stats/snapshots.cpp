@@ -88,7 +88,7 @@ namespace mongo {
 
     void Snapshots::outputLockInfoHTML( stringstream& ss ){
         boostlock lk(_lock);
-        ss << "<table>";
+        ss << "\n<table>";
         ss << "<tr><th>elapsed(ms)</th><th>% write locked</th></tr>\n";
         
         for ( int i=0; i<numDeltas(); i++ ){

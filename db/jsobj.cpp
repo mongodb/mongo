@@ -1140,7 +1140,10 @@ namespace mongo {
             
             if ( strchr( name , '.' ) ||
                  strchr( name , '$' ) ){
-                return false;
+                return 
+                    strcmp( name , "$ref" ) == 0 ||
+                    strcmp( name , "$id" ) == 0
+                    ;
             }
             
             if ( e.mayEncapsulate() ){

@@ -171,7 +171,6 @@ namespace mongo {
             if (q.fields.get() && q.fields->errmsg)
                 uassert( 10053 , q.fields->errmsg, false);
 
-            c.curop()->setRead();
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
@@ -222,13 +221,14 @@ namespace mongo {
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
 
         bool writeLock = true;
-
+        
         // before we lock...
         int op = m.data->operation();
-        globalOpCounters.gotOp( op );
+        bool isCommand = false;
         const char *ns = m.data->_data + 4;
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
+                isCommand = true;
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -253,6 +253,8 @@ namespace mongo {
         else if( op == dbGetMore ) {
             writeLock = false;
         }
+
+        globalOpCounters.gotOp( op , isCommand );
         
         if ( handlePossibleShardedMessage( m , dbresponse ) ){
             /* important to do this before we lock
@@ -334,7 +336,6 @@ namespace mongo {
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
-                        mongolock lk(writeLock);
                         currentOp.ensureStarted();
                         logThreshold = 10;
                         ss << "killcursors ";
@@ -367,7 +368,7 @@ namespace mongo {
         if ( currentOp.shouldDBProfile( ms ) ){
             // performance profiling is on
             if ( dbMutex.getState() < 0 ){
-                mongo::log(1) << "warning: not profiling because recursive read lock" << endl;
+                mongo::log(1) << "note: not profiling because recursive read lock" << endl;
             }
             else {
                 mongolock lk(true);
@@ -376,7 +377,7 @@ namespace mongo {
                     profile(ss.str().c_str(), ms);
                 }
                 else {
-                    mongo::log() << "warning: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
+                    mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
                 }
             }
         }
@@ -454,7 +455,6 @@ namespace mongo {
 
         mongolock lk(1);
         Client::Context ctx( ns );
-        op.setWrite();
 
         UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
         recordUpdate( res.existing , (int) res.num ); // for getlasterror
@@ -466,7 +466,6 @@ namespace mongo {
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        op.setWrite();
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -490,7 +489,6 @@ namespace mongo {
         ss << ns;
         mongolock lk(false);
         Client::Context ctx(ns);
-        curop.setRead();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
         ss << " cid:" << cursorid;
@@ -520,7 +518,6 @@ namespace mongo {
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
         Client::Context ctx(ns);
-        op.setWrite();
         op.debug().str << ns;
 		
         while ( d.moreJSObjs() ) {
@@ -624,6 +621,7 @@ namespace mongo {
 
     /* not using log() herein in case we are already locked */
     void dbexit( ExitCode rc, const char *why) {        
+        Client * c = currentClient.get();
         {
             boostlock lk( exitMutex );
             if ( numExitCalls++ > 0 ) {
@@ -634,6 +632,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "dbexit: " << why << "; exiting immediately" << endl;
                 tryToOutputFatal( ss.str() );
+                if ( c ) c->shutdown();
                 ::exit( rc );                
             }
         }
@@ -650,6 +649,7 @@ namespace mongo {
         }
         
         tryToOutputFatal( "dbexit: really exiting now\n" );
+        if ( c ) c->shutdown();
         ::exit(rc);
     }
     

@@ -9,6 +9,7 @@ db[ baseName ].save( {} );
 assert.eq( 1, db[ baseName ].count() );
 
 checkDir = function( dir ) {
+    db.runCommand( {fsync:1} );
     files = listFiles( dir );
     found = false;
     for( f in files ) {
