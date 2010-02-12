@@ -34,7 +34,7 @@ namespace mongo {
     public:
 
         MMS()
-            : Module( "mms" ) , _baseurl( "http://mms.10gen.com/ping/" ) , 
+            : Module( "mms" ) , _baseurl( "http://mms.10gen.com/ping?" ) , 
               _secsToSleep(1) , _token( "" ) , _name( "" ) {
             
             add_options()
@@ -71,73 +71,66 @@ namespace mongo {
                 log() << "no name for mms - not running" << endl;
                 return;
             }
-
+            
             log() << "mms monitor staring...  token:" << _token << " name:" << _name << " interval: " << _secsToSleep << endl;
-
-            unsigned long long lastTime = 0;
-            unsigned long long lastLockTime = 0;
-        
+            Client::initThread( "mms" );
+            Client& c = cc();
+            
+            
+            // TODO: using direct client is bad, but easy for now
+            
             while ( ! inShutdown() ){
                 sleepsecs( _secsToSleep );
-            
+                
                 stringstream url;
-                url << _baseurl << _token << "?";
-                url << "monitor_name=" << _name << "&";
-                url << "version=" << versionString << "&";
-                url << "git_hash=" << gitVersion() << "&";
+                url << _baseurl << "?"
+                    << "token=" << _token << "&"
+                    << "name=" << _name << "&"
+                    << "ts=" << time(0)
+                    ;
 
-                { //percent_locked
-                    unsigned long long time = curTimeMicros64();
-                    unsigned long long start , lock;
-                    dbMutex.info().getTimingInfo( start , lock );
-                    if ( lastTime ){
-                        double timeDiff = (double) (time - lastTime);
-                        double lockDiff = (double) (lock - lastLockTime);
-                        url << "percent_locked=" << (int)ceil( 100 * ( lockDiff / timeDiff ) ) << "&";
-                    }
-                    lastTime = time;
-                    lastLockTime = lock;
-                }
-            
-                vector< string > dbNames;
-                getDatabaseNames( dbNames );
-                boost::intmax_t totalSize = 0;
-                for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
-                    boost::intmax_t size = dbSize( i->c_str() );
-                    totalSize += size;
-                }
-                url << "data_size=" << totalSize / ( 1024 * 1024 ) << "&";
-
-            
-            
-                /* TODO: 
-                   message_operations
-                   update_operations
-                   insert_operations
-                   get_more_operations
-                   delete_operations
-                   kill_cursors_operations 
-                */
-            
-
-                log(1) << "mms url: " << url.str() << endl;
+                BSONObjBuilder bb;
+                // duplicated so the post has everything
+                bb.append( "token" , _token );
+                bb.append( "name" , _token );
+                bb.appendDate( "ts" , jsTime()  );
+                
+                // any commands
+                _add( bb , "buildinfo" );
+                _add( bb , "serverStatus" );
+                
+                BSONObj postData = bb.obj();
+                
+                log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
             
                 try {
                     HttpClient c;
-                    map<string,string> headers;
-                    stringstream ss;
-                    int rc = c.get( url.str() , headers , ss );
+                    HttpClient::Result r;
+                    int rc = c.post( url.str() , postData.jsonString() , &r );
                     log(1) << "\t response code: " << rc << endl;
                     if ( rc != 200 ){
                         log() << "mms error response code:" << rc << endl;
-                        log(1) << "mms error body:" << ss.str() << endl;
+                        log(1) << "mms error body:" << r.getEntireResponse() << endl;
                     }
                 }
                 catch ( std::exception& e ){
                     log() << "mms get exception: " << e.what() << endl;
                 }
             }
+            
+            c.shutdown();
         }
+        
+        void _add( BSONObjBuilder& postData , const char* cmd ){
+            BSONObj res;
+            if ( ! _db.simpleCommand( "admin" , &res , cmd ) ){
+                postData.append( cmd , "ERROR" );
+                return;
+            }
+
+            postData.append( cmd , res );
+        }
+        
 
         void init(){ go(); }
 
@@ -151,7 +144,8 @@ namespace mongo {
         
         string _token;
         string _name;
-
+        
+        DBDirectClient _db;
     } mms ;
 
 }
