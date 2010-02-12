@@ -96,7 +96,7 @@ namespace mongo {
                     BSONObjBuilder bb;
                     // duplicated so the post has everything
                     bb.append( "token" , _token );
-                    bb.append( "name" , _token );
+                    bb.append( "name" , _name );
                     bb.appendDate( "ts" , jsTime()  );
                     
                     // any commands
