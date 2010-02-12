@@ -390,7 +390,7 @@ namespace mongo {
         int *x = (int *) m.data->_data;
         x++; // reserved
         int n = *x++;
-        assert( n >= 1 );
+        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             problem() << "Assertion failure, receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
