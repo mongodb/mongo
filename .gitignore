@@ -87,6 +87,7 @@ test
 authTest
 perftest
 clientTest
+httpClientTest
 
 #debian
 build-stamp

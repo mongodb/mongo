@@ -1084,6 +1084,7 @@ clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cp
 clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
 clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
@@ -1278,7 +1279,7 @@ def startMongodForTests( env, target, source ):
     dirName = "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
-    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName, "--nohttpinterface" ] )
+    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
 
     if not utils.didMongodStart( 32000 ):
         print( "Failed to start mongod" )
