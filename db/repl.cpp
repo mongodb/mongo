@@ -1364,7 +1364,7 @@ namespace mongo {
             ReplInfo r("trying to connect to sync source");
             if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
                 resetConnection();
-                log() << "repl: " << errmsg << endl;
+                log() << "repl:  " << errmsg << endl;
                 return false;
             }
         }
@@ -1388,7 +1388,7 @@ namespace mongo {
         }
 
         if ( !connect() ) {
-			log() << "repl:   can't connect to sync source" << endl;
+			log() << "repl:  can't connect to sync source" << endl;
             if ( replPair && paired ) {
                 assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
                 replPair->arbitrate();
@@ -1626,7 +1626,7 @@ namespace mongo {
             }
             if ( s ) {
                 stringstream ss;
-                ss << "repl: sleep " << s << "sec before next pass";
+                ss << "repl:  sleep " << s << "sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;

@@ -1094,7 +1094,7 @@ namespace mongo {
 
 #else
 void ctrlCTerminate() {
-    log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
+    log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
     Client::initThread( "ctrlCTerminate" );
     exitCleanly();
 }
@@ -1132,14 +1132,6 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
             massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
     }
 #endif
-
-void temptestfoo() {
-    MongoMutex m;
-    m.lock();
-//    m.lock_upgrade();
-    m.lock_shared();
-}
-
 
 } // namespace mongo
 
