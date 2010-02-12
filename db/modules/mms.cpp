@@ -22,6 +22,7 @@
 #include "../module.h"
 #include "../../util/httpclient.h"
 #include "../../util/background.h"
+#include "../commands.h"
 
 namespace po = boost::program_options;
 
@@ -84,28 +85,28 @@ namespace mongo {
             while ( ! inShutdown() ){
                 sleepsecs( _secsToSleep );
                 
-                stringstream url;
-                url << _baseurl << "?"
-                    << "token=" << _token << "&"
-                    << "name=" << _name << "&"
-                    << "ts=" << time(0)
-                    ;
-
-                BSONObjBuilder bb;
-                // duplicated so the post has everything
-                bb.append( "token" , _token );
-                bb.append( "name" , _token );
-                bb.appendDate( "ts" , jsTime()  );
-                
-                // any commands
-                _add( bb , "buildinfo" );
-                _add( bb , "serverStatus" );
-                
-                BSONObj postData = bb.obj();
-                
-                log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
-            
                 try {
+                    stringstream url;
+                    url << _baseurl << "?"
+                        << "token=" << _token << "&"
+                        << "name=" << _name << "&"
+                        << "ts=" << time(0)
+                        ;
+                    
+                    BSONObjBuilder bb;
+                    // duplicated so the post has everything
+                    bb.append( "token" , _token );
+                    bb.append( "name" , _token );
+                    bb.appendDate( "ts" , jsTime()  );
+                    
+                    // any commands
+                    _add( bb , "buildinfo" );
+                    _add( bb , "serverStatus" );
+                    
+                    BSONObj postData = bb.obj();
+                    
+                    log(1) << "mms url: " << url.str() << "\n\t post: " << postData << endl;;
+                    
                     HttpClient c;
                     HttpClient::Result r;
                     int rc = c.post( url.str() , postData.jsonString() , &r );
@@ -116,7 +117,7 @@ namespace mongo {
                     }
                 }
                 catch ( std::exception& e ){
-                    log() << "mms get exception: " << e.what() << endl;
+                    log() << "mms exception: " << e.what() << endl;
                 }
             }
             
@@ -124,13 +125,27 @@ namespace mongo {
         }
         
         void _add( BSONObjBuilder& postData , const char* cmd ){
-            BSONObj res;
-            if ( ! _db.simpleCommand( "admin" , &res , cmd ) ){
-                postData.append( cmd , "ERROR" );
+            Command * c = Command::findCommand( cmd );
+            if ( ! c ){
+                log() << "MMS can't find command: " << cmd << endl;
+                postData.append( cmd , "can't find command" );
+                return;
+            }
+            
+            if ( ! c->noLocking() ){
+                log() << "MSM can only use noLocking commands not: " << cmd << endl;
+                postData.append( cmd , "not noLocking" );
                 return;
             }
 
-            postData.append( cmd , res );
+            BSONObj co = BSON( cmd << 1 );
+
+            string errmsg;
+            BSONObjBuilder sub;
+            if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
+                postData.append( cmd , errmsg );
+            else
+                postData.append( cmd , sub.obj() );
         }
         
 
@@ -147,7 +162,6 @@ namespace mongo {
         string _token;
         string _name;
         
-        DBDirectClient _db;
     } mms ;
 
 }
