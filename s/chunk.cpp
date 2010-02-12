@@ -77,7 +77,7 @@ namespace mongo {
             }
             BSONObj end = conn->findOne( _ns , q );
             conn.done();
-            
+
             if ( ! end.isEmpty() )
                 return _manager->getShardKey().extractKey( end );
         }
@@ -93,9 +93,25 @@ namespace mongo {
             ss << "medianKey command failed: " << result;
             uassert( 10164 ,  ss.str() , 0 );
         }
+
+        BSONObj median = result.getObjectField( "median" );
+        if (median == getMin()){
+            //TODO compound support
+            BSONElement key = getMin().firstElement();
+            BSONObjBuilder b;
+            b.appendAs("$gt", key);
+
+            Query q = QUERY(key.fieldName() << b.obj());
+            q.sort(_manager->getShardKey().key());
+
+            median = conn->findOne(_ns, q);
+            median = _manager->getShardKey().extractKey( median );
+            PRINT(median);
+        }
+
         conn.done();
         
-        return result.getObjectField( "median" ).getOwned();
+        return median.getOwned();
     }
 
     Chunk * Chunk::split(){
@@ -109,6 +125,8 @@ namespace mongo {
                << "\t self  : " << toString() << endl;
 
         uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
+        uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
+                          !m.isEmpty() && _min.woCompare(m) && _max.woCompare(m)); 
 
         Chunk * s = new Chunk( _manager );
         s->_ns = _ns;
@@ -219,7 +237,8 @@ namespace mongo {
 
         _dataWritten = 0;
         
-        if ( _min.woCompare( _max ) == 0 ){
+        BSONObj split_point = pickSplitPoint();
+        if ( split_point.isEmpty() || _min == split_point || _max == split_point) {
             log() << "SHARD PROBLEM** shard is too big, but can't split: " << toString() << endl;
             return false;
         }
@@ -229,7 +248,7 @@ namespace mongo {
             return false;
         
         log() << "autosplitting " << _ns << " size: " << size << " shard: " << toString() << endl;
-        Chunk * newShard = split();
+        Chunk * newShard = split(split_point);
 
         moveIfShould( newShard );
         
