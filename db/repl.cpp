@@ -332,6 +332,8 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual bool noLocking() { return true; }
+
         CmdIsMaster() : Command("ismaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 

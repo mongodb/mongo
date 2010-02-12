@@ -304,6 +304,9 @@ namespace mongo {
         CmdServerStatus() : Command("serverStatus") {
             started = time(0);
         }
+        
+        virtual bool noLocking(){ return true; }
+
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
@@ -1026,6 +1029,7 @@ namespace mongo {
         CmdBuildInfo() : Command( "buildinfo" ) {}
         virtual bool slaveOk() { return true; }
         virtual bool adminOnly() { return true; }
+        virtual bool noLocking() { return true; }
         virtual void help( stringstream &help ) const {
             help << "example: { buildinfo:1 }";
         }
@@ -1480,7 +1484,7 @@ namespace mongo {
         } 
 
         bool canRunHere = 
-            isMaster() ||
+            isMaster( dbname.c_str() ) ||
             c->slaveOk() ||
             ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
             fromRepl;
