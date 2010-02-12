@@ -527,12 +527,13 @@ elif "win32" == os.sys.platform:
 	env['ENV'] = dict(os.environ)
 
     def find_boost():
-	for bv in reversed( range(33,50) ):
-	    for extra in ('', '_0', '_1'):
-		boostDir = "C:/Program Files/Boost/boost_1_" + str(bv) + extra
-		if os.path.exists( boostDir ):
-		    return boostDir
-	return None
+        for x in ('', ' (x86)'):	
+            for bv in reversed( range(33,50) ):
+	            for extra in ('', '_0', '_1'):
+		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
+		            if os.path.exists( boostDir ):
+		                return boostDir
+        return None
 
     boostDir = find_boost()
     if boostDir is None:
