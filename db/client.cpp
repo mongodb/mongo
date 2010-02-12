@@ -110,12 +110,26 @@ namespace mongo {
             _justCreated = false;
         }
         else {
-            // we need to be in a write lock since we're going to create the DB object
-            if ( _lock )
-                _lock->releaseAndWriteLock();
-            assertInWriteLock();
+            for ( int x=0; x<2; x++ ){
+                { //   we need to be in a write lock since we're going to create the DB object
+                    // to do that, we're going to unlock, then get a write lock
+                    // this is so that if this is the first query and its long doesn't block db
+                    // we just have to check that the db wasn't closed in the interim where we unlock
+                    
+                    dbtemprelease unlock;
+                    writelock lk( _ns );
+                    dbHolder.getOrCreate( _ns , _path , _justCreated );
+                }
+                
+                _db = dbHolder.get( _ns , _path );
+                
+                if ( _db )
+                    break;
+                
+                log() << "db was closed on us right after we opened it: " << _ns << endl;
+            }
             
-            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
+            uassert( 13005 , "can't create db, keeps getting closed" , _db );
         }
         
         _client->_context = this;
