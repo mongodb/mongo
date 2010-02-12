@@ -133,7 +133,7 @@ namespace mongo {
             }
             
             if ( ! c->noLocking() ){
-                log() << "MSM can only use noLocking commands not: " << cmd << endl;
+                log() << "MMS can only use noLocking commands not: " << cmd << endl;
                 postData.append( cmd , "not noLocking" );
                 return;
             }
