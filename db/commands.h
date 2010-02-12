@@ -25,7 +25,8 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class BufBuilder;
-    
+    class Client;
+
 // db "commands" (sent via db.$cmd.findOne(...))
 // subclass to make a command.
     class Command {
@@ -91,6 +92,18 @@ namespace mongo {
 
         Command(const char *_name);
         virtual ~Command() {}
+
+        /** 
+         * this handles
+          - auth
+          - locking
+          - context
+          then calls run()
+         */
+        bool exec( Client& client , int queryOptions , 
+                   const char *ns, BSONObj& cmdObj, 
+                   BSONObjBuilder& result, 
+                   bool fromRepl);
 
     protected:
         BSONObj getQuery( const BSONObj& cmdObj ){

@@ -1475,65 +1475,7 @@ namespace mongo {
         
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
-            string errmsg;
-            AuthenticationInfo *ai = client.getAuthenticationInfo();
-            
-            bool needWriteLock = ! c->readOnly();
-            
-            if ( ! c->requiresAuth() && 
-                 ( ai->isAuthorizedReads( dbname ) && 
-                   ! ai->isAuthorized( dbname ) ) ){
-                // this means that they can read, but not write
-                // so only get a read lock
-                needWriteLock = false;
-            }
-            
-            mongolock lk( needWriteLock );
-            Client::Context ctx( ns , dbpath , &lk , c->requiresAuth() );
-
-            bool admin = c->adminOnly();
-
-            if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 
-                ok = false;
-                errmsg = "unauthorized: this command must run from localhost when running db without auth";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            else if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
-                ok = false;
-                errmsg = "access denied";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            else if ( isMaster() ||
-                      c->slaveOk() ||
-                      ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
-                      fromRepl ){
-                if ( jsobj.getBoolField( "help" ) ) {
-                    stringstream help;
-                    help << "help for: " << e.fieldName() << " ";
-                    c->help( help );
-                    anObjBuilder.append( "help" , help.str() );
-                } 
-                else {
-                    if( admin )
-                        log( 2 ) << "command: " << jsobj << endl;
-                    try {
-                        ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
-                    }
-                    catch ( AssertionException& e ){
-                        ok = false;
-                        errmsg = "assertion: ";
-                        errmsg += e.what();
-                    }
-                    if ( ok && c->logTheOp() && !fromRepl )
-                        logOp("c", ns, jsobj);
-                }
-            }
-            else {
-                ok = false;
-                errmsg = "not master";
-            }
-            if ( !ok )
-                anObjBuilder.append("errmsg", errmsg);
+            ok = c->exec( client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
         else {
             anObjBuilder.append("errmsg", "no such cmd");
