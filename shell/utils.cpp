@@ -600,6 +600,15 @@ namespace mongo {
 #endif
             return BSON( "" << double( r ) / ( double( RAND_MAX ) + 1 ) );
         }
+
+        BSONObj isWindows(const BSONObj& a){
+            uassert( 13006, "isWindows accepts no arguments", a.nFields() == 0 );
+#ifdef _WIN32
+            return BSON( "" << true );
+#else
+            return BSON( "" << false );
+#endif
+        }
         
         void installShellUtils( Scope& scope ){
             scope.injectNative( "sleep" , JSSleep );
@@ -607,6 +616,8 @@ namespace mongo {
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
+            scope.injectNative( "_isWindows" , isWindows );
+
 #ifndef MONGO_SAFE_SHELL
             //can't launch programs
             scope.injectNative( "_startMongoProgram", StartMongoProgram );

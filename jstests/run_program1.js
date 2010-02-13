@@ -1,4 +1,4 @@
-if (runProgram('uname') == 0) { //test for a unixy environment (includes cygwin tools)
+if ( ! _isWindows() ) {
     
     // note that normal program exit returns 0
     assert.eq (0, runProgram('true'))
@@ -12,8 +12,8 @@ if (runProgram('uname') == 0) { //test for a unixy environment (includes cygwin 
     // numbers can be passed as numbers or strings
     runProgram('sleep', 0.5);
     runProgram('sleep', '0.5');
-}
 
-if (runProgram('ver') == 0) { //on windows
+} else {
+
     runProgram('echo', 'Hello', 'World.', 'How   are   you?');
 }
