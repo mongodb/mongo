@@ -193,12 +193,6 @@ namespace mongo {
         map< pid_t, HANDLE > handles;
 #endif
         
-        char *copyString( const char *original ) {
-            char *ret = reinterpret_cast< char * >( malloc( strlen( original ) + 1 ) );
-            strcpy( ret, original );
-            return ret;
-        }
-        
         boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
         stringstream mongoProgramOutput_;
 
@@ -224,39 +218,35 @@ namespace mongo {
         }
                 
         class MongoProgramRunner {
-            char **argv_;
-            BSONObj args_;
+            vector<string> argv_;
             int port_;
             int pipe_;
             pid_t pid_;
-            boost::filesystem::path programPath_;
         public:
             pid_t pid() const { return pid_; }
             MongoProgramRunner( const BSONObj &args , bool isMongoProgram=true)
-                :args_(args)
             {
-                assert( args.nFields() > 0 );
+                assert( !args.isEmpty() );
 
                 string program( args.firstElement().valuestrsafe() );
                 assert( !program.empty() );
-                programPath_ = program;
+                boost::filesystem::path programPath = program;
 
-                argv_ = new char *[ args.nFields() + 1 ];
                 if (isMongoProgram){
-                    programPath_ = boost::filesystem::initial_path() / programPath_;
+                    programPath = boost::filesystem::initial_path() / programPath;
 #ifdef _WIN32
-                    programPath_ = change_extension(programPath_, ".exe");
+                    programPath = change_extension(programPath, ".exe");
 #endif
-                    massert( 10435 ,  "couldn't find " + programPath_.native_file_string(), boost::filesystem::exists( programPath_ ) );
+                    massert( 10435 ,  "couldn't find " + programPath.native_file_string(), boost::filesystem::exists( programPath ) );
                 }
 
-                argv_[ 0 ] = copyString( programPath_.native_file_string().c_str() );
+                argv_.push_back( programPath.native_file_string() );
                 
                 port_ = -1;
                 
                 BSONObjIterator j( args );
-                j.next();
-                for( int i = 1; i < args.nFields(); ++i ) {
+                j.next(); // skip program name (handled above)
+                while(j.more()) {
                     BSONElement e = j.next();
                     string str;
                     if ( e.isNumber() ) {
@@ -267,14 +257,12 @@ namespace mongo {
                         assert( e.type() == mongo::String );
                         str = e.valuestr();
                     }
-                    char *s = copyString( str.c_str() );
-                    if ( string( "--port" ) == s )
+                    if ( str == "--port" )
                         port_ = -2;
                     else if ( port_ == -2 )
-                        port_ = strtol( s, 0, 10 );
-                    argv_[ i ] = s;
+                        port_ = strtol( str.c_str(), 0, 10 );
+                    argv_.push_back(str);
                 }
-                argv_[ args.nFields() ] = 0;
                 
                 if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
                     port_ = 0;
@@ -291,18 +279,12 @@ namespace mongo {
                 assert( pipe( pipeEnds ) != -1 );
                 
                 fflush( 0 );
-                launch_process(argv_, pipeEnds[1]); //sets pid_
+                launch_process(pipeEnds[1]); //sets pid_
                 
                 cout << "shell: started mongo program";
-                int i = 0;
-                while( argv_[ i ] )
-                    cout << " " << argv_[ i++ ];
+                for (unsigned i=0; i < argv_.size(); i++)
+                    cout << " " << argv_[i];
                 cout << endl;
-                
-                i = 0;
-                while( argv_[ i ] )
-                    free( argv_[ i++ ] );
-                delete[] argv_;
 
                 if ( port_ > 0 )
                     dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
@@ -345,12 +327,12 @@ namespace mongo {
                     start = buf + strlen( buf );
                 }        
             }
-            void launch_process(char** argv, int child_stdout){
+            void launch_process(int child_stdout){
 #ifdef _WIN32
                 stringstream ss;
-                for (int i=0; argv[i]; i++){
+                for (int i=0; i < argv_.size(); i++){
                     if (i) ss << ' ';
-                    ss << '"' << argv[i] << '"';
+                    ss << '"' << argv_[i] << '"';
                 }
 
                 string args = ss.str();
@@ -387,12 +369,27 @@ namespace mongo {
                 assert( pid_ != -1 );
                 
                 if ( pid_ == 0 ) {
+                    // DON'T ASSERT IN THIS BLOCK - very bad things will happen
+
+                    const char** argv = new const char* [argv_.size()+1]; // don't need to free - in child
+                    for (unsigned i=0; i < argv_.size(); i++){
+                        argv[i] = argv_[i].c_str();
+                    }
+                    argv[argv_.size()] = 0;
                     
-                    assert( dup2( child_stdout, STDOUT_FILENO ) != -1 );
-                    assert( dup2( child_stdout, STDERR_FILENO ) != -1 );
-                    execvp( argv[ 0 ], argv );
-                    massert( 10436 ,  "Unable to start program" , 0 );
+                    if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
+                         dup2( child_stdout, STDERR_FILENO ) == -1 )
+                    {
+                        cout << "Unable to dup2 child output" << endl;
+                        ::_Exit(-1); //do not pass go, do not call atexit handlers
+                    }
+
+                    execvp( argv[ 0 ], const_cast<char**>(argv) );
+
+                    cout << "Unable to start program" << endl;
+                    ::_Exit(-1);
                 }
+
 #endif
             }
         };
