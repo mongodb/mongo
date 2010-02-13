@@ -163,6 +163,13 @@ AddOption( "--noshell",
            action="store",
            help="don't build shell" )
 
+AddOption( "--safeshell",
+           dest="safeshell",
+           type="string",
+           nargs=0,
+           action="store",
+           help="don't let shell scripts run programs (still, don't run untrusted scripts)" )
+
 AddOption( "--extrapath",
            dest="extrapath",
            type="string",
@@ -296,6 +303,8 @@ env.Append( CPPDEFINES=[ "_SCONS" ] )
 env.Append( CPPPATH=[ "." ] )
 
 
+if GetOption( "safeshell" ) != None:
+    env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
 
 boostCompiler = GetOption( "boostCompiler" )
 if boostCompiler is None:

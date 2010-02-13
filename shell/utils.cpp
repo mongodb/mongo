@@ -103,6 +103,32 @@ namespace mongo {
             return undefined_;
         }
 
+        
+        BSONObj Quit(const BSONObj& args) {
+            // If not arguments are given first element will be EOO, which
+            // converts to the integer value 0.
+            int exit_code = int( args.firstElement().number() );
+            ::exit(exit_code);
+            return undefined_;
+        }
+
+        BSONObj JSGetMemInfo( const BSONObj& args ){
+            ProcessInfo pi;
+            uassert( 10258 ,  "processinfo not supported" , pi.supported() );
+            
+            BSONObjBuilder e;
+            e.append( "virtual" , pi.getVirtualMemorySize() );
+            e.append( "resident" , pi.getResidentSize() );
+            
+            BSONObjBuilder b;
+            b.append( "ret" , e.obj() );
+            
+            return b.obj();
+        }
+
+
+#ifndef MONGO_SAFE_SHELL
+
         BSONObj listFiles(const BSONObj& args){
             uassert( 10257 ,  "need to specify 1 argument to listFiles" , args.nFields() == 1 );
             
@@ -163,30 +189,6 @@ namespace mongo {
             b.appendBool( "removed" , found );
             return b.obj();
         }
-
-        
-        BSONObj Quit(const BSONObj& args) {
-            // If not arguments are given first element will be EOO, which
-            // converts to the integer value 0.
-            int exit_code = int( args.firstElement().number() );
-            ::exit(exit_code);
-            return undefined_;
-        }
-
-        BSONObj JSGetMemInfo( const BSONObj& args ){
-            ProcessInfo pi;
-            uassert( 10258 ,  "processinfo not supported" , pi.supported() );
-            
-            BSONObjBuilder e;
-            e.append( "virtual" , pi.getVirtualMemorySize() );
-            e.append( "resident" , pi.getResidentSize() );
-            
-            BSONObjBuilder b;
-            b.append( "ret" , e.obj() );
-            
-            return b.obj();
-        }
-
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
 #ifdef _WIN32
@@ -567,6 +569,9 @@ namespace mongo {
             for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }
+#else // ndef MONGO_SAFE_SHELL
+        void KillMongoProgramInstances() {}
+#endif
         
         MongoProgramScope::~MongoProgramScope() {
             try {
@@ -597,21 +602,26 @@ namespace mongo {
         }
         
         void installShellUtils( Scope& scope ){
-            scope.injectNative( "listFiles" , listFiles );
-            scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "sleep" , JSSleep );
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
+#ifndef MONGO_SAFE_SHELL
+            //can't launch programs
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runProgram", RunProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
-            scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
+
+            //can't access filesystem
+            scope.injectNative( "removeFile" , removeFile );
+            scope.injectNative( "listFiles" , listFiles );
+            scope.injectNative( "resetDbpath", ResetDbpath );
+#endif
         }
 
         void initScope( Scope &scope ) {
