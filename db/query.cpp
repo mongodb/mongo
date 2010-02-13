@@ -780,6 +780,7 @@ namespace mongo {
         Client& c = cc();
         /* we assume you are using findOne() for running a cmd... */
         if ( ntoreturn == 1 && runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
+            ss << " command ";
             curop.markCommand();
             n = 1;
             qr.reset( (QueryResult *) bb.buf() );
@@ -791,182 +792,185 @@ namespace mongo {
             qr->setOperation(opReply);
             qr->cursorId = cursorid;
             qr->startingFrom = 0;
-            qr->nReturned = n;            
+            qr->nReturned = n;
+            return qr;
         }
-        else { /* regular query */
-            mongolock lk(false); // read lock
-            Client::Context ctx( ns , dbpath , &lk );
+        
+        // regular query
 
-			/* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
-			   so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
-			   query the nonmaster member of a replica pair.
-			*/
-            uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
+        mongolock lk(false); // read lock
+        Client::Context ctx( ns , dbpath , &lk );
 
-            BSONElement hint;
-            BSONObj min;
-            BSONObj max;
-            bool explain = false;
-            bool _gotquery = false;
-            bool snapshot = false;
-            BSONObj query;
-            {
-                BSONElement e = jsobj.getField("$query");
-                if ( e.eoo() )
-                    e = jsobj.getField("query");                    
-                if ( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
-                    query = e.embeddedObject();
-                    _gotquery = true;
-                }
+        /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
+           so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
+           query the nonmaster member of a replica pair.
+        */
+        uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
+
+        BSONElement hint;
+        BSONObj min;
+        BSONObj max;
+        bool explain = false;
+        bool _gotquery = false;
+        bool snapshot = false;
+        BSONObj query;
+        {
+            BSONElement e = jsobj.getField("$query");
+            if ( e.eoo() )
+                e = jsobj.getField("query");                    
+            if ( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
+                query = e.embeddedObject();
+                _gotquery = true;
             }
-            BSONObj order;
-            {
-                BSONElement e = jsobj.getField("$orderby");
-                if ( e.eoo() )
-                    e = jsobj.getField("orderby");                    
-                if ( !e.eoo() ) {
-                    order = e.embeddedObjectUserCheck();
-                    if ( e.type() == Array )
-                        order = transformOrderFromArrayFormat(order);
-                }
+        }
+        BSONObj order;
+        {
+            BSONElement e = jsobj.getField("$orderby");
+            if ( e.eoo() )
+                e = jsobj.getField("orderby");                    
+            if ( !e.eoo() ) {
+                order = e.embeddedObjectUserCheck();
+                if ( e.type() == Array )
+                    order = transformOrderFromArrayFormat(order);
             }
-            if ( !_gotquery && order.isEmpty() )
-                query = jsobj;
-            else {
-                explain = jsobj.getBoolField("$explain");
-                if ( useHints )
-                    hint = jsobj.getField("$hint");
-                min = jsobj.getObjectField("$min");
-                max = jsobj.getObjectField("$max");
-                BSONElement e = jsobj.getField("$snapshot");
-                snapshot = !e.eoo() && e.trueValue();
-                if( snapshot ) { 
-                    uassert( 12001 , "E12001 can't sort with $snapshot", order.isEmpty());
-					uassert( 12002 , "E12002 can't use hint with $snapshot", hint.eoo());
-                    NamespaceDetails *d = nsdetails(ns);
-                    if ( d ){
-                        int i = d->findIdIndex();
-                        if( i < 0 ) { 
-                            if ( strstr( ns , ".system." ) == 0 )
-                                log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
-                        }
-                        else {
-                            /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
-                               probably need a better way to specify "use the _id index" as a hint.  if someone is
-                               in the query optimizer please fix this then!
-                            */
-                            BSONObjBuilder b;
-                            b.append("$hint", d->idx(i).indexName());
-                            snapshotHint = b.obj();
-                            hint = snapshotHint.firstElement();
-                        }
+        }
+        if ( !_gotquery && order.isEmpty() )
+            query = jsobj;
+        else {
+            explain = jsobj.getBoolField("$explain");
+            if ( useHints )
+                hint = jsobj.getField("$hint");
+            min = jsobj.getObjectField("$min");
+            max = jsobj.getObjectField("$max");
+            BSONElement e = jsobj.getField("$snapshot");
+            snapshot = !e.eoo() && e.trueValue();
+            if( snapshot ) { 
+                uassert( 12001 , "E12001 can't sort with $snapshot", order.isEmpty());
+                uassert( 12002 , "E12002 can't use hint with $snapshot", hint.eoo());
+                NamespaceDetails *d = nsdetails(ns);
+                if ( d ){
+                    int i = d->findIdIndex();
+                    if( i < 0 ) { 
+                        if ( strstr( ns , ".system." ) == 0 )
+                            log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                    }
+                    else {
+                        /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+                           probably need a better way to specify "use the _id index" as a hint.  if someone is
+                           in the query optimizer please fix this then!
+                        */
+                        BSONObjBuilder b;
+                        b.append("$hint", d->idx(i).indexName());
+                        snapshotHint = b.obj();
+                        hint = snapshotHint.firstElement();
                     }
                 }
             }
+        }
             
-            /* The ElemIter will not be happy if this isn't really an object. So throw exception
-               here when that is true.
-               (Which may indicate bad data from client.)
-            */
-            if ( query.objsize() == 0 ) {
-                out() << "Bad query object?\n  jsobj:";
-                out() << jsobj.toString() << "\n  query:";
-                out() << query.toString() << endl;
-                uassert( 10110 , "bad query object", false);
-            }
+        /* The ElemIter will not be happy if this isn't really an object. So throw exception
+           here when that is true.
+           (Which may indicate bad data from client.)
+        */
+        if ( query.objsize() == 0 ) {
+            out() << "Bad query object?\n  jsobj:";
+            out() << jsobj.toString() << "\n  query:";
+            out() << query.toString() << endl;
+            uassert( 10110 , "bad query object", false);
+        }
             
-            bool idHackWorked = false;
+        bool idHackWorked = false;
 
-            if ( isSimpleIdQuery( query ) ){
-                nscanned = 1;
+        if ( isSimpleIdQuery( query ) ){
+            nscanned = 1;
 
-                bool nsFound = false;
-                bool indexFound = false;
+            bool nsFound = false;
+            bool indexFound = false;
 
-                BSONObj resObject;
-                bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
-                if ( nsFound == false || indexFound == true ){
-                    idHackWorked = true;
-                    if ( found ){
-                        n = 1;
-                        fillQueryResultFromObj( bb , filter.get() , resObject );
-                    }
-                    qr.reset( (QueryResult *) bb.buf() );
-                    bb.decouple();
-                    qr->setResultFlagsToOk();
-                    qr->len = bb.len();
-                    ss << " reslen:" << bb.len();
-                    qr->setOperation(opReply);
-                    qr->cursorId = cursorid;
-                    qr->startingFrom = 0;
-                    qr->nReturned = n;       
-                }     
-            }
-            
-            if ( ! idHackWorked ){ // non-simple _id lookup
-                BSONObj oldPlan;
-                if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
-                    QueryPlanSet qps( ns, query, order );
-                    if ( qps.usingPrerecordedPlan() )
-                        oldPlan = qps.explain();
-                }
-                QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
-                UserQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
-                shared_ptr< UserQueryOp > o = qps.runOp( original );
-                UserQueryOp &dqo = *o;
-                massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
-                n = dqo.n();
-                nscanned = dqo.nscanned();
-                if ( dqo.scanAndOrderRequired() )
-                    ss << " scanAndOrder ";
-                auto_ptr< Cursor > c = dqo.cursor();
-                log( 5 ) << "   used cursor: " << c.get() << endl;
-                if ( dqo.saveClientCursor() ) {
-                    // the clientcursor now owns the Cursor* and 'c' is released:
-                    ClientCursor *cc = new ClientCursor(c, ns, !(queryOptions & QueryOption_NoCursorTimeout));
-                    cursorid = cc->cursorid;
-                    cc->query = jsobj.getOwned();
-                    DEV out() << "  query has more, cursorid: " << cursorid << endl;
-                    cc->matcher = dqo.matcher();
-                    cc->pos = n;
-                    cc->filter = filter;
-                    cc->originalMessage = m;
-                    cc->updateLocation();
-                    if ( !cc->c->ok() && cc->c->tailable() ) {
-                        DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
-                    } else {
-                        DEV out() << "  query has more, cursorid: " << cursorid << endl;
-                    }
-                }
-                if ( explain ) {
-                    BSONObjBuilder builder;
-                    builder.append("cursor", c->toString());
-                    builder.append("startKey", c->prettyStartKey());
-                    builder.append("endKey", c->prettyEndKey());
-                    builder.append("nscanned", double( dqo.nscanned() ) );
-                    builder.append("n", n);
-                    if ( dqo.scanAndOrderRequired() )
-                        builder.append("scanAndOrder", true);
-                    builder.append("millis", curop.elapsedMillis());
-                    if ( !oldPlan.isEmpty() )
-                        builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
-                    if ( hint.eoo() )
-                        builder.appendElements(qps.explain());
-                    BSONObj obj = builder.done();
-                    fillQueryResultFromObj(dqo.builder(), 0, obj);
+            BSONObj resObject;
+            bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+            if ( nsFound == false || indexFound == true ){
+                idHackWorked = true;
+                if ( found ){
                     n = 1;
+                    fillQueryResultFromObj( bb , filter.get() , resObject );
                 }
-                qr.reset( (QueryResult *) dqo.builder().buf() );
-                dqo.builder().decouple();
-                qr->cursorId = cursorid;
+                qr.reset( (QueryResult *) bb.buf() );
+                bb.decouple();
                 qr->setResultFlagsToOk();
-                qr->len = dqo.builder().len();
-                ss << " reslen:" << qr->len;
+                qr->len = bb.len();
+                ss << " reslen:" << bb.len();
                 qr->setOperation(opReply);
+                qr->cursorId = cursorid;
                 qr->startingFrom = 0;
-                qr->nReturned = n;
+                qr->nReturned = n;       
+            }     
+        }
+            
+        if ( ! idHackWorked ){ // non-simple _id lookup
+            BSONObj oldPlan;
+            if ( explain && hint.eoo() && min.isEmpty() && max.isEmpty() ) {
+                QueryPlanSet qps( ns, query, order );
+                if ( qps.usingPrerecordedPlan() )
+                    oldPlan = qps.explain();
             }
-        } // end else for regular query
+            QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
+            UserQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
+            shared_ptr< UserQueryOp > o = qps.runOp( original );
+            UserQueryOp &dqo = *o;
+            massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
+            n = dqo.n();
+            nscanned = dqo.nscanned();
+            if ( dqo.scanAndOrderRequired() )
+                ss << " scanAndOrder ";
+            auto_ptr< Cursor > c = dqo.cursor();
+            log( 5 ) << "   used cursor: " << c.get() << endl;
+            if ( dqo.saveClientCursor() ) {
+                // the clientcursor now owns the Cursor* and 'c' is released:
+                ClientCursor *cc = new ClientCursor(c, ns, !(queryOptions & QueryOption_NoCursorTimeout));
+                cursorid = cc->cursorid;
+                cc->query = jsobj.getOwned();
+                DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                cc->matcher = dqo.matcher();
+                cc->pos = n;
+                cc->filter = filter;
+                cc->originalMessage = m;
+                cc->updateLocation();
+                if ( !cc->c->ok() && cc->c->tailable() ) {
+                    DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
+                } else {
+                    DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                }
+            }
+            if ( explain ) {
+                BSONObjBuilder builder;
+                builder.append("cursor", c->toString());
+                builder.append("startKey", c->prettyStartKey());
+                builder.append("endKey", c->prettyEndKey());
+                builder.append("nscanned", double( dqo.nscanned() ) );
+                builder.append("n", n);
+                if ( dqo.scanAndOrderRequired() )
+                    builder.append("scanAndOrder", true);
+                builder.append("millis", curop.elapsedMillis());
+                if ( !oldPlan.isEmpty() )
+                    builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
+                if ( hint.eoo() )
+                    builder.appendElements(qps.explain());
+                BSONObj obj = builder.done();
+                fillQueryResultFromObj(dqo.builder(), 0, obj);
+                n = 1;
+            }
+            qr.reset( (QueryResult *) dqo.builder().buf() );
+            dqo.builder().decouple();
+            qr->cursorId = cursorid;
+            qr->setResultFlagsToOk();
+            qr->len = dqo.builder().len();
+            ss << " reslen:" << qr->len;
+            qr->setOperation(opReply);
+            qr->startingFrom = 0;
+            qr->nReturned = n;
+        }
+
         
         int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
