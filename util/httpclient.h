@@ -23,7 +23,33 @@ namespace mongo {
     
     class HttpClient {
     public:
-        int get( string url , map<string,string>& headers, stringstream& data );
+        
+        class Result {
+        public:
+            Result(){}
+            
+            const string& getEntireResponse() const {
+                return _entireResponse;
+            }
+        private:
+            int _code;
+            string _entireResponse;
+            friend class HttpClient;
+        };
+        
+        /**
+         * @return response code
+         */
+        int get( string url , Result * result = 0 );
+
+        /**
+         * @return response code
+         */
+        int post( string url , string body , Result * result = 0 );
+
+    private:
+        int _go( const char * command , string url , const char * body , Result * result );
+        
     };
 }
 

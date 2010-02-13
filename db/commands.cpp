@@ -20,6 +20,8 @@
 #include "stdafx.h"
 #include "jsobj.h"
 #include "commands.h"
+#include "client.h"
+#include "replset.h"
 
 namespace mongo {
 
@@ -103,5 +105,6 @@ namespace mongo {
             return false;
         return c->readOnly();
     }
+
     
 } // namespace mongo

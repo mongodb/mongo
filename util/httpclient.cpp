@@ -17,10 +17,25 @@
 
 #include "stdafx.h"
 #include "httpclient.h"
+#include "sock.h"
+#include "message.h"
+#include "builder.h"
 
 namespace mongo {
 
-    int HttpClient::get( string url , map<string,string>& headers, stringstream& data ){
+    //#define HD(x) cout << x << endl;
+#define HD(x)
+
+
+    int HttpClient::get( string url , Result * result ){
+        return _go( "GET" , url , 0 , result );
+    }
+
+    int HttpClient::post( string url , string data , Result * result ){
+        return _go( "POST" , url , data.c_str() , result );
+    }    
+
+    int HttpClient::_go( const char * command , string url , const char * body , Result * result ){
         uassert( 10271 ,  "invalid url" , url.find( "http://" ) == 0 );
         url = url.substr( 7 );
         
@@ -34,28 +49,84 @@ namespace mongo {
             path = url.substr( url.find( "/" ) );
         }
 
-        int port = 80;
-        uassert( 10272 ,  "non standard port not supported yet" , host.find( ":" ) == string::npos );
         
-        cout << "host [" << host << "]" << endl;
-        cout << "path [" << path << "]" << endl;
-        cout << "port: " << port << endl;
+        HD( "host [" << host << "]" );
+        HD( "path [" << path << "]" );
+
+        string server = host;
+        int port = 80;
+        
+        string::size_type idx = host.find( ":" );
+        if ( idx != string::npos ){
+            server = host.substr( 0 , idx );
+            string t = host.substr( idx + 1 );
+            port = atoi( t.c_str() );
+        }
+
+        HD( "server [" << server << "]" );
+        HD( "port [" << port << "]" );
         
         string req;
         {
             stringstream ss;
-            ss << "GET " << path << " HTTP/1.1\r\n";
+            ss << command << " " << path << " HTTP/1.1\r\n";
             ss << "Host: " << host << "\r\n";
             ss << "Connection: Close\r\n";
             ss << "User-Agent: mongodb http client\r\n";
+            if ( body ) {
+                ss << "Content-Length: " << strlen( body ) << "\r\n";
+            }
             ss << "\r\n";
+            if ( body ) {
+                ss << body;
+            }
 
             req = ss.str();
         }
+        
+        SockAddr addr( server.c_str() , port );
+        HD( "addr: " << addr.toString() );
+        
+        MessagingPort p;
+        if ( ! p.connect( addr ) )
+            return -1;
+        
+        { 
+            const char * out = req.c_str();
+            int toSend = req.size();
+            while ( toSend ){
+                int did = p.send( out , toSend );
+                toSend -= did;
+                out += did;
+            }
+        }
+        
+        char buf[4096];
+        int got = p.recv( buf , 4096 );
+        buf[got] = 0;
 
-        cout << req << endl;
+        int rc;
+        char version[32];
+        assert( sscanf( buf , "%s %d" , version , &rc ) == 2 );
+        HD( "rc: " << rc );
+        
+        StringBuilder sb;
+        if ( result )
+            sb << buf;
+        
+        while ( ( got = p.recv( buf , 4096 ) ) > 0){
+            if ( result )
+                sb << buf;
+        }
 
-        return -1;
+        if ( result ){
+            result->_code = rc;
+            result->_entireResponse = sb.str();
+        }
+
+        return rc;
     }
+
+
     
 }
