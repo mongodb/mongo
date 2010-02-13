@@ -217,14 +217,14 @@ namespace mongo {
             return BSON( "" << out );
         }
                 
-        class MongoProgramRunner {
+        class ProgramRunner {
             vector<string> argv_;
             int port_;
             int pipe_;
             pid_t pid_;
         public:
             pid_t pid() const { return pid_; }
-            MongoProgramRunner( const BSONObj &args , bool isMongoProgram=true)
+            ProgramRunner( const BSONObj &args , bool isMongoProgram=true)
             {
                 assert( !args.isEmpty() );
 
@@ -380,13 +380,13 @@ namespace mongo {
                     if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
                          dup2( child_stdout, STDERR_FILENO ) == -1 )
                     {
-                        cout << "Unable to dup2 child output" << endl;
+                        cout << "Unable to dup2 child output: " << OUTPUT_ERRNO << endl;
                         ::_Exit(-1); //do not pass go, do not call atexit handlers
                     }
 
                     execvp( argv[ 0 ], const_cast<char**>(argv) );
 
-                    cout << "Unable to start program" << endl;
+                    cout << "Unable to start program: " << OUTPUT_ERRNO << endl;
                     ::_Exit(-1);
                 }
 
@@ -395,7 +395,7 @@ namespace mongo {
         };
         
         //returns true if process exited
-        bool wait_for_pid(pid_t pid, bool block=true){
+        bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL){
 #ifdef _WIN32
             assert(handles.count(pid));
             HANDLE h = handles[pid];
@@ -403,33 +403,49 @@ namespace mongo {
             if (block)
                 WaitForSingleObject(h, INFINITE);
 
-            DWORD ignore;
-            if(GetExitCodeProcess(h, &ignore)){
+            DWORD tmp;
+            if(GetExitCodeProcess(h, &tmp)){
                 CloseHandle(h);
                 handles.erase(pid);
+                if (exit_code)
+                    *exit_code = tmp;
                 return true;
             }else{
                 return false;
             }
 #else
-            int ignore;
-            return (pid == waitpid(pid, &ignore, (block ? 0 : WNOHANG)));
+            int tmp;
+            bool ret = (pid == waitpid(pid, &tmp, (block ? 0 : WNOHANG)));
+            if (exit_code)
+                *exit_code = WEXITSTATUS(tmp);
+            return ret;
+                
 #endif
         }
         BSONObj StartMongoProgram( const BSONObj &a ) {
-            MongoProgramRunner r( a );
+            ProgramRunner r( a );
             r.start();
             boost::thread t( r );
             return BSON( string( "" ) << int( r.pid() ) );
         }
 
         BSONObj RunMongoProgram( const BSONObj &a ) {
-            MongoProgramRunner r( a );
+            ProgramRunner r( a );
             r.start();
             boost::thread t( r );
             wait_for_pid(r.pid());
             shells.erase( r.pid() );
             return BSON( string( "" ) << int( r.pid() ) );
+        }
+
+        BSONObj RunProgram(const BSONObj &a) {
+            ProgramRunner r( a, false );
+            r.start();
+            boost::thread t( r );
+            int exit_code;
+            wait_for_pid(r.pid(), true,  &exit_code);
+            shells.erase( r.pid() );
+            return BSON( string( "" ) << exit_code );
         }
 
         BSONObj ResetDbpath( const BSONObj &a ) {
@@ -589,6 +605,7 @@ namespace mongo {
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
+            scope.injectNative( "runProgram", RunProgram );
             scope.injectNative( "runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
