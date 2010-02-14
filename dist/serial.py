@@ -11,9 +11,21 @@ import os
 from dist import compare_srcfile
 
 serial = {}
-serial['cache_discard'] = ['WT_DRAIN */drain', 'u_int32_t/drain_elem']
-serial['cache_in'] = ['WT_PAGE */page', 'u_int32_t/addr', 'u_int32_t/bytes']
-serial['put'] = ['WT_INDX */indx', 'void */data', 'u_int32_t/size']
+serial['cache_discard'] = [
+	'WT_DRAIN */drain',
+	'u_int32_t/drain_elem']
+
+serial['cache_in'] = [
+	'WT_PAGE */page',
+	'u_int32_t/addr',
+	'u_int32_t/bytes']
+
+serial['bt_put'] = [
+	'WT_INDX */indx',
+	'WT_REPL */repl',
+	'u_int32_t/repl_size',
+	'void */data',
+	'u_int32_t/size']
 
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule

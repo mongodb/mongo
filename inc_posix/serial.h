@@ -1,6 +1,36 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
+	WT_INDX * indx;
+	WT_REPL * repl;
+	u_int32_t repl_size;
+	void * data;
+	u_int32_t size;
+} __wt_bt_put_args;
+#define	 __wt_bt_put_serial(toc, _indx, _repl, _repl_size, _data, _size) do {\
+	__wt_bt_put_args _args;\
+	_args.indx = _indx;\
+	_args.repl = _repl;\
+	_args.repl_size = _repl_size;\
+	_args.data = _data;\
+	_args.size = _size;\
+	__wt_toc_serialize_request(\
+	    toc, __wt_bt_put_serial_func, &_args);\
+} while (0)
+#define	__wt_bt_put_unpack(toc, _indx, _repl, _repl_size, _data, _size) do {\
+	_indx =\
+	    ((__wt_bt_put_args *)(toc)->serial_args)->indx;\
+	_repl =\
+	    ((__wt_bt_put_args *)(toc)->serial_args)->repl;\
+	_repl_size =\
+	    ((__wt_bt_put_args *)(toc)->serial_args)->repl_size;\
+	_data =\
+	    ((__wt_bt_put_args *)(toc)->serial_args)->data;\
+	_size =\
+	    ((__wt_bt_put_args *)(toc)->serial_args)->size;\
+} while (0)
+
+typedef struct {
 	WT_DRAIN * drain;
 	u_int32_t drain_elem;
 } __wt_cache_discard_args;
@@ -38,26 +68,4 @@ typedef struct {
 	    ((__wt_cache_in_args *)(toc)->serial_args)->addr;\
 	_bytes =\
 	    ((__wt_cache_in_args *)(toc)->serial_args)->bytes;\
-} while (0)
-
-typedef struct {
-	WT_INDX * indx;
-	void * data;
-	u_int32_t size;
-} __wt_put_args;
-#define	 __wt_put_serial(toc, _indx, _data, _size) do {\
-	__wt_put_args _args;\
-	_args.indx = _indx;\
-	_args.data = _data;\
-	_args.size = _size;\
-	__wt_toc_serialize_request(\
-	    toc, __wt_put_serial_func, &_args);\
-} while (0)
-#define	__wt_put_unpack(toc, _indx, _data, _size) do {\
-	_indx =\
-	    ((__wt_put_args *)(toc)->serial_args)->indx;\
-	_data =\
-	    ((__wt_put_args *)(toc)->serial_args)->data;\
-	_size =\
-	    ((__wt_put_args *)(toc)->serial_args)->size;\
 } while (0)

@@ -72,7 +72,16 @@ __wt_bt_dbt_return(WT_TOC *toc,
 
 	/*
 	 * Handle the data item.
+	 *
+	 * If it's been updated, it's easy, take the last data item, it's just
+	 * a byte string.
 	 */
+	if (ip->repl != NULL) {
+		data->data = ip->repl[0].data;
+		data->size = ip->repl[0].size;
+		return (callback == NULL ? 0 : callback(db, key, data));
+	}
+
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_LEAF:

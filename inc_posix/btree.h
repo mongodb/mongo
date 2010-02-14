@@ -61,14 +61,28 @@ struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
+ * WT_REPL --
+ *	A replacement structure.
+ */
+typedef struct __wt_repl {
+	/*
+	 * The first part of the WT_REPL structure is the same as the first
+	 * bytes of a DBT so we can feed it to routines expecting a DBT ref.
+	 */
+	void	 *data;			/* DBT: data */
+	u_int32_t size;			/* DBT: data length */
+} WT_REPL;
+
+/*
  * WT_INDX --
  * The WT_INDX structure describes the in-memory information about a single
  * key/data pair on a database page.
  */
 typedef	struct __wt_indx {
 	/*
-	 * The first part of the WT_INDX structure looks exactly like a DBT
-	 * so we can feed it to a Btree comparison function without copying.
+	 * The first part of the WT_INDX structure is the same as the first
+	 * bytes of a DBT so we can feed it to the Btree comparison function
+	 * without copying.  This is important for keys on internal pages.
 	 *
 	 * Overflow and/or compressed on-page items need processing before
 	 * we look at them.   Handy macro to identify such.
@@ -98,6 +112,15 @@ typedef	struct __wt_indx {
     (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->addr)
 
 	void *page_data;		/* Associated on-page data */
+
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in the
+	 * following array.  It's an array because we can't free the references
+	 * without first checking the hazard information -- we don't block the
+	 * readers when updating data items, and references may still be in use.
+	 */
+	WT_REPL	 *repl;			/* Replacement array */
+	u_int32_t repl_size;		/* Replacement array size */
 
 	u_int32_t flags;
 } WT_INDX;
