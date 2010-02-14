@@ -9,14 +9,10 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_diag_set_fp(const char *ofile, FILE **fpp, int *close_varp);
-int
 __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
 __wt_bt_debug_page(
     WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp, int inmemory);
-void
-__wt_bt_debug_dbt(const char *tag, DBT *dbt, FILE *fp);
 void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
 void
@@ -42,7 +38,7 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
 __wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp);
 void
-__wt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *addr);
+__wt_bt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *p);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *
@@ -87,7 +83,7 @@ __wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t));
 int
-__wt_db_verify_int(
+__wt_bt_verify_int(
     WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
@@ -265,6 +261,12 @@ int
 __wt_db_lockout(DB *db);
 int
 __wt_env_lockout(ENV *env);
+void
+__wt_hazard_set(WT_TOC *toc, WT_PAGE *page);
+void
+__wt_hazard_clear(WT_TOC *toc, WT_PAGE *page);
+void
+__wt_hazard_empty(WT_TOC *toc);
 int
 __wt_huffman_open(ENV *env,
     u_int8_t const *byte_frequency_array, u_int nbytes, void *retp);
