@@ -482,23 +482,25 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
-        bool ok = true;
-        DbMessage d(m);
-        const char *ns = d.getns();
         StringBuilder& ss = curop.debug().str;
-        ss << ns;
-        mongolock lk(false);
-        Client::Context ctx(ns);
+        bool ok = true;
+        
+        DbMessage d(m);
+
+        const char *ns = d.getns();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
-        ss << " cid:" << cursorid;
-        ss << " ntoreturn:" << ntoreturn;
+        
+        ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
+
         QueryResult* msgdata;
         try {
+            mongolock lk(false);
+            Client::Context ctx(ns);
             msgdata = getMore(ns, ntoreturn, cursorid, curop);
         }
         catch ( AssertionException& e ) {
-            ss << " exception " + e.toString();
+            ss << " exception " << e.toString();
             msgdata = emptyMoreResult(cursorid);
             ok = false;
         }
@@ -508,7 +510,7 @@ namespace mongo {
         ss << " nreturned:" << msgdata->nReturned;
         dbresponse.response = resp;
         dbresponse.responseTo = m.data->id;
-        //dbMsgPort.reply(m, resp);
+
         return ok;
     }
 
