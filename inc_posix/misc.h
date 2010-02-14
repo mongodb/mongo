@@ -37,13 +37,8 @@ extern "C" {
 #define	WT_ENV_FCHK(env, name, f, mask)					\
 	if ((f) & ~(mask))						\
 		return (__wt_api_args(env, name));
-#define	WT_ENV_FCHK_NOTFATAL(env, name, f, mask, ret)			\
-	if ((f) & ~(mask))						\
-		(ret) = __wt_api_args(env, name);
 #define	WT_DB_FCHK(db, name, f, mask)					\
 	WT_ENV_FCHK((db)->env, name, f, mask)
-#define	WT_DB_FCHK_NOTFATAL(db, name, f, mask, ret)			\
-	WT_ENV_FCHK_NOTFATAL((db)->env, name, f, mask, ret)
 
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a

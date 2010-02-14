@@ -106,8 +106,6 @@ typedef	struct __wt_indx {
     WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 #define	WT_INDX_ITEM_OFF_ADDR(ip)					\
     (((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
-#define	WT_INDX_ITEM_OVFL_LEN(ip)					\
-    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->len)
 #define	WT_INDX_ITEM_OVFL_ADDR(ip)					\
     (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->addr)
 

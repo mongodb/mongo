@@ -57,23 +57,3 @@ struct __wt_mtx {
 
 	int locked;			/* Mutex is locked */
 };
-
-/*
- * WT_TOC_GEN_IGNORE --
- *	The api_gen of a WT_TOC that's outside the library, or in the library
- *	but known to be holding no resources (used when long-running threads
- *	want to let other threads proceed).
- */
-#define	WT_TOC_GEN_IGNORE	0
-
-/*
- * WT_TOC_GEN_BLOCK --
- *	An api_gen that always blocks a running WT_TOC thread.
- */
-#define	WT_TOC_GEN_BLOCK	1
-
-/*
- * WT_TOC_GEN_MIN --
- *	The starting api_gen.
- */
-#define	WT_TOC_GEN_MIN		5

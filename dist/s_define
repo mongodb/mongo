@@ -1,0 +1,28 @@
+#! /bin/sh
+#
+# $Id$
+
+# Complain about unused #defines.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+(
+sed '/^#/d' < s_define.list
+for i in \
+    `cat ../inc_posix/*.h ../inc_posix/*.in |
+     egrep '^#define' |
+     sed 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' |
+     sort -u`; do
+	if `egrep "$i" ../*/*.c ../utilities/*/*.c > /dev/null`; then
+		continue
+	fi
+	echo $i
+done
+) | sort | uniq -u > $t
+
+test -s $t && {
+	echo 'Unused #defines:'
+	sed 's/^/	/' < $t
+}
+
+exit 0

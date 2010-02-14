@@ -152,8 +152,6 @@ typedef struct __wt_drain {
 struct __ienv {
 	WT_MTX mtx;			/* Global mutex */
 
-	u_int32_t api_gen;		/* API generation number */
-
 	pthread_t cache_tid;		/* Cache thread ID */
 	pthread_t workq_tid;		/* workQ thread ID */
 
