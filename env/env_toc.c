@@ -69,6 +69,10 @@ __wt_wt_toc_close(WT_TOC *toc)
 	env = toc->env;
 	ienv = env->ienv;
 
+	/* Clear any remaining hazard references (there shouldn't be any). */
+	__wt_hazard_empty(toc);
+
+	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.data_len);
 	__wt_free(env, toc->data.data, toc->data.data_len);
 	__wt_free(env, toc->scratch.data, toc->scratch.data_len);
