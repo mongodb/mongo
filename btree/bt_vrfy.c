@@ -47,7 +47,7 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.verify");
 
-	ret = __wt_db_verify_int(toc, f, NULL);
+	ret = __wt_bt_verify_int(toc, f, NULL);
 
 	WT_TRET(toc->close(toc, 0));
 
@@ -55,11 +55,11 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
 }
 
 /*
- * __wt_db_verify_int --
+ * __wt_bt_verify_int --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_db_verify_int(
+__wt_bt_verify_int(
     WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream)
 {
 	DB *db;

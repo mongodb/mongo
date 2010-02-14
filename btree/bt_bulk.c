@@ -659,7 +659,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	page->records = dup_count;
 	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
 	memcpy(page->first_free, dup_data, (size_t)len);
-	__wt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page) + len);
+	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page) + len);
 
 	/*
 	 * Unless we have enough duplicates to split this page, it will be the
@@ -770,7 +770,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	p = (u_int8_t *)dup_data;
 	memcpy(p, &data_item, sizeof(data_item));
 	memcpy(p + sizeof(data_item), &offpage_item, sizeof(offpage_item));
-	__wt_set_ff_and_sa_from_addr(leaf_page,
+	__wt_bt_set_ff_and_sa_from_addr(leaf_page,
 	    (u_int8_t *)dup_data + WT_ITEM_SPACE_REQ(sizeof(WT_OFF)));
 
 	return (ret);

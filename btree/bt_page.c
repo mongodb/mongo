@@ -39,7 +39,7 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
 	/* Set the space-available and first-free byte. */
-	__wt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
+	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
 
 	/* If we're allocating page 0, initialize the WT_PAGE_DESC structure. */
 	if (page->addr == 0)
@@ -319,7 +319,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries / 2;
 	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -401,7 +401,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = indx_count;
 	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -435,7 +435,7 @@ __wt_bt_page_inmem_col_int(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
 	return (0);
 }
 
@@ -482,7 +482,7 @@ __wt_bt_page_inmem_col_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
 
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -516,7 +516,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_set_ff_and_sa_from_addr(page, (u_int8_t *)p);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)p);
 	return (0);
 }
 
