@@ -544,13 +544,11 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     auto_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
-        DiskLoc loc;
-        bool found = nsindex(ns)->find(ns, loc);
-        if ( !found ) {
-            //		out() << "info: findAll() namespace does not exist: " << ns << endl;
+        NamespaceDetails * d = nsdetails( ns );
+        if ( ! d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
-        }
-
+        
+        DiskLoc loc = d->firstExtent;
         Extent *e = getExtent(loc);
 
         DEBUGGING {
@@ -572,22 +570,22 @@ namespace mongo {
             nsdetails(ns)->dumpDeleted(&extents);
         }
 
-        if ( !nsdetails( ns )->capped ) {
-            if ( !startLoc.isNull() )
-                return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
-            while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
-                /* todo: if extent is empty, free it for reuse elsewhere.
-                   that is a bit complicated have to clean up the freelists.
-                */
-                RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
-                // find a nonempty extent
-                // it might be nice to free the whole extent here!  but have to clean up free recs then.
-                e = e->getNextExtent();
-            }
-            return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
-        } else {
+        if ( nsdetails( ns )->capped ) 
             return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ), startLoc ) );
+        
+        if ( !startLoc.isNull() )
+            return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
+        
+        while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
+            /* todo: if extent is empty, free it for reuse elsewhere.
+               that is a bit complicated have to clean up the freelists.
+            */
+            RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
+            // find a nonempty extent
+            // it might be nice to free the whole extent here!  but have to clean up free recs then.
+            e = e->getNextExtent();
         }
+        return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
     }
 
     /* get a table scan cursor, but can be forward or reverse direction.
@@ -598,11 +596,13 @@ namespace mongo {
 
         if ( el.number() >= 0 )
             return DataFileMgr::findAll(ns, startLoc);
-
+        
         // "reverse natural order"
         NamespaceDetails *d = nsdetails(ns);
+        
         if ( !d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+        
         if ( !d->capped ) {
             if ( !startLoc.isNull() )
                 return auto_ptr<Cursor>(new ReverseCursor( startLoc ));                
