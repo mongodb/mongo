@@ -547,7 +547,7 @@ namespace mongo {
         NamespaceDetails * d = nsdetails( ns );
         if ( ! d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
-        
+
         DiskLoc loc = d->firstExtent;
         Extent *e = getExtent(loc);
 
@@ -567,11 +567,11 @@ namespace mongo {
             }
 
             out() << endl;
-            nsdetails(ns)->dumpDeleted(&extents);
+            d->dumpDeleted(&extents);
         }
 
-        if ( nsdetails( ns )->capped ) 
-            return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ), startLoc ) );
+        if ( d->capped ) 
+            return auto_ptr< Cursor >( new ForwardCappedCursor( d , startLoc ) );
         
         if ( !startLoc.isNull() )
             return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
