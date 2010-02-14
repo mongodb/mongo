@@ -52,8 +52,9 @@ __wt_db_get_recno(
 		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 1);
 	}
 
-	/* Discard the returned page. */
-	WT_TRET(__wt_bt_page_out(toc, page, 0));
+	/* Discard the returned page, if it's not the root page. */
+	if (page != idb->root_page)
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 err:	WT_TOC_DB_CLEAR(toc);
 
@@ -74,7 +75,7 @@ __wt_bt_search_recno_row(
 	WT_PAGE *page;
 	u_int64_t record_cnt;
 	u_int32_t addr, i, type;
-	int isleaf, next_isleaf, put_page;
+	int isleaf, next_isleaf;
 
 	db = toc->db;
 	idb = db->idb;
@@ -84,7 +85,7 @@ __wt_bt_search_recno_row(
 	isleaf = page->hdr->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
 	/* Search the tree. */
-	for (record_cnt = 0, put_page = 0;; put_page = 1) {
+	for (record_cnt = 0;;) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
@@ -105,7 +106,7 @@ __wt_bt_search_recno_row(
 		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
-		if (put_page)
+		if (page != idb->root_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
 
 		isleaf = next_isleaf;
@@ -141,7 +142,7 @@ __wt_bt_search_recno_col(
 	WT_PAGE *page;
 	u_int64_t record_cnt;
 	u_int32_t addr, i;
-	int isleaf, next_isleaf, put_page;
+	int isleaf, next_isleaf;
 
 	idb = toc->db->idb;
 
@@ -150,7 +151,7 @@ __wt_bt_search_recno_col(
 	isleaf = page->hdr->type == WT_PAGE_COL_VAR ? 1 : 0;
 
 	/* Search the tree. */
-	for (record_cnt = 0, put_page = 0;; put_page = 1) {
+	for (record_cnt = 0;;) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
@@ -170,7 +171,7 @@ __wt_bt_search_recno_col(
 		next_isleaf = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
 
 		/* We're done with the page. */
-		if (put_page)
+		if (page != idb->root_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
 
 		isleaf = next_isleaf;
