@@ -260,13 +260,6 @@ main(int argc, char *argv[])
 			teardown();
 			setup();
 		}
-		if (dtype == TYPE_ROW && write_check() != 0)
-			goto err;
-
-		if (op_reopen) {
-			teardown();
-			setup();
-		}
 		switch (dtype) {
 		case TYPE_ROW:
 			if (read_check_row() != 0)
@@ -277,6 +270,13 @@ main(int argc, char *argv[])
 				goto err;
 			break;
 		}
+
+		if (op_reopen) {
+			teardown();
+			setup();
+		}
+		if (dtype == TYPE_ROW && write_check() != 0)
+			goto err;
 #endif
 		teardown();
 
@@ -475,8 +475,9 @@ read_check_row()
 		/* Retrieve the key/data pair by key. */
 		key_set(cnt, &key.data, &key.size);
 		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret, "read_row: get by key failed: {%.*s}",
-			    (int)key.size, (char *)key.data);
+			env->err(env, ret,
+			    "read_row: get by key %llu: {%.*s}",
+			    cnt, (int)key.size, (char *)key.data);
 			assert(0);
 		}
 
@@ -489,7 +490,7 @@ read_check_row()
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
-			    "read_row: get by key:"
+			    "read_row: get by key %llu:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
 			    cnt,
@@ -526,7 +527,7 @@ read_check_row()
 		if (key.size != klen || memcmp(kbuf, key.data, klen) ||
 		    dlen != data.size || memcmp(dbuf, data.data, dlen) != 0) {
 			env->errx(env,
-			    "read_row: get by record number %d:"
+			    "read_row: get by record number %llu:"
 			    "\n\tkey: expected {%s}, got {%.*s}; "
 			    "\n\tdata: expected {%s}, got {%.*s}",
 			    cnt,
@@ -549,7 +550,7 @@ read_check_row()
 int
 write_check()
 {
-	DBT key, data;
+	DBT key, data, repl;
 	WT_TOC *toc;
 	u_int64_t cnt, last_cnt;
 	u_int32_t klen, dlen;
@@ -558,6 +559,7 @@ write_check()
 
 	memset(&key, 0, sizeof(key));
 	memset(&data, 0, sizeof(data));
+	memset(&repl, 0, sizeof(repl));
 
 	assert(env->toc(env, 0, &toc) == 0);
 
@@ -580,9 +582,26 @@ write_check()
 		}
 
 		/* Overwrite the key/data pair. */
+		data_set_var(keys_cnt, &data.data, &data.size, 0);
 		if ((ret = db->put(db, toc, &key, &data, 0)) != 0) {
 			env->err(env, ret, "write: put by key failed: {%.*s}",
 			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+
+		/* Retrieve the key/data pair by key. */
+		if ((ret = db->get(db, toc, &key, NULL, &repl, 0)) != 0) {
+			env->err(env, ret, "write: get by key failed: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+		if (repl.size != data.size ||
+		    memcmp(repl.data, data.data, data.size) != 0) {
+			env->errx(env,
+			    "write_check: get replacement by key:"
+			    "\n\tdata: expected {%.*s}, got {%.*s}",
+			    (int)data.size, (char *)data.data,
+			    (int)repl.size, (char *)repl.data);
 			assert(0);
 		}
 	}
