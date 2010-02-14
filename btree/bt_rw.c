@@ -19,8 +19,6 @@ static void __wt_cache_discard(ENV *, WT_PAGE *);
 static int  __wt_cache_drain_compare_gen(const void *a, const void *b);
 static int  __wt_cache_drain_compare_page(const void *a, const void *b);
 static int  __wt_cache_hazard_compare(const void *a, const void *b);
-static void __wt_hazard_clear(WT_TOC *, WT_PAGE *);
-static void __wt_hazard_set(WT_TOC *, WT_PAGE *);
 
 /*
  * WT_CACHE_DRAIN_CHECK --
