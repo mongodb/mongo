@@ -768,31 +768,33 @@ namespace mongo {
         ss << "query " << ns << " ntoreturn:" << ntoreturn;
         curop.setQuery(jsobj);
         
-        BufBuilder bb;
         BSONObjBuilder cmdResBuf;
         long long cursorid = 0;
-        
-        bb.skip(sizeof(QueryResult));
         
         auto_ptr< QueryResult > qr;
         int n = 0;
         
         Client& c = cc();
         /* we assume you are using findOne() for running a cmd... */
-        if ( ntoreturn == 1 && runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-            ss << " command ";
-            curop.markCommand();
-            n = 1;
-            qr.reset( (QueryResult *) bb.buf() );
-            bb.decouple();
-            qr->setResultFlagsToOk();
-            qr->len = bb.len();
-            ss << " reslen:" << bb.len();
-            //	qr->channel = 0;
-            qr->setOperation(opReply);
-            qr->cursorId = cursorid;
-            qr->startingFrom = 0;
-            qr->nReturned = n;
+        if ( ntoreturn == 1 && strstr( ns , ".$cmd" ) ){
+            BufBuilder bb;
+            bb.skip(sizeof(QueryResult));
+
+            if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
+                ss << " command ";
+                curop.markCommand();
+                n = 1;
+                qr.reset( (QueryResult *) bb.buf() );
+                bb.decouple();
+                qr->setResultFlagsToOk();
+                qr->len = bb.len();
+                ss << " reslen:" << bb.len();
+                //	qr->channel = 0;
+                qr->setOperation(opReply);
+                qr->cursorId = cursorid;
+                qr->startingFrom = 0;
+                qr->nReturned = n;
+            }
             return qr;
         }
         
@@ -889,6 +891,9 @@ namespace mongo {
             BSONObj resObject;
             bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
             if ( nsFound == false || indexFound == true ){
+                BufBuilder bb;
+                bb.skip(sizeof(QueryResult));
+                
                 ss << " idhack ";
                 if ( found ){
                     n = 1;
