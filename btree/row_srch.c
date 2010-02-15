@@ -267,7 +267,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			 */
 			ip = page->indx + (base == 0 ? base : base - 1);
 		}
-		addr = WT_INDX_ITEM_OFF_ADDR(ip);
+		addr = WT_ROW_OFF_ADDR(ip);
 		next_isleaf =
 		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
 

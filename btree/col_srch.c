@@ -95,13 +95,13 @@ __wt_bt_search_recno_row(
 
 		/* Walk the page, counting records. */
 		WT_INDX_FOREACH(page, ip, i) {
-			if (record_cnt + WT_INDX_ITEM_OFF_RECORDS(ip) >= recno)
+			if (record_cnt + WT_ROW_OFF_RECORDS(ip) >= recno)
 				break;
-			record_cnt += WT_INDX_ITEM_OFF_RECORDS(ip);
+			record_cnt += WT_ROW_OFF_RECORDS(ip);
 		}
 
 		/* ip references the subtree containing the record. */
-		addr = WT_INDX_ITEM_OFF_ADDR(ip);
+		addr = WT_ROW_OFF_ADDR(ip);
 		next_isleaf =
 		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
 
@@ -161,13 +161,13 @@ __wt_bt_search_recno_col(
 
 		/* Walk the page, counting records. */
 		WT_INDX_FOREACH(page, ip, i) {
-			if (record_cnt + WT_INDX_OFF_RECORDS(ip) >= recno)
+			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
 				break;
-			record_cnt += WT_INDX_OFF_RECORDS(ip);
+			record_cnt += WT_COL_OFF_RECORDS(ip);
 		}
 
 		/* ip references the subtree containing the record. */
-		addr = WT_INDX_OFF_ADDR(ip);
+		addr = WT_COL_OFF_ADDR(ip);
 		next_isleaf = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
 
 		/* We're done with the page. */

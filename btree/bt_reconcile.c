@@ -393,7 +393,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 		case WT_ITEM_OFF_INT:
 		case WT_ITEM_OFF_LEAF:
 			indx->page_data = item;
-			records += WT_INDX_ITEM_OFF_RECORDS(indx);
+			records += WT_ROW_OFF_RECORDS(indx);
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -550,8 +550,8 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip)
 	 */
 	is_overflow = ip->data == NULL ? 1 : 0;
 	if (is_overflow) {
-		WT_RET(__wt_bt_ovfl_in(
-		    toc, WT_INDX_ITEM_OVFL_ADDR(ip), ip->size, &ovfl_page));
+		WT_RET(__wt_bt_ovfl_in(toc,
+		    WT_ITEM_OVFL_ADDR(ip), WT_ITEM_OVFL_LEN(ip), &ovfl_page));
 		p = WT_PAGE_BYTE(ovfl_page);
 	} else
 		p = ip->data;

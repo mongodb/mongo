@@ -428,12 +428,12 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
 		WT_INDX_FOREACH(parent, parent_indx, i)
-			if (WT_INDX_ITEM_OFF_ADDR(parent_indx) == addr)
+			if (WT_ROW_OFF_ADDR(parent_indx) == addr)
 				break;
 		break;
 	case WT_PAGE_COL_INT:
 		WT_INDX_FOREACH(parent, parent_indx, i)
-			if (WT_INDX_OFF_ADDR(parent_indx) == addr)
+			if (WT_COL_OFF_ADDR(parent_indx) == addr)
 				break;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);

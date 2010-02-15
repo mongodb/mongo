@@ -76,38 +76,16 @@ typedef struct __wt_repl {
 /*
  * WT_INDX --
  * The WT_INDX structure describes the in-memory information about a single
- * key/data pair on a database page.
+ * key/data pair on a row-store database page.
  */
 typedef	struct __wt_indx {
 	/*
 	 * The first part of the WT_INDX structure is the same as the first
 	 * bytes of a DBT so we can feed it to the Btree comparison function
 	 * without copying.  This is important for keys on internal pages.
-	 *
-	 * Overflow and/or compressed on-page items need processing before
-	 * we look at them.   Handy macro to identify such.
 	 */
-#define	WT_INDX_NEED_PROCESS(ip)					\
-	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
-
-	/*
-	 * Associated on-page data -- when the data is an offpage or overflow
-	 * structure, we use the following macros to to reach onto the page to
-	 * get information from the structure.
-	 */
-#define	WT_INDX_OFF_RECORDS(ip)						\
-    WT_RECORDS((WT_OFF *)(ip)->page_data)
-#define	WT_INDX_OFF_ADDR(ip)						\
-    (((WT_OFF *)(ip)->page_data)->addr)
-
-#define	WT_INDX_ITEM_OFF_RECORDS(ip)					\
-    WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
-#define	WT_INDX_ITEM_OFF_ADDR(ip)					\
-    (((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
-#define	WT_INDX_ITEM_OVFL_ADDR(ip)					\
-    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->addr)
 
 	void *page_data;		/* Associated on-page data */
 
@@ -122,6 +100,30 @@ typedef	struct __wt_indx {
 
 	u_int32_t flags;
 } WT_INDX;
+
+/*
+ *
+ * Overflow and/or compressed on-page items need processing before we look at
+ * them.   Handy macro to identify such.
+ */
+#define	WT_INDX_NEED_PROCESS(ip)					\
+	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
+
+/*
+ * On both row- and column-store internal pages, the on-page data referenced
+ * by the WT_INDX page_data field is a WT_OFF structure, which contains a
+ * record count and a page address.   These macros reach into the on-page
+ * structure and return the values.
+ */
+#define	WT_COL_OFF_ADDR(ip)						\
+	(((WT_OFF *)(ip)->page_data)->addr)
+#define	WT_COL_OFF_RECORDS(ip)						\
+	WT_RECORDS((WT_OFF *)(ip)->page_data)
+
+#define	WT_ROW_OFF_ADDR(ip)						\
+    (((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
+#define	WT_ROW_OFF_RECORDS(ip)						\
+    WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 
 /*
  * WT_PAGE --
@@ -416,6 +418,17 @@ struct __wt_item {
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
+
+/*
+ * On row-store pages, the on-page data referenced by the WT_INDX page_data
+ * field may be a WT_OVFL structure, which contains the address for the start
+ * of the overflow pages, and its length.  These macros reach into the on-page
+ * structure and return the values.
+ */
+#define	WT_ITEM_OVFL_ADDR(ip)						\
+    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->addr)
+#define	WT_ITEM_OVFL_LEN(ip)						\
+    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->len)
 
 /*
  * Btree internal items and offpage duplicates reference another page.
