@@ -53,7 +53,6 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 /*******************************************
  * Internal include files.
  *******************************************/
-#include "api.h"
 #include "btree.h"
 #include "debug.h"
 #include "fh.h"

@@ -293,30 +293,6 @@ api = api_class.methods
 flags = api_class.flags
 
 #####################################################################
-# Update api.h, the API header file.
-#####################################################################
-tfile = open(tmp_file, 'w')
-tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
-
-tfile.write('/*\n')
-tfile.write(' * Do not clear the DB handle in the WT_TOC schedule macro, we may be doing a\n')
-tfile.write(' * WT_TOC call from within a DB call.\n')
-tfile.write(' */\n')
-tfile.write('#define\twt_api_toc_sched(oparg)\\\n')
-tfile.write('\ttoc->op = (oparg);\\\n')
-tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_toc_sched(wt_toc))\n')
-
-tfile.write('#define\twt_api_db_sched(oparg)\\\n')
-tfile.write('\ttoc->op = (oparg);\\\n')
-tfile.write('\ttoc->db = db;\\\n')
-tfile.write('\ttoc->argp = &args;\\\n')
-tfile.write('\treturn (__wt_toc_sched(wt_toc))\n')
-
-tfile.close()
-compare_srcfile(tmp_file, '../inc_posix/api.h')
-
-#####################################################################
 # Update api.c, the API source file.
 #####################################################################
 tfile = open(tmp_file, 'w')
