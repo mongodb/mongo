@@ -194,11 +194,11 @@ namespace mongo {
 
                 set<string> servers;
                 cm->getAllServers(servers);
-
+                
                 BSONObjBuilder shardStats;
-                int count=0;
-                int size=0;
-                int storageSize=0;
+                long long count=0;
+                long long size=0;
+                long long storageSize=0;
                 int nindexes=0;
                 for ( set<string>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ScopedDbConnection conn( *i );
@@ -209,9 +209,9 @@ namespace mongo {
                     }
                     conn.done();
 
-                    count += res["count"].numberInt();
-                    size += res["size"].numberInt();
-                    storageSize += res["storageSize"].numberInt();
+                    count += res["count"].numberLong();
+                    size += res["size"].numberLong();
+                    storageSize += res["storageSize"].numberLong();
 
                     if (nindexes)
                         massert(12595, "nindexes should be the same on all shards!", nindexes == res["nindexes"].numberInt());
@@ -222,9 +222,9 @@ namespace mongo {
                 }
 
                 result.append("ns", fullns);
-                result.append("count", count);
-                result.append("size", size);
-                result.append("storageSize", storageSize);
+                result.appendIntOrLL("count", count);
+                result.appendIntOrLL("size", size);
+                result.appendIntOrLL("storageSize", storageSize);
                 result.append("nindexes", nindexes);
 
                 result.append("nchunks", cm->numChunks());
