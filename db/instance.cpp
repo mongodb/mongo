@@ -168,9 +168,6 @@ namespace mongo {
         CurOp& op = *(c.curop());
         
         try {
-            if (q.fields.get() && q.fields->errmsg)
-                uassert( 10053 , q.fields->errmsg, false);
-
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {

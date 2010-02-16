@@ -26,13 +26,12 @@
 namespace mongo {
     
     // --------  ClusteredCursor -----------
-
+    
     ClusteredCursor::ClusteredCursor( QueryMessage& q ){
         _ns = q.ns;
         _query = q.query.copy();
         _options = q.queryOptions;
-        if ( q.fields.get() )
-            _fields = q.fields->getSpec();
+        _fields = q.fields;
         _done = false;
     }
 

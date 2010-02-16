@@ -180,7 +180,7 @@ namespace mongo {
         int ntoreturn;
         int queryOptions;
         BSONObj query;
-        auto_ptr< FieldMatcher > fields;
+        BSONObj fields;
         
         /* parses the message into the above fields */
         QueryMessage(DbMessage& d) {
@@ -189,11 +189,7 @@ namespace mongo {
             ntoreturn = d.pullInt();
             query = d.nextJsObj();
             if ( d.moreJSObjs() ) {
-                BSONObj o = d.nextJsObj();
-                if (!o.isEmpty()){
-                    fields = auto_ptr< FieldMatcher >(new FieldMatcher() );
-                    fields->add( o );
-                }
+                fields = d.nextJsObj();
             }
             queryOptions = d.msg().data->dataAsInt();
         }

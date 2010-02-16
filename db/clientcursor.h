@@ -123,7 +123,7 @@ namespace mongo {
             return _lastLoc;
         }
 
-        auto_ptr< FieldMatcher > filter; // which fields query wants returned
+        shared_ptr< FieldMatcher > fields; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
         /* Get rid of cursors for namespaces that begin with nsprefix.

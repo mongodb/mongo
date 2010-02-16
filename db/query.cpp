@@ -232,29 +232,6 @@ namespace mongo {
     BSONObj id_obj = fromjson("{\"_id\":1}");
     BSONObj empty_obj = fromjson("{}");
 
-    /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
-       [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
-    */
-    inline BSONObj transformOrderFromArrayFormat(BSONObj order) {
-        /* note: this is slow, but that is ok as order will have very few pieces */
-        BSONObjBuilder b;
-        char p[2] = "0";
-
-        while ( 1 ) {
-            BSONObj j = order.getObjectField(p);
-            if ( j.isEmpty() )
-                break;
-            BSONElement e = j.firstElement();
-            uassert( 10102 , "bad order array", !e.eoo());
-            uassert( 10103 , "bad order array [2]", e.isNumber());
-            b.append(e);
-            (*p)++;
-            uassert( 10104 , "too many ordering elements", *p <= '9');
-        }
-
-        return b.obj();
-    }
-
 
     //int dump = 0;
 
@@ -324,7 +301,7 @@ namespace mongo {
                     }
                     else {
                         BSONObj js = c->current();
-                        fillQueryResultFromObj(b, cc->filter.get(), js);
+                        fillQueryResultFromObj(b, cc->fields.get(), js);
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
@@ -683,7 +660,7 @@ namespace mongo {
                                 }
                                 finish();
                                 return;
-                                }
+                            }
                         }
                     }
                 }
@@ -743,11 +720,10 @@ namespace mongo {
     /* run a query -- includes checking for and running a Command */
     auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop ) {
         StringBuilder& ss = curop.debug().str;
+        ParsedQuery pq( q );
         const char *ns = q.ns;
         int ntoskip = q.ntoskip;
-        int _ntoreturn = q.ntoreturn;
         BSONObj jsobj = q.query;
-        auto_ptr< FieldMatcher > filter = q.fields; // what fields to return (unspecified = full object)
         int queryOptions = q.queryOptions;
         BSONObj snapshotHint;
         
@@ -755,17 +731,7 @@ namespace mongo {
             log() << "runQuery: " << ns << jsobj << endl;
         
         long long nscanned = 0;
-        bool wantMore = true;
-        int ntoreturn = _ntoreturn;
-        if ( _ntoreturn < 0 ) {
-            /* _ntoreturn greater than zero is simply a hint on how many objects to send back per 
-               "cursor batch".
-               A negative number indicates a hard limit.
-            */
-            ntoreturn = -_ntoreturn;
-            wantMore = false;
-        }
-        ss << "query " << ns << " ntoreturn:" << ntoreturn;
+        ss << "query " << ns << " ntoreturn:" << pq.getNumToReturn();
         curop.setQuery(jsobj);
         
         BSONObjBuilder cmdResBuf;
@@ -775,8 +741,8 @@ namespace mongo {
         int n = 0;
         
         Client& c = cc();
-        /* we assume you are using findOne() for running a cmd... */
-        if ( ntoreturn == 1 && strstr( ns , ".$cmd" ) ){
+
+        if ( pq.couldBeCommand() ){
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
 
@@ -807,65 +773,34 @@ namespace mongo {
            so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
            query the nonmaster member of a replica pair.
         */
-        uassert( 10107 ,  "not master", isMaster() || (queryOptions & QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
+        uassert( 10107 , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
 
-        BSONElement hint;
-        BSONObj min;
-        BSONObj max;
-        bool explain = false;
-        bool _gotquery = false;
-        bool snapshot = false;
-        BSONObj query;
-        {
-            BSONElement e = jsobj.getField("$query");
-            if ( e.eoo() )
-                e = jsobj.getField("query");                    
-            if ( !e.eoo() && (e.type() == Object || e.type() == Array) ) {
-                query = e.embeddedObject();
-                _gotquery = true;
-            }
-        }
-        BSONObj order;
-        {
-            BSONElement e = jsobj.getField("$orderby");
-            if ( e.eoo() )
-                e = jsobj.getField("orderby");                    
-            if ( !e.eoo() ) {
-                order = e.embeddedObjectUserCheck();
-                if ( e.type() == Array )
-                    order = transformOrderFromArrayFormat(order);
-            }
-        }
-        if ( !_gotquery && order.isEmpty() )
-            query = jsobj;
-        else {
-            explain = jsobj.getBoolField("$explain");
-            if ( useHints )
-                hint = jsobj.getField("$hint");
-            min = jsobj.getObjectField("$min");
-            max = jsobj.getObjectField("$max");
-            BSONElement e = jsobj.getField("$snapshot");
-            snapshot = !e.eoo() && e.trueValue();
-            if( snapshot ) { 
-                uassert( 12001 , "E12001 can't sort with $snapshot", order.isEmpty());
-                uassert( 12002 , "E12002 can't use hint with $snapshot", hint.eoo());
-                NamespaceDetails *d = nsdetails(ns);
-                if ( d ){
-                    int i = d->findIdIndex();
-                    if( i < 0 ) { 
-                        if ( strstr( ns , ".system." ) == 0 )
-                            log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
-                    }
-                    else {
-                        /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
-                           probably need a better way to specify "use the _id index" as a hint.  if someone is
-                           in the query optimizer please fix this then!
-                        */
-                        BSONObjBuilder b;
-                        b.append("$hint", d->idx(i).indexName());
-                        snapshotHint = b.obj();
-                        hint = snapshotHint.firstElement();
-                    }
+        BSONElement hint = useHints ? pq.getHint() : BSONElement();
+        BSONObj min = pq.getMin();
+        BSONObj max = pq.getMax();
+        bool explain = pq.isExplain();
+        //bool _gotquery = false;
+        bool snapshot = pq.isSnapshot();
+        BSONObj query = pq.getFilter();
+        BSONObj order = pq.getOrder();
+
+        if( snapshot ) { 
+            NamespaceDetails *d = nsdetails(ns);
+            if ( d ){
+                int i = d->findIdIndex();
+                if( i < 0 ) { 
+                    if ( strstr( ns , ".system." ) == 0 )
+                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                }
+                else {
+                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+                       probably need a better way to specify "use the _id index" as a hint.  if someone is
+                       in the query optimizer please fix this then!
+                    */
+                    BSONObjBuilder b;
+                    b.append("$hint", d->idx(i).indexName());
+                    snapshotHint = b.obj();
+                    hint = snapshotHint.firstElement();
                 }
             }
         }
@@ -897,7 +832,7 @@ namespace mongo {
                 ss << " idhack ";
                 if ( found ){
                     n = 1;
-                    fillQueryResultFromObj( bb , filter.get() , resObject );
+                    fillQueryResultFromObj( bb , pq.getFields() , resObject );
                 }
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
@@ -921,7 +856,7 @@ namespace mongo {
                 oldPlan = qps.explain();
         }
         QueryPlanSet qps( ns, query, order, &hint, !explain, min, max );
-        UserQueryOp original( ntoskip, ntoreturn, order, wantMore, explain, filter.get(), queryOptions );
+        UserQueryOp original( ntoskip, pq.getNumToReturn(), order, pq.wantMore(), explain, pq.getFields() , queryOptions );
         shared_ptr< UserQueryOp > o = qps.runOp( original );
         UserQueryOp &dqo = *o;
         massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
@@ -939,7 +874,7 @@ namespace mongo {
             DEV out() << "  query has more, cursorid: " << cursorid << endl;
             cc->matcher = dqo.matcher();
             cc->pos = n;
-            cc->filter = filter;
+            cc->fields = pq.getFieldPtr();
             cc->originalMessage = m;
             cc->updateLocation();
             if ( !cc->c->ok() && cc->c->tailable() ) {

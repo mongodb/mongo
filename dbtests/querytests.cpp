@@ -906,6 +906,34 @@ namespace QueryTests {
     private:
         int _old;
     };
+
+    
+    namespace parsedtests {
+        class basic1 {
+        public:
+            void _test( const BSONObj& in ){
+                ParsedQuery q( "a.b" , 5 , 6 , 9 , in , BSONObj() );
+                ASSERT_EQUALS( BSON( "x" << 5 ) , q.getFilter() );
+            }
+            void run(){
+                _test( BSON( "x" << 5 ) );
+                _test( BSON( "query" << BSON( "x" << 5 ) ) );
+                _test( BSON( "$query" << BSON( "x" << 5 ) ) );
+
+                {
+                    ParsedQuery q( "a.b" , 5 , 6 , 9 , BSON( "x" << 5 ) , BSONObj() );
+                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
+                    ASSERT( q.wantMore() );
+                }
+                {
+                    ParsedQuery q( "a.b" , 5 , -6 , 9 , BSON( "x" << 5 ) , BSONObj() );
+                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
+                    ASSERT( ! q.wantMore() );
+                }
+            }
+        };
+    };
+
     
     class All : public Suite {
     public:
@@ -950,6 +978,8 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStart >();
+
+            add< parsedtests::basic1 >();
         }
     } myall;
     
