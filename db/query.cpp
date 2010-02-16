@@ -613,16 +613,19 @@ namespace mongo {
             else {
                 DiskLoc cl = _c->currLoc();
                 if( !_c->getsetdup(cl) ) { 
-                    BSONObj js = _c->current();
                     // got a match.
+                    
+                    BSONObj js = _pq.returnKey() ? _c->currKey() : _c->current();
                     assert( js.objsize() >= 0 ); //defensive for segfaults
+
                     if ( _inMemSort ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
                         _so->add(js);
                     }
                     else if ( _ntoskip > 0 ) {
                         _ntoskip--;
-                    } else {
+                    } 
+                    else {
                         if ( _pq.isExplain() ) {
                             _n++;
                             if ( _n >= _pq.getNumToReturn() && !_pq.wantMore() ) {
@@ -632,7 +635,10 @@ namespace mongo {
                             }
                         }
                         else {
-                            fillQueryResultFromObj( _buf , _pq.getFields() , js );
+                            if ( _pq.returnKey() )
+                                _buf.append( js.objdata() , js.objsize() );
+                            else
+                                fillQueryResultFromObj( _buf , _pq.getFields() , js );
                             _n++;
                             if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */

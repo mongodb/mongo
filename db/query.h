@@ -170,6 +170,7 @@ namespace mongo {
         
         bool isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
+        bool returnKey() const { return _returnKey; }
 
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
@@ -197,7 +198,7 @@ namespace mongo {
                 return ( len > 1024 * 1024 ) || n >= 101;
             return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
         }
-
+        
     private:
         void init( const BSONObj& q ){
             _reset();
@@ -230,6 +231,7 @@ namespace mongo {
             _wantMore = true;
             _explain = false;
             _snapshot = false;
+            _returnKey = false;
         }
 
         void _initTop( const BSONObj& top ){
@@ -257,6 +259,8 @@ namespace mongo {
                     _max = e.embeddedObject();
                 else if ( strcmp( "$hint" , name ) == 0 )
                     _hint = e;
+                else if ( strcmp( "$returnKey" , name ) == 0 )
+                    _returnKey = e.trueValue();
 
             }
 
@@ -290,6 +294,7 @@ namespace mongo {
 
         bool _explain;
         bool _snapshot;
+        bool _returnKey;
         BSONObj _min;
         BSONObj _max;
         BSONElement _hint;
