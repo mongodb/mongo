@@ -717,6 +717,14 @@ namespace mongo {
                     tmp.syncedTo = OpTime();
                     tmp.replacing = true;
                 }
+            } else if ( !replPair & tmp.syncedTo.isNull()  ) {
+                DBDirectClient c;
+                if ( c.exists( "local.oplog.$main" ) ) {
+                    BSONObj op = c.findOne( "local.oplog.$main", Query().sort( BSON( "$natural" << -1 ) ) );
+                    if ( !op.isEmpty() ) {
+                        tmp.syncedTo = op[ "ts" ].date();
+                    }
+                }
             }
             addSourceToList(v, tmp, c->current(), old);
             c->advance();
