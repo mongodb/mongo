@@ -71,6 +71,8 @@
 
 namespace mongo {
 
+    extern const int MaxBytesToReturnToClientAtOnce;
+
     // for an existing query (ie a ClientCursor), send back additional information.
     QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op);
 
@@ -178,6 +180,24 @@ namespace mongo {
             /* we assume you are using findOne() for running a cmd... */
             return _ntoreturn == 1 && strstr( _ns , ".$cmd" );
         }
+
+        bool hasIndexSpecifier() const {
+            return ! _hint.eoo() || ! _min.isEmpty() || ! _max.isEmpty();
+        }
+
+        /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+           is only a size limit.  The idea is that on a find() where one doesn't use much results,
+           we don't return much, but once getmore kicks in, we start pushing significant quantities.
+           
+           The n limit (vs. size) is important when someone fetches only one small field from big
+           objects, which causes massive scanning server-side.
+        */
+        bool enoughForFirstBatch( int n , int len ) const {
+            if ( _ntoreturn == 0 )
+                return ( len > 1024 * 1024 ) || n >= 101;
+            return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
+        }
+
     private:
         void init( const BSONObj& q ){
             _reset();
