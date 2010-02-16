@@ -269,8 +269,10 @@ namespace mongo {
 //  SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
         MessagingPort p;
-        if ( !p.connect(db) )
+        if ( !p.connect(db) ){
+            out() << "msg couldn't connect" << endl;
             return;
+        }
 
         const int Loops = 1;
         for ( int q = 0; q < Loops; q++ ) {
@@ -286,8 +288,9 @@ namespace mongo {
             Timer t;
             bool ok = p.call(send, response);
             double tm = ((double) t.micros()) + 1;
-            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
-                 ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
+            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
+                  << "len: " << len << " data: " << response.data->_data << endl;
+
             if (  q+1 < Loops ) {
                 out() << "\t\tSLEEP 8 then sending again as a test" << endl;
                 sleepsecs(8);

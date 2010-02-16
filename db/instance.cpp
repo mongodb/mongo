@@ -287,22 +287,22 @@ namespace mongo {
                 log = true;
         }
         else if ( op == dbMsg ) {
-            writelock lk("");
-			/* deprecated / rarely used.  intended for connection diagnostics. */
+            // deprecated - replaced by commands
             char *p = m.data->_data;
             int len = strlen(p);
             if ( len > 400 )
                 out() << curTimeMillis() % 10000 <<
-                     " long msg received, len:" << len <<
-                     " ends with: " << p + len - 10 << endl;
-            bool end = false; //strcmp("end", p) == 0;
+                    " long msg received, len:" << len <<
+                    " ends with: " << p + len - 10 << endl;
+
             Message *resp = new Message();
-            resp->setData(opReply, "i am fine");
+            if ( strcmp( "end" , p ) == 0 )
+                resp->setData( opReply , "dbMsg end no longer supported" );
+            else
+                resp->setData( opReply , "i am fine - dbMsg deprecated");
+
             dbresponse.response = resp;
             dbresponse.responseTo = m.data->id;
-            //dbMsgPort.reply(m, resp);
-            if ( end )
-                return false;
         }
         else {
             const char *ns = m.data->_data + 4;
