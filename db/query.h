@@ -251,8 +251,6 @@ namespace mongo {
                 return;
             _fields.reset( new FieldMatcher() );
             _fields->add( fields );
-            if ( _fields->errmsg )
-                uassert( 10053 , _fields->errmsg, false); // TODO: just have FieldMatcher throw now
         }
 
         ParsedQuery( const ParsedQuery& other ){

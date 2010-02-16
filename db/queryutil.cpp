@@ -446,8 +446,8 @@ namespace mongo {
     ///////////////////
     
     void FieldMatcher::add( const BSONObj& o ){
-        massert( 10371 , "can only add to FieldMatcher once", source_.isEmpty());
-        source_ = o;
+        massert( 10371 , "can only add to FieldMatcher once", _source.isEmpty());
+        _source = o;
 
         BSONObjIterator i( o );
         int true_false = -1;
@@ -458,23 +458,24 @@ namespace mongo {
             // validate input
             if (true_false == -1){
                 true_false = e.trueValue();
-                include_ = !e.trueValue();
-            }else{
-                if((bool) true_false != e.trueValue())
-                    errmsg = "You cannot currently mix including and excluding fields. Contact us if this is an issue.";
+                _include = !e.trueValue();
+            }
+            else{
+                uassert( 10053 , "You cannot currently mix including and excluding fields. Contact us if this is an issue." , 
+                         (bool)true_false == e.trueValue() );
             }
         }
     }
 
     void FieldMatcher::add(const string& field, bool include){
         if (field.empty()){ // this is the field the user referred to
-            include_ = include;
+            _include = include;
         } else {
             const size_t dot = field.find('.');
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos)); 
 
-            boost::shared_ptr<FieldMatcher>& fm = fields_[subfield];
+            boost::shared_ptr<FieldMatcher>& fm = _fields[subfield];
             if (!fm)
                 fm.reset(new FieldMatcher(!include));
 
@@ -483,7 +484,7 @@ namespace mongo {
     }
 
     BSONObj FieldMatcher::getSpec() const{
-        return source_;
+        return _source;
     }
 
     //b will be the value part of an array-typed BSONElement
@@ -510,7 +511,7 @@ namespace mongo {
                     break;
                 }
                 default:
-                    if (include_)
+                    if (_include)
                         b.appendAs(e, b.numStr(i++).c_str());
             }
             
@@ -519,18 +520,20 @@ namespace mongo {
     }
 
     void FieldMatcher::append( BSONObjBuilder& b , const BSONElement& e ) const {
-        FieldMap::const_iterator field = fields_.find( e.fieldName() );
+        FieldMap::const_iterator field = _fields.find( e.fieldName() );
         
-        if (field == fields_.end()){
-            if (include_)
+        if (field == _fields.end()){
+            if (_include)
                 b.append(e);
-        } else {
+        } 
+        else {
             FieldMatcher& subfm = *field->second;
-
-            if (subfm.fields_.empty() || !(e.type()==Object || e.type()==Array) ){
-                if (subfm.include_)
+            
+            if (subfm._fields.empty() || !(e.type()==Object || e.type()==Array) ){
+                if (subfm._include)
                     b.append(e);
-            } else if (e.type() == Object){ 
+            }
+            else if (e.type() == Object){ 
                 BSONObjBuilder subb;
                 BSONObjIterator it(e.embeddedObject());
                 while (it.more()){
@@ -538,7 +541,8 @@ namespace mongo {
                 }
                 b.append(e.fieldName(), subb.obj());
 
-            } else { //Array
+            } 
+            else { //Array
                 BSONObjBuilder subb;
                 subfm.appendArray(subb, e.embeddedObject());
                 b.appendArray(e.fieldName(), subb.obj());
