@@ -823,7 +823,7 @@ namespace mongo {
             BSONObj resObject;
             bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
             if ( nsFound == false || indexFound == true ){
-                BufBuilder bb;
+                BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
                 bb.skip(sizeof(QueryResult));
                 
                 ss << " idhack ";
