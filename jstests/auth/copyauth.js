@@ -15,3 +15,15 @@ assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
 target.getDB( baseName ).copyDatabase( baseName, baseName, source.host, "foo", "bar" );
 assert.eq( 1, target.getDB( baseName )[ baseName ].count() );
 assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
+
+stopMongod( ports[ 1 ] );
+
+var target = startMongod( "--auth", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
+
+target.getDB( "admin" ).addUser( "super1", "super1" );
+assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
+target.getDB( "admin" ).auth( "super1", "super1" );
+
+target.getDB( baseName ).copyDatabase( baseName, baseName, source.host, "foo", "bar" );
+assert.eq( 1, target.getDB( baseName )[ baseName ].count() );
+assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
