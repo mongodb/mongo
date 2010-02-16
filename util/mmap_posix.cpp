@@ -49,7 +49,7 @@ namespace mongo {
 #define O_NOATIME 0
 #endif
 
-    void* MemoryMappedFile::map(const char *filename, long &length) {
+    void* MemoryMappedFile::map(const char *filename, long &length, int options) {
         // length may be updated by callee.
         theFileAllocator().allocateAsap( filename, length );
         len = length;
@@ -76,9 +76,16 @@ namespace mongo {
             }
             return 0;
         }
+        
+        if ( options & SEQUENTIAL ){
+            if ( madvise( view , length , MADV_SEQUENTIAL ) ){
+                out() << " madvise failed for " << filename << " " << errno << endl;
+            }
+        }
+        
         return view;
     }
-
+    
     void MemoryMappedFile::flush(bool sync) {
         if ( view == 0 || fd == 0 )
             return;

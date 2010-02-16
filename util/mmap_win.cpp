@@ -69,9 +69,13 @@ namespace mongo {
         updateLength( filename, length );
         std::wstring filenamew = toWideString(filename);
 
+        DWORD createOptions = FILE_ATTRIBUTE_NORMAL;
+        if ( options & SEQUENTIAL )
+            createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
+
         fd = CreateFile(
                  filenamew.c_str(), GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ,
-                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                 NULL, OPEN_ALWAYS, createOptions , NULL);
         if ( fd == INVALID_HANDLE_VALUE ) {
             out() << "Create/OpenFile failed " << filename << ' ' << GetLastError() << endl;
             return 0;
