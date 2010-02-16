@@ -474,9 +474,7 @@ namespace mongo {
             findingStart_( (queryOptions & QueryOption_OplogReplay) != 0 ),
             findingStartCursor_(),
             findingStartMode_()
-        {
-            uassert( 10105 , "bad skip value in query", ntoskip >= 0);
-        }
+        {}
         
         virtual void init() {
             b_.skip( sizeof( QueryResult ) );
@@ -779,7 +777,6 @@ namespace mongo {
         BSONObj min = pq.getMin();
         BSONObj max = pq.getMax();
         bool explain = pq.isExplain();
-        //bool _gotquery = false;
         bool snapshot = pq.isSnapshot();
         BSONObj query = pq.getFilter();
         BSONObj order = pq.getOrder();

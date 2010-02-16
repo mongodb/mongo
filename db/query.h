@@ -181,6 +181,7 @@ namespace mongo {
     private:
         void init( const BSONObj& q ){
             _reset();
+            uassert( 10105 , "bad skip value in query", _ntoskip >= 0);
             
             if ( _ntoreturn < 0 ){
                 /* _ntoreturn greater than zero is simply a hint on how many objects to send back per 
