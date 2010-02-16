@@ -212,13 +212,9 @@ namespace mongo {
         return ok;
     }
 
-    bool commandIsReadOnly(BSONObj& _cmdobj);
-
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
 
-        bool writeLock = true;
-        
         // before we lock...
         int op = m.data->operation();
         bool isCommand = false;
@@ -226,6 +222,7 @@ namespace mongo {
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
+                OPWRITE;
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -240,17 +237,19 @@ namespace mongo {
                         return true;
                     }
                 }
-                DbMessage d( m );
-                QueryMessage q( d );
-                writeLock = !commandIsReadOnly(q.query);
+
             }
-            else
-                writeLock = false;
+            else {
+                OPREAD;
+            }
         }
         else if( op == dbGetMore ) {
-            writeLock = false;
+            OPREAD;
         }
-
+        else {
+            OPWRITE;
+        }
+        
         globalOpCounters.gotOp( op , isCommand );
         
         if ( handlePossibleShardedMessage( m , dbresponse ) ){
@@ -258,13 +257,6 @@ namespace mongo {
                so if a message has to be forwarded, doesn't block for that
             */
             return true;
-        }
-
-        if ( writeLock ){
-            OPWRITE;
-        }
-        else {
-            OPREAD;
         }
 
         Client& c = cc();
@@ -295,7 +287,7 @@ namespace mongo {
                 log = true;
         }
         else if ( op == dbMsg ) {
-            mongolock lk(writeLock);
+            writelock lk("");
 			/* deprecated / rarely used.  intended for connection diagnostics. */
             char *p = m.data->_data;
             int len = strlen(p);
@@ -322,14 +314,12 @@ namespace mongo {
             else {
                 try {
                     if ( op == dbInsert ) {
-                        mongolock lk(writeLock);
                         receivedInsert(m, currentOp);
                     }
                     else if ( op == dbUpdate ) {
                         receivedUpdate(m, currentOp);
                     }
                     else if ( op == dbDelete ) {
-                        mongolock lk(writeLock);
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
@@ -462,7 +452,6 @@ namespace mongo {
         const char *ns = d.getns();
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
-        Client::Context ctx(ns);
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -472,6 +461,10 @@ namespace mongo {
             op.debug().str << " query: " << s;
             op.setQuery(pattern);
         }        
+
+        writelock lk(ns);
+        Client::Context ctx(ns);
+
         long long n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( (int) n );
     }
@@ -516,9 +509,10 @@ namespace mongo {
 		const char *ns = d.getns();
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
-        Client::Context ctx(ns);
         op.debug().str << ns;
-		
+
+        writelock lk(ns);
+        Client::Context ctx(ns);		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);

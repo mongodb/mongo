@@ -1427,23 +1427,6 @@ namespace mongo {
         }
     } cmdFindAndModify;
     
-    bool commandIsReadOnly(BSONObj& _cmdobj) { 
-        BSONObj jsobj;
-        {
-            BSONElement e = _cmdobj.firstElement();
-            if ( e.type() == Object && string("query") == e.fieldName() ) {
-                jsobj = e.embeddedObject();
-            }
-            else {
-                jsobj = _cmdobj;
-            }
-        }
-        BSONElement e = jsobj.firstElement();
-        if ( ! e.type() )
-            return false;
-        return Command::readOnly( e.fieldName() );
-    }
-
     /** 
      * this handles
      - auth
