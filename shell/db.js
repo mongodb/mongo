@@ -64,6 +64,10 @@ DB.prototype.removeUser = function( username ){
     this.getCollection( "system.users" ).remove( { user : username } );
 }
 
+DB.prototype.__pwHash = function( nonce, username, pass ) {
+    return hex_md5( nonce + username + hex_md5( username + ":mongo:" + pass ) );
+}
+
 DB.prototype.auth = function( username , pass ){
     var n = this.runCommand( { getnonce : 1 } );
 
@@ -72,7 +76,7 @@ DB.prototype.auth = function( username , pass ){
             authenticate : 1 , 
             user : username , 
             nonce : n.nonce , 
-            key : hex_md5( n.nonce + username + hex_md5( username + ":mongo:" + pass ) )
+            key : this.__pwHash( n.nonce, username, pass )
         }
     );
 
@@ -221,12 +225,16 @@ DB.prototype.cloneCollection = function(from, collection, query) {
   * @return Object returned has member ok set to true if operation succeeds, false otherwise.
   * See also: db.clone()
 */
-DB.prototype.copyDatabase = function(fromdb, todb, fromhost) { 
+DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password) { 
     assert( isString(fromdb) && fromdb.length );
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
-    //this.resetIndexCache();
-    return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
+    if ( username && password ) {
+        var n = this._adminCommand( { copydbgetnonce : 1, fromhost:fromhost } );
+        return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb, username:username, nonce:n.nonce, key:this.__pwHash( n.nonce, username, password ) } );
+    } else {
+        return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
+    }
 }
 
 /**

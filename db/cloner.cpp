@@ -46,6 +46,7 @@ namespace mongo {
            snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
                          for example repairDatabase need not use it.
         */
+        void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot);
         bool startCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, string& errmsg, bool logForRepl, bool copyIndexes, int logSizeMb, long long &cursorId );
         bool finishCloneCollection( const char *fromhost, const char *ns, const BSONObj &query, long long cursorId, string &errmsg );
@@ -191,7 +192,9 @@ namespace mongo {
 		
             auto_ptr<DBClientCursor> c;
             {
-                if ( !masterSameProcess ) {
+                if ( conn.get() ) {
+                    // nothing to do
+                } else if ( !masterSameProcess ) {
                     auto_ptr< DBClientConnection > c( new DBClientConnection() );
                     if ( !c->connect( masterHost, errmsg ) )
                         return false;
@@ -231,12 +234,11 @@ namespace mongo {
                         continue;
                     }
                 }
-                else if( strchr(from_name, '$') ) {
+                if( strchr(from_name, '$') ) {
                     // don't clone index namespaces -- we take care of those separately below.
                     log(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }            
-                
                 toClone.push_back( collection.getOwned() );
             }
         }
@@ -571,8 +573,41 @@ namespace mongo {
         }
     } cmdfinishclonecollection;
 
+    thread_specific_ptr< DBClientConnection > authConn_;
     /* Usage:
-       admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db> } );
+     admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <hostname> } );
+     */
+    class CmdCopyDbGetNonce : public Command {
+    public:
+        CmdCopyDbGetNonce() : Command("copydbgetnonce") { }
+        virtual bool adminOnly() {
+            return true;
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        virtual void help( stringstream &help ) const {
+            help << "get a nonce for subsequent copy db request from secure server\n";
+            help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
+        }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            string fromhost = cmdObj.getStringField("fromhost");
+            uassert( 13009, "fromhost must be specified", !fromhost.empty() );
+            authConn_.reset( new DBClientConnection() );
+            if ( !authConn_->connect( fromhost, errmsg ) )
+                return false;
+            BSONObj ret;
+            if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
+                errmsg = "couldn't get nonce " + string( ret );
+                return false;
+            }
+            result.appendElements( ret );
+            return true;
+        }
+    } cmdcopydbgetnonce;
+
+    /* Usage:
+       admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
     */
     class CmdCopyDb : public Command {
     public:
@@ -585,7 +620,7 @@ namespace mongo {
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from antoher host to this host\n";
-            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
+            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>]}";
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
@@ -601,8 +636,21 @@ namespace mongo {
                 errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
                 return false;
             }
+            Cloner c;
+            string username = cmdObj.getStringField( "username" );
+            string nonce = cmdObj.getStringField( "nonce" );
+            string key = cmdObj.getStringField( "key" );
+            if ( !username.empty() && !nonce.empty() && !key.empty() ) {
+                uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
+                BSONObj ret;
+                if ( !authConn_->runCommand( fromdb, BSON( "authenticate" << 1 << "user" << username << "nonce" << nonce << "key" << key ), ret ) ) {
+                    errmsg = "unable to login " + string( ret );
+                    return false;
+                }
+                c.setConnection( authConn_.release() );
+            }
             Client::Context ctx(todb);
-            bool res = cloneFrom(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
+            bool res = c.go(fromhost.c_str(), errmsg, fromdb, /*logForReplication=*/!fromRepl, /*slaveok*/false, /*replauth*/false, /*snapshot*/true);
             return res;
         }
     } cmdcopydb;
