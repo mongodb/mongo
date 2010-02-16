@@ -12,8 +12,8 @@ function test( want , msg ){
 }
 
 test( 0 , "A1" );
-assert.eq( 2 , t.find().count() , "A1" );
-assert.eq( 2 , t.find( {} ).count() , "A2" );
+assert.eq( 3 , t.find().count() , "A1" );
+assert.eq( 3 , t.find( {} ).count() , "A2" );
 assert.eq( 2, t.find( {} ).limit( 2 ).itcount() , "A3" );
 test( 1 , "B1" );
 
