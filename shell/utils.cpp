@@ -465,13 +465,13 @@ namespace mongo {
             directory_iterator i( from );
             while( i != end ) {
                 path p = *i;
-                if ( p.filename() != "mongod.lock" ) {
+                if ( p.leaf() != "mongod.lock" ) {
                     if ( is_directory( p ) ) {
-                        path newDir = to / p.filename();
+                        path newDir = to / p.leaf();
                         boost::filesystem::create_directory( newDir );
                         copyDir( p, newDir );
                     } else {
-                        boost::filesystem::copy_file( p, to / p.filename() );
+                        boost::filesystem::copy_file( p, to / p.leaf() );
                     }
                 }
                 ++i;
