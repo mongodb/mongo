@@ -19,8 +19,8 @@ for ( i=1; i<4; i++ ){
     o = { _id : i , x : -i }
     t.insert( o );
     all.push( o );
-    ids.push( { "" : i } );
-    xs.push( { "" : -i } );
+    ids.push( { _id : i } );
+    xs.push( { x : -i } );
 }
 
 assert.eq( all , t.find().sort( { _id : 1 } ).toArray() , "A1" );

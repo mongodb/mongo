@@ -1612,6 +1612,17 @@ namespace mongo {
 
     }
 
+    void BSONObjBuilder::appendKeys( const BSONObj& keyPattern , const BSONObj& values ){
+        BSONObjIterator i(keyPattern);
+        BSONObjIterator j(values);
+        
+        while ( i.more() && j.more() ){
+            appendAs( j.next() , i.next().fieldName() );
+        }
+        
+        assert( ! i.more() );
+        assert( ! j.more() );
+    }
 
     int BSONElementFieldSorter( const void * a , const void * b ){
         const char * x = *((const char**)a);

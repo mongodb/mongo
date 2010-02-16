@@ -98,7 +98,6 @@ namespace mongo {
     }
 
     void IndexSpec::_init(){
-        _indexType = 0;
         assert( keyPattern.objsize() );
         
         string pluginName = "";
@@ -130,14 +129,14 @@ namespace mongo {
                 log() << "warning: can't find plugin [" << pluginName << "]" << endl;
             }
             else {
-                assert(0);
+                _indexType.reset( plugin->generate( this ) );
             }
         }
     }
 
 
     void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-        if ( _indexType ){
+        if ( _indexType.get() ){
             _indexType->getKeys( obj , keys );
             return;
         }

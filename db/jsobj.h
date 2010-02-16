@@ -1507,6 +1507,7 @@ namespace mongo {
             b.decouple();    // post done() call version.  be sure jsobj frees...
         }
 
+        void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
     private:
         static const string numStrs[100]; // cache of 0 to 99 inclusive

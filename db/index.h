@@ -53,7 +53,7 @@ namespace mongo {
         IndexPlugin( const string& name );
         virtual ~IndexPlugin(){}
         
-        virtual IndexType* generate( const IndexSpec& spec ) const = 0;
+        virtual IndexType* generate( const IndexSpec * spec ) const = 0;
 
         static IndexPlugin* get( const string& name ){
             if ( ! _plugins )
@@ -104,7 +104,9 @@ namespace mongo {
         
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
-    private:
+        BSONElement missingField() const { return _nullElt; }
+
+    protected:
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
         vector<const char*> _fieldNames;
@@ -114,9 +116,11 @@ namespace mongo {
         BSONObj _nullObj;
         BSONElement _nullElt;
         
-        IndexType * _indexType;
+        shared_ptr<IndexType> _indexType;
         
         void _init();
+
+        friend class IndexType;
     };
 
 	/* Details about a particular index. There is one of these effectively for each object in 
