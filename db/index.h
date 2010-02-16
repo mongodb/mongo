@@ -19,8 +19,54 @@
 #pragma once
 
 #include "../stdafx.h"
+#include "diskloc.h"
+#include "jsobj.h"
+#include <map>
 
 namespace mongo {
+
+    class IndexSpec;
+    class IndexType; // TODO: this name sucks
+
+    /**
+     * this represents an instance of a index plugin
+     * done this way so parsing, etc... can be cached
+     * so if there is a FTS IndexPlugin, for each index using FTS
+     * there will be 1 of these, and it can have things pre-parsed, etc...
+     */
+    class IndexType : boost::noncopyable {
+    public:
+        virtual ~IndexType();
+        virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
+        virtual int compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const;
+    
+    };
+    
+    /**
+     * this represents a plugin
+     * a plugin could be something like full text search, sparse index, etc...
+     * 1 of these exists per type of index per server
+     * 1 IndexType is created per index using this plugin
+     */
+    class IndexPlugin : boost::noncopyable {
+    public:
+        IndexPlugin( const string& name );
+        virtual ~IndexPlugin(){}
+        
+        virtual IndexType* generate( const IndexSpec& spec ) const = 0;
+
+        static IndexPlugin* get( const string& name ){
+            if ( ! _plugins )
+                return 0;
+            map<string,IndexPlugin*>::iterator i = _plugins->find( name );
+            if ( i == _plugins->end() )
+                return 0;
+            return i->second;
+        }
+    private:
+        string _name;
+        static map<string,IndexPlugin*> * _plugins;
+    };
 
     /* precomputed details about an index, used for inserting keys on updates
        stored/cached in NamespaceDetailsTransient, or can be used standalone
@@ -67,6 +113,8 @@ namespace mongo {
         
         BSONObj _nullObj;
         BSONElement _nullElt;
+        
+        IndexType * _indexType;
         
         void _init();
     };
