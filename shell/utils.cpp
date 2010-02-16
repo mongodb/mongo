@@ -459,6 +459,39 @@ namespace mongo {
             boost::filesystem::create_directory( path );    
             return undefined_;
         }
+        
+        void copyDir( const path &from, const path &to ) {
+            directory_iterator end;
+            directory_iterator i( from );
+            while( i != end ) {
+                path p = *i;
+                if ( p.filename() != "mongod.lock" ) {
+                    if ( is_directory( p ) ) {
+                        path newDir = to / p.filename();
+                        boost::filesystem::create_directory( newDir );
+                        copyDir( p, newDir );
+                    } else {
+                        boost::filesystem::copy_file( p, to / p.filename() );
+                    }
+                }
+                ++i;
+            }            
+        }
+        
+        // NOTE target dbpath will be cleared first
+        BSONObj CopyDbpath( const BSONObj &a ) {
+            assert( a.nFields() == 2 );
+            BSONObjIterator i( a );
+            string from = i.next().str();
+            string to = i.next().str();
+            assert( !from.empty() );
+            assert( !to.empty() );
+            if ( boost::filesystem::exists( to ) )
+                boost::filesystem::remove_all( to );
+            boost::filesystem::create_directory( to );
+            copyDir( from, to );
+            return undefined_;
+        }
 
         inline void kill_wrapper(pid_t pid, int sig, int port){
 #ifdef _WIN32
@@ -632,6 +665,7 @@ namespace mongo {
             scope.injectNative( "removeFile" , removeFile );
             scope.injectNative( "listFiles" , listFiles );
             scope.injectNative( "resetDbpath", ResetDbpath );
+            scope.injectNative( "copyDbpath", CopyDbpath );
 #endif
         }
 
