@@ -635,10 +635,14 @@ namespace mongo {
                             }
                         }
                         else {
-                            if ( _pq.returnKey() )
-                                _buf.append( js.objdata() , js.objsize() );
-                            else
+                            if ( _pq.returnKey() ){
+                                BSONObjBuilder bb( _buf );
+                                bb.appendKeys( _c->indexKeyPattern() , js );
+                                bb.done();
+                            }
+                            else {
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js );
+                            }
                             _n++;
                             if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
