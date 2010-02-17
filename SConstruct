@@ -244,6 +244,11 @@ AddOption( "--gdbserver",
            nargs=0,
            action="store" )
 
+AddOption("--nostrip",
+          dest="nostrip",
+          action="store_true",
+          help="do not strip installed binaries")
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -1468,7 +1473,7 @@ def installBinary( e , name ):
     fullInstallName = installDir + "/bin/" + name
 
     allBinaries += [ name ]
-    if solaris or linux:
+    if (solaris or linux) and (not GetOption("nostrip")):
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
 
     if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":

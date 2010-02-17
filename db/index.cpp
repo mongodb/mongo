@@ -27,6 +27,11 @@ namespace mongo {
 
     map<string,IndexPlugin*> * IndexPlugin::_plugins;
 
+    IndexType::IndexType( const IndexPlugin * plugin )
+        : _plugin( plugin ){
+        
+    }
+
     IndexType::~IndexType(){
     }
 
@@ -67,6 +72,10 @@ namespace mongo {
         if( n ) { 
             log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
         }
+    }
+
+    const IndexSpec& IndexDetails::getSpec() const {
+        return NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
     /* delete this index.  does NOT clean up the system catalog
@@ -229,7 +238,7 @@ namespace mongo {
        Keys will be left empty if key not found in the object.
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this ).getKeys( obj, keys );
+        getSpec().getKeys( obj, keys );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {
