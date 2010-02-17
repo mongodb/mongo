@@ -117,7 +117,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 				__wt_free(env, rip->data, 0);
 			}
 #ifdef DIAGNOSTIC
-			if (F_ISSET(rip, ~WT_APIMASK_WT_INDX))
+			if (F_ISSET(rip, ~WT_APIMASK_WT_ROW_INDX))
 				(void)__wt_api_args(env, "Page.recycle");
 #endif
 		}
@@ -128,7 +128,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	case WT_PAGE_COL_VAR:
 #ifdef DIAGNOSTIC
 		WT_INDX_FOREACH(page, cip, i)
-			if (F_ISSET(cip, ~WT_APIMASK_WT_INDX))
+			if (F_ISSET(cip, ~WT_APIMASK_WT_COL_INDX))
 				(void)__wt_api_args(env, "Page.recycle");
 #endif
 		break;
