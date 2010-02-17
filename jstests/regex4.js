@@ -1,5 +1,5 @@
 
-t = db.regex3;
+t = db.regex4;
 t.drop();
 
 t.save( { name : "eliot" } );
