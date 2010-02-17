@@ -153,12 +153,13 @@ __wt_bt_put_serial_func(WT_TOC *toc)
 	env = toc->env;
 
 	/* If passed a new replacement array, use it or lose it. */
-	if (repl != NULL)
+	if (repl != NULL) {
 		if (ip->repl == NULL) {
 			ip->repl = repl;
 			ip->repl_size = repl_size;
 		} else
 			__wt_free(env, repl, repl_size * sizeof(WT_REPL));
+	}
 
 	/* Update the replacement array. */
 	for (repl_cnt = 0,

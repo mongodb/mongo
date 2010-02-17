@@ -37,12 +37,16 @@ def func_method_single(handle, method, config, args, func, f):
 #	Set a handle's methods to the lockout function (skipping the close
 #	method, it's always legal).
 def func_method_lockout(handle, decl, f):
+	quiet = 1
 	f.write('void\n__wt_methods_' + handle + '_lockout(' + decl + ')\n{\n')
 	for i in sorted(filter(lambda _i:
 	    _i[1].handle == handle and _i[1].method != 'close',
 	    api.iteritems())):
 		func_method_single(i[1].handle,
 		    i[1].method, i[1].config, i[1].args, 'lockout', f)
+		quiet = 0;
+	if quiet:
+		f.write('\tWT_CC_QUIET(' + handle + ', NULL);\n')
 	f.write('}\n\n')
 
 # func_method_transition --

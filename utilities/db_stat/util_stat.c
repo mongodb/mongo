@@ -20,7 +20,6 @@ main(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind;
 	DB *db;
-	u_int32_t flags;
 	int ch, ret, tret;
 
 	WT_UTILITY_INTRO(progname, argv);

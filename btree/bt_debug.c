@@ -10,7 +10,6 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static int  __wt_bt_debug_addr(WT_TOC *, u_int32_t, char *, FILE *);
 static void __wt_bt_debug_dbt(const char *, void *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
@@ -74,7 +73,7 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
  * __wt_bt_debug_addr --
  *	Dump a single page in debugging mode.
  */
-static int
+int
 __wt_bt_debug_addr(WT_TOC *toc, u_int32_t addr, char *ofile, FILE *fp)
 {
 	DB *db;
@@ -272,7 +271,8 @@ __wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
 
 	icnt = 0;
 	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp, "%6lu: {flags %#lx}\n", ++icnt, (u_long)ip->flags);
+		fprintf(fp,
+		    "%6lu: {flags %#lx}\n", (u_long)++icnt, (u_long)ip->flags);
 		if (ip->page_data != NULL)
 			fprintf(fp, "\tpage_data: %#lx",
 			    WT_ADDR_TO_ULONG(ip->page_data));
@@ -301,7 +301,8 @@ __wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
 
 	icnt = 0;
 	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp, "%6lu: {flags %#lx}\n", ++icnt, (u_long)ip->flags);
+		fprintf(fp,
+		    "%6lu: {flags %#lx}\n", (u_long)++icnt, (u_long)ip->flags);
 		if (ip->data != NULL)
 			__wt_bt_debug_dbt("\tdata dbt", ip, fp);
 		if (ip->repl != NULL)

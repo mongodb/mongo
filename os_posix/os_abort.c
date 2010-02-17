@@ -14,7 +14,7 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort()
+__wt_abort(void)
 {
 	abort();
 	/* NOTREACHED */

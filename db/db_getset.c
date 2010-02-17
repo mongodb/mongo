@@ -34,6 +34,8 @@ __wt_db_column_set_verify(DB *db,
 {
 	IDB *idb;
 
+	WT_CC_QUIET(dictionary, NULL);
+
 	idb = db->idb;
 
 	/* Repeat compression is incompatible with variable length records. */

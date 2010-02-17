@@ -97,11 +97,12 @@ __wt_bt_open_verify(DB *db)
 		db->intlsize = 8 * 1024;
 	else if (WT_UNEXPECTED(db->intlsize))
 		goto unexpected;
-	if (db->intlitemsize == 0)
+	if (db->intlitemsize == 0) {
 		if (db->intlsize <= 1024)
 			db->intlitemsize = 50;
 		else
 			db->intlitemsize = db->intlsize / 40;
+	}
 
 	/*
 	 * Leaf pages are larger to amortize I/O across a large chunk of the
@@ -125,11 +126,12 @@ unexpected:	__wt_db_errx(db,
 		    "Allocation and page sizes are limited to 128MB");
 		return (WT_ERROR);
 	}
-	if (db->leafitemsize == 0)
+	if (db->leafitemsize == 0) {
 		if (db->leafsize <= 4096)
 			db->leafitemsize = 80;
 		else
 			db->leafitemsize = db->leafsize / 40;
+	}
 
 	/*
 	 * We only have 3 bytes of length for on-page items, so the maximum

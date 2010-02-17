@@ -23,6 +23,8 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	IENV *ienv;
 	int ret;
 
+	WT_CC_QUIET(flags, 0);
+
 	/*
 	 * !!!
 	 * We don't yet have valid ENV/IENV structures to use to call other

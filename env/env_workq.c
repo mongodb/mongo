@@ -51,7 +51,7 @@ __wt_workq_srvr(void *arg)
 		 * don't find work for awhile, sleep.
 		 */
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
-		if (notfound++)
+		if (notfound++) {
 			if (notfound >= 100000) {
 				WT_STAT_INCR(ienv->stats, WORKQ_SLEEP);
 				__wt_sleep(0, notfound);
@@ -60,6 +60,7 @@ __wt_workq_srvr(void *arg)
 				WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
 				__wt_yield();
 			}
+		}
 	}
 
 	return (NULL);

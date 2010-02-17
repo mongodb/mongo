@@ -14,7 +14,7 @@
  * together to make the code prettier.
  */
 typedef struct {
-	u_int32_t frags;			/* Total frags */
+	int frags;				/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
 	FILE	*stream;			/* Dump file stream */

@@ -183,7 +183,7 @@ bulk_read(DBT *dbt, int iskey)
 {
 	static u_int64_t line = 0;
 	size_t len;
-	int ch, ret;
+	int ch;
 
 	++line;
 	for (len = 0;; ++len) {
@@ -216,6 +216,8 @@ bulk_callback(DB *db, DBT **keyp, DBT **datap)
 {
 	static DBT key, data;
 	int ret;
+
+	WT_CC_QUIET(db, NULL);
 
 	if ((ret = bulk_read(&key, 1)) != 0)
 		return (ret);

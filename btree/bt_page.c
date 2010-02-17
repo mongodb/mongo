@@ -10,8 +10,8 @@
 #include "wt_internal.h"
 
 static int __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_col_int(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_col_leaf(DB *, WT_PAGE *);
+static int __wt_bt_page_inmem_col_int(WT_PAGE *);
+static int __wt_bt_page_inmem_col_leaf(WT_PAGE *);
 static int __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
 static int __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
@@ -193,10 +193,10 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 		ret = __wt_bt_page_inmem_col_fix(db, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret = __wt_bt_page_inmem_col_int(db, page);
+		ret = __wt_bt_page_inmem_col_int(page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret = __wt_bt_page_inmem_col_leaf(db, page);
+		ret = __wt_bt_page_inmem_col_leaf(page);
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -358,7 +358,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__wt_bt_page_inmem_col_int(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL_INDX *ip;
 	WT_OFF *offp;
@@ -393,7 +393,7 @@ __wt_bt_page_inmem_col_int(DB *db, WT_PAGE *page)
  *	column-store trees.
  */
 static int
-__wt_bt_page_inmem_col_leaf(DB *db, WT_PAGE *page)
+__wt_bt_page_inmem_col_leaf(WT_PAGE *page)
 {
 	WT_COL_INDX *ip;
 	WT_ITEM *item;
