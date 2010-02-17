@@ -116,6 +116,9 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	if (ienv == NULL)
 		return (0);
 
+	/* Diagnostic check: check flags against approved list. */
+	WT_ENV_FCHK_RET(env, "Env.close", ienv->flags, WT_APIMASK_IENV, ret);
+
 	/* Free allocated memory. */
 	__wt_free(env, ienv->toc, 0);
 	__wt_free(env, ienv->toc_array, 0);

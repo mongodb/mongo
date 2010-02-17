@@ -34,6 +34,9 @@ extern "C" {
 /*
  * Flag checking for API functions.
  */
+#define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
+	if ((f) & ~(mask))						\
+		ret = __wt_api_args(env, name);
 #define	WT_ENV_FCHK(env, name, f, mask)					\
 	if ((f) & ~(mask))						\
 		return (__wt_api_args(env, name));

@@ -253,7 +253,7 @@ methods['env.verbose_get'] = Api(
 	['init'], [])
 methods['env.verbose_set'] = Api(
 	'env.verbose_set',
-	'method, setter',
+	'method, setter, verify',
 	['verbose/u_int32_t @S'],
 	['VERB_ALL',
 	 'VERB_FILEOPS'],

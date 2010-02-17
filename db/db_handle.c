@@ -142,6 +142,9 @@ __wt_idb_close(DB *db, int refresh)
 	if (idb == NULL)
 		return (0);
 
+	/* Diagnostic check: check flags against approved list. */
+	WT_ENV_FCHK_RET(env, "Db.close", idb->flags, WT_APIMASK_IDB, ret);
+
 	if (idb->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */
 		if (idb->huffman_data == idb->huffman_key)

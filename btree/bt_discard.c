@@ -96,8 +96,11 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 void
 __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 {
+	WT_COL_INDX *cip;
 	WT_ROW_INDX *rip;
 	u_int32_t i;
+
+	WT_CC_QUIET(cip, NULL);
 
 	WT_ASSERT(env, !F_ISSET(page, WT_MODIFIED));
 
@@ -106,18 +109,29 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		if (F_ISSET(page, WT_ALLOCATED)) {
-			WT_INDX_FOREACH(page, rip, i)
-				if (F_ISSET(rip, WT_ALLOCATED)) {
-					F_CLR(rip, WT_ALLOCATED);
-					__wt_free(env, rip->data, 0);
-				}
-			F_CLR(page, WT_ALLOCATED);
+		if (!F_ISSET(page, WT_ALLOCATED))
+			break;
+		WT_INDX_FOREACH(page, rip, i) {
+			if (F_ISSET(rip, WT_ALLOCATED)) {
+				F_CLR(rip, WT_ALLOCATED);
+				__wt_free(env, rip->data, 0);
+			}
+#ifdef DIAGNOSTIC
+			if (F_ISSET(rip, ~WT_APIMASK_WT_INDX))
+				(void)__wt_api_args(env, "Page.recycle");
+#endif
 		}
+		F_CLR(page, WT_ALLOCATED);
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
+#ifdef DIAGNOSTIC
+		WT_INDX_FOREACH(page, cip, i)
+			if (F_ISSET(cip, ~WT_APIMASK_WT_INDX))
+				(void)__wt_api_args(env, "Page.recycle");
+#endif
+		break;
 	case WT_PAGE_OVFL:
 	default:
 		break;
@@ -127,6 +141,11 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		__wt_free(env, page->u.indx, 0);
 
 	__wt_free(env, page->hdr, page->bytes);
+
+#ifdef DIAGNOSTIC
+	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
+		(void)__wt_api_args(env, "Page.recycle");
+#endif
 	__wt_free(env, page, sizeof(WT_PAGE));
 }
 

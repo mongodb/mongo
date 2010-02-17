@@ -955,6 +955,8 @@ static int __wt_api_env_verbose_set(
 	ENV *env,
 	u_int32_t verbose)
 {
+	WT_RET((__wt_env_verbose_set_verify(env, verbose)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	env->verbose = verbose;
 	__wt_unlock(&env->ienv->mtx);

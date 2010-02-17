@@ -102,6 +102,9 @@ __wt_cache_destroy(ENV *env)
 	if (!F_ISSET(cache, WT_INITIALIZED))
 		return (0);
 
+	/* Diagnostic check: check flags against approved list. */
+	WT_ENV_FCHK_RET(env, "Env.close", cache->flags, WT_APIMASK_CACHE, ret);
+
 	/*
 	 * Discard all pages.  No server support needed, this is done when the
 	 * environment is closed, after all threads of control have exited the

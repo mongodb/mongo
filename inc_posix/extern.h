@@ -150,6 +150,8 @@ __wt_env_hazard_size_set_verify(ENV *env, u_int32_t hazard_size);
 int
 __wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size);
 int
+__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose);
+int
 __wt_library_init(void);
 int
 __wt_breakpoint(void);

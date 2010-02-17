@@ -52,3 +52,15 @@ __wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size)
 	return (__wt_api_arg_min(env,
 	    "Env.toc_size_set", "toc size", toc_size, 1));
 }
+
+/*
+ * __wt_env_verbose_set_verify --
+ *	Verify an argument to the Env.verbose_set method.
+ */
+int
+__wt_env_verbose_set_verify(ENV *env, u_int32_t verbose)
+{
+	WT_ENV_FCHK(env,
+	    "Env.verbose_set", WT_APIMASK_ENV_VERBOSE_SET, verbose);
+	return (0);
+}
