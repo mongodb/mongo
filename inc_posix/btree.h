@@ -275,12 +275,7 @@ typedef	struct __wt_row_indx {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
-	/*
-	 * If the data has not been modified since the page was read into
-	 * the cache, page_data references the on-page data associated with
-	 * the entry.
-	 */
-	void *page_data;		/* Associated on-page data */
+	void *page_data;		/* Original on-page data */
 
 	/*
 	 * Data items on leaf pages may be updated with new data, stored in the
@@ -288,8 +283,8 @@ typedef	struct __wt_row_indx {
 	 * without first checking the hazard information -- we don't block the
 	 * readers when updating data items, and references may still be in use.
 	 */
-	WT_REPL	 *repl;			/* Replacement array */
-	u_int32_t repl_size;		/* Replacement array size */
+	WT_REPL	 *repl;			/* Replacement data array */
+	u_int32_t repl_size;		/* Replacement data array size */
 
 	u_int32_t flags;
 } WT_ROW_INDX;
@@ -307,12 +302,7 @@ typedef	struct __wt_row_indx {
  * item on a column-store database page.
  */
 typedef	struct __wt_col_indx {
-	/*
-	 * If the data has not been modified since the page was read into
-	 * the cache, page_data references the on-page data associated with
-	 * the entry.
-	 */
-	void *page_data;		/* Associated on-page data */
+	void *page_data;		/* Original on-page data */
 
 	/*
 	 * Data items on leaf pages may be updated with new data, stored in the
@@ -320,8 +310,8 @@ typedef	struct __wt_col_indx {
 	 * without first checking the hazard information -- we don't block the
 	 * readers when updating data items, and references may still be in use.
 	 */
-	WT_REPL	 *repl;			/* Replacement array */
-	u_int32_t repl_size;		/* Replacement array size */
+	WT_REPL	 *repl;			/* Replacement data array */
+	u_int32_t repl_size;		/* Replacement data array size */
 
 	u_int32_t flags;
 } WT_COL_INDX;
