@@ -473,7 +473,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	/*
 	 * The only remaining work is to compare the sort order of the keys on
 	 * the parent and child pages.  If the pages aren't sorted (that is, if
-	 * it's a column store), we're done.  Otherwise, choose a comparison
+	 * it's a column-store), we're done.  Otherwise, choose a comparison
 	 * function.
 	 */
 	switch (hdr->type) {
@@ -875,7 +875,7 @@ eop:			__wt_db_errx(db,
 
 		/*
 		 * When walking the whole file, verify off-page duplicate trees
-		 * (any off-page reference on a row store leaf page) as well as
+		 * (any off-page reference on a row-store leaf page) as well as
 		 * overflow references.
 		 *
 		 * Check to see if addresses are past EOF; the check is simple

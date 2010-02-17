@@ -48,7 +48,7 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 
 /*
  * __wt_bt_bulk_fix
- *	Db.bulk_load method for column store, fixed-length database pages.
+ *	Db.bulk_load method for column-store, fixed-length database pages.
  */
 static int
 __wt_bt_bulk_fix(DB *db,
@@ -200,7 +200,7 @@ err:		if (page != NULL)
 
 /*
  * __wt_bt_bulk_var --
- *	Db.bulk_load method for row or column store variable-length database
+ *	Db.bulk_load method for row or column-store variable-length database
  *	pages.
  */
 static int
@@ -259,7 +259,7 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 				ret = WT_ERROR;
 				goto err;
 			}
-		} else
+		} else {
 			if (key == NULL && !LF_ISSET(WT_DUPLICATES)) {
 				__wt_db_errx(db,
 				    "keys must be set unless duplicadtes are "
@@ -273,6 +273,7 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 				ret = WT_ERROR;
 				goto err;
 			}
+		}
 
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
@@ -285,8 +286,8 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 		 * Then, optionally compress using a Huffman engine.
 		 *
 		 * We don't have a key to store on the page if we're building a
-		 * column store, and we don't store the key on the page in the
-		 * case of a row store duplicate data item.  The check from here
+		 * column-store, and we don't store the key on the page in the
+		 * case of a row-store duplicate data item.  The check from here
 		 * on is if "key == NULL" for both cases, that is, there's no
 		 * key to store.
 		 */
@@ -814,13 +815,13 @@ __wt_bt_promote(
 	next = parent = NULL;
 
 	/*
-	 * If it's a row store, get a copy of the first item on the page -- it
+	 * If it's a row-store, get a copy of the first item on the page -- it
 	 * might be an overflow item, in which case we need to make a copy for
 	 * the database.  Most versions of Berkeley DB tried to reference count
 	 * overflow items if they were promoted to internal pages.  That turned
 	 * out to be hard to get right, so I'm not doing it again.
 	 *
-	 * If it's a column store page, we don't promote a key at all.
+	 * If it's a column-store page, we don't promote a key at all.
 	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_DUP_INT:

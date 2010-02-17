@@ -187,8 +187,8 @@ struct __wt_page_hdr {
 #define	WT_PAGE_DUP_INT		4	/* Duplicate tree internal page */
 #define	WT_PAGE_DUP_LEAF	5	/* Duplicate tree leaf page */
 #define	WT_PAGE_OVFL		6	/* Overflow page */
-#define	WT_PAGE_ROW_INT		7	/* Row store internal page */
-#define	WT_PAGE_ROW_LEAF	8	/* Row store leaf page */
+#define	WT_PAGE_ROW_INT		7	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	8	/* Row-store leaf page */
 	u_int8_t type;			/* 12: page type */
 
 	/*
@@ -200,7 +200,7 @@ struct __wt_page_hdr {
 
 	/*
 	 * WT_OFFPAGE_REF_LEAF --
-	 *	Used on WT_PAGE_COL_INT pages (column store internal pages),
+	 *	Used on WT_PAGE_COL_INT pages (column-store internal pages),
 	 *	specifies if offpage references are to internal pages or to
 	 *	leaf pages.  See note at __wt_off structure.
 	 */
@@ -412,11 +412,11 @@ struct __wt_item {
  *
  * Here's the usage by page type:
  *
- * WT_PAGE_ROW_INT (row store internal pages):
+ * WT_PAGE_ROW_INT (row-store internal pages):
  * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
  * followed by a WT_ITEM_OFF_INT/OFF_LEAF item).
  *
- * WT_PAGE_ROW_LEAF (row store primary leaf pages):
+ * WT_PAGE_ROW_LEAF (row-store primary leaf pages):
  * -- Variable-length key followed by a single variable-length/data item (a
  *    WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_DATA/DATA_OVFL item);
  * -- Variable-length key/offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
@@ -432,11 +432,11 @@ struct __wt_item {
  * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
  * Variable-length data items (WT_ITEM_DUP/DUP_OVFL).
  *
- * WT_PAGE_COL_VAR (Column store leaf page storing variable-length items):
+ * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length items):
  * Variable-length data items (WT_ITEM_DATA/DATA_OVFL).
  *
- * WT_PAGE_COL_INT (Column store internal page):
- * WT_PAGE_COL_FIX (Column store leaf page storing fixed-length items):
+ * WT_PAGE_COL_INT (Column-store internal page):
+ * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length items):
  * WT_PAGE_OVFL (Overflow page):
  *	These pages contain fixed-sized structures (WT_PAGE_COL_INT and
  *	WT_PAGE_COL_FIX), or a string of bytes (WT_PAGE_OVFL), and so do
@@ -512,7 +512,7 @@ struct __wt_item {
  * type: WT_ITEM_OFFP_INTL is an internal page reference, and WT_ITEM_OFFP_LEAF
  * is a leaf page reference.
  *
- * On pages without variable-length items (column store internal pages), we
+ * On pages without variable-length items (column-store internal pages), we
  * encode the information in the page header's flags field.
  *
  * This complicates the code, but 4 bytes per offpage reference is a real cost

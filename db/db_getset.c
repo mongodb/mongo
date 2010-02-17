@@ -57,7 +57,7 @@ __wt_db_column_set_verify(DB *db,
 		return (WT_ERROR);
 	}
 
-	/* Side-effect: this call means we're doing a column store. */
+	/* Side-effect: this call means we're doing a column-store. */
 	F_SET(idb, WT_COLUMN);
 	return (0);
 }

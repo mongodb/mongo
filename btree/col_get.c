@@ -61,7 +61,7 @@ err:	WT_TOC_DB_CLEAR(toc);
 
 /*
  * __wt_bt_search_recno_row --
- *	Search a row store tree for a specific record-based key.
+ *	Search a row-store tree for a specific record-based key.
  */
 static int
 __wt_bt_search_recno_row(
@@ -128,7 +128,7 @@ __wt_bt_search_recno_row(
 
 /*
  * __wt_bt_search_recno_col --
- *	Search a column store tree for a specific record-based key.
+ *	Search a column-store tree for a specific record-based key.
  */
 static int
 __wt_bt_search_recno_col(

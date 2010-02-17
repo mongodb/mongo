@@ -215,7 +215,7 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_item_int --
- *	Build in-memory index for row store and off-page duplicate tree
+ *	Build in-memory index for row-store and off-page duplicate tree
  *	internal pages.
  */
 static int
@@ -273,7 +273,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_row_leaf --
- *	Build in-memory index for row store leaf pages.
+ *	Build in-memory index for row-store leaf pages.
  */
 static int
 __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
@@ -355,7 +355,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_col_int --
- *	Build in-memory index for column store internal pages.
+ *	Build in-memory index for column-store internal pages.
  */
 static int
 __wt_bt_page_inmem_col_int(DB *db, WT_PAGE *page)
@@ -465,7 +465,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 
 /*
  * __wt_bt_page_inmem_col_fix --
- *	Build in-memory index for column store fixed-length leaf pages.
+ *	Build in-memory index for column-store fixed-length leaf pages.
  */
 static int
 __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
