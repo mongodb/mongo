@@ -615,6 +615,7 @@ namespace mongo {
         MongoProgramScope::~MongoProgramScope() {
             try {
                 KillMongoProgramInstances();
+                ClearRawMongoProgramOutput( BSONObj() );
             } catch ( ... ) {
                 assert( false );
             }

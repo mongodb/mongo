@@ -31,4 +31,4 @@ m.getDB( baseName )[ baseName ].save( {i:1001} );
 assert.soon( function() { return 1002 == s2.getDB( baseName )[ baseName ].count(); } );
 assert.soon( function() { return 1002 == s1.getDB( baseName )[ baseName ].count(); } );
 
-assert( !rawMongoProgramOutput().match( /resync: cloning database/ ) );
+assert( !rawMongoProgramOutput().match( /resync/ ) );
