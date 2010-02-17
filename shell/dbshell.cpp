@@ -517,10 +517,4 @@ int main(int argc, char* argv[]) {
     }
 }
 
-namespace mongo {
-    DBClientBase * createDirectClient(){
-        uassert( 10256 ,  "no createDirectClient in shell" , 0 );
-        return 0;
-    }
-}
 
