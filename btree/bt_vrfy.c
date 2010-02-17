@@ -14,7 +14,7 @@
  * together to make the code prettier.
  */
 typedef struct {
-	int frags;				/* Total frags */
+	u_int32_t frags;			/* Total frags */
 	bitstr_t *fragbits;			/* Frag tracking bit list */
 
 	FILE	*stream;			/* Dump file stream */
@@ -1145,13 +1145,14 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
 static int
 __wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
 {
-	int ffc, ffc_start, ffc_end, ret;
+	int ffc, ffc_start, ffc_end, frags, ret;
 
+	frags = (int)vs->frags;		/* XXX: bitstring.h wants "ints" */
 	ret = 0;
 
 	/* Check for page fragments we haven't verified. */
 	for (ffc_start = ffc_end = -1;;) {
-		bit_ffc(vs->fragbits, vs->frags, &ffc);
+		bit_ffc(vs->fragbits, frags, &ffc);
 		if (ffc != -1) {
 			bit_set(vs->fragbits, ffc);
 			if (ffc_start == -1) {

@@ -11,7 +11,7 @@
 
 /*
  * __wt_db_btree_compare_int_set_verify --
- *	Verify arguments to the Db.set_btree_compare_int setter.
+ *	Verify arguments to the Db.btree_compare_int_set method.
  */
 int
 __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
@@ -25,8 +25,33 @@ __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
 }
 
 /*
+ * __wt_db_btree_dup_offpage_set_verify --
+ *	Verify arguments to the Db.btree_dup_offpage_set method.
+ */
+int
+__wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage)
+{
+	/*
+	 * Limiting this value to something between 10 and 50 is a sanity test,
+	 * not a hard constraint (although a value of 100 might fail hard).
+	 *
+	 * If the value is too large, pages can end up being empty because it
+	 * isn't possible for duplicate sets to span pages.  So, if you set
+	 * the value to 50%, and you have two sequential, large duplicate sets,
+	 * you end up with two, half-empty pages.
+	 */
+	if (dup_offpage > 10 && dup_offpage <= 50)
+		return (0);
+
+	__wt_db_errx(db,
+	    "The percent of the page taken up by duplicate entries before "
+	    "being moved off-page must must be between 10 and 50");
+	return (WT_ERROR);
+}
+
+/*
  * __wt_db_column_set_verify --
- *	Verify arguments to the Db.set_column_set_verify setter.
+ *	Verify arguments to the Db.column_set method.
  */
 int
 __wt_db_column_set_verify(DB *db,
@@ -34,32 +59,22 @@ __wt_db_column_set_verify(DB *db,
 {
 	IDB *idb;
 
-	WT_CC_QUIET(dictionary, NULL);
-
 	idb = db->idb;
 
-	/* Repeat compression is incompatible with variable length records. */
-	if (LF_ISSET(WT_REPEAT_COMP)) {
-		if (fixed_len == 0) {
-			__wt_db_errx(db,
-			    "Repeat compression is incompatible with variable "
-			    "length records");
-			return (WT_ERROR);
-		}
-		F_SET(idb, WT_REPEAT_COMP);
-	}
-
 	/*
-	 * We limit the size of fixed-length objects to 64 bytes, just so we
-	 * don't have to deal with objects bigger than the page size.
+	 * Dictionary and repeat compression are incompatible with variable
+	 * length records.
 	 */
-	if (fixed_len > 64) {
+	if (fixed_len == 0 &&
+	    (dictionary != NULL || LF_ISSET(WT_REPEAT_COMP))) {
 		__wt_db_errx(db,
-		    "Fixed-length objects are limited to 64 bytes in size");
+		    "Repeated record count and dictionary compression are "
+		    "incompatible with variable length column-store records");
 		return (WT_ERROR);
 	}
 
-	/* Side-effect: this call means we're doing a column-store. */
+	if (LF_ISSET(WT_REPEAT_COMP))
+		F_SET(idb, WT_REPEAT_COMP);
 	F_SET(idb, WT_COLUMN);
 	return (0);
 }

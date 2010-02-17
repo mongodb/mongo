@@ -95,6 +95,8 @@ __wt_db_errx(DB *db, const char *fmt, ...);
 int
 __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int);
 int
+__wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage);
+int
 __wt_db_column_set_verify(DB *db,
     u_int32_t fixed_len, const char *dictionary, u_int32_t flags);
 int

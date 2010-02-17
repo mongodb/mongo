@@ -52,6 +52,10 @@ err:	WT_TRET(toc->close(toc, 0));
 static int
 __wt_bt_open_verify(DB *db)
 {
+	IDB *idb;
+
+	idb = db->idb;
+
 	/*
 	 * The application can set lots of sizes.  It's complicated enough
 	 * that instead of verifying them when they're set, we verify them
@@ -189,6 +193,18 @@ unexpected:	__wt_db_errx(db,
 		__wt_db_errx(db,
 		    "The leaf page size is too small for its maximum item "
 		    "size");
+		return (WT_ERROR);
+	}
+
+	/*
+	 * A fixed-size column store should be able to store at least 20
+	 * objects on a page, otherwise it just doesn't make sense.
+	 */
+	if (F_ISSET(idb, WT_COLUMN) &&
+	    db->fixed_len != 0 && db->leafsize / db->fixed_len < 20) {
+		__wt_db_errx(db,
+		    "The leaf page size cannot store at least 20 fixed-length "
+		    "objects");
 		return (WT_ERROR);
 	}
 

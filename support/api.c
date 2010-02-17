@@ -134,6 +134,8 @@ static int __wt_api_db_btree_dup_offpage_set(
 
 	env = db->env;
 
+	WT_RET((__wt_db_btree_dup_offpage_set_verify(db, btree_dup_offpage)));
+
 	__wt_lock(env, &env->ienv->mtx);
 	db->btree_dup_offpage = btree_dup_offpage;
 	__wt_unlock(&env->ienv->mtx);

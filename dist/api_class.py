@@ -309,7 +309,7 @@ methods['db.btree_dup_offpage_get'] = Api(
 	['init'], [])
 methods['db.btree_dup_offpage_set'] = Api(
 	'db.btree_dup_offpage_set',
-	'method, setter',
+	'method, setter, verify',
 	['btree_dup_offpage/u_int32_t @S'],
 	[],
 	['init'], ['open'])
