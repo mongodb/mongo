@@ -563,29 +563,24 @@ namespace mongo {
 
     JSBool dbref_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ){
         Convertor c( cx );
-                
+
         if ( argc == 2 ){
-            assert( JS_SetProperty( cx , obj , "$ref" , &(argv[0]) ) );
-            assert( JS_SetProperty( cx , obj , "$id" , &(argv[1]) ) );
+            JSObject * o = JS_NewObject( cx , NULL , NULL, NULL );
+            assert( o );
+            assert( JS_SetProperty( cx, o , "$ref" , &argv[ 0 ] ) );
+            assert( JS_SetProperty( cx, o , "$id" , &argv[ 1 ] ) );
+            BSONObj bo = c.toObject( o );
+            assert( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( bo.getOwned() ) ) ) );
             return JS_TRUE;
         }
         else {
             JS_ReportError( cx , "DBRef needs 2 arguments" );
+            assert( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( BSONObj().getOwned() ) ) ) );
             return JS_FALSE;            
         }
     }
  
-    JSClass dbref_class = {
-        "DBRef" , JSCLASS_HAS_PRIVATE ,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub , JS_ConvertStub, JS_FinalizeStub,
-        JSCLASS_NO_OPTIONAL_MEMBERS
-    };
-
-    JSFunctionSpec dbref_functions[] = {
-        { 0 }
-    };
-
+    JSClass dbref_class = bson_class; // name will be fixed later
 
     // BinData
 
@@ -817,7 +812,6 @@ namespace mongo {
         assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 0 , 0 , dbref_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
 
         assert( JS_InitClass( cx , global , 0 , &timestamp_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
@@ -829,6 +823,10 @@ namespace mongo {
         
         assert( JS_InitClass( cx , global , 0 , &bson_ro_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
         assert( JS_InitClass( cx , global , 0 , &bson_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
+        
+        static const char *dbrefName = "DBRef";
+        dbref_class.name = dbrefName;
+        assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
         
         scope->exec( jsconcatcode );
     }
