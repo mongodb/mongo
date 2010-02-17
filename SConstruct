@@ -249,6 +249,11 @@ AddOption("--nostrip",
           action="store_true",
           help="do not strip installed binaries")
 
+AddOption("--sharedclient",
+          dest="sharedclient",
+          action="store",
+          help="build a libmongoclient.so/.dll")
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -1091,6 +1096,8 @@ mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + s
 
 # c++ library
 clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
+if GetOption( "sharedclient" ):
+    sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + serverOnlyFiles + ["client/gridfs.cpp"])
 
 clientTests = []
