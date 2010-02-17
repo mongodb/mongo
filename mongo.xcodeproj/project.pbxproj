@@ -465,6 +465,9 @@
 		93B4A82A0F1C0256000C862C /* pdfiletests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pdfiletests.cpp; sourceTree = "<group>"; };
 		93B9F5A7112B12440066ECD2 /* slavefromsnapshot.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = slavefromsnapshot.js; sourceTree = "<group>"; };
 		93B9F671112B3AD40066ECD2 /* copyauth.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; name = copyauth.js; path = auth/copyauth.js; sourceTree = "<group>"; };
+		93B9F769112B6BE00066ECD2 /* slavefromsnapshot.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = slavefromsnapshot.js; sourceTree = "<group>"; };
+		93B9F76A112B6C020066ECD2 /* snapshot1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = snapshot1.js; sourceTree = "<group>"; };
+		93B9F76B112B6C1D0066ECD2 /* snapshot2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = snapshot2.js; sourceTree = "<group>"; };
 		93BC2AE10FB87662006BC285 /* cursortests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cursortests.cpp; sourceTree = "<group>"; };
 		93BC2AE20FB87662006BC285 /* jstests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jstests.cpp; sourceTree = "<group>"; };
 		93BCE15610F25DFE00FA139B /* arrayfind1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = arrayfind1.js; sourceTree = "<group>"; };
@@ -1000,6 +1003,9 @@
 		934BEC5010DFFA9600178102 /* repl */ = {
 			isa = PBXGroup;
 			children = (
+				93B9F76B112B6C1D0066ECD2 /* snapshot2.js */,
+				93B9F76A112B6C020066ECD2 /* snapshot1.js */,
+				93B9F769112B6BE00066ECD2 /* slavefromsnapshot.js */,
 				934BEC5110DFFA9600178102 /* basic1.js */,
 				934BEC5210DFFA9600178102 /* pair1.js */,
 				934BEC5310DFFA9600178102 /* pair2.js */,
