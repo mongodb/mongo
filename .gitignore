@@ -5,6 +5,7 @@
 
 *~
 *.o
+*.os
 *.obj
 *.aps
 *.ilk
