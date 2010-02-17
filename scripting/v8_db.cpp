@@ -498,7 +498,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> dbRefInit( const v8::Arguments& args ) {
 
-        if (args.Length() != 2) {
+        if (args.Length() != 2 && args.Length() != 0) {
             return v8::ThrowException( v8::String::New( "DBRef needs 2 arguments" ) );
         }
 
@@ -509,8 +509,10 @@ namespace mongo {
             it = f->NewInstance();
         }
 
-        it->Set( v8::String::New( "$ref" ) , args[0] );
-        it->Set( v8::String::New( "$id" ) , args[1] );
+        if ( args.Length() == 2 ) {
+            it->Set( v8::String::New( "$ref" ) , args[0] );
+            it->Set( v8::String::New( "$id" ) , args[1] );
+        }
 
         return it;
     }
