@@ -260,6 +260,13 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 				goto err;
 			}
 		} else
+			if (key == NULL && !LF_ISSET(WT_DUPLICATES)) {
+				__wt_db_errx(db,
+				    "keys must be set unless duplicadtes are "
+				    "configured");
+				ret = WT_ERROR;
+				goto err;
+			}
 			if (key->size == 0) {
 				__wt_db_errx(db,
 				    "zero-length keys are not supported");
@@ -328,8 +335,9 @@ skip_read:	/*
 		 * not allow zero-length keys.
 		 */
 		if (LF_ISSET(WT_DUPLICATES) &&
-		    lastkey->size == key->size &&
-		    db->btree_compare(db, lastkey, key) == 0) {
+		    (key == NULL ||
+		    (lastkey->size == key->size &&
+		    db->btree_compare(db, lastkey, key) == 0))) {
 			/*
 			 * The first duplicate in the set is already on the
 			 * page, but with an item type set to WT_ITEM_DATA or
