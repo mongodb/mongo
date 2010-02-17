@@ -2,7 +2,7 @@
 
 ports = allocatePorts( 3 );
 
-var baseName = "jstests_disk_slavefromsnapshot";
+var baseName = "repl_snapshot1";
 
 rt1 = new ReplTest( "repl_snapshot1-1", [ ports[ 0 ], ports[ 1 ] ] );
 rt2 = new ReplTest( "repl_snapshot1-2", [ ports[ 0 ], ports[ 2 ] ] );

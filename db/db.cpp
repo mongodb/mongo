@@ -649,6 +649,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
         ("pairwith", po::value<string>(), "address of server to pair with")
         ("arbiter", po::value<string>(), "address of arbiter server")
+        ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
@@ -873,6 +874,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("slave")) {
             replSettings.slave = SimpleSlave;
+        }
+        if (params.count("fastsync")) {
+            replSettings.fastsync = true;
         }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;

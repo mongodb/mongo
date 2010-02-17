@@ -58,10 +58,12 @@ namespace mongo {
 
         int opIdMem;
 
+        bool fastsync;
+        
         bool autoresync;
 
         ReplSettings()
-            : slave(NotSlave) , master(false) , opIdMem(100000000) , autoresync(false) {
+            : slave(NotSlave) , master(false) , opIdMem(100000000) , fastsync() , autoresync(false) {
         }
 
     };

@@ -682,6 +682,9 @@ namespace mongo {
         if ( replPair ) {
             const string &remote = replPair->remote;
             // --pairwith host specified.
+            if ( replSettings.fastsync ) {
+                Helpers::emptyCollection( "local.sources" );  // ignore saved sources
+            }
             // check that no items are in sources other than that
             // add if missing
             auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
@@ -717,12 +720,15 @@ namespace mongo {
                     tmp.syncedTo = OpTime();
                     tmp.replacing = true;
                 }
-            } else if ( !replPair & tmp.syncedTo.isNull()  ) {
+            } 
+            if ( ( !replPair && tmp.syncedTo.isNull() ) ||
+                ( replPair && replSettings.fastsync ) ) {
                 DBDirectClient c;
                 if ( c.exists( "local.oplog.$main" ) ) {
                     BSONObj op = c.findOne( "local.oplog.$main", Query().sort( BSON( "$natural" << -1 ) ) );
                     if ( !op.isEmpty() ) {
                         tmp.syncedTo = op[ "ts" ].date();
+                        tmp._lastSavedLocalTs = op[ "ts" ].date();
                     }
                 }
             }
