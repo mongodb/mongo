@@ -27,6 +27,7 @@ namespace mongo {
 
     class IndexSpec;
     class IndexType; // TODO: this name sucks
+    class IndexPlugin;
 
     /**
      * this represents an instance of a index plugin
@@ -36,10 +37,16 @@ namespace mongo {
      */
     class IndexType : boost::noncopyable {
     public:
+        IndexType( const IndexPlugin * plugin );
         virtual ~IndexType();
+
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
         virtual int compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const;
-    
+        
+        const IndexPlugin * getPlugin() const { return _plugin; }
+
+    protected:
+        const IndexPlugin * _plugin;
     };
     
     /**
@@ -63,6 +70,8 @@ namespace mongo {
                 return 0;
             return i->second;
         }
+
+        string getName() const { return _name; }
     private:
         string _name;
         static map<string,IndexPlugin*> * _plugins;
@@ -105,7 +114,16 @@ namespace mongo {
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
         BSONElement missingField() const { return _nullElt; }
+        
+        string getTypeName() const {
+            if ( _indexType.get() )
+                return _indexType->getPlugin()->getName();
+            return "";
+        }
 
+        IndexType* getType() const {
+            return _indexType.get();
+        }
     protected:
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
@@ -226,6 +244,8 @@ namespace mongo {
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill_idx();
+        
+        const IndexSpec& getSpec() const;
 
         operator string() const {
             return info.obj().toString();
