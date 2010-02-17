@@ -285,6 +285,35 @@ namespace QueryTests {
         }
     };
 
+    class TailableQueryOnId : public ClientBase {
+    public:
+        ~TailableQueryOnId() {
+            client().dropCollection( "unittests.querytests.TailableQueryOnId" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.TailableQueryOnId";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
+            OID id;
+            id.init("000000000000000000000000");
+            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "_id" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
+            c1->next();
+            c1->next();
+            ASSERT( !c1->more() );
+            c2->next();
+            c2->next();
+            ASSERT( !c2->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            ASSERT( c1->more() );
+            ASSERT_EQUALS( 2, c1->next().getIntField( "a" ) );
+            ASSERT( !c1->more() );
+            // ASSERT( c2->more() ); // SERVER-645
+            // ASSERT_EQUALS( 2, c2->next().getIntField( "a" ) );  // SERVER-645
+            ASSERT( !c2->more() );
+        }
+    };
+
     class OplogReplayMode : public ClientBase {
     public:
         ~OplogReplayMode() {
@@ -953,6 +982,7 @@ namespace QueryTests {
             add< EmptyTail >();
             add< TailableDelete >();
             add< TailableInsertDelete >();
+            add< TailableQueryOnId >();
             add< OplogReplayMode >();
             add< ArrayId >();
             add< UnderscoreNs >();
