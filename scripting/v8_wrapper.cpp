@@ -85,9 +85,10 @@ namespace mongo {
         internalFieldObjects->SetInternalFieldCount( 1 );
 
         if ( !o.IsEmpty() ) {
-            // do nothing
+            readOnly = false;
         } else if ( array ) {
             // NOTE Looks like it's impossible to add interceptors to v8 arrays.
+            readOnly = false;
             o = v8::Array::New();
         } else if ( !readOnly ) {
             o = v8::Object::New();
@@ -254,7 +255,7 @@ namespace mongo {
         
         }
 
-        if ( !array && readOnly ) {
+        if ( readOnly ) {
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );            
         }
