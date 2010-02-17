@@ -47,7 +47,6 @@ void	data_set_var(int, void *, u_int32_t *, int);
 int	dtype_arg(void);
 void	key_set(int, void *, u_int32_t *);
 int	load(void);
-void	progress(const char *, u_int64_t);
 int	read_check(void);
 void	setup(void);
 void	teardown(void);
@@ -280,7 +279,7 @@ main(int argc, char *argv[])
 #endif
 		teardown();
 
-		progress(NULL, 0);
+		track(NULL, 0);
 		(void)printf("OK\r");
 
 		rand_seed = rand() ^ time(NULL);
@@ -370,14 +369,14 @@ load()
 		assert(db->verify(db, track, 0) == 0);
 
 	if (op_dump) {
-		progress("debug dump", 0);
+		track("debug dump", 0);
 		assert((fp = fopen(MYDUMP, "w")) != NULL);
-		assert(db->dump(db, fp, WT_DEBUG) == 0);
+		assert(db->dump(db, fp, track, WT_DEBUG) == 0);
 		assert(fclose(fp) == 0);
 
-		progress("print dump", 0);
+		track("print dump", 0);
 		assert((fp = fopen(MYPRINT, "w")) != NULL);
-		assert(db->dump(db, fp, WT_PRINTABLES) == 0);
+		assert(db->dump(db, fp, track, WT_PRINTABLES) == 0);
 		assert(fclose(fp) == 0);
 	}
 
@@ -409,7 +408,7 @@ read_check_col()
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
-			progress("recno read-check", cnt);
+			track("recno read-check", cnt);
 			last_cnt = cnt;
 		}
 
@@ -468,7 +467,7 @@ read_check_row()
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
-			progress("key read-check", cnt);
+			track("key read-check", cnt);
 			last_cnt = cnt;
 		}
 
@@ -506,7 +505,7 @@ read_check_row()
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
-			progress("recno read-check", cnt);
+			track("recno read-check", cnt);
 			last_cnt = cnt;
 		}
 
@@ -569,7 +568,7 @@ write_check()
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
-			progress("key write-check", cnt);
+			track("key write-check", cnt);
 			last_cnt = cnt;
 		}
 
@@ -678,12 +677,6 @@ data_set_var(int cnt, void *dbufp, u_int32_t *dlenp, int dlen)
 
 void
 track(const char *s, u_int64_t i)
-{
-	progress(s, i);
-}
-
-void
-progress(const char *s, u_int64_t i)
 {
 	static int lastlen = 0;
 	int len;
