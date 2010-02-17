@@ -19,11 +19,11 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt)
 	u_int32_t len;
 	u_int8_t *userp, *treep;
 
-	/*lint -esym(715,db)
-	 *
+	/*
 	 * The DB * argument isn't used by the default routine, but is
 	 * a standard argument for user-specified comparison functions.
 	 */
+	WT_CC_QUIET(db, NULL);
 
 	/*
 	 * Return:

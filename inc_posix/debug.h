@@ -44,6 +44,14 @@ typedef struct __wt_mbuf {
 	size_t len;			/* Allocated length of the buffer */
 } WT_MBUF;
 
+/*
+ * Quiet a compiler warning by writing, and then reading, a variable.
+ */
+#define	WT_CC_QUIET(var, value)	do {				        \
+	(var) = (value);					        \
+	(var) = (var);						        \
+} while (0)
+
 #if defined(__cplusplus)
 }
 #endif
