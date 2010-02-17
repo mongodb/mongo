@@ -3,11 +3,17 @@ int
 __wt_db_bulk_load(DB *db, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
 int
+__wt_db_get_recno(
+    DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data);
+int
 __wt_bt_close(DB *db);
 int
 __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
+int
+__wt_bt_search_recno_col(
+    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, void *ipp);
 int
 __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
@@ -30,10 +36,6 @@ __wt_db_dump(
     DB *db, FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags);
 void
 __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
-int
-__wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data);
-int
-__wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data);
 int
 __wt_bt_build_verify(void);
 int
@@ -72,11 +74,17 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *ip);
 int
-__wt_db_get_recno(
-    DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data);
-int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
+int
+__wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data);
+int
+__wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data);
+int
+__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_ROW_INDX **ipp);
+int
+__wt_bt_search_recno_row(
+    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, void *ipp);
 int
 __wt_bt_stat(DB *db);
 int

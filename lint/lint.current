@@ -44,9 +44,23 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 ../btree/bt_bulk.c  1256  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
+--- Module:   ../btree/bt_cget.c (C)
+
 --- Module:   ../btree/bt_close.c (C)
 
 --- Module:   ../btree/bt_cmp.c (C)
+
+--- Module:   ../btree/bt_csrch.c (C)
+                                                              _
+#...                    WT_RECORDS((WT_OFF *)((ip)->page_data))
+			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
+../btree/bt_csrch.c  45  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                                                           _
+#...                 WT_RECORDS((WT_OFF *)((ip)->page_data))
+			record_cnt += WT_COL_OFF_RECORDS(ip);
+../btree/bt_csrch.c  47  Info 740: Unusual pointer cast (incompatible indirect
+    types)
 
 --- Module:   ../btree/bt_debug.c (C)
                                                                     _
@@ -76,22 +90,6 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
     have been initialized
 ../btree/bt_dump.c  123  Info 830: Location cited in prior message
 
---- Module:   ../btree/bt_key.c (C)
-                                                                          _
-				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_key.c  238  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                            _
-		if (cmp == 0) {
-../btree/bt_key.c  255  Warning 644: Variable 'cmp' (line 198) may not have
-    been initialized
-../btree/bt_key.c  198  Info 830: Location cited in prior message
-                                         _
-				*ipp = ip;
-../btree/bt_key.c  258  Info 771: Symbol 'ip' (line 196) conceivably not
-    initialized
-../btree/bt_key.c  196  Info 830: Location cited in prior message
-
 --- Module:   ../btree/bt_misc.c (C)
 
 --- Module:   ../btree/bt_open.c (C)
@@ -113,29 +111,37 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 ../btree/bt_page.c  399  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
---- Module:   ../btree/bt_recno.c (C)
+--- Module:   ../btree/bt_ret.c (C)
+
+--- Module:   ../btree/bt_rget.c (C)
+
+--- Module:   ../btree/bt_rput.c (C)
+
+--- Module:   ../btree/bt_rsrch.c (C)
+                                                                          _
+				cmp = db->btree_compare(db, key, (DBT *)ip);
+../btree/bt_rsrch.c  64  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                            _
+		if (cmp == 0) {
+../btree/bt_rsrch.c  81  Warning 644: Variable 'cmp' (line 24) may not have
+    been initialized
+../btree/bt_rsrch.c  24  Info 830: Location cited in prior message
+                                         _
+				*ipp = ip;
+../btree/bt_rsrch.c  84  Info 771: Symbol 'ip' (line 22) conceivably not
+    initialized
+../btree/bt_rsrch.c  22  Info 830: Location cited in prior message
                                                               _
 #...        WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			if (record_cnt + WT_ROW_OFF_RECORDS(ip) >= recno)
-../btree/bt_recno.c  97  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_rsrch.c  159  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                            _
 #...     WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			record_cnt += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_recno.c  99  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_rsrch.c  161  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                              _
-#...                    WT_RECORDS((WT_OFF *)((ip)->page_data))
-			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
-../btree/bt_recno.c  162  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                                                           _
-#...                 WT_RECORDS((WT_OFF *)((ip)->page_data))
-			record_cnt += WT_COL_OFF_RECORDS(ip);
-../btree/bt_recno.c  164  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-
---- Module:   ../btree/bt_ret.c (C)
 
 --- Module:   ../btree/bt_stat.c (C)
 
