@@ -61,7 +61,7 @@ main(int argc, char *argv[])
 			    progname, *argv, wiredtiger_strerror(ret));
 			goto err;
 		}
-		if ((ret = db->dump(db, stdout, flags)) != 0) {
+		if ((ret = db->dump(db, stdout, NULL, flags)) != 0) {
 			fprintf(stderr, "%s: Db.dump: %s\n",
 			    progname, wiredtiger_strerror(ret));
 			goto err;

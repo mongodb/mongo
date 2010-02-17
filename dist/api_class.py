@@ -377,6 +377,7 @@ methods['db.dump'] = Api(
 	'db.dump',
 	'method',
 	['stream/FILE *@S',
+	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['DEBUG',
 	 'PRINTABLES' ],

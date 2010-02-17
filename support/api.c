@@ -299,10 +299,12 @@ static int __wt_api_db_column_set(
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags);
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
+	void (*progress)(const char *, u_int64_t),
 	u_int32_t flags)
 {
 	ENV *env;
@@ -311,7 +313,7 @@ static int __wt_api_db_dump(
 
 	WT_ENV_FCHK(env, "DB.dump", flags, WT_APIMASK_DB_DUMP);
 
-	return (__wt_db_dump(db, stream, flags));
+	return (__wt_db_dump(db, stream, progress, flags));
 }
 
 static int __wt_api_db_errcall_get(
@@ -1026,7 +1028,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, u_int32_t , const char *, u_int32_t ))
 	    __wt_db_lockout;
 	db->dump = (int (*)
-	    (DB *, FILE *, u_int32_t ))
+	    (DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t ))
 	    __wt_db_lockout;
 	db->errcall_get = (int (*)
 	    (DB *, void (**)(const DB *, const char *)))
