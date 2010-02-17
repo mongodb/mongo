@@ -251,9 +251,9 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	else
 		fprintf(fp, "\troot addr %lu, ", (u_long)desc.root_addr);
 	if (desc.free_addr == WT_ADDR_INVALID)
-		fprintf(fp, "free addr (none), ");
+		fprintf(fp, "free addr (none)");
 	else
-		fprintf(fp, "free addr %lu, ", (u_long)desc.free_addr);
+		fprintf(fp, "free addr %lu", (u_long)desc.free_addr);
 	fprintf(fp, "\n}\n");
 }
 
