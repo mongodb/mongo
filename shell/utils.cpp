@@ -218,7 +218,13 @@ namespace mongo {
                 out = out.substr( len - 100000, 100000 );
             return BSON( "" << out );
         }
-                
+
+        BSONObj ClearRawMongoProgramOutput( const BSONObj &args ) {
+            boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            mongoProgramOutput_.str( "" );
+            return undefined_;
+        }
+        
         class ProgramRunner {
             vector<string> argv_;
             int port_;
@@ -660,6 +666,7 @@ namespace mongo {
             scope.injectNative( "stopMongoProgram", StopMongoProgram );        
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
+            scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
 
             //can't access filesystem
             scope.injectNative( "removeFile" , removeFile );

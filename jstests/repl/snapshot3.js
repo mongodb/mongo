@@ -17,7 +17,9 @@ big = new Array( 2000 ).toString();
 rp.slave().setSlaveOk();
 for( i = 0; i < 1000; ++i ) {
     rp.master().getDB( baseName )[ baseName ].save( { _id: new ObjectId(), i: i, b: big } );
-    assert.soon( function() { return i+1 == rp.slave().getDB( baseName )[ baseName ].count(); } );    
+    if ( i % 250 == 249 ) {
+        assert.soon( function() { return i+1 == rp.slave().getDB( baseName )[ baseName ].count(); } );    
+    }
 }
 
 rp.slave().getDB( "admin" ).runCommand( {fsync:1,lock:1} );
@@ -25,14 +27,16 @@ leftSlave = ( rp.slave().host == rp.left().host );
 rp.killNode( rp.master() );
 if ( leftSlave ) {
     copyDbpath( basePath + "-left", basePath + "-right" );
-    rp.right_.extraArgs_ = [ "--fastsync" ];
 } else {
     copyDbpath( basePath + "-right", basePath + "-left" );    
-    rp.left_.extraArgs_ = [ "--fastsync" ];
 }
 rp.slave().getDB( "admin" ).$cmd.sys.unlock.findOne();
-assert.commandWorked( rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} ) );
 rp.killNode( rp.slave() );                     
+
+clearRawMongoProgramOutput();
+
+rp.right_.extraArgs_ = [ "--fastsync" ];
+rp.left_.extraArgs_ = [ "--fastsync" ];
 
 rp.start( true );
 rp.waitForSteadyState();
