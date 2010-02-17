@@ -33,7 +33,7 @@ __wt_db_get_recno(
 
 	/* Check for a record past the end of the database. */
 	if (idb->root_page->records < recno)
-		return (WT_ERROR);
+		return (WT_NOTFOUND);
 
 	/*
 	 * Initialize the thread-of-control structure.
