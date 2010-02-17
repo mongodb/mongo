@@ -546,8 +546,8 @@ skip_read:	/*
 		 * move it offpage.
 		 */
 		if (LF_ISSET(WT_DUPLICATES) &&
-		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP ||
-		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP_OVFL) {
+		    (WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP ||
+		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP_OVFL)) {
 			++dup_count;
 			dup_space += data->size;
 
