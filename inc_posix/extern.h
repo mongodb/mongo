@@ -24,7 +24,8 @@ __wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp);
 int
 __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr);
 int
-__wt_db_dump(DB *db, FILE *stream, u_int32_t flags);
+__wt_db_dump(
+    DB *db, FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags);
 void
 __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
 int
@@ -67,15 +68,13 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_page_inmem_append(DB *db, WT_PAGE *page, WT_ITEM *key, void *page_data);
-int
-__wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_INDX *ip);
+__wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *ip);
 int
 __wt_db_get_recno(
     DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data);
 int
 __wt_bt_dbt_return(WT_TOC *toc,
-    DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return);
+    DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
 int
 __wt_bt_stat(DB *db);
 int
@@ -83,8 +82,8 @@ __wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t));
 int
 __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t));
 int
-__wt_bt_verify_int(
-    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream);
+__wt_bt_verify_int(WT_TOC *toc,
+    void (*f)(const char *s, u_int64_t), const char *ptag, FILE *stream);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);
 void

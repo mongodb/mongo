@@ -15,29 +15,30 @@ static int __wt_bt_dbt_copyout(
 
 /*
  * __wt_bt_dbt_return --
- *	Copy a WT_PAGE/WT_INDX pair into a key/data pair for return to the
- *	application.
+ *	Retrun a WT_PAGE/WT_{ROW,COL}_INDX pair to the application.
  */
 int
 __wt_bt_dbt_return(WT_TOC *toc,
-    DBT *key, DBT *data, WT_PAGE *page, WT_INDX *ip, int key_return)
+    DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return)
 {
 	DB *db;
 	DBT local_key, local_data;
 	IDB *idb;
+	WT_COL_INDX *cip;
 	WT_ITEM *item;
 	WT_OVFL *ovfl;
 	WT_PAGE *ovfl_page;
+	WT_ROW_INDX *rip;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;
 	idb = db->idb;
-	ovfl_page = NULL;
+	cip = ip;
+	ovfl = NULL;
+	rip = ip;
 	callback = data->callback;
 
 	/*
-	 * Hand out a key/data pair.
-	 *
 	 * If the key/data items are being passed to a callback routine and
 	 * there's nothing special about them (they aren't uninstantiated
 	 * overflow or compressed items), then give the callback a pointer to
@@ -56,17 +57,21 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	 *
 	 * Handle the key item -- the key may be unchanged, in which case we
 	 * don't touch it, it's already correct.
+	 *
+	 * Key return implies a reference to a WT_ROW_INDX index -- we don't
+	 * return record number keys (yet -- that will probably change when I
+	 * add cursor support).
 	 */
 	if (key_return) {
 		if (callback != NULL &&
-		    ip->data != NULL && !F_ISSET(ip, WT_HUFFMAN)) {
+		    rip->data != NULL && !F_ISSET(rip, WT_HUFFMAN)) {
 			WT_CLEAR(local_key);
 			key = &local_key;
-			key->data = ip->data;
-			key->size = ip->size;
+			key->data = rip->data;
+			key->size = rip->size;
 		} else
 			WT_RET(__wt_bt_dbt_copyout(toc, key, &toc->key,
-			    ip->data, ip->size, WT_INDX_NEED_PROCESS(ip) ?
+			    rip->data, rip->size, WT_ROW_INDX_PROCESS(rip) ?
 			    WT_KEY : WT_KEY_NO_HUFFMAN));
 	}
 
@@ -76,16 +81,52 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	 * If it's been updated, it's easy, take the last data item, it's just
 	 * a byte string.
 	 */
-	if (ip->repl != NULL) {
-		data->data = ip->repl[0].data;
-		data->size = ip->repl[0].size;
-		return (callback == NULL ? 0 : callback(db, key, data));
+	switch (page->hdr->type) {
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_LEAF:
+		if (rip->repl != NULL) {
+			data->data = rip->repl[0].data;
+			data->size = rip->repl[0].size;
+			return (callback == NULL ? 0 : callback(db, key, data));
+		}
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		if (cip->repl != NULL) {
+			data->data = cip->repl[0].data;
+			data->size = cip->repl[0].size;
+			return (callback == NULL ? 0 : callback(db, key, data));
+		}
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
 
+	/*
+	 * Copy the data item out.   In the case of a variable-length column-
+	 * or row-store leaf page, we have to get it from the page.
+	 */
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_VAR:
+		item = cip->page_data;
+		if (callback != NULL &&
+		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
+		    idb->huffman_data == NULL) {
+			WT_CLEAR(local_data);
+			data = &local_data;
+			data->data = WT_ITEM_BYTE(item);
+			data->size = WT_ITEM_LEN(item);
+			break;
+		}
+		if (WT_ITEM_TYPE(item) != WT_ITEM_DATA) {
+			ovfl = WT_ITEM_BYTE_OVFL(cip->page_data);
+			goto overflow;
+		}
+
+		WT_RET(__wt_bt_dbt_copyout(toc, data, &toc->data,
+		    WT_ITEM_BYTE(item), WT_ITEM_LEN(item), WT_DATA));
+		break;
 	case WT_PAGE_ROW_LEAF:
-		item = ip->page_data;
+		item = rip->page_data;
 		if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DATA &&
 		    idb->huffman_data == NULL) {
@@ -96,36 +137,39 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			break;
 		}
 
-		if (WT_ITEM_TYPE(item) != WT_ITEM_DATA)
+		if (WT_ITEM_TYPE(item) != WT_ITEM_DATA) {
+			ovfl = WT_ITEM_BYTE_OVFL(rip->page_data);
 			goto overflow;
+		}
 
 		WT_RET(__wt_bt_dbt_copyout(toc, data, &toc->data,
 		    WT_ITEM_BYTE(item), WT_ITEM_LEN(item), WT_DATA));
 		break;
 	case WT_PAGE_DUP_LEAF:
-		item = ip->page_data;
+		item = rip->page_data;
 		if (callback != NULL &&
 		    WT_ITEM_TYPE(item) == WT_ITEM_DUP &&
 		    idb->huffman_data == NULL) {
 			WT_CLEAR(local_data);
 			data = &local_data;
-			data->data = ip->data;
-			data->size = ip->size;
+			data->data = rip->data;
+			data->size = rip->size;
 			break;
 		}
 
-		if (WT_ITEM_TYPE(item) != WT_ITEM_DUP)
+		if (WT_ITEM_TYPE(item) != WT_ITEM_DUP) {
+			ovfl = WT_ITEM_BYTE_OVFL(rip->page_data);
 			goto overflow;
+		}
 
 		WT_RET(__wt_bt_dbt_copyout(toc, data,
-		    &toc->data, ip->data, ip->size, WT_DATA));
+		    &toc->data, rip->data, rip->size, WT_DATA));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
 	if (0) {
-overflow:	ovfl = (WT_OVFL *)WT_ITEM_BYTE(ip->page_data);
-		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+overflow:	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
 		ret = __wt_bt_dbt_copyout(toc, data,
 		    &toc->data, WT_PAGE_BYTE(ovfl_page), ovfl->len, WT_DATA);
 		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));

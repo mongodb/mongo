@@ -21,7 +21,7 @@ serial['cache_in'] = [
 	'u_int32_t/bytes']
 
 serial['bt_put'] = [
-	'WT_INDX */indx',
+	'WT_ROW_INDX */indx',
 	'WT_REPL */repl',
 	'u_int32_t/repl_size',
 	'void */data',

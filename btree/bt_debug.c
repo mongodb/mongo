@@ -15,9 +15,10 @@ static void __wt_bt_debug_dbt(const char *, void *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
+static int  __wt_bt_debug_page_col_inmemory(WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
-static int  __wt_bt_debug_page_inmemory(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
+static int  __wt_bt_debug_page_row_inmemory(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
 static int
@@ -61,7 +62,7 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_bt_verify_int(toc, NULL, fp);
+	ret = __wt_bt_verify_int(toc, NULL, NULL, fp);
 
 	if (do_close)
 		(void)fclose(fp);
@@ -142,29 +143,28 @@ __wt_bt_debug_page(
 	int do_close, ret;
 
 	db = toc->db;
+	hdr = page->hdr;
 	ret = 0;
 
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
-	if (page->addr == 0)
-		__wt_bt_debug_desc(page, fp);
-
 	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
 	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
 
-	fprintf(fp,
-	    "\taddr %lu, bytes %lu\n", (u_long)page->addr, (u_long)page->bytes);
-	fprintf(fp, "\tfirst-free %#lx, space avail: %lu, records: %llu\n",
-	    (u_long)page->first_free, (u_long)page->space_avail, page->records);
+	fprintf(fp, "\taddr %lu, bytes %lu, lsn %lu/%lu\n",
+	    (u_long)page->addr, (u_long)page->bytes,
+	    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
 
-	hdr = page->hdr;
 	fprintf(fp, "\t%s: ", __wt_bt_hdr_type(hdr));
 	if (hdr->type == WT_PAGE_OVFL)
-		fprintf(fp, "%lu bytes", (u_long)hdr->u.datalen);
-	else
-		fprintf(fp, "%lu entries", (u_long)hdr->u.entries);
-	fprintf(fp,
-	    ", lsn %lu/%lu\n", (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
+		fprintf(fp, "%lu bytes\n", (u_long)hdr->u.datalen);
+	else {
+		fprintf(fp, "%lu entries, %llu records\n",
+		    (u_long)hdr->u.entries, page->records);
+		fprintf(fp,
+		    "\tfirst-free %#lx, space avail: %lu\n",
+		    (u_long)page->first_free, (u_long)page->space_avail);
+	}
 	if (hdr->prntaddr == WT_ADDR_INVALID)
 		fprintf(fp, "\tprntaddr (none), ");
 	else
@@ -179,8 +179,26 @@ __wt_bt_debug_page(
 		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
 	fprintf(fp, "\n}\n");
 
+	if (page->addr == 0)
+		__wt_bt_debug_desc(page, fp);
+
 	if (inmemory)
-		ret = __wt_bt_debug_page_inmemory(page, fp);
+		switch (hdr->type) {
+		case WT_PAGE_DUP_INT:
+		case WT_PAGE_DUP_LEAF:
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			ret = __wt_bt_debug_page_row_inmemory(page, fp);
+			break;
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_VAR:
+			ret = __wt_bt_debug_page_col_inmemory(page, fp);
+			break;
+		case WT_PAGE_OVFL:
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
 	else
 		switch (hdr->type) {
 		case WT_PAGE_COL_VAR:
@@ -240,14 +258,43 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_page_inmemory --
- *	Dump the WT_PAGE information.
+ * __wt_bt_debug_page_col_inmemory --
+ *	Dump the WT_PAGE information for a column-store.
  */
 static int
-__wt_bt_debug_page_inmemory(WT_PAGE *page, FILE *fp)
+__wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
 {
+	WT_COL_INDX *ip;
 	u_int32_t i, icnt, repl_cnt;
-	WT_INDX *ip;
+
+	if (fp == NULL)				/* Callable from a debugger. */
+		fp = stdout;
+
+	icnt = 0;
+	WT_INDX_FOREACH(page, ip, i) {
+		fprintf(fp, "%6lu: {flags %#lx}\n", ++icnt, (u_long)ip->flags);
+		if (ip->page_data != NULL)
+			fprintf(fp, "\tpage_data: %#lx",
+			    WT_ADDR_TO_ULONG(ip->page_data));
+		if (ip->repl != NULL)
+			for (repl_cnt = 0; repl_cnt < ip->repl_size; ++repl_cnt)
+				if (ip->repl[repl_cnt].data != NULL)
+					__wt_bt_debug_dbt("\trepl dbt",
+					    &ip->repl[repl_cnt], fp);
+		fprintf(fp, "\n");
+	}
+	return (0);
+}
+
+/*
+ * __wt_bt_debug_page_row_inmemory --
+ *	Dump the WT_PAGE information for a row-store.
+ */
+static int
+__wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
+{
+	WT_ROW_INDX *ip;
+	u_int32_t i, icnt, repl_cnt;
 
 	if (fp == NULL)				/* Callable from a debugger. */
 		fp = stdout;
@@ -278,23 +325,19 @@ static int
 __wt_bt_debug_page_item(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
-	u_int32_t i;
-	u_int8_t *p;
+	u_int32_t i, cnt;
 
 	if (fp == NULL)				/* Callable from a debugger. */
 		fp = stdout;
 
-	for (p = WT_PAGE_BYTE(page),
-	    hdr = page->hdr, i = 1; i <= hdr->u.entries; ++i) {
-		item = (WT_ITEM *)p;
+	cnt = 1;
+	WT_ITEM_FOREACH(page, item, i) {
 		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
-		    (u_long)i, __wt_bt_item_type(item),
+		    (u_long)cnt++, __wt_bt_item_type(item),
 		    (u_long)WT_ITEM_LEN(item),
-		    (u_long)(p - (u_int8_t *)hdr));
+		    (u_long)((u_int8_t *)item - (u_int8_t *)(page->hdr)));
 		WT_RET(__wt_bt_debug_item_data(toc, item, fp));
 		fprintf(fp, "}\n");
-		p += WT_ITEM_SPACE_REQ(WT_ITEM_LEN(item));
 	}
 	return (0);
 }
@@ -387,7 +430,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
-		ovfl = (WT_OVFL *)WT_ITEM_BYTE(item);
+		ovfl = WT_ITEM_BYTE_OVFL(item);
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
@@ -399,7 +442,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_OFF_INT:
 	case WT_ITEM_OFF_LEAF:
-		offp = (WT_OFF *)WT_ITEM_BYTE(item);
+		offp = WT_ITEM_BYTE_OFF(item);
 		fprintf(fp, "addr: %lu, records %llu",
 		    (u_long)offp->addr, WT_RECORDS(offp));
 		return (0);

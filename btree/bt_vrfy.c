@@ -20,6 +20,7 @@ typedef struct {
 	FILE	*stream;			/* Dump file stream */
 
 	void (*f)(const char *s, u_int64_t);	/* Progress callback */
+	const char *ptag;			/* Progress tag */
 	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
@@ -47,7 +48,7 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
 	WT_RET(env->toc(env, 0, &toc));
 	WT_TOC_DB_INIT(toc, db, "Db.verify");
 
-	ret = __wt_bt_verify_int(toc, f, NULL);
+	ret = __wt_bt_verify_int(toc, f, "Db.verify", NULL);
 
 	WT_TRET(toc->close(toc, 0));
 
@@ -59,8 +60,8 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_bt_verify_int(
-    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream)
+__wt_bt_verify_int(WT_TOC *toc,
+    void (*f)(const char *s, u_int64_t), const char *ptag, FILE *stream)
 {
 	DB *db;
 	ENV *env;
@@ -77,6 +78,7 @@ __wt_bt_verify_int(
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.stream = stream;
 	vstuff.f = f;
+	vstuff.ptag = ptag;
 
 	/*
 	 * If we don't have a root page yet, read the database description
@@ -133,6 +135,10 @@ __wt_bt_verify_int(
 err:	if (vstuff.fragbits != NULL)
 		__wt_free(env, vstuff.fragbits, 0);
 
+	/* Wrap up reporting. */
+	if (vstuff.f != NULL)
+		vstuff.f(vstuff.ptag, vstuff.fcnt);
+
 	return (ret);
 }
 
@@ -144,9 +150,9 @@ static int
 __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 {
 	DB *db;
-	WT_INDX *page_indx, *prev_indx;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
+	WT_ROW_INDX *page_ip, *prev_ip;
 	u_int32_t addr_arg;
 	int first, isleaf_arg, ret;
 	int (*func)(DB *, const DBT *, const DBT *);
@@ -319,13 +325,13 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		if (func == NULL || prev == NULL)
 			continue;
 
-		prev_indx = prev->indx + (prev->indx_count - 1);
-		if (WT_INDX_NEED_PROCESS(prev_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, prev, prev_indx));
-		page_indx = page->indx;
-		if (WT_INDX_NEED_PROCESS(page_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, page, page_indx));
-		if (func(db, (DBT *)prev_indx, (DBT *)page_indx) >= 0) {
+		prev_ip = prev->u.r_indx + (prev->indx_count - 1);
+		if (WT_ROW_INDX_PROCESS(prev_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, prev, prev_ip));
+		page_ip = page->u.r_indx;
+		if (WT_ROW_INDX_PROCESS(page_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, page, page_ip));
+		if (func(db, (DBT *)prev_ip, (DBT *)page_ip) >= 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
 			    "after the last key on the previous page",
@@ -355,9 +361,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
 	WT_OFF *offp;
-	WT_INDX *child_indx, *parent_indx;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
+	WT_ROW_INDX *child_ip, *parent_ip;
 	u_int32_t addr, frags, i, nextaddr, root_addr;
 	int (*func)(DB *, const DBT *, const DBT *);
 	int ret;
@@ -427,18 +433,18 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	switch (parent->hdr->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(parent, parent_indx, i)
-			if (WT_ROW_OFF_ADDR(parent_indx) == addr)
+		WT_INDX_FOREACH(parent, parent_ip, i)
+			if (WT_ROW_OFF_ADDR(parent_ip) == addr)
 				break;
 		break;
 	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(parent, parent_indx, i)
-			if (WT_COL_OFF_ADDR(parent_indx) == addr)
+		WT_INDX_FOREACH(parent, parent_ip, i)
+			if (WT_COL_OFF_ADDR(parent_ip) == addr)
 				break;
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
-	if (parent_indx == NULL) {
+	if (parent_ip == NULL) {
 		__wt_db_errx(db,
 		    "parent of page at addr %lu doesn't reference it",
 		    (u_long)addr);
@@ -448,11 +454,11 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	/* Check that the record counts are correct. */
 	switch (parent->hdr->type) {
 	case WT_PAGE_COL_INT:
-		offp = (WT_OFF *)parent_indx->page_data;
+		offp = (WT_OFF *)parent_ip->page_data;
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		offp = (WT_OFF *)WT_ITEM_BYTE(parent_indx->page_data);
+		offp = WT_ITEM_BYTE_OFF(parent_ip->page_data);
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
@@ -495,28 +501,28 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * set (in other words, the parent is the smallest page on its level),
 	 * confirm that's also the case for the child.
 	 */
-	if (parent_indx == parent->indx) {
+	if (parent_ip == parent->u.r_indx) {
 		if (((hdr->prevaddr == WT_ADDR_INVALID &&
 		    parent->hdr->prevaddr != WT_ADDR_INVALID) ||
 		    (hdr->prevaddr != WT_ADDR_INVALID &&
 		    parent->hdr->prevaddr == WT_ADDR_INVALID))) {
 			__wt_db_errx(db,
 			    "parent key of page at addr %lu is the smallest "
-			    "in its level, but the page is not the smallest "
-			    "in its level",
+			    "key in its level of the tree, but the child key "
+			    "is not the smallest key in its level",
 			    (u_long)addr);
 			goto err_set;
 		}
 	} else {
 		/* The two keys we're going to compare may be overflow keys. */
-		child_indx = child->indx;
-		if (WT_INDX_NEED_PROCESS(child_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, child, child_indx));
-		if (WT_INDX_NEED_PROCESS(parent_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_indx));
+		child_ip = child->u.r_indx;
+		if (WT_ROW_INDX_PROCESS(child_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, child, child_ip));
+		if (WT_ROW_INDX_PROCESS(parent_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_ip));
 
 		/* Compare the parent's key against the child's key. */
-		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) < 0) {
+		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) < 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu sorts before "
 			    "its reference key on its parent's page",
@@ -536,7 +542,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * is not set (in other words, the parent is the largest page on its
 	 * level), confirm that's also the case for the child.
 	 */
-	if (parent_indx == (parent->indx + (parent->indx_count - 1))) {
+	if (parent_ip == (parent->u.r_indx + (parent->indx_count - 1))) {
 		nextaddr = parent->hdr->nextaddr;
 		if ((hdr->nextaddr == WT_ADDR_INVALID &&
 		    nextaddr != WT_ADDR_INVALID) ||
@@ -556,20 +562,20 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 			parent = NULL;
 		else {
 			WT_RET(__wt_bt_page_in(toc, nextaddr, 0, 1, &parent));
-			parent_indx = parent->indx;
+			parent_ip = parent->u.r_indx;
 		}
 	} else
-		++parent_indx;
+		++parent_ip;
 
 	if (parent != NULL) {
 		/* The two keys we're going to compare may be overflow keys. */
-		child_indx = child->indx + (child->indx_count - 1);
-		if (WT_INDX_NEED_PROCESS(child_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, child, child_indx));
-		if (WT_INDX_NEED_PROCESS(parent_indx))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_indx));
+		child_ip = child->u.r_indx + (child->indx_count - 1);
+		if (WT_ROW_INDX_PROCESS(child_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, child, child_ip));
+		if (WT_ROW_INDX_PROCESS(parent_ip))
+			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_ip));
 		/* Compare the parent's key against the child's key. */
-		if (func(db, (DBT *)child_indx, (DBT *)parent_indx) >= 0) {
+		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) >= 0) {
 			__wt_db_errx(db,
 			    "the last key on page at addr %lu sorts after the "
 			    "first key on a parent page",
@@ -607,9 +613,9 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	hdr = page->hdr;
 	addr = page->addr;
 
-	/* Report progress every 10 pages. */
-	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 10 == 0)
-		vs->f("Db.verify", vs->fcnt);
+	/* Report progress every 100 pages. */
+	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 100 == 0)
+		vs->f(vs->ptag, vs->fcnt);
 
 	/*
 	 * If we're verifying the whole tree, complain if there's a page
@@ -882,7 +888,7 @@ eop:			__wt_db_errx(db,
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
-				ovflp = (WT_OVFL *)WT_ITEM_BYTE(item);
+				ovflp = WT_ITEM_BYTE_OVFL(item);
 				if (WT_ADDR_TO_OFF(db, ovflp->addr) +
 				    WT_OVFL_BYTES(db, ovflp->len) >
 				    idb->fh->file_size)
@@ -892,7 +898,7 @@ eop:			__wt_db_errx(db,
 			case WT_ITEM_OFF_INT:
 				if (hdr->type != WT_PAGE_ROW_LEAF)
 					break;
-				offp = (WT_OFF *)WT_ITEM_BYTE(item);
+				offp = WT_ITEM_BYTE_OFF(item);
 				if (WT_ADDR_TO_OFF(db, offp->addr) +
 				    db->intlsize > idb->fh->file_size)
 					goto eof;
@@ -902,7 +908,7 @@ eop:			__wt_db_errx(db,
 			case WT_ITEM_OFF_LEAF:
 				if (hdr->type != WT_PAGE_ROW_LEAF)
 					break;
-				offp = (WT_OFF *)WT_ITEM_BYTE(item);
+				offp = WT_ITEM_BYTE_OFF(item);
 				if (WT_ADDR_TO_OFF(db, offp->addr) +
 				    db->leafsize > idb->fh->file_size) {
 eof:					__wt_db_errx(db,

@@ -21,16 +21,19 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
+__wt_db_dump(
+    DB *db, FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags)
 {
 	ENV *env;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	WT_TOC *toc;
+	u_int64_t fcnt;
 	u_int32_t addr;
 	int ret;
 
 	env = db->env;
+	fcnt = 0;
 	ret = 0;
 
 	WT_RET(env->toc(env, 0, &toc));
@@ -43,7 +46,7 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before walking it.
 		 */
-		ret = __wt_bt_verify_int(toc, NULL, stream);
+		ret = __wt_bt_verify_int(toc, f, "Db.dump", stream);
 #else
 		__wt_db_errx(db, "library not built for debugging");
 		ret = WT_ERROR;
@@ -78,9 +81,18 @@ __wt_db_dump(DB *db, FILE *stream, u_int32_t flags)
 		WT_ERR(__wt_bt_page_out(toc, page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
+
+		/* Report progress every 100 pages. */
+		if (f != NULL && ++fcnt % 100 == 0)
+			f("Db.dump", fcnt);
 	}
 
 err:	WT_TRET(toc->close(toc, 0));
+
+	/* Wrap up reporting. */
+	if (f != NULL)
+		f("Db.dump", fcnt);
+
 	return (ret);
 }
 
@@ -152,7 +164,7 @@ __wt_bt_dump_page_item(
 			/* FALLTHROUGH */
 		case WT_ITEM_DATA_OVFL:
 		case WT_ITEM_DUP_OVFL:
-			ovfl = (WT_OVFL *)WT_ITEM_BYTE(item);
+			ovfl = WT_ITEM_BYTE_OVFL(item);
 			WT_ERR(__wt_bt_ovfl_in(
 			    toc, ovfl->addr, ovfl->len, &ovfl_page));
 
@@ -217,7 +229,7 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 	 *
 	 * We need to know what kind of page we're getting, use the item type.
 	 */
-	addr = ((WT_OFF *)WT_ITEM_BYTE(item))->addr;
+	addr = WT_ITEM_BYTE_OFF(item)->addr;
 	isleaf = WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0;
 
 	/* Walk down the duplicates tree to the first leaf page. */
@@ -244,7 +256,7 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 				    WT_ITEM_LEN(item), stream);
 				break;
 			case WT_ITEM_DUP_OVFL:
-				ovfl = (WT_OVFL *)WT_ITEM_BYTE(item);
+				ovfl = WT_ITEM_BYTE_OVFL(item);
 				WT_ERR(__wt_bt_ovfl_in(toc,
 				    ovfl->addr, ovfl->len, &ovfl_page));
 				func(

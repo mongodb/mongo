@@ -200,7 +200,7 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 		case WT_ITEM_OFF_LEAF:
 			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);
 			WT_RET(__wt_bt_stat_level(toc,
-			    ((WT_OFF *)WT_ITEM_BYTE(item))->addr,
+			    WT_ITEM_BYTE_OFF(item)->addr,
 			    WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0));
 			break;
 		WT_ILLEGAL_FORMAT(db);

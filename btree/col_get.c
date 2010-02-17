@@ -9,10 +9,8 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_search_recno_col(
-    WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
-static int __wt_bt_search_recno_row(
-    WT_TOC *, u_int64_t, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search_recno_col(WT_TOC *, u_int64_t, WT_PAGE **, void *);
+static int __wt_bt_search_recno_row(WT_TOC *, u_int64_t, WT_PAGE **, void *);
 
 /*
  * __wt_db_get_recno --
@@ -23,7 +21,7 @@ __wt_db_get_recno(
     DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data)
 {
 	IDB *idb;
-	WT_INDX *indx;
+	void *ip;
 	WT_PAGE *page;
 	int ret;
 
@@ -45,11 +43,11 @@ __wt_db_get_recno(
 
 	/* Search the primary btree for the key. */
 	if (F_ISSET(idb, WT_COLUMN)) {
-		WT_ERR(__wt_bt_search_recno_col(toc, recno, &page, &indx));
-		ret = __wt_bt_dbt_return(toc, NULL, data, page, indx, 0);
+		WT_ERR(__wt_bt_search_recno_col(toc, recno, &page, &ip));
+		ret = __wt_bt_dbt_return(toc, NULL, data, page, ip, 0);
 	} else {
-		WT_ERR(__wt_bt_search_recno_row(toc, recno, &page, &indx));
-		ret = __wt_bt_dbt_return(toc, key, data, page, indx, 1);
+		WT_ERR(__wt_bt_search_recno_row(toc, recno, &page, &ip));
+		ret = __wt_bt_dbt_return(toc, key, data, page, ip, 1);
 	}
 
 	/* Discard the returned page, if it's not the root page. */
@@ -62,20 +60,20 @@ err:	WT_TOC_DB_CLEAR(toc);
 }
 
 /*
- * __wt_bt_search_recno_var --
+ * __wt_bt_search_recno_row --
  *	Search a row store tree for a specific record-based key.
  */
 static int
 __wt_bt_search_recno_row(
-    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
+    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, void *ipp)
 {
 	DB *db;
 	IDB *idb;
-	WT_INDX *ip;
+	WT_ROW_INDX *ip;
 	WT_PAGE *page;
 	u_int64_t record_cnt;
 	u_int32_t addr, i, type;
-	int isleaf, next_isleaf;
+	int isleaf;
 
 	db = toc->db;
 	idb = db->idb;
@@ -89,7 +87,8 @@ __wt_bt_search_recno_row(
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
-			*indxp = ip = page->indx + ((recno - record_cnt) - 1);
+			*(WT_ROW_INDX **)ipp =
+			    ip = page->u.r_indx + ((recno - record_cnt) - 1);
 			break;
 		}
 
@@ -102,14 +101,12 @@ __wt_bt_search_recno_row(
 
 		/* ip references the subtree containing the record. */
 		addr = WT_ROW_OFF_ADDR(ip);
-		next_isleaf =
+		isleaf =
 		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
 
 		/* We're done with the page. */
 		if (page != idb->root_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
-
-		isleaf = next_isleaf;
 
 		/* Get the next page. */
 		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
@@ -135,14 +132,14 @@ __wt_bt_search_recno_row(
  */
 static int
 __wt_bt_search_recno_col(
-    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, WT_INDX **indxp)
+    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, void *ipp)
 {
 	IDB *idb;
-	WT_INDX *ip;
+	WT_COL_INDX *ip;
 	WT_PAGE *page;
 	u_int64_t record_cnt;
 	u_int32_t addr, i;
-	int isleaf, next_isleaf;
+	int isleaf;
 
 	idb = toc->db->idb;
 
@@ -155,7 +152,8 @@ __wt_bt_search_recno_col(
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
 			*pagep = page;
-			*indxp = page->indx + ((recno - record_cnt) - 1);
+			*(WT_COL_INDX **)ipp =
+			    page->u.c_indx + ((recno - record_cnt) - 1);
 			return (0);
 		}
 
@@ -168,13 +166,11 @@ __wt_bt_search_recno_col(
 
 		/* ip references the subtree containing the record. */
 		addr = WT_COL_OFF_ADDR(ip);
-		next_isleaf = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
+		isleaf = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
 
 		/* We're done with the page. */
 		if (page != idb->root_page)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
-
-		isleaf = next_isleaf;
 
 		/* Get the next page. */
 		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));

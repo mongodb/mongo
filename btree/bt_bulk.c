@@ -8,14 +8,18 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_bulk_fix(DB *,
+static int  __wt_bt_bulk_fix(DB *,
     void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_bulk_var(DB *, u_int32_t,
+static int  __wt_bt_bulk_var(DB *, u_int32_t,
     void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
-static int __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
-static int __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
+static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
+static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
     DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
-static int __wt_bt_promote(WT_TOC *, WT_PAGE *, u_int64_t, u_int32_t *);
+static int  __wt_bt_promote(WT_TOC *, WT_PAGE *, u_int64_t, u_int32_t *);
+static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
+static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, void *);
+static void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
+static void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
 
 /*
  * __wt_db_bulk_load --
@@ -40,7 +44,6 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 		return (__wt_bt_bulk_fix(db, f, cb));
 
 	return (__wt_bt_bulk_var(db, flags, f, cb));
-
 }
 
 /*
@@ -786,9 +789,8 @@ __wt_bt_promote(
 {
 	DB *db;
 	DBT *key, key_build;
-	WT_INDX *ip;
 	WT_ITEM *key_item, item, *parent_key;
-	WT_OFF off, *offp;
+	WT_OFF off;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
 	u_int32_t parent_addr, tmp_root_addr;
@@ -833,7 +835,7 @@ __wt_bt_promote(
 		case WT_ITEM_KEY_OVFL:
 			WT_CLEAR(tmp_ovfl);
 			WT_RET(__wt_bt_ovfl_copy(toc,
-			    (WT_OVFL *)WT_ITEM_BYTE(key_item), &tmp_ovfl));
+			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
 			key->data = &tmp_ovfl;
 			key->size = sizeof(tmp_ovfl);
 			WT_ITEM_TYPE_SET(&item, WT_ITEM_KEY_OVFL);
@@ -1024,6 +1026,9 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		    (page->hdr->type == WT_PAGE_COL_FIX ||
 		    page->hdr->type == WT_PAGE_COL_VAR))
 			F_SET(parent->hdr, WT_OFFPAGE_REF_LEAF);
+
+		/* Append new parent index to the in-memory page structures. */
+		WT_ERR(__wt_bt_promote_col_indx(toc, parent, parent_data));
 		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
@@ -1056,12 +1061,14 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		memcpy(parent->first_free + sizeof(item), &off, sizeof(off));
 		parent->first_free += WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
 		parent->space_avail -= WT_ITEM_SPACE_REQ(sizeof(WT_OFF));
+
+		/* Append new parent index to the in-memory page structures. */
+		WT_ERR(__wt_bt_promote_row_indx(
+		    toc, parent, parent_key, parent_data));
 		break;
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	/* Append the new parent key index to the in-memory page structures. */
-	WT_ERR(__wt_bt_page_inmem_append(db, parent, parent_key, parent_data));
 	parent->records += page->records;
 
 	/*
@@ -1076,31 +1083,22 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		 * to the root.  We've already corrected our current "parent"
 		 * page, so proceed from there to the root.
 		 */
-		for (;;) {
-			if ((parent_addr =
-			    parent->hdr->prntaddr) == WT_ADDR_INVALID)
-				break;
+		while (
+		    (parent_addr = parent->hdr->prntaddr) != WT_ADDR_INVALID) {
 			WT_ERR(__wt_bt_page_out(toc, parent, WT_MODIFIED));
 			parent = NULL;
 			WT_ERR(
 			    __wt_bt_page_in(toc, parent_addr, 0, 1, &parent));
 
-			/*
-			 * Because of the bulk load pattern, we're always adding
-			 * records to the subtree referenced by the last entry
-			 * in each parent page.
-			 */
-			ip = parent->indx + (parent->indx_count - 1);
 			switch (parent->hdr->type) {
 			case WT_PAGE_COL_INT:
-				offp = (WT_OFF *)ip->page_data;
+				__wt_bt_promote_col_rec(parent, increment);
 				break;
 			case WT_PAGE_ROW_INT:
-				offp = (WT_OFF *)WT_ITEM_BYTE(ip->page_data);
+				__wt_bt_promote_row_rec(parent, increment);
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}
-			WT_RECORDS(offp) += increment;
 			parent->records += increment;
 		}
 
@@ -1111,6 +1109,142 @@ err:	/* Discard the parent page. */
 		WT_TRET(__wt_bt_page_out(toc, next, WT_MODIFIED));
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_promote_col_indx --
+ *	Append a new WT_OFF to an internal page's in-memory information.
+ */
+static int
+__wt_bt_promote_col_indx(WT_TOC *toc, WT_PAGE *page, void *page_data)
+{
+	ENV *env;
+	WT_COL_INDX *ip;
+	u_int32_t allocated;
+
+	env = toc->env;
+
+	/*
+	 * Make sure there's enough room in the in-memory index.  We don't grow
+	 * the page's index anywhere else, so we don't have any "size" value
+	 * separate from the number of entries the index array holds.  In this
+	 * one case, to avoid re-allocating the array on every promotion, we
+	 * allocate in chunks of 100, which we can detect as the count hits a
+	 * new boundary.
+	 */
+	if (page->indx_count % 100 == 0) {
+		allocated = page->indx_count * sizeof(WT_COL_INDX);
+		WT_RET(__wt_realloc(env, &allocated,
+		    (page->indx_count + 100) * sizeof(WT_COL_INDX),
+		    &page->u.c_indx));
+	}
+
+	/* Add in the new index entry. */
+	ip = page->u.c_indx + page->indx_count;
+	++page->indx_count;
+
+	/* Fill in the on-page data. */
+	ip->page_data = page_data;
+
+	return (0);
+}
+
+/*
+ * __wt_bt_promote_row_indx --
+ *	Append a new WT_ITEM_KEY/WT_OFF pair to an internal page's in-memory
+ *	information.
+ */
+static int
+__wt_bt_promote_row_indx(
+    WT_TOC *toc, WT_PAGE *page, WT_ITEM *key, void *page_data)
+{
+	DB *db;
+	ENV *env;
+	IDB *idb;
+	WT_ROW_INDX *ip;
+	u_int32_t allocated;
+
+	env = toc->env;
+	db = toc->db;
+	idb = db->idb;
+
+	/*
+	 * Make sure there's enough room in the in-memory index.  We don't grow
+	 * the page's index anywhere else, so we don't have any "size" value
+	 * separate from the number of entries the index array holds.  In this
+	 * one case, to avoid re-allocating the array on every promotion, we
+	 * allocate in chunks of 100, which we can detect as the count hits a
+	 * new boundary.
+	 */
+	if (page->indx_count % 100 == 0) {
+		allocated = page->indx_count * sizeof(WT_ROW_INDX);
+		WT_RET(__wt_realloc(env, &allocated,
+		    (page->indx_count + 100) * sizeof(WT_ROW_INDX),
+		    &page->u.r_indx));
+	}
+
+	/* Add in the new index entry. */
+	ip = page->u.r_indx + page->indx_count;
+	++page->indx_count;
+
+	/*
+	 * If there's a key, fill it in.  On-page keys are directly referenced.
+	 * Overflow keys, we grab the size but otherwise leave them alone.
+	 */
+	if (key != NULL) {
+		switch (WT_ITEM_TYPE(key)) {
+		case WT_ITEM_KEY:
+			ip->data = WT_ITEM_BYTE(key);
+			ip->size = WT_ITEM_LEN(key);
+			break;
+		case WT_ITEM_KEY_OVFL:
+			ip->size = WT_ITEM_BYTE_OVFL(key)->len;
+			break;
+		WT_ILLEGAL_FORMAT(db);
+		}
+
+		if (idb->huffman_key != NULL)
+			F_SET(ip, WT_HUFFMAN);
+	}
+
+	/* Fill in the on-page data. */
+	ip->page_data = page_data;
+
+	return (0);
+}
+
+/*
+ * __wt_bt_promote_col_rec --
+ *	Promote the record count to a column-store parent.
+ */
+static void
+__wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t increment)
+{
+	WT_COL_INDX *ip;
+
+	/*
+	 * Because of the bulk load pattern, we're always adding records to
+	 * the subtree referenced by the last entry in each parent page.
+	 */
+	ip = parent->u.c_indx + (parent->indx_count - 1);
+	WT_COL_OFF_RECORDS(ip) += increment;
+}
+
+/*
+ * __wt_bt_promote_row_rec --
+ *	Promote the record count to a row-store parent.
+ */
+static void
+__wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t increment)
+{
+	WT_ROW_INDX *ip;
+
+	/*
+	 * Because of the bulk load pattern, we're always adding records to
+	 * the subtree referenced by the last entry in each parent page.
+	 */
+	ip = parent->u.r_indx + (parent->indx_count - 1);
+	WT_ROW_OFF_RECORDS(ip) += increment;
 }
 
 /*

@@ -212,7 +212,7 @@ struct __db {
 	    DB *, u_int32_t , const char *, u_int32_t );
 
 	int (*dump)(
-	    DB *, FILE *, u_int32_t );
+	    DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t );
 
 	int (*errcall_get)(
 	    DB *, void (**)(const DB *, const char *));

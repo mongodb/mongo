@@ -99,8 +99,6 @@ struct __idb {
 
 	WT_PAGE  *root_page;		/* Root page */
 
-	u_int32_t indx_size_hint;	/* Number of keys on internal pages */
-
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */
 

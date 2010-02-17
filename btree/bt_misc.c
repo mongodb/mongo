@@ -20,12 +20,15 @@ __wt_bt_build_verify(void)
 		u_int s, c, align;
 		char *name;
 	} list[] = {
+		{ sizeof(WT_COL_INDX), WT_COL_INDX_SIZE, 0, "WT_COL_INDX" },
 		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
+		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
+		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" },
+		{ sizeof(WT_PAGE), WT_PAGE_SIZE, 0, "WT_PAGE" },
 		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, 0, "WT_PAGE_DESC" },
 		{ sizeof(WT_PAGE_HDR),
 		    WT_PAGE_HDR_SIZE, sizeof(u_int32_t), "WT_PAGE_HDR" },
-		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
-		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" }
+		{ sizeof(WT_ROW_INDX), WT_ROW_INDX_SIZE, 0, "WT_ROW_INDX" }
 	}, *lp;
 
 	/*
@@ -109,8 +112,10 @@ __wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp)
 		item = (WT_ITEM *)WT_PAGE_BYTE(page);
 		item = WT_ITEM_NEXT(item);
 
-		*addrp = ((WT_OFF *)WT_ITEM_BYTE(item))->addr;
+		*addrp = WT_ITEM_BYTE_OFF(item)->addr;
 		*isleafp = WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0;
+		break;
+	default:
 		break;
 	}
 }

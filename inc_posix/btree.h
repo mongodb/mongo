@@ -61,127 +61,6 @@ struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
- * WT_REPL --
- *	A replacement structure.
- */
-typedef struct __wt_repl {
-	/*
-	 * The first part of the WT_REPL structure is the same as the first
-	 * bytes of a DBT so we can feed it to routines expecting a DBT ref.
-	 */
-	void	 *data;			/* DBT: data */
-	u_int32_t size;			/* DBT: data length */
-} WT_REPL;
-
-/*
- * WT_INDX --
- * The WT_INDX structure describes the in-memory information about a single
- * key/data pair on a row-store database page.
- */
-typedef	struct __wt_indx {
-	/*
-	 * The first part of the WT_INDX structure is the same as the first
-	 * bytes of a DBT so we can feed it to the Btree comparison function
-	 * without copying.  This is important for keys on internal pages.
-	 */
-	void	 *data;			/* DBT: data */
-	u_int32_t size;			/* DBT: data length */
-
-	void *page_data;		/* Associated on-page data */
-
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in the
-	 * following array.  It's an array because we can't free the references
-	 * without first checking the hazard information -- we don't block the
-	 * readers when updating data items, and references may still be in use.
-	 */
-	WT_REPL	 *repl;			/* Replacement array */
-	u_int32_t repl_size;		/* Replacement array size */
-
-	u_int32_t flags;
-} WT_INDX;
-
-/*
- *
- * Overflow and/or compressed on-page items need processing before we look at
- * them.   Handy macro to identify such.
- */
-#define	WT_INDX_NEED_PROCESS(ip)					\
-	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
-
-/*
- * On both row- and column-store internal pages, the on-page data referenced
- * by the WT_INDX page_data field is a WT_OFF structure, which contains a
- * record count and a page address.   These macros reach into the on-page
- * structure and return the values.
- */
-#define	WT_COL_OFF_ADDR(ip)						\
-	(((WT_OFF *)(ip)->page_data)->addr)
-#define	WT_COL_OFF_RECORDS(ip)						\
-	WT_RECORDS((WT_OFF *)(ip)->page_data)
-
-#define	WT_ROW_OFF_ADDR(ip)						\
-    (((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
-#define	WT_ROW_OFF_RECORDS(ip)						\
-    WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
-
-/*
- * WT_PAGE --
- * The WT_PAGE structure describes the in-memory information about a database
- * page.   When pages are read, the page is reviewed, and in-memory specific
- * information is created.  That information is generally what's used in the
- * cache, not the actual page itself.
- */
-struct __wt_page {
-	WT_PAGE  *next;			/* Hash queue */
-	u_int32_t page_gen;		/* LRU generation number */
-
-	DB	 *db;			/* Page's backing database */
-	u_int32_t addr;			/* Page's allocation address */
-
-	/*
-	 * The page size is limited to 4GB by this type -- we could use
-	 * off_t's here if we need something bigger, but the page-sizing
-	 * code limits page sizes to 128MB.
-	 */
-	u_int32_t bytes;		/* Page size */
-
-	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
-
-	u_int8_t *first_free;		/* Page's first free byte address */
-	u_int32_t space_avail;		/* Page's available memory */
-
-	/*
-	 * Each item on the page is referenced by a WT_INDX structure.  (This
-	 * is where the on-page index array found in DB 1.85 and Berkeley
-	 * DB moved.)   It's always sorted, but it's not always a "key", for
-	 * example, offpage duplicate leaf pages contain sorted data items,
-	 * where the data is the interesting stuff.  For simplicity, and as
-	 * it's always a sorted list, we call it a key,
-	 */
-	WT_INDX	 *indx;			/* Key items on the page */
-	u_int32_t indx_count;		/* Entries in key index */
-	u_int32_t indx_size;		/* Size of key index */
-
-	u_int64_t records;		/* Records in this page and below */
-
-	/*
-	 * The drain field is set when the page is being discarded from the
-	 * cache.   Threads acquiring pages must set a hazard pointer before
-	 * checking the drain field, the cache server must set the drain field
-	 * before checking the hazard pointers.
-	 */
-	u_int32_t drain;		/* Page is being actively drained */
-
-	u_int32_t flags;
-};
-
-/* Macro to walk the indexes of an in-memory page. */
-#define	WT_INDX_FOREACH(page, ip, i)					\
-	for ((i) = (page)->indx_count,					\
-	    (ip) = (page)->indx; (i) > 0; ++(ip), --(i))
-
-/*
  * The database itself needs a chunk of memory that describes it.   Here's
  * the structure.
  *
@@ -217,6 +96,72 @@ struct __wt_page_desc {
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_PAGE_DESC_SIZE		64
+
+/*
+ * WT_PAGE --
+ * The WT_PAGE structure describes the in-memory information about a database
+ * page.   When pages are read, the page is reviewed, and in-memory specific
+ * information is created.  That information is generally what's used in the
+ * cache, not the actual page itself.
+ */
+struct __wt_page {
+	WT_PAGE  *next;			/* Hash queue */
+	u_int32_t page_gen;		/* LRU generation number */
+
+	DB	 *db;			/* Page's backing database */
+	u_int32_t addr;			/* Page's allocation address */
+
+	/*
+	 * The page size is limited to 4GB by this type -- we could use
+	 * off_t's here if we need something bigger, but the page-sizing
+	 * code limits page sizes to 128MB.
+	 */
+	u_int32_t bytes;		/* Page size */
+
+	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
+
+	u_int8_t *first_free;		/* Page's first free byte address */
+	u_int32_t space_avail;		/* Page's available memory */
+
+	u_int64_t records;		/* Records in this page and below */
+
+	/*
+	 * Each item on a page is referenced by a the indx field, which points
+	 * to a WT_ROW_INDX or WT_COL_INDX structure.  (This is where the
+	 * on-page index array found in DB 1.85 and Berkeley DB moved.)  The
+	 * indx field initially references an array of WT_{ROW,COL}_INDX
+	 * structures.  If a record on the page is modified, the indx field
+	 * changes to reference a binary tree that references WT_{ROW,COL}_INDX
+	 * structures.
+	 *
+	 * We use a union so you can increment the address and have the right
+	 * thing happen (and so you're forced to think about what exactly you
+	 * are dereferencing when you write the code).
+	 */
+	union {				/* Entry index */
+		struct __wt_col_indx *c_indx;
+		struct __wt_row_indx *r_indx;
+		void *indx;
+	} u;
+	u_int32_t indx_count;		/* Entry count */
+
+	/*
+	 * The drain field is set when the page is being discarded from the
+	 * cache.   Threads acquiring pages must set a hazard pointer before
+	 * checking the drain field, the cache server must set the drain field
+	 * before checking the hazard pointers.
+	 */
+	u_int32_t drain;		/* Page is being actively drained */
+
+	u_int32_t flags;
+};
+/*
+ * WT_PAGE_SIZE is the expected structure size --  we check at startup to ensure
+ * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_PAGE_SIZE		56
 
 /*
  * WT_PAGE_HDR --
@@ -300,6 +245,124 @@ struct __wt_page_hdr {
 	WT_PAGE_HDR_SIZE + ((page)->addr == 0 ? WT_PAGE_DESC_SIZE : 0))
 
 /*
+ * WT_REPL --
+ *	A replacement structure.
+ */
+typedef struct __wt_repl {
+	/*
+	 * The first part of the WT_REPL structure is the same as the first
+	 * bytes of a DBT so we can feed it to routines expecting a DBT ref.
+	 */
+	void	 *data;			/* DBT: data */
+	u_int32_t size;			/* DBT: data length */
+} WT_REPL;
+
+/*
+ * WT_ROW_INDX --
+ * The WT_ROW_INDX structure describes the in-memory information about a single
+ * key/data pair on a row-store database page.
+ */
+typedef	struct __wt_row_indx {
+	/*
+	 * WT_ROW_INDX structures are used to describe pages where there's a
+	 * sort key (that is, a row-store, not a column-store, which is only
+	 * "sorted" by record number).
+	 *
+	 * The first fields of the WT_ROW_INDX structure is the same as the
+	 * first fields of a DBT so we can feed it to a comparison function
+	 * without copying.  This is important for keys on internal pages.
+	 */
+	void	 *data;			/* DBT: data */
+	u_int32_t size;			/* DBT: data length */
+
+	/*
+	 * If the data has not been modified since the page was read into
+	 * the cache, page_data references the on-page data associated with
+	 * the entry.
+	 */
+	void *page_data;		/* Associated on-page data */
+
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in the
+	 * following array.  It's an array because we can't free the references
+	 * without first checking the hazard information -- we don't block the
+	 * readers when updating data items, and references may still be in use.
+	 */
+	WT_REPL	 *repl;			/* Replacement array */
+	u_int32_t repl_size;		/* Replacement array size */
+
+	u_int32_t flags;
+} WT_ROW_INDX;
+/*
+ * WT_ROW_SIZE is the expected structure size --  we check at startup to ensure
+ * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_ROW_INDX_SIZE	24
+
+/*
+ * WT_COL_INDX --
+ * The WT_COL_INDX structure describes the in-memory information about a single
+ * item on a column-store database page.
+ */
+typedef	struct __wt_col_indx {
+	/*
+	 * If the data has not been modified since the page was read into
+	 * the cache, page_data references the on-page data associated with
+	 * the entry.
+	 */
+	void *page_data;		/* Associated on-page data */
+
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in the
+	 * following array.  It's an array because we can't free the references
+	 * without first checking the hazard information -- we don't block the
+	 * readers when updating data items, and references may still be in use.
+	 */
+	WT_REPL	 *repl;			/* Replacement array */
+	u_int32_t repl_size;		/* Replacement array size */
+
+	u_int32_t flags;
+} WT_COL_INDX;
+/*
+ * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
+ * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
+ * padding it won't break the world, but we don't want to waste space, and there
+ * are a lot of these structures.
+ */
+#define	WT_COL_INDX_SIZE	16
+
+/* Macro to walk the indexes of an in-memory page. */
+#define	WT_INDX_FOREACH(page, ip, i)					\
+	for ((i) = (page)->indx_count,					\
+	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
+
+/*
+ *
+ * Overflow and/or compressed on-page items need processing before we look at
+ * them.   Handy macro to identify such.
+ */
+#define	WT_ROW_INDX_PROCESS(ip)						\
+	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
+
+/*
+ * On both row- and column-store internal pages, the on-page data referenced
+ * by the WT_INDX page_data field is a WT_OFF structure, which contains a
+ * record count and a page address.   These macros reach into the on-page
+ * structure and return the values.
+ */
+#define	WT_COL_OFF_ADDR(ip)						\
+	(((WT_OFF *)((ip)->page_data))->addr)
+#define	WT_COL_OFF_RECORDS(ip)						\
+	WT_RECORDS((WT_OFF *)((ip)->page_data))
+
+#define	WT_ROW_OFF_ADDR(ip)						\
+	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
+#define	WT_ROW_OFF_RECORDS(ip)						\
+	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
+
+/*
  * WT_ITEM --
  *	Trailing data length (in bytes) plus item type.
  *
@@ -360,7 +423,7 @@ struct __wt_item {
  *    followed by a WT_ITEM_OFF_INT/OFF_LEAF item);
  * -- Variable-length key followed a sets of duplicates that have not yet been
  *    moved into their own tree (a WT_ITEM_KEY/KEY_OVFL item followed by two
- *    or more WT_ITEM_DUP/DUP_OVFL items.
+ *    or more WT_ITEM_DUP/DUP_OVFL items).
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
  * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
@@ -402,6 +465,23 @@ struct __wt_item {
 	((u_int8_t *)(addr) + sizeof(WT_ITEM))
 
 /*
+ * On row-store pages, the on-page data referenced by the WT_INDX page_data
+ * field may be a WT_OVFL (which contains the address for the start of the
+ * overflow pages and its length), or a WT_OFF structure.  These macros do
+ * the cast for the right type, and, in the case of WT_OVFL, reach into the
+ * on-page structure and return the values.
+ */
+#define	WT_ITEM_BYTE_OFF(addr)						\
+	((WT_OFF *)(WT_ITEM_BYTE(addr)))
+
+#define	WT_ITEM_BYTE_OVFL(addr)						\
+	((WT_OVFL *)(WT_ITEM_BYTE(addr)))
+#define	WT_ITEM_OVFL_ADDR(ip)						\
+	(WT_ITEM_BYTE_OVFL((ip)->page_data)->addr)
+#define	WT_ITEM_OVFL_LEN(ip)						\
+	(WT_ITEM_BYTE_OVFL((ip)->page_data)->len)
+
+/*
  * The number of bytes required to store a WT_ITEM followed by len additional
  * bytes.  Align the entry and the data itself to a 4-byte boundary so it's
  * possible to directly access WT_ITEMs on the page.
@@ -418,17 +498,6 @@ struct __wt_item {
 	for ((item) = (WT_ITEM *)WT_PAGE_BYTE(page),			\
 	    (i) = (page)->hdr->u.entries;				\
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
-
-/*
- * On row-store pages, the on-page data referenced by the WT_INDX page_data
- * field may be a WT_OVFL structure, which contains the address for the start
- * of the overflow pages, and its length.  These macros reach into the on-page
- * structure and return the values.
- */
-#define	WT_ITEM_OVFL_ADDR(ip)						\
-    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->addr)
-#define	WT_ITEM_OVFL_LEN(ip)						\
-    (((WT_OVFL *)WT_ITEM_BYTE((ip)->page_data))->len)
 
 /*
  * Btree internal items and offpage duplicates reference another page.

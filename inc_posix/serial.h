@@ -1,7 +1,7 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
-	WT_INDX * indx;
+	WT_ROW_INDX * indx;
 	WT_REPL * repl;
 	u_int32_t repl_size;
 	void * data;

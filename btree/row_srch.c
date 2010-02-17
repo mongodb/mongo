@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_INDX **);
+static int __wt_bt_search(WT_TOC *, DBT *, WT_PAGE **, WT_ROW_INDX **);
 static int __wt_bt_put_serial_func(WT_TOC *);
 
 /*
@@ -20,8 +20,8 @@ int
 __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 {
 	IDB *idb;
-	WT_INDX *ip;
 	WT_PAGE *page;
+	WT_ROW_INDX *ip;
 	u_int32_t type;
 	int ret;
 
@@ -37,7 +37,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	 */
 	WT_TOC_DB_INIT(toc, db, "Db.get");
 
-	/* Search the primary btree for the key. */
+	/* Search the btree for the key. */
 	WT_ERR(__wt_bt_search(toc, key, &page, &ip));
 
 	/*
@@ -71,9 +71,9 @@ __wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data)
 {
 	ENV *env;
 	IDB *idb;
-	WT_INDX *ip;
 	WT_PAGE *page;
 	WT_REPL *repl;
+	WT_ROW_INDX *ip;
 	u_int32_t repl_cnt;
 	void *p;
 	int ret;
@@ -144,8 +144,8 @@ static int
 __wt_bt_put_serial_func(WT_TOC *toc)
 {
 	ENV *env;
-	WT_INDX *ip;
 	WT_REPL *repl;
+	WT_ROW_INDX *ip;
 	void *data;
 	u_int32_t repl_cnt, repl_size, size;
 
@@ -187,12 +187,12 @@ __wt_bt_put_serial_func(WT_TOC *toc)
  *	Search the tree for a specific key.
  */
 static int
-__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
+__wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_ROW_INDX **ipp)
 {
 	DB *db;
 	IDB *idb;
-	WT_INDX *ip;
 	WT_PAGE *page;
+	WT_ROW_INDX *ip;
 	u_int32_t addr, base, indx, limit;
 	int cmp, isleaf, next_isleaf, ret;
 
@@ -216,8 +216,8 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			 * If the key is compressed or an overflow, it may not
 			 * have been instantiated yet.
 			 */
-			ip = page->indx + indx;
-			if (WT_INDX_NEED_PROCESS(ip))
+			ip = page->u.r_indx + indx;
+			if (WT_ROW_INDX_PROCESS(ip))
 				WT_ERR(__wt_bt_key_to_indx(toc, page, ip));
 
 			/*
@@ -265,7 +265,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_INDX **ipp)
 			 * sorts less than any application key), decrement it
 			 * to the smallest index less than or equal to key.
 			 */
-			ip = page->indx + (base == 0 ? base : base - 1);
+			ip = page->u.r_indx + (base == 0 ? base : base - 1);
 		}
 		addr = WT_ROW_OFF_ADDR(ip);
 		next_isleaf =
