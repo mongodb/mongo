@@ -119,13 +119,13 @@ assert.eq( 200000, f.a.count() );
 
 doParallel( "assert.commandWorked( db.cloneCollection( \"localhost:" + ports[ 0 ] + "\", \"a\" ) );" );
 
-sleep( 200 );
+sleep( 100 );
 for( i = 200000; i < 210000; ++i ) {
     f.a.save( { i: i } );
 }
 
 waitParallel();
-assert.eq( 210000, t.a.find().count() );
+assert( 200000 < t.a.find().count() );
     
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();
@@ -134,6 +134,7 @@ t.a.drop();
 for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
+assert.eq( 100000, f.a.count() );
 
 doParallel( "z = db.runCommand( {startCloneCollection:\"jstests_clonecollection.a\", from:\"localhost:" + ports[ 0 ] + "\" } ); print( \"clone_clone_clone_commandResult:::::\" + tojson( z , '' , true ) + \":::::\" );" );
 
