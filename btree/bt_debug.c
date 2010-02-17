@@ -453,7 +453,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	if (hp != NULL) {
 		WT_ERR(__wt_huffman_decode(
 		    hp, p, len, &toc->scratch.data,
-		    &toc->scratch.size, &toc->scratch.data_len));
+		    &toc->scratch.data_len, &toc->scratch.size));
 		p = toc->scratch.data;
 		len = toc->scratch.size;
 	}
