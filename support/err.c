@@ -129,7 +129,7 @@ int
 __wt_api_arg_max(ENV *env,
     const char *name, const char *arg_name, u_int32_t v, u_int32_t max)
 {
-	if (v >= max)
+	if (v <= max)
 		return (0);
 
 	__wt_api_env_errx(env,
