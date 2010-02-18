@@ -65,18 +65,14 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_debug.c (C)
                                                                     _
 		    ref, (u_long)offp->addr, (u_quad)WT_RECORDS(offp));
-../btree/bt_debug.c  373  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  372  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                        _
 		    (u_long)offp->addr, WT_RECORDS(offp));
-../btree/bt_debug.c  458  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  457  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
-                                      _
-	desc.fixed_len = db->fixed_len;
-../btree/bt_desc.c  199  Info 734: Loss of precision (assignment) (32 bits to 8
-    bits)
 
 --- Module:   ../btree/bt_dump.c (C)
                                                                     _
@@ -99,16 +95,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_page.c (C)
                                                   _
 			records += WT_RECORDS(offp);
-../btree/bt_page.c  306  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  304  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...  WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  390  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  388  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		records += WT_RECORDS(offp);
-../btree/bt_page.c  426  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  424  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_rdel.c (C)
