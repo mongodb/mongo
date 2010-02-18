@@ -12,7 +12,7 @@ from dist import compare_srcfile
 
 serial = {}
 serial['cache_discard'] = [
-	'WT_DRAIN */drain',
+	'WT_REF */drain',
 	'u_int32_t/drain_elem']
 
 serial['cache_in'] = [
@@ -20,10 +20,13 @@ serial['cache_in'] = [
 	'u_int32_t/addr',
 	'u_int32_t/bytes']
 
+serial['bt_del'] = [
+	'WT_ROW_INDX */indx',
+	'WT_REPL */repl']
+
 serial['bt_put'] = [
 	'WT_ROW_INDX */indx',
 	'WT_REPL */repl',
-	'u_int32_t/repl_size',
 	'void */data',
 	'u_int32_t/size']
 

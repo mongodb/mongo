@@ -32,8 +32,8 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	 * are the memory allocation and free functions, no other functions
 	 * may be called.
 	 */
-	WT_RET(__wt_calloc(NULL, 1, sizeof(ENV), &env));
-	WT_ERR(__wt_calloc(NULL, 1, sizeof(IENV), &ienv));
+	WT_RET(__wt_malloc(NULL, sizeof(ENV), &env));
+	WT_ERR(__wt_malloc(NULL, sizeof(IENV), &ienv));
 
 	/* Connect everything together. */
 	env->ienv = ienv;

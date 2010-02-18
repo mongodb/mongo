@@ -58,6 +58,7 @@ idb_stats['BULK_REPEAT_COUNT'] = Stat([], 'bulk insert repeat count compression'
 idb_stats['DB_CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
 idb_stats['DB_CACHE_HIT'] = Stat([], 'cache hit: reads found in the cache')
 idb_stats['DB_CACHE_MISS'] = Stat([], 'cache miss: reads not found in the cache')
+idb_stats['DB_DELETE_BY_KEY'] = Stat([], 'database delete-by-key operations')
 idb_stats['DB_READ_BY_KEY'] = Stat([], 'database read-by-key operations')
 idb_stats['DB_READ_BY_RECNO'] = Stat([], 'database read-by-recno operations')
 idb_stats['DB_WRITE_BY_KEY'] = Stat([], 'database put-by-key operations')

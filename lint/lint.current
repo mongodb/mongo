@@ -65,11 +65,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_debug.c (C)
                                                                     _
 		    ref, (u_long)offp->addr, (u_quad)WT_RECORDS(offp));
-../btree/bt_debug.c  363  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  373  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                        _
 		    (u_long)offp->addr, WT_RECORDS(offp));
-../btree/bt_debug.c  448  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  458  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -99,17 +99,19 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_page.c (C)
                                                   _
 			records += WT_RECORDS(offp);
-../btree/bt_page.c  279  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  306  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...  WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  363  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  390  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		records += WT_RECORDS(offp);
-../btree/bt_page.c  399  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  426  Info 740: Unusual pointer cast (incompatible indirect
     types)
+
+--- Module:   ../btree/bt_rdel.c (C)
 
 --- Module:   ../btree/bt_ret.c (C)
 
@@ -266,8 +268,8 @@ _
 			review_cnt = cache_pages / 20;
 ../env/env_cache.c  594  Info 712: Loss of precision (assignment) (unsigned
     long long to unsigned int)
-                                                                   _
-		    sizeof(WT_DRAIN), __wt_cache_drain_compare_gen);
+                                                                 _
+		    sizeof(WT_REF), __wt_cache_drain_compare_gen);
 ../env/env_cache.c  635  Warning 668: Possibly passing a null pointer to
     function 'qsort(void *, unsigned int, unsigned int, int (*)(const void *,
     const void *))', arg. no. 1 [Reference: file ../env/env_cache.c: line 554]

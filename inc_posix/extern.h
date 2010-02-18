@@ -74,12 +74,16 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *ip);
 int
+__wt_db_del(DB *db, WT_TOC *toc, DBT *key);
+int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
 int
 __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data);
 int
 __wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data);
+int
+__wt_bt_repl_alloc(ENV *env, WT_REPL **orig);
 int
 __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_ROW_INDX **ipp);
 int
@@ -197,6 +201,8 @@ int
 __wt_toc_dump(ENV *env);
 void *
 __wt_workq_srvr(void *arg);
+int
+__wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new);
 void
 __wt_abort(void);
 int

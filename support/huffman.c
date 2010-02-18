@@ -221,7 +221,7 @@ __wt_huffman_open(ENV *env,
 	node = NULL;
 	ret = 0;
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_HUFFMAN_OBJ), &huffman));
+	WT_RET(__wt_malloc(env, sizeof(WT_HUFFMAN_OBJ), &huffman));
 	WT_ERR(__wt_calloc(env, nbytes, sizeof(INDEXED_BYTE), &indexed_freqs));
 	huffman->env = env;
 
@@ -238,8 +238,8 @@ __wt_huffman_open(ENV *env,
 	    nbytes, sizeof(INDEXED_BYTE), indexed_byte_comparator);
 
 	/* We need two node queues to build the tree. */
-	WT_ERR(__wt_calloc(env, 1, sizeof(NODE_QUEUE), &leaves));
-	WT_ERR(__wt_calloc(env, 1, sizeof(NODE_QUEUE), &combined_nodes));
+	WT_ERR(__wt_malloc(env, sizeof(NODE_QUEUE), &leaves));
+	WT_ERR(__wt_malloc(env, sizeof(NODE_QUEUE), &combined_nodes));
 
 	/* Adding the leaves to the queue */
 	for (i = 0; i < nbytes; ++i) {
@@ -254,8 +254,8 @@ __wt_huffman_open(ENV *env,
 		 * an optional feature.
 		 */
 		if (indexed_freqs[i].frequency > 0) {
-			WT_ERR(__wt_calloc(
-			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			WT_ERR(__wt_malloc(
+			    env, sizeof(WT_FREQTREE_NODE), &tempnode));
 			tempnode->symbol = indexed_freqs[i].symbol;
 			tempnode->weight = indexed_freqs[i].frequency;
 			WT_ERR(node_queue_enqueue(env, leaves, tempnode));
@@ -302,8 +302,8 @@ __wt_huffman_open(ENV *env,
 		 * In every second run, we have both node and node2 initialized.
 		 */
 		if (node != NULL && node2 != NULL) {
-			WT_ERR(__wt_calloc(
-			    env, 1, sizeof(WT_FREQTREE_NODE), &tempnode));
+			WT_ERR(__wt_malloc(
+			    env, sizeof(WT_FREQTREE_NODE), &tempnode));
 
 			/* The new weight is the sum of the two weights. */
 			tempnode->weight = node->weight + node2->weight;
@@ -643,7 +643,7 @@ node_queue_enqueue(ENV *env, NODE_QUEUE *queue, WT_FREQTREE_NODE *node)
 	NODE_QUEUE_ELEM *elem;
 
 	/* Allocating a new linked list element */
-	WT_RET(__wt_calloc(env, 1, sizeof(NODE_QUEUE_ELEM), &elem));
+	WT_RET(__wt_malloc(env, sizeof(NODE_QUEUE_ELEM), &elem));
 
 	/* It holds the tree node, and has no next element yet */
 	elem->node = node;

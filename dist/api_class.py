@@ -26,6 +26,7 @@
 #		method	 -- method returns an int
 #		methodV  -- method returns void
 #		noauto	 -- don't create a stub
+#		restart	 -- handle WT_RESTART in the API call
 #		setter	 -- auto-generated setter method
 #		verify	 -- setter methods call validation function
 #	3: a list of argument and name/declaration pairs
@@ -373,6 +374,15 @@ methods['db.column_set'] = Api(
 	[ 'REPEAT_COMP' ],
 	['init'], ['open'])
 
+methods['db.del'] = Api(
+	'db.del',
+	'method, cache, restart',
+	['toc/WT_TOC *@S',
+	 'key/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
 methods['db.dump'] = Api(
 	'db.dump',
 	'method',
@@ -465,7 +475,7 @@ methods['db.open'] = Api(
 
 methods['db.put'] = Api(
 	'db.put',
-	'method, cache',
+	'method, cache, restart',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',

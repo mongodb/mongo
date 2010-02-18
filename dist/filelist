@@ -15,6 +15,7 @@ btree/bt_misc.c
 btree/bt_open.c
 btree/bt_ovfl.c
 btree/bt_page.c
+btree/bt_rdel.c
 btree/bt_ret.c
 btree/bt_rget.c
 btree/bt_rput.c

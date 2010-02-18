@@ -65,7 +65,7 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB handle.
  */
-#define	WT_STAT_DB_TOTAL		   13
+#define	WT_STAT_DB_TOTAL		   14
 
 #define	WT_STAT_BULK_DUP_DATA_READ	    0
 #define	WT_STAT_BULK_HUFFMAN_DATA	    1
@@ -77,9 +77,10 @@ struct __wt_stats {
 #define	WT_STAT_DB_CACHE_ALLOC		    7
 #define	WT_STAT_DB_CACHE_HIT		    8
 #define	WT_STAT_DB_CACHE_MISS		    9
-#define	WT_STAT_DB_READ_BY_KEY		   10
-#define	WT_STAT_DB_READ_BY_RECNO	   11
-#define	WT_STAT_DB_WRITE_BY_KEY		   12
+#define	WT_STAT_DB_DELETE_BY_KEY	   10
+#define	WT_STAT_DB_READ_BY_KEY		   11
+#define	WT_STAT_DB_READ_BY_RECNO	   12
+#define	WT_STAT_DB_WRITE_BY_KEY		   13
 
 /*
  * Statistics entries for DB/IDB database.

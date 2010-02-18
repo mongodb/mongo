@@ -79,7 +79,7 @@ extern "C" {
 
 /*
  * Standard macros to handle simple return values and optionally branch to
- *  an error label.
+ * an error label.
  */
 #define	WT_ERR(a) do {							\
 	if ((ret = (a)) != 0)						\

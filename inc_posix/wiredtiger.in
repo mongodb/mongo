@@ -211,6 +211,9 @@ struct __db {
 	int (*column_set)(
 	    DB *, u_int32_t , const char *, u_int32_t );
 
+	int (*del)(
+	    DB *, WT_TOC *, DBT *, u_int32_t );
+
 	int (*dump)(
 	    DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t );
 
@@ -445,6 +448,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_COLUMN_SET			0x00000001
+#define	WT_APIMASK_DB_DEL				0x00000000
 #define	WT_APIMASK_DB_DUMP				0x00000003
 #define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_GET_RECNO				0x00000000

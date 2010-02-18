@@ -92,6 +92,8 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 	    "cache hit: reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
+	stats[WT_STAT_DB_DELETE_BY_KEY].desc =
+	    "database delete-by-key operations";
 	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
 	stats[WT_STAT_DB_READ_BY_RECNO].desc =
 	    "database read-by-recno operations";
@@ -114,6 +116,7 @@ __wt_stat_clear_db_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
+	stats[WT_STAT_DB_DELETE_BY_KEY].v = 0;
 	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
 	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
 	stats[WT_STAT_DB_WRITE_BY_KEY].v = 0;

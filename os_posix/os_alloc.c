@@ -71,15 +71,6 @@ __wt_open_mfp(ENV *env)
 #endif
 
 /*
- * __wt_malloc --
- *
- * There's no malloc interface, WiredTiger never calls malloc.  The problem is
- * an application might: allocate memory, write secret stuff into it, free the
- * memory, we allocate the memory, and then use it for a database page or log
- * record and write it to disk.  That would result in the secret stuff being
- * protected by the WiredTiger permission mechanisms, potentially inappropriate
- * for the secret stuff.
- *
  * __wt_calloc --
  *	ANSI calloc function.
  */
@@ -202,7 +193,7 @@ __wt_strdup(ENV *env, const char *str, void *retp)
 		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
 
 	len = strlen(str) + 1;
-	WT_RET(__wt_calloc(env, len, 1, &p));
+	WT_RET(__wt_malloc(env, len, &p));
 
 	memcpy(p, str, len);
 

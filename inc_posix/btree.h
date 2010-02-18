@@ -19,6 +19,7 @@ struct __wt_off;		typedef struct __wt_off WT_OFF;
 struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
+struct __wt_repl;		typedef struct __wt_repl WT_REPL;
 
 /*
  * We use 32-bits to store file locations on database pages, so all such file
@@ -112,8 +113,8 @@ struct __wt_page {
 	u_int32_t addr;			/* Page's allocation address */
 
 	/*
-	 * The page size is limited to 4GB by this type -- we could use
-	 * off_t's here if we need something bigger, but the page-sizing
+	 * The page size is limited to 4GB by this type -- we could use off_t's
+	 * here if we need something bigger, but the page-size configuration
 	 * code limits page sizes to 128MB.
 	 */
 	u_int32_t bytes;		/* Page size */
@@ -245,17 +246,34 @@ struct __wt_page_hdr {
 	WT_PAGE_HDR_SIZE + ((page)->addr == 0 ? WT_PAGE_DESC_SIZE : 0))
 
 /*
- * WT_REPL --
- *	A replacement structure.
+ * WT_SDBT --
+ *	A minimal version of the DBT structure -- just the data & size fields.
  */
-typedef struct __wt_repl {
-	/*
-	 * The first part of the WT_REPL structure is the same as the first
-	 * bytes of a DBT so we can feed it to routines expecting a DBT ref.
-	 */
+typedef struct __wt_sdbt {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
-} WT_REPL;
+} WT_SDBT;
+
+/*
+ * WT_REPL --
+ *	A data replacement structure.
+ */
+struct __wt_repl {
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in
+	 * the WT_REPL structure.  It's an array for two reasons: first, we
+	 * don't block readers when updating it, which means it may be in
+	 * use during updates, and second because we'll need history when we
+	 * add MVCC to the system.
+	 */
+#define	WT_DATA_DELETED	((void *)0x01)	/* Data item was deleted */
+	WT_SDBT  *data;			/* Data array */
+
+	u_int16_t repl_size;		/* Data array size */
+	u_int16_t repl_next;		/* Next available slot */
+
+	WT_REPL *next;			/* Previous replace structures */
+};
 
 /*
  * WT_ROW_INDX --
@@ -275,16 +293,9 @@ typedef	struct __wt_row_indx {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
-	void *page_data;		/* Original on-page data */
+	void	 *page_data;		/* Original on-page data */
 
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in the
-	 * following array.  It's an array because we can't free the references
-	 * without first checking the hazard information -- we don't block the
-	 * readers when updating data items, and references may still be in use.
-	 */
 	WT_REPL	 *repl;			/* Replacement data array */
-	u_int32_t repl_size;		/* Replacement data array size */
 
 	u_int32_t flags;
 } WT_ROW_INDX;
@@ -294,7 +305,7 @@ typedef	struct __wt_row_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_ROW_INDX_SIZE	24
+#define	WT_ROW_INDX_SIZE	20
 
 /*
  * WT_COL_INDX --
@@ -302,16 +313,9 @@ typedef	struct __wt_row_indx {
  * item on a column-store database page.
  */
 typedef	struct __wt_col_indx {
-	void *page_data;		/* Original on-page data */
+	void	 *page_data;		/* Original on-page data */
 
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in the
-	 * following array.  It's an array because we can't free the references
-	 * without first checking the hazard information -- we don't block the
-	 * readers when updating data items, and references may still be in use.
-	 */
 	WT_REPL	 *repl;			/* Replacement data array */
-	u_int32_t repl_size;		/* Replacement data array size */
 
 	u_int32_t flags;
 } WT_COL_INDX;
@@ -321,7 +325,7 @@ typedef	struct __wt_col_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_COL_INDX_SIZE	16
+#define	WT_COL_INDX_SIZE	12
 
 /* Macro to walk the indexes of an in-memory page. */
 #define	WT_INDX_FOREACH(page, ip, i)					\

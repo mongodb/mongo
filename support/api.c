@@ -298,6 +298,29 @@ static int __wt_api_db_column_set(
 	return (0);
 }
 
+static int __wt_api_db_del(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	u_int32_t flags);
+static int __wt_api_db_del(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	u_int32_t flags)
+{
+	ENV *env;
+	int ret;
+
+	env = db->env;
+
+	WT_ENV_FCHK(env, "DB.del", flags, WT_APIMASK_DB_DEL);
+
+	while ((ret = __wt_db_del(db, toc, key)) == WT_RESTART)
+		;
+	return (ret);
+}
+
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
@@ -530,12 +553,15 @@ static int __wt_api_db_put(
 	u_int32_t flags)
 {
 	ENV *env;
+	int ret;
 
 	env = db->env;
 
 	WT_ENV_FCHK(env, "DB.put", flags, WT_APIMASK_DB_PUT);
 
-	return (__wt_db_put(db, toc, key, data));
+	while ((ret = __wt_db_put(db, toc, key, data)) == WT_RESTART)
+		;
+	return (ret);
 }
 
 static int __wt_api_db_stat_clear(
@@ -975,7 +1001,6 @@ static int __wt_api_wt_toc_close(
 	ENV *env;
 	int ret;
 
-
 	env = wt_toc->env;
 
 	WT_ENV_FCHK(env, "WT_TOC.close", flags, WT_APIMASK_WT_TOC_CLOSE);
@@ -1030,6 +1055,9 @@ __wt_methods_db_lockout(DB *db)
 	    __wt_db_lockout;
 	db->column_set = (int (*)
 	    (DB *, u_int32_t , const char *, u_int32_t ))
+	    __wt_db_lockout;
+	db->del = (int (*)
+	    (DB *, WT_TOC *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->dump = (int (*)
 	    (DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t ))
@@ -1136,6 +1164,7 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, u_int8_t const *, u_int , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
+	db->del = __wt_api_db_del;
 	db->dump = __wt_api_db_dump;
 	db->get = __wt_api_db_get;
 	db->get_recno = __wt_api_db_get_recno;

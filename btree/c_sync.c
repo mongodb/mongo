@@ -12,7 +12,7 @@
 static int  __wt_cache_discard_serial_func(WT_TOC *);
 static int  __wt_cache_in_serial_func(WT_TOC *);
 static int  __wt_cache_drain(
-		WT_TOC *, WT_DRAIN *, u_int32_t, WT_PAGE **, u_int32_t);
+		WT_TOC *, WT_REF *, u_int32_t, WT_PAGE **, u_int32_t);
 static void __wt_cache_hazard_check(ENV *, WT_PAGE *);
 static int  __wt_cache_write(ENV *, WT_PAGE *);
 static void __wt_cache_discard(ENV *, WT_PAGE *);
@@ -254,8 +254,8 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	 * better alignment from the underlying heap memory allocator.
 	 * Clear the memory because code depends on initial values of 0.
 	 */
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, 1, (size_t)bytes, &page->hdr));
+	WT_RET(__wt_malloc(env, sizeof(WT_PAGE), &page));
+	WT_ERR(__wt_malloc(env, (size_t)bytes, &page->hdr));
 
 	/*
 	 * Allocate "bytes" bytes from the end of the file; we must serialize
@@ -357,8 +357,8 @@ retry:	/* Search for the page in the cache. */
 	 *
 	 * Read the page.
 	 */
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, 1, (size_t)bytes, &page->hdr));
+	WT_RET(__wt_malloc(env, sizeof(WT_PAGE), &page));
+	WT_ERR(__wt_malloc(env, (size_t)bytes, &page->hdr));
 	offset = WT_ADDR_TO_OFF(db, addr);
 	WT_ERR(__wt_read(env, idb->fh, offset, bytes, page->hdr));
 
@@ -499,8 +499,8 @@ __wt_cache_drain_compare_page(const void *a, const void *b)
 {
 	WT_PAGE *a_page, *b_page;
 
-	a_page = ((WT_DRAIN *)a)->page;
-	b_page = ((WT_DRAIN *)b)->page;
+	a_page = ((WT_REF *)a)->ref;
+	b_page = ((WT_REF *)b)->ref;
 
 	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
 }
@@ -510,8 +510,8 @@ __wt_cache_drain_compare_gen(const void *a, const void *b)
 {
 	u_int32_t a_gen, b_gen;
 
-	a_gen = ((WT_DRAIN *)a)->gen;
-	b_gen = ((WT_DRAIN *)b)->gen;
+	a_gen = ((WT_REF *)a)->gen;
+	b_gen = ((WT_REF *)b)->gen;
 
 	return (a_gen > b_gen ? 1 : (a_gen < b_gen ? -1 : 0));
 }
@@ -537,8 +537,8 @@ __wt_cache_srvr(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_DRAIN *drain, *drainp;
 	WT_PAGE **hazard, *page;
+	WT_REF *drain, *drainp;
 	WT_TOC *toc;
 	u_int64_t cache_pages;
 	u_int32_t bucket_cnt, drain_len, drain_cnt, drain_elem, hazard_elem;
@@ -597,9 +597,9 @@ __wt_cache_srvr(void *arg)
 			else if (review_cnt > 100)
 				review_cnt = 100;
 		}
-		if (review_cnt * sizeof(WT_DRAIN) > drain_len)
+		if (review_cnt * sizeof(WT_REF) > drain_len)
 			WT_ERR(__wt_realloc(env, &drain_len,
-			    (review_cnt + 20) * sizeof(WT_DRAIN), &drain));
+			    (review_cnt + 20) * sizeof(WT_REF), &drain));
 
 		/*
 		 * Copy out review_cnt pages with their generation numbers.  We
@@ -617,7 +617,7 @@ __wt_cache_srvr(void *arg)
 			for (page = cache->hb[bucket_cnt];
 			    page != NULL; page = page->next)
 				if (!F_ISSET(page, WT_PINNED)) {
-					drainp->page = page;
+					drainp->ref = page;
 					drainp->gen = page->page_gen;
 					++drainp;
 					if (--review_cnt == 0)
@@ -632,7 +632,7 @@ __wt_cache_srvr(void *arg)
 
 		/* Sort the list of drain pages by their generation number. */
 		qsort(drain, (size_t)drain_elem,
-		    sizeof(WT_DRAIN), __wt_cache_drain_compare_gen);
+		    sizeof(WT_REF), __wt_cache_drain_compare_gen);
 
 		/*
 		 * Try and drain 10 pages, knowing we may not be able to drain
@@ -646,7 +646,7 @@ __wt_cache_srvr(void *arg)
 
 		/* Re-sort the drain pages by their addressess. */
 		qsort(drain, (size_t)drain_elem,
-		    sizeof(WT_DRAIN), __wt_cache_drain_compare_page);
+		    sizeof(WT_REF), __wt_cache_drain_compare_page);
 
 		/*
 		 * Mark the pages as being drained, and flush memory.
@@ -658,7 +658,7 @@ __wt_cache_srvr(void *arg)
 		 * page draining algorithm.
 		 */
 		for (drain_cnt = 0; drain_cnt < drain_elem; ++drain_cnt)
-			drain[drain_cnt].page->drain = 1;
+			((WT_PAGE *)drain[drain_cnt].ref)->drain = 1;
 		WT_MEMORY_FLUSH;
 
 		/* Copy and sort the hazard references. */
@@ -683,7 +683,7 @@ err:	if (drain != NULL)
 }
 
 static int
-__wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
+__wt_cache_drain(WT_TOC *toc, WT_REF *drain,
     u_int32_t drain_elem, WT_PAGE **hazard, u_int32_t hazard_elem)
 {
 	ENV *env;
@@ -703,7 +703,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 		 * Look for the page in the hazard list until we reach the end
 		 * of the list or find a hazard pointer larger than the page.
 		 */
-		for (page = drain[drain_cnt].page;
+		for (page = drain[drain_cnt].ref;
 		    hp < hazard + hazard_elem && *hp < page; ++hp)
 			;
 
@@ -716,7 +716,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 			page->drain = 0;
 			WT_MEMORY_FLUSH;
 
-			drain[drain_cnt].page = NULL;
+			drain[drain_cnt].ref = NULL;
 			continue;
 		}
 		work = 1;
@@ -756,7 +756,7 @@ __wt_cache_drain(WT_TOC *toc, WT_DRAIN *drain,
 	__wt_cache_discard_serial(toc, drain, drain_cnt);
 
 	for (drain_cnt = 0; drain_cnt < drain_elem; ++drain_cnt, ++drain)
-		if ((page = drain->page) != NULL)
+		if ((page = drain->ref) != NULL)
 			__wt_bt_page_recycle(env, page);
 
 	return (0);
@@ -770,8 +770,8 @@ static int
 __wt_cache_discard_serial_func(WT_TOC *toc)
 {
 	ENV *env;
-	WT_DRAIN *drain;
 	WT_PAGE *page;
+	WT_REF *drain;
 	u_int32_t drain_cnt, drain_elem;
 
 	env = toc->env;
@@ -779,7 +779,7 @@ __wt_cache_discard_serial_func(WT_TOC *toc)
 	__wt_cache_discard_unpack(toc, drain, drain_elem);
 
 	for (drain_cnt = 0; drain_cnt < drain_elem; ++drain_cnt, ++drain)
-		if ((page = drain->page) != NULL) {
+		if ((page = drain->ref) != NULL) {
 #ifdef HAVE_DIAGNOSTIC
 			__wt_cache_hazard_check(env, page);
 #endif

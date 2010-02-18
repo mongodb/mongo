@@ -29,6 +29,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	WT_OVFL *ovfl;
 	WT_PAGE *ovfl_page;
 	WT_ROW_INDX *rip;
+	WT_SDBT *sdbt;
 	int (*callback)(DB *, DBT *, DBT *), ret;
 
 	db = toc->db;
@@ -85,16 +86,18 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_LEAF:
 		if (rip->repl != NULL) {
-			data->data = rip->repl[0].data;
-			data->size = rip->repl[0].size;
-			return (callback == NULL ? 0 : callback(db, key, data));
+			sdbt = rip->repl->data + (rip->repl->repl_next - 1);
+			goto repl;
 		}
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 		if (cip->repl != NULL) {
-			data->data = cip->repl[0].data;
-			data->size = cip->repl[0].size;
+			sdbt = cip->repl->data + (cip->repl->repl_next - 1);
+repl:			if (sdbt->data == WT_DATA_DELETED)
+				return (WT_NOTFOUND);
+			data->data = sdbt->data;
+			data->size = sdbt->size;
 			return (callback == NULL ? 0 : callback(db, key, data));
 		}
 		break;

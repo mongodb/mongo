@@ -55,7 +55,7 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 		return (WT_ERROR);
 	}
 
-	WT_RET(__wt_calloc(env, 1, sizeof(WT_FH), &fh));
+	WT_RET(__wt_malloc(env, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_stat_alloc_fh_stats(env, &fh->stats));
 	WT_ERR(__wt_strdup(env, name, &fh->name));
 

@@ -245,21 +245,19 @@ def func_method(a, f):
 	config = a.config
 	args = a.args
 
-	# We need a return variable if we're doing locking.
-	if config.count('ienvlock'):
-		locking = 1
-	else:
-		locking = 0
+	locking = config.count('ienvlock')	# We're doing locking
+	restart = config.count('restart')	# We're handling WT_RESTART
 
 	# We need an ENV handle, find one.
+	# If we're doing locking or handling restart we need a 'ret' variable.
 	if handle != 'env':
 		f.write('\tENV *env;\n')
-		if locking:
-			f.write('\tint ret;\n\n')
-		f.write('\n\tenv = ' + handle + '->env;\n\n')
-	else:
-		if locking:
-			f.write('\tint ret;\n\n')
+	if locking or restart:
+		f.write('\tint ret;\n')
+	if handle != 'env':
+		f.write('\n\tenv = ' + handle + '->env;\n')
+	if handle != 'env' or locking or restart:
+		f.write('\n')
 
 	# If we have a "flags" argument, check it before we continue.
 	for l in args:
@@ -272,17 +270,22 @@ def func_method(a, f):
 	if locking:
 		f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
 		f.write('\tret = ')
+	elif restart:
+		f.write('\twhile ((ret = ')
 	else:
 		f.write('\treturn (')
-
 	f.write('__wt_' + handle + '_' + method + '(' + handle)
 	for l in args:
 		if l.count('flags/') and flags[a.key][0] == '__NONE__':
 			continue
 		f.write(', ' + l.split('/')[0])
+	if restart:
+		f.write(')) == WT_RESTART)\n\t\t;\n')
 
 	if locking:
-		f.write(');\n\t__wt_unlock(&env->ienv->mtx);\n')
+		f.write(');\n')
+		f.write('\t__wt_unlock(&env->ienv->mtx);\n')
+	if locking or restart:
 		f.write('\treturn (ret);\n')
 	else:
 		f.write('));\n')

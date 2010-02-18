@@ -65,3 +65,61 @@ __wt_workq_srvr(void *arg)
 
 	return (NULL);
 }
+
+/*
+ * __wt_workq_repl --
+ *	Swap in a new WT_PAGE replacement array.
+ */
+int
+__wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new)
+{
+	WT_REPL *repl;
+	int ret;
+
+	repl = *orig;
+	ret = 0;
+
+	/*
+	 * The WorkQ thread updates the WT_REPL replacement structure so writes
+	 * to an existing key/data item are serialized.   Callers have already
+	 * allocated memory for the update and copied the previous replacement
+	 * structure's contents into that memory.
+	 *
+	 * It's easy the first time -- just fill stuff in.
+	 */
+	if (repl == NULL) {
+		*orig = new;
+		return (0);
+	}
+
+	/*
+	 * Two threads might try to update the same item, and race while waiting
+	 * for the WorkQ thread.   Before updating the replacement structure, we
+	 * confirm the current WT_REPL reference is the same as when we decided
+	 * to do the update.
+	 *
+	 * Even if we raced, if there's an empty slot in the current WT_REPL
+	 * structure (another thread did an update, and there's room for our
+	 * caller's change), we return success, our caller can use that empty
+	 * slot, there's no need to upgrade the WT_REPL structure again.
+	 */
+	if (repl->data[repl->repl_next].data == NULL)
+		goto err;
+	if (new->next != repl) {
+		ret = WT_RESTART;
+
+err:		__wt_free(env, new->data, 0);
+		__wt_free(env, new, sizeof(WT_REPL));
+		return (ret);
+	}
+
+
+	/*
+	 * Update the WT_REPL structure and flush the change to the rest of the
+	 * system.
+	 */
+	*orig = new;
+	WT_MEMORY_FLUSH;
+
+	return (0);
+}

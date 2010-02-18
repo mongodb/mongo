@@ -264,6 +264,7 @@ static int
 __wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
 {
 	WT_COL_INDX *ip;
+	WT_SDBT *sdbt;
 	u_int32_t i, icnt, repl_cnt;
 
 	if (fp == NULL)				/* Callable from a debugger. */
@@ -276,11 +277,15 @@ __wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
 		if (ip->page_data != NULL)
 			fprintf(fp, "\tpage_data: %#lx",
 			    WT_ADDR_TO_ULONG(ip->page_data));
-		if (ip->repl != NULL)
-			for (repl_cnt = 0; repl_cnt < ip->repl_size; ++repl_cnt)
-				if (ip->repl[repl_cnt].data != NULL)
-					__wt_bt_debug_dbt("\trepl dbt",
-					    &ip->repl[repl_cnt], fp);
+		if (ip->repl != NULL) {
+			for (sdbt = ip->repl->data, repl_cnt = 0;
+			    repl_cnt < ip->repl->repl_next; ++sdbt, ++repl_cnt)
+				if (sdbt->data == WT_DATA_DELETED)
+					fprintf(fp, "\trepl deleted");
+				else
+					__wt_bt_debug_dbt(
+					    "\trepl dbt", sdbt, fp);
+		}
 		fprintf(fp, "\n");
 	}
 	return (0);
@@ -294,6 +299,7 @@ static int
 __wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
 {
 	WT_ROW_INDX *ip;
+	WT_SDBT *sdbt;
 	u_int32_t i, icnt, repl_cnt;
 
 	if (fp == NULL)				/* Callable from a debugger. */
@@ -305,11 +311,15 @@ __wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
 		    "%6lu: {flags %#lx}\n", (u_long)++icnt, (u_long)ip->flags);
 		if (ip->data != NULL)
 			__wt_bt_debug_dbt("\tdata dbt", ip, fp);
-		if (ip->repl != NULL)
-			for (repl_cnt = 0; repl_cnt < ip->repl_size; ++repl_cnt)
-				if (ip->repl[repl_cnt].data != NULL)
-					__wt_bt_debug_dbt("\trepl dbt",
-					    &ip->repl[repl_cnt], fp);
+		if (ip->repl != NULL) {
+			for (sdbt = ip->repl->data, repl_cnt = 0;
+			    repl_cnt < ip->repl->repl_next; ++sdbt, ++repl_cnt)
+				if (sdbt->data == WT_DATA_DELETED)
+					fprintf(fp, "\trepl deleted");
+				else
+					__wt_bt_debug_dbt(
+					    "\trepl dbt", sdbt, fp);
+		}
 		if (ip->page_data != NULL)
 			fprintf(fp, "\tpage_data: %#lx",
 			    WT_ADDR_TO_ULONG(ip->page_data));

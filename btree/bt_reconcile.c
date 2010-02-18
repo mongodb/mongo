@@ -9,12 +9,13 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_col_int(WT_PAGE *);
-static int __wt_bt_page_inmem_col_leaf(WT_PAGE *);
-static int __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
-static int __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
+static int  __wt_bt_page_inmem_col_leaf(WT_PAGE *);
+static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
+static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
+static void __wt_bt_page_recycle_repl(ENV *, WT_REPL *);
 
 /*
  * __wt_bt_page_alloc --
@@ -116,21 +117,22 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 				F_CLR(rip, WT_ALLOCATED);
 				__wt_free(env, rip->data, 0);
 			}
-#ifdef DIAGNOSTIC
 			if (F_ISSET(rip, ~WT_APIMASK_WT_ROW_INDX))
 				(void)__wt_api_args(env, "Page.recycle");
-#endif
+			if (rip->repl != NULL)
+				__wt_bt_page_recycle_repl(env, rip->repl);
 		}
 		F_CLR(page, WT_ALLOCATED);
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-#ifdef DIAGNOSTIC
-		WT_INDX_FOREACH(page, cip, i)
+		WT_INDX_FOREACH(page, cip, i) {
 			if (F_ISSET(cip, ~WT_APIMASK_WT_COL_INDX))
 				(void)__wt_api_args(env, "Page.recycle");
-#endif
+			if (cip->repl != NULL)
+				__wt_bt_page_recycle_repl(env, cip->repl);
+		}
 		break;
 	case WT_PAGE_OVFL:
 	default:
@@ -147,6 +149,31 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		(void)__wt_api_args(env, "Page.recycle");
 #endif
 	__wt_free(env, page, sizeof(WT_PAGE));
+}
+
+/*
+ * __wt_bt_page_recycle_repl --
+ *	Recycle the replacement array.
+ */
+static void
+__wt_bt_page_recycle_repl(ENV *env, WT_REPL *repl)
+{
+	WT_REPL *next;
+	u_int16_t i;
+
+	/*
+	 * We only free the data pointers in the top-level WT_REPL structure,
+	 * all data pointers in previous WT_REPL structures were copied into
+	 * the top-level structure as it was upgraded.
+	 */
+	for (i = 0; i < repl->repl_next; ++i)
+		__wt_free(env, repl->data[i].data, repl->data[i].size);
+
+	/* Walk the WT_REPL list, freeing the replacement structures. */
+	do {
+		next = repl->next;
+		__wt_free(env, repl, sizeof(WT_REPL));
+	} while ((repl = next) != NULL);
 }
 
 /*
