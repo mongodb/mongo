@@ -112,7 +112,9 @@ int mongo::Tool::main( int argc , char ** argv ){
         }
     }
 
-    if ( ! hasParam( "dbpath" ) ) {
+    bool useDirectClient = hasParam( "dbpath" );
+
+    if ( ! useDirectClient ) {
         _host = "127.0.0.1";
         if ( _params.count( "host" ) )
             _host = _params["host"].as<string>();
@@ -178,7 +180,8 @@ int mongo::Tool::main( int argc , char ** argv ){
     if ( currentClient.get() )
         currentClient->shutdown();
 
-    dbexit( EXIT_CLEAN );
+    if ( useDirectClient )
+        dbexit( EXIT_CLEAN );
     return ret;
 }
 

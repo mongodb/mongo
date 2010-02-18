@@ -40,7 +40,7 @@ namespace mongo {
 
         // returns the key value for o
         BSONObj getKeyFromObject(BSONObj o) {
-            return o.extractFields(pattern);
+            return o.extractFields(pattern,true);
         }
     };
 
