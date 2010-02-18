@@ -48,7 +48,7 @@ static int debug_count;
 static void
 __wt_debug_loadme(const char *msg, void *addr)
 {
-	fprintf(stderr, "memory: %lx: %s\n", (u_long)addr, msg);
+	fprintf(stderr, "memory: %lx: %s\n", WT_ADDR_TO_ULONG(addr), msg);
 	if (debug_count > 0 && --debug_count == 0)
 		__wt_abort();
 }
@@ -101,7 +101,7 @@ __wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp)
 		__wt_open_mfp(env);
 	if (debug_addr == p)
 		__wt_debug_loadme("allocation", p);
-	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
+	fprintf(__wt_mfp, "A\t%lx\n", WT_ADDR_TO_ULONG(p));
 #endif
 
 	return (0);
@@ -146,7 +146,7 @@ __wt_realloc(ENV *env,
 	if (p != NULL) {
 		if (debug_addr == p)
 			__wt_debug_loadme("free", p);
-		fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
+		fprintf(__wt_mfp, "F\t%lx\n", WT_ADDR_TO_ULONG(p));
 	}
 #endif
 	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL) {
@@ -168,7 +168,7 @@ __wt_realloc(ENV *env,
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
 		__wt_debug_loadme("allocation", p);
-	fprintf(__wt_mfp, "A\t%lx\n", (u_long)p);
+	fprintf(__wt_mfp, "A\t%lx\n", WT_ADDR_TO_ULONG(p));
 #endif
 
 	*(void **)retp = p;
@@ -239,7 +239,7 @@ __wt_free_worker(ENV *env, void *p_arg, u_int32_t len)
 #ifdef HAVE_DIAGNOSTIC_MEMORY
 	if (debug_addr == p)
 		__wt_debug_loadme("free", p);
-	fprintf(__wt_mfp, "F\t%lx\n", (u_long)p);
+	fprintf(__wt_mfp, "F\t%lx\n", WT_ADDR_TO_ULONG(p));
 #endif
 
 	free(p);
