@@ -532,8 +532,8 @@ flags['idb'] = [
 	'REPEAT_COMP' ]
 flags['ienv'] = [
 	'CACHE_LOCKOUT',
-	'WORKQ_RUN',
-	'SERVER_RUN' ]
+	'SERVER_RUN',
+	'WORKQ_RUN' ]
 flags['wt_row_indx'] = [
 	'ALLOCATED',
 	'HUFFMAN' ]
