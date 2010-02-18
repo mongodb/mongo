@@ -273,6 +273,9 @@ int
 __wt_api_arg_min(ENV *env,
     const char *name, const char *arg_name, u_int32_t v, u_int32_t min);
 int
+__wt_api_arg_max(ENV *env,
+    const char *name, const char *arg_name, u_int32_t v, u_int32_t max);
+int
 __wt_database_readonly(DB *db, const char *name);
 int
 __wt_database_format(DB *db);
