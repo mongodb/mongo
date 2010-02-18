@@ -515,7 +515,8 @@ struct __wt_off {
  * 64-bit records field.   This is an on-disk structure, which means we have to
  * have a fixed size, without padding, so we declare it as two 32-bit fields and
  * cast it.  We haven't yet found a compiler that aligns the 32-bit fields such
- * that a cast won't work; if we find one, we'll have to go to bit masks.
+ * that a cast won't work; if we find one, we'll have to go to bit masks, or to
+ * reading/write the bytes to/from a local variable.
  */
 #define	WT_RECORDS(offp)	(*(u_int64_t *)(&(offp)->__record_chunk[0]))
 	u_int32_t __record_chunk[2];	/* Subtree record count */
