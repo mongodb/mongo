@@ -31,9 +31,7 @@ extern "C" {
  */
 #define	WT_ADDR_TO_ULONG(addr)	((u_long)(uintptr_t)(addr))
 
-/*
- * Flag checking for API functions.
- */
+/* Flag check for API functions. */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
 		ret = __wt_api_args(env, name);
@@ -42,6 +40,11 @@ extern "C" {
 		return (__wt_api_args(env, name));
 #define	WT_DB_FCHK(db, name, f, mask)					\
 	WT_ENV_FCHK((db)->env, name, f, mask)
+
+/* Read-only database check. */
+#define	WT_DB_RDONLY(db, name)						\
+	if (F_ISSET((db)->idb, WT_RDONLY))				\
+		return (__wt_database_readonly(db, name));
 
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a

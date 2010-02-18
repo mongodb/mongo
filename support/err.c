@@ -121,6 +121,20 @@ __wt_api_arg_min(ENV *env,
 }
 
 /*
+ * __wt_database_readonly --
+ *	Print a standard error message on attempts to modify  a read-only
+ *	database.
+ */
+int
+__wt_database_readonly(DB *db, const char *name)
+{
+	__wt_db_errx(db,
+	    "%s: the database was opened read-only and may not be modified",
+	    name);
+	return (WT_READONLY);
+}
+
+/*
  * __wt_database_format --
  *	Print a standard error message when a database format error is
  *	suddenly discovered.

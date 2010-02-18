@@ -47,7 +47,6 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	IENV *ienv;
 	IDB *idb;
 
-	WT_CC_QUIET(flags, 0);
 
 	env = db->env;
 	ienv = env->ienv;
@@ -59,6 +58,9 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	__wt_lock(env, &ienv->mtx);
 	idb->file_id = ++ienv->next_file_id;
 	__wt_unlock(&ienv->mtx);
+
+	if (LF_ISSET(WT_RDONLY))
+		F_SET(idb, WT_RDONLY);
 
 	return (0);
 }

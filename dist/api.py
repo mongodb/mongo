@@ -163,21 +163,18 @@ def func_method_getset(a, f):
 	config = a.config
 	args = a.args
 
+	handcode = config.count('handcode')
+
 	# Declarations:
 	# If we don't have an environment handle, acquire one.
 	# If we are hand-coding the routine, we'll need a place to save the
 	# return value.
-	newl = 0
 	if handle != 'env':
-		f.write('\tENV *env;\n')
-		newl = 1
-	if config.count('handcode'):
+		f.write('\tENV *env = ' + handle + '->env;\n')
+	if handcode:
 		f.write('\tint ret;\n')
-		newl = 1
-	if newl:
+	if handle != 'env' or handcode:
 		f.write('\n')
-	if handle != 'env':
-		f.write('\tenv = ' + handle + '->env;\n\n')
 
 	# If we have a "flags" argument to a setter fucntion, check it
 	# before we continue.
@@ -207,7 +204,7 @@ def func_method_getset(a, f):
 	f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
 
 	# If the function is hand-coded, just call it.
-	if config.count('handcode'):
+	if handcode:
 		f.write('\tret = __wt_' +
 		    handle + '_' + method + '(\n\t    ' + handle)
 		for l in args:
@@ -229,7 +226,7 @@ def func_method_getset(a, f):
 	# getter/setter implies ienvlock: unlock the data structure.
 	f.write('\t__wt_unlock(&env->ienv->mtx);\n')
 	f.write('\treturn (')
-	if config.count('handcode'):
+	if handcode:
 		f.write('ret')
 	else:
 		f.write('0')
@@ -246,26 +243,33 @@ def func_method(a, f):
 	args = a.args
 
 	locking = config.count('ienvlock')	# We're doing locking
+	rdonly = config.count('rdonly')		# We're checking read-only
 	restart = config.count('restart')	# We're handling WT_RESTART
-
-	# We need an ENV handle, find one.
-	# If we're doing locking or handling restart we need a 'ret' variable.
-	if handle != 'env':
-		f.write('\tENV *env;\n')
-	if locking or restart:
-		f.write('\tint ret;\n')
-	if handle != 'env':
-		f.write('\n\tenv = ' + handle + '->env;\n')
-	if handle != 'env' or locking or restart:
-		f.write('\n')
-
-	# If we have a "flags" argument, check it before we continue.
+	flagchk = 0				# We're checking flags
 	for l in args:
 		if l.count('flags/'):
-			f.write('\tWT_ENV_FCHK(env, "' + handle.upper() +
-			    '.' + method + '", flags, WT_APIMASK_' +
-			    handle.upper() + '_' + method.upper() + ');\n\n')
-			break
+			flagchk = 1
+
+	# We need an ENV handle, find one.
+	# If we're doing flag or read-only checks, we need a method name.
+	# If we're doing locking or handling restart we need a 'ret' variable.
+	if flagchk or rdonly:
+		f.write('\tconst char *method_name = "' +
+		    handle.upper() + '.' + method + '";\n')
+	if (flagchk or locking) and handle != 'env':
+		f.write('\tENV *env = ' + handle + '->env;\n')
+	if locking or restart:
+		f.write('\tint ret;\n')
+	if flagchk or locking or restart:
+		f.write('\n')
+
+	if flagchk:
+		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
+		    handle.upper() + '_' + method.upper() + ');\n\n')
+
+	# If the method is illegal for read-only databases, check that.
+	if rdonly:
+		f.write('\tWT_DB_RDONLY(db, method_name);\n\n')
 
 	if locking:
 		f.write('\t__wt_lock(env, &env->ienv->mtx);\n')

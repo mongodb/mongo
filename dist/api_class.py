@@ -26,6 +26,7 @@
 #		method	 -- method returns an int
 #		methodV  -- method returns void
 #		noauto	 -- don't create a stub
+#		rdonly	 -- not allowed if the database is read-only
 #		restart	 -- handle WT_RESTART in the API call
 #		setter	 -- auto-generated setter method
 #		verify	 -- setter methods call validation function
@@ -351,7 +352,7 @@ methods['db.btree_pagesize_set'] = Api(
 
 methods['db.bulk_load'] = Api(
 	'db.bulk_load',
-	'method',
+	'method, rdonly',
 	['flags/u_int32_t @S',
 	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
@@ -376,7 +377,7 @@ methods['db.column_set'] = Api(
 
 methods['db.del'] = Api(
 	'db.del',
-	'method, cache, restart',
+	'method, cache, rdonly, restart',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'flags/u_int32_t @S'],
@@ -470,12 +471,12 @@ methods['db.open'] = Api(
 	['dbname/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/u_int32_t @S'],
-	[ 'CREATE' ],
+	[ 'CREATE', 'RDONLY' ],
 	['init'], [])
 
 methods['db.put'] = Api(
 	'db.put',
-	'method, cache, restart',
+	'method, cache, rdonly, restart',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
@@ -500,7 +501,7 @@ methods['db.stat_print'] = Api(
 
 methods['db.sync'] = Api(
 	'db.sync',
-	'method',
+	'method, rdonly',
 	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
@@ -527,6 +528,7 @@ flags['cache'] = [
 	'SERVER_SLEEPING' ]
 flags['idb'] = [
 	'COLUMN',
+	'RDONLY',
 	'REPEAT_COMP' ]
 flags['ienv'] = [
 	'CACHE_LOCKOUT',

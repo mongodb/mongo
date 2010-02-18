@@ -424,7 +424,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_ASCII_ENGLISH				0x00000008
 #define	WT_CACHE_DRAIN_WAIT				0x00000001
 #define	WT_CACHE_LOCKOUT				0x00000004
-#define	WT_COLUMN					0x00000002
+#define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000001
@@ -435,6 +435,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_MODIFIED					0x00000008
 #define	WT_PINNED					0x00000004
 #define	WT_PRINTABLES					0x00000001
+#define	WT_RDONLY					0x00000002
 #define	WT_REPEAT_COMP					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SERVER_SLEEPING				0x00000001
@@ -453,7 +454,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_DB_GET				0x00000000
 #define	WT_APIMASK_DB_GET_RECNO				0x00000000
 #define	WT_APIMASK_DB_HUFFMAN_SET			0x0000000f
-#define	WT_APIMASK_DB_OPEN				0x00000001
+#define	WT_APIMASK_DB_OPEN				0x00000003
 #define	WT_APIMASK_DB_PUT				0x00000000
 #define	WT_APIMASK_DB_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_DB_STAT_PRINT			0x00000000
@@ -466,7 +467,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
-#define	WT_APIMASK_IDB					0x00000003
+#define	WT_APIMASK_IDB					0x00000007
 #define	WT_APIMASK_IENV					0x00000007
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
 #define	WT_APIMASK_WT_COL_INDX				0x00000003
@@ -488,8 +489,9 @@ char	*wiredtiger_version(int *, int *, int *);
  */
 #define	WT_ERROR	-31800
 #define	WT_NOTFOUND	-31801
-#define	WT_RESTART	-31802
-#define	WT_TOOSMALL	-31803
+#define	WT_READONLY	-31802
+#define	WT_RESTART	-31803
+#define	WT_TOOSMALL	-31804
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
