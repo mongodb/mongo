@@ -167,7 +167,8 @@ __wt_bt_page_recycle_repl(ENV *env, WT_REPL *repl)
 	 * the top-level structure as it was upgraded.
 	 */
 	for (i = 0; i < repl->repl_next; ++i)
-		__wt_free(env, repl->data[i].data, repl->data[i].size);
+		if (repl->data[i].data != WT_DATA_DELETED)
+			__wt_free(env, repl->data[i].data, repl->data[i].size);
 
 	/* Walk the WT_REPL list, freeing the replacement structures. */
 	do {
