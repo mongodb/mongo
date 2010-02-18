@@ -79,6 +79,12 @@ void intr( int sig ){
 }
 
 #if !defined(_WIN32)
+void killOps() {
+    mongo::BSONObj spec = BSON( "" << mongo::shellUtils::_allMyUris );
+    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
+    scope->invoke( "function( x ) { killWithUris( x ); }", spec );
+}
+
 void quitNicely( int sig ){
     if ( sig == SIGINT && inMultiLine ){
         gotInterrupted = 1;
@@ -86,6 +92,7 @@ void quitNicely( int sig ){
     }
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
+    killOps();
     shellHistoryDone();
     exit(0);
 }

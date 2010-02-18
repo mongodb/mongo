@@ -26,6 +26,7 @@ namespace mongo {
 
         extern std::string _dbConnect;
         extern std::string _dbAuth;
+        extern vector< string > _allMyUris;
 
         void RecordMyLocation( const char *_argv0 );
         void installShellUtils( Scope& scope );

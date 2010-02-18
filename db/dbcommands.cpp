@@ -1427,6 +1427,30 @@ namespace mongo {
         }
     } cmdFindAndModify;
     
+    /* Returns client's uri */
+    class CmdWhatsMyUri : public Command {
+    public:
+        CmdWhatsMyUri() : Command("whatsmyuri") { }
+        virtual bool logTheOp() {
+            return false; // the modification will be logged directly
+        }
+        virtual bool slaveOk() {
+            return true;
+        }
+        virtual bool readOnly() {
+            return true;
+        }
+        virtual bool requiresAuth() {
+            return false;
+        }
+        virtual bool noLocking() { return true; }
+        virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            BSONObj info = cc().curop()->infoNoauth();
+            result << "you" << info[ "client" ];
+            return true;
+        }
+    } cmdWhatsMyUri;
+    
     /** 
      * this handles
      - auth

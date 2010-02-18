@@ -553,7 +553,7 @@ namespace mongo {
                 cout << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
                 assert( "Failed to terminate process" == 0 );
             }
-            
+
             if ( port > 0 ) {
                 close( dbs[ port ].second );
                 dbs.erase( port );
@@ -613,12 +613,10 @@ namespace mongo {
 #endif
         
         MongoProgramScope::~MongoProgramScope() {
-            try {
+            DESTRUCTOR_GUARD(
                 KillMongoProgramInstances();
                 ClearRawMongoProgramOutput( BSONObj() );
-            } catch ( ... ) {
-                assert( false );
-            }
+            )
         }
 
         unsigned _randomSeed;
@@ -677,6 +675,8 @@ namespace mongo {
 #endif
         }
 
+        vector< string > _allMyUris;
+        
         void initScope( Scope &scope ) {
             scope.externalSetup();
             mongo::shellUtils::installShellUtils( scope );
@@ -684,6 +684,9 @@ namespace mongo {
             
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
+                uassert( 13010, "whatsmyuri failed", scope.exec( "__myuri = db.runCommand( {whatsmyuri:1} ).you", "(whatsmyuri)", false , true , false ) );
+                string uri = scope.getString( "__myuri" );
+                _allMyUris.push_back( uri );
                 if ( !_dbAuth.empty() ) {
                     installGlobalUtils( scope );
                     uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );

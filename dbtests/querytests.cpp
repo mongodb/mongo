@@ -936,6 +936,15 @@ namespace QueryTests {
         int _old;
     };
 
+    class WhatsMyUri : public CollectionBase {
+    public:
+        WhatsMyUri() : CollectionBase( "whatsmyuri" ) {}
+        void run() {
+            BSONObj result;
+            client().runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
+            ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
+        }
+    };
     
     namespace parsedtests {
         class basic1 {
@@ -963,7 +972,6 @@ namespace QueryTests {
         };
     };
 
-    
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -1008,6 +1016,7 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStart >();
+            add< WhatsMyUri >();
 
             add< parsedtests::basic1 >();
         }
