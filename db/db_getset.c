@@ -57,9 +57,18 @@ int
 __wt_db_column_set_verify(DB *db,
     u_int32_t fixed_len, const char *dictionary, u_int32_t flags)
 {
+	ENV *env;
 	IDB *idb;
 
+	env = db->env;
 	idb = db->idb;
+
+	/*
+	 * The fixed-length number of bytes is stored in a single byte, which
+	 * limits the size to 255 bytes.
+	 */
+	WT_RET(__wt_api_arg_max(
+	    env, "DB.column_set", "fixed_len", fixed_len, 255));
 
 	/*
 	 * Dictionary and repeat compression are incompatible with variable

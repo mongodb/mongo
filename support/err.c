@@ -121,6 +121,24 @@ __wt_api_arg_min(ENV *env,
 }
 
 /*
+ * __wt_api_arg_max --
+ *	Print a standard error message when an API function is passed a
+ *	too-large argument.
+ */
+int
+__wt_api_arg_max(ENV *env,
+    const char *name, const char *arg_name, u_int32_t v, u_int32_t max)
+{
+	if (v >= max)
+		return (0);
+
+	__wt_api_env_errx(env,
+	    "%s: %s argument larger than maximum value of %lu",
+	    name, arg_name, (u_long)max);
+	return (WT_ERROR);
+}
+
+/*
  * __wt_database_readonly --
  *	Print a standard error message on attempts to modify  a read-only
  *	database.

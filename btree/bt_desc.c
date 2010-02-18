@@ -196,7 +196,7 @@ __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr)
 	desc.root_addr = root_addr;
 	desc.leafsize = db->leafsize;
 	desc.intlsize = db->intlsize;
-	desc.fixed_len = db->fixed_len;
+	desc.fixed_len = (u_int8_t)db->fixed_len;
 	memcpy(
 	    (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, &desc, WT_PAGE_DESC_SIZE);
 
