@@ -30,7 +30,8 @@ int op_reopen = 0;				/* Sync and reopen database */
 int op_verify = 0;				/* Verify database */
 
 enum {						/* Statistics */
-    STAT_NONE, STAT_ALL, STAT_LOAD, STAT_READ, STAT_WRITE } stat_op = STAT_NONE;
+    STAT_NONE, STAT_ALL,
+    STAT_DELETE, STAT_LOAD, STAT_READ, STAT_WRITE } stat_op = STAT_NONE;
 enum {						/* Database type */
     TYPE_COLUMN_FIX, TYPE_COLUMN_VAR, TYPE_ROW } dtype;
 
@@ -44,6 +45,7 @@ char *logfile;
 
 void	data_set_fix(int, void *, u_int32_t *);
 void	data_set_var(int, void *, u_int32_t *, int);
+int	del_check(void);
 int	dtype_arg(void);
 void	key_set(int, void *, u_int32_t *);
 int	load(void);
@@ -130,6 +132,9 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			switch (optarg[0]) {
+			case 'd':
+				stat_op = STAT_DELETE;
+				break;
 			case 'l':
 				stat_op = STAT_LOAD;
 				break;
@@ -275,6 +280,13 @@ main(int argc, char *argv[])
 			setup();
 		}
 		if (dtype == TYPE_ROW && write_check() != 0)
+			goto err;
+
+		if (op_reopen) {
+			teardown();
+			setup();
+		}
+		if (dtype == TYPE_ROW && del_check() != 0)
 			goto err;
 #endif
 		teardown();
@@ -547,6 +559,68 @@ read_check_row()
 }
 
 int
+del_check()
+{
+	DBT key, data, repl;
+	WT_TOC *toc;
+	u_int64_t cnt, last_cnt;
+	u_int32_t klen, dlen;
+	char *kbuf, *dbuf;
+	int ret;
+
+	memset(&key, 0, sizeof(key));
+
+	assert(env->toc(env, 0, &toc) == 0);
+
+	/* Remove a random subset of the records using the key. */
+	for (last_cnt = cnt = 0; cnt < keys;) {
+		cnt += rand() % 43 + 1;
+		if (cnt > keys)
+			cnt = keys;
+		if (cnt - last_cnt > 1000) {
+			track("key delete-check", cnt);
+			last_cnt = cnt;
+		}
+
+		/* Retrieve the key/data pair by key. */
+		key_set(cnt, &key.data, &key.size);
+		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
+			env->err(env, ret, "delete: get by key failed: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+
+		/* Remove the key/data pair. */
+		if ((ret = db->del(db, toc, &key, 0)) != 0) {
+			env->err(env, ret, "delete by key failed: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+
+		/* Retrieve the key/data pair by key. */
+		if ((ret = db->get(
+		    db, toc, &key, NULL, &repl, 0)) != WT_NOTFOUND) {
+			env->err(env, ret,
+			    "delete: get by key succeeded: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+	}
+
+	assert(toc->close(toc, 0) == 0);
+
+	if (op_verify)
+		assert(db->verify(db, track, 0) == 0);
+
+	if (stat_op == STAT_ALL || stat_op == STAT_DELETE) {
+		(void)printf("\nDelete-check statistics:\n");
+		assert(env->stat_print(env, stdout, 0) == 0);
+	}
+
+	return (0);
+}
+
+int
 write_check()
 {
 	DBT key, data, repl;
@@ -708,7 +782,7 @@ usage()
 	(void)fprintf(stderr,
 	    "usage: %s [-Cdv] [-a d|r|v] [-c cachesize] [-f length ] [-h 0|1] "
 	    "[-k keys] [-L logfile] [-l leafsize] [-n nodesize] [-R rand] "
-	    "[-r runs] [-s l|r|w|*] [-t r|v]\n",
+	    "[-r runs] [-s d|l|r|w|*] [-t r|v]\n",
 	    progname);
 	exit(1);
 }
