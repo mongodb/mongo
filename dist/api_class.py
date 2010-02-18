@@ -534,9 +534,6 @@ flags['ienv'] = [
 	'CACHE_LOCKOUT',
 	'WORKQ_RUN',
 	'SERVER_RUN' ]
-flags['wt_col_indx'] = [
-	'ALLOCATED',
-	'HUFFMAN' ]
 flags['wt_row_indx'] = [
 	'ALLOCATED',
 	'HUFFMAN' ]

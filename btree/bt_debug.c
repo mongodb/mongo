@@ -272,8 +272,7 @@ __wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
 
 	icnt = 0;
 	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp,
-		    "%6lu: {flags %#lx}\n", (u_long)++icnt, (u_long)ip->flags);
+		fprintf(fp, "%6lu:\n", (u_long)++icnt);
 		if (ip->page_data != NULL)
 			fprintf(fp, "\tpage_data: %#lx",
 			    WT_ADDR_TO_ULONG(ip->page_data));

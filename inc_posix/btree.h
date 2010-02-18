@@ -314,10 +314,7 @@ typedef	struct __wt_row_indx {
  */
 typedef	struct __wt_col_indx {
 	void	 *page_data;		/* Original on-page data */
-
 	WT_REPL	 *repl;			/* Replacement data array */
-
-	u_int32_t flags;
 } WT_COL_INDX;
 /*
  * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
@@ -325,7 +322,7 @@ typedef	struct __wt_col_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_COL_INDX_SIZE	12
+#define	WT_COL_INDX_SIZE	8
 
 /* Macro to walk the indexes of an in-memory page. */
 #define	WT_INDX_FOREACH(page, ip, i)					\

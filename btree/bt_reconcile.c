@@ -127,12 +127,9 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-		WT_INDX_FOREACH(page, cip, i) {
-			if (F_ISSET(cip, ~WT_APIMASK_WT_COL_INDX))
-				(void)__wt_api_args(env, "Page.recycle");
+		WT_INDX_FOREACH(page, cip, i)
 			if (cip->repl != NULL)
 				__wt_bt_page_recycle_repl(env, cip->repl);
-		}
 		break;
 	case WT_PAGE_OVFL:
 	default:
