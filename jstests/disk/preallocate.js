@@ -1,4 +1,4 @@
-port = allocatePorts( 1 )[ 0 ]
+port = allocatePorts( 1 )[ 0 ];
 
 var baseName = "jstests_preallocate";
 
