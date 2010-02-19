@@ -114,14 +114,13 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		WT_INDX_FOREACH(page, rip, i) {
 			/*
 			 * For each entry, see if the data was an allocation,
-			 * that is, if it points somewhere other than to the
+			 * that is, if it points somewhere other than the
 			 * original page.  If it's an allocation, free it.
 			 *
 			 * For each entry, see if replacements were made -- if
 			 * so, free them.
 			 */
-			if (rip->data != NULL &&
-			    (rip->data < bp || rip->data >= ep))
+			if (rip->data < bp || rip->data >= ep)
 				__wt_free(env, rip->data, rip->size);
 			if (rip->repl != NULL)
 				__wt_bt_page_recycle_repl(env, rip->repl);

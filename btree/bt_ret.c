@@ -71,9 +71,10 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			key->data = toc->key.data;
 			key->size = toc->key.size;
 		} else if (callback == NULL) {
-			if (key->data_len < rip->size)
+			if (toc->key.data_len < rip->size)
 				WT_RET(__wt_realloc(env,
-				    &key->data_len, rip->size, &key->data));
+				    &toc->key.data_len,
+				    rip->size, &toc->key.data));
 			memcpy(toc->key.data, rip->data, rip->size);
 			toc->key.size = rip->size;
 
