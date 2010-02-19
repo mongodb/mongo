@@ -484,7 +484,7 @@ namespace mongo {
         
         assert( len < 400000000 );
         int passes = 0;
-        int maxPasses = len / 32; // 30 is about the smallest entry that could go in the oplog
+        int maxPasses = ( len / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
         if ( maxPasses < 5000 ){
             // this is for bacwards safety since 5000 was the old value
             maxPasses = 5000;
