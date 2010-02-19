@@ -553,7 +553,7 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip)
 	WT_PAGE *ovfl_page;
 	u_int32_t size;
 	int ret;
-	void *dest, *p;
+	void *orig, *copy;
 
 	env = toc->env;
 	idb = toc->db->idb;
@@ -577,23 +577,23 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip)
 	if (WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
 		ovfl = WT_ITEM_BYTE_OVFL(item);
 		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
-		p = WT_PAGE_BYTE(ovfl_page);
+		orig = WT_PAGE_BYTE(ovfl_page);
 		size = ovfl->len;
 	} else {
-		p = WT_ITEM_BYTE(item);
+		orig = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
 	}
 
 	/* Copy the item into place; if the item is compressed, decode it. */
 	if (idb->huffman_key == NULL) {
-		WT_ERR(__wt_malloc(env, size, &dest));
-		memcpy(dest, p, size);
+		WT_ERR(__wt_malloc(env, size, &copy));
+		memcpy(copy, orig, size);
 	} else
 		WT_ERR(__wt_huffman_decode(
-		    idb->huffman_key, p, size, &dest, NULL, &size));
+		    idb->huffman_key, orig, size, &copy, NULL, &size));
 
 	/* Replace the on-page WT_ITEM reference with the processed key. */
-	ip->data = dest;
+	ip->data = copy;
 	ip->size = size;
 
 err:	if (ovfl_page != NULL)
