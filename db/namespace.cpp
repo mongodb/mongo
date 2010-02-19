@@ -484,7 +484,11 @@ namespace mongo {
         
         assert( len < 400000000 );
         int passes = 0;
-        const int maxPasses = len / 30; // 30 is about the smallest entry that could go in the oplog
+        int maxPasses = len / 32; // 30 is about the smallest entry that could go in the oplog
+        if ( maxPasses < 5000 ){
+            // this is for bacwards safety since 5000 was the old value
+            maxPasses = 5000;
+        }
         DiskLoc loc;
 
         // delete records until we have room and the max # objects limit achieved.
@@ -533,7 +537,7 @@ namespace mongo {
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
-            if( ++passes >= maxPasses ) {
+            if( ++passes > maxPasses ) {
                 log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << '\n';
                 log() << "passes max:" << max << " nrecords:" << nrecords << " datasize: " << datasize << endl;
                 massert( 10345 ,  "passes >= maxPasses in capped collection alloc", false );
