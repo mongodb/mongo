@@ -64,8 +64,7 @@ __wt_bt_dbt_return(WT_TOC *toc,
 	 * add cursor support).
 	 */
 	if (key_return) {
-		if (callback != NULL &&
-		    rip->data != NULL && !F_ISSET(rip, WT_HUFFMAN)) {
+		if (callback != NULL && !WT_ROW_INDX_PROCESS(rip)) {
 			WT_CLEAR(local_key);
 			key = &local_key;
 			key->data = rip->data;

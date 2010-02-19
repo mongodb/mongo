@@ -45,7 +45,7 @@ __wt_bt_search(WT_TOC *toc, DBT *key, WT_PAGE **pagep, WT_ROW_INDX **ipp)
 			 */
 			ip = page->u.r_indx + indx;
 			if (WT_ROW_INDX_PROCESS(ip))
-				WT_ERR(__wt_bt_key_to_indx(toc, page, ip));
+				WT_ERR(__wt_bt_key_to_indx(toc, ip));
 
 			/*
 			 * If we're about to compare an application key with

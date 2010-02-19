@@ -306,8 +306,7 @@ __wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
 
 	icnt = 0;
 	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp,
-		    "%6lu: {flags %#lx}\n", (u_long)++icnt, (u_long)ip->flags);
+		fprintf(fp, "%6lu:\n", (u_long)++icnt);
 		if (ip->data != NULL)
 			__wt_bt_debug_dbt("\tdata dbt", ip, fp);
 		if (ip->repl != NULL) {
@@ -444,8 +443,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		fprintf(fp, "addr %lu; len %lu; ",
 		    (u_long)ovfl->addr, (u_long)ovfl->len);
 
-		WT_ERR(__wt_bt_ovfl_in(
-		    toc, ovfl->addr, (u_int32_t)ovfl->len, &page));
+		WT_ERR(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &page));
 		hp = idb->huffman_data;
 		p = WT_PAGE_BYTE(page);
 		len = ovfl->len;

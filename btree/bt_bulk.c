@@ -1197,24 +1197,25 @@ __wt_bt_promote_row_indx(
 	++page->indx_count;
 
 	/*
-	 * If there's a key, fill it in.  On-page keys are directly referenced.
-	 * Overflow keys, we grab the size but otherwise leave them alone.
+	 * If there's a key, fill it in.  On-page uncompressed keys are directly
+	 * referenced, but compressed or overflow keys reference the on-page
+	 * item, with a size of 0 to indicate they need further processing.
 	 */
-	if (key != NULL) {
+	if (key != NULL)
 		switch (WT_ITEM_TYPE(key)) {
 		case WT_ITEM_KEY:
-			ip->data = WT_ITEM_BYTE(key);
-			ip->size = WT_ITEM_LEN(key);
-			break;
+			if (idb->huffman_key == NULL) {
+				ip->data = WT_ITEM_BYTE(key);
+				ip->size = WT_ITEM_LEN(key);
+				break;
+			}
+			/* FALLTHROUGH */
 		case WT_ITEM_KEY_OVFL:
-			ip->size = WT_ITEM_BYTE_OVFL(key)->len;
+			ip->data = key;
+			ip->size = 0;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
-
-		if (idb->huffman_key != NULL)
-			F_SET(ip, WT_HUFFMAN);
-	}
 
 	/* Fill in the on-page data. */
 	ip->page_data = page_data;

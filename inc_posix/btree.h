@@ -286,18 +286,22 @@ typedef	struct __wt_row_indx {
 	 * sort key (that is, a row-store, not a column-store, which is only
 	 * "sorted" by record number).
 	 *
-	 * The first fields of the WT_ROW_INDX structure is the same as the
-	 * first fields of a DBT so we can feed it to a comparison function
-	 * without copying.  This is important for keys on internal pages.
+	 * The first fields of the WT_ROW_INDX structure are the same as the
+	 * first fields of a DBT so we can hand it to a comparison function
+	 * without copying (this is important for keys on internal pages).
+	 *
+	 * If a key requires processing (for example, an overflow key or an
+	 * Huffman encoded key), the data field references the on-page key
+	 * information, but the size is set to 0 to indicate the key requires
+	 * processing.
 	 */
+#define	WT_ROW_INDX_PROCESS(ip)		((ip)->size == 0)
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
 	void	 *page_data;		/* Original on-page data */
 
 	WT_REPL	 *repl;			/* Replacement data array */
-
-	u_int32_t flags;
 } WT_ROW_INDX;
 /*
  * WT_ROW_SIZE is the expected structure size --  we check at startup to ensure
@@ -305,7 +309,7 @@ typedef	struct __wt_row_indx {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_ROW_INDX_SIZE	20
+#define	WT_ROW_INDX_SIZE	16
 
 /*
  * WT_COL_INDX --
@@ -328,14 +332,6 @@ typedef	struct __wt_col_indx {
 #define	WT_INDX_FOREACH(page, ip, i)					\
 	for ((i) = (page)->indx_count,					\
 	    (ip) = (page)->u.indx; (i) > 0; ++(ip), --(i))
-
-/*
- *
- * Overflow and/or compressed on-page items need processing before we look at
- * them.   Handy macro to identify such.
- */
-#define	WT_ROW_INDX_PROCESS(ip)						\
-	((ip)->data == NULL || F_ISSET(ip, WT_HUFFMAN))
 
 /*
  * On both row- and column-store internal pages, the on-page data referenced
@@ -459,18 +455,12 @@ struct __wt_item {
  * On row-store pages, the on-page data referenced by the WT_INDX page_data
  * field may be a WT_OVFL (which contains the address for the start of the
  * overflow pages and its length), or a WT_OFF structure.  These macros do
- * the cast for the right type, and, in the case of WT_OVFL, reach into the
- * on-page structure and return the values.
+ * the cast for the right type.
  */
 #define	WT_ITEM_BYTE_OFF(addr)						\
 	((WT_OFF *)(WT_ITEM_BYTE(addr)))
-
 #define	WT_ITEM_BYTE_OVFL(addr)						\
 	((WT_OVFL *)(WT_ITEM_BYTE(addr)))
-#define	WT_ITEM_OVFL_ADDR(ip)						\
-	(WT_ITEM_BYTE_OVFL((ip)->page_data)->addr)
-#define	WT_ITEM_OVFL_LEN(ip)						\
-	(WT_ITEM_BYTE_OVFL((ip)->page_data)->len)
 
 /*
  * The number of bytes required to store a WT_ITEM followed by len additional

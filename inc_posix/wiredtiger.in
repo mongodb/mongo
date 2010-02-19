@@ -420,7 +420,6 @@ char	*wiredtiger_version(int *, int *, int *);
  * DO NOT EDIT: automatically built by dist/api.py.
  * API flags section: BEGIN
  */
-#define	WT_ALLOCATED					0x00000001
 #define	WT_ASCII_ENGLISH				0x00000008
 #define	WT_CACHE_DRAIN_WAIT				0x00000001
 #define	WT_CACHE_LOCKOUT				0x00000004
@@ -428,19 +427,18 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000001
-#define	WT_HUFFMAN					0x00000002
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INITIALIZED					0x00000002
-#define	WT_MODIFIED					0x00000008
-#define	WT_PINNED					0x00000004
+#define	WT_MODIFIED					0x00000004
+#define	WT_PINNED					0x00000002
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
 #define	WT_REPEAT_COMP					0x00000001
 #define	WT_SERVER_RUN					0x00000002
 #define	WT_SERVER_SLEEPING				0x00000001
 #define	WT_TELEPHONE					0x00000001
-#define	WT_UNFORMATTED					0x00000002
+#define	WT_UNFORMATTED					0x00000001
 #define	WT_VERB_ALL					0x00000002
 #define	WT_VERB_FILEOPS					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
@@ -470,8 +468,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_IDB					0x00000007
 #define	WT_APIMASK_IENV					0x00000007
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000000
-#define	WT_APIMASK_WT_PAGE				0x0000000f
-#define	WT_APIMASK_WT_ROW_INDX				0x00000003
+#define	WT_APIMASK_WT_PAGE				0x00000007
 #define	WT_APIMASK_WT_TOC				0x00000001
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*

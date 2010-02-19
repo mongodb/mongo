@@ -327,10 +327,10 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 
 		prev_ip = prev->u.r_indx + (prev->indx_count - 1);
 		if (WT_ROW_INDX_PROCESS(prev_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, prev, prev_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, prev_ip));
 		page_ip = page->u.r_indx;
 		if (WT_ROW_INDX_PROCESS(page_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, page, page_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, page_ip));
 		if (func(db, (DBT *)prev_ip, (DBT *)page_ip) >= 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
@@ -517,9 +517,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_ip = child->u.r_indx;
 		if (WT_ROW_INDX_PROCESS(child_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, child, child_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, child_ip));
 		if (WT_ROW_INDX_PROCESS(parent_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, parent_ip));
 
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) < 0) {
@@ -571,9 +571,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		/* The two keys we're going to compare may be overflow keys. */
 		child_ip = child->u.r_indx + (child->indx_count - 1);
 		if (WT_ROW_INDX_PROCESS(child_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, child, child_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, child_ip));
 		if (WT_ROW_INDX_PROCESS(parent_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent, parent_ip));
+			WT_ERR(__wt_bt_key_to_indx(toc, parent_ip));
 		/* Compare the parent's key against the child's key. */
 		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) >= 0) {
 			__wt_db_errx(db,

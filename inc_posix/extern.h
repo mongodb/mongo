@@ -72,7 +72,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_key_to_indx(WT_TOC *toc, WT_PAGE *page, WT_ROW_INDX *ip);
+__wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip);
 int
 __wt_db_del(DB *db, WT_TOC *toc, DBT *key);
 int

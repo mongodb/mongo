@@ -241,6 +241,5 @@ __wt_free_worker(ENV *env, void *p_arg, u_int32_t len)
 		__wt_debug_loadme("free", p);
 	fprintf(__wt_mfp, "F\t%lx\n", WT_ADDR_TO_ULONG(p));
 #endif
-
 	free(p);
 }
