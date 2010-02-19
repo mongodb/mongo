@@ -1,4 +1,4 @@
-FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
+FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
@@ -95,16 +95,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_page.c (C)
                                                   _
 			records += WT_RECORDS(offp);
-../btree/bt_page.c  307  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  306  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...  WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  384  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  383  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		records += WT_RECORDS(offp);
-../btree/bt_page.c  420  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  419  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_rdel.c (C)
@@ -112,18 +112,18 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_ret.c (C)
                                              _
 		if (toc->data.data_len < size)
-../btree/bt_ret.c  168  Warning 644: Variable 'size' (line 31) may not have
+../btree/bt_ret.c  169  Warning 644: Variable 'size' (line 31) may not have
     been initialized
 ../btree/bt_ret.c  31  Info 830: Location cited in prior message
                                                   _
 		memcpy(toc->data.data, orig, size);
-../btree/bt_ret.c  171  Warning 644: Variable 'orig' (line 30) may not have
+../btree/bt_ret.c  172  Warning 644: Variable 'orig' (line 30) may not have
     been initialized
 ../btree/bt_ret.c  30  Info 830: Location cited in prior message
                                                            _
 #... __wt_bt_page_out(toc, ovfl_page, 0))) != 0 && ret == 0) ret = __ret; } whi
 		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
-../btree/bt_ret.c  181  Warning 644: Variable 'ovfl_page' (line 27) may not
+../btree/bt_ret.c  182  Warning 644: Variable 'ovfl_page' (line 27) may not
     have been initialized
 ../btree/bt_ret.c  27  Info 830: Location cited in prior message
 
@@ -350,6 +350,9 @@ _
 --- Module:   ../support/api.c (C)
 
 --- Module:   ../support/cksum.c (C)
+                              _
+	result = *data++ << 24;
+../support/cksum.c  123  Info 701: Shift left of signed quantity (int)
 
 --- Module:   ../support/err.c (C)
                                            _
@@ -359,6 +362,19 @@ _
 --- Module:   ../support/hazard.c (C)
 
 --- Module:   ../support/huffman.c (C)
+                                                            _
+#...  { if ((ret = (__wt_calloc(env, 1 << huffman->max_depth, sizeof(WT_STATIC_
+	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
+../support/huffman.c  334  Info 701: Shift left of signed quantity (int)
+                                                       _
+		for (i = 0, n = 1 << huffman->max_depth; i < n; ++i) {
+../support/huffman.c  390  Info 701: Shift left of signed quantity (int)
+                                   _
+	n = 1 << huffman->max_depth;
+../support/huffman.c  464  Info 701: Shift left of signed quantity (int)
+                                             _
+		mask = (u_int8_t)(1 << bitpos);
+../support/huffman.c  573  Info 701: Shift left of signed quantity (int)
 
 --- Module:   ../support/prime.c (C)
 
