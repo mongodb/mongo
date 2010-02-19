@@ -538,14 +538,14 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 }
 
 /*
- * __wt_bt_key_to_indx --
+ * __wt_bt_key_process --
  *	Overflow and/or compressed on-page items need processing before
- *	we look at them.   Copy such items into allocated memory in the
- *	WT_ROW_INDX structure.
+ *	we look at them.
  */
 int
-__wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip)
+__wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 {
+	DBT local_dbt;
 	ENV *env;
 	IDB *idb;
 	WT_ITEM *item;
@@ -553,7 +553,7 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip)
 	WT_PAGE *ovfl_page;
 	u_int32_t size;
 	int ret;
-	void *orig, *copy;
+	void *orig;
 
 	env = toc->env;
 	idb = toc->db->idb;
@@ -584,17 +584,32 @@ __wt_bt_key_to_indx(WT_TOC *toc, WT_ROW_INDX *ip)
 		size = WT_ITEM_LEN(item);
 	}
 
+	/*
+	 * When returning keys to the application, this function is called with
+	 * a DBT into which to copy the key; if that isn't given, copy the key
+	 * into allocated memory in the WT_ROW_INDX structure.
+	 */
+	if (dbt == NULL) {
+		WT_CLEAR(local_dbt);
+		dbt = &local_dbt;
+	}
+
 	/* Copy the item into place; if the item is compressed, decode it. */
 	if (idb->huffman_key == NULL) {
-		WT_ERR(__wt_malloc(env, size, &copy));
-		memcpy(copy, orig, size);
+		WT_ERR(__wt_realloc(env, &dbt->data_len, size, &dbt->data));
+		memcpy(dbt->data, orig, size);
 	} else
-		WT_ERR(__wt_huffman_decode(
-		    idb->huffman_key, orig, size, &copy, NULL, &size));
+		WT_ERR(__wt_huffman_decode(idb->huffman_key,
+		    orig, size, &dbt->data, &dbt->data_len, &dbt->size));
 
-	/* Replace the on-page WT_ITEM reference with the processed key. */
-	ip->data = copy;
-	ip->size = size;
+	/*
+	 * If no target DBT specified, replace the on-page WT_ITEM reference
+	 * with the processed key.
+	 */
+	if (dbt == &local_dbt) {
+		ip->data = dbt->data;
+		ip->size = dbt->size;
+	}
 
 err:	if (ovfl_page != NULL)
 		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));

@@ -295,7 +295,7 @@ typedef	struct __wt_row_indx {
 	 * information, but the size is set to 0 to indicate the key requires
 	 * processing.
 	 */
-#define	WT_ROW_INDX_PROCESS(ip)		((ip)->size == 0)
+#define	WT_KEY_PROCESS(ip)		((ip)->size == 0)
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 

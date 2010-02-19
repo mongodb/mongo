@@ -150,6 +150,8 @@ static int
 __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 {
 	DB *db;
+	DBT *page_dbt_ref, page_dbt, *prev_dbt_ref, prev_dbt;
+	ENV *env;
 	WT_PAGE *page, *prev;
 	WT_PAGE_HDR *hdr;
 	WT_ROW_INDX *page_ip, *prev_ip;
@@ -158,8 +160,12 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 	int (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
+	env = toc->env;
 	addr_arg = WT_ADDR_INVALID;
 	ret = 0;
+
+	WT_CLEAR(prev_dbt);
+	WT_CLEAR(page_dbt);
 
 	/*
 	 * Callers pass us a reference to an on-page WT_ITEM_OFF_INT/LEAF.
@@ -326,12 +332,18 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 			continue;
 
 		prev_ip = prev->u.r_indx + (prev->indx_count - 1);
-		if (WT_ROW_INDX_PROCESS(prev_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, prev_ip));
+		if (WT_KEY_PROCESS(prev_ip)) {
+			prev_dbt_ref = &prev_dbt;
+			WT_ERR(__wt_bt_key_process(toc, prev_ip, prev_dbt_ref));
+		} else
+			prev_dbt_ref = (DBT *)prev_ip;
 		page_ip = page->u.r_indx;
-		if (WT_ROW_INDX_PROCESS(page_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, page_ip));
-		if (func(db, (DBT *)prev_ip, (DBT *)page_ip) >= 0) {
+		if (WT_KEY_PROCESS(page_ip)) {
+			page_dbt_ref = &page_dbt;
+			WT_ERR(__wt_bt_key_process(toc, page_ip, page_dbt_ref));
+		} else
+			page_dbt_ref = (DBT *)page_ip;
+		if (func(db, prev_dbt_ref, page_dbt_ref) >= 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
 			    "after the last key on the previous page",
@@ -345,6 +357,9 @@ err:	if (prev != NULL)
 		WT_TRET(__wt_bt_page_out(toc, prev, 0));
 	if (page != NULL)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
+
+	__wt_free(env, page_dbt.data, page_dbt.data_len);
+	__wt_free(env, prev_dbt.data, prev_dbt.data_len);
 
 	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
 		ret = __wt_bt_verify_level(toc, addr_arg, isleaf_arg, vs);
@@ -360,6 +375,8 @@ static int
 __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 {
 	DB *db;
+	DBT *cd_ref, child_dbt, *pd_ref, parent_dbt;
+	ENV *env;
 	WT_OFF *offp;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
@@ -369,10 +386,14 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	int ret;
 
 	db = toc->db;
+	env = toc->env;
 	parent = NULL;
 	hdr = child->hdr;
 	addr = child->addr;
 	ret = 0;
+
+	WT_CLEAR(child_dbt);
+	WT_CLEAR(parent_dbt);
 
 	/*
 	 * This function implements most of the connection checking in the
@@ -516,13 +537,19 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	} else {
 		/* The two keys we're going to compare may be overflow keys. */
 		child_ip = child->u.r_indx;
-		if (WT_ROW_INDX_PROCESS(child_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, child_ip));
-		if (WT_ROW_INDX_PROCESS(parent_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent_ip));
+		if (WT_KEY_PROCESS(child_ip)) {
+			cd_ref = &child_dbt;
+			WT_ERR(__wt_bt_key_process(toc, child_ip, cd_ref));
+		} else
+			cd_ref = (DBT *)child_ip;
+		if (WT_KEY_PROCESS(parent_ip)) {
+			pd_ref = &parent_dbt;
+			WT_ERR(__wt_bt_key_process(toc, parent_ip, pd_ref));
+		} else
+			pd_ref = (DBT *)parent_ip;
 
 		/* Compare the parent's key against the child's key. */
-		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) < 0) {
+		if (func(db, cd_ref, pd_ref) < 0) {
 			__wt_db_errx(db,
 			    "the first key on page at addr %lu sorts before "
 			    "its reference key on its parent's page",
@@ -570,12 +597,18 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	if (parent != NULL) {
 		/* The two keys we're going to compare may be overflow keys. */
 		child_ip = child->u.r_indx + (child->indx_count - 1);
-		if (WT_ROW_INDX_PROCESS(child_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, child_ip));
-		if (WT_ROW_INDX_PROCESS(parent_ip))
-			WT_ERR(__wt_bt_key_to_indx(toc, parent_ip));
+		if (WT_KEY_PROCESS(child_ip)) {
+			cd_ref = &child_dbt;
+			WT_ERR(__wt_bt_key_process(toc, child_ip, cd_ref));
+		} else
+			cd_ref = (DBT *)child_ip;
+		if (WT_KEY_PROCESS(parent_ip)) {
+			pd_ref = &parent_dbt;
+			WT_ERR(__wt_bt_key_process(toc, parent_ip, pd_ref));
+		} else
+			pd_ref = (DBT *)parent_ip;
 		/* Compare the parent's key against the child's key. */
-		if (func(db, (DBT *)child_ip, (DBT *)parent_ip) >= 0) {
+		if (func(db, cd_ref, pd_ref) >= 0) {
 			__wt_db_errx(db,
 			    "the last key on page at addr %lu sorts after the "
 			    "first key on a parent page",
@@ -591,6 +624,9 @@ err_set:	ret = WT_ERROR;
 done:
 err:	if (parent != NULL)
 		WT_TRET(__wt_bt_page_out(toc, parent, 0));
+
+	__wt_free(env, child_dbt.data, child_dbt.data_len);
+	__wt_free(env, parent_dbt.data, parent_dbt.data_len);
 
 	return (ret);
 }
