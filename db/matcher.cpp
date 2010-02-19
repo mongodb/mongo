@@ -84,6 +84,31 @@ namespace mongo {
         }
     }
 
+    ElementMatcher::ElementMatcher( BSONElement _e , int _op , const BSONObj& array ) 
+        : toMatch( _e ) , compareOp( _op ) {
+        
+        myset.reset( new set<BSONElement,element_lt>() );
+        
+        BSONObjIterator i( array );
+        while ( i.more() ) {
+            BSONElement ie = i.next();
+            if ( _op == BSONObj::opALL && ie.type() == Object && ie.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ){
+                shared_ptr<Matcher> s;
+                s.reset( new Matcher( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
+                allMatchers.push_back( s );
+            }
+            else {
+                myset->insert(ie);
+            }
+        }
+        
+        if ( allMatchers.size() ){
+            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0);
+        }
+        
+    }
+    
+
 } // namespace mongo
 
 #include "pdfile.h"
@@ -386,12 +411,40 @@ namespace mongo {
     */
     int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr) {
         if ( compareOp == BSONObj::opALL ) {
+            
+            if ( em.allMatchers.size() ){
+                BSONElement e = obj.getFieldDotted( fieldName );
+                uassert( 13021 , "$all/$elemMatch needs to be applied to array" , e.type() == Array );
+                
+                for ( unsigned i=0; i<em.allMatchers.size(); i++ ){
+                    bool found = false;
+                    BSONObjIterator x( e.embeddedObject() );
+                    while ( x.more() ){
+                        BSONElement f = x.next();
+
+                        if ( f.type() != Object )
+                            continue;
+                        if ( em.allMatchers[i]->matches( f.embeddedObject() ) ){
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if ( ! found )
+                        return -1;
+                }
+                
+                return 1;
+            }
+            
             if ( em.myset->size() == 0 )
                 return -1; // is this desired?
+            
             BSONObjSetDefaultOrder actualKeys;
             IndexSpec( BSON( fieldName << 1 ) ).getKeys( obj, actualKeys );
             if ( actualKeys.size() == 0 )
                 return 0;
+            
             for( set< BSONElement, element_lt >::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
                 // ignore nulls
                 if ( i->type() == jstNULL )
@@ -402,9 +455,10 @@ namespace mongo {
                 if ( !actualKeys.count( b.done() ) )
                     return -1;
             }
+
             return 1;
         }
-
+        
         if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, em );
         if ( compareOp == BSONObj::NIN ) {

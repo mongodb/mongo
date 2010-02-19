@@ -175,8 +175,15 @@ namespace mongo {
         case BSONObj::opALL: {
             massert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
-            if ( i.more() )
-                lower = upper = i.next();
+            if ( i.more() ){
+                BSONElement x = i.next();
+                if ( x.type() == Object && x.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ){
+                    // this is a bit more complex...
+                }
+                else {
+                    lower = upper = x;
+                }
+            }
             break;
         }
         case BSONObj::opMOD: {

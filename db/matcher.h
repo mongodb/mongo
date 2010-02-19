@@ -60,16 +60,7 @@ namespace mongo {
         
         ElementMatcher( BSONElement _e , int _op );
         
-        ElementMatcher( BSONElement _e , int _op , const BSONObj& array ) : toMatch( _e ) , compareOp( _op ) {
-            
-            myset.reset( new set<BSONElement,element_lt>() );
-            
-            BSONObjIterator i( array );
-            while ( i.more() ) {
-                BSONElement ie = i.next();
-                myset->insert(ie);
-            }
-        }
+        ElementMatcher( BSONElement _e , int _op , const BSONObj& array );
         
         ~ElementMatcher() { }
 
@@ -83,6 +74,8 @@ namespace mongo {
         BSONType type;
 
         shared_ptr<Matcher> subMatcher;
+
+        vector< shared_ptr<Matcher> > allMatchers;
     };
 
     class Where; // used for $where javascript eval
