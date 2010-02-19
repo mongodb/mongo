@@ -110,12 +110,22 @@ FlexeLint for C/C++ (Unix) Vers. 8.00v, Copyright Gimpel Software 1985-2006
 --- Module:   ../btree/bt_rdel.c (C)
 
 --- Module:   ../btree/bt_ret.c (C)
-                                                                              _
-#... r, ovfl->len, &ovfl_page))) != 0) return (__ret); } while (0)
-overflow:	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
-../btree/bt_ret.c  179  Warning 644: Variable 'ovfl' (line 28) may not have
+                                             _
+		if (toc->data.data_len < size)
+../btree/bt_ret.c  168  Warning 644: Variable 'size' (line 31) may not have
     been initialized
-../btree/bt_ret.c  28  Info 830: Location cited in prior message
+../btree/bt_ret.c  31  Info 830: Location cited in prior message
+                                                  _
+		memcpy(toc->data.data, orig, size);
+../btree/bt_ret.c  171  Warning 644: Variable 'orig' (line 30) may not have
+    been initialized
+../btree/bt_ret.c  30  Info 830: Location cited in prior message
+                                                           _
+#... __wt_bt_page_out(toc, ovfl_page, 0))) != 0 && ret == 0) ret = __ret; } whi
+		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+../btree/bt_ret.c  181  Warning 644: Variable 'ovfl_page' (line 27) may not
+    have been initialized
+../btree/bt_ret.c  27  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_rget.c (C)
 
