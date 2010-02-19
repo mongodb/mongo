@@ -169,7 +169,7 @@ namespace mongo {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
-        bool matches(const BSONObj &key, const DiskLoc &recLoc);
+        bool matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded = 0 );
         bool needRecord(){ return _needRecord; }
 
         Matcher& docMatcher() { return _docMatcher; }

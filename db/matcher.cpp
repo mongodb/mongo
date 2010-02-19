@@ -118,7 +118,10 @@ namespace mongo {
                           );
     }
     
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc ) {
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded ) {
+        if ( loaded )
+            *loaded = false;
+        
         if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key) ) {
                 return false;
@@ -128,6 +131,9 @@ namespace mongo {
         if ( ! _needRecord ){
             return true;
         }
+
+        if ( loaded )
+            *loaded = true;
 
         return _docMatcher.matches(recLoc.rec());
     }
