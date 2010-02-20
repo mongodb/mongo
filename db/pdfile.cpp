@@ -774,9 +774,9 @@ namespace mongo {
             try {
                 ok = id.head.btree()->unindex(id.head, id, j, dl);
             }
-            catch (AssertionException&) {
+            catch (AssertionException& e) {
                 problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
-                out() << "Assertion failure: _unindex failed" << '\n';
+                out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
                 out() << "  obj:" << obj.toString() << '\n';
                 out() << "  key:" << j.toString() << '\n';
                 out() << "  dl:" << dl.toString() << endl;
