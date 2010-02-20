@@ -30,6 +30,7 @@ _ disallow system* manipulations from the database.
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
 #include "../util/file_allocator.h"
+#include "../util/processinfo.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -993,13 +994,14 @@ namespace mongo {
         BSONObj order = idx.keyPattern();
 
         idx.head.Null();
-
+        
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
         unsigned long long nkeys = 0;
         ProgressMeter pm( d->nrecords , 10 );
+        if ( logLevel > 1 ) printMemInfo( "before index start" );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1014,12 +1016,18 @@ namespace mongo {
                 sorter.add(*i, loc);
                 nkeys++;
             }
-
+            
             c->advance();
             n++;
             pm.hit();
+            if ( logLevel > 1 && n % 10000 == 0 ){
+                printMemInfo( "\t iterating objects" );
+            }
+
         };
+        if ( logLevel > 1 ) printMemInfo( "before final sort" );
         sorter.sort();
+        if ( logLevel > 1 ) printMemInfo( "after final sort" );
         
         log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
