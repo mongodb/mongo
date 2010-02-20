@@ -126,6 +126,8 @@ namespace mongo {
         }
     protected:
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
+        
+        BSONSizeTracker _sizeTracker;
 
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;

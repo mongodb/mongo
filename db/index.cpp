@@ -188,7 +188,7 @@ namespace mongo {
         if ( allFound ) {
             if ( arrElt.eoo() ) {
                 // no terminal array element to expand
-                BSONObjBuilder b;
+                BSONObjBuilder b(_sizeTracker);
                 for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
                     b.appendAs( *i, "" );
                 keys.insert( b.obj() );
@@ -198,7 +198,7 @@ namespace mongo {
                 BSONObjIterator i( arrElt.embeddedObject() );
                 if ( i.more() ){
                     while( i.more() ) {
-                        BSONObjBuilder b;
+                        BSONObjBuilder b(_sizeTracker);
                         for( unsigned j = 0; j < fixed.size(); ++j ) {
                             if ( j == arrIdx )
                                 b.appendAs( i.next(), "" );
@@ -210,7 +210,7 @@ namespace mongo {
                 }
                 else if ( fixed.size() > 1 ){
                     // x : [] - need to insert undefined
-                    BSONObjBuilder b;
+                    BSONObjBuilder b(_sizeTracker);
                     for( unsigned j = 0; j < fixed.size(); ++j ) {
                         if ( j == arrIdx )
                             b.appendUndefined( "" );
