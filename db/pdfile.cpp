@@ -995,13 +995,15 @@ namespace mongo {
 
         idx.head.Null();
         
+        if ( logLevel > 1 ) printMemInfo( "before index start" );
+
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
+        sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
         ProgressMeter pm( d->nrecords , 10 );
-        if ( logLevel > 1 ) printMemInfo( "before index start" );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();

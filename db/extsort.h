@@ -121,6 +121,11 @@ namespace mongo {
         
         long getCurSizeSoFar(){ return _curSizeSoFar; }
 
+        void hintNumObjects( long long numObjects ){
+            if ( numObjects < _arraySize )
+                _arraySize = (int)(numObjects + 100);
+        }
+
     private:
 
         void _sortInMem();
@@ -132,6 +137,7 @@ namespace mongo {
         long _maxFilesize;
         path _root;
         
+        int _arraySize;
         InMemory * _cur;
         long _curSizeSoFar;
         

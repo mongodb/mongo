@@ -5,7 +5,7 @@ namespace mongo {
     template<typename T>
     class FastArray {
     public:
-        FastArray( int capacity=1000000 )
+        FastArray( int capacity=10000 )
             : _capacity( capacity ) , _size(0) , _end(this,capacity){
             _data = new T[capacity];
         }

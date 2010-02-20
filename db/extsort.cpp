@@ -32,7 +32,7 @@ namespace mongo {
     
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
         : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
-          _cur(0), _curSizeSoFar(0), _sorted(0){
+          _arraySize(1000000), _cur(0), _curSizeSoFar(0), _sorted(0){
         
         stringstream rootpath;
         rootpath << dbpath;
@@ -94,7 +94,7 @@ namespace mongo {
         uassert( 10049 ,  "sorted already" , ! _sorted );
         
         if ( ! _cur ){
-            _cur = new InMemory();
+            _cur = new InMemory( _arraySize );
         }
         
         Data& d = _cur->getNext();
