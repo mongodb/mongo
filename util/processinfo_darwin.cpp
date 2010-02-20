@@ -67,7 +67,7 @@ namespace mongo {
             cout << "error getting task_info: " << result << endl;
             return 0;
         }
-        return (int)((double)ti.virtual_size / (1024.0 * 1024 * 2 ) );
+        return (int)((double)ti.virtual_size / (1024.0 * 1024 ) );
     }
     
     int ProcessInfo::getResidentSize(){
