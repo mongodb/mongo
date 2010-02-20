@@ -60,7 +60,7 @@ namespace mongo {
     void BSONObjExternalSorter::_sortInMem(){
         // extSortComp needs to use glbals
         // qsort_r only seems available on bsd, which is what i really want to use
-        dbMutex.assertWriteLocked();
+        dblock l;
         extSortOrder = _order;
         _cur->sort( BSONObjExternalSorter::extSortComp );
     }
