@@ -1058,6 +1058,7 @@ namespace mongo {
                 }
                 pm2.hit();
             }
+            log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 
         }
