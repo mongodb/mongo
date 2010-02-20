@@ -607,7 +607,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("directoryperdb", "each database will be stored in a separate directory")
         ("quiet", "quieter output")
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
-        ("logappend" , "appnd to logpath instead of over-writing" )
+        ("logappend" , "append to logpath instead of over-writing" )
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
 #ifndef _WIN32
         ("fork" , "fork server process" )
