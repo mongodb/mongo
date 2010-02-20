@@ -21,6 +21,7 @@
 
 #include "dbtests.h"
 #include "../util/base64.h"
+#include "../util/array.h"
 
 namespace BasicTests {
 
@@ -227,6 +228,28 @@ namespace BasicTests {
             ASSERT_EQUALS( 1 , x );
         }
     };
+
+    namespace ArrayTests {
+        class basic1 {
+        public:
+            void run(){
+                FastArray<int> a(100);
+                a.push_back( 5 );
+                a.push_back( 6 );
+                
+                ASSERT_EQUALS( 2 , a.size() );
+                
+                FastArray<int>::iterator i = a.begin();
+                ASSERT( i != a.end() );
+                ASSERT_EQUALS( 5 , *i );
+                ++i;
+                ASSERT( i != a.end() );
+                ASSERT_EQUALS( 6 , *i );
+                ++i;
+                ASSERT( i == a.end() );
+            }
+        };
+    };
     
     class All : public Suite {
     public:
@@ -244,6 +267,8 @@ namespace BasicTests {
 
             add< sleeptest >();
             add< AssertTests >();
+            
+            add< ArrayTests::basic1 >();
         }
     } myall;
     

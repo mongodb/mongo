@@ -22,8 +22,10 @@
 #include "jsobj.h"
 #include "namespace.h"
 #include "curop.h"
+#include "../util/array.h"
 
 namespace mongo {
+
 
     /**
        for sorting by BSONObj and attaching a value
@@ -32,8 +34,21 @@ namespace mongo {
     public:
         
         typedef pair<BSONObj,DiskLoc> Data;
-        
+
     private:
+        static BSONObj extSortOrder;
+
+        static int extSortComp( const void *lv, const void *rv ){
+            RARELY killCurrentOp.checkForInterrupt();
+            _compares++;
+            Data * l = (Data*)lv;
+            Data * r = (Data*)rv;
+            int cmp = l->first.woCompare( r->first , extSortOrder );
+            if ( cmp )
+                return cmp;
+            return l->second.compare( r->second );
+        };
+
         class FileIterator : boost::noncopyable {
         public:
             FileIterator( string file );
@@ -57,13 +72,14 @@ namespace mongo {
                     return x < 0;
                 return l.second.compare( r.second ) < 0;
             };
+
         private:
             BSONObj _order;
         };
-        
-    public:
 
-        typedef list<Data> InMemory;
+    public:
+        
+        typedef FastArray<Data> InMemory;
 
         class Iterator : boost::noncopyable {
         public:
@@ -102,8 +118,12 @@ namespace mongo {
         int numFiles(){
             return _files.size();
         }
+        
+        long getCurSizeSoFar(){ return _curSizeSoFar; }
 
     private:
+
+        void _sortInMem();
         
         void sort( string file );
         void finishMap();
