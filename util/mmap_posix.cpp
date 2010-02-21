@@ -77,12 +77,16 @@ namespace mongo {
             return 0;
         }
         
+#if defined(__sunos__)
+#warning madvise not supported on solaris yet
+#else
+
         if ( options & SEQUENTIAL ){
             if ( madvise( view , length , MADV_SEQUENTIAL ) ){
                 out() << " madvise failed for " << filename << " " << errno << endl;
             }
         }
-        
+#endif        
         return view;
     }
     
