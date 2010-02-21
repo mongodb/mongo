@@ -30,20 +30,23 @@ using namespace mongo;
 
 namespace po = boost::program_options;
 
-mongo::Tool::Tool( string name , string defaultDB , string defaultCollection ) :
+mongo::Tool::Tool( string name , bool localDBAllowed , string defaultDB , string defaultCollection ) :
     _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
-
+    
     _options = new po::options_description( "options" );
     _options->add_options()
         ("help","produce help message")
+        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("host,h",po::value<string>(), "mongo host to connect to (\"left,right\" for pairs)" )
         ("db,d",po::value<string>(), "database to use" )
         ("collection,c",po::value<string>(), "collection to use (some commands)" )
         ("username,u",po::value<string>(), "username" )
         ("password,p",po::value<string>(), "password" )
-        ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
-        ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
-        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
+        ;
+    if ( localDBAllowed )
+        _options->add_options()
+            ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
+            ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
         ;
 
     _hidden_options = new po::options_description( name + " hidden options" );
