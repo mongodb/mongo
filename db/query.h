@@ -215,10 +215,10 @@ namespace mongo {
 
             
             BSONElement e = q["query"];
-            if ( e.type() != Object )
+            if ( ! e.isABSONObj() )
                 e = q["$query"];
             
-            if ( e.type() == Object ){
+            if ( e.isABSONObj() ){
                 _filter = e.embeddedObject();
                 _initTop( q );
             }
