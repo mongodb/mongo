@@ -88,10 +88,20 @@ namespace mongo {
             _cur = new InMemory();
         }
         
-        _cur->push_back( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
+        BSONObj toadd = o;
+        if ( toadd.isOwned() ){
+            // hack to handle buffer problems
+            if ( toadd.objsize() < 100 )
+                toadd = toadd.copy();
+        }
+        else {
+            toadd = toadd.getOwned();
+        }
+
+        _cur->push_back( pair<BSONObj,DiskLoc>( o , loc ) );
 
         long size = o.objsize();
-        _curSizeSoFar += size + sizeof( DiskLoc );
+        _curSizeSoFar += size + sizeof( DiskLoc ) + sizeof( BSONObj );
         
         if ( _curSizeSoFar > _maxFilesize )
             finishMap();
