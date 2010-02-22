@@ -155,6 +155,7 @@ namespace mongo {
                 JS_ReportError( cx , ((string)"couldn't connect: " + errmsg).c_str() );
                 return JS_FALSE;
             }
+            ScriptEngine::runConnectCallback( *c );
         }
         else { // paired
             int numCommas = 0;
