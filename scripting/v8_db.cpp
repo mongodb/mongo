@@ -156,7 +156,7 @@ namespace mongo {
         if ( ! conn->connect( host , errmsg ) ){
             return v8::ThrowException( v8::String::New( "couldn't connect" ) );
         }
-        ScriptEngine::runConnectCallback( *conn );
+
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );
         args.This()->Set( v8::String::New( "slaveOk" ) , Boolean::New( false ) );

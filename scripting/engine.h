@@ -120,8 +120,6 @@ namespace mongo {
     
     void installGlobalUtils( Scope& scope );
 
-    class DBClientWithCommands;
-    
     class ScriptEngine : boost::noncopyable {
     public:
         ScriptEngine();
@@ -148,18 +146,12 @@ namespace mongo {
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new Unlocker ); }
         
         void setScopeInitCallback( void ( *func )( Scope & ) ) { _scopeInitCallback = func; }
-        static void setConnectCallback( void ( *func )( DBClientWithCommands& ) ) { _connectCallback = func; }
-        static void runConnectCallback( DBClientWithCommands &c ) {
-            if ( _connectCallback )
-                _connectCallback( c );
-        }
         
     protected:
         virtual Scope * createScope() = 0;
         
     private:
         void ( *_scopeInitCallback )( Scope & );
-        static void ( *_connectCallback )( DBClientWithCommands & );
     };
 
     extern ScriptEngine * globalScriptEngine;

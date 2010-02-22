@@ -40,6 +40,5 @@ namespace mongo {
         void KillMongoProgramInstances();
         
         void initScope( Scope &scope );
-        void onConnect( DBClientWithCommands &c );
     }
 }
