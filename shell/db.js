@@ -249,7 +249,7 @@ DB.prototype.repairDatabase = function() {
 
 DB.prototype.help = function() {
     print("DB methods:");
-    print("\tdb.addUser(username, password)");
+    print("\tdb.addUser(username, password[, readOnly=false])");
     print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.commandHelp(name) returns the help for the command");
