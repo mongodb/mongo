@@ -32,9 +32,8 @@ namespace mongo {
     public:
         const char *fieldName;
         pcrecpp::RE *re;
-        RegexMatcher() {
-            re = 0;
-        }
+        bool isNot;
+        RegexMatcher() : re( 0 ), isNot() {}
         ~RegexMatcher() {
             delete re;
         }
@@ -58,14 +57,15 @@ namespace mongo {
         ElementMatcher() {
         }
         
-        ElementMatcher( BSONElement _e , int _op );
+        ElementMatcher( BSONElement _e , int _op, bool _isNot );
         
-        ElementMatcher( BSONElement _e , int _op , const BSONObj& array );
+        ElementMatcher( BSONElement _e , int _op , const BSONObj& array, bool _isNot );
         
         ~ElementMatcher() { }
 
         BSONElement toMatch;
         int compareOp;
+        bool isNot;
         shared_ptr< set<BSONElement,element_lt> > myset;
         
         // these are for specific operators
@@ -124,13 +124,15 @@ namespace mongo {
         bool atomic() const { return _atomic; }
 
     private:
-        void addBasic(const BSONElement &e, int c) {
+        void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
             if ( e.type() == MinKey || e.type() == MaxKey )
                 return;
-            basics.push_back( ElementMatcher( e , c ) );
+            basics.push_back( ElementMatcher( e , c, isNot ) );
         }
 
+        void addRegex(const BSONElement &e, const char *fieldName = 0, bool isNot = false);
+        
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
 
         Where *where;                    // set if query uses $where
