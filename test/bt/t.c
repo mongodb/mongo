@@ -30,8 +30,8 @@ int op_reopen = 0;				/* Sync and reopen database */
 int op_verify = 0;				/* Verify database */
 
 enum {						/* Statistics */
-    STAT_NONE, STAT_ALL,
-    STAT_DELETE, STAT_LOAD, STAT_READ, STAT_WRITE } stat_op = STAT_NONE;
+    STAT_NONE, STAT_ALL, STAT_DELETE,
+    STAT_INSERT, STAT_LOAD, STAT_READ, STAT_WRITE } stat_op = STAT_NONE;
 enum {						/* Database type */
     TYPE_COLUMN_FIX, TYPE_COLUMN_VAR, TYPE_ROW } dtype;
 
@@ -47,6 +47,7 @@ void	data_set_fix(int, void *, u_int32_t *);
 void	data_set_var(int, void *, u_int32_t *, int);
 int	del_check(void);
 int	dtype_arg(void);
+int	insert_check(void);
 void	key_set(int, void *, u_int32_t *);
 int	load(void);
 int	read_check(void);
@@ -134,6 +135,9 @@ main(int argc, char *argv[])
 			switch (optarg[0]) {
 			case 'd':
 				stat_op = STAT_DELETE;
+				break;
+			case 'i':
+				stat_op = STAT_INSERT;
 				break;
 			case 'l':
 				stat_op = STAT_LOAD;
@@ -287,6 +291,13 @@ main(int argc, char *argv[])
 			setup();
 		}
 		if (dtype == TYPE_ROW && del_check() != 0)
+			goto err;
+
+		if (op_reopen) {
+			teardown();
+			setup();
+		}
+		if (dtype == TYPE_ROW && insert_check() != 0)
 			goto err;
 #endif
 		teardown();
@@ -574,7 +585,7 @@ del_check()
 
 	/* Remove a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
-		cnt += rand() % 43 + 1;
+		cnt += rand() % 37 + 1;
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
@@ -638,7 +649,7 @@ write_check()
 
 	/* Update a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < keys;) {
-		cnt += rand() % 43 + 1;
+		cnt += rand() % 41 + 1;
 		if (cnt > keys)
 			cnt = keys;
 		if (cnt - last_cnt > 1000) {
@@ -686,6 +697,73 @@ write_check()
 
 	if (stat_op == STAT_ALL || stat_op == STAT_WRITE) {
 		(void)printf("\nWrite-check statistics:\n");
+		assert(env->stat_print(env, stdout, 0) == 0);
+	}
+
+	return (0);
+}
+
+int
+insert_check()
+{
+	DBT key, data, repl;
+	WT_TOC *toc;
+	u_int64_t cnt, last_cnt;
+	u_int32_t klen, dlen;
+	char *kbuf, *dbuf;
+	int ret;
+
+	memset(&key, 0, sizeof(key));
+	memset(&data, 0, sizeof(data));
+	memset(&repl, 0, sizeof(repl));
+
+	assert(env->toc(env, 0, &toc) == 0);
+
+	/* Insert a random number of records. */
+	for (last_cnt = cnt = 0; cnt < keys;) {
+		cnt += rand() % 43 + 1;
+		if (cnt > keys)
+			cnt = keys;
+		if (cnt - last_cnt > 1000) {
+			track("key insert-check", cnt);
+			last_cnt = cnt;
+		}
+
+		/* Create a new key/data pair. */
+		key_set(cnt, &key.data, &key.size);
+		memcpy((u_int8_t *)key.data + key.size, "aaaaa", 5);
+		key.size += 5;
+		data_set_var(keys_cnt, &data.data, &data.size, 0);
+		if ((ret = db->put(db, toc, &key, &data, 0)) != 0) {
+			env->err(env, ret, "write: put by key failed: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+
+		/* Retrieve the key/data pair by key. */
+		if ((ret = db->get(db, toc, &key, NULL, &repl, 0)) != 0) {
+			env->err(env, ret, "write: get by key failed: {%.*s}",
+			    (int)key.size, (char *)key.data);
+			assert(0);
+		}
+		if (repl.size != data.size ||
+		    memcmp(repl.data, data.data, data.size) != 0) {
+			env->errx(env,
+			    "write_check: get replacement by key:"
+			    "\n\tdata: expected {%.*s}, got {%.*s}",
+			    (int)data.size, (char *)data.data,
+			    (int)repl.size, (char *)repl.data);
+			assert(0);
+		}
+	}
+
+	assert(toc->close(toc, 0) == 0);
+
+	if (op_verify)
+		assert(db->verify(db, track, 0) == 0);
+
+	if (stat_op == STAT_ALL || stat_op == STAT_INSERT) {
+		(void)printf("\nInsert-check statistics:\n");
 		assert(env->stat_print(env, stdout, 0) == 0);
 	}
 
@@ -782,7 +860,7 @@ usage()
 	(void)fprintf(stderr,
 	    "usage: %s [-Cdv] [-a d|r|v] [-c cachesize] [-f length ] [-h 0|1] "
 	    "[-k keys] [-L logfile] [-l leafsize] [-n nodesize] [-R rand] "
-	    "[-r runs] [-s d|l|r|w|*] [-t r|v]\n",
+	    "[-r runs] [-s d|i|l|r|w|*] [-t r|v]\n",
 	    progname);
 	exit(1);
 }
