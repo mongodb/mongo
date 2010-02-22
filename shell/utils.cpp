@@ -675,8 +675,6 @@ namespace mongo {
 #endif
         }
 
-        vector< string > _allMyUris;
-        
         void initScope( Scope &scope ) {
             scope.externalSetup();
             mongo::shellUtils::installShellUtils( scope );
@@ -684,14 +682,18 @@ namespace mongo {
             
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );
-                uassert( 13010, "whatsmyuri failed", scope.exec( "__myuri = db.runCommand( {whatsmyuri:1} ).you", "(whatsmyuri)", false , true , false ) );
-                string uri = scope.getString( "__myuri" );
-                _allMyUris.push_back( uri );
                 if ( !_dbAuth.empty() ) {
                     installGlobalUtils( scope );
                     uassert( 12514, "login failed", scope.exec( _dbAuth , "(auth)" , true , true , false ) );
                 }
             }
+        }
+        
+        vector< string > _allMyUris;        
+        void onConnect( DBClientWithCommands &c ) {
+            BSONObj info;
+            uassert( 13010, "whatsmyuri failed", c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) );
+            _allMyUris.push_back( info[ "you" ].str() );            
         }
     }
 }

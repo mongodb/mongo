@@ -406,6 +406,7 @@ int _main(int argc, char* argv[]) {
 
     }
 
+    mongo::ScriptEngine::setConnectCallback( mongo::shellUtils::onConnect );
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );    
