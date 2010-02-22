@@ -11,4 +11,8 @@ spawn = startMongoProgramNoConnect( "mongo", "--port", myPort(), "--eval", "db."
 sleep( 100 );
 stopMongoProgramByPid( spawn );
 sleep( 100 );
-assert.eq( [], db.currentOp().inprog );
+inprog = db.currentOp().inprog
+printjson( inprog );
+for( i in inprog ) {
+    assert( inprog[ i ].ns != "test." + baseName, "still running op" );
+}
