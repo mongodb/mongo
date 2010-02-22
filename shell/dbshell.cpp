@@ -80,7 +80,12 @@ void intr( int sig ){
 
 #if !defined(_WIN32)
 void killOps() {
-    mongo::BSONObj spec = BSON( "" << mongo::shellUtils::_allMyUris );
+    if ( mongo::shellUtils::_nokillop )
+        return;
+    vector< string > uris;
+    for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
+        uris.push_back( i->second );
+    mongo::BSONObj spec = BSON( "" << uris );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
     scope->invoke( "function( x ) { killWithUris( x ); }", spec );
 }
@@ -313,6 +318,7 @@ int _main(int argc, char* argv[]) {
     hidden_options.add_options()
         ("dbaddress", po::value<string>(), "dbaddress")
         ("files", po::value< vector<string> >(), "files")
+        ("nokillop", "nokillop") // for testing, kill op will also be disabled automatically if the tests starts a mongo program
         ;
 
     positional_options.add("dbaddress", 1);
@@ -360,7 +366,10 @@ int _main(int argc, char* argv[]) {
     if (params.count("quiet")) {
         mongo::cmdLine.quiet = true;
     }
-
+    if (params.count("nokillop")) {
+        mongo::shellUtils::_nokillop = true;
+    }
+    
     /* This is a bit confusing, here are the rules:
      *
      * if nodb is set then all positional parameters are files

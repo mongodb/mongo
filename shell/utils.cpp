@@ -431,6 +431,7 @@ namespace mongo {
 #endif
         }
         BSONObj StartMongoProgram( const BSONObj &a ) {
+            _nokillop = true;
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
@@ -689,11 +690,17 @@ namespace mongo {
             }
         }
         
-        vector< string > _allMyUris;        
+        map< const void*, string > _allMyUris;        
+        bool _nokillop = false;
         void onConnect( DBClientWithCommands &c ) {
+            if ( _nokillop ) {
+                return;
+            }
             BSONObj info;
             uassert( 13010, "whatsmyuri failed", c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) );
-            _allMyUris.push_back( info[ "you" ].str() );            
+            // There's no way to explicitly disconnect a DBClientConnection, but we might allocate
+            // a new uri on automatic reconnect.  So just store one uri per connection.
+            _allMyUris[ &c ] = info[ "you" ].str();
         }
     }
 }
