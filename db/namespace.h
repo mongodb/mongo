@@ -506,9 +506,11 @@ namespace mongo {
         /* IndexSpec caching */
     private:
         map<const IndexDetails*,IndexSpec> _indexSpecs;
+        static boost::mutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ){
-            DEV assertInWriteLock();
+            //DEV assertInWriteLock();
+            boostlock lk(_isMutex);
             IndexSpec& spec = _indexSpecs[details];
             if ( spec.info.isEmpty() ){
                 spec.reset( details->info );

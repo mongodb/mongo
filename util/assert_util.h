@@ -67,6 +67,21 @@ namespace mongo {
     /* last assert of diff types: regular, wassert, msgassert, uassert: */
     extern Assertion lastAssert[4];
 
+    class AssertionCount {
+    public:
+        AssertionCount();
+        void rollover();
+        void condrollover( int newValue );
+
+        int regular;
+        int warning;
+        int msg;
+        int user;
+        int rollovers;
+    };
+    
+    extern AssertionCount assertionCount;
+
     class DBException : public std::exception {
     public:
         virtual const char* what() const throw() = 0;

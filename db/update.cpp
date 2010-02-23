@@ -737,7 +737,7 @@ namespace mongo {
                 } 
                 else {
                     BSONObj newObj = mss->createNewFromMods();
-                    uassert( 12522 , "$ operator made object too large" , newObj.isValid() );
+                    uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
                     DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
                     if ( newLoc != loc || modsIsIndexed ) {
                         // object moved, need to make sure we don' get again

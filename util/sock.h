@@ -263,7 +263,7 @@ namespace mongo {
 
             for ( set<int>::iterator i=s->begin(); i!=s->end(); i++ ){
                 int sock = *i;
-                log() << "going to close listening socket: " << sock << endl;
+                log() << "\t going to close listening socket: " << sock << endl;
                 closesocket( sock );
             }
             

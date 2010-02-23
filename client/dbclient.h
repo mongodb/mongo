@@ -253,10 +253,14 @@ namespace mongo {
             return (opts & QueryOption_CursorTailable) != 0;
         }
         
+        /** see QueryResult::ResultFlagType (db/dbmessage.h) for flag values 
+            mostly these flags are for internal purposes - 
+            ResultFlag_ErrSet is the possible exception to that
+        */
         bool hasResultFlag( int flag ){
             return (resultFlags & flag) != 0;
         }
-    public:
+
         DBClientCursor( DBConnector *_connector, const string &_ns, BSONObj _query, int _nToReturn,
                         int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions ) :
                 connector(_connector),

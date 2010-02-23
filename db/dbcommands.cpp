@@ -380,6 +380,16 @@ namespace mongo {
             
             result.append( "opcounters" , globalOpCounters.getObj() );
             
+            {
+                BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
+                asserts.append( "regular" , assertionCount.regular );
+                asserts.append( "warning" , assertionCount.warning );
+                asserts.append( "msg" , assertionCount.msg );
+                asserts.append( "user" , assertionCount.user );
+                asserts.append( "rollovers" , assertionCount.rollovers );
+                asserts.done();
+            }
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
 
@@ -983,6 +993,26 @@ namespace mongo {
         }
     } cmdDatasize;
 
+    namespace {
+        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL){
+            DBDirectClient client;
+            auto_ptr<DBClientCursor> indexes =
+                client.query(db + ".system.indexes", QUERY( "ns" << ns));
+
+            long long totalSize = 0;
+            while (indexes->more()){
+                BSONObj index = indexes->nextSafe();
+                NamespaceDetails * nsd = nsdetails( (ns + ".$" + index["name"].valuestrsafe()).c_str() );
+                if (!nsd)
+                    continue; // nothing to do here
+                totalSize += nsd->datasize;
+                if (details)
+                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize);
+            }
+            return totalSize;
+        }
+    }
+
     class CollectionStats : public Command {
     public:
         CollectionStats() : Command( "collstats" ) {}
@@ -990,12 +1020,12 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { collstats:\"blog.posts\" } ";
         }
-        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string ns = dbname;
-            if ( ns.find( "." ) != string::npos )
-                ns = ns.substr( 0 , ns.find( "." ) );
-            ns += ".";
-            ns += jsobj.firstElement().valuestr();
+        bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dbname = dbname_c;
+            if ( dbname.find( "." ) != string::npos )
+                dbname = dbname.substr( 0 , dbname.find( "." ) );
+
+            string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd ){
@@ -1014,6 +1044,10 @@ namespace mongo {
             result.append( "lastExtentSize" , nsd->lastExtentSize );
             result.append( "paddingFactor" , nsd->paddingFactor );
             result.append( "flags" , nsd->flags );
+
+            BSONObjBuilder indexSizes;
+            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes) );
+            result.append("indexSizes", indexSizes.obj());
             
             if ( nsd->capped ){
                 result.append( "capped" , nsd->capped );
@@ -1023,6 +1057,63 @@ namespace mongo {
             return true;
         }
     } cmdCollectionStatis;
+
+
+    class DBStats : public Command {
+    public:
+        DBStats() : Command( "dbstats" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << " example: { dbstats:1 } ";
+        }
+        bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dbname = dbname_c;
+            if ( dbname.find( "." ) != string::npos )
+                dbname = dbname.substr( 0 , dbname.find( "." ) );
+
+            DBDirectClient client;
+            const list<string> collections = client.getCollectionNames(dbname);
+
+            long long ncollections = 0;
+            long long objects = 0;
+            long long size = 0;
+            long long storageSize = 0;
+            long long numExtents = 0;
+            long long indexes = 0;
+            long long indexSize = 0;
+
+            for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it){
+                const string ns = *it;
+
+                NamespaceDetails * nsd = nsdetails( ns.c_str() );
+                if ( ! nsd ){
+                    // should this assert here?
+                    continue;
+                }
+
+                ncollections += 1;
+                objects += nsd->nrecords;
+                size += nsd->datasize;
+
+                int temp;
+                storageSize += nsd->storageSize( &temp );
+                numExtents += temp;
+
+                indexes += nsd->nIndexes;
+                indexSize += getIndexSizeForCollection(dbname, ns);
+            }
+
+            result.appendIntOrLL( "collections" , ncollections );
+            result.appendIntOrLL( "objects" , objects );
+            result.appendIntOrLL( "dataSize" , size );
+            result.appendIntOrLL( "storageSize" , storageSize);
+            result.appendIntOrLL( "numExtents" , numExtents );
+            result.appendIntOrLL( "indexes" , indexes );
+            result.appendIntOrLL( "indexSize" , indexSize );
+
+                return true;
+        }
+    } cmdDBStats;
 
     class CmdBuildInfo : public Command {
     public:

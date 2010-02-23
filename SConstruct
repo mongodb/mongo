@@ -383,7 +383,7 @@ coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
 serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp" )
-serverOnlyFiles += [ "db/index.cpp" ]
+serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/index_*.cpp" )
 
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
 serverOnlyFiles += Glob( "db/stats/*.cpp" )
@@ -1081,13 +1081,10 @@ Default( mongod )
 
 # tools
 allToolFiles = commonFiles + coreDbFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
-env.Program( "mongodump" , allToolFiles + [ "tools/dump.cpp" ] )
-env.Program( "mongorestore" , allToolFiles + [ "tools/restore.cpp" ] )
-
-env.Program( "mongoexport" , allToolFiles + [ "tools/export.cpp" ] )
-env.Program( "mongoimport" , allToolFiles + [ "tools/import.cpp" ] )
-
-env.Program( "mongofiles" , allToolFiles + [ "tools/files.cpp" ] )
+normalTools = [ "dump" , "restore" , "export" , "import" , "files" ]
+env.Alias( "tools" , [ "mongo" + x for x in normalTools ] )
+for x in normalTools:
+    env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
 
 env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
 
@@ -1489,13 +1486,8 @@ def installBinary( e , name ):
     if nix:
         e.AddPostAction( inst , e.Action( 'chmod 755 ' + fullInstallName ) )
 
-installBinary( env , "mongodump" )
-installBinary( env , "mongorestore" )
-
-installBinary( env , "mongoexport" )
-installBinary( env , "mongoimport" )
-
-installBinary( env , "mongofiles" )
+for x in normalTools:
+    installBinary( env , "mongo" + x )
 
 if mongosniff_built:
     installBinary(env, "mongosniff")

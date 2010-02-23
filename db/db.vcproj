@@ -144,7 +144,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib"
+				AdditionalDependencies="ws2_32.lib psapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;c:\program files\boost\boost_1_35_0\lib&quot;"
 				GenerateDebugInformation="true"
@@ -1512,6 +1512,10 @@
 				</File>
 				<File
 					RelativePath=".\index.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\index_geo2d.cpp"
 					>
 				</File>
 				<File
