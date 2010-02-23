@@ -239,7 +239,7 @@ namespace mongo {
                 break;
             }
             case BSONObj::opREGEX:{
-                uassert( 13028, "can't use $not with $regex, use BSON regex type instead", !isNot );
+                uassert( 13032, "can't use $not with $regex, use BSON regex type instead", !isNot );
                 regex = fe.valuestrsafe();
                 break;
             }
