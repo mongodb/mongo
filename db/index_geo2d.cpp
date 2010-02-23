@@ -70,6 +70,7 @@ namespace mongo {
         }
 
         void init( unsigned x , unsigned y , unsigned bits ){
+            assert( bits <= 32 );
             StringBuilder buf(64);
             for ( unsigned i=0; i<bits; i++ ){
                 buf.append( isBitSet( x , i ) ? "1" : "0" );
@@ -207,6 +208,9 @@ namespace mongo {
             uassert( 13024 , "no geo field specified" , _geo.size() );
             
             _bits = _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
+
+            uassert( 13028 , "can't have more than 32 bits in geo index" , _bits <= 32 );
+
             _max = _configval( spec , "max" , 180 );
             _min = _configval( spec , "min" , -180 );
             
