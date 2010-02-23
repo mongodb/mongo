@@ -1464,6 +1464,7 @@ namespace mongo {
                 // save our error msg string as an exception on dropIndexes will overwrite our message
                 LastError *le = lastError.get();
                 assert( le );
+                int savecode = le->code;
                 string saveerrmsg = le->msg;
                 assert( !saveerrmsg.empty() );
 
@@ -1475,7 +1476,7 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
-                raiseError(12506,saveerrmsg.c_str());
+                raiseError(savecode,saveerrmsg.c_str());
                 throw;
             }
         }
