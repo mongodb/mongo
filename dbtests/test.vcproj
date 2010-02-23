@@ -1507,6 +1507,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\db\index_geo2d.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\instance.cpp"
 					>
 				</File>

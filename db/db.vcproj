@@ -1515,6 +1515,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\index_geo2d.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\instance.cpp"
 					>
 				</File>

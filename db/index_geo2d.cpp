@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "namespace.h"
 #include "jsobj.h"
 #include "index.h"
@@ -160,6 +160,11 @@ namespace mongo {
 
         void reset( const string& s ){
             _hash = s;
+        }
+
+        GeoHash& operator=(const GeoHash& h) { 
+            reset(h._hash);
+            return *this;
         }
         
         string _hash;
@@ -663,23 +668,23 @@ namespace mongo {
             IndexDetails& id = d->idx( geoIdx );
             Geo2dType * g = (Geo2dType*)id.getSpec().getType();
             
-            GeoHash near;
+            GeoHash n;
             {
                 BSONElement nearElement = cmdObj["near"];
                 if ( nearElement.isABSONObj() ){
-                    near = g->_hash( cmdObj["near"].embeddedObjectUserCheck() );
+                    n = g->_hash( cmdObj["near"].embeddedObjectUserCheck() );
                 }
                 else if ( nearElement.type() == String){
-                    near = (string)(nearElement.valuestr());
+                    n = (string)(nearElement.valuestr());
                 }
                 else {
                     errmsg = "near invalid";
                     return false;
                 }
             }
-            result.append( "near" , near );
+            result.append( "near" , n );
             
-            GeoHash start = near;
+            GeoHash start = n;
             if ( cmdObj["start"].type() == String){
                 start = (string)cmdObj["start"].valuestr();
                 if ( 2 * ( start.size() / 2 ) != start.size() ){
@@ -709,14 +714,14 @@ namespace mongo {
             if ( cmdObj["query"].type() == Object )
                 filter = cmdObj["query"].embeddedObject();
 
-            GeoHopper hopper( g , numWanted , near , filter );
+            GeoHopper hopper( g , numWanted , n , filter );
 
             GeoHash prefix = start;
             { // 1 regular geo hash algorithm
                 
 
                 BtreeLocation min;
-                min.bucket = head->locate( id , id.head , near.wrap() , g->_order , min.pos , min.found , minDiskLoc );
+                min.bucket = head->locate( id , id.head , n.wrap() , g->_order , min.pos , min.found , minDiskLoc );
                 min.checkCur( found , hopper );
                 BtreeLocation max = min;
                 
@@ -730,7 +735,7 @@ namespace mongo {
             }
             
             if ( found && prefix.size() ){
-                Point center( g , near );
+                Point center( g , n );
                 double boxSize = g->size( prefix );
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
                 
