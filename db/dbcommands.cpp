@@ -380,6 +380,16 @@ namespace mongo {
             
             result.append( "opcounters" , globalOpCounters.getObj() );
             
+            {
+                BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
+                asserts.append( "regular" , assertionCount.regular );
+                asserts.append( "warning" , assertionCount.warning );
+                asserts.append( "msg" , assertionCount.msg );
+                asserts.append( "user" , assertionCount.user );
+                asserts.append( "rollovers" , assertionCount.rollovers );
+                asserts.done();
+            }
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
 
