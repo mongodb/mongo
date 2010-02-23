@@ -239,12 +239,12 @@ namespace mongo {
                 break;
             }
             case BSONObj::opREGEX:{
-                uassert( 13022, "can't use $not with $regex, use BSON regex type instead", !isNot );
+                uassert( 13028, "can't use $not with $regex, use BSON regex type instead", !isNot );
                 regex = fe.valuestrsafe();
                 break;
             }
             case BSONObj::opOPTIONS:{
-                uassert( 13023, "can't use $not with $options, use BSON regex type instead", !isNot );
+                uassert( 13029, "can't use $not with $options, use BSON regex type instead", !isNot );
                 flags = fe.valuestrsafe();
                 break;
             }
@@ -313,7 +313,7 @@ namespace mongo {
                             switch( fe.type() ) {
                                 case Object: {
                                     BSONObjIterator k( fe.embeddedObject() );
-                                    uassert( 13025, "$not cannot be empty", k.more() );
+                                    uassert( 13030, "$not cannot be empty", k.more() );
                                     while( k.more() ) {
                                         addOp( e, k.next(), true, regex, flags );
                                     }
@@ -323,7 +323,7 @@ namespace mongo {
                                     addRegex( fe, e.fieldName(), true );
                                     break;
                                 default:
-                                    uassert( 13024, "invalid use of $not", false );
+                                    uassert( 13031, "invalid use of $not", false );
                             }
                         } else {
                             if ( !addOp( e, fe, false, regex, flags ) ) {
