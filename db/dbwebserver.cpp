@@ -226,7 +226,7 @@ namespace mongo {
             if ( from.localhost() )
                 return true;
             
-            if ( db.findOne( "admin.system.users" , BSONObj() ).isEmpty() , 0 , QueryOption_SlaveOk )
+            if ( db.findOne( "admin.system.users" , BSONObj() , 0 , QueryOption_SlaveOk ).isEmpty() )
                 return true;
             
             string auth = getHeader( rq , "Authorization" );
