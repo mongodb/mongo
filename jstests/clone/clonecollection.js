@@ -141,7 +141,7 @@ assert.eq( 200000, f.a.count() );
 startstartclone( ", logSizeMb:1" );
 ret = finishstartclone();
 
-for( i = 200000; i < 210000; ++i ) {
+for( i = 200000; i < 250000; ++i ) {
     f.a.save( { i: i } );
 }
 
@@ -159,13 +159,13 @@ assert.eq( 200000, f.a.count() );
 startstartclone();
 ret = finishstartclone();
 
-for( i = 200000; i < 210000; ++i ) {
+for( i = 200000; i < 250000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 210000, f.a.count() );
+assert.eq( 250000, f.a.count() );
 
 finishclone( ret );
-assert.eq( 210000, t.a.find().count() );
+assert.eq( 250000, t.a.find().count() );
     
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();

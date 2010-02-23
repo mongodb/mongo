@@ -22,3 +22,4 @@ assert.eq( 1 , t.find( "this.a % 10 == 0" ).itcount() , "B3" );
 assert.eq( 1 , t.find( { a : { $mod : [ 10 , 0 ] } } ).itcount() , "B4" );
 assert.eq( 4 , t.find( { a : { $mod : [ 10 , 1 ] } } ).explain().nscanned , "B5" );
 
+assert.eq( 1, t.find( { a: { $gt: 5, $mod : [ 10, 1 ] } } ).itcount() );
