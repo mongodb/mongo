@@ -104,7 +104,7 @@ namespace mongo {
         }
     }
     
-    FieldRange::FieldRange( const BSONElement &e, bool optimize ) {
+    FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) {
         if ( !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
             set< BSONElement, element_lt > vals;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
@@ -150,15 +150,45 @@ namespace mongo {
              || (e.type() == Object && !e.embeddedObject()["$regex"].eoo())
            )
         {
-            const string r = simpleRegex(e);
-            if ( r.size() ) {
-                lower = addObj( BSON( "" << r ) ).firstElement();
-                upper = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
-                upperInclusive = false;
-            }            
+            if ( !isNot ) { // no optimization for negated regex - we could consider creating 2 intervals comprising all nonmatching prefixes
+                const string r = simpleRegex(e);
+                if ( r.size() ) {
+                    lower = addObj( BSON( "" << r ) ).firstElement();
+                    upper = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
+                    upperInclusive = false;
+                }
+            }
             return;
         }
-        switch( e.getGtLtOp() ) {
+        int op = e.getGtLtOp();
+        if ( isNot ) {
+            switch( op ) {
+                case BSONObj::Equality:
+                case BSONObj::opALL:
+                case BSONObj::opMOD: // NOTE for mod and type, we could consider having 1-2 intervals comprising the complementary types (multiple intervals already possible with $in)
+                case BSONObj::opTYPE:
+                    op = BSONObj::NE; // no bound calculation
+                    break;
+                case BSONObj::NE:
+                    op = BSONObj::Equality;
+                    break;
+                case BSONObj::LT:
+                    op = BSONObj::GTE;
+                    break;
+                case BSONObj::LTE:
+                    op = BSONObj::GT;
+                    break;
+                case BSONObj::GT:
+                    op = BSONObj::LTE;
+                    break;
+                case BSONObj::GTE:
+                    op = BSONObj::LT;
+                    break;
+                default: // otherwise doesn't matter
+                    break;
+            }
+        }
+        switch( op ) {
         case BSONObj::Equality:
             lower = upper = e;
             break;
@@ -294,6 +324,32 @@ namespace mongo {
         return o;
     }
     
+    void FieldRangeSet::processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize ) {
+        int op2 = f.getGtLtOp();
+        if ( op2 == BSONObj::opELEM_MATCH ) {
+            BSONObjIterator k( f.embeddedObjectUserCheck() );
+            while ( k.more() ){
+                BSONElement g = k.next();
+                StringBuilder buf(32);
+                buf << fieldName << "." << g.fieldName();
+                string fullname = buf.str();
+                
+                int op3 = getGtLtOp( g );
+                if ( op3 == BSONObj::Equality ){
+                    ranges_[ fullname ] &= FieldRange( g , isNot , optimize );
+                }
+                else {
+                    BSONObjIterator l( g.embeddedObject() );
+                    while ( l.more() ){
+                        ranges_[ fullname ] &= FieldRange( l.next() , isNot , optimize );
+                    }
+                }
+            }                        
+        } else {
+            ranges_[ fieldName ] &= FieldRange( f , isNot , optimize );
+        }        
+    }
+    
     FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query , bool optimize )
         : ns_( ns ), query_( query.getOwned() ) {
         BSONObjIterator i( query_ );
@@ -305,37 +361,38 @@ namespace mongo {
             if ( strcmp( e.fieldName(), "$where" ) == 0 )
                 continue;
 
-            int op = getGtLtOp( e );
-            
-            if ( op == BSONObj::Equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
-                ranges_[ e.fieldName() ] &= FieldRange( e , optimize );
+            bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
+            if ( equality && e.type() == Object ) {
+                equality = ( strcmp( e.embeddedObject().firstElement().fieldName(), "$not" ) != 0 );
             }
-            if ( op != BSONObj::Equality ) {
+            
+            if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
+                ranges_[ e.fieldName() ] &= FieldRange( e , false , optimize );
+            }
+            if ( !equality ) {
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
                     BSONElement f = j.next();
-                    int op2 = f.getGtLtOp();
-                    if ( op2 == BSONObj::opELEM_MATCH ) {
-                        BSONObjIterator k( f.embeddedObjectUserCheck() );
-                        while ( k.more() ){
-                            BSONElement g = k.next();
-                            StringBuilder buf(32);
-                            buf << e.fieldName() << "." << g.fieldName();
-                            string fullname = buf.str();
-                            
-                            int op3 = getGtLtOp( g );
-                            if ( op3 == BSONObj::Equality ){
-                                ranges_[ fullname ] &= FieldRange( g , optimize );
-                            }
-                            else {
-                                BSONObjIterator l( g.embeddedObject() );
-                                while ( l.more() ){
-                                    ranges_[ fullname ] &= FieldRange( l.next() , optimize );
+                    if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
+                        switch( f.type() ) {
+                            case Object: {
+                                BSONObjIterator k( f.embeddedObject() );
+                                while( k.more() ) {
+                                    BSONElement g = k.next();
+                                    uassert( 13034, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
+                                    processOpElement( e.fieldName(), g, true, optimize );
                                 }
+                                break;
                             }
-                        }                        
+                            case RegEx:
+                                log() << "regex: " << f << endl;
+                                processOpElement( e.fieldName(), f, true, optimize );
+                                break;
+                            default:
+                                uassert( 13033, "invalid use of $not", false );
+                        }
                     } else {
-                        ranges_[ e.fieldName() ] &= FieldRange( f , optimize );
+                        processOpElement( e.fieldName(), f, false, optimize );
                     }
                 }                
             }

@@ -48,7 +48,7 @@ namespace mongo {
     // determine index limits
     class FieldRange {
     public:
-        FieldRange( const BSONElement &e = BSONObj().firstElement() , bool optimize=true );
+        FieldRange( const BSONElement &e = BSONObj().firstElement() , bool isNot=false , bool optimize=true );
         const FieldRange &operator&=( const FieldRange &other );
         BSONElement min() const { assert( !empty() ); return intervals_[ 0 ].lower_.bound_; }
         BSONElement max() const { assert( !empty() ); return intervals_[ intervals_.size() - 1 ].upper_.bound_; }
@@ -172,6 +172,7 @@ namespace mongo {
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
     private:
+        void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
         static FieldRange *trivialRange_;
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > ranges_;

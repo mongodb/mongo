@@ -12,7 +12,10 @@ check = function( query, expected, size ) {
 }
 
 fail = function( query ) {
-    t.count( query );
+    try {
+        t.count( query );
+    } catch ( e ) {
+    }
     assert( db.getLastError(), tojson( query ) );
 }
 
@@ -41,7 +44,8 @@ check( {i:{$not:/a/,$regex:"a"}}, "", 0 );
 check( {i:{$not:/aa/}}, "a", 2 );
 fail( {i:{$not:{$regex:"a"}}} );
 fail( {i:{$not:{$options:"a"}}} );
-check( {i:{$not:{$type:0}}}, "a", 2 );
+check( {i:{$type:2}}, "a", 2 );
+check( {i:{$not:{$type:1}}}, "a", 2 );
 check( {i:{$not:{$type:2}}}, "", 0 );
 
 check( {i:{$not:{$gt:"c",$lt:"b"}}}, "b" );
@@ -60,8 +64,12 @@ check( {i:{$not:{$gt:"a"}}}, null, 0 );
 check( {i:{$not:{$gt:"c"}}}, ["a","b"] );
 check( {i:{$not:{$all:["a","b"]}}}, null, 0 );
 check( {i:{$not:{$all:["c"]}}}, ["a","b"] );
-check( {i:{$not:{$elemMatch:"a"}}}, null, 0 );
-check( {i:{$not:{$elemMatch:"f"}}}, null, 0 );
+
+t.drop();
+t.save( {i:{j:"a"}} );
+t.save( {i:{j:"b"}} );
+check( {i:{$not:{$elemMatch:{j:"a"}}}}, {j:"b"} );
+check( {i:{$not:{$elemMatch:{j:"f"}}}}, {j:"a"}, 2 );
 
 t.drop();
 t.save( {i:"a"} );
@@ -69,14 +77,14 @@ t.save( {i:"b"} );
 t.ensureIndex( {i:1} );
 
 indexed = function( query, min, max ) {
-    min = min || minKey;
-    max = max || maxKey;
+    min = min || MinKey;
+    max = max || MaxKey;
     exp = t.find( query ).explain();
     printjson( exp );
     assert( exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
-    assert.eq( exp.startKey, {i:min} );
-    assert.eq( exp.endKey, {i:max} );
+    assert.eq( exp.startKey.i, min );
+    assert.eq( exp.endKey.i, max );
 }
 
 not = function( query ) {
@@ -89,5 +97,17 @@ not = function( query ) {
 indexed( {i:1}, 1, 1 );
 not( {i:{$ne:1}} );
 
-//indexed( {i:{$not:{$ne:"a"}}}, "a", "a" );
-//not( {i:{$not:/a/}} );
+indexed( {i:{$not:{$ne:"a"}}}, "a", "a" );
+not( {i:{$not:/^a/}} );
+
+//indexed( {i:{$gt:"a"}}, "a", null );
+//indexed( {i:{$not:{$gt:"a"}}}, null, "a" );
+//
+//indexed( {i:{$gte:"a"}}, "a", null );
+//indexed( {i:{$not:{$gte:"a"}}}, null, "a" );
+//
+//indexed( {i:{$lt:"b"}}, null, "b" );
+//indexed( {i:{$not:{$gte:"b"}}}, "b", null );
+//
+//indexed( {i:{$lte:"b"}}, null, "b" );
+//indexed( {i:{$not:{$gt:"b"}}}, "b", null );
