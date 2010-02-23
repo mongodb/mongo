@@ -984,7 +984,7 @@ namespace mongo {
     } cmdDatasize;
 
     namespace {
-        long long getIndexSizeForCollection(string db, string ns){
+        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL){
             DBDirectClient client;
             auto_ptr<DBClientCursor> indexes =
                 client.query(db + ".system.indexes", QUERY( "ns" << ns));
@@ -996,6 +996,8 @@ namespace mongo {
                 if (!nsd)
                     continue; // nothing to do here
                 totalSize += nsd->datasize;
+                if (details)
+                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize);
             }
             return totalSize;
         }
@@ -1008,12 +1010,12 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { collstats:\"blog.posts\" } ";
         }
-        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string ns = dbname;
-            if ( ns.find( "." ) != string::npos )
-                ns = ns.substr( 0 , ns.find( "." ) );
-            ns += ".";
-            ns += jsobj.firstElement().valuestr();
+        bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dbname = dbname_c;
+            if ( dbname.find( "." ) != string::npos )
+                dbname = dbname.substr( 0 , dbname.find( "." ) );
+
+            string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd ){
@@ -1032,6 +1034,10 @@ namespace mongo {
             result.append( "lastExtentSize" , nsd->lastExtentSize );
             result.append( "paddingFactor" , nsd->paddingFactor );
             result.append( "flags" , nsd->flags );
+
+            BSONObjBuilder indexSizes;
+            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes) );
+            result.append("indexSizes", indexSizes.obj());
             
             if ( nsd->capped ){
                 result.append( "capped" , nsd->capped );
