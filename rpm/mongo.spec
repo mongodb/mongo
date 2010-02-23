@@ -47,25 +47,7 @@ to develop mongo client software.
 scons --prefix=$RPM_BUILD_ROOT/usr all
 # XXX really should have shared library here
 
-%build mostlystatic
-scons --prefix=$RPM_BUILD_ROOT/usr --extralib=nspr4 --staticlib=boost_system-mt,boost_thread-mt,boost_filesystem-mt,boost_program_options-mt,js  install
-
 %install
-scons --prefix=$RPM_BUILD_ROOT/usr install
-mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
-cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
-mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
-cp rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
-chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
-mkdir -p $RPM_BUILD_ROOT/etc
-cp rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
-mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
-cp rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
-mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
-mkdir -p $RPM_BUILD_ROOT/var/log
-touch $RPM_BUILD_ROOT/var/log/mongo
-
-%install mostlystatic
 scons --prefix=$RPM_BUILD_ROOT/usr install
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
@@ -118,10 +100,12 @@ fi
 %{_bindir}/mongorestore
 
 %{_mandir}/man1/mongo.1*
+%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
+%{_mandir}/man1/mongosniff.1*
 %{_mandir}/man1/mongorestore.1*
 
 %files server
@@ -143,8 +127,8 @@ fi
 #%{_libdir}/libmongotestfiles.a
 
 %changelog
-* Sat Oct 24 2009 Joe Miklojcik <jmiklojcik@shopwiki.com> - 
-- Wrote mongo.spec.
-
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
+
+* Sat Oct 24 2009 Joe Miklojcik <jmiklojcik@shopwiki.com> - 
+- Wrote mongo.spec.

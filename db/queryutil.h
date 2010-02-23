@@ -185,25 +185,23 @@ namespace mongo {
     class FieldMatcher {
     public:
 
-        FieldMatcher(bool include=false) : errmsg(NULL), include_(include)  {}
+        FieldMatcher(bool include=false) : _include(include){}
         
         void add( const BSONObj& o );
 
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
         BSONObj getSpec() const;
-
-        const char* errmsg; //null if FieldMatcher is valid
     private:
 
         void add( const string& field, bool include );
         void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
 
-        bool include_; // true if default at this level is to include
+        bool _include; // true if default at this level is to include
         //TODO: benchmark vector<pair> vs map
         typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
-        FieldMap fields_;
-        BSONObj source_;
+        FieldMap _fields;
+        BSONObj _source;
     };
 
 

@@ -27,11 +27,12 @@
 
 namespace mongo {
     
+    BSONObj BSONObjExternalSorter::extSortOrder;
     unsigned long long BSONObjExternalSorter::_compares = 0;
     
     BSONObjExternalSorter::BSONObjExternalSorter( const BSONObj & order , long maxFileSize )
         : _order( order.getOwned() ) , _maxFilesize( maxFileSize ) , 
-          _cur(0), _curSizeSoFar(0), _sorted(0){
+          _arraySize(1000000), _cur(0), _curSizeSoFar(0), _sorted(0){
         
         stringstream rootpath;
         rootpath << dbpath;
@@ -56,13 +57,21 @@ namespace mongo {
         wassert( removed == 1 + _files.size() );
     }
 
+    void BSONObjExternalSorter::_sortInMem(){
+        // extSortComp needs to use glbals
+        // qsort_r only seems available on bsd, which is what i really want to use
+        dblock l;
+        extSortOrder = _order;
+        _cur->sort( BSONObjExternalSorter::extSortComp );
+    }
+    
     void BSONObjExternalSorter::sort(){
         uassert( 10048 ,  "already sorted" , ! _sorted );
-
+        
         _sorted = true;
 
         if ( _cur && _files.size() == 0 ){
-            _cur->sort( MyCmp( _order ) );
+            _sortInMem();
             log(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
             return;
         }
@@ -85,16 +94,20 @@ namespace mongo {
         uassert( 10049 ,  "sorted already" , ! _sorted );
         
         if ( ! _cur ){
-            _cur = new InMemory();
+            _cur = new InMemory( _arraySize );
         }
         
-        _cur->push_back( pair<BSONObj,DiskLoc>( o.getOwned() , loc ) );
-
-        long size = o.objsize();
-        _curSizeSoFar += size + sizeof( DiskLoc );
+        Data& d = _cur->getNext();
+        d.first = o.getOwned();
+        d.second = loc;
         
-        if ( _curSizeSoFar > _maxFilesize )
+        long size = o.objsize();
+        _curSizeSoFar += size + sizeof( DiskLoc ) + sizeof( BSONObj );
+        
+        if (  _cur->hasSpace() == false ||  _curSizeSoFar > _maxFilesize ){
             finishMap();
+            log() << "finishing map" << endl;
+        }
 
     }
     
@@ -105,7 +118,7 @@ namespace mongo {
         if ( _cur->size() == 0 )
             return;
         
-        _cur->sort( MyCmp( _order ) );
+        _sortInMem();
         
         stringstream ss;
         ss << _root.string() << "/file." << _files.size();
@@ -116,7 +129,7 @@ namespace mongo {
         ASSERT_STREAM_GOOD( 10051 ,  (string)"couldn't open file: " + file , out );
         
         int num = 0;
-        for ( InMemory::iterator i=_cur->begin(); i != _cur->end(); i++ ){
+        for ( InMemory::iterator i=_cur->begin(); i != _cur->end(); ++i ){
             Data p = *i;
             out.write( p.first.objdata() , p.first.objsize() );
             out.write( (char*)(&p.second) , sizeof( DiskLoc ) );
@@ -169,10 +182,12 @@ namespace mongo {
         return false;
     }
         
-    pair<BSONObj,DiskLoc> BSONObjExternalSorter::Iterator::next(){
+    BSONObjExternalSorter::Data BSONObjExternalSorter::Iterator::next(){
         
         if ( _in ){
-            return *(_it++);
+            Data& d = *_it;
+            ++_it;
+            return d;
         }
         
         Data best;
@@ -216,7 +231,7 @@ namespace mongo {
         return _buf < _end;
     }
     
-    pair<BSONObj,DiskLoc> BSONObjExternalSorter::FileIterator::next(){
+    BSONObjExternalSorter::Data BSONObjExternalSorter::FileIterator::next(){
         BSONObj o( _buf );
         _buf += o.objsize();
         DiskLoc * l = (DiskLoc*)_buf;

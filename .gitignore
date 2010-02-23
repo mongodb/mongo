@@ -5,7 +5,10 @@
 
 *~
 *.o
+*.os
+*.obj
 *.aps
+*.ilk
 *.tar.gz
 *.suo
 *.ncb
@@ -85,6 +88,7 @@ test
 authTest
 perftest
 clientTest
+httpClientTest
 
 #debian
 build-stamp

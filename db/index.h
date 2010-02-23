@@ -19,8 +19,63 @@
 #pragma once
 
 #include "../stdafx.h"
+#include "diskloc.h"
+#include "jsobj.h"
+#include <map>
 
 namespace mongo {
+
+    class IndexSpec;
+    class IndexType; // TODO: this name sucks
+    class IndexPlugin;
+
+    /**
+     * this represents an instance of a index plugin
+     * done this way so parsing, etc... can be cached
+     * so if there is a FTS IndexPlugin, for each index using FTS
+     * there will be 1 of these, and it can have things pre-parsed, etc...
+     */
+    class IndexType : boost::noncopyable {
+    public:
+        IndexType( const IndexPlugin * plugin );
+        virtual ~IndexType();
+
+        virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
+        virtual int compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const;
+        
+        const IndexPlugin * getPlugin() const { return _plugin; }
+
+    protected:
+        const IndexPlugin * _plugin;
+    };
+    
+    /**
+     * this represents a plugin
+     * a plugin could be something like full text search, sparse index, etc...
+     * 1 of these exists per type of index per server
+     * 1 IndexType is created per index using this plugin
+     */
+    class IndexPlugin : boost::noncopyable {
+    public:
+        IndexPlugin( const string& name );
+        virtual ~IndexPlugin(){}
+        
+        virtual IndexType* generate( const IndexSpec * spec ) const = 0;
+
+        static IndexPlugin* get( const string& name ){
+            if ( ! _plugins )
+                return 0;
+            map<string,IndexPlugin*>::iterator i = _plugins->find( name );
+            if ( i == _plugins->end() )
+                return 0;
+            return i->second;
+        }
+
+        string getName() const { return _name; }
+    private:
+        string _name;
+        static map<string,IndexPlugin*> * _plugins;
+    };
 
     /* precomputed details about an index, used for inserting keys on updates
        stored/cached in NamespaceDetailsTransient, or can be used standalone
@@ -58,8 +113,21 @@ namespace mongo {
         
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
-    private:
+        BSONElement missingField() const { return _nullElt; }
+        
+        string getTypeName() const {
+            if ( _indexType.get() )
+                return _indexType->getPlugin()->getName();
+            return "";
+        }
+
+        IndexType* getType() const {
+            return _indexType.get();
+        }
+    protected:
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
+        
+        BSONSizeTracker _sizeTracker;
 
         vector<const char*> _fieldNames;
         vector<BSONElement> _fixed;
@@ -68,7 +136,11 @@ namespace mongo {
         BSONObj _nullObj;
         BSONElement _nullElt;
         
+        shared_ptr<IndexType> _indexType;
+        
         void _init();
+
+        friend class IndexType;
     };
 
 	/* Details about a particular index. There is one of these effectively for each object in 
@@ -174,6 +246,8 @@ namespace mongo {
            (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
         void kill_idx();
+        
+        const IndexSpec& getSpec() const;
 
         operator string() const {
             return info.obj().toString();

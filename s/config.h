@@ -180,6 +180,8 @@ namespace mongo {
         
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );
+        
+        void reloadSettings();
 
         /**
          * @return 0 = ok, otherwise error #

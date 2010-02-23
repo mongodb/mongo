@@ -304,6 +304,9 @@ namespace mongo {
         CmdServerStatus() : Command("serverStatus") {
             started = time(0);
         }
+        
+        virtual bool noLocking(){ return true; }
+
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
@@ -377,6 +380,16 @@ namespace mongo {
             
             result.append( "opcounters" , globalOpCounters.getObj() );
             
+            {
+                BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
+                asserts.append( "regular" , assertionCount.regular );
+                asserts.append( "warning" , assertionCount.warning );
+                asserts.append( "msg" , assertionCount.msg );
+                asserts.append( "user" , assertionCount.user );
+                asserts.append( "rollovers" , assertionCount.rollovers );
+                asserts.done();
+            }
+
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );
 
@@ -980,6 +993,26 @@ namespace mongo {
         }
     } cmdDatasize;
 
+    namespace {
+        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL){
+            DBDirectClient client;
+            auto_ptr<DBClientCursor> indexes =
+                client.query(db + ".system.indexes", QUERY( "ns" << ns));
+
+            long long totalSize = 0;
+            while (indexes->more()){
+                BSONObj index = indexes->nextSafe();
+                NamespaceDetails * nsd = nsdetails( (ns + ".$" + index["name"].valuestrsafe()).c_str() );
+                if (!nsd)
+                    continue; // nothing to do here
+                totalSize += nsd->datasize;
+                if (details)
+                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize);
+            }
+            return totalSize;
+        }
+    }
+
     class CollectionStats : public Command {
     public:
         CollectionStats() : Command( "collstats" ) {}
@@ -987,12 +1020,12 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { collstats:\"blog.posts\" } ";
         }
-        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string ns = dbname;
-            if ( ns.find( "." ) != string::npos )
-                ns = ns.substr( 0 , ns.find( "." ) );
-            ns += ".";
-            ns += jsobj.firstElement().valuestr();
+        bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dbname = dbname_c;
+            if ( dbname.find( "." ) != string::npos )
+                dbname = dbname.substr( 0 , dbname.find( "." ) );
+
+            string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd ){
@@ -1011,6 +1044,10 @@ namespace mongo {
             result.append( "lastExtentSize" , nsd->lastExtentSize );
             result.append( "paddingFactor" , nsd->paddingFactor );
             result.append( "flags" , nsd->flags );
+
+            BSONObjBuilder indexSizes;
+            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes) );
+            result.append("indexSizes", indexSizes.obj());
             
             if ( nsd->capped ){
                 result.append( "capped" , nsd->capped );
@@ -1021,11 +1058,69 @@ namespace mongo {
         }
     } cmdCollectionStatis;
 
+
+    class DBStats : public Command {
+    public:
+        DBStats() : Command( "dbstats" ) {}
+        virtual bool slaveOk() { return true; }
+        virtual void help( stringstream &help ) const {
+            help << " example: { dbstats:1 } ";
+        }
+        bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dbname = dbname_c;
+            if ( dbname.find( "." ) != string::npos )
+                dbname = dbname.substr( 0 , dbname.find( "." ) );
+
+            DBDirectClient client;
+            const list<string> collections = client.getCollectionNames(dbname);
+
+            long long ncollections = 0;
+            long long objects = 0;
+            long long size = 0;
+            long long storageSize = 0;
+            long long numExtents = 0;
+            long long indexes = 0;
+            long long indexSize = 0;
+
+            for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it){
+                const string ns = *it;
+
+                NamespaceDetails * nsd = nsdetails( ns.c_str() );
+                if ( ! nsd ){
+                    // should this assert here?
+                    continue;
+                }
+
+                ncollections += 1;
+                objects += nsd->nrecords;
+                size += nsd->datasize;
+
+                int temp;
+                storageSize += nsd->storageSize( &temp );
+                numExtents += temp;
+
+                indexes += nsd->nIndexes;
+                indexSize += getIndexSizeForCollection(dbname, ns);
+            }
+
+            result.appendIntOrLL( "collections" , ncollections );
+            result.appendIntOrLL( "objects" , objects );
+            result.appendIntOrLL( "dataSize" , size );
+            result.appendIntOrLL( "storageSize" , storageSize);
+            result.appendIntOrLL( "numExtents" , numExtents );
+            result.appendIntOrLL( "indexes" , indexes );
+            result.appendIntOrLL( "indexSize" , indexSize );
+
+                return true;
+        }
+    } cmdDBStats;
+
     class CmdBuildInfo : public Command {
     public:
         CmdBuildInfo() : Command( "buildinfo" ) {}
         virtual bool slaveOk() { return true; }
         virtual bool adminOnly() { return true; }
+        virtual bool noLocking() { return true; }
         virtual void help( stringstream &help ) const {
             help << "example: { buildinfo:1 }";
         }
@@ -1423,22 +1518,130 @@ namespace mongo {
         }
     } cmdFindAndModify;
     
-    bool commandIsReadOnly(BSONObj& _cmdobj) { 
-        BSONObj jsobj;
-        {
-            BSONElement e = _cmdobj.firstElement();
-            if ( e.type() == Object && string("query") == e.fieldName() ) {
-                jsobj = e.embeddedObject();
-            }
-            else {
-                jsobj = _cmdobj;
+    /* Returns client's uri */
+    class CmdWhatsMyUri : public Command {
+    public:
+        CmdWhatsMyUri() : Command("whatsmyuri") { }
+        virtual bool logTheOp() {
+            return false; // the modification will be logged directly
+        }
+        virtual bool slaveOk() {
+            return true;
+        }
+        virtual bool readOnly() {
+            return true;
+        }
+        virtual bool requiresAuth() {
+            return false;
+        }
+        virtual bool noLocking() { return true; }
+        virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            BSONObj info = cc().curop()->infoNoauth();
+            result << "you" << info[ "client" ];
+            return true;
+        }
+    } cmdWhatsMyUri;
+    
+    /** 
+     * this handles
+     - auth
+     - locking
+     - context
+     then calls run()
+    */
+    bool execCommand( Command * c ,
+                      Client& client , int queryOptions , 
+                      const char *ns, BSONObj& cmdObj , 
+                      BSONObjBuilder& result, 
+                      bool fromRepl ){
+        
+        string dbname = nsToDatabase( ns );
+        
+        AuthenticationInfo *ai = client.getAuthenticationInfo();    
+
+        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost ) { 
+            result.append( "errmsg" , 
+                           "unauthorized: this command must run from localhost when running db without auth" );
+            log() << "command denied: " << cmdObj.toString() << endl;
+            return false;
+        }
+        
+
+        if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
+            result.append( "errmsg" ,  "access denied" );
+            log() << "command denied: " << cmdObj.toString() << endl;
+            return false;
+        }        
+
+        if ( cmdObj["help"].trueValue() ){
+            stringstream ss;
+            ss << "help for: " << c->name << " ";
+            c->help( ss );
+            result.append( "help" , ss.str() );
+            return true;
+        } 
+
+        bool canRunHere = 
+            isMaster( dbname.c_str() ) ||
+            c->slaveOk() ||
+            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
+            fromRepl;
+
+        if ( ! canRunHere ){
+            result.append( "errmsg" , "not master" );
+            return false;
+        }
+        
+        if ( c->noLocking() ){
+            // we also trust that this won't crash
+            string errmsg;
+            int ok = c->run( ns , cmdObj , errmsg , result , fromRepl );
+            if ( ! ok )
+                result.append( "errmsg" , errmsg );
+            return ok;
+        }
+     
+        bool needWriteLock = ! c->readOnly();
+        
+        if ( ! c->requiresAuth() && 
+             ( ai->isAuthorizedReads( dbname ) && 
+               ! ai->isAuthorized( dbname ) ) ){
+            // this means that they can read, but not write
+            // so only get a read lock
+            needWriteLock = false;
+        }
+        
+        if ( ! needWriteLock ){
+            assert( ! c->logTheOp() );
+        }
+
+        mongolock lk( needWriteLock );
+        Client::Context ctx( ns , dbpath , &lk , c->requiresAuth() );
+        
+        if ( c->adminOnly() )
+            log( 2 ) << "command: " << cmdObj << endl;
+        
+        try {
+            string errmsg;
+            if ( ! c->run(ns, cmdObj, errmsg, result, fromRepl ) ){
+                result.append( "errmsg" , errmsg );
+                return false;
             }
         }
-        BSONElement e = jsobj.firstElement();
-        if ( ! e.type() )
+        catch ( AssertionException& e ){
+            stringstream ss;
+            ss << "assertion: " << e.what();
+            result.append( "errmsg" , ss.str() );
             return false;
-        return Command::readOnly( e.fieldName() );
+        }
+        
+        if ( c->logTheOp() && ! fromRepl ){
+            logOp("c", ns, cmdObj);
+        }
+        
+        return true;
     }
+
 
     /* TODO make these all command objects -- legacy stuff here
 
@@ -1475,65 +1678,7 @@ namespace mongo {
         
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
         if ( c ){
-            string errmsg;
-            AuthenticationInfo *ai = client.getAuthenticationInfo();
-            
-            bool needWriteLock = ! c->readOnly();
-            
-            if ( ! c->requiresAuth() && 
-                 ( ai->isAuthorizedReads( dbname ) && 
-                   ! ai->isAuthorized( dbname ) ) ){
-                // this means that they can read, but not write
-                // so only get a read lock
-                needWriteLock = false;
-            }
-            
-            mongolock lk( needWriteLock );
-            Client::Context ctx( ns , dbpath , &lk , c->requiresAuth() );
-
-            bool admin = c->adminOnly();
-
-            if( admin && c->localHostOnlyIfNoAuth(jsobj) && noauth && !ai->isLocalHost ) { 
-                ok = false;
-                errmsg = "unauthorized: this command must run from localhost when running db without auth";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            else if ( admin && !fromRepl && strncmp(ns, "admin", 5) != 0 ) {
-                ok = false;
-                errmsg = "access denied";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            else if ( isMaster() ||
-                      c->slaveOk() ||
-                      ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
-                      fromRepl ){
-                if ( jsobj.getBoolField( "help" ) ) {
-                    stringstream help;
-                    help << "help for: " << e.fieldName() << " ";
-                    c->help( help );
-                    anObjBuilder.append( "help" , help.str() );
-                } 
-                else {
-                    if( admin )
-                        log( 2 ) << "command: " << jsobj << endl;
-                    try {
-                        ok = c->run(ns, jsobj, errmsg, anObjBuilder, fromRepl);
-                    }
-                    catch ( AssertionException& e ){
-                        ok = false;
-                        errmsg = "assertion: ";
-                        errmsg += e.what();
-                    }
-                    if ( ok && c->logTheOp() && !fromRepl )
-                        logOp("c", ns, jsobj);
-                }
-            }
-            else {
-                ok = false;
-                errmsg = "not master";
-            }
-            if ( !ok )
-                anObjBuilder.append("errmsg", errmsg);
+            ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
         else {
             anObjBuilder.append("errmsg", "no such cmd");

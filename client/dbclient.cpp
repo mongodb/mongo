@@ -448,7 +448,13 @@ namespace mongo {
             port = CmdLine::DefaultDBPort;
             ip = hostbyname( serverAddress.c_str() );
         }
-        massert( 10277 ,  "Unable to parse hostname", !ip.empty() );
+        if( ip.empty() ) {
+            stringstream ss;
+            ss << "client connect: couldn't parse/resolve hostname: " << _serverAddress;
+            errmsg = ss.str();
+            failed = true;
+            return false;
+        }
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?

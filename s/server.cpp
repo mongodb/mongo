@@ -193,7 +193,8 @@ int main(int argc, char* argv[], char *envp[] ) {
         cout << "config server error: " << configError << endl;
         return configError;
     }
-
+    configServer.reloadSettings();
+    
     init();
     start();
     dbexit( EXIT_CLEAN );

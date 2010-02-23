@@ -79,11 +79,15 @@ namespace mongo {
     public:
         QueryOp() : complete_(), qp_(), error_() {}
         virtual ~QueryOp() {}
+        
+        /** this gets called after a query plan is set? ERH 2/16/10 */
         virtual void init() = 0;
         virtual void next() = 0;
         virtual bool mayRecordPlan() const = 0;
-        // Return a copy of the inheriting class, which will be run with its own
-        // query plan.
+        
+        /** @return a copy of the inheriting class, which will be run with its own
+                    query plan.
+        */
         virtual QueryOp *clone() const = 0;
         bool complete() const { return complete_; }
         bool error() const { return error_; }

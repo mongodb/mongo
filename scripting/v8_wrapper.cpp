@@ -67,16 +67,15 @@ namespace mongo {
     
     Local<v8::Object> mongoToV8( const BSONObj& m , bool array, bool readOnly ){
 
+        Local<v8::Object> o;
+
         // handle DBRef. needs to come first. isn't it? (metagoto)
         static string ref = "$ref";
         if ( ref == m.firstElement().fieldName() ) {
             const BSONElement& id = m["$id"];
             if (!id.eoo()) { // there's no check on $id exitence in sm implementation. risky ?
                 v8::Function* dbRef = getNamedCons( "DBRef" );
-                v8::Handle<v8::Value> argv[2];
-                argv[0] = mongoToV8Element(m.firstElement());
-                argv[1] = mongoToV8Element(m["$id"]);
-                return dbRef->NewInstance(2, argv);
+                o = dbRef->NewInstance();
             }
         }
 
@@ -85,9 +84,11 @@ namespace mongo {
         Local< v8::ObjectTemplate > internalFieldObjects = v8::ObjectTemplate::New();
         internalFieldObjects->SetInternalFieldCount( 1 );
 
-        Local<v8::Object> o;
-        if ( array ) {
-            // NOTE Looks like it's impossible to add interceptors to non array objects in v8.
+        if ( !o.IsEmpty() ) {
+            readOnly = false;
+        } else if ( array ) {
+            // NOTE Looks like it's impossible to add interceptors to v8 arrays.
+            readOnly = false;
             o = v8::Array::New();
         } else if ( !readOnly ) {
             o = v8::Object::New();
@@ -254,7 +255,7 @@ namespace mongo {
         
         }
 
-        if ( !array && readOnly ) {
+        if ( readOnly ) {
             readOnlyObjects->SetNamedPropertyHandler( 0, NamedReadOnlySet, 0, NamedReadOnlyDelete );
             readOnlyObjects->SetIndexedPropertyHandler( 0, IndexedReadOnlySet, 0, IndexedReadOnlyDelete );            
         }

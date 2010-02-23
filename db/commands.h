@@ -25,7 +25,8 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class BufBuilder;
-    
+    class Client;
+
 // db "commands" (sent via db.$cmd.findOne(...))
 // subclass to make a command.
     class Command {
@@ -46,6 +47,14 @@ namespace mongo {
 		   note: logTheTop() MUST be false if readOnly
 		 */
         virtual bool readOnly() { 
+            return false;
+        }
+
+        /**
+           true if don't need any lock or Client::Context setup
+           use with caution
+         */
+        virtual bool noLocking() {
             return false;
         }
 
@@ -110,5 +119,6 @@ namespace mongo {
     };
 
     bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
+
 
 } // namespace mongo

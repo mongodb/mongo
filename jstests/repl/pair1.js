@@ -34,6 +34,7 @@ check = function( s ) {
     assert.soon( function() {
                 return 1 == getCount( s );
                 } );    
+    sleep( 500 ); // wait for sync clone to finish up
 }
 
 // check that slave reads and writes are guarded

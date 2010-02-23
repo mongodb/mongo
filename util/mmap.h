@@ -62,6 +62,7 @@ namespace mongo {
         void *view;
         long len;
     };
-    
+
+    void printMemInfo( const char * where );    
 
 } // namespace mongo

@@ -68,21 +68,46 @@ namespace mongo {
 
     ElementMatcher::ElementMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ) {
         if ( _op == BSONObj::opMOD ){
-            BSONObj o = _e.embeddedObject().firstElement().embeddedObject();
+            BSONObj o = _e.embeddedObject();
             mod = o["0"].numberInt();
             modm = o["1"].numberInt();
             
             uassert( 10073 ,  "mod can't be 0" , mod );
         }
         else if ( _op == BSONObj::opTYPE ){
-            type = (BSONType)(_e.embeddedObject().firstElement().numberInt());
+            type = (BSONType)(_e.numberInt());
         }
         else if ( _op == BSONObj::opELEM_MATCH ){
-            BSONElement m = toMatch.embeddedObjectUserCheck().firstElement();
+            BSONElement m = _e;
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
             subMatcher.reset( new Matcher( m.embeddedObject() ) );
         }
     }
+
+    ElementMatcher::ElementMatcher( BSONElement _e , int _op , const BSONObj& array ) 
+        : toMatch( _e ) , compareOp( _op ) {
+        
+        myset.reset( new set<BSONElement,element_lt>() );
+        
+        BSONObjIterator i( array );
+        while ( i.more() ) {
+            BSONElement ie = i.next();
+            if ( _op == BSONObj::opALL && ie.type() == Object && ie.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ){
+                shared_ptr<Matcher> s;
+                s.reset( new Matcher( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
+                allMatchers.push_back( s );
+            }
+            else {
+                myset->insert(ie);
+            }
+        }
+        
+        if ( allMatchers.size() ){
+            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0);
+        }
+        
+    }
+    
 
 } // namespace mongo
 
@@ -118,7 +143,10 @@ namespace mongo {
                           );
     }
     
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc ) {
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded ) {
+        if ( loaded )
+            *loaded = false;
+        
         if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key) ) {
                 return false;
@@ -128,6 +156,9 @@ namespace mongo {
         if ( ! _needRecord ){
             return true;
         }
+
+        if ( loaded )
+            *loaded = true;
 
         return _docMatcher.matches(recLoc.rec());
     }
@@ -232,10 +263,14 @@ namespace mongo {
                             break;
                         case BSONObj::opMOD:
                         case BSONObj::opTYPE:
-                        case BSONObj::opELEM_MATCH:
+                        case BSONObj::opELEM_MATCH: {
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            _builders.push_back( b );
+                            b->appendAs(fe, e.fieldName());                                
                             // these are types where ElementMatcher has all the info
-                            basics.push_back( ElementMatcher( e , op ) );
-                            break;
+                            basics.push_back( ElementMatcher( b->done().firstElement() , op ) );
+                            break;                                
+                        }
                         case BSONObj::opSIZE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             _builders.push_back( b );
@@ -380,12 +415,40 @@ namespace mongo {
     */
     int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr) {
         if ( compareOp == BSONObj::opALL ) {
+            
+            if ( em.allMatchers.size() ){
+                BSONElement e = obj.getFieldDotted( fieldName );
+                uassert( 13021 , "$all/$elemMatch needs to be applied to array" , e.type() == Array );
+                
+                for ( unsigned i=0; i<em.allMatchers.size(); i++ ){
+                    bool found = false;
+                    BSONObjIterator x( e.embeddedObject() );
+                    while ( x.more() ){
+                        BSONElement f = x.next();
+
+                        if ( f.type() != Object )
+                            continue;
+                        if ( em.allMatchers[i]->matches( f.embeddedObject() ) ){
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if ( ! found )
+                        return -1;
+                }
+                
+                return 1;
+            }
+            
             if ( em.myset->size() == 0 )
                 return -1; // is this desired?
+            
             BSONObjSetDefaultOrder actualKeys;
             IndexSpec( BSON( fieldName << 1 ) ).getKeys( obj, actualKeys );
             if ( actualKeys.size() == 0 )
                 return 0;
+            
             for( set< BSONElement, element_lt >::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
                 // ignore nulls
                 if ( i->type() == jstNULL )
@@ -396,9 +459,10 @@ namespace mongo {
                 if ( !actualKeys.count( b.done() ) )
                     return -1;
             }
+
             return 1;
         }
-
+        
         if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, em );
         if ( compareOp == BSONObj::NIN ) {

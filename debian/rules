@@ -35,7 +35,10 @@ clean:
 	dh_testroot
 	rm -f build-stamp configure-stamp
 
-	scons -c
+	# FIXME: scons freaks out at the presence of target files
+	# under debian/mongodb.
+	#scons -c
+	rm -rf $(CURDIR)/debian/mongodb
 	rm -f config.log
 	rm -f mongo
 	rm -f mongod

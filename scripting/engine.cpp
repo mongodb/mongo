@@ -418,5 +418,8 @@ namespace mongo {
         }
     }
     
+    void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
+    
     ScriptEngine * globalScriptEngine;
 }
+    

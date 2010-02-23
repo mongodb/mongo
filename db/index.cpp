@@ -25,6 +25,28 @@
 
 namespace mongo {
 
+    map<string,IndexPlugin*> * IndexPlugin::_plugins;
+
+    IndexType::IndexType( const IndexPlugin * plugin )
+        : _plugin( plugin ){
+        
+    }
+
+    IndexType::~IndexType(){
+    }
+
+    IndexPlugin::IndexPlugin( const string& name )
+        : _name( name ){
+        if ( ! _plugins )
+            _plugins = new map<string,IndexPlugin*>();
+        (*_plugins)[name] = this;
+    }
+    
+    int IndexType::compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const {
+        return l.woCompare( r , spec.keyPattern );
+    }
+
+
     int removeFromSysIndexes(const char *ns, const char *idxName) { 
         string system_indexes = cc().database()->name + ".system.indexes";
         BSONObjBuilder b;
@@ -50,6 +72,10 @@ namespace mongo {
         if( n ) { 
             log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
         }
+    }
+
+    const IndexSpec& IndexDetails::getSpec() const {
+        return NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
     /* delete this index.  does NOT clean up the system catalog
@@ -83,12 +109,20 @@ namespace mongo {
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );
         
+        string pluginName = "";
+
         BSONObjIterator i( keyPattern );
         BSONObjBuilder nullKeyB;
         while( i.more() ) {
-            _fieldNames.push_back( i.next().fieldName() );
+            BSONElement e = i.next();
+            _fieldNames.push_back( e.fieldName() );
             _fixed.push_back( BSONElement() );
             nullKeyB.appendNull( "" );
+            if ( e.type() == String ){
+                uassert( 13007 , "can only have 1 index plugin" , pluginName.size() == 0 );
+                pluginName = e.valuestr();
+            }
+                
         }
         
         _nullKey = nullKeyB.obj();
@@ -97,10 +131,24 @@ namespace mongo {
         b.appendNull( "" );
         _nullObj = b.obj();
         _nullElt = _nullObj.firstElement();
+        
+        if ( pluginName.size() ){
+            IndexPlugin * plugin = IndexPlugin::get( pluginName );
+            if ( ! plugin ){
+                log() << "warning: can't find plugin [" << pluginName << "]" << endl;
+            }
+            else {
+                _indexType.reset( plugin->generate( this ) );
+            }
+        }
     }
 
 
     void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
+        if ( _indexType.get() ){
+            _indexType->getKeys( obj , keys );
+            return;
+        }
         vector<const char*> fieldNames( _fieldNames );
         vector<BSONElement> fixed( _fixed );
         _getKeys( fieldNames , fixed , obj, keys );
@@ -140,7 +188,7 @@ namespace mongo {
         if ( allFound ) {
             if ( arrElt.eoo() ) {
                 // no terminal array element to expand
-                BSONObjBuilder b;
+                BSONObjBuilder b(_sizeTracker);
                 for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i )
                     b.appendAs( *i, "" );
                 keys.insert( b.obj() );
@@ -150,7 +198,7 @@ namespace mongo {
                 BSONObjIterator i( arrElt.embeddedObject() );
                 if ( i.more() ){
                     while( i.more() ) {
-                        BSONObjBuilder b;
+                        BSONObjBuilder b(_sizeTracker);
                         for( unsigned j = 0; j < fixed.size(); ++j ) {
                             if ( j == arrIdx )
                                 b.appendAs( i.next(), "" );
@@ -162,7 +210,7 @@ namespace mongo {
                 }
                 else if ( fixed.size() > 1 ){
                     // x : [] - need to insert undefined
-                    BSONObjBuilder b;
+                    BSONObjBuilder b(_sizeTracker);
                     for( unsigned j = 0; j < fixed.size(); ++j ) {
                         if ( j == arrIdx )
                             b.appendUndefined( "" );
@@ -190,7 +238,7 @@ namespace mongo {
        Keys will be left empty if key not found in the object.
     */
     void IndexDetails::getKeysFromObject( const BSONObj& obj, BSONObjSetDefaultOrder& keys) const {
-        NamespaceDetailsTransient::get_w( info.obj()["ns"].valuestr() ).getIndexSpec( this ).getKeys( obj, keys );
+        getSpec().getKeys( obj, keys );
     }
 
     void setDifference(BSONObjSetDefaultOrder &l, BSONObjSetDefaultOrder &r, vector<BSONObj*> &diff) {

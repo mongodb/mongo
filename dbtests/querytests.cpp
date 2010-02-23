@@ -285,6 +285,35 @@ namespace QueryTests {
         }
     };
 
+    class TailableQueryOnId : public ClientBase {
+    public:
+        ~TailableQueryOnId() {
+            client().dropCollection( "unittests.querytests.TailableQueryOnId" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.TailableQueryOnId";
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
+            OID id;
+            id.init("000000000000000000000000");
+            auto_ptr< DBClientCursor > c2 = client().query( ns, QUERY( "_id" << GT << id ), 0, 0, 0, QueryOption_CursorTailable );
+            c1->next();
+            c1->next();
+            ASSERT( !c1->more() );
+            c2->next();
+            c2->next();
+            ASSERT( !c2->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            ASSERT( c1->more() );
+            ASSERT_EQUALS( 2, c1->next().getIntField( "a" ) );
+            ASSERT( !c1->more() );
+            // ASSERT( c2->more() ); // SERVER-645
+            // ASSERT_EQUALS( 2, c2->next().getIntField( "a" ) );  // SERVER-645
+            ASSERT( !c2->more() );
+        }
+    };
+
     class OplogReplayMode : public ClientBase {
     public:
         ~OplogReplayMode() {
@@ -906,7 +935,43 @@ namespace QueryTests {
     private:
         int _old;
     };
+
+    class WhatsMyUri : public CollectionBase {
+    public:
+        WhatsMyUri() : CollectionBase( "whatsmyuri" ) {}
+        void run() {
+            BSONObj result;
+            client().runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
+            ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
+        }
+    };
     
+    namespace parsedtests {
+        class basic1 {
+        public:
+            void _test( const BSONObj& in ){
+                ParsedQuery q( "a.b" , 5 , 6 , 9 , in , BSONObj() );
+                ASSERT_EQUALS( BSON( "x" << 5 ) , q.getFilter() );
+            }
+            void run(){
+                _test( BSON( "x" << 5 ) );
+                _test( BSON( "query" << BSON( "x" << 5 ) ) );
+                _test( BSON( "$query" << BSON( "x" << 5 ) ) );
+
+                {
+                    ParsedQuery q( "a.b" , 5 , 6 , 9 , BSON( "x" << 5 ) , BSONObj() );
+                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
+                    ASSERT( q.wantMore() );
+                }
+                {
+                    ParsedQuery q( "a.b" , 5 , -6 , 9 , BSON( "x" << 5 ) , BSONObj() );
+                    ASSERT_EQUALS( 6 , q.getNumToReturn() );
+                    ASSERT( ! q.wantMore() );
+                }
+            }
+        };
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -925,6 +990,7 @@ namespace QueryTests {
             add< EmptyTail >();
             add< TailableDelete >();
             add< TailableInsertDelete >();
+            add< TailableQueryOnId >();
             add< OplogReplayMode >();
             add< ArrayId >();
             add< UnderscoreNs >();
@@ -950,6 +1016,9 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStart >();
+            add< WhatsMyUri >();
+
+            add< parsedtests::basic1 >();
         }
     } myall;
     

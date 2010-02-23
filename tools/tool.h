@@ -35,7 +35,7 @@ namespace mongo {
 
     class Tool {
     public:
-        Tool( string name , string defaultDB="test" , string defaultCollection="");
+        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , string defaultCollection="");
         virtual ~Tool();
 
         int main( int argc , char ** argv );

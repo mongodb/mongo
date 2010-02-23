@@ -87,7 +87,7 @@ startMongoProgram = function(){
         } catch( e ) {
         }
         return false;
-    }, "unable to connect to mongo program on port " + port, 30000 );
+    }, "unable to connect to mongo program on port " + port, 60000 );
 
     return m;
 }
@@ -107,7 +107,9 @@ myPort = function() {
         return 27017;
 }
 
-ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
+ShardingTest = function( testName , numServers , verboseLevel , numMongos , otherParams ){
+    if ( ! otherParams )
+        otherParams = {}
     this._connections = [];
     this._serverNames = [];
 
@@ -121,7 +123,8 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos ){
     }
 
     this._configDB = "localhost:30000";
-
+    this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+    
 
     this._mongos = [];
     var startMongosPort = 31000;

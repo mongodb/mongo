@@ -269,8 +269,10 @@ namespace mongo {
 //  SockAddr db("172.16.0.179", MessagingPort::DBPort);
 
         MessagingPort p;
-        if ( !p.connect(db) )
+        if ( !p.connect(db) ){
+            out() << "msg couldn't connect" << endl;
             return;
+        }
 
         const int Loops = 1;
         for ( int q = 0; q < Loops; q++ ) {
@@ -286,8 +288,9 @@ namespace mongo {
             Timer t;
             bool ok = p.call(send, response);
             double tm = ((double) t.micros()) + 1;
-            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms " <<
-                 ((double) len) * 8 / 1000000 / (tm/1000000) << "Mbps" << endl;
+            out() << " ****ok. response.data:" << ok << " time:" << tm / 1000.0 << "ms "
+                  << "len: " << len << " data: " << response.data->_data << endl;
+
             if (  q+1 < Loops ) {
                 out() << "\t\tSLEEP 8 then sending again as a test" << endl;
                 sleepsecs(8);
@@ -604,7 +607,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("directoryperdb", "each database will be stored in a separate directory")
         ("quiet", "quieter output")
         ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
-        ("logappend" , "appnd to logpath instead of over-writing" )
+        ("logappend" , "append to logpath instead of over-writing" )
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
 #ifndef _WIN32
         ("fork" , "fork server process" )
@@ -646,6 +649,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
         ("pairwith", po::value<string>(), "address of server to pair with")
         ("arbiter", po::value<string>(), "address of arbiter server")
+        ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
@@ -871,6 +875,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("slave")) {
             replSettings.slave = SimpleSlave;
         }
+        if (params.count("fastsync")) {
+            replSettings.fastsync = true;
+        }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
         }
@@ -1094,7 +1101,8 @@ namespace mongo {
 
 #else
 void ctrlCTerminate() {
-    log() << "got kill or ctrl c signal, will terminate after current cmd ends" << endl;
+    log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
+    Client::initThread( "ctrlCTerminate" );
     exitCleanly();
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
@@ -1131,14 +1139,6 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
             massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
     }
 #endif
-
-void temptestfoo() {
-    MongoMutex m;
-    m.lock();
-//    m.lock_upgrade();
-    m.lock_shared();
-}
-
 
 } // namespace mongo
 

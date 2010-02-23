@@ -406,7 +406,8 @@ namespace mongo {
                 
             switch ( m.op ){
                     
-            case Mod::PUSH: { 
+            case Mod::PUSH: 
+            case Mod::ADDTOSET: { 
                 BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
                 arr.appendAs( m.elt, "0" );
                 arr.done();

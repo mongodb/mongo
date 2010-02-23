@@ -48,6 +48,11 @@ namespace mongo {
     bool haveLocalShardingInfo( const string& ns ){
         return false;
     }
+
+    DBClientBase * createDirectClient(){
+        uassert( 10256 ,  "no createDirectClient in clientOnly" , 0 );
+        return 0;
+    }
 /*
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
         uassert( 10000 ,  "Helpers::find can't be used in client" , 0 );

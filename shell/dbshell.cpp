@@ -79,6 +79,17 @@ void intr( int sig ){
 }
 
 #if !defined(_WIN32)
+void killOps() {
+    if ( mongo::shellUtils::_nokillop )
+        return;
+    vector< string > uris;
+    for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
+        uris.push_back( i->second );
+    mongo::BSONObj spec = BSON( "" << uris );
+    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
+    scope->invoke( "function( x ) { killWithUris( x ); }", spec );
+}
+
 void quitNicely( int sig ){
     if ( sig == SIGINT && inMultiLine ){
         gotInterrupted = 1;
@@ -86,6 +97,7 @@ void quitNicely( int sig ){
     }
     if ( sig == SIGPIPE )
         mongo::rawOut( "mongo got signal SIGPIPE\n" );
+    killOps();
     shellHistoryDone();
     exit(0);
 }
@@ -306,6 +318,7 @@ int _main(int argc, char* argv[]) {
     hidden_options.add_options()
         ("dbaddress", po::value<string>(), "dbaddress")
         ("files", po::value< vector<string> >(), "files")
+        ("nokillop", "nokillop") // for testing, kill op will also be disabled automatically if the tests starts a mongo program
         ;
 
     positional_options.add("dbaddress", 1);
@@ -353,7 +366,10 @@ int _main(int argc, char* argv[]) {
     if (params.count("quiet")) {
         mongo::cmdLine.quiet = true;
     }
-
+    if (params.count("nokillop")) {
+        mongo::shellUtils::_nokillop = true;
+    }
+    
     /* This is a bit confusing, here are the rules:
      *
      * if nodb is set then all positional parameters are files
@@ -399,6 +415,7 @@ int _main(int argc, char* argv[]) {
 
     }
 
+    mongo::ScriptEngine::setConnectCallback( mongo::shellUtils::onConnect );
     mongo::ScriptEngine::setup();
     mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );    
@@ -517,10 +534,4 @@ int main(int argc, char* argv[]) {
     }
 }
 
-namespace mongo {
-    DBClientBase * createDirectClient(){
-        uassert( 10256 ,  "no createDirectClient in shell" , 0 );
-        return 0;
-    }
-}
 

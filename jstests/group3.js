@@ -1,4 +1,4 @@
-t = db.group2;
+t = db.group3;
 t.drop();
 
 t.save({a: 1});

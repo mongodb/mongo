@@ -168,9 +168,6 @@ namespace mongo {
         CurOp& op = *(c.curop());
         
         try {
-            if (q.fields.get() && q.fields->errmsg)
-                uassert( 10053 , q.fields->errmsg, false);
-
             msgdata = runQuery(m, q, op ).release();
         }
         catch ( AssertionException& e ) {
@@ -215,13 +212,9 @@ namespace mongo {
         return ok;
     }
 
-    bool commandIsReadOnly(BSONObj& _cmdobj);
-
     // Returns false when request includes 'end'
     bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
 
-        bool writeLock = true;
-        
         // before we lock...
         int op = m.data->operation();
         bool isCommand = false;
@@ -229,6 +222,7 @@ namespace mongo {
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
+                OPWRITE;
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -243,17 +237,19 @@ namespace mongo {
                         return true;
                     }
                 }
-                DbMessage d( m );
-                QueryMessage q( d );
-                writeLock = !commandIsReadOnly(q.query);
+
             }
-            else
-                writeLock = false;
+            else {
+                OPREAD;
+            }
         }
         else if( op == dbGetMore ) {
-            writeLock = false;
+            OPREAD;
         }
-
+        else {
+            OPWRITE;
+        }
+        
         globalOpCounters.gotOp( op , isCommand );
         
         if ( handlePossibleShardedMessage( m , dbresponse ) ){
@@ -261,13 +257,6 @@ namespace mongo {
                so if a message has to be forwarded, doesn't block for that
             */
             return true;
-        }
-
-        if ( writeLock ){
-            OPWRITE;
-        }
-        else {
-            OPREAD;
         }
 
         Client& c = cc();
@@ -298,22 +287,22 @@ namespace mongo {
                 log = true;
         }
         else if ( op == dbMsg ) {
-            mongolock lk(writeLock);
-			/* deprecated / rarely used.  intended for connection diagnostics. */
+            // deprecated - replaced by commands
             char *p = m.data->_data;
             int len = strlen(p);
             if ( len > 400 )
                 out() << curTimeMillis() % 10000 <<
-                     " long msg received, len:" << len <<
-                     " ends with: " << p + len - 10 << endl;
-            bool end = false; //strcmp("end", p) == 0;
+                    " long msg received, len:" << len <<
+                    " ends with: " << p + len - 10 << endl;
+
             Message *resp = new Message();
-            resp->setData(opReply, "i am fine");
+            if ( strcmp( "end" , p ) == 0 )
+                resp->setData( opReply , "dbMsg end no longer supported" );
+            else
+                resp->setData( opReply , "i am fine - dbMsg deprecated");
+
             dbresponse.response = resp;
             dbresponse.responseTo = m.data->id;
-            //dbMsgPort.reply(m, resp);
-            if ( end )
-                return false;
         }
         else {
             const char *ns = m.data->_data + 4;
@@ -325,14 +314,12 @@ namespace mongo {
             else {
                 try {
                     if ( op == dbInsert ) {
-                        mongolock lk(writeLock);
                         receivedInsert(m, currentOp);
                     }
                     else if ( op == dbUpdate ) {
                         receivedUpdate(m, currentOp);
                     }
                     else if ( op == dbDelete ) {
-                        mongolock lk(writeLock);
                         receivedDelete(m, currentOp);
                     }
                     else if ( op == dbKillCursors ) {
@@ -390,7 +377,7 @@ namespace mongo {
         int *x = (int *) m.data->_data;
         x++; // reserved
         int n = *x++;
-        assert( n >= 1 );
+        uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
         if ( n > 2000 ) {
             problem() << "Assertion failure, receivedKillCursors, n=" << n << endl;
             assert( n < 30000 );
@@ -465,7 +452,6 @@ namespace mongo {
         const char *ns = d.getns();
         assert(*ns);
         uassert( 10056 ,  "not master", isMasterNs( ns ) );
-        Client::Context ctx(ns);
         int flags = d.pullInt();
         bool justOne = flags & 1;
         assert( d.moreJSObjs() );
@@ -475,6 +461,10 @@ namespace mongo {
             op.debug().str << " query: " << s;
             op.setQuery(pattern);
         }        
+
+        writelock lk(ns);
+        Client::Context ctx(ns);
+
         long long n = deleteObjects(ns, pattern, justOne, true);
         recordDelete( (int) n );
     }
@@ -482,23 +472,25 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
-        bool ok = true;
-        DbMessage d(m);
-        const char *ns = d.getns();
         StringBuilder& ss = curop.debug().str;
-        ss << ns;
-        mongolock lk(false);
-        Client::Context ctx(ns);
+        bool ok = true;
+        
+        DbMessage d(m);
+
+        const char *ns = d.getns();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
-        ss << " cid:" << cursorid;
-        ss << " ntoreturn:" << ntoreturn;
+        
+        ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
+
         QueryResult* msgdata;
         try {
+            mongolock lk(false);
+            Client::Context ctx(ns);
             msgdata = getMore(ns, ntoreturn, cursorid, curop);
         }
         catch ( AssertionException& e ) {
-            ss << " exception " + e.toString();
+            ss << " exception " << e.toString();
             msgdata = emptyMoreResult(cursorid);
             ok = false;
         }
@@ -508,7 +500,7 @@ namespace mongo {
         ss << " nreturned:" << msgdata->nReturned;
         dbresponse.response = resp;
         dbresponse.responseTo = m.data->id;
-        //dbMsgPort.reply(m, resp);
+
         return ok;
     }
 
@@ -517,9 +509,10 @@ namespace mongo {
 		const char *ns = d.getns();
 		assert(*ns);
         uassert( 10058 ,  "not master", isMasterNs( ns ) );
-        Client::Context ctx(ns);
         op.debug().str << ns;
-		
+
+        writelock lk(ns);
+        Client::Context ctx(ns);		
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);

@@ -481,9 +481,14 @@ namespace mongo {
         // signal done allocating new extents.
         if ( !deletedList[ 1 ].isValid() )
             deletedList[ 1 ] = DiskLoc();
-
+        
         assert( len < 400000000 );
         int passes = 0;
+        int maxPasses = ( len / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
+        if ( maxPasses < 5000 ){
+            // this is for bacwards safety since 5000 was the old value
+            maxPasses = 5000;
+        }
         DiskLoc loc;
 
         // delete records until we have room and the max # objects limit achieved.
@@ -532,10 +537,10 @@ namespace mongo {
             DiskLoc fr = theCapExtent()->firstRecord;
             theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true);
             compact();
-            if( ++passes >= 5000 ) {
-                log() << "passes ns:" << ns << " len:" << len << '\n';
+            if( ++passes > maxPasses ) {
+                log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << '\n';
                 log() << "passes max:" << max << " nrecords:" << nrecords << " datasize: " << datasize << endl;
-                massert( 10345 ,  "passes >= 5000 in capped collection alloc", false );
+                massert( 10345 ,  "passes >= maxPasses in capped collection alloc", false );
             }
         }
 

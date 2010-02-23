@@ -167,28 +167,26 @@ DBQuery.prototype.length = function(){
     return this.toArray().length;
 }
 
-DBQuery.prototype.sort = function( sortBy ){
+DBQuery.prototype._addSpecial = function( name , value ){
     this._ensureSpecial();
-    this._query.orderby = sortBy;
+    this._query[name] = value;
     return this;
+}
+
+DBQuery.prototype.sort = function( sortBy ){
+    return this._addSpecial( "orderby" , sortBy );
 }
 
 DBQuery.prototype.hint = function( hint ){
-    this._ensureSpecial();
-    this._query["$hint"] = hint;
-    return this;
+    return this._addSpecial( "$hint" , hint );
 }
 
 DBQuery.prototype.min = function( min ) {
-    this._ensureSpecial();
-    this._query["$min"] = min;
-    return this;
+    return this._addSpecial( "$min" , min );
 }
 
 DBQuery.prototype.max = function( max ) {
-    this._ensureSpecial();
-    this._query["$max"] = max;
-    return this;
+    return this._addSpecial( "$max" , max );
 }
 
 DBQuery.prototype.forEach = function( func ){
@@ -219,7 +217,7 @@ DBQuery.prototype.snapshot = function(){
     this._ensureSpecial();
     this._query.$snapshot = true;
     return this;
- }
+}
 
 DBQuery.prototype.shellPrint = function(){
     try {

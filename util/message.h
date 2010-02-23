@@ -74,6 +74,9 @@ namespace mongo {
         void piggyBack( Message& toSend , int responseTo = -1 );
 
         virtual unsigned remotePort();
+
+        int send( const char * data , const int len );
+        int recv( char * data , int max );
     private:
         int sock;
         PiggyBackData * piggyBackData;

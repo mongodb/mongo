@@ -307,12 +307,13 @@ namespace mongo {
                 }
                 
                 if ( level > 1 ){
+                    dbtemprelease unlock;
                     ScopedDbConnection conn( s["host"].valuestr() );
                     BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
                     BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
                     bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
                     bb.appendDate( "masterLast" , last["ts"].timestampTime() );
-                    double lag = last["ts"].timestampTime() - s["syncedTo"].timestampTime();
+                    double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
                     bb.append( "lagSeconds" , lag / 1000 );
                     conn.done();
                 }
@@ -331,6 +332,8 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual bool noLocking() { return true; }
+
         CmdIsMaster() : Command("ismaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
@@ -646,8 +649,8 @@ namespace mongo {
                 n++;
                 ReplSource tmp(c->current());
                 if ( tmp.hostName != cmdLine.source ) {
-                    log() << "--source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
-                    log() << "terminating after 30 seconds" << endl;
+                    log() << "repl: --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
+                    log() << "repl: terminating mongod after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
@@ -679,6 +682,9 @@ namespace mongo {
         if ( replPair ) {
             const string &remote = replPair->remote;
             // --pairwith host specified.
+            if ( replSettings.fastsync ) {
+                Helpers::emptyCollection( "local.sources" );  // ignore saved sources
+            }
             // check that no items are in sources other than that
             // add if missing
             auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
@@ -713,6 +719,17 @@ namespace mongo {
                     // peer was replaced -- start back at the beginning.
                     tmp.syncedTo = OpTime();
                     tmp.replacing = true;
+                }
+            } 
+            if ( ( !replPair && tmp.syncedTo.isNull() ) ||
+                ( replPair && replSettings.fastsync ) ) {
+                DBDirectClient c;
+                if ( c.exists( "local.oplog.$main" ) ) {
+                    BSONObj op = c.findOne( "local.oplog.$main", Query().sort( BSON( "$natural" << -1 ) ) );
+                    if ( !op.isEmpty() ) {
+                        tmp.syncedTo = op[ "ts" ].date();
+                        tmp._lastSavedLocalTs = op[ "ts" ].date();
+                    }
                 }
             }
             addSourceToList(v, tmp, c->current(), old);
@@ -1363,7 +1380,7 @@ namespace mongo {
             ReplInfo r("trying to connect to sync source");
             if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
                 resetConnection();
-                log() << "repl: " << errmsg << endl;
+                log() << "repl:  " << errmsg << endl;
                 return false;
             }
         }
@@ -1387,7 +1404,7 @@ namespace mongo {
         }
 
         if ( !connect() ) {
-			log() << "repl:   can't connect to sync source" << endl;
+			log(4) << "repl:  can't connect to sync source" << endl;
             if ( replPair && paired ) {
                 assert( startsWith(hostName.c_str(), replPair->remoteHost.c_str()) );
                 replPair->arbitrate();
@@ -1625,7 +1642,7 @@ namespace mongo {
             }
             if ( s ) {
                 stringstream ss;
-                ss << "repl: sleep " << s << "sec before next pass";
+                ss << "repl:  sleep " << s << "sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;

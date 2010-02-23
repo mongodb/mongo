@@ -119,7 +119,7 @@ namespace mongo {
         
         void _markModified();
         
-        static long MaxChunkSize;
+        static int MaxChunkSize;
 
     private:
         

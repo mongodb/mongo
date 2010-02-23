@@ -453,8 +453,7 @@ namespace mongo {
             if ( ref == obj->firstElement().fieldName() ){
                 JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
                 assert( o );
-                setProperty( o , "$ref" , toval( obj->firstElement() ) );
-                setProperty( o , "$id" , toval( (*obj)["$id"] ) );
+                assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
                 return o;
             }
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
@@ -768,6 +767,8 @@ namespace mongo {
     JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp){
         Convertor c(cx);
         BSONHolder * holder = GETHOLDER( cx , obj );
+        if ( !holder ) // needed when we're messing with DBRef.prototype
+            return JS_TRUE;
         if ( holder->_inResolve )
             return JS_TRUE;
         holder->_modified = true;

@@ -21,3 +21,4 @@ assert.eq( 1 , t.find( { x : { $type : 1 } } ).count() , "B2" );
 assert.eq( 3 , t.find( { x : { $type : 2 } } ).count() , "B3" );
 assert.eq( 0 , t.find( { x : { $type : 3 } } ).count() , "B4" );
 assert.eq( 1 , t.find( { x : { $type : 1 } } ).explain().nscanned , "B5" );
+assert.eq( 1 , t.find( { x : { $regex:"f", $type : 2 } } ).count() , "B3" );

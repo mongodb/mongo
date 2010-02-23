@@ -30,6 +30,7 @@ _ disallow system* manipulations from the database.
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
 #include "../util/file_allocator.h"
+#include "../util/processinfo.h"
 #include "btree.h"
 #include <algorithm>
 #include <list>
@@ -544,13 +545,11 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     auto_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
-        DiskLoc loc;
-        bool found = nsindex(ns)->find(ns, loc);
-        if ( !found ) {
-            //		out() << "info: findAll() namespace does not exist: " << ns << endl;
+        NamespaceDetails * d = nsdetails( ns );
+        if ( ! d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
-        }
 
+        DiskLoc loc = d->firstExtent;
         Extent *e = getExtent(loc);
 
         DEBUGGING {
@@ -569,25 +568,25 @@ namespace mongo {
             }
 
             out() << endl;
-            nsdetails(ns)->dumpDeleted(&extents);
+            d->dumpDeleted(&extents);
         }
 
-        if ( !nsdetails( ns )->capped ) {
-            if ( !startLoc.isNull() )
-                return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
-            while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
-                /* todo: if extent is empty, free it for reuse elsewhere.
-                   that is a bit complicated have to clean up the freelists.
-                */
-                RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
-                // find a nonempty extent
-                // it might be nice to free the whole extent here!  but have to clean up free recs then.
-                e = e->getNextExtent();
-            }
-            return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
-        } else {
-            return auto_ptr< Cursor >( new ForwardCappedCursor( nsdetails( ns ), startLoc ) );
+        if ( d->capped ) 
+            return auto_ptr< Cursor >( new ForwardCappedCursor( d , startLoc ) );
+        
+        if ( !startLoc.isNull() )
+            return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
+        
+        while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
+            /* todo: if extent is empty, free it for reuse elsewhere.
+               that is a bit complicated have to clean up the freelists.
+            */
+            RARELY out() << "info DFM::findAll(): extent " << loc.toString() << " was empty, skipping ahead " << ns << endl;
+            // find a nonempty extent
+            // it might be nice to free the whole extent here!  but have to clean up free recs then.
+            e = e->getNextExtent();
         }
+        return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
     }
 
     /* get a table scan cursor, but can be forward or reverse direction.
@@ -598,11 +597,13 @@ namespace mongo {
 
         if ( el.number() >= 0 )
             return DataFileMgr::findAll(ns, startLoc);
-
+        
         // "reverse natural order"
         NamespaceDetails *d = nsdetails(ns);
+        
         if ( !d )
             return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+        
         if ( !d->capped ) {
             if ( !startLoc.isNull() )
                 return auto_ptr<Cursor>(new ReverseCursor( startLoc ));                
@@ -728,9 +729,9 @@ namespace mongo {
             try {
                 ok = id.head.btree()->unindex(id.head, id, j, dl);
             }
-            catch (AssertionException&) {
+            catch (AssertionException& e) {
                 problem() << "Assertion failure: _unindex failed " << id.indexNamespace() << endl;
-                out() << "Assertion failure: _unindex failed" << '\n';
+                out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
                 out() << "  obj:" << obj.toString() << '\n';
                 out() << "  key:" << j.toString() << '\n';
                 out() << "  dl:" << dl.toString() << endl;
@@ -993,11 +994,14 @@ namespace mongo {
         BSONObj order = idx.keyPattern();
 
         idx.head.Null();
+        
+        if ( logLevel > 1 ) printMemInfo( "before index start" );
 
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
         auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
+        sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
         ProgressMeter pm( d->nrecords , 10 );
         while ( c->ok() ) {
@@ -1014,12 +1018,18 @@ namespace mongo {
                 sorter.add(*i, loc);
                 nkeys++;
             }
-
+            
             c->advance();
             n++;
             pm.hit();
+            if ( logLevel > 1 && n % 10000 == 0 ){
+                printMemInfo( "\t iterating objects" );
+            }
+
         };
+        if ( logLevel > 1 ) printMemInfo( "before final sort" );
         sorter.sort();
+        if ( logLevel > 1 ) printMemInfo( "after final sort" );
         
         log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
@@ -1058,6 +1068,7 @@ namespace mongo {
                 }
                 pm2.hit();
             }
+            log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 
         }
@@ -1302,7 +1313,7 @@ namespace mongo {
     */
     DiskLoc DataFileMgr::insert(const char *ns, const void *obuf, int len, bool god, const BSONElement &writeId, bool mayAddIndex) {
         bool wouldAddIndex = false;
-        uassert( 10093 , "cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
+        massert( 10093 , "cannot insert into reserved $ collection", god || strchr(ns, '$') == 0 );
         uassert( 10094 , "invalid ns", strchr( ns , '.' ) > 0 );
         const char *sys = strstr(ns, "system.");
         if ( sys ) {

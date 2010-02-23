@@ -449,20 +449,13 @@ DBCollection.prototype.storageSize = function(){
 }
 
 DBCollection.prototype.totalIndexSize = function( verbose ){
-    var total = 0;
-    var mydb = this._db;
-    var shortName = this._shortName;
-    this.getIndexes().forEach(
-        function( spec ){
-            var coll = mydb.getCollection( shortName + ".$" + spec.name );
-            var mysize = coll.dataSize();
-            total += coll.dataSize();
-            if ( verbose ) {
-                print( coll + "\t" + mysize );
-            }
+    var stats = this.stats();
+    if (verbose){
+        for (var ns in stats.indexSizes){
+            print( ns + "\t" + stats.indexSizes[ns] );
         }
-    );
-    return total;
+    }
+    return stats.totalIndexSize;
 }
 
 

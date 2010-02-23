@@ -53,10 +53,10 @@ namespace mongo {
             */
             recordLoc.GETOFS() |= 1;
         }
-        int isUnused() {
+        int isUnused() const {
             return recordLoc.getOfs() & 1;
         }
-        int isUsed() {
+        int isUsed() const {
             return !isUnused();
         }
     };
@@ -85,14 +85,17 @@ namespace mongo {
         bool isHead() { return parent.isNull(); }
         void assertValid(const BSONObj &order, bool force = false);
         int fullValidate(const DiskLoc& thisLoc, const BSONObj &order); /* traverses everything */
-    protected:
-        void modified(const DiskLoc& thisLoc);
+
         KeyNode keyNode(int i) const {
             if ( i >= n ){
                 massert( 13000 , (string)"invalid keyNode: " +  BSON( "i" << i << "n" << n ).jsonString() , i < n );
             }
             return KeyNode(*this, k(i));
         }
+
+    protected:
+
+        void modified(const DiskLoc& thisLoc);
 
         char * dataAt(short ofs) {
             return data + ofs;
@@ -152,6 +155,10 @@ namespace mongo {
             ss << "    Size: " << _Size << " flags:" << flags << endl;
             ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
             return ss.str();
+        }
+        
+        bool isUsed( int i ) const {
+            return k(i).isUsed();
         }
 
     protected:
