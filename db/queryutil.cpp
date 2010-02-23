@@ -105,7 +105,8 @@ namespace mongo {
     }
     
     FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) {
-        if ( !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
+        // NOTE with $not, we could potentially form a complementary set of intervals.
+        if ( !isNot && !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
             set< BSONElement, element_lt > vals;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
             BSONObjIterator i( e.embeddedObject() );
@@ -385,7 +386,6 @@ namespace mongo {
                                 break;
                             }
                             case RegEx:
-                                log() << "regex: " << f << endl;
                                 processOpElement( e.fieldName(), f, true, optimize );
                                 break;
                             default:

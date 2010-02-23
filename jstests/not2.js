@@ -77,19 +77,22 @@ t.save( {i:"b"} );
 t.ensureIndex( {i:1} );
 
 indexed = function( query, min, max ) {
-    min = min || MinKey;
-    max = max || MaxKey;
     exp = t.find( query ).explain();
-    printjson( exp );
+//    printjson( exp );
     assert( exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
-    assert.eq( exp.startKey.i, min );
-    assert.eq( exp.endKey.i, max );
+    // just expecting one element per key
+    for( i in exp.startKey ) {
+        assert.eq( exp.startKey[ i ], min );        
+    }
+    for( i in exp.endKey ) {
+        assert.eq( exp.endKey[ i ], max );
+    }
 }
 
 not = function( query ) {
     exp = t.find( query ).explain();
-    printjson( exp );
+//    printjson( exp );
     assert( !exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
 }
@@ -100,14 +103,27 @@ not( {i:{$ne:1}} );
 indexed( {i:{$not:{$ne:"a"}}}, "a", "a" );
 not( {i:{$not:/^a/}} );
 
-//indexed( {i:{$gt:"a"}}, "a", null );
-//indexed( {i:{$not:{$gt:"a"}}}, null, "a" );
-//
-//indexed( {i:{$gte:"a"}}, "a", null );
-//indexed( {i:{$not:{$gte:"a"}}}, null, "a" );
-//
-//indexed( {i:{$lt:"b"}}, null, "b" );
-//indexed( {i:{$not:{$gte:"b"}}}, "b", null );
-//
-//indexed( {i:{$lte:"b"}}, null, "b" );
-//indexed( {i:{$not:{$gt:"b"}}}, "b", null );
+indexed( {i:{$gt:"a"}}, "a", {} );
+indexed( {i:{$not:{$gt:"a"}}}, "", "a" );
+
+indexed( {i:{$gte:"a"}}, "a", {} );
+indexed( {i:{$not:{$gte:"a"}}}, "", "a" );
+
+indexed( {i:{$lt:"b"}}, "", "b" );
+indexed( {i:{$not:{$lt:"b"}}}, "b", {} );
+
+indexed( {i:{$lte:"b"}}, "", "b" );
+indexed( {i:{$not:{$lte:"b"}}}, "b", {} );
+
+not( {i:{$not:{$all:["a"]}}} );
+not( {i:{$not:{$mod:[2,1]}}} );
+not( {i:{$not:{$type:2}}} );
+
+indexed( {i:{$in:[1]}}, 1, 1 );
+not( {i:{$not:{$in:[1]}}} );
+
+t.drop();
+t.ensureIndex( {"i.j":1} );
+indexed( {i:{$elemMatch:{j:1}}}, 1, 1 );
+not( {i:{$not:{$elemMatch:{j:1}}}} );
+indexed( {i:{$not:{$elemMatch:{j:{$ne:1}}}}}, 1, 1 );
