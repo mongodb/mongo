@@ -407,7 +407,7 @@ namespace mongo {
     struct GeoUnitTest : public UnitTest {
         
         int round( double d ){
-            return (int)(::round(d*1000));
+            return (int)(.5+(d*1000));
         }
 
         void run(){
