@@ -68,17 +68,17 @@ namespace mongo {
 
     ElementMatcher::ElementMatcher( BSONElement _e , int _op ) : toMatch( _e ) , compareOp( _op ) {
         if ( _op == BSONObj::opMOD ){
-            BSONObj o = _e.embeddedObject().firstElement().embeddedObject();
+            BSONObj o = _e.embeddedObject();
             mod = o["0"].numberInt();
             modm = o["1"].numberInt();
             
             uassert( 10073 ,  "mod can't be 0" , mod );
         }
         else if ( _op == BSONObj::opTYPE ){
-            type = (BSONType)(_e.embeddedObject().firstElement().numberInt());
+            type = (BSONType)(_e.numberInt());
         }
         else if ( _op == BSONObj::opELEM_MATCH ){
-            BSONElement m = toMatch.embeddedObjectUserCheck().firstElement();
+            BSONElement m = _e;
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
             subMatcher.reset( new Matcher( m.embeddedObject() ) );
         }
@@ -263,10 +263,14 @@ namespace mongo {
                             break;
                         case BSONObj::opMOD:
                         case BSONObj::opTYPE:
-                        case BSONObj::opELEM_MATCH:
+                        case BSONObj::opELEM_MATCH: {
+                            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                            _builders.push_back( b );
+                            b->appendAs(fe, e.fieldName());                                
                             // these are types where ElementMatcher has all the info
-                            basics.push_back( ElementMatcher( e , op ) );
-                            break;
+                            basics.push_back( ElementMatcher( b->done().firstElement() , op ) );
+                            break;                                
+                        }
                         case BSONObj::opSIZE:{
                             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                             _builders.push_back( b );

@@ -17,3 +17,4 @@ assert.eq( 2 , t.find( { a : { $in : [ 1 , 2 ] } } ).itcount() , "F" );
 
 assert.eq( 0 , t.find( { a : { $in : [] } } ).itcount() , "G" );
 
+assert.eq( 1 , t.find( { a : { $gt: 1, $in : [ 2 ] } } ).itcount() , "E" );

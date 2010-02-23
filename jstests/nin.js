@@ -29,6 +29,7 @@ doTest = function( n ) {
     assert.eq( 4, t.find( { a: { $nin: [ 9 ] } } ).count() , n + " G" );
     assert.eq( 4, t.find( { a: { $nin: [ 3 ] } } ).count() , n + " H" );
     assert.eq( 3, t.find( { a: { $nin: [ 2, 3 ] } } ).count() , n + " I" );
+    assert.eq( 1, t.find( { a: { $ne: 8, $nin: [ 2, 3 ] } } ).count() , n + " I2" );
     
     checkEqual( n + " A" , "a" , 5 );
 

@@ -36,3 +36,4 @@ res = t.find( { "a" : { $elemMatch : { x : { $gt : 2 } } } } ).explain()
 assert( res.cursor.indexOf( "BtreeC" ) == 0 , "C1" );
 assert.eq( 2 , t.find( { a : { $elemMatch : { x : { $gt : 2 } } } } ).count() , "D2" );
 
+assert.eq( 2 , t.find( { a : { $ne:2, $elemMatch : { x : { $gt : 2 } } } } ).count() , "D2" );
