@@ -344,6 +344,8 @@ namespace mongo {
                 }
 
                 string args = ss.str();
+                
+                PRINT(args);
 
                 boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
                 for (size_t i=0; i < args.size()+1; i++)
@@ -364,6 +366,9 @@ namespace mongo {
                 ZeroMemory(&pi, sizeof(pi));
 
                 bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi);
+
+                PRINT(success);
+                cout << OUTPUT_ERRNO << endl;
                 assert(success);
 
                 CloseHandle(pi.hThread);
