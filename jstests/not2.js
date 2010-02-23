@@ -68,11 +68,15 @@ t.save( {i:"a"} );
 t.save( {i:"b"} );
 t.ensureIndex( {i:1} );
 
-indexed = function( query ) {
+indexed = function( query, min, max ) {
+    min = min || minKey;
+    max = max || maxKey;
     exp = t.find( query ).explain();
     printjson( exp );
     assert( exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
+    assert.eq( exp.startKey, {i:min} );
+    assert.eq( exp.endKey, {i:max} );
 }
 
 not = function( query ) {
@@ -81,9 +85,9 @@ not = function( query ) {
     assert( !exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
 }
-//
-//indexed( {i:1} );
-//not( {i:{$ne:1}} );
-//
-//indexed( {i:{$not:{$ne:"a"}}} );
-////not( {i:{$not:/a/}} );
+
+indexed( {i:1}, 1, 1 );
+not( {i:{$ne:1}} );
+
+//indexed( {i:{$not:{$ne:"a"}}}, "a", "a" );
+//not( {i:{$not:/a/}} );
