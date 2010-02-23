@@ -483,8 +483,11 @@ namespace mongo {
                 GeoHash a = g._hash( 1 , 1 );
                 GeoHash b = g._hash( 4 , 5 );
                 assert( 5 == (int)(g.distance( a , b ) ) );
+                a = g._hash( 50 , 50 );
+                b = g._hash( 42 , 44 );
+                assert( round(10) == round(g.distance( a , b )) );
             }
-
+            
         }
     } geoUnitTest;
     
