@@ -1080,7 +1080,8 @@ def jsSpec( suffix ):
     return apply( os.path.join, args )
 
 def jsDirTestSpec( dir ):
-    return mongo[0].abspath + " --nodb " + jsSpec( [ dir, "*.js" ] )
+    tests = Glob( jsSpec( [ dir, "*.js" ] ) )
+    return  [ mongo[0].abspath + " --nodb " + test.abspath for test in tests ]
 
 def runShellTest( env, target, source ):
     global mongodForTestsPort
@@ -1102,14 +1103,14 @@ def runShellTest( env, target, source ):
 # These tests require the mongo shell
 if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")], runShellTest )
-    addSmoketest( "smokeClone", [ "mongo", "mongod" ], [ jsDirTestSpec( "clone" ) ] )
-    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], [ jsDirTestSpec( "repl" ) ] )
-    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "disk" ) ] )
-    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ], [ jsDirTestSpec( "auth" ) ] )
-    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], [ jsDirTestSpec( "sharding" ) ] )
+    addSmoketest( "smokeClone", [ "mongo", "mongod" ], jsDirTestSpec( "clone" ) )
+    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ], jsDirTestSpec( "repl" ) )
+    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ) ], jsDirTestSpec( "disk" ) )
+    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ], jsDirTestSpec( "auth" ) )
+    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], jsDirTestSpec( "sharding" ) )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
-    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [ jsDirTestSpec( "tool" ) ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], jsDirTestSpec( "tool" ) )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
