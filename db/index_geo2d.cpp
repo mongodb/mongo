@@ -513,8 +513,8 @@ namespace mongo {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper( Geo2dType * g , unsigned max , const GeoHash& near , const BSONObj& filter = BSONObj() )
-            : _g( g ) , _max( max ) , _near( near ) , _lookedAt(0) , _objectsLoaded(0){
+        GeoHopper( Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() )
+            : _g( g ) , _max( max ) , _near( n ) , _lookedAt(0) , _objectsLoaded(0){
 
             if ( ! filter.isEmpty() )
                 _matcher.reset( new CoveredIndexMatcher( filter , g->_spec->keyPattern ) );
@@ -701,7 +701,7 @@ namespace mongo {
             
             GeoHash start = n;
             if ( cmdObj["start"].type() == String){
-                start = (string)cmdObj["start"].valuestr();
+                start = (string) cmdObj["start"].valuestr();
                 if ( 2 * ( start.size() / 2 ) != start.size() ){
                     errmsg = "start has to be an even size";
                     return false;
@@ -728,6 +728,8 @@ namespace mongo {
             BSONObj filter;
             if ( cmdObj["query"].type() == Object )
                 filter = cmdObj["query"].embeddedObject();
+
+            //cout << "--------- GeoHopper " << n._hash << endl;
 
             GeoHopper hopper( g , numWanted , n , filter );
 

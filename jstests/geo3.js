@@ -9,15 +9,20 @@ for ( var x=-100; x<100; x+=2 ){
     }
 }
 
+
 t.ensureIndex( { loc : "2d" } )
 
 fast = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 } );
+
+//printjson( fast.stats );
+
 slow = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
+
+//printjson( slow.stats );
 
 assert.lt( fast.stats.nscanned * 10 , slow.stats.nscanned , "A1" );
 assert.lt( fast.stats.objectsLoaded , slow.stats.objectsLoaded , "A2" );
 assert.eq( fast.stats.avgDistance , slow.stats.avgDistance , "A3" );
-//printjson( fast.stats );
 
 // test filter
 
