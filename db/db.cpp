@@ -465,7 +465,7 @@ namespace mongo {
 
         log() << "Mongo DB : starting : pid = " << pid << " port = " << cmdLine.port << " dbpath = " << dbpath
               <<  " master = " << replSettings.master << " slave = " << (int) replSettings.slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
-
+        DEV log() << " FULL DEBUG ENABLED " << endl;
         show_32_warning();
 
         {

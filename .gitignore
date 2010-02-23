@@ -67,6 +67,7 @@ mongoexport
 mongoimport
 mongosniff
 mongobridge
+mongostat
 
 *.tgz
 *.zip
