@@ -690,7 +690,6 @@ namespace mongo {
                     return false;
                 }
             }
-            const GeoHash nAtStart = n;
             result.append( "near" , n );
             
             GeoHash start = n;
@@ -789,12 +788,6 @@ namespace mongo {
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             
-            /* start temp */
-            result.append( "temp-n" , n );
-            result.append( "temp-nAtStart" , nAtStart );
-            assert( n == nAtStart );
-            /* end temp */
-
             return true;
         }
         
