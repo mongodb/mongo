@@ -246,7 +246,7 @@ namespace mongo {
                                     addRegex( fe, e.fieldName(), true );
                                     continue;
                                 default:
-                                    assert( false );
+                                    uassert( 13024, "invalid use of $not", false );
                             }
                         }
                         
@@ -307,10 +307,12 @@ namespace mongo {
                             break;
                         }
                         case BSONObj::opREGEX:{
+                            uassert( 13022, "can't use $not with $regex, use BSON regex type instead", !isNot );
                             regex = fe.valuestrsafe();
                             break;
                         }
                         case BSONObj::opOPTIONS:{
+                            uassert( 13023, "can't use $not with $options, use BSON regex type instead", !isNot );
                             flags = fe.valuestrsafe();
                             break;
                         }
@@ -626,7 +628,7 @@ namespace mongo {
             if ( cmp == 0 ) {
                 /* missing is ok iff we were looking for null */
                 if ( m.type() == jstNULL || m.type() == Undefined ) {
-                    if ( bm.compareOp == BSONObj::NE ^ bm.isNot ) {
+                    if ( ( bm.compareOp == BSONObj::NE ) ^ bm.isNot ) {
                         return false;
                     }
                 } else {

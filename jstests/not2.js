@@ -11,10 +11,15 @@ check = function( query, expected, size ) {
     }
 }
 
+fail = function( query ) {
+    t.count( query );
+    assert( db.getLastError(), tojson( query ) );
+}
+
 t.save( {i:"a"} );
 t.save( {i:"b"} );
 
-//check( {i:{$not:"a"}}, "b" );
+fail( {i:{$not:"a"}} );
 check( {i:{$not:{$gt:"a"}}}, "a" );
 check( {i:{$not:{$gte:"b"}}}, "a" );
 check( {i:{$exists:true}}, "a", 2 );
@@ -28,9 +33,17 @@ check( {i:{$not:{$nin:["a"]}}}, "a" );
 // $mod
 // $size
 check( {i:{$not:/a/}}, "b" );
-check( {i:{$not:/a/,$regex:"b"}}, "b" );
+check( {i:{$not:/(a|b)/}}, "", 0 );
+check( {i:{$not:/a/,$regex:"a"}}, "", 0 );
 check( {i:{$not:/aa/}}, "a", 2 );
-// other type of regex
+fail( {i:{$not:{$regex:"a"}}} );
+fail( {i:{$not:{$options:"a"}}} );
+
+t.drop();
+t.save( {i:1} );
+check( {i:{$not:{$mod:[5,1]}}}, null, 0 );
+check( {i:{$mod:[5,2]}}, null, 0 );
+check( {i:{$not:{$mod:[5,2]}}}, 1, 1 );
 
 //in array
 //$all
