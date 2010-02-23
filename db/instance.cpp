@@ -655,7 +655,6 @@ namespace mongo {
     
     void shutdown() {
 
-
         log() << "\t shutdown: going to close listening sockets..." << endl;        
         ListeningSockets::get()->closeAll();
 
