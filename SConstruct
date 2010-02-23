@@ -1110,7 +1110,11 @@ if not onlyServer and not noshell:
     addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ], jsDirTestSpec( "sharding" ) )
     addSmoketest( "smokeJsPerf", [ "mongo" ], runShellTest )
     addSmoketest( "smokeQuota", [ "mongo" ], runShellTest )
-    addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], jsDirTestSpec( "tool" ) )
+
+    if windows: # this test doesn't work on windows in v1.2.x
+        addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], [] )
+    else:
+        addSmoketest( "smokeTool", [ add_exe( "mongo" ) ], jsDirTestSpec( "tool" ) )
 
 mongodForTests = None
 mongodForTestsPort = "27017"
