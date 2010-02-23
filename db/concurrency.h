@@ -35,7 +35,7 @@
 #define assert xassert
 #define HAVE_READLOCK
 #else
-#warning built with boost version 1.34 or older limited concurrency
+#warning built with boost version 1.34 or older - limited concurrency
 #endif
 
 namespace mongo {
