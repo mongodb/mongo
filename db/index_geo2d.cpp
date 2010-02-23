@@ -171,6 +171,10 @@ namespace mongo {
             return *this;
         }
         
+        bool operator==(const GeoHash& h ){
+            return _hash == h._hash;
+        }
+
         string _hash;
     };
 
@@ -686,6 +690,7 @@ namespace mongo {
                     return false;
                 }
             }
+            const GeoHash nAtStart = n;
             result.append( "near" , n );
             
             GeoHash start = n;
@@ -739,6 +744,7 @@ namespace mongo {
             }
             
             if ( found && prefix.size() ){
+                // 2
                 Point center( g , n );
                 double boxSize = g->size( prefix );
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
@@ -748,6 +754,7 @@ namespace mongo {
                         GeoHash toscan = prefix;
                         toscan.move( x , y );
                         
+                        // 3 & 4
                         doBox( id , g , hopper , nscanned , found , want , toscan );
                     }
                 }
@@ -782,6 +789,12 @@ namespace mongo {
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             
+            /* start temp */
+            result.append( "temp-n" , n );
+            result.append( "temp-nAtStart" , nAtStart );
+            assert( n == nAtStart );
+            /* end temp */
+
             return true;
         }
         
