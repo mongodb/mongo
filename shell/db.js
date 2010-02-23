@@ -20,6 +20,10 @@ DB.prototype.getName = function(){
     return this._name;
 }
 
+DB.prototype.stats = function(){
+    return this.runCommand( { dbstats : 1 } );
+}
+
 DB.prototype.getCollection = function( name ){
     return new DBCollection( this._mongo , this , name , this._name + "." + name );
 }
@@ -280,6 +284,7 @@ DB.prototype.help = function() {
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.shutdownServer()");
+    print("\tdb.stats()");
     print("\tdb.version() current version of the server" );
 }
 
