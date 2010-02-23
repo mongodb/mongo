@@ -73,7 +73,7 @@ namespace mongo {
 
         void cell( stringstream& ss , string name , unsigned width , double val ){
             cellstart( ss , name , width );
-            ss << setw(width) << val << " ";
+            ss << setw(width) << setprecision(3) << val << " ";
         }
 
         void cell( stringstream& ss , string name , unsigned width , int val ){
