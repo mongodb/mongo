@@ -214,6 +214,10 @@ namespace mongo {
             
             break;
         }
+        case BSONObj::opREGEX:
+        case BSONObj::opOPTIONS:
+            // do nothing
+            break;
         case BSONObj::opELEM_MATCH: {
             log() << "warning: shouldn't get here?" << endl;
             break;
@@ -303,34 +307,36 @@ namespace mongo {
 
             int op = getGtLtOp( e );
             
-            if ( op == BSONObj::Equality || op == BSONObj::opREGEX || op == BSONObj::opOPTIONS ) {
+            if ( op == BSONObj::Equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
                 ranges_[ e.fieldName() ] &= FieldRange( e , optimize );
             }
-            else if ( op == BSONObj::opELEM_MATCH ){
-                BSONObjIterator i( e.embeddedObjectUserCheck().firstElement().embeddedObjectUserCheck() );
-                while ( i.more() ){
-                    BSONElement f = i.next();
-                    StringBuilder buf(32);
-                    buf << e.fieldName() << "." << f.fieldName();
-                    string fullname = buf.str();
-
-                    int op2 = getGtLtOp( f );
-                    if ( op2 == BSONObj::Equality ){
-                        ranges_[ fullname ] &= FieldRange( f , optimize );
+            if ( op != BSONObj::Equality ) {
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    BSONElement f = j.next();
+                    int op2 = f.getGtLtOp();
+                    if ( op2 == BSONObj::opELEM_MATCH ) {
+                        BSONObjIterator k( f.embeddedObjectUserCheck() );
+                        while ( k.more() ){
+                            BSONElement g = k.next();
+                            StringBuilder buf(32);
+                            buf << e.fieldName() << "." << g.fieldName();
+                            string fullname = buf.str();
+                            
+                            int op3 = getGtLtOp( g );
+                            if ( op3 == BSONObj::Equality ){
+                                ranges_[ fullname ] &= FieldRange( g , optimize );
+                            }
+                            else {
+                                BSONObjIterator l( g.embeddedObject() );
+                                while ( l.more() ){
+                                    ranges_[ fullname ] &= FieldRange( l.next() , optimize );
+                                }
+                            }
+                        }                        
+                    } else {
+                        ranges_[ e.fieldName() ] &= FieldRange( f , optimize );
                     }
-                    else {
-                        BSONObjIterator j( f.embeddedObject() );
-                        while ( j.more() ){
-                            ranges_[ fullname ] &= FieldRange( j.next() , optimize );
-                        }
-                    }
-                }
-            }
-            else {
-                BSONObjIterator i( e.embeddedObject() );
-                while( i.more() ) {
-                    BSONElement f = i.next();
-                    ranges_[ e.fieldName() ] &= FieldRange( f , optimize );
                 }                
             }
         }

@@ -65,7 +65,12 @@ namespace mongo {
             init( x , y , bits );
         }
 
+        GeoHash( const GeoHash& old ){
+            _hash = old._hash;
+        }
+
         void init( unsigned x , unsigned y , unsigned bits ){
+            assert( bits <= 32 );
             StringBuilder buf(64);
             for ( unsigned i=0; i<bits; i++ ){
                 buf.append( isBitSet( x , i ) ? "1" : "0" );
@@ -167,6 +172,10 @@ namespace mongo {
             return *this;
         }
         
+        bool operator==(const GeoHash& h ){
+            return _hash == h._hash;
+        }
+
         string _hash;
     };
 
@@ -199,6 +208,9 @@ namespace mongo {
             uassert( 13024 , "no geo field specified" , _geo.size() );
             
             _bits = _configval( spec , "bits" , 26 ); // for lat/long, ~ 1ft
+
+            uassert( 13028 , "can't have more than 32 bits in geo index" , _bits <= 32 );
+
             _max = _configval( spec , "max" , 180 );
             _min = _configval( spec , "min" , -180 );
             
@@ -475,8 +487,11 @@ namespace mongo {
                 GeoHash a = g._hash( 1 , 1 );
                 GeoHash b = g._hash( 4 , 5 );
                 assert( 5 == (int)(g.distance( a , b ) ) );
+                a = g._hash( 50 , 50 );
+                b = g._hash( 42 , 44 );
+                assert( round(10) == round(g.distance( a , b )) );
             }
-
+            
         }
     } geoUnitTest;
     
@@ -737,6 +752,7 @@ namespace mongo {
             }
             
             if ( found && prefix.size() ){
+                // 2
                 Point center( g , n );
                 double boxSize = g->size( prefix );
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
@@ -746,6 +762,7 @@ namespace mongo {
                         GeoHash toscan = prefix;
                         toscan.move( x , y );
                         
+                        // 3 & 4
                         doBox( id , g , hopper , nscanned , found , want , toscan );
                     }
                 }
