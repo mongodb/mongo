@@ -17,3 +17,6 @@ assert.eq( 0 , t.find( { name : /^\./ } ).explain().nscanned , "index explain 4"
 assert.eq( 4 , t.find( { name : /^./ } ).explain().nscanned , "index explain 5" );
 
 assert.eq( 4 , t.find( { name : /^\Qblah\E/ } ).explain().nscanned , "index explain 6" );
+
+assert.eq( 1, t.find( { name : { $regex : "^e", $gte: "emily" } } ).explain().nscanned , "ie7" );
+assert.eq( 1, t.find( { name : { $gt : "a", $regex: "^emily" } } ).explain().nscanned , "ie7" );
