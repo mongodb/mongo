@@ -487,7 +487,7 @@ namespace mongo {
         }
 
         bool operator<( const GeoPoint& other ) const {
-            return other._distance >= _distance;
+            return _distance < other._distance;
         }
 
         BSONObj _o;

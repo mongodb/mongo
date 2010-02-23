@@ -610,10 +610,12 @@ namespace mongo {
     /* ------------------------------------------------------------------------- */
 
     boost::mutex NamespaceDetailsTransient::_qcMutex;
+    boost::mutex NamespaceDetailsTransient::_isMutex;
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
+        DEV assertInWriteLock();
         clearQueryCache();
         _keysComputed = false;
         _indexSpecs.clear();
