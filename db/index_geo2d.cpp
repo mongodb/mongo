@@ -65,6 +65,10 @@ namespace mongo {
             init( x , y , bits );
         }
 
+        GeoHash( const GeoHash& old ){
+            _hash = old._hash;
+        }
+
         void init( unsigned x , unsigned y , unsigned bits ){
             StringBuilder buf(64);
             for ( unsigned i=0; i<bits; i++ ){
