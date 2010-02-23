@@ -697,10 +697,11 @@ namespace mongo {
                 return;
             }
             BSONObj info;
-            uassert( 13010, "whatsmyuri failed", c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) );
-            // There's no way to explicitly disconnect a DBClientConnection, but we might allocate
-            // a new uri on automatic reconnect.  So just store one uri per connection.
-            _allMyUris[ &c ] = info[ "you" ].str();
+            if ( c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
+                // There's no way to explicitly disconnect a DBClientConnection, but we might allocate
+                // a new uri on automatic reconnect.  So just store one uri per connection.
+                _allMyUris[ &c ] = info[ "you" ].str();
+            }
         }
     }
 }
