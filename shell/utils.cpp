@@ -340,7 +340,10 @@ namespace mongo {
                 stringstream ss;
                 for (int i=0; i < argv_.size(); i++){
                     if (i) ss << ' ';
-                    ss << '"' << argv_[i] << '"';
+                    if (argv_[i].find(' ') == string::npos)
+                        ss << argv_[i];
+                    else
+                        ss << '"' << argv_[i] << '"';
                 }
 
                 string args = ss.str();
