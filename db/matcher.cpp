@@ -606,21 +606,10 @@ namespace mongo {
     extern int dump;
 
     inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
-        char buf[64];
-        const char *p = buf;
         if ( e.type() == String || e.type() == Symbol )
-            p = e.valuestr();
-        else if ( e.isNumber() ) {
-            sprintf(buf, "%f", e.number());
-        }
-        else if ( e.type() == Date ) {
-            Date_t d = e.date();
-            time_t t = (d.millis/1000);
-            time_t_to_String(t, buf);
-        }
+            return rm.re->PartialMatch(e.valuestr());
         else
             return false;
-        return rm.re->PartialMatch(p);
     }
 
     /* See if an object matches the query.
