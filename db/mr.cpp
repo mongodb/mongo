@@ -123,8 +123,10 @@ namespace mongo {
                     if ( cmdObj["finalize"].type() ){
                         finalizeCode = cmdObj["finalize"].ascode();
                     }
+                    checkCodeWScope( "map" , cmdObj );
+                    checkCodeWScope( "reduce" , cmdObj );
+                    checkCodeWScope( "finalize" , cmdObj );
                     
-
                     if ( cmdObj["mapparams"].type() == Array ){
                         mapparams = cmdObj["mapparams"].embeddedObjectUserCheck();
                     }
@@ -151,6 +153,14 @@ namespace mongo {
                 }
             }
             
+            void checkCodeWScope( const char * field , const BSONObj& o ){
+                BSONElement e = o[field];
+                if ( e.type() != CodeWScope )
+                    return;
+                BSONObj x = e.codeWScopeObject();
+                uassert( 13035 , (string)"can't use CodeWScope with map/reduce function: " + field , x.isEmpty() );
+            }
+
             /**
                @return number objects in collection
              */
