@@ -19,6 +19,10 @@ fail = function( query ) {
     assert( db.getLastError(), tojson( query ) );
 }
 
+doTest = function() {
+
+t.remove( {} );
+    
 t.save( {i:"a"} );
 t.save( {i:"b"} );
 
@@ -50,13 +54,13 @@ check( {i:{$not:{$type:2}}}, "", 0 );
 
 check( {i:{$not:{$gt:"c",$lt:"b"}}}, "b" );
 
-t.drop();
+t.remove( {} );
 t.save( {i:1} );
 check( {i:{$not:{$mod:[5,1]}}}, null, 0 );
 check( {i:{$mod:[5,2]}}, null, 0 );
 check( {i:{$not:{$mod:[5,2]}}}, 1, 1 );
 
-t.drop();
+t.remove( {} );
 t.save( {i:["a","b"]} );
 check( {i:{$not:{$size:2}}}, null, 0 );
 check( {i:{$not:{$size:3}}}, ["a","b"] );
@@ -65,11 +69,17 @@ check( {i:{$not:{$gt:"c"}}}, ["a","b"] );
 check( {i:{$not:{$all:["a","b"]}}}, null, 0 );
 check( {i:{$not:{$all:["c"]}}}, ["a","b"] );
 
-t.drop();
+t.remove( {} );
 t.save( {i:{j:"a"}} );
 t.save( {i:{j:"b"}} );
 check( {i:{$not:{$elemMatch:{j:"a"}}}}, {j:"b"} );
 check( {i:{$not:{$elemMatch:{j:"f"}}}}, {j:"a"}, 2 );
+
+}
+
+doTest();
+t.ensureIndex( {i:1} );
+doTest();
 
 t.drop();
 t.save( {i:"a"} );

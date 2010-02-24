@@ -257,7 +257,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), _atomic(false), nRegex(0) {
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNot(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
@@ -310,6 +310,7 @@ namespace mongo {
                         isOperator = true;
                         
                         if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
+                            haveNot = true;
                             switch( fe.type() ) {
                                 case Object: {
                                     BSONObjIterator k( fe.embeddedObject() );
