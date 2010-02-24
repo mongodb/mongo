@@ -158,7 +158,7 @@ namespace mongo {
                 if ( e.type() != CodeWScope )
                     return;
                 BSONObj x = e.codeWScopeObject();
-                uassert( 13029 , (string)"can't use CodeWScope with map/reduce function: " + field , x.isEmpty() );
+                uassert( 13035 , (string)"can't use CodeWScope with map/reduce function: " + field , x.isEmpty() );
             }
 
             /**
