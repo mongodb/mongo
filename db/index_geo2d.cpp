@@ -757,11 +757,13 @@ namespace mongo {
                     uassert( 13036 , "can't find index starting point" , d->nrecords == 0 );
                 }
 
-                while ( found < numWanted && prefix.constrains() ){
+                while ( found < numWanted ){
                     while ( min.hasPrefix( prefix ) && min.advance( -1 , found , hopper ) )
                         nscanned++;
                     while ( max.hasPrefix( prefix ) && max.advance( 1 , found , hopper ) )
                         nscanned++;
+                    if ( prefix.size() == 0 )
+                        break;
                     prefix = prefix.up();
                 }
             }
