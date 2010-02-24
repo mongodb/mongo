@@ -612,6 +612,12 @@ namespace mongo {
 
             return true;
         }
+
+        string toString(){
+            stringstream ss;
+            ss << "bucket: " << bucket.toString() << " pos: " << pos << " found: " << found;
+            return ss.str();
+        }
     };
 
     class Geo2dFindNearCmd : public Command {
@@ -741,7 +747,16 @@ namespace mongo {
                 min.bucket = head->locate( id , id.head , n.wrap() , g->_order , min.pos , min.found , minDiskLoc );
                 min.checkCur( found , hopper );
                 BtreeLocation max = min;
+
+                if ( min.bucket.isNull() ){
+                    min.bucket = head->locate( id , id.head , n.wrap() , g->_order , min.pos , min.found , minDiskLoc , -1 );
+                    min.checkCur( found , hopper );
+                }
                 
+                if ( min.bucket.isNull() && max.bucket.isNull() ){
+                    uassert( 13036 , "can't find index starting point" , d->nrecords == 0 );
+                }
+
                 while ( found < numWanted && prefix.constrains() ){
                     while ( min.hasPrefix( prefix ) && min.advance( -1 , found , hopper ) )
                         nscanned++;
