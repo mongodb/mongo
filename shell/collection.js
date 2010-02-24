@@ -50,6 +50,7 @@ DBCollection.prototype.help = function() {
     print("\tdb.foo.mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb.foo.remove(query)");
     print("\tdb.foo.renameCollection( newName , <dropTarget> ) renames the collection.");
+    print("\tdb.foo.runCommand( name , <options> ) runs a db command with the given name where the 1st param is the colleciton name" );
     print("\tdb.foo.save(obj)");
     print("\tdb.foo.stats()");
     print("\tdb.foo.storageSize() - includes free space allocated to this collection");
@@ -67,9 +68,18 @@ DBCollection.prototype.getDB = function(){
     return this._db;
 }
 
-DBCollection.prototype._dbCommand = function( cmd ){
-    return this._db._dbCommand( cmd );
+DBCollection.prototype._dbCommand = function( cmd , params ){
+    if ( typeof( cmd ) == "object" )
+        return this._db._dbCommand( cmd );
+    
+    var c = {};
+    c[cmd] = this.getName();
+    if ( params )
+        Object.extend( c , params );
+    return this._db._dbCommand( c );    
 }
+
+DBCollection.prototype.runCommand = DBCollection.prototype._dbCommand;
 
 DBCollection.prototype._massageObject = function( q ){
     if ( ! q )
@@ -407,7 +417,7 @@ DBCollection.prototype.dropIndex =  function(index) {
     if ( ! isString( index ) && isObject( index ) )
     	index = this._genIndexName( index );
 
-    var res = this._dbCommand( { deleteIndexes: this.getName(), index: index } );
+    var res = this._dbCommand( "deleteIndexes" ,{ index: index } );
     this.resetIndexCache();
     return res;
 }
