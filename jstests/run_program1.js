@@ -15,5 +15,5 @@ if ( ! _isWindows() ) {
 
 } else {
 
-    runProgram('echo', 'Hello', 'World.', 'How   are   you?');
+    runProgram('cmd', '/c', 'echo hello windows');
 }
