@@ -77,8 +77,6 @@ typedef struct node_queue {
 
 #define	node_queue_is_empty(queue)					\
 	(((queue) == NULL || (queue)->first == NULL) ? 1 : 0)
-#define	node_queue_get_first(queue)					\
-	((queue)->first->node)
 
 static void node_queue_close(ENV *, NODE_QUEUE *);
 static void node_queue_dequeue(ENV *, NODE_QUEUE *, WT_FREQTREE_NODE **);
@@ -218,7 +216,7 @@ __wt_huffman_open(ENV *env,
 
 	indexed_freqs = NULL;
 	combined_nodes = leaves = NULL;
-	node = NULL;
+	node = node2 = tempnode = NULL;
 	ret = 0;
 
 	WT_RET(__wt_malloc(env, sizeof(WT_HUFFMAN_OBJ), &huffman));
@@ -259,10 +257,9 @@ __wt_huffman_open(ENV *env,
 			tempnode->symbol = indexed_freqs[i].symbol;
 			tempnode->weight = indexed_freqs[i].frequency;
 			WT_ERR(node_queue_enqueue(env, leaves, tempnode));
+			tempnode = NULL;
 		}
 	}
-
-	node2 = NULL;
 
 	while (!node_queue_is_empty(leaves) ||
 	    !node_queue_is_empty(combined_nodes)) {
@@ -277,17 +274,10 @@ __wt_huffman_open(ENV *env,
 		 * To decide which queue must be used, we get the weights of
 		 * the first items from both:
 		 */
-		w1 = w2 = UINT32_MAX;
-
-		if (!node_queue_is_empty(leaves)) {
-			tempnode = node_queue_get_first(leaves);
-			w1 = tempnode->weight;
-		}
-
-		if (!node_queue_is_empty(combined_nodes)) {
-			tempnode = node_queue_get_first(combined_nodes);
-			w2 = tempnode->weight;
-		}
+		w1 = node_queue_is_empty(leaves) ?
+		    UINT32_MAX : leaves->first->node->weight;
+		w2 = node_queue_is_empty(combined_nodes) ?
+		    UINT32_MAX : combined_nodes->first->node->weight;
 
 		/*
 		 * Based on the two weights we finally can dequeue the smaller
@@ -313,6 +303,7 @@ __wt_huffman_open(ENV *env,
 			/* Enqueue it to the combined nodes queue */
 			WT_ERR(
 			    node_queue_enqueue(env, combined_nodes, tempnode));
+			tempnode = NULL;
 
 			/* Reset the state pointers */
 			node = node2 = NULL;
@@ -344,6 +335,10 @@ err:	if (leaves != NULL)
 		__wt_free(env, indexed_freqs, 0);
 	if (node != NULL)
 		recursive_free_node(env, node);
+	if (node2 != NULL)
+		recursive_free_node(env, node2);
+	if (tempnode != NULL)
+		__wt_free(env, tempnode, sizeof(WT_FREQTREE_NODE));
 	if (ret != 0) {
 		if (huffman->nodes != NULL)
 			__wt_free(env, huffman->nodes, 0);
