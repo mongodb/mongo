@@ -340,11 +340,14 @@ namespace mongo {
                 stringstream ss;
                 for (int i=0; i < argv_.size(); i++){
                     if (i) ss << ' ';
-                    ss << '"' << argv_[i] << '"';
+                    if (argv_[i].find(' ') == string::npos)
+                        ss << argv_[i];
+                    else
+                        ss << '"' << argv_[i] << '"';
                 }
 
                 string args = ss.str();
-
+                
                 boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
                 for (size_t i=0; i < args.size()+1; i++)
                     args_tchar[i] = args[i];

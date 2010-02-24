@@ -480,7 +480,7 @@ namespace mongo {
         BSONObj embeddedObject() const;
 
         /* uasserts if not an object */
-        BSONObj embeddedObjectUserCheck();
+        BSONObj embeddedObjectUserCheck() const;
 
         BSONObj codeWScopeObject() const;
 
@@ -1745,7 +1745,7 @@ namespace mongo {
 #define CHECK_OBJECT( o , msg )
 #endif
 
-    inline BSONObj BSONElement::embeddedObjectUserCheck() {
+    inline BSONObj BSONElement::embeddedObjectUserCheck() const {
         uassert( 10065 ,  "invalid parameter: expected an object", isABSONObj() );
         return BSONObj(value());
     }
