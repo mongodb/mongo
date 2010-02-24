@@ -732,7 +732,7 @@ namespace mongo {
             log() << "runQuery: " << ns << jsobj << endl;
         
         long long nscanned = 0;
-        ss << "query " << ns << " ntoreturn:" << pq.getNumToReturn();
+        ss << ns << " ntoreturn:" << pq.getNumToReturn();
         curop.setQuery(jsobj);
         
         BSONObjBuilder cmdResBuf;
