@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static WT_BIN_INDX *
+	    __wt_bt_bin_init(WT_BIN_INDX *, u_int32_t);
 static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
 static int  __wt_bt_page_inmem_col_leaf(WT_PAGE *);
@@ -537,6 +539,88 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 }
 
 /*
+ * __wt_bt_bin_create --
+ *	Create the in-memory binary tree for a page.
+ */
+int
+__wt_bt_bin_create(WT_TOC *toc, WT_PAGE *page)
+{
+	DB *db;
+	ENV *env;
+	WT_BIN_INDX *bp;
+	WT_COL_INDX *cip;
+	WT_ROW_INDX *rip;
+	u_int32_t i;
+
+	db = toc->db;
+	env = toc->env;
+
+	/* Allocate the initial binary tree in one chunk of memory. */
+	WT_RET(__wt_calloc(
+	    env, page->indx_count, sizeof(WT_BIN_INDX), &page->bin));
+
+	/*
+	 * First, fill in the references to the underlying index array.   We
+	 * could do this at the same time we build the binary tree, but it's
+	 * a lot simpler to do in two passes than to complicate the recursive
+	 * function that builds the tree.
+	 */
+	bp = page->bin;
+	switch (page->hdr->type) {
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		WT_INDX_FOREACH(page, rip, i) {
+			bp->indx = rip;
+			++bp;
+		}
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		WT_INDX_FOREACH(page, cip, i) {
+			bp->indx = cip;
+			++bp;
+		}
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
+
+	/* Second, build the balanced binary tree. */
+	page->bin = __wt_bt_bin_init(page->bin, page->indx_count);
+
+	return (0);
+}
+
+/*
+ * __wt_bt_bin_init --
+ *	Routine to fill in the initial binary tree.
+ */
+static WT_BIN_INDX *
+__wt_bt_bin_init(WT_BIN_INDX *base, u_int32_t n)
+{
+	WT_BIN_INDX *p;
+	u_int32_t c, l, r;
+
+	if (n == 1)
+		return (base);
+
+	c = (n + 1) / 2;			/* Center element */
+	p = &base[c - 1];			/* Middle pointer */
+
+	r = n - c;				/* Right count */
+	if (r != 0)
+		p->right = __wt_bt_bin_init(base + c, r);
+
+	l = (n - 1) - r;			/* Left count */
+	if (l != 0)
+		p->left = __wt_bt_bin_init(base, l);
+
+	return (p);
+}
+
+/*
  * __wt_bt_key_process --
  *	Overflow and/or compressed on-page items need processing before
  *	we look at them.
@@ -596,13 +680,15 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	/* Copy the item into place; if the item is compressed, decode it. */
 	if (idb->huffman_key == NULL) {
 		WT_ERR(__wt_realloc(env, &dbt->data_len, size, &dbt->data));
+		dbt->size = size;
 		memcpy(dbt->data, orig, size);
 	} else
 		WT_ERR(__wt_huffman_decode(idb->huffman_key,
 		    orig, size, &dbt->data, &dbt->data_len, &dbt->size));
 
 	/*
-	 * If no target DBT specified, replace the on-page WT_ITEM reference
+	 * If no target DBT specified (that is, we're intending to persist this
+	 * conversion in our in-memory tree), update the WT_ROW_INDX reference
 	 * with the processed key.
 	 */
 	if (dbt == &local_dbt) {
