@@ -323,6 +323,10 @@ namespace mongo {
             return distance( a , b );
         }
 
+        const IndexDetails* getDetails(){
+            return _spec->getDetails();
+        }
+
         const IndexSpec* _spec;
         string _geo;
         vector<string> _other;
@@ -634,6 +638,115 @@ namespace mongo {
         }
     };
 
+    class GeoSearch {
+    public:
+        GeoSearch( Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() )
+            : _spec( g ) , _n( n ) , _start( n ) , 
+              _numWanted( numWanted ) , _filter( filter ) , 
+              _hopper( g , numWanted , n , filter )
+        {
+            assert( g->getDetails() );
+            _nscanned = 0;
+            _found = 0;
+        }
+        
+        void exec(){
+            const IndexDetails& id = *_spec->getDetails();
+            
+            BtreeBucket * head = id.head.btree();
+            
+            /*
+             * Search algorithm
+             * 1) use geohash prefix to find X items
+             * 2) compute max distance from want to an item
+             * 3) find optimal set of boxes that complete circle
+             * 4) use regular btree cursors to scan those boxes
+             */
+
+            GeoHash prefix = _start;
+            { // 1 regular geo hash algorithm
+                
+
+                BtreeLocation min;
+                min.bucket = head->locate( id , id.head , _n.wrap() , _spec->_order , min.pos , min.found , minDiskLoc );
+                min.checkCur( _found , _hopper );
+                BtreeLocation max = min;
+
+                if ( min.bucket.isNull() ){
+                    min.bucket = head->locate( id , id.head , _n.wrap() , _spec->_order , min.pos , min.found , minDiskLoc , -1 );
+                    min.checkCur( _found , _hopper );
+                }
+                
+                uassert( 13036 , "can't find index starting point" , ! min.bucket.isNull() || ! max.bucket.isNull() );
+
+                while ( _found < _numWanted ){
+                    while ( min.hasPrefix( prefix ) && min.advance( -1 , _found , _hopper ) )
+                        _nscanned++;
+                    while ( max.hasPrefix( prefix ) && max.advance( 1 , _found , _hopper ) )
+                        _nscanned++;
+                    if ( prefix.size() == 0 )
+                        break;
+                    prefix = prefix.up();
+                }
+            }
+            
+            if ( _found && prefix.size() ){
+                // 2
+                Point center( _spec , _n );
+                double boxSize = _spec->size( prefix );
+                Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
+                
+                for ( int x=-1; x<=1; x++ ){
+                    for ( int y=-1; y<=1; y++ ){
+                        GeoHash toscan = prefix;
+                        toscan.move( x , y );
+                        
+                        // 3 & 4
+                        doBox( id , want , toscan );
+                    }
+                }
+            }
+            
+        }
+
+        void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
+            Box testBox( _spec , toscan );
+
+            double intPer = testBox.intersects( want );
+
+            if ( intPer <= 0 )
+                return;
+            
+            if ( intPer < .5 && depth < 3 ){
+                doBox( id , want , toscan._hash + "00" , depth + 1);
+                doBox( id , want , toscan._hash + "01" , depth + 1);
+                doBox( id , want , toscan._hash + "10" , depth + 1);
+                doBox( id , want , toscan._hash + "11" , depth + 1);
+                return;
+            }
+
+            BtreeLocation loc;
+            loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , _spec->_order , 
+                                                        loc.pos , loc.found , minDiskLoc );
+            loc.checkCur( _found , _hopper );
+            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper ) )
+                _nscanned++;
+
+        }
+
+
+        Geo2dType * _spec;
+
+        GeoHash _n;
+        GeoHash _start;
+        int _numWanted;
+        BSONObj _filter;
+        GeoHopper _hopper;
+
+        long long _nscanned;
+        int _found;
+    };
+
     class Geo2dFindNearCmd : public Command {
     public:
         Geo2dFindNearCmd() : Command( "geo2d" ){}
@@ -642,32 +755,6 @@ namespace mongo {
         bool slaveOk() { return true; }
         bool slaveOverrideOk() { return true; }
 
-        void doBox( const IndexDetails& id , Geo2dType* g , 
-                    GeoHopper& hopper , long long& nscanned , int& found ,
-                    const Box& want , const GeoHash& toscan , int depth = 0 ){
-            Box testBox( g , toscan );
-
-            double intPer = testBox.intersects( want );
-
-            if ( intPer <= 0 )
-                return;
-            
-            if ( intPer < .5 && depth < 3 ){
-                doBox( id , g , hopper , nscanned , found , want , toscan._hash + "00" , depth + 1);
-                doBox( id , g , hopper , nscanned , found , want , toscan._hash + "01" , depth + 1);
-                doBox( id , g , hopper , nscanned , found , want , toscan._hash + "10" , depth + 1);
-                doBox( id , g , hopper , nscanned , found , want , toscan._hash + "11" , depth + 1);
-                return;
-            }
-
-            BtreeLocation loc;
-            loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , g->_order , 
-                                                        loc.pos , loc.found , minDiskLoc );
-            loc.checkCur( found , hopper );
-            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , found , hopper ) )
-                nscanned++;
-
-        }
 
         bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
@@ -702,6 +789,11 @@ namespace mongo {
 
             IndexDetails& id = d->idx( geoIdx );
             Geo2dType * g = (Geo2dType*)id.getSpec().getType();
+            assert( &id == g->getDetails() );
+            
+            int numWanted = 100;
+            if ( cmdObj["num"].isNumber() )
+                numWanted = cmdObj["num"].numberInt();
             
             GeoHash n;
             {
@@ -718,96 +810,34 @@ namespace mongo {
                 }
             }
             result.append( "near" , n );
-            
-            GeoHash start = n;
-            if ( cmdObj["start"].type() == String){
-                start = (string) cmdObj["start"].valuestr();
-                if ( 2 * ( start.size() / 2 ) != start.size() ){
-                    errmsg = "start has to be an even size";
-                    return false;
-                }
-            }
 
-            int numWanted = 100;
-            if ( cmdObj["num"].isNumber() )
-                numWanted = cmdObj["num"].numberInt();
-            
-            long long nscanned = 0;
-
-            BtreeBucket * head = id.head.btree();
-            
-            /*
-             * Search algorithm
-             * 1) use geohash prefix to find X items
-             * 2) compute max distance from want to an item
-             * 3) find optimal set of boxes that complete circle
-             * 4) use regular btree cursors to scan those boxes
-             */
-            
-            int found = 0;
             BSONObj filter;
             if ( cmdObj["query"].type() == Object )
                 filter = cmdObj["query"].embeddedObject();
 
-            //cout << "--------- GeoHopper " << n._hash << endl;
+            GeoSearch gs( g , n , numWanted , filter );
 
-            GeoHopper hopper( g , numWanted , n , filter );
-
-            GeoHash prefix = start;
-            { // 1 regular geo hash algorithm
-                
-
-                BtreeLocation min;
-                min.bucket = head->locate( id , id.head , n.wrap() , g->_order , min.pos , min.found , minDiskLoc );
-                min.checkCur( found , hopper );
-                BtreeLocation max = min;
-
-                if ( min.bucket.isNull() ){
-                    min.bucket = head->locate( id , id.head , n.wrap() , g->_order , min.pos , min.found , minDiskLoc , -1 );
-                    min.checkCur( found , hopper );
+            if ( cmdObj["start"].type() == String){
+                GeoHash start = (string) cmdObj["start"].valuestr();
+                if ( 2 * ( start.size() / 2 ) != start.size() ){
+                    errmsg = "start has to be an even size";
+                    return false;
                 }
-                
-                if ( min.bucket.isNull() && max.bucket.isNull() ){
-                    uassert( 13036 , "can't find index starting point" , d->nrecords == 0 );
-                }
-
-                while ( found < numWanted ){
-                    while ( min.hasPrefix( prefix ) && min.advance( -1 , found , hopper ) )
-                        nscanned++;
-                    while ( max.hasPrefix( prefix ) && max.advance( 1 , found , hopper ) )
-                        nscanned++;
-                    if ( prefix.size() == 0 )
-                        break;
-                    prefix = prefix.up();
-                }
+                gs._start = start;
             }
             
-            if ( found && prefix.size() ){
-                // 2
-                Point center( g , n );
-                double boxSize = g->size( prefix );
-                Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
-                
-                for ( int x=-1; x<=1; x++ ){
-                    for ( int y=-1; y<=1; y++ ){
-                        GeoHash toscan = prefix;
-                        toscan.move( x , y );
-                        
-                        // 3 & 4
-                        doBox( id , g , hopper , nscanned , found , want , toscan );
-                    }
-                }
-            }
-            
+            gs.exec();
+
             double distanceMultipier = 1;
             if ( cmdObj["distanceMultipier"].isNumber() )
                 distanceMultipier = cmdObj["distanceMultipier"].number();
             
             double totalDistance = 0;
 
+
             BSONObjBuilder arr( result.subarrayStart( "results" ) );
             int x = 0;
-            for ( GeoHopper::Holder::iterator i=hopper._points.begin(); i!=hopper._points.end(); i++ ){
+            for ( GeoHopper::Holder::iterator i=gs._hopper._points.begin(); i!=gs._hopper._points.end(); i++ ){
                 const GeoPoint& p = *i;
                 
                 double dis = distanceMultipier * p._distance;
@@ -822,9 +852,9 @@ namespace mongo {
             
             BSONObjBuilder stats( result.subobjStart( "stats" ) );
             stats.append( "time" , cc().curop()->elapsedMillis() );
-            stats.appendIntOrLL( "btreelocs" , nscanned );
-            stats.appendIntOrLL( "nscanned" , hopper._lookedAt );
-            stats.appendIntOrLL( "objectsLoaded" , hopper._objectsLoaded );
+            stats.appendIntOrLL( "btreelocs" , gs._nscanned );
+            stats.appendIntOrLL( "nscanned" , gs._hopper._lookedAt );
+            stats.appendIntOrLL( "objectsLoaded" , gs._hopper._objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             

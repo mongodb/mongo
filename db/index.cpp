@@ -105,6 +105,22 @@ namespace mongo {
         int n = removeFromSysIndexes(pns.c_str(), name.c_str());
         wassert( n == 1 );
     }
+    
+    void IndexSpec::reset( const IndexDetails * details ){
+        _details = details;
+        reset( details->info );
+    }
+
+    void IndexSpec::reset( const DiskLoc& loc ){
+        info = loc.obj();
+        keyPattern = info["key"].embeddedObjectUserCheck();
+        if ( keyPattern.objsize() == 0 ) {
+            out() << info.toString() << endl;
+            assert(false);
+        }
+        _init();
+    }
+
 
     void IndexSpec::_init(){
         assert( keyPattern.objsize() );

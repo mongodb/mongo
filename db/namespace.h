@@ -513,7 +513,7 @@ namespace mongo {
             if ( ! spec._finishedInit ){
                 boostlock lk(_isMutex);
                 if ( ! spec._finishedInit ){
-                    spec.reset( details->info );
+                    spec.reset( details );
                     assert( spec._finishedInit );
                 }
             }
