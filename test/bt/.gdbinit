@@ -1,5 +1,8 @@
 b __wt_api_env_err
 b __wt_api_env_errx
+b __wt_api_db_err
+b __wt_api_db_errx
+b __wt_assert
 b __wt_assert
 #b __wt_breakpoint
 b __wt_database_format
