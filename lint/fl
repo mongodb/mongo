@@ -46,17 +46,15 @@ l=`ls $l`
 if [ $# -ne 0 ]; then
 	f "$*"
 else
-	f "$l" > flexlint.out 2>&1
-
-	f=../lint/flexlint.out
+	f "$l" > lint.tmp 2>&1
 
 	if test "$update" -eq 1; then
-		cp flexlint.out $f
-	elif test -f "$f"; then
-		cmp flexlint.out $f > /dev/null 2>&1 ||
-		    diff flexlint.out $f | more
+		cp lint.tmp lint.current
+	elif test -f "lint.current"; then
+		cmp lint.tmp lint.current > /dev/null 2>&1 ||
+		    diff lint.tmp lint.current | more
 	else
-		more flexlint.out
+		more lint.tmp
 	fi
 fi
 
