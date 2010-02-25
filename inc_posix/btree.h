@@ -14,12 +14,16 @@ extern "C" {
 /*******************************************
  * Internal forward declarations.
  *******************************************/
+struct __wt_bin_indx;		typedef struct __wt_bin_indx WT_BIN_INDX;
+struct __wt_col_indx;		typedef struct __wt_col_indx WT_COL_INDX;
 struct __wt_item;		typedef struct __wt_item WT_ITEM;
 struct __wt_off;		typedef struct __wt_off WT_OFF;
 struct __wt_ovfl;		typedef struct __wt_ovfl WT_OVFL;
 struct __wt_page_desc;		typedef struct __wt_page_desc WT_PAGE_DESC;
 struct __wt_page_hdr;		typedef struct __wt_page_hdr WT_PAGE_HDR;
 struct __wt_repl;		typedef struct __wt_repl WT_REPL;
+struct __wt_row_indx;		typedef struct __wt_row_indx WT_ROW_INDX;
+struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
 
 /*
  * We use 32-bits to store file locations on database pages, so all such file
@@ -131,8 +135,6 @@ struct __wt_page {
 	 * to a WT_ROW_INDX or WT_COL_INDX structure.  (This is where the
 	 * on-page index array found in DB 1.85 and Berkeley DB moved.)  The
 	 * indx field initially references an array of WT_{ROW,COL}_INDX
-	 * structures.  If a record on the page is modified, the indx field
-	 * changes to reference a binary tree that references WT_{ROW,COL}_INDX
 	 * structures.
 	 *
 	 * We use a union so you can increment the address and have the right
@@ -140,11 +142,17 @@ struct __wt_page {
 	 * are dereferencing when you write the code).
 	 */
 	union {				/* Entry index */
-		struct __wt_col_indx *c_indx;
-		struct __wt_row_indx *r_indx;
+		WT_COL_INDX *c_indx;	/* Array of WT_COL_INDX structures */
+		WT_ROW_INDX *r_indx;	/* Array of WT_ROW_INDX structures */
 		void *indx;
 	} u;
 	u_int32_t indx_count;		/* Entry count */
+
+	/*
+	 * When new item is inserted into a page (not just a replacement or a
+	 * delete of an item), the indx is replaced by a balanced binary tree.
+	 */
+	WT_BIN_INDX *bin;		/* Binary tree root */
 
 	/*
 	 * The drain field is set when the page is being discarded from the
@@ -152,7 +160,7 @@ struct __wt_page {
 	 * checking the drain field, the cache server must set the drain field
 	 * before checking the hazard pointers.
 	 */
-	u_int32_t drain;		/* Page is being actively drained */
+	u_int32_t drain;		/* Page is being drained */
 
 	u_int32_t flags;
 };
@@ -162,7 +170,7 @@ struct __wt_page {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_PAGE_SIZE		56
+#define	WT_PAGE_SIZE		60
 
 /*
  * WT_PAGE_HDR --
@@ -246,41 +254,11 @@ struct __wt_page_hdr {
 	WT_PAGE_HDR_SIZE + ((page)->addr == 0 ? WT_PAGE_DESC_SIZE : 0))
 
 /*
- * WT_SDBT --
- *	A minimal version of the DBT structure -- just the data & size fields.
- */
-typedef struct __wt_sdbt {
-	void	 *data;			/* DBT: data */
-	u_int32_t size;			/* DBT: data length */
-} WT_SDBT;
-
-/*
- * WT_REPL --
- *	A data replacement structure.
- */
-struct __wt_repl {
-	/*
-	 * Data items on leaf pages may be updated with new data, stored in
-	 * the WT_REPL structure.  It's an array for two reasons: first, we
-	 * don't block readers when updating it, which means it may be in
-	 * use during updates, and second because we'll need history when we
-	 * add MVCC to the system.
-	 */
-#define	WT_DATA_DELETED	((void *)0x01)	/* Data item was deleted */
-	WT_SDBT  *data;			/* Data array */
-
-	u_int16_t repl_size;		/* Data array size */
-	u_int16_t repl_next;		/* Next available slot */
-
-	WT_REPL *next;			/* Previous replace structures */
-};
-
-/*
  * WT_ROW_INDX --
  * The WT_ROW_INDX structure describes the in-memory information about a single
  * key/data pair on a row-store database page.
  */
-typedef	struct __wt_row_indx {
+struct __wt_row_indx {
 	/*
 	 * WT_ROW_INDX structures are used to describe pages where there's a
 	 * sort key (that is, a row-store, not a column-store, which is only
@@ -299,10 +277,11 @@ typedef	struct __wt_row_indx {
 	void	 *data;			/* DBT: data */
 	u_int32_t size;			/* DBT: data length */
 
-	void	 *page_data;		/* Original on-page data */
+	/* The original on-page data associated with this particular key. */
+	void	 *page_data;
 
 	WT_REPL	 *repl;			/* Replacement data array */
-} WT_ROW_INDX;
+};
 /*
  * WT_ROW_SIZE is the expected structure size --  we check at startup to ensure
  * the compiler hasn't inserted padding.  The WT_ROW structure is in-memory, so
@@ -316,10 +295,10 @@ typedef	struct __wt_row_indx {
  * The WT_COL_INDX structure describes the in-memory information about a single
  * item on a column-store database page.
  */
-typedef	struct __wt_col_indx {
+struct __wt_col_indx {
 	void	 *page_data;		/* Original on-page data */
 	WT_REPL	 *repl;			/* Replacement data array */
-} WT_COL_INDX;
+};
 /*
  * WT_COL_SIZE is the expected structure size --  we check at startup to ensure
  * the compiler hasn't inserted padding.  The WT_COL structure is in-memory, so
@@ -348,6 +327,53 @@ typedef	struct __wt_col_indx {
 	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
 #define	WT_ROW_OFF_RECORDS(ip)						\
 	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
+
+/*
+ * WT_BIN_INDX --
+ *	Binary tree node.
+ */
+struct __wt_bin_indx {
+	void *indx;			/* Underlying WT_{COL,ROW}_INDX */
+	WT_BIN_INDX *left;		/* Left/right nodes */
+	WT_BIN_INDX *right;
+};
+/*
+ * WT_BIN_INDX is the expected structure size --  we check at startup to ensure
+ * the compiler hasn't inserted padding.  The WT_BIN_INDX structure is in-memory
+ * so padding it won't break the world, but we don't want to waste space, and
+ * there are a lot of these structures.
+ */
+#define	WT_BIN_INDX_SIZE	12
+
+/*
+ * WT_SDBT --
+ *	A minimal version of the DBT structure -- just the data & size fields.
+ */
+struct __wt_sdbt {
+	void	 *data;			/* DBT: data */
+	u_int32_t size;			/* DBT: data length */
+};
+
+/*
+ * WT_REPL --
+ *	A data replacement structure.
+ */
+struct __wt_repl {
+	/*
+	 * Data items on leaf pages may be updated with new data, stored in
+	 * the WT_REPL structure.  It's an array for two reasons: first, we
+	 * don't block readers when updating it, which means it may be in
+	 * use during updates, and second because we'll need history when we
+	 * add MVCC to the system.
+	 */
+#define	WT_DATA_DELETED	((void *)0x01)	/* Data item was deleted */
+	WT_SDBT  *data;			/* Data array */
+
+	u_int16_t repl_size;		/* Data array size */
+	u_int16_t repl_next;		/* Next available slot */
+
+	WT_REPL *next;			/* Previous replace structures */
+};
 
 /*
  * WT_ITEM --
@@ -558,6 +584,18 @@ struct __wt_ovfl {
 #define	WT_FIX_REPEAT_ITERATE(db, page, p, i, j)			\
 	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
 		for ((j) = *(u_int16_t *)p; (j) > 0; --(j))
+
+/*
+ * There's a structure returned from the search routine which includes (at
+ * the moment), a page reference, a WT_{ROW,COL}_INDX reference, and in some
+ * cases information as to which leg of the binary tree is the insert leg.
+ */
+typedef struct __wt_srch {
+	WT_PAGE		*page;		/* Returned page */
+	WT_BIN_INDX	*bp;		/* Returned binary tree node */
+	void		*indx;		/* Returned WT_{ROW,COL}_INDX */
+	int		 isleft;	/* Left leg vs. right leg of tree */
+} WT_SRCH;
 
 #if defined(__cplusplus)
 }

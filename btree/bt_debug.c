@@ -10,14 +10,17 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
+static void __wt_bt_debug_col_indx(WT_TOC *, WT_COL_INDX *, FILE *);
 static void __wt_bt_debug_dbt(const char *, void *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
+static int  __wt_bt_debug_inmem_tree(WT_TOC *, WT_BIN_INDX *, int, FILE *);
+static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
-static int  __wt_bt_debug_page_col_inmemory(WT_PAGE *, FILE *);
 static void __wt_bt_debug_page_col_int(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_page_item(WT_TOC *, WT_PAGE *, FILE *);
-static int  __wt_bt_debug_page_row_inmemory(WT_PAGE *, FILE *);
+static void __wt_bt_debug_repl(WT_REPL *, FILE *);
+static int  __wt_bt_debug_row_indx(WT_TOC *, WT_ROW_INDX *, FILE *);
 static int  __wt_bt_debug_set_fp(const char *, FILE **, int *);
 
 static int
@@ -119,7 +122,7 @@ __wt_bt_debug_addr(WT_TOC *toc, u_int32_t addr, char *ofile, FILE *fp)
 		WT_RET(__wt_cache_in(toc, addr, bytes, 0, &page));
 	}
 
-	ret = __wt_bt_debug_page(toc, page, ofile, fp, 0);
+	ret = __wt_bt_debug_page(toc, page, ofile, fp);
 
 	WT_TRET(__wt_cache_out(toc, page, 0));
 
@@ -131,11 +134,10 @@ __wt_bt_debug_addr(WT_TOC *toc, u_int32_t addr, char *ofile, FILE *fp)
 
 /*
  * __wt_bt_debug_page --
- *	Dump a single in-memory page in debugging mode.
+ *	Dump a page in debugging mode.
  */
 int
-__wt_bt_debug_page(
-    WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp, int inmemory)
+__wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
 	DB *db;
 	WT_PAGE_HDR *hdr;
@@ -176,47 +178,31 @@ __wt_bt_debug_page(
 		fprintf(fp, "nextaddr (none)");
 	else
 		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
-	fprintf(fp, "\n}\n");
+	fprintf(fp, "\n");
 
 	if (page->addr == 0)
 		__wt_bt_debug_desc(page, fp);
 
-	if (inmemory)
-		switch (hdr->type) {
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_DUP_LEAF:
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			ret = __wt_bt_debug_page_row_inmemory(page, fp);
-			break;
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_COL_VAR:
-			ret = __wt_bt_debug_page_col_inmemory(page, fp);
-			break;
-		case WT_PAGE_OVFL:
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-	else
-		switch (hdr->type) {
-		case WT_PAGE_COL_VAR:
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_DUP_LEAF:
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			ret = __wt_bt_debug_page_item(toc, page, fp);
-			break;
-		case WT_PAGE_COL_FIX:
-			__wt_bt_debug_page_col_fix(db, page, fp);
-			break;
-		case WT_PAGE_COL_INT:
-			__wt_bt_debug_page_col_int(page, fp);
-			break;
-		case WT_PAGE_OVFL:
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
+	switch (hdr->type) {
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		ret = __wt_bt_debug_page_item(toc, page, fp);
+		break;
+	case WT_PAGE_COL_FIX:
+		__wt_bt_debug_page_col_fix(db, page, fp);
+		break;
+	case WT_PAGE_COL_INT:
+		__wt_bt_debug_page_col_int(page, fp);
+		break;
+	case WT_PAGE_OVFL:
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
+
+	fprintf(fp, "}\n");
 
 	if (do_close)
 		(void)fclose(fp);
@@ -233,97 +219,157 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 {
 	WT_PAGE_DESC desc;
 
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
-
 	memcpy(
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
-	fprintf(fp, "description record: {\n"),
-	fprintf(fp, "\tmagic: %#lx, major: %lu, minor: %lu\n",
+	fprintf(fp, "\tdescription record: {\n"),
+	fprintf(fp, "\t\tmagic: %#lx, major: %lu, minor: %lu\n",
 	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
-	fprintf(fp, "\tintlsize: %lu, leafsize: %lu, base record: %llu\n",
+	fprintf(fp, "\t\tintlsize: %lu, leafsize: %lu, base record: %llu\n",
 	    (u_long)desc.intlsize, (u_long)desc.leafsize, desc.base_recno);
-	fprintf(fp, "\tfixed_len: %lu\n", (u_long)desc.fixed_len);
+	fprintf(fp, "\t\tfixed_len: %lu\n", (u_long)desc.fixed_len);
 	if (desc.root_addr == WT_ADDR_INVALID)
-		fprintf(fp, "\troot addr (none), ");
+		fprintf(fp, "\t\troot addr (none), ");
 	else
-		fprintf(fp, "\troot addr %lu, ", (u_long)desc.root_addr);
+		fprintf(fp, "\t\troot addr %lu, ", (u_long)desc.root_addr);
 	if (desc.free_addr == WT_ADDR_INVALID)
 		fprintf(fp, "free addr (none)");
 	else
 		fprintf(fp, "free addr %lu", (u_long)desc.free_addr);
-	fprintf(fp, "\n}\n");
+	fprintf(fp, "\n\t}\n");
 }
 
 /*
- * __wt_bt_debug_page_col_inmemory --
- *	Dump the WT_PAGE information for a column-store.
+ * __wt_bt_debug_inmem --
+ *	Dump the in-memory information for a page.
  */
-static int
-__wt_bt_debug_page_col_inmemory(WT_PAGE *page, FILE *fp)
+int
+__wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 {
-	WT_COL_INDX *ip;
-	WT_SDBT *sdbt;
-	u_int32_t i, icnt, repl_cnt;
+	DB *db;
+	WT_COL_INDX *cip;
+	WT_ROW_INDX *rip;
+	u_int32_t i;
+	int do_close;
 
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
+	db = toc->db;
 
-	icnt = 0;
-	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp, "%6lu:\n", (u_long)++icnt);
-		if (ip->page_data != NULL)
-			fprintf(fp, "\tpage_data: %#lx",
-			    WT_ADDR_TO_ULONG(ip->page_data));
-		if (ip->repl != NULL) {
-			for (sdbt = ip->repl->data, repl_cnt = 0;
-			    repl_cnt < ip->repl->repl_next; ++sdbt, ++repl_cnt)
-				if (sdbt->data == WT_DATA_DELETED)
-					fprintf(fp, "\trepl deleted");
-				else
-					__wt_bt_debug_dbt(
-					    "\trepl dbt", sdbt, fp);
-		}
-		fprintf(fp, "\n");
+	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
+
+	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
+
+	/*
+	 * If we've created the binary tree, dump it, otherwise dump the
+	 * WT_{ROW,COL}_INDX array itself.
+	 */
+	switch (page->hdr->type) {
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if (page->bin == NULL) {
+			WT_INDX_FOREACH(page, rip, i)
+				WT_RET(__wt_bt_debug_row_indx(toc, rip, fp));
+		} else
+			WT_RET(__wt_bt_debug_inmem_tree(toc, page->bin, 1, fp));
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		if (page->bin == NULL) {
+			WT_INDX_FOREACH(page, cip, i)
+				__wt_bt_debug_col_indx(toc, cip, fp);
+		} else
+			WT_RET(__wt_bt_debug_inmem_tree(toc, page->bin, 0, fp));
+		break;
+	case WT_PAGE_OVFL:
+		break;
+	WT_ILLEGAL_FORMAT(db);
 	}
+
+	fprintf(fp, "}\n");
+
+	if (do_close)
+		(void)fclose(fp);
+
 	return (0);
 }
 
 /*
- * __wt_bt_debug_page_row_inmemory --
- *	Dump the WT_PAGE information for a row-store.
+ * __wt_bt_debug_inmem_tree --
+ *	Dump the WT_COL_INDX structures from the binary tree.
  */
 static int
-__wt_bt_debug_page_row_inmemory(WT_PAGE *page, FILE *fp)
+__wt_bt_debug_inmem_tree(WT_TOC *toc, WT_BIN_INDX *bin, int isrow, FILE *fp)
 {
-	WT_ROW_INDX *ip;
-	WT_SDBT *sdbt;
-	u_int32_t i, icnt, repl_cnt;
+	if (bin->left != NULL)
+		WT_RET(__wt_bt_debug_inmem_tree(toc, bin->left, isrow, fp));
+	if (isrow)
+		WT_RET(__wt_bt_debug_row_indx(toc, bin->indx, fp));
+	else
+		__wt_bt_debug_col_indx(toc, bin->indx, fp);
+	if (bin->right != NULL)
+		WT_RET(__wt_bt_debug_inmem_tree(toc, bin->right, isrow, fp));
 
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
-
-	icnt = 0;
-	WT_INDX_FOREACH(page, ip, i) {
-		fprintf(fp, "%6lu:\n", (u_long)++icnt);
-		if (ip->data != NULL)
-			__wt_bt_debug_dbt("\tdata dbt", ip, fp);
-		if (ip->repl != NULL) {
-			for (sdbt = ip->repl->data, repl_cnt = 0;
-			    repl_cnt < ip->repl->repl_next; ++sdbt, ++repl_cnt)
-				if (sdbt->data == WT_DATA_DELETED)
-					fprintf(fp, "\trepl deleted");
-				else
-					__wt_bt_debug_dbt(
-					    "\trepl dbt", sdbt, fp);
-		}
-		if (ip->page_data != NULL)
-			fprintf(fp, "\tpage_data: %#lx",
-			    WT_ADDR_TO_ULONG(ip->page_data));
-		fprintf(fp, "\n");
-	}
 	return (0);
+}
+
+/*
+ * __wt_bt_debug_col_indx --
+ *	Dump a single WT_COL_INDX structure.
+ */
+static void
+__wt_bt_debug_col_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
+{
+	WT_CC_QUIET(toc, NULL);
+
+	if (cip->page_data != NULL)
+		fprintf(fp,
+		    "\tpage_data: %#lx", WT_ADDR_TO_ULONG(cip->page_data));
+	if (cip->repl != NULL)
+		__wt_bt_debug_repl(cip->repl, fp);
+	fprintf(fp, "\n");
+}
+
+/*
+ * __wt_bt_debug_row_indx --
+ *	Dump a single WT_ROW_INDX structure.
+ */
+static int
+__wt_bt_debug_row_indx(WT_TOC *toc, WT_ROW_INDX *rip, FILE *fp)
+{
+	if (!WT_KEY_PROCESS(rip))
+		__wt_bt_debug_dbt("\tkey", rip, fp);
+	else
+		fprintf(fp, "\tkey: requires processing\n");
+	if (rip->repl != NULL)
+		__wt_bt_debug_repl(rip->repl, fp);
+	if (rip->page_data != NULL) {
+		fprintf(fp, "\tdata: {");
+		WT_RET(__wt_bt_debug_item_data(toc, rip->page_data, fp));
+		fprintf(fp, "}");
+	}
+	fprintf(fp, "\n");
+	return (0);
+}
+
+/*
+ * __wt_bt_debug_repl --
+ *	Dump a single WT_REPL array.
+ */
+static void
+__wt_bt_debug_repl(WT_REPL *repl, FILE *fp)
+{
+	WT_SDBT *sdbt;
+	u_int32_t repl_cnt;
+
+	for (sdbt = repl->data, repl_cnt = 0;
+	    repl_cnt < repl->repl_next; ++sdbt, ++repl_cnt)
+		if (sdbt->data == WT_DATA_DELETED)
+			fprintf(fp, "\trepl: deleted\n");
+		else
+			__wt_bt_debug_dbt("\trepl", sdbt, fp);
 }
 
 /*
@@ -334,20 +380,53 @@ static int
 __wt_bt_debug_page_item(WT_TOC *toc, WT_PAGE *page, FILE *fp)
 {
 	WT_ITEM *item;
-	u_int32_t i, cnt;
+	u_int32_t i;
 
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
+	WT_ITEM_FOREACH(page, item, i)
+		WT_RET(__wt_bt_debug_item(toc, item, fp));
+	return (0);
+}
 
-	cnt = 1;
-	WT_ITEM_FOREACH(page, item, i) {
-		fprintf(fp, "%6lu: {type %s; len %lu; off %lu}\n\t{",
-		    (u_long)cnt++, __wt_bt_item_type(item),
-		    (u_long)WT_ITEM_LEN(item),
-		    (u_long)((u_int8_t *)item - (u_int8_t *)(page->hdr)));
-		WT_RET(__wt_bt_debug_item_data(toc, item, fp));
-		fprintf(fp, "}\n");
+/*
+ * __wt_bt_debug_item --
+ *	Dump a single WT_ITEM.
+ */
+static int
+__wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
+{
+	DB *db;
+	WT_OFF *offp;
+	WT_OVFL *ovfl;
+
+	db = toc->db;
+
+	fprintf(fp, "\t{type %s; len %lu",
+	    __wt_bt_item_type(item), (u_long)WT_ITEM_LEN(item));
+
+	switch (WT_ITEM_TYPE(item)) {
+	case WT_ITEM_KEY:
+	case WT_ITEM_DATA:
+	case WT_ITEM_DUP:
+		break;
+	case WT_ITEM_KEY_OVFL:
+	case WT_ITEM_DATA_OVFL:
+	case WT_ITEM_DUP_OVFL:
+		ovfl = WT_ITEM_BYTE_OVFL(item);
+		fprintf(fp, " {addr %lu; len %lu}",
+		    (u_long)ovfl->addr, (u_long)ovfl->len);
+		break;
+	case WT_ITEM_OFF_INT:
+	case WT_ITEM_OFF_LEAF:
+		offp = WT_ITEM_BYTE_OFF(item);
+		fprintf(fp, " {addr: %lu, records %llu}\n",
+		    (u_long)offp->addr, WT_RECORDS(offp));
+		return (0);
+	WT_ILLEGAL_FORMAT(db);
 	}
+
+	fprintf(fp, "}\n\t{");
+	WT_RET(__wt_bt_debug_item_data(toc, item, fp));
+	fprintf(fp, "}\n");
 	return (0);
 }
 
@@ -361,9 +440,6 @@ __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 	WT_OFF *offp;
 	u_int32_t i;
 	char *ref;
-
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
 
 	ref = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? "leaf" : "tree";
 	WT_OFF_FOREACH(page, offp, i)
@@ -381,9 +457,6 @@ __wt_bt_debug_page_col_fix(DB *db, WT_PAGE *page, FILE *fp)
 	IDB *idb;
 	u_int32_t i;
 	u_int8_t *p;
-
-	if (fp == NULL)				/* Callable from a debugger. */
-		fp = stdout;
 
 	idb = db->idb;
 
@@ -410,7 +483,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
 	IDB *idb;
-	WT_OFF *offp;
 	WT_OVFL *ovfl;
 	WT_PAGE *page;
 	u_int32_t len;
@@ -440,9 +512,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		fprintf(fp, "addr %lu; len %lu; ",
-		    (u_long)ovfl->addr, (u_long)ovfl->len);
-
 		WT_ERR(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &page));
 		hp = idb->huffman_data;
 		p = WT_PAGE_BYTE(page);
@@ -450,9 +519,6 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 		break;
 	case WT_ITEM_OFF_INT:
 	case WT_ITEM_OFF_LEAF:
-		offp = WT_ITEM_BYTE_OFF(item);
-		fprintf(fp, "addr: %lu, records %llu",
-		    (u_long)offp->addr, WT_RECORDS(offp));
 		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -481,9 +547,6 @@ static void
 __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 {
 	DBT *dbt;
-
-	if (fp == NULL)				/* Callable from a debugger */
-		fp = stdout;
 
 	/*
 	 * The argument isn't necessarily a DBT structure, but the first two

@@ -19,29 +19,51 @@ typedef struct {
 } while (0)
 
 typedef struct {
+	WT_BIN_INDX * bp;
+	WT_BIN_INDX * new;
+	int isleft;
+} __wt_bt_insert_args;
+#define	 __wt_bt_insert_serial(toc, _bp, _new, _isleft) do {\
+	__wt_bt_insert_args _args;\
+	_args.bp = _bp;\
+	_args.new = _new;\
+	_args.isleft = _isleft;\
+	__wt_toc_serialize_request(\
+	    toc, __wt_bt_insert_serial_func, &_args);\
+} while (0)
+#define	__wt_bt_insert_unpack(toc, _bp, _new, _isleft) do {\
+	_bp =\
+	    ((__wt_bt_insert_args *)(toc)->serial_args)->bp;\
+	_new =\
+	    ((__wt_bt_insert_args *)(toc)->serial_args)->new;\
+	_isleft =\
+	    ((__wt_bt_insert_args *)(toc)->serial_args)->isleft;\
+} while (0)
+
+typedef struct {
 	WT_ROW_INDX * indx;
 	WT_REPL * repl;
 	void * data;
 	u_int32_t size;
-} __wt_bt_put_args;
-#define	 __wt_bt_put_serial(toc, _indx, _repl, _data, _size) do {\
-	__wt_bt_put_args _args;\
+} __wt_bt_repl_args;
+#define	 __wt_bt_repl_serial(toc, _indx, _repl, _data, _size) do {\
+	__wt_bt_repl_args _args;\
 	_args.indx = _indx;\
 	_args.repl = _repl;\
 	_args.data = _data;\
 	_args.size = _size;\
 	__wt_toc_serialize_request(\
-	    toc, __wt_bt_put_serial_func, &_args);\
+	    toc, __wt_bt_repl_serial_func, &_args);\
 } while (0)
-#define	__wt_bt_put_unpack(toc, _indx, _repl, _data, _size) do {\
+#define	__wt_bt_repl_unpack(toc, _indx, _repl, _data, _size) do {\
 	_indx =\
-	    ((__wt_bt_put_args *)(toc)->serial_args)->indx;\
+	    ((__wt_bt_repl_args *)(toc)->serial_args)->indx;\
 	_repl =\
-	    ((__wt_bt_put_args *)(toc)->serial_args)->repl;\
+	    ((__wt_bt_repl_args *)(toc)->serial_args)->repl;\
 	_data =\
-	    ((__wt_bt_put_args *)(toc)->serial_args)->data;\
+	    ((__wt_bt_repl_args *)(toc)->serial_args)->data;\
 	_size =\
-	    ((__wt_bt_put_args *)(toc)->serial_args)->size;\
+	    ((__wt_bt_repl_args *)(toc)->serial_args)->size;\
 } while (0)
 
 typedef struct {

@@ -24,7 +24,12 @@ serial['bt_del'] = [
 	'WT_ROW_INDX */indx',
 	'WT_REPL */repl']
 
-serial['bt_put'] = [
+serial['bt_insert'] = [
+	'WT_BIN_INDX */bp',
+	'WT_BIN_INDX */new',
+	'int/isleft']
+
+serial['bt_repl'] = [
 	'WT_ROW_INDX */indx',
 	'WT_REPL */repl',
 	'void */data',

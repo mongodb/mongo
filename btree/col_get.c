@@ -20,6 +20,7 @@ __wt_db_get_recno(
 	IDB *idb;
 	void *ip;
 	WT_PAGE *page;
+	WT_SRCH srch;
 	int ret;
 
 	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
@@ -43,7 +44,9 @@ __wt_db_get_recno(
 		WT_ERR(__wt_bt_search_recno_col(toc, recno, &page, &ip));
 		ret = __wt_bt_dbt_return(toc, NULL, data, page, ip, 0);
 	} else {
-		WT_ERR(__wt_bt_search_recno_row(toc, recno, &page, &ip));
+		WT_ERR(__wt_bt_search_recno_row(toc, recno, &srch));
+		page = srch.page;
+		ip = srch.indx;
 		ret = __wt_bt_dbt_return(toc, key, data, page, ip, 1);
 	}
 

@@ -23,10 +23,12 @@ __wt_db_del(DB *db, WT_TOC *toc, DBT *key)
 	WT_PAGE *page;
 	WT_REPL *repl;
 	WT_ROW_INDX *ip;
+	WT_SRCH srch;
 	int ret;
 
 	env = db->env;
 	idb = db->idb;
+	page = NULL;
 	repl = NULL;
 	ret = 0;
 
@@ -38,12 +40,14 @@ __wt_db_del(DB *db, WT_TOC *toc, DBT *key)
 	 * Search the primary btree for the key, delete the item on the
 	 * page, and discard the page.
 	 */
-	WT_ERR(__wt_bt_search(toc, key, &page, &ip));
+	WT_ERR(__wt_bt_search_key_row(toc, key, &srch, 0));
+	page = srch.page;
+	ip = srch.indx;
 
 	/* Grow the replacement array as necessary. */
 	repl = ip->repl;
 	if (repl == NULL || repl->repl_next == repl->repl_size)
-		WT_ERR(__wt_bt_repl_alloc(env, &repl));
+		WT_ERR(__wt_bt_repl_alloc(env, &repl, 0));
 	else
 		repl = NULL;
 
