@@ -132,7 +132,8 @@ namespace mongo {
     }
 
     void destroyConnection( Persistent<Value> object, void* parameter){
-        cout << "Yo ho ho" << endl;
+        // TODO
+        cout << "warning: destroyConnection not implemented" << endl;
     }
 
     Handle<Value> mongoConsExternal(const Arguments& args){
