@@ -45,9 +45,12 @@ namespace mongo {
         while ( x.more() ){
             BSONElement e = x.next();
             BSONObjIterator y(b);
-            while ( y.more() )
-                if ( strcmp( e.fieldName() , y.next().fieldName() ) == 0 )
+            while ( y.more() ){
+                BSONElement f = y.next();
+                FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() );
+                if ( res == SAME || res == LEFT_SUBFIELD || res == RIGHT_SUBFIELD )
                     return true;
+            }
         }
         return false;
     }
