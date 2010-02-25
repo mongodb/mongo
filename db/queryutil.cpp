@@ -157,6 +157,14 @@ namespace mongo {
                     lower = addObj( BSON( "" << r ) ).firstElement();
                     upper = addObj( BSON( "" << simpleRegexEnd( r ) ) ).firstElement();
                     upperInclusive = false;
+                } else {
+                    BSONObjBuilder b1(32), b2(32);
+                    b1.appendMinForType( "" , String );
+                    lower = addObj( b1.obj() ).firstElement();
+
+                    b2.appendMaxForType( "" , String );
+                    upper = addObj( b2.obj() ).firstElement();
+                    upperInclusive = false; //MaxForType String is an empty Object
                 }
             }
             return;

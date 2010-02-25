@@ -169,11 +169,23 @@ namespace QueryOptimizerTests {
         };
         
         class UnhelpfulRegex : public Base {
+        public:
+            UnhelpfulRegex() {
+                BSONObjBuilder b;
+                b.appendMinForType("lower", String);
+                b.appendMaxForType("upper", String);
+                limits = b.obj();
+            }
+
             virtual BSONObj query() {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "abc" );
                 return b.obj();
             }            
+            virtual BSONElement lower() { return limits["lower"]; }
+            virtual BSONElement upper() { return limits["upper"]; }
+            virtual bool upperInclusive() { return false; }
+            BSONObj limits;
         };
         
         class In : public Base {
