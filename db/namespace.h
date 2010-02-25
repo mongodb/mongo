@@ -472,7 +472,7 @@ namespace mongo {
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount(), _cll_enabled() { }
-        /* _get() is not threadsafe */
+        /* _get() is not threadsafe -- see get_inlock() comments */
         static NamespaceDetailsTransient& _get(const char *ns);
         /* use get_w() when doing write operations */
         static NamespaceDetailsTransient& get_w(const char *ns) { 
