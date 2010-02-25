@@ -32,7 +32,8 @@ namespace mongo {
                   const FieldRangeSet &fbs,
                   const BSONObj &order,
                   const BSONObj &startKey = BSONObj(),
-                  const BSONObj &endKey = BSONObj() );
+                  const BSONObj &endKey = BSONObj() ,
+                  string special="" );
 
         /* If true, no other index can do better. */
         bool optimal() const { return optimal_; }
@@ -70,6 +71,7 @@ namespace mongo {
         BoundList indexBounds_;
         bool endKeyInclusive_;
         bool unhelpful_;
+        string _special;
     };
 
     // Inherit from this interface to implement a new query operation.

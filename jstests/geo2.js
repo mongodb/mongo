@@ -34,3 +34,6 @@ printjson( slow.stats )
 slow.results.forEach( p )
 
 */
+
+
+//t.find( { loc : { $near : [ 50 , 50 ] } } ).itcount();

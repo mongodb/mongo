@@ -46,6 +46,8 @@ namespace mongo {
         
         const IndexPlugin * getPlugin() const { return _plugin; }
 
+        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order ) const = 0;
+
         virtual BSONObj fixKey( const BSONObj& in ) { return in; }
 
     protected:

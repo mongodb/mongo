@@ -327,6 +327,12 @@ namespace mongo {
             return _spec->getDetails();
         }
 
+        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order ) const {
+            auto_ptr<Cursor> c;
+            assert(0);
+            return c;
+        }
+        
         const IndexSpec* _spec;
         string _geo;
         vector<string> _other;

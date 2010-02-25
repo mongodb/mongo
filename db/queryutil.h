@@ -69,11 +69,14 @@ namespace mongo {
         }
         bool empty() const { return intervals_.empty(); }
 		const vector< FieldInterval > &intervals() const { return intervals_; }
+        string getSpecial() const { return _special; }
+
     private:
         BSONObj addObj( const BSONObj &o );
         string simpleRegexEnd( string regex );
         vector< FieldInterval > intervals_;
         vector< BSONObj > objData_;
+        string _special;
     };
     
     // implements query pattern matching, used to determine if a query is
@@ -171,6 +174,7 @@ namespace mongo {
         }
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
+        string getSpecial() const;
     private:
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
         static FieldRange *trivialRange_;

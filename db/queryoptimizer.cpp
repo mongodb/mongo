@@ -63,7 +63,7 @@ namespace mongo {
     
     QueryPlan::QueryPlan( 
         NamespaceDetails *_d, int _idxNo,
-        const FieldRangeSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey ) :
+        const FieldRangeSet &fbs, const BSONObj &order, const BSONObj &startKey, const BSONObj &endKey , string special ) :
     d(_d), idxNo(_idxNo),
     fbs_( fbs ),
     order_( order ),
@@ -73,7 +73,8 @@ namespace mongo {
     exactKeyMatch_( false ),
     direction_( 0 ),
     endKeyInclusive_( endKey.isEmpty() ),
-    unhelpful_( false ) {
+    unhelpful_( false ),
+    _special( special ){
 
         if ( !fbs_.matchPossible() ) {
             unhelpful_ = true;
@@ -87,6 +88,12 @@ namespace mongo {
             // full table scan case
             if ( order_.isEmpty() || !strcmp( order_.firstElement().fieldName(), "$natural" ) )
                 scanAndOrderRequired_ = false;
+            return;
+        }
+
+        if ( _special.size() ){
+            optimal_ = true;
+            scanAndOrderRequired_ = false; // TODO: maybe part of key spec?
             return;
         }
 
@@ -179,6 +186,13 @@ namespace mongo {
     }
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc ) const {
+
+        if ( _special.size() ){
+            IndexType * type = index_->getSpec().getType();
+            massert( 13040 , (string)"no type for special: " + _special , type );
+            return type->newCursor( fbs_.query() , order_ );
+        }
+        
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
                 checkTableScanAllowed( fbs_.ns() );
@@ -322,6 +336,23 @@ namespace mongo {
             }
         }
         
+        if ( fbs_.getSpecial().size() ){
+            string special = fbs_.getSpecial();
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                int j = i.pos();
+                IndexDetails& ii = i.next();
+                if ( ii.getSpec().getTypeName() == special ){
+                    usingPrerecordedPlan_ = true;
+                    mayRecordPlan_ = true;
+                    plans_.push_back( PlanPtr( new QueryPlan( d , j , fbs_ , order_ , 
+                                                              BSONObj() , BSONObj() , special ) ) );
+                    return;
+                }
+            }
+            uassert( 13038 , (string)"can't find special index: " + special , 0 );
+        }
+
         if ( honorRecordedPlan_ ) {
             boostlock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );

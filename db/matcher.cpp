@@ -248,6 +248,8 @@ namespace mongo {
                 flags = fe.valuestrsafe();
                 break;
             }
+            case BSONObj::opNEAR:
+                break;
             default:
                 uassert( 10069 ,  (string)"BUG - can't operator for: " + fn , 0 );
         }        

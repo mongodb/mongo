@@ -253,6 +253,9 @@ namespace mongo {
             log() << "warning: shouldn't get here?" << endl;
             break;
         }
+        case BSONObj::opNEAR:
+            _special = "2d";
+            break;
         default:
             break;
         }
@@ -312,6 +315,8 @@ namespace mongo {
         intervals_ = newIntervals;
         for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
             objData_.push_back( *i );
+        if ( _special.size() == 0 && other._special.size() )
+            _special = other._special;
         return *this;
     }
     
@@ -325,6 +330,17 @@ namespace mongo {
         return o;
     }
     
+    string FieldRangeSet::getSpecial() const {
+        string s = "";
+        for ( map<string,FieldRange>::iterator i=ranges_.begin(); i!=ranges_.end(); i++ ){
+            if ( i->second.getSpecial().size() == 0 )
+                continue;
+            uassert( 13033 , "can't have 2 special fields" , s.size() == 0 );
+            s = i->second.getSpecial();
+        }
+        return s;
+    }
+
     void FieldRangeSet::processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize ) {
         int op2 = f.getGtLtOp();
         if ( op2 == BSONObj::opELEM_MATCH ) {
@@ -389,7 +405,7 @@ namespace mongo {
                                 processOpElement( e.fieldName(), f, true, optimize );
                                 break;
                             default:
-                                uassert( 13033, "invalid use of $not", false );
+                                uassert( 13041, "invalid use of $not", false );
                         }
                     } else {
                         processOpElement( e.fieldName(), f, false, optimize );
