@@ -993,7 +993,8 @@ namespace mongo {
             opTYPE = 0x0F,
             opREGEX = 0x10,
             opOPTIONS = 0x11,
-            opELEM_MATCH = 0x12
+            opELEM_MATCH = 0x12,
+            opNEAR = 0x13
         };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );

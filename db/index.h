@@ -28,6 +28,7 @@ namespace mongo {
     class IndexSpec;
     class IndexType; // TODO: this name sucks
     class IndexPlugin;
+    class IndexDetails;
 
     /**
      * this represents an instance of a index plugin
@@ -44,6 +45,8 @@ namespace mongo {
         virtual int compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const;
         
         const IndexPlugin * getPlugin() const { return _plugin; }
+
+        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order ) const = 0;
 
         virtual BSONObj fixKey( const BSONObj& in ) { return in; }
 
@@ -88,14 +91,14 @@ namespace mongo {
         BSONObj info; // this is the same as IndexDetails::info.obj()
         
         IndexSpec()
-            : _finishedInit(false){
+            : _details(0) , _finishedInit(false){
         }
 
         IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
-            : keyPattern(k) , info(m) , _finishedInit(false){
+            : keyPattern(k) , info(m) , _details(0) , _finishedInit(false){
             _init();
         }
-
+        
         /**
            this is a DiscLoc of an IndexDetails info
            should have a key field 
@@ -104,15 +107,8 @@ namespace mongo {
             reset( loc );
         }
         
-        void reset( const DiskLoc& loc ){
-            info = loc.obj();
-            keyPattern = info["key"].embeddedObjectUserCheck();
-            if ( keyPattern.objsize() == 0 ) {
-                out() << info.toString() << endl;
-                assert(false);
-            }
-            _init();
-        }
+        void reset( const DiskLoc& loc );
+        void reset( const IndexDetails * details );
         
         void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
 
@@ -127,6 +123,11 @@ namespace mongo {
         IndexType* getType() const {
             return _indexType.get();
         }
+
+        const IndexDetails * getDetails() const {
+            return _details;
+        }
+
     protected:
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
         
@@ -140,6 +141,8 @@ namespace mongo {
         BSONElement _nullElt;
         
         shared_ptr<IndexType> _indexType;
+
+        const IndexDetails * _details;
         
         void _init();
 
