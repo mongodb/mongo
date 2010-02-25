@@ -36,21 +36,21 @@
 }
 
 /*
- * __wt_db_err --
+ * __wt_api_db_err --
  *	Db.err method.
  */
 void
-__wt_db_err(DB *db, int error, const char *fmt, ...)
+__wt_api_db_err(DB *db, int error, const char *fmt, ...)
 {
 	WT_DB_ERR(db, error, fmt);
 }
 
 /*
- * __wt_db_errx --
+ * __wt_api_db_errx --
  *	Db.errx method.
  */
 void
-__wt_db_errx(DB *db, const char *fmt, ...)
+__wt_api_db_errx(DB *db, const char *fmt, ...)
 {
 	WT_DB_ERR(db, 0, fmt);
 }

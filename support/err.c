@@ -146,7 +146,7 @@ __wt_api_arg_max(ENV *env,
 int
 __wt_database_readonly(DB *db, const char *name)
 {
-	__wt_db_errx(db,
+	__wt_api_db_errx(db,
 	    "%s: the database was opened read-only and may not be modified",
 	    name);
 	return (WT_READONLY);
@@ -160,7 +160,7 @@ __wt_database_readonly(DB *db, const char *name)
 int
 __wt_database_format(DB *db)
 {
-	__wt_db_errx(db, "the database is corrupted; use the Db.salvage"
+	__wt_api_db_errx(db, "the database is corrupted; use the Db.salvage"
 	    " method or the db_salvage utility to repair the database");
 	return (WT_ERROR);
 }

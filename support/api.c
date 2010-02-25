@@ -1028,6 +1028,9 @@ __wt_methods_db_lockout(DB *db)
 	db->dump = (int (*)
 	    (DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t ))
 	    __wt_db_lockout;
+	db->err = (void (*)
+	    (DB *, int , const char *, ...))
+	    __wt_db_lockout;
 	db->errcall_get = (int (*)
 	    (DB *, void (**)(const DB *, const char *)))
 	    __wt_db_lockout;
@@ -1045,6 +1048,9 @@ __wt_methods_db_lockout(DB *db)
 	    __wt_db_lockout;
 	db->errpfx_set = (int (*)
 	    (DB *, const char *))
+	    __wt_db_lockout;
+	db->errx = (void (*)
+	    (DB *, const char *, ...))
 	    __wt_db_lockout;
 	db->get = (int (*)
 	    (DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t ))
@@ -1092,12 +1098,14 @@ __wt_methods_db_init_transition(DB *db)
 	db->btree_pagesize_set = __wt_api_db_btree_pagesize_set;
 	db->close = __wt_api_db_close;
 	db->column_set = __wt_api_db_column_set;
+	db->err = __wt_api_db_err;
 	db->errcall_get = __wt_api_db_errcall_get;
 	db->errcall_set = __wt_api_db_errcall_set;
 	db->errfile_get = __wt_api_db_errfile_get;
 	db->errfile_set = __wt_api_db_errfile_set;
 	db->errpfx_get = __wt_api_db_errpfx_get;
 	db->errpfx_set = __wt_api_db_errpfx_set;
+	db->errx = __wt_api_db_errx;
 	db->huffman_set = __wt_api_db_huffman_set;
 	db->open = __wt_api_db_open;
 }

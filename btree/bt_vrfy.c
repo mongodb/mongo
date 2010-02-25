@@ -108,7 +108,7 @@ __wt_bt_verify_int(WT_TOC *toc,
 	 */
 	vstuff.frags = WT_OFF_TO_ADDR(db, idb->fh->file_size);
 	if (vstuff.frags > INT_MAX) {
-		__wt_db_errx(db, "file is too large to verify");
+		__wt_api_db_errx(db, "file is too large to verify");
 		goto err;
 	}
 	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
@@ -344,7 +344,7 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 		} else
 			page_dbt_ref = (DBT *)page_ip;
 		if (func(db, prev_dbt_ref, page_dbt_ref) >= 0) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "the first key on page at addr %lu does not sort "
 			    "after the last key on the previous page",
 			    (u_long)addr);
@@ -405,7 +405,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	if (hdr->prntaddr == WT_ADDR_INVALID) {
 		if (hdr->prevaddr != WT_ADDR_INVALID ||
 		    hdr->nextaddr != WT_ADDR_INVALID) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "page at addr %lu has siblings, but no parent "
 			    "address",
 			    (u_long)addr);
@@ -421,7 +421,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		    hdr->type == WT_PAGE_ROW_INT) {
 			WT_RET(__wt_bt_desc_read(toc, &root_addr));
 			if (root_addr != addr) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "page at addr %lu appears to be a root "
 				    "page which doesn't match the database "
 				    "descriptor record", (u_long)addr);
@@ -442,7 +442,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	frags = WT_OFF_TO_ADDR(db, db->intlsize);
 	for (i = 0; i < frags; ++i)
 		if (!bit_test(vs->fragbits, hdr->prntaddr + i)) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "parent of page at addr %lu not found on internal "
 			    "page links",
 			    (u_long)addr);
@@ -466,7 +466,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 	if (parent_ip == NULL) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "parent of page at addr %lu doesn't reference it",
 		    (u_long)addr);
 		goto err_set;
@@ -484,7 +484,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 	if (child->records != WT_RECORDS(offp)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "parent of page at addr %lu has incorrect record count "
 		    "(parent: %llu, child: %llu)",
 		    (u_long)addr, WT_RECORDS(offp), child->records);
@@ -527,7 +527,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		    parent->hdr->prevaddr != WT_ADDR_INVALID) ||
 		    (hdr->prevaddr != WT_ADDR_INVALID &&
 		    parent->hdr->prevaddr == WT_ADDR_INVALID))) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "parent key of page at addr %lu is the smallest "
 			    "key in its level of the tree, but the child key "
 			    "is not the smallest key in its level",
@@ -550,7 +550,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 
 		/* Compare the parent's key against the child's key. */
 		if (func(db, cd_ref, pd_ref) < 0) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "the first key on page at addr %lu sorts before "
 			    "its reference key on its parent's page",
 			    (u_long)addr);
@@ -559,8 +559,10 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	}
 
 	/*
-	 * Confirm the parent's following key is greater than the last key
-	 * on the child.
+	 * Confirm the key following the child's parent key is greater than the
+	 * last key on the child.  (In other words, find the parent's key that
+	 * references this child -- the key AFTER that follows that key on the
+	 * parent page should sort after the last key on the child page).
 	 *
 	 * If the parent's key is the largest key on the page, look at the
 	 * parent's next page addr.  If the parent's next page addr is set,
@@ -575,10 +577,10 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		    nextaddr != WT_ADDR_INVALID) ||
 		    (hdr->nextaddr != WT_ADDR_INVALID &&
 		    nextaddr == WT_ADDR_INVALID)) {
-			__wt_db_errx(db,
-			    "parent key of page at addr %lu is the largest in "
-			    "its level, but the page is not the largest in its "
-			    "level",
+			__wt_api_db_errx(db,
+			    "the parent key of the page at addr %lu is the "
+			    "largest in its level, but the page is not the "
+			    "largest in its level",
 			    (u_long)addr);
 			goto err_set;
 		}
@@ -609,9 +611,9 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 			pd_ref = (DBT *)parent_ip;
 		/* Compare the parent's key against the child's key. */
 		if (func(db, cd_ref, pd_ref) >= 0) {
-			__wt_db_errx(db,
-			    "the last key on page at addr %lu sorts after the "
-			    "first key on a parent page",
+			__wt_api_db_errx(db,
+			    "the last key on the page at addr %lu sorts after "
+			    "a parent page's key for a subsequent page",
 			    (u_long)addr);
 			goto err_set;
 		}
@@ -661,7 +663,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		frags = WT_OFF_TO_ADDR(db, page->bytes);
 		for (i = 0; i < frags; ++i)
 			if (bit_test(vs->fragbits, addr + i)) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "page at addr %lu already verified",
 				    (u_long)addr);
 				return (WT_ERROR);
@@ -686,7 +688,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		break;
 	case WT_PAGE_OVFL:
 		if (hdr->u.entries == 0) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "overflow page at addr %lu has no entries",
 			    (u_long)addr);
 			return (WT_ERROR);
@@ -694,14 +696,14 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		break;
 	case WT_PAGE_INVALID:
 	default:
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "page at addr %lu has an invalid type of %lu",
 		    (u_long)addr, (u_long)hdr->type);
 		return (WT_ERROR);
 	}
 
 	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);
 		return (WT_ERROR);
@@ -710,7 +712,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	if (hdr->flags != 0)
 		if (hdr->type != WT_PAGE_COL_INT ||
 		    hdr->flags != WT_OFFPAGE_REF_LEAF) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "page at addr %lu has an invalid flags field "
 			    "of %#lx",
 			    (u_long)addr, (u_long)hdr->flags);
@@ -749,7 +751,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
 	if (vs != NULL && vs->stream != NULL)
-		return (__wt_bt_debug_page(toc, page, NULL, vs->stream, 0));
+		return (__wt_bt_debug_page(toc, page, NULL, vs->stream));
 #endif
 	return (0);
 }
@@ -855,7 +857,7 @@ __wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
 			if (hdr->type != WT_PAGE_DUP_INT &&
 			    hdr->type != WT_PAGE_ROW_INT &&
 			    hdr->type != WT_PAGE_ROW_LEAF) {
-item_vs_page:			__wt_db_errx(db,
+item_vs_page:			__wt_api_db_errx(db,
 				    "illegal item and page type combination "
 				    "(item %lu on page at addr %lu is a %s "
 				    "item on a %s page)",
@@ -866,7 +868,7 @@ item_vs_page:			__wt_db_errx(db,
 			}
 			break;
 		default:
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "item %lu on page at addr %lu has an illegal type "
 			    "of %lu",
 			    (u_long)item_num, (u_long)addr, (u_long)item_type);
@@ -889,7 +891,7 @@ item_vs_page:			__wt_db_errx(db,
 		case WT_ITEM_OFF_INT:
 		case WT_ITEM_OFF_LEAF:
 			if (item_len != sizeof(WT_OFF)) {
-item_len:			__wt_db_errx(db,
+item_len:			__wt_api_db_errx(db,
 				    "item %lu on page at addr %lu has an "
 				    "incorrect length",
 				    (u_long)item_num, (u_long)addr);
@@ -902,7 +904,7 @@ item_len:			__wt_db_errx(db,
 
 		/* Check if the item's data is entirely on the page. */
 		if ((u_int8_t *)WT_ITEM_NEXT(item) > end) {
-eop:			__wt_db_errx(db,
+eop:			__wt_api_db_errx(db,
 			    "item %lu on page at addr %lu extends past the end "
 			    " of the page",
 			    (u_long)item_num, (u_long)addr);
@@ -947,7 +949,7 @@ eop:			__wt_db_errx(db,
 				offp = WT_ITEM_BYTE_OFF(item);
 				if (WT_ADDR_TO_OFF(db, offp->addr) +
 				    db->leafsize > idb->fh->file_size) {
-eof:					__wt_db_errx(db,
+eof:					__wt_api_db_errx(db,
 					    "off-page reference in item %lu on "
 					    "page at addr %lu extends past the "
 					    "end of the file",
@@ -1003,7 +1005,7 @@ eof:					__wt_db_errx(db,
 		case WT_ITEM_KEY_OVFL:
 			if (last_key->item != NULL &&
 			    func(db, last_key->item, current->item) >= 0) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "item %lu and item %lu on page at addr %lu "
 				    "are incorrectly sorted",
 				    last_key->indx, current->indx,
@@ -1018,7 +1020,7 @@ eof:					__wt_db_errx(db,
 		case WT_ITEM_DUP_OVFL:
 			if (last_data->item != NULL &&
 			    func(db, last_data->item, current->item) >= 0) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "item %lu and item %lu on page at addr %lu "
 				    "are incorrectly sorted",
 				    last_data->indx, current->indx,
@@ -1074,7 +1076,7 @@ __wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
 
 		/* Check if this entry is entirely on the page. */
 		if ((u_int8_t *)offp + sizeof(WT_OFF) > end) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "offpage reference %lu on page at addr %lu extends "
 			    "past the end of the page",
 			    (u_long)entry_num, (u_long)addr);
@@ -1085,7 +1087,7 @@ __wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
 		if (WT_ADDR_TO_OFF(db, offp->addr) +
 		    (F_ISSET(hdr, WT_OFFPAGE_REF_LEAF) ?
 		    db->leafsize : db->intlsize) > idb->fh->file_size) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "off-page reference in object %lu on page at "
 			    "addr %lu extends past the end of the file",
 			    (u_long)entry_num, (u_long)addr);
@@ -1127,7 +1129,7 @@ __wt_bt_verify_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 
 			/* Count must be non-zero. */
 			if (*(u_int16_t *)p == 0) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "fixed-length entry %lu on page at addr "
 				    "%lu has a repeat count of 0",
 				    (u_long)entry_num, (u_long)addr);
@@ -1143,7 +1145,7 @@ __wt_bt_verify_page_col_fix(WT_TOC *toc, WT_PAGE *page)
 
 			/* Check if this entry is entirely on the page. */
 			if (p + len > end) {
-eop:				__wt_db_errx(db,
+eop:				__wt_api_db_errx(db,
 				    "fixed-length entry %lu on page at addr "
 				    "%lu extends past the end of the page",
 				    (u_long)entry_num, (u_long)addr);
@@ -1201,7 +1203,7 @@ __wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
 			}
 		}
 		if (ffc_start != -1) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "fragments %d to %d were never verified",
 			    ffc_start, ffc_end);
 			ret = WT_ERROR;

@@ -189,7 +189,7 @@ __wt_idb_close(DB *db, int refresh)
 int
 __wt_db_lockout_err(DB *db)
 {
-	__wt_db_errx(db,
+	__wt_api_db_errx(db,
 	    "This Db handle has failed for some reason, and can no longer "
 	    "be used; the only method permitted on it is Db.close which "
 	    "discards the handle permanently");
@@ -199,7 +199,7 @@ __wt_db_lockout_err(DB *db)
 int
 __wt_db_lockout_open(DB *db)
 {
-	__wt_db_errx(db,
+	__wt_api_db_errx(db,
 	    "This method may not be called until after the Db.open method has "
 	    "been called");
 	return (WT_ERROR);

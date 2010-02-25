@@ -377,7 +377,7 @@ retry:	/* Search for the page in the cache. */
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
 	if (checksum != __wt_cksum(hdr, bytes)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "file offset %llu with length %lu was read and had a "
 		    "checksum error", (u_quad)offset, (u_long)bytes);
 		ret = WT_ERROR;

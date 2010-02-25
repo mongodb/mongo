@@ -77,43 +77,43 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
 
 	if (desc.magic != WT_BTREE_MAGIC) {
-		__wt_db_errx(db, "magic number %#lx, expected %#lx",
+		__wt_api_db_errx(db, "magic number %#lx, expected %#lx",
 		    (u_long)desc.magic, WT_BTREE_MAGIC);
 		return (WT_ERROR);
 	}
 	if (desc.majorv != WT_BTREE_MAJOR_VERSION) {
-		__wt_db_errx(db, "major version %d, expected %d",
+		__wt_api_db_errx(db, "major version %d, expected %d",
 		    (int)desc.majorv, WT_BTREE_MAJOR_VERSION);
 		return (WT_ERROR);
 	}
 	if (desc.minorv != WT_BTREE_MINOR_VERSION) {
-		__wt_db_errx(db, "minor version %d, expected %d",
+		__wt_api_db_errx(db, "minor version %d, expected %d",
 		    (int)desc.minorv, WT_BTREE_MINOR_VERSION);
 		return (WT_ERROR);
 	}
 	if (desc.leafsize != db->leafsize) {
-		__wt_db_errx(db, "leaf page size %lu, expected %lu",
+		__wt_api_db_errx(db, "leaf page size %lu, expected %lu",
 		    (u_long)db->leafsize, (u_long)desc.leafsize);
 		return (WT_ERROR);
 	}
 	if (desc.intlsize != db->intlsize) {
-		__wt_db_errx(db, "internal page size %lu, expected %lu",
+		__wt_api_db_errx(db, "internal page size %lu, expected %lu",
 		    (u_long)db->intlsize, (u_long)desc.intlsize);
 		return (WT_ERROR);
 	}
 	if (desc.base_recno != 0) {
-		__wt_db_errx(db, "base recno %llu, expected 0",
+		__wt_api_db_errx(db, "base recno %llu, expected 0",
 		    (u_quad)desc.base_recno);
 		return (WT_ERROR);
 	}
 	if (desc.fixed_len == 0 && F_ISSET(&desc, WT_PAGE_DESC_REPEAT)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "repeat counts configured but no fixed length record "
 		    "size specified");
 		return (WT_ERROR);
 	}
 	if (F_ISSET(&desc, ~WT_PAGE_DESC_MASK)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "unexpected flags found in description record");
 		return (WT_ERROR);
 	}
@@ -121,7 +121,7 @@ __wt_bt_desc_verify(DB *db, WT_PAGE *page)
 	if (desc.unused1[0] || desc.unused1[1] || desc.unused1[2] ||
 	    desc.unused2[0] || desc.unused2[1] || desc.unused2[2] ||
 	    desc.unused2[3] || desc.unused2[4] || desc.unused2[5]) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "unexpected values found in unused fields");
 		return (WT_ERROR);
 	}

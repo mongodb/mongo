@@ -48,7 +48,7 @@ __wt_db_dump(
 		 */
 		ret = __wt_bt_verify_int(toc, f, "Db.dump", stream);
 #else
-		__wt_db_errx(db, "library not built for debugging");
+		__wt_api_db_errx(db, "library not built for debugging");
 		ret = WT_ERROR;
 #endif
 		WT_TRET(toc->close(toc, 0));

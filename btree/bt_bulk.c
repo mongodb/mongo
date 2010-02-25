@@ -87,7 +87,7 @@ __wt_bt_bulk_fix(DB *db,
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "column database keys are implied and "
 			    "so should not be returned by the bulk "
 			    "load input routine");
@@ -95,7 +95,7 @@ __wt_bt_bulk_fix(DB *db,
 			goto err;
 		}
 		if (data->size != db->fixed_len) {
-			__wt_db_errx(db,
+			__wt_api_db_errx(db,
 			    "length of %lu does not match the fixed-length "
 			    "configuration for this database of %lu",
 			    (u_long)data->size, (u_long)db->fixed_len);
@@ -252,7 +252,7 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
 			if (key != NULL) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "column database keys are implied and "
 				    "so should not be returned by the bulk "
 				    "load input routine");
@@ -261,14 +261,14 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 			}
 		} else {
 			if (key == NULL && !LF_ISSET(WT_DUPLICATES)) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "keys must be set unless duplicadtes are "
 				    "configured");
 				ret = WT_ERROR;
 				goto err;
 			}
 			if (key->size == 0) {
-				__wt_db_errx(db,
+				__wt_api_db_errx(db,
 				    "zero-length keys are not supported");
 				ret = WT_ERROR;
 				goto err;
@@ -690,7 +690,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	/* Read in new duplicate records until the key changes. */
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key->size == 0) {
-			__wt_db_errx(db, "zero-length keys are not supported");
+			__wt_api_db_errx(
+			    db, "zero-length keys are not supported");
 			return (WT_ERROR);
 		}
 		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);

@@ -126,7 +126,7 @@ __wt_bt_open_verify(DB *db)
 	if (db->leafsize == 0)
 		db->leafsize = 32 * 1024;
 	else if (WT_UNEXPECTED(db->leafsize)) {
-unexpected:	__wt_db_errx(db,
+unexpected:	__wt_api_db_errx(db,
 		    "Allocation and page sizes are limited to 128MB");
 		return (WT_ERROR);
 	}
@@ -159,14 +159,14 @@ unexpected:	__wt_db_errx(db,
 
 	/* Check everything for safety. */
 	if (db->allocsize < 512 || db->allocsize % 512 != 0) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "The fragment size must be a multiple of 512B");
 		return (WT_ERROR);
 	}
 	if (db->intlsize % db->allocsize != 0 ||
 	    db->leafsize % db->allocsize != 0 ||
 	    db->extsize % db->allocsize != 0) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "The internal, leaf and extent sizes must be a multiple "
 		    "of the fragment size");
 		return (WT_ERROR);
@@ -184,13 +184,13 @@ unexpected:	__wt_db_errx(db,
 #define	WT_MINIMUM_DATA_SPACE(db, s)					\
 	    (((s) - (WT_PAGE_HDR_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
 	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlsize)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "The internal page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
 	}
 	if (db->leafitemsize > WT_MINIMUM_DATA_SPACE(db, db->leafsize)) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "The leaf page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
@@ -202,7 +202,7 @@ unexpected:	__wt_db_errx(db,
 	 */
 	if (F_ISSET(idb, WT_COLUMN) &&
 	    db->fixed_len != 0 && db->leafsize / db->fixed_len < 20) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "The leaf page size cannot store at least 20 fixed-length "
 		    "objects");
 		return (WT_ERROR);

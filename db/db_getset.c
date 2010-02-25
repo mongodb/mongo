@@ -19,7 +19,7 @@ __wt_db_btree_compare_int_set_verify(DB *db, int btree_compare_int)
 	if (btree_compare_int >= 0 && btree_compare_int <= 8)
 		return (0);
 
-	__wt_db_errx(db,
+	__wt_api_db_errx(db,
 	    "The number of bytes must be an integral value between 1 and 8");
 	return (WT_ERROR);
 }
@@ -43,7 +43,7 @@ __wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage)
 	if (dup_offpage > 10 && dup_offpage <= 50)
 		return (0);
 
-	__wt_db_errx(db,
+	__wt_api_db_errx(db,
 	    "The percent of the page taken up by duplicate entries before "
 	    "being moved off-page must must be between 10 and 50");
 	return (WT_ERROR);
@@ -76,7 +76,7 @@ __wt_db_column_set_verify(DB *db,
 	 */
 	if (fixed_len == 0 &&
 	    (dictionary != NULL || LF_ISSET(WT_REPEAT_COMP))) {
-		__wt_db_errx(db,
+		__wt_api_db_errx(db,
 		    "Repeated record count and dictionary compression are "
 		    "incompatible with variable length column-store records");
 		return (WT_ERROR);
