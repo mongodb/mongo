@@ -114,6 +114,13 @@ namespace mongo {
             _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
             assert( _db );
         }
+        else if ( dbMutex.getState() < -1 ){
+            // nested read lock :(
+            assert( _lock );
+            _lock->releaseAndWriteLock();
+            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
+            assert( _db );
+        }
         else {
             // we have a read lock, but need to get a write lock for a bit
             // we need to be in a write lock since we're going to create the DB object
