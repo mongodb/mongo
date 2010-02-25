@@ -85,11 +85,12 @@ namespace mongo {
         BSONObj keyPattern; // e.g., { name : 1 }
         BSONObj info; // this is the same as IndexDetails::info.obj()
         
-        IndexSpec(){
+        IndexSpec()
+            : _finishedInit(false){
         }
 
         IndexSpec( const BSONObj& k , const BSONObj& m = BSONObj() )
-            : keyPattern(k) , info(m){
+            : keyPattern(k) , info(m) , _finishedInit(false){
             _init();
         }
 
@@ -139,6 +140,9 @@ namespace mongo {
         shared_ptr<IndexType> _indexType;
         
         void _init();
+
+    public:
+        bool _finishedInit;
 
         friend class IndexType;
     };

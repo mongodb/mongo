@@ -509,11 +509,13 @@ namespace mongo {
         static boost::mutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ){
-            //DEV assertInWriteLock();
-            boostlock lk(_isMutex);
             IndexSpec& spec = _indexSpecs[details];
-            if ( spec.info.isEmpty() ){
-                spec.reset( details->info );
+            if ( ! spec._finishedInit ){
+                boostlock lk(_isMutex);
+                if ( ! spec._finishedInit ){
+                    spec.reset( details->info );
+                    assert( spec._finishedInit );
+                }
             }
             return spec;
         }

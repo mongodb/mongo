@@ -141,9 +141,10 @@ namespace mongo {
                 _indexType.reset( plugin->generate( this ) );
             }
         }
+        _finishedInit = true;
     }
 
-
+    
     void IndexSpec::getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
         if ( _indexType.get() ){
             _indexType->getKeys( obj , keys );
