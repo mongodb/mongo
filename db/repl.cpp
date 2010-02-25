@@ -809,7 +809,7 @@ namespace mongo {
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         Client::Context ctx( dummyNs );
         {
-            log() << "resync: cloning database " << db << endl;
+            log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
             string errmsg;
             bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveok*/ true, /*replauth*/ true, /*snapshot*/false);
@@ -819,7 +819,7 @@ namespace mongo {
             }
         }
 
-        log() << "resync: done " << db << endl;
+        log() << "resync: done with initial clone for db: " << db << endl;
 
         return true;
     }
