@@ -217,6 +217,9 @@ struct __db {
 	int (*dump)(
 	    DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t );
 
+	void (*err)(
+	    DB *, int , const char *, ...);
+
 	int (*errcall_get)(
 	    DB *, void (**)(const DB *, const char *));
 
@@ -234,6 +237,9 @@ struct __db {
 
 	int (*errpfx_set)(
 	    DB *, const char *);
+
+	void (*errx)(
+	    DB *, const char *, ...);
 
 	int (*get)(
 	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
@@ -430,6 +436,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INITIALIZED					0x00000002
+#define	WT_INSERT					0x00000001
 #define	WT_MODIFIED					0x00000004
 #define	WT_PINNED					0x00000002
 #define	WT_PRINTABLES					0x00000001
@@ -443,6 +450,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_VERB_FILEOPS					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
+#define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_CACHE				0x00000003
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000000

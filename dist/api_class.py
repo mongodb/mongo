@@ -394,6 +394,14 @@ methods['db.dump'] = Api(
 	 'PRINTABLES' ],
 	['open'], [])
 
+methods['db.err'] = Api(
+	'db.err',
+	'methodV, noauto',
+	['err/int @S',
+	 'fmt/const char *@S, ...'],
+	[],
+	['init'], [])
+
 methods['db.errcall_get'] = Api(
 	'db.errcall_get',
 	'method, getter',
@@ -430,6 +438,13 @@ methods['db.errpfx_set'] = Api(
 	'db.errpfx_set',
 	'method, setter',
 	['errpfx/const char *@S'],
+	[],
+	['init'], [])
+
+methods['db.errx'] = Api(
+	'db.errx',
+	'methodV, noauto',
+	['fmt/const char *@S, ...'],
 	[],
 	['init'], [])
 
@@ -519,6 +534,12 @@ methods['db.verify'] = Api(
 # Non-method external routine flag declarations
 ###################################################
 flags['wiredtiger_env_init'] = [ ]
+
+###################################################
+# Internal routine flag declarations
+###################################################
+flags['bt_search_key_row'] = [
+	'INSERT' ]
 
 ###################################################
 # Structure flag declarations
