@@ -39,6 +39,18 @@ namespace mongo {
 
         uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
     }
+
+    bool anyElementNamesMatch( const BSONObj& a , const BSONObj& b ){
+        BSONObjIterator x(a);
+        while ( x.more() ){
+            BSONElement e = x.next();
+            BSONObjIterator y(b);
+            while ( y.more() )
+                if ( strcmp( e.fieldName() , y.next().fieldName() ) == 0 )
+                    return true;
+        }
+        return false;
+    }
     
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
@@ -353,8 +365,18 @@ namespace mongo {
             return;
         }
         
+        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty();
+
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
+            IndexDetails& id = d->idx(i);
+            const IndexSpec& spec = id.getSpec();
+            if ( normalQuery ){
+                if ( anyElementNamesMatch( spec.keyPattern , query_ ) == 0 && 
+                     anyElementNamesMatch( spec.keyPattern , order_ ) == 0 )
+                    continue;
+            }
+
             PlanPtr p( new QueryPlan( d, i, fbs_, order_ ) );
             if ( p->optimal() ) {
                 addPlan( p, checkFirst );
@@ -587,9 +609,11 @@ namespace mongo {
             while( i.more() ) {
                 IndexDetails& ii = i.next();
                 if ( indexWorks( ii.keyPattern(), min.isEmpty() ? max : min, ret.first, ret.second ) ) {
-                    id = &ii;
-                    keyPattern = ii.keyPattern();
-                    break;
+                    if ( ii.getSpec().getType() == 0 ){
+                        id = &ii;
+                        keyPattern = ii.keyPattern();
+                        break;
+                    }
                 }
             }
             
