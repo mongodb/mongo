@@ -38,11 +38,20 @@ t.insert( { loc : [ 200 , 200 ]  } )
 assert( db.getLastError() , "B2" )
 assert.eq( 3 , t.count() , "B3" );
 
+// test normal access
+
+wb = t.findOne( { zip : "06525" } )
+assert( wb , "C1" );
+
+assert.eq( "06525" , t.find( { loc : wb.loc } ).hint( { "$natural" : 1 } )[0].zip , "C2" )
+assert.eq( "06525" , t.find( { loc : wb.loc } )[0].zip , "C3" )
+assert.eq( 1 , t.find( { loc : wb.loc } ).explain().nscanned , "C4" )
+
 // test config options
 
 t.drop();
 
 t.ensureIndex( { loc : "2d" } , { min : -500 , max : 500 , bits : 4 } );
 t.insert( { loc : [ 200 , 200 ]  } )
-assert.isnull( db.getLastError() , "C1" )
-assert.eq( 8 , t.find( {} ).hint( { loc : "2d" } )._addSpecial( "$returnKey" , true ).next().loc.length , "C2" )
+assert.isnull( db.getLastError() , "D1" )
+assert.eq( 8 , t.find( {} ).hint( { loc : "2d" } )._addSpecial( "$returnKey" , true ).next().loc.length , "D2" )

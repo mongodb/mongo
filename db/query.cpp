@@ -486,7 +486,10 @@ namespace mongo {
                 _c = qp().newCursor();
             }
             
-            _matcher.reset(new CoveredIndexMatcher(qp().query(), qp().indexKey()));
+            if ( ! _c.get() || _c->useMatcher() )
+                _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
+            else
+                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));
             
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
