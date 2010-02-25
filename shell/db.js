@@ -505,7 +505,7 @@ DB.prototype.getCollectionNames = function(){
         function(z){
             var name = z.name;
             
-            if ( name.indexOf( "$" ) >= 0 )
+            if ( name.indexOf( "$" ) >= 0 && name != "local.oplog.$main" )
                 return;
             
             all.push( name.substring( nsLength ) );
