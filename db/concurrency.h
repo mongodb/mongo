@@ -324,6 +324,20 @@ namespace mongo {
         bool _got;
     };
     
+    struct atleastreadlock {
+        atleastreadlock( const string& ns ){
+            _prev = dbMutex.getState();
+            if ( _prev == 0 )
+                dbMutex.lock_shared();
+        }
+        ~atleastreadlock(){
+            if ( _prev == 0 )
+                dbMutex.unlock_shared();
+        }
+
+        int _prev;
+    };
+
     class mongolock {
         bool _writelock;
     public:
