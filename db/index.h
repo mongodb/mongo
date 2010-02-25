@@ -45,6 +45,8 @@ namespace mongo {
         
         const IndexPlugin * getPlugin() const { return _plugin; }
 
+        virtual BSONObj fixKey( const BSONObj& in ) { return in; }
+
     protected:
         const IndexPlugin * _plugin;
     };

@@ -230,6 +230,20 @@ namespace mongo {
             
         }
 
+        virtual BSONObj fixKey( const BSONObj& in ) { 
+            if ( ! in.firstElement().isABSONObj() )
+                return in;
+
+            BSONObjBuilder b;
+            b.append( "" , _hash( in.firstElement().embeddedObject() ) );
+
+            BSONObjIterator i(in);
+            i.next();
+            while ( i.more() )
+                b.append( i.next() );
+            return b.obj();
+        }
+
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
             BSONObjBuilder b(64);
 
