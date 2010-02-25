@@ -1181,7 +1181,7 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
-        log() << "building new index on " << idx.keyPattern() << " for " << ns << "..." << endl;
+        log() << "building new index on " << idx.keyPattern() << " for " << ns << endl;
         Timer t;
 		unsigned long long n;
 

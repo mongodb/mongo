@@ -75,7 +75,8 @@ namespace mongo {
     }
 
     const IndexSpec& IndexDetails::getSpec() const {
-        return NamespaceDetailsTransient::_get( info.obj()["ns"].valuestr() ).getIndexSpec( this );
+        boostlock lk(NamespaceDetailsTransient::_qcMutex);
+        return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
     /* delete this index.  does NOT clean up the system catalog
