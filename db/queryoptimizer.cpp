@@ -239,9 +239,7 @@ namespace mongo {
     min_( min.getOwned() ),
     max_( max.getOwned() ) {
         if ( hint && !hint->eoo() ) {
-            BSONObjBuilder b;
-            b.append( *hint );
-            hint_ = b.obj();
+            hint_ = hint->wrap();
         }
         init();
     }
