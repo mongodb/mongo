@@ -531,9 +531,10 @@ methods['db.verify'] = Api(
 	['open'], [])
 
 ###################################################
-# Non-method external routine flag declarations
+# External routine flag declarations
 ###################################################
-flags['wiredtiger_env_init'] = [ ]
+flags['wiredtiger_env_init'] = [
+	'MEMORY_CHECK' ]
 
 ###################################################
 # Internal routine flag declarations
@@ -547,6 +548,8 @@ flags['bt_search_key_row'] = [
 flags['cache'] = [
 	'INITIALIZED',
 	'SERVER_SLEEPING' ]
+flags['env'] = [
+	'MEMORY_CHECK' ]
 flags['idb'] = [
 	'COLUMN',
 	'RDONLY',

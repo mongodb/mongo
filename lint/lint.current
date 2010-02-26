@@ -367,7 +367,7 @@ _
 
 --- Module:   ../support/huffman.c (C)
                                                             _
-#...  { if ((ret = (__wt_calloc(env, 1 << huffman->max_depth, sizeof(WT_STATIC_
+#...  ((ret = (__wt_calloc_func(env, 1 << huffman->max_depth, sizeof(WT_STATIC_
 	    sizeof(WT_STATIC_HUFFMAN_NODE), &huffman->nodes));
 ../support/huffman.c  325  Info 701: Shift left of signed quantity (int)
                                                        _

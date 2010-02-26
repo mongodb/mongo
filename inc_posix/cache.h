@@ -56,31 +56,10 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 #include "btree.h"
 #include "debug.h"
 #include "fh.h"
+#include "mem.h"
 #include "misc.h"
 #include "mutex.h"
 #include "stat.h"
-
-/*
- * Private functions.
- *
- * Our private free function clears the underlying address atomically so there's
- * no chance of racing threads looking an intermediate results while a structure
- * is being free'd.   (That would be a bug, of course, but I'd rather not drop
- * core, just the same.)  That's a non-standard "free" API, and the resulting
- * bug is a mother to find -- make sure we get it right, don't make the caller
- * remember to put the & operator on the pointer.
- */
-#define	__wt_free(a, b, c)	__wt_free_worker(a, &(b), c)
-
-/*
- * There's no malloc interface, WiredTiger never calls malloc.  The problem is
- * an application might: allocate memory, write secret stuff into it, free the
- * memory, we allocate the memory, and then use it for a database page or log
- * record and write it to disk.  That would result in the secret stuff being
- * protected by the WiredTiger permission mechanisms, potentially inappropriate
- * for the secret stuff.
- */
-#define	__wt_malloc(a, b, c)	__wt_calloc(a, 1, b, c)
 
 /*******************************************
  * WT_TOC support (the structures are public, so declared in wiredtiger.h).
@@ -217,6 +196,10 @@ struct __ienv {
 
 	WT_CACHE  cache;		/* Page cache */
 	u_int32_t page_gen;		/* Page cache LRU generation number */
+
+#ifdef HAVE_DIAGNOSTIC
+	WT_MTRACK *mtrack;		/* Memory tracking information */
+#endif
 
 	WT_STATS *stats;		/* Environment handle statistics */
 

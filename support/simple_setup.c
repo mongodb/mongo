@@ -20,7 +20,7 @@ static ENV *__env;
  *	Standard setup for simple applications.
  */
 int
-wiredtiger_simple_setup(const char *progname, DB **dbp)
+wiredtiger_simple_setup(const char *progname, DB **dbp, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -28,7 +28,7 @@ wiredtiger_simple_setup(const char *progname, DB **dbp)
 
 	db = *dbp = NULL;
 
-	if ((ret = wiredtiger_env_init(&env, 0)) != 0) {
+	if ((ret = wiredtiger_env_init(&env, flags)) != 0) {
 		fprintf(stderr,
 		    "%s: wiredtiger_env_init: %s\n",
 		    progname, wiredtiger_strerror(ret));

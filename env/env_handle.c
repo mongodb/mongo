@@ -38,6 +38,10 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	/* Connect everything together. */
 	env->ienv = ienv;
 
+	/* Set flags. */
+	if (LF_ISSET(WT_MEMORY_CHECK))
+		F_SET(env, WT_MEMORY_CHECK);
+
 	/* Configure the ENV and the IENV. */
 	WT_ERR(__wt_env_config_default(env));
 	WT_ERR(__wt_ienv_config_default(env));
@@ -77,6 +81,12 @@ __wt_ienv_config_default(ENV *env)
 	IENV *ienv;
 
 	ienv = env->ienv;
+
+#ifdef HAVE_DIAGNOSTIC
+	/* If we're tracking memory, initialize those structures first. */
+	if (F_ISSET(env, WT_MEMORY_CHECK))
+		WT_RET(__wt_mtrack_alloc(env));
+#endif
 
 	WT_RET(__wt_mtx_init(&ienv->mtx));	/* Global mutex */
 
@@ -124,6 +134,12 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	__wt_free(env, ienv->toc_array, 0);
 	__wt_free(env, ienv->hazard, 0);
 	__wt_free(env, ienv->stats, 0);
+
+#ifdef HAVE_DIAGNOSTIC
+	/* If we're tracking memory, check to see if everything was free'd. */
+	__wt_mtrack_dump(env);
+	__wt_mtrack_free(env);
+#endif
 
 	/*
 	 * This is the guts of the split between the public/private, ENV/IENV

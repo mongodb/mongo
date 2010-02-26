@@ -208,14 +208,32 @@ __wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new);
 void
 __wt_abort(void);
 int
-__wt_calloc(ENV *env, u_int32_t number, u_int32_t size, void *retp);
+__wt_calloc_func(ENV *env, u_int32_t number, u_int32_t size, void *retp
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    );
 int
-__wt_realloc(ENV *env,
-    u_int32_t *bytes_allocated_ret, u_int32_t bytes_to_allocate, void *retp);
+__wt_realloc_func(ENV *env,
+    u_int32_t *bytes_allocated_ret, u_int32_t bytes_to_allocate, void *retp
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    );
 int
-__wt_strdup(ENV *env, const char *str, void *retp);
+__wt_strdup_func(ENV *env, const char *str, void *retp
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    );
 void
-__wt_free_worker(ENV *env, void *p_arg, u_int32_t len);
+__wt_free_func(ENV *env, void *p_arg, u_int32_t len);
+int
+__wt_mtrack_alloc(ENV *env);
+void
+__wt_mtrack_free(ENV *env);
+void
+__wt_mtrack_dump(ENV *env);
 int
 __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep);
 int
