@@ -288,13 +288,13 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplayMode";
-            insert( ns, BSON( "a" << 3 ) );
-            insert( ns, BSON( "a" << 0 ) );
-            insert( ns, BSON( "a" << 1 ) );
-            insert( ns, BSON( "a" << 2 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_OplogReplay );
+            insert( ns, BSON( "ts" << 3 ) );
+            insert( ns, BSON( "ts" << 0 ) );
+            insert( ns, BSON( "ts" << 1 ) );
+            insert( ns, BSON( "ts" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, Option_OplogReplay );
             ASSERT( c->more() );
-            ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
+            ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
             ASSERT( !c->more() );
         }
     };
