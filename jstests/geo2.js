@@ -37,3 +37,6 @@ assert.eq( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } }
 assert.close( 1.33333 , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(3) ) , "B2" );
 assert.close( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B3" );
 
+printjson( t.find( { loc : { $near : [ 50 , 50 ] } } ).explain() )
+
+

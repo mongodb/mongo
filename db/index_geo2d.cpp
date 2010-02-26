@@ -662,7 +662,7 @@ namespace mongo {
     class GeoSearch {
     public:
         GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() )
-            : _spec( g ) , _n( n ) , _start( n ) , 
+            : _spec( g ) , _n( n ) , _start( n ) ,
               _numWanted( numWanted ) , _filter( filter ) , 
               _hopper( g , numWanted , n , filter )
         {
@@ -683,8 +683,8 @@ namespace mongo {
              * 3) find optimal set of boxes that complete circle
              * 4) use regular btree cursors to scan those boxes
              */
-
-            GeoHash prefix = _start;
+            
+            _prefix = _start;
             { // 1 regular geo hash algorithm
                 
 
@@ -701,31 +701,31 @@ namespace mongo {
                 uassert( 13036 , "can't find index starting point" , ! min.bucket.isNull() || ! max.bucket.isNull() );
 
                 while ( _found < _numWanted ){
-                    while ( min.hasPrefix( prefix ) && min.advance( -1 , _found , _hopper ) )
+                    while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , _hopper ) )
                         _nscanned++;
-                    while ( max.hasPrefix( prefix ) && max.advance( 1 , _found , _hopper ) )
+                    while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , _hopper ) )
                         _nscanned++;
-                    if ( prefix.size() == 0 )
+                    if ( _prefix.size() == 0 )
                         break;
-                    prefix = prefix.up();
+                    _prefix = _prefix.up();
                 }
             }
             
-            if ( _found && prefix.size() ){
+            if ( _found && _prefix.size() ){
                 // 2
                 Point center( _spec , _n );
-                double boxSize = _spec->size( prefix );
+                double boxSize = _spec->size( _prefix );
                 double farthest = _hopper.farthest();
                 if ( farthest > boxSize )
                     boxSize = farthest;
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
-                while ( _spec->size( prefix ) < boxSize )
-                    prefix = prefix.up();
-                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->size( prefix ) << endl;
+                while ( _spec->size( _prefix ) < boxSize )
+                    _prefix = _prefix.up();
+                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->size( _prefix ) << endl;
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
-                        GeoHash toscan = prefix;
+                        GeoHash toscan = _prefix;
                         toscan.move( x , y );
                         
                         // 3 & 4
@@ -767,6 +767,7 @@ namespace mongo {
 
         GeoHash _n;
         GeoHash _start;
+        GeoHash _prefix;
         int _numWanted;
         BSONObj _filter;
         GeoHopper _hopper;
@@ -816,8 +817,13 @@ namespace mongo {
             return false;
         }
 
-        virtual BSONObj prettyStartKey() const { return BSON( "TODO" << "TDOO" ); }
-        virtual BSONObj prettyEndKey() const { return BSON( "TODO" << "TODO" ); }
+        virtual BSONObj prettyStartKey() const { return BSON( _s->_spec->_geo << _s->_prefix ); }
+        virtual BSONObj prettyEndKey() const { 
+            GeoHash temp = _s->_prefix;
+            temp.move( 1 , 1 );
+            return BSON( _s->_spec->_geo << temp ); 
+        }
+
 
         shared_ptr<GeoSearch> _s;
         GeoHopper::Holder::iterator _cur;
@@ -825,6 +831,7 @@ namespace mongo {
     };
 
     auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
+        uassert( 13045 , "can't specify order with geo search" , order.isEmpty() );
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
         else if ( numWanted == 0 )
