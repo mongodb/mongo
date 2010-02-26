@@ -799,6 +799,28 @@ namespace JSTests {
         }
     };
 
+    class Speed1 {
+    public:
+        void run(){
+            BSONObj start = BSON( "x" << 5 );
+            BSONObj empty;
+
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
+            
+            ScriptingFunction f = s->createFunction( "return this.x + 6;" );
+            s->setThis( &start );
+            
+            Timer t;
+            double n = 0;
+            for ( ; n < 100000; n++ ){
+                s->invoke( f , empty );
+                ASSERT_EQUALS( 11 , s->getNumber( "return" ) );
+            }
+            cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
@@ -828,8 +850,10 @@ namespace JSTests {
             add< DBRefTest >();
             add< InformalDBRef >();
             add< BinDataType >();
-
+            
             add< VarTests >();
+            
+            add< Speed1 >();
         }
     } myall;
     
