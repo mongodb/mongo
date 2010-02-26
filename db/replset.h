@@ -49,13 +49,13 @@ namespace mongo {
         };
 
         int state;
-        string info; // commentary about our current state
+        ThreadSafeString info; // commentary about our current state
         string arbHost;  // "-" for no arbiter.  "host[:port]"
         int remotePort;
         string remoteHost;
         string remote; // host:port if port specified.
 //    int date; // -1 not yet set; 0=slave; 1=master
-
+        
         string getInfo() {
             stringstream ss;
             ss << "  state:   ";
