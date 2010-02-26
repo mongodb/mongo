@@ -507,7 +507,7 @@ namespace mongo {
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
             virtual bool slaveOk() { return true; }
             
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype(){ return WRITE; } 
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cc().database()->name; // this has to come before dbtemprelease
                 dbtemprelease temprelease; // we don't touch the db directly
