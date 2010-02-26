@@ -79,6 +79,7 @@ namespace mongo {
     
     class WriteBackCommand : public MongodShardCommand {
     public:
+        virtual LockType locktype(){ return NONE; } 
         WriteBackCommand() : MongodShardCommand( "writebacklisten" ){}
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
@@ -89,8 +90,6 @@ namespace mongo {
             }
             
             const OID id = e.__oid();
-            
-            dbtemprelease unlock;
             
             if ( ! clientQueues[id.str()] )
                 clientQueues[id.str()] = new BlockingQueue<BSONObj>();
@@ -114,6 +113,8 @@ namespace mongo {
             help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
         }
         
+        virtual LockType locktype(){ return WRITE; } // TODO: figure out how to make this not need to lock
+ 
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             
             bool authoritative = cmdObj.getBoolField( "authoritative" );
@@ -247,6 +248,8 @@ namespace mongo {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
         
+        virtual LockType locktype(){ return WRITE; } // TODO: figure out how to make this not need to lock
+
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ){
@@ -273,6 +276,8 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
+
+        virtual LockType locktype(){ return WRITE; } 
         
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // so i have to start clone, tell caller its ok to make change
@@ -342,6 +347,8 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "should not be calling this directly" << endl;
         }
+
+        virtual LockType locktype(){ return WRITE; } 
         
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // see MoveShardStartCommand::run

@@ -41,7 +41,7 @@ namespace mongo {
 
         virtual bool slaveOk(){ return true; }
         virtual bool readOnly(){ return true; }
-
+        virtual LockType locktype(){ return READ; } 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             result.append( "readlock" , readLockSupported() );
             if ( globalScriptEngine ){
@@ -59,7 +59,8 @@ namespace mongo {
         CleanCmd() : Command( "clean" ){}
 
         virtual bool slaveOk(){ return true; }
-
+        virtual LockType locktype(){ return WRITE; } 
+        
         bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string dropns = cc().database()->name + "." + cmdObj.firstElement().valuestrsafe();
             
@@ -90,6 +91,7 @@ namespace mongo {
             return true;
         }
         
+        virtual LockType locktype(){ return WRITE; } 
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
         
         bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
@@ -335,7 +337,7 @@ namespace mongo {
         };
     public:
         FSyncCommand() : Command( "fsync" ){}
-
+        virtual LockType locktype(){ return WRITE; } 
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }
         /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 

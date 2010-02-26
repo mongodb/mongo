@@ -416,6 +416,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "clone this database from an instance of the db on another host\n";
             help << "example: { clone : \"host13\" }";
@@ -438,6 +439,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
@@ -481,6 +483,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdStartCloneCollection() : Command("startCloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { startCloneCollection: <collection ns>, from: <hostname>, query: <query> }";
@@ -534,6 +537,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdFinishCloneCollection() : Command("finishCloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { finishCloneCollection: <finishToken> }";
@@ -586,6 +590,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
@@ -618,6 +623,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "copy a database from antoher host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>]}";
@@ -664,6 +670,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         virtual bool logTheOp() {
             return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
         }

@@ -116,6 +116,7 @@ namespace mongo {
         virtual bool requiresAuth() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdEval() : Command("$eval") { }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();

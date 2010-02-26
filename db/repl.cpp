@@ -139,6 +139,7 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdReplacePeer() : Command("replacepeer") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( replPair == 0 ) {
@@ -198,6 +199,7 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;   
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             replAllDead = "forced by command";
@@ -217,6 +219,7 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj.getBoolField( "force" ) ) {
@@ -332,8 +335,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        virtual bool noLocking() { return true; }
-
+        virtual LockType locktype(){ return NONE; }
         CmdIsMaster() : Command("ismaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
@@ -354,6 +356,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdIsInitialSyncComplete() : Command( "isinitialsynccomplete" ) {}
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             result.appendBool( "initialsynccomplete", getInitialSyncCompleted() );
@@ -387,7 +390,7 @@ namespace mongo {
         virtual bool adminOnly() {
             return true;
         }
-
+        virtual LockType locktype(){ return WRITE; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             if ( replPair == 0 ) {
                 massert( 10383 ,  "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
@@ -1777,6 +1780,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
+        virtual LockType locktype(){ return WRITE; }
         CmdLogCollection() : Command( "logCollection" ) {}
         virtual void help( stringstream &help ) const {
             help << "examples: { logCollection: <collection ns>, start: 1 }, "

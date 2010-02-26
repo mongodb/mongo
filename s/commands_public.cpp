@@ -42,6 +42,10 @@ namespace mongo {
             virtual bool adminOnly() {
                 return false;
             }
+
+            // all grid commands are designed not to lock
+            virtual LockType locktype(){ return NONE; } 
+
         protected:
             string getDBName( string ns ){
                 return ns.substr( 0 , ns.size() - 5 );

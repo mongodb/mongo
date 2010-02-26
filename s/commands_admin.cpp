@@ -54,6 +54,9 @@ namespace mongo {
             virtual bool adminOnly() {
                 return true;
             }
+
+            // all grid commands are designed not to lock
+            virtual LockType locktype(){ return NONE; } 
         };
 
         // --------------- misc commands ----------------------
@@ -585,6 +588,7 @@ namespace mongo {
 
         class IsDbGridCmd : public Command {
         public:
+            virtual LockType locktype(){ return NONE; } 
             virtual bool slaveOk() {
                 return true;
             }
@@ -598,6 +602,7 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
+            virtual LockType locktype(){ return NONE; } 
             virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;
@@ -615,6 +620,7 @@ namespace mongo {
 
         class CmdShardingGetPrevError : public Command {
         public:
+            virtual LockType locktype(){ return NONE; } 
             virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;
@@ -631,6 +637,7 @@ namespace mongo {
 
         class CmdShardingGetLastError : public Command {
         public:
+            virtual LockType locktype(){ return NONE; } 
             virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() {
                 return true;

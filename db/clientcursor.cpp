@@ -267,6 +267,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }";
         }
+        virtual LockType locktype(){ return NONE; }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             recursive_boostlock lock(ClientCursor::ccmutex);
             result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );

@@ -108,6 +108,7 @@ namespace mongo {
     class PoolFlushCmd : public Command {
     public:
         PoolFlushCmd() : Command( "connpoolsync" ){}
+        virtual LockType locktype(){ return NONE; }
         virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.flush();
             result << "ok" << 1;

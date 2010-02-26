@@ -860,12 +860,9 @@ namespace mongo {
     class Geo2dFindNearCmd : public Command {
     public:
         Geo2dFindNearCmd() : Command( "geo2d" ){}
-
-        bool readOnly() { return true; }
+        virtual LockType locktype(){ return READ; } 
         bool slaveOk() { return true; }
         bool slaveOverrideOk() { return true; }
-
-
         bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
 

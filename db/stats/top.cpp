@@ -139,8 +139,8 @@ namespace mongo {
         TopCmd() : Command( "top" ){}
 
         virtual bool slaveOk(){ return true; }
-        virtual bool readOnly(){ return true; }
         virtual bool adminOnly(){ return true; }
+        virtual LockType locktype(){ return READ; } 
         virtual void help( stringstream& help ) const { help << "usage by collection"; }
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){

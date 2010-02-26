@@ -99,11 +99,11 @@ namespace mongo {
     }
 
 
-    bool Command::readOnly( const string& name ){
+    Command::LockType Command::locktype( const string& name ){
         Command * c = findCommand( name );
         if ( ! c )
-            return false;
-        return c->readOnly();
+            return WRITE;
+        return c->locktype();
     }
 
     

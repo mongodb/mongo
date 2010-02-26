@@ -370,7 +370,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "see http://www.mongodb.org/display/DOCS/MapReduce";
             }
-        
+            virtual LockType locktype(){ return WRITE; } // TODO, READ?
             bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
@@ -506,7 +506,8 @@ namespace mongo {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
             virtual bool slaveOk() { return true; }
-
+            
+            virtual LockType locktype(){ return NONE; } 
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cc().database()->name; // this has to come before dbtemprelease
                 dbtemprelease temprelease; // we don't touch the db directly
