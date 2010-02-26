@@ -260,6 +260,17 @@ namespace mongo {
             keys.insert( b.obj() );
         }
         
+        GeoHash _tohash( const BSONElement& e ) const {
+            if ( e.isABSONObj() )
+                return _hash( e.embeddedObject() );
+            
+            if ( e.type() == String)
+                return (string)(e.valuestr());
+            
+            uassert( 13043 , "invalid near" , 0 );
+            return "";
+        }
+
         GeoHash _hash( const BSONObj& o ) const {
             BSONObjIterator i(o);
             assert( i.more() );
@@ -323,15 +334,11 @@ namespace mongo {
             return distance( a , b );
         }
 
-        const IndexDetails* getDetails(){
+        const IndexDetails* getDetails() const {
             return _spec->getDetails();
         }
 
-        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order ) const {
-            auto_ptr<Cursor> c;
-            assert(0);
-            return c;
-        }
+        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
         
         const IndexSpec* _spec;
         string _geo;
@@ -348,7 +355,7 @@ namespace mongo {
     class Point {
     public:
         
-        Point( Geo2dType * g , const GeoHash& hash ){
+        Point( const Geo2dType * g , const GeoHash& hash ){
             g->_unconvert( hash , _x , _y );
         }
 
@@ -370,7 +377,7 @@ namespace mongo {
     class Box {
     public:
         
-        Box( Geo2dType * g , const GeoHash& hash )
+        Box( const Geo2dType * g , const GeoHash& hash )
             : _min( g , hash ) , 
               _max( _min._x + g->size( hash ) , _min._y + g->size( hash ) ){
         }
@@ -521,14 +528,19 @@ namespace mongo {
     
     class GeoPoint {
     public:
-        GeoPoint( const BSONObj& o , double distance )
-            : _o( o ) , _distance( distance ){
+        GeoPoint( DiskLoc loc , double distance )
+            : _loc(loc) , _o( loc.obj() ) , _distance( distance ){
+            BSONObjBuilder b( loc.obj().objsize() + 24 );
+            b.appendElements( loc.obj() );
+            b.append( "$distance" , distance );
+            _o = b.obj();
         }
 
         bool operator<( const GeoPoint& other ) const {
             return _distance < other._distance;
         }
 
+        DiskLoc _loc;
         BSONObj _o;
         double _distance;
     };
@@ -537,7 +549,7 @@ namespace mongo {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper( Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() )
+        GeoHopper( const Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() )
             : _g( g ) , _max( max ) , _near( n ) , _lookedAt(0) , _objectsLoaded(0){
 
             if ( ! filter.isEmpty() )
@@ -571,7 +583,7 @@ namespace mongo {
             if ( ! loaded ) // dont double count
                 _objectsLoaded++;
             
-            _points.insert( GeoPoint( node.recordLoc.obj() , d ) );
+            _points.insert( GeoPoint( node.recordLoc , d ) );
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
             }
@@ -586,7 +598,7 @@ namespace mongo {
             return i->_distance;
         }
 
-        Geo2dType * _g;
+        const Geo2dType * _g;
         unsigned _max;
         GeoHash _near;
         Holder _points;
@@ -646,7 +658,7 @@ namespace mongo {
 
     class GeoSearch {
     public:
-        GeoSearch( Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() )
+        GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() )
             : _spec( g ) , _n( n ) , _start( n ) , 
               _numWanted( numWanted ) , _filter( filter ) , 
               _hopper( g , numWanted , n , filter )
@@ -741,7 +753,7 @@ namespace mongo {
         }
 
 
-        Geo2dType * _spec;
+        const Geo2dType * _spec;
 
         GeoHash _n;
         GeoHash _start;
@@ -752,6 +764,81 @@ namespace mongo {
         long long _nscanned;
         int _found;
     };
+    
+    class GeoCursor : public Cursor {
+    public:
+        GeoCursor( shared_ptr<GeoSearch> s )
+            : _s( s ) , _cur( s->_hopper._points.begin() ) , _end( s->_hopper._points.end() ) {
+        }
+        
+        virtual ~GeoCursor() {}
+        
+        virtual bool ok(){
+            return _cur != _end;
+        }
+        
+        virtual Record* _current(){ return _cur->_loc.rec(); }
+        virtual BSONObj current(){ return _cur->_o; }
+        virtual DiskLoc currLoc(){ return _cur->_loc; }
+        virtual bool advance(){ _cur++; return ok(); }
+        virtual BSONObj currKey() const { return BSONObj(); }
+
+        virtual DiskLoc refLoc(){ return DiskLoc(); }
+
+        virtual BSONObj indexKeyPattern() {
+            return _s->_spec->_spec->keyPattern;
+        }
+
+        virtual void noteLocation() { 
+            assert(0);
+        }
+
+        /* called before query getmore block is iterated */
+        virtual void checkLocation() {
+            assert(0);
+        }
+
+        virtual string toString() {
+            return "GeoCursor";
+        }
+
+        virtual bool getsetdup(DiskLoc loc){
+            return false;
+        }
+
+        virtual BSONObj prettyStartKey() const { return BSON( "TODO" << "TDOO" ); }
+        virtual BSONObj prettyEndKey() const { return BSON( "TODO" << "TODO" ); }
+
+        shared_ptr<GeoSearch> _s;
+        GeoHopper::Holder::iterator _cur;
+        GeoHopper::Holder::iterator _end;
+    };
+
+    auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
+        if ( numWanted < 0 )
+            numWanted = numWanted * -1;
+        else if ( numWanted == 0 )
+             numWanted = 100;
+        
+        GeoHash n;
+        BSONObjIterator i(query);
+        while ( i.more() ){
+            BSONElement e = i.next();
+            if ( _geo != e.fieldName() )
+                continue;
+            if ( e.type() == Object && 
+                 strcmp( e.embeddedObject().firstElement().fieldName() , "$near" ) == 0 )
+                e = e.embeddedObject().firstElement();
+            n = _tohash( e );
+        }
+        uassert( 13042 , "no geo field" , n.size() );
+
+        shared_ptr<GeoSearch> s( new GeoSearch( this , n , numWanted , query ) );
+        s->exec();
+        auto_ptr<Cursor> c;
+        c.reset( new GeoCursor( s ) );
+        return c;
+    }
 
     class Geo2dFindNearCmd : public Command {
     public:
@@ -801,20 +888,7 @@ namespace mongo {
             if ( cmdObj["num"].isNumber() )
                 numWanted = cmdObj["num"].numberInt();
             
-            GeoHash n;
-            {
-                BSONElement nearElement = cmdObj["near"];
-                if ( nearElement.isABSONObj() ){
-                    n = g->_hash( cmdObj["near"].embeddedObjectUserCheck() );
-                }
-                else if ( nearElement.type() == String){
-                    n = (string)(nearElement.valuestr());
-                }
-                else {
-                    errmsg = "near invalid";
-                    return false;
-                }
-            }
+            const GeoHash n = g->_tohash( cmdObj["near"] );
             result.append( "near" , n );
 
             BSONObj filter;

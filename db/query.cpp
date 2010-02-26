@@ -483,7 +483,7 @@ namespace mongo {
                 _findingStartTimer.reset();
                 _findingStartMode = Initial;
             } else {
-                _c = qp().newCursor();
+                _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
             }
             
             if ( ! _c.get() || _c->useMatcher() )

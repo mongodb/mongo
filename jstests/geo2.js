@@ -23,17 +23,23 @@ assert.lt( fast.stats.nscanned * 10 , slow.stats.nscanned , "A1" + v );
 assert.lt( fast.stats.objectsLoaded , slow.stats.objectsLoaded , "A2" + v );
 assert.eq( fast.stats.avgDistance , slow.stats.avgDistance , "A3" + v );
 
-/*
-function p( z ){
-    print( z.dis + "\t" + z.obj.loc )
+function a( cur ){
+    var total = 0;
+    var outof = 0;
+    while ( cur.hasNext() ){
+        total += cur.next()["$distance"];
+        outof++;
+    }
+    return total/outof;
 }
 
-printjson( fast.stats )
-fast.results.forEach( p )
-printjson( slow.stats )
-slow.results.forEach( p )
+assert.eq( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B1" )
 
-*/
+print( "---" )
+query = t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10)
+query.forEach( printjson )
 
+print( "---" )
+query = t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(3)
+query.forEach( printjson )
 
-//t.find( { loc : { $near : [ 50 , 50 ] } } ).itcount();
