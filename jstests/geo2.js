@@ -11,8 +11,8 @@ for ( var x=-100; x<100; x+=2 ){
 
 t.ensureIndex( { loc : "2d" } )
 
-fast = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 } );
-slow = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
+fast = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 } );
+slow = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
 
 printjson(fast.stats);
 printjson(slow.stats);

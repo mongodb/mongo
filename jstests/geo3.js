@@ -12,11 +12,11 @@ for ( var x=-100; x<100; x+=2 ){
 
 t.ensureIndex( { loc : "2d" } )
 
-fast = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 } );
+fast = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 } );
 
 //printjson( fast.stats );
 
-slow = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
+slow = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , start : "11" } );
 
 //printjson( slow.stats );
 
@@ -26,7 +26,7 @@ assert.eq( fast.stats.avgDistance , slow.stats.avgDistance , "A3" );
 
 // test filter
 
-filtered1 = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
+filtered1 = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
 assert.eq( 10 , filtered1.results.length , "B1" );
 filtered1.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B2: " + tojson( z ) ); } )
 //printjson( filtered1.stats );
@@ -34,7 +34,7 @@ filtered1.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B2: " + tojson
 t.dropIndex( { loc : "2d" } )
 t.ensureIndex( { loc : "2d" , a : 1 } )
 
-filtered2 = db.runCommand( { geo2d : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
+filtered2 = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
 assert.eq( 10 , filtered2.results.length , "B3" );
 filtered2.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B4: " + tojson( z ) ); } )
 //printjson( filtered2.stats );

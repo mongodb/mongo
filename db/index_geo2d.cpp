@@ -859,7 +859,7 @@ namespace mongo {
 
     class Geo2dFindNearCmd : public Command {
     public:
-        Geo2dFindNearCmd() : Command( "geo2d" ){}
+        Geo2dFindNearCmd() : Command( "geoNear" ){}
         virtual LockType locktype(){ return READ; } 
         bool slaveOk() { return true; }
         bool slaveOverrideOk() { return true; }
