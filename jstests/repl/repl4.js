@@ -28,6 +28,14 @@ doTest = function() {
     printjson( s.getDBNames() );
     assert.eq( -1, s.getDBNames().indexOf( "b" ) );
     assert.eq( 0, s.getDB( "b" ).b.find().count() );
+    
+    stopMongod( ports[ 1 ] );
+    
+    cm.save( { x:3 } );
+    bm.save( { x:4 } );
+    
+    s = startMongoProgram( "mongod", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:" + ports[ 0 ], "--only", "c", "--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1" );
+    soonCount( "c", "c", 2 );
 }
 
 doTest();

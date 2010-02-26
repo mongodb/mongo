@@ -981,7 +981,11 @@ namespace mongo {
     
     void ReplSource::syncToTailOfRemoteLog() {
         string _ns = ns();
-        BSONObj last = conn->findOne( _ns.c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
+        BSONObjBuilder b;
+        if ( !only.empty() ) {
+            b.appendRegex("ns", string("^") + only);
+        }        
+        BSONObj last = conn->findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
             BSONElement ts = last.findElement( "ts" );
             massert( "non Date ts found", ts.type() == Date || ts.type() == Timestamp );

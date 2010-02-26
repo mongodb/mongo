@@ -103,7 +103,6 @@ namespace mongo {
         if ( ! _needRecord ){
             return true;
         }
-
         return _recordMatcher.matches(recLoc.rec());
     }
     

@@ -481,11 +481,16 @@ namespace mongo {
                 findingStartCursor_ = new ClientCursor();
                 findingStartCursor_->c = qp().newReverseCursor();
                 findingStartCursor_->ns = qp().ns();
+                BSONElement tsElt = qp().query()[ "ts" ];
+                massert( "no ts field in query", !tsElt.eoo() );
+                BSONObjBuilder b;
+                b.append( tsElt );
+                BSONObj tsQuery = b.obj();
+                matcher_.reset(new KeyValJSMatcher(tsQuery, qp().indexKey()));
             } else {
                 c_ = qp().newCursor();
+                matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             }
-            
-            matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
             
             if ( qp().scanAndOrderRequired() ) {
                 ordering_ = true;
@@ -498,9 +503,11 @@ namespace mongo {
                 if ( !findingStartCursor_ || !findingStartCursor_->c->ok() ) {
                     findingStart_ = false;
                     c_ = qp().newCursor();
+                    matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
                 } else if ( !matcher_->matches( findingStartCursor_->c->currKey(), findingStartCursor_->c->currLoc() ) ) {
                     findingStart_ = false;
                     c_ = qp().newCursor( findingStartCursor_->c->currLoc() );
+                    matcher_.reset(new KeyValJSMatcher(qp().query(), qp().indexKey()));
                 } else {
                     findingStartCursor_->c->advance();
                     RARELY {
