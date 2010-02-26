@@ -165,14 +165,37 @@ namespace mongo {
     
     
     void Matcher::addRegex( const BSONElement &e, const char *fieldName, bool isNot ) {
+        if ( fieldName == 0 )
+            fieldName = e.fieldName();
+        const char* regex = e.regex();
+        const char* flags = e.regexFlags();
+
+        if (!isNot){ //TODO something smarter
+            bool purePrefix;
+            string prefix = simpleRegex(regex, flags, &purePrefix);
+            if (purePrefix){
+                {
+                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                    _builders.push_back( b );
+                    *b << fieldName << prefix;
+                    addBasic(b->done().firstElement(), BSONObj::GTE , isNot);
+                }
+                {
+                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+                    _builders.push_back( b );
+                    *b << fieldName << simpleRegexEnd(prefix);
+                    addBasic(b->done().firstElement(), BSONObj::LT , isNot);
+                }
+                return;
+            }
+        }
+
         if ( nRegex >= 4 ) {
             out() << "ERROR: too many regexes in query" << endl;
         }
         else {
-            if ( fieldName == 0 )
-                fieldName = e.fieldName();
             RegexMatcher& rm = regexs[nRegex];
-            rm.re = new pcrecpp::RE(e.regex(), flags2options(e.regexFlags()));
+            rm.re = new pcrecpp::RE(regex, flags2options(flags));
             rm.fieldName = fieldName;
             rm.isNot = isNot;
             nRegex++;

@@ -24,85 +24,95 @@
 #include "../util/unittest.h"
 
 namespace mongo {
-    namespace {
-        /** returns a string that when used as a matcher, would match a super set of regex()
-            returns "" for complex regular expressions
-            used to optimize queries in some simple regex cases that start with '^'
-        */
-        inline string simpleRegexHelper(const char* regex, const char* flags){
-            string r = "";
+    /** returns a string that when used as a matcher, would match a super set of regex()
+        returns "" for complex regular expressions
+        used to optimize queries in some simple regex cases that start with '^'
 
-            bool extended = false;
-            while (*flags){
-                switch (*(flags++)){
-                    case 'm': // multiline
-                        continue;
-                    case 'x': // extended
-                        extended = true;
-                        break;
-                    default:
-                        return r; // cant use index
-                }
-            }
+        if purePrefix != NULL, sets it to whether the regex can be converted to a range query
+    */
+    string simpleRegex(const char* regex, const char* flags, bool* purePrefix){
+        string r = "";
 
-            if ( *(regex++) != '^' )
-                return r;
+        if (purePrefix) *purePrefix = false;
 
-            stringstream ss;
-
-            while(*regex){
-                char c = *(regex++);
-                if ( c == '*' || c == '?' ){
-                    // These are the only two symbols that make the last char optional
-                    r = ss.str();
-                    r = r.substr( 0 , r.size() - 1 );
-                    return r; //breaking here fails with /^a?/
-                } else if (c == '\\'){
-                    // slash followed by non-alphanumeric represents the following char
-                    c = *(regex++);
-                    if ((c >= 'A' && c <= 'Z') ||
-                        (c >= 'a' && c <= 'z') ||
-                        (c >= '0' && c <= '0') ||
-                        (c == '\0'))
-                    {
-                        r = ss.str();
-                        break;
-                    } else {
-                        ss << c;
-                    }
-                } else if (strchr("^$.[|()+{", c)){
-                    // list of "metacharacters" from man pcrepattern
-                    r = ss.str();
-                    break;
-                } else if (extended && c == '#'){
-                    // comment
-                    r = ss.str();
-                    break;
-                } else if (extended && isspace(c)){
+        bool extended = false;
+        while (*flags){
+            switch (*(flags++)){
+                case 'm': // multiline
                     continue;
+                case 'x': // extended
+                    extended = true;
+                    break;
+                default:
+                    return r; // cant use index
+            }
+        }
+
+        if ( *(regex++) != '^' )
+            return r;
+
+        stringstream ss;
+
+        while(*regex){
+            char c = *(regex++);
+            if ( c == '*' || c == '?' ){
+                // These are the only two symbols that make the last char optional
+                r = ss.str();
+                r = r.substr( 0 , r.size() - 1 );
+                return r; //breaking here fails with /^a?/
+            } else if (c == '\\'){
+                // slash followed by non-alphanumeric represents the following char
+                c = *(regex++);
+                if ((c >= 'A' && c <= 'Z') ||
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= '0' && c <= '0') ||
+                    (c == '\0'))
+                {
+                    r = ss.str();
+                    break;
                 } else {
-                    // self-matching char
                     ss << c;
                 }
-            }
-
-            if ( r.size() == 0 && *regex == 0 )
+            } else if (strchr("^$.[|()+{", c)){
+                // list of "metacharacters" from man pcrepattern
                 r = ss.str();
-
-            return r;
-        }
-        inline string simpleRegex(const BSONElement& e){
-            switch(e.type()){
-                case RegEx:
-                    return simpleRegexHelper(e.regex(), e.regexFlags());
-                case Object:{
-                    BSONObj o = e.embeddedObject();
-                    return simpleRegexHelper(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
-                }
-                default: assert(false); return ""; //return squashes compiler warning
+                break;
+            } else if (extended && c == '#'){
+                // comment
+                r = ss.str();
+                break;
+            } else if (extended && isspace(c)){
+                continue;
+            } else {
+                // self-matching char
+                ss << c;
             }
+        }
+
+        if ( r.empty() && *regex == 0 ){
+            r = ss.str();
+            if (purePrefix) *purePrefix = !r.empty();
+        }
+
+        return r;
+    }
+    inline string simpleRegex(const BSONElement& e){
+        switch(e.type()){
+            case RegEx:
+                return simpleRegex(e.regex(), e.regexFlags());
+            case Object:{
+                BSONObj o = e.embeddedObject();
+                return simpleRegex(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
+            }
+            default: assert(false); return ""; //return squashes compiler warning
         }
     }
+
+    string simpleRegexEnd( string regex ) {
+        ++regex[ regex.length() - 1 ];
+        return regex;
+    }    
+    
     
     FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) {
         // NOTE with $not, we could potentially form a complementary set of intervals.
@@ -327,11 +337,6 @@ namespace mongo {
             _special = other._special;
         return *this;
     }
-    
-    string FieldRange::simpleRegexEnd( string regex ) {
-        ++regex[ regex.length() - 1 ];
-        return regex;
-    }    
     
     BSONObj FieldRange::addObj( const BSONObj &o ) {
         objData_.push_back( o );
