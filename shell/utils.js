@@ -132,6 +132,13 @@ assert.gt = function( a , b , msg ){
     doassert( a + " is not greater than " + b + " : " + msg );
 }
 
+assert.close = function( a , b , msg ){
+    var diff = Math.abs( (a-b)/((a+b)/2) );
+    if ( diff < .001 )
+        return;
+    doassert( a + " is not close to " + b + " diff: " + diff + " : " + msg );
+}
+
 Object.extend = function( dst , src , deep ){
     for ( var k in src ){
         var v = src[k];

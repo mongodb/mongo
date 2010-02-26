@@ -396,7 +396,10 @@ namespace mongo {
             buf << _min.toString() << " -->> " << _max.toString();
             return buf.str();
         }
-
+        
+        operator string() const {
+            return toString();
+        }
 
         bool between( double min , double max , double val ) const {
             return val >= min && val <= min;
@@ -712,7 +715,13 @@ namespace mongo {
                 // 2
                 Point center( _spec , _n );
                 double boxSize = _spec->size( prefix );
+                double farthest = _hopper.farthest();
+                if ( farthest > boxSize )
+                    boxSize = farthest;
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
+                while ( _spec->size( prefix ) < boxSize )
+                    prefix = prefix.up();
+                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->size( prefix ) << endl;
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){
@@ -729,6 +738,7 @@ namespace mongo {
 
         void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
             Box testBox( _spec , toscan );
+            log(1) << "\t doBox: " << testBox << endl;
 
             double intPer = testBox.intersects( want );
 
@@ -798,7 +808,7 @@ namespace mongo {
             assert(0);
         }
 
-        virtual string toString() {
+        virtual string toString() const {
             return "GeoCursor";
         }
 

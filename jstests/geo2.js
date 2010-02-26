@@ -34,12 +34,6 @@ function a( cur ){
 }
 
 assert.eq( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B1" )
-
-print( "---" )
-query = t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10)
-query.forEach( printjson )
-
-print( "---" )
-query = t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(3)
-query.forEach( printjson )
+assert.close( 1.33333 , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(3) ) , "B2" );
+assert.close( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B3" );
 
