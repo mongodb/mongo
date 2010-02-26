@@ -321,13 +321,13 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplayMode";
-            insert( ns, BSON( "a" << 3 ) );
-            insert( ns, BSON( "a" << 0 ) );
-            insert( ns, BSON( "a" << 1 ) );
-            insert( ns, BSON( "a" << 2 ) );
-            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "a" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_OplogReplay );
+            insert( ns, BSON( "ts" << 3 ) );
+            insert( ns, BSON( "ts" << 0 ) );
+            insert( ns, BSON( "ts" << 1 ) );
+            insert( ns, BSON( "ts" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query( ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ), 0, 0, 0, QueryOption_OplogReplay );
             ASSERT( c->more() );
-            ASSERT_EQUALS( 2, c->next().getIntField( "a" ) );
+            ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
             ASSERT( !c->more() );
         }
     };
@@ -919,15 +919,15 @@ namespace QueryTests {
             int i = 0;
             for( int oldCount = -1;
                 count() != oldCount;
-                oldCount = count(), client().insert( ns(), BSON( "i" << i++ ) ) );
+                oldCount = count(), client().insert( ns(), BSON( "ts" << i++ ) ) );
 
             for( int k = 0; k < 5; ++k ) {
-                client().insert( ns(), BSON( "i" << i++ ) );
-                int min = client().query( ns(), Query().sort( BSON( "$natural" << 1 ) ) )->next()[ "i" ].numberInt();            
+                client().insert( ns(), BSON( "ts" << i++ ) );
+                int min = client().query( ns(), Query().sort( BSON( "$natural" << 1 ) ) )->next()[ "ts" ].numberInt();            
                 for( int j = -1; j < i; ++j ) {
-                    auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "i" << GTE << j ), 0, 0, 0, QueryOption_OplogReplay );
+                    auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "ts" << GTE << j ), 0, 0, 0, QueryOption_OplogReplay );
                     ASSERT( c->more() );
-                    ASSERT_EQUALS( ( j > min ? j : min ), c->next()[ "i" ].numberInt() );
+                    ASSERT_EQUALS( ( j > min ? j : min ), c->next()[ "ts" ].numberInt() );
                 }
             }
         }

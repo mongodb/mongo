@@ -25,6 +25,14 @@ doTest = function() {
     printjson( s.getDBNames() );
     assert.eq( -1, s.getDBNames().indexOf( "b" ) );
     assert.eq( 0, s.getDB( "b" ).b.find().count() );
+    
+    rt.stop( false );
+    
+    cm.save( { x:3 } );
+    bm.save( { x:4 } );
+    
+    s = rt.start( false, { only: "c" }, true );
+    soonCount( "c", "c", 2 );
 }
 
 doTest();

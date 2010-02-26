@@ -472,6 +472,13 @@ namespace mongo {
             _findingStartMode()
         {}
         
+        void setupMatcher() {
+            if ( ! _c.get() || _c->useMatcher() )
+                _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
+            else
+                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));            
+        }
+        
         virtual void init() {
             _buf.skip( sizeof( QueryResult ) );
             
@@ -482,15 +489,17 @@ namespace mongo {
                 _findingStartCursor = new ClientCursor(c, qp().ns(), false);
                 _findingStartTimer.reset();
                 _findingStartMode = Initial;
+                BSONElement tsElt = qp().query()[ "ts" ];
+                massert( 13042, "no ts field in query", !tsElt.eoo() );
+                BSONObjBuilder b;
+                b.append( tsElt );
+                BSONObj tsQuery = b.obj();
+                _matcher.reset(new CoveredIndexMatcher(tsQuery, qp().indexKey()));
             } else {
                 _c = qp().newCursor();
+                setupMatcher();
             }
-            
-            if ( ! _c.get() || _c->useMatcher() )
-                _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
-            else
-                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));
-            
+
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
                 _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder() ) );
@@ -539,6 +548,7 @@ namespace mongo {
                 if ( !_findingStartCursor || !_findingStartCursor->c->ok() ) {
                     _findingStart = false;
                     _c = qp().newCursor(); // on error, start from beginning
+                    setupMatcher();
                     return;
                 }
                 switch( _findingStartMode ) {
@@ -546,6 +556,7 @@ namespace mongo {
                         if ( !_matcher->matches( _findingStartCursor->c->currKey(), _findingStartCursor->c->currLoc() ) ) {
                             _findingStart = false; // found first record out of query range, so scan normally
                             _c = qp().newCursor( _findingStartCursor->c->currLoc() );
+                            setupMatcher();
                             return;
                         }
                         _findingStartCursor->c->advance();
@@ -580,6 +591,7 @@ namespace mongo {
                         if ( _matcher->matches( _findingStartCursor->c->currKey(), _findingStartCursor->c->currLoc() ) ) {
                             _findingStart = false; // found first record in query range, so scan normally
                             _c = qp().newCursor( _findingStartCursor->c->currLoc() );
+                            setupMatcher();
                             return;
                         }
                         _findingStartCursor->c->advance();
