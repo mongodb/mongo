@@ -185,12 +185,12 @@ namespace mongo {
             unhelpful_ = true;
     }
     
-    auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc ) const {
+    auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
         if ( _special.size() ){
             IndexType * type = index_->getSpec().getType();
             massert( 13040 , (string)"no type for special: " + _special , type );
-            return type->newCursor( fbs_.query() , order_ );
+            return type->newCursor( fbs_.query() , order_ , numWanted );
         }
         
         if ( !fbs_.matchPossible() ){

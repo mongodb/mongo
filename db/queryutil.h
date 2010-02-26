@@ -73,7 +73,6 @@ namespace mongo {
 
     private:
         BSONObj addObj( const BSONObj &o );
-        string simpleRegexEnd( string regex );
         vector< FieldInterval > intervals_;
         vector< BSONObj > objData_;
         string _special;
@@ -209,5 +208,15 @@ namespace mongo {
         BSONObj _source;
     };
 
+    /** returns a string that when used as a matcher, would match a super set of regex()
+        returns "" for complex regular expressions
+        used to optimize queries in some simple regex cases that start with '^'
+
+        if purePrefix != NULL, sets it to whether the regex can be converted to a range query
+    */
+    string simpleRegex(const char* regex, const char* flags, bool* purePrefix=NULL);
+
+    /** returns the upper bound of a query that matches prefix */
+    string simpleRegexEnd( string prefix );
 
 } // namespace mongo

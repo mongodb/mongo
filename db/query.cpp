@@ -490,13 +490,13 @@ namespace mongo {
                 _findingStartTimer.reset();
                 _findingStartMode = Initial;
                 BSONElement tsElt = qp().query()[ "ts" ];
-                massert( 13042, "no ts field in query", !tsElt.eoo() );
+                massert( 13044, "no ts field in query", !tsElt.eoo() );
                 BSONObjBuilder b;
                 b.append( tsElt );
                 BSONObj tsQuery = b.obj();
                 _matcher.reset(new CoveredIndexMatcher(tsQuery, qp().indexKey()));
             } else {
-                _c = qp().newCursor();
+                _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
                 setupMatcher();
             }
 
