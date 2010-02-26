@@ -19,7 +19,8 @@ wts_setup(int logfile)
 	int ret;
 	char *p;
 
-	if ((ret = wiredtiger_simple_setup(g.progname, &db)) != 0) {
+	if ((ret =
+	    wiredtiger_simple_setup(g.progname, &db, WT_MEMORY_CHECK)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
