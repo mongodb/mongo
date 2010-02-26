@@ -378,6 +378,7 @@ again:
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
+        assert( toSend.data );
         mmm( out() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
         toSend.data->id = nextMessageId();
         toSend.data->responseTo = responseTo;
