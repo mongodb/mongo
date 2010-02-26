@@ -251,6 +251,30 @@ namespace BasicTests {
         };
     };
     
+    class ThreadSafeStringTest {
+    public:
+        void run(){
+            ThreadSafeString s;
+            s = "eliot";
+            ASSERT_EQUALS( s , "eliot" );
+            ASSERT( s != "eliot2" );
+
+            ThreadSafeString s2 = s;
+            ASSERT_EQUALS( s2 , "eliot" );
+            
+            
+            {
+                string foo;
+                {
+                    ThreadSafeString bar;
+                    bar = "eliot2";
+                    foo = bar;
+                }
+                ASSERT_EQUALS( "eliot2" , foo );
+            }
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "basic" ){

@@ -510,13 +510,19 @@ namespace mongo {
             memset( _buf , 0 , _size );
         }
 
+        ThreadSafeString( const ThreadSafeString& other )
+            : _size( other._size ) , _buf( new char[_size] ){
+            strncpy( _buf , other._buf , _size );
+        }
+
         ~ThreadSafeString(){
-            delete _buf;
+            delete[] _buf;
             _buf = 0;
         }
         
         operator string() const {
-            return (string)_buf;
+            string s = _buf;
+            return s;
         }
 
         ThreadSafeString& operator=( const char * str ){
@@ -526,6 +532,18 @@ namespace mongo {
             strncpy( _buf , str , s );
             _buf[s] = 0;
             return *this;
+        }
+        
+        bool operator==( const ThreadSafeString& other ) const {
+            return strcmp( _buf , other._buf ) == 0;
+        }
+
+        bool operator==( const char * str ) const {
+            return strcmp( _buf , str ) == 0;
+        }
+
+        bool operator!=( const char * str ) const {
+            return strcmp( _buf , str );
         }
 
         bool empty() const {

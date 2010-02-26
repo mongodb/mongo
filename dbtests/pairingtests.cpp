@@ -144,7 +144,7 @@ namespace PairingTests {
                 ReplPair rp( "a", "b" );
                 rp.setMaster( ReplPair::State_CantArb, "foo" );
                 ASSERT( rp.state == ReplPair::State_CantArb );
-                ASSERT_EQUALS( "foo", rp.info );
+                ASSERT_EQUALS( rp.info , "foo" );
                 rp.setMaster( ReplPair::State_Confused, "foo" );
                 ASSERT( rp.state == ReplPair::State_Confused );
             }
