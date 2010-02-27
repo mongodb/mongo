@@ -1012,7 +1012,7 @@ namespace mongo {
     } cmdDatasize;
 
     namespace {
-        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL){
+        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ){
             DBDirectClient client;
             auto_ptr<DBClientCursor> indexes =
                 client.query(db + ".system.indexes", QUERY( "ns" << ns));
@@ -1025,7 +1025,7 @@ namespace mongo {
                     continue; // nothing to do here
                 totalSize += nsd->datasize;
                 if (details)
-                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize);
+                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize / scale );
             }
             return totalSize;
         }
@@ -1043,7 +1043,7 @@ namespace mongo {
             string dbname = dbname_c;
             if ( dbname.find( "." ) != string::npos )
                 dbname = dbname.substr( 0 , dbname.find( "." ) );
-
+            
             string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
@@ -1053,19 +1053,23 @@ namespace mongo {
             }
 
             result.append( "ns" , ns.c_str() );
+            
+            int scale = 1;
+            if ( jsobj["scale"].isNumber() )
+                scale = jsobj["scale"].numberInt();
 
             result.appendIntOrLL( "count" , nsd->nrecords );
-            result.appendIntOrLL( "size" , nsd->datasize );
+            result.appendIntOrLL( "size" , nsd->datasize / scale );
             int numExtents;
-            result.appendIntOrLL( "storageSize" , nsd->storageSize( &numExtents ) );
+            result.appendIntOrLL( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
-            result.append( "lastExtentSize" , nsd->lastExtentSize );
+            result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
             result.append( "paddingFactor" , nsd->paddingFactor );
             result.append( "flags" , nsd->flags );
 
             BSONObjBuilder indexSizes;
-            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes) );
+            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
             
             if ( nsd->capped ){

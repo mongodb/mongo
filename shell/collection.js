@@ -446,8 +446,8 @@ DBCollection.prototype.getCollection = function( subName ){
     return this._db.getCollection( this._shortName + "." + subName );
 }
 
-DBCollection.prototype.stats = function(){
-    return this._db.runCommand( { collstats : this._shortName } );
+DBCollection.prototype.stats = function( scale ){
+    return this._db.runCommand( { collstats : this._shortName , scale : scale } );
 }
 
 DBCollection.prototype.dataSize = function(){
