@@ -1046,7 +1046,7 @@ namespace mongo {
     BSON( "a" << GT << 23.4 << NE << 30 << "b" << 2 ) produces the object
     { a: { \$gt: 23.4, \$ne: 30 }, b: 2 }.
 */
-#define BSON(x) (( mongo::BSONObjBuilder() << x ).obj())
+#define BSON(x) (( mongo::BSONObjBuilder(64) << x ).obj())
 
 /** Use BSON_ARRAY macro like BSON macro, but without keys
 
