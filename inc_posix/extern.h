@@ -23,6 +23,8 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 int
 __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 void
+__wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp);
+void
 __wt_bt_desc_init(DB *db, WT_PAGE *page);
 void
 __wt_bt_desc_stats(DB *db, WT_PAGE *page);

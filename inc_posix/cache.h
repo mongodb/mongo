@@ -191,7 +191,7 @@ struct __ienv {
 	 * The hazard array is separate from the WT_TOC array because we want to
 	 * be able to easily copy and search it when draining the cache.
 	 */
-#define	WT_HAZARD_SIZE_DEFAULT	10
+#define	WT_HAZARD_SIZE_DEFAULT	15
 	WT_PAGE	**hazard;		/* Hazard references array */
 
 	WT_CACHE  cache;		/* Page cache */
