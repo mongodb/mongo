@@ -210,7 +210,7 @@ namespace mongo {
        4 - skip
     */
     Handle<Value> mongoFind(const Arguments& args){
-        jsassert( args.Length() == 5 , "find needs 5 args" );
+        jsassert( args.Length() == 6 , "find needs 6 args" );
         jsassert( args[1]->IsObject() , "needs to be an object" );
         DBClientBase * conn = getConnection( args );
         GETNS;
@@ -227,14 +227,15 @@ namespace mongo {
         Local<v8::Value> slaveOkVal = mongo->Get( v8::String::New( "slaveOk" ) );
         jsassert( slaveOkVal->IsBoolean(), "slaveOk member invalid" );
         bool slaveOk = slaveOkVal->BooleanValue();
-    
+        
         try {
             auto_ptr<mongo::DBClientCursor> cursor;
             int nToReturn = (int)(args[3]->ToNumber()->Value());
             int nToSkip = (int)(args[4]->ToNumber()->Value());
+            int batchSize = (int)(args[5]->ToNumber()->Value());
             {
                 v8::Unlocker u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 );
+                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
             }
             v8::Function * cons = (v8::Function*)( *( mongo->Get( v8::String::New( "internalCursor" ) ) ) );
             assert( cons );
