@@ -80,7 +80,7 @@ main(int argc, char *argv[])
 
 		if (wts_bulk_load())
 			goto err;
-		if (wts_read_key())
+		if (g.c_database_type == ROW && wts_read_key())
 			goto err;
 		if (wts_read_recno())
 			goto err;

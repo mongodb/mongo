@@ -31,7 +31,7 @@ static CONFIG c[] = {
   { "data_max",		1,	32,	4096,		&g.c_data_max },
   { "data_min",		1,	10,	64,		&g.c_data_min },
   { "database_type",	1,	0,	2,		&g.c_database_type },
-  { "fixed_length",	1,	0,	1,		&g.c_fixed_length },
+  { "fixed_length",	1,	1,	24,		&g.c_fixed_length },
   { "huffman_data",	1,	0,	1,		&g.c_huffman_data },
   { "huffman_key",	1,	0,	1,		&g.c_huffman_key },
   { "internal_node",	1,	9,	17,		&g.c_internal_node },
@@ -96,9 +96,6 @@ config_init(void)
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
-
-	/* Override the type, we ony support row at the moment. */
-	g.c_database_type = ROW;
 }
 
 /*

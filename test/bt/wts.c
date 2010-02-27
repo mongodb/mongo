@@ -174,18 +174,19 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 		return (1);
 	}
 
+	/* Generate a key for BDB, even if WT isn't using one. */
+	key_gen(&key, g.key_cnt);
+	data_gen(&data);
+
 	switch (g.c_database_type) {
 	case COLUMN_FIX:
 	case COLUMN_VAR:
 		*keyp = NULL;
 		*datap = &data;
-		data_gen(&data);
 		break;
 	case ROW:
 		*keyp = &key;
-		key_gen(&key, g.key_cnt);
 		*datap = &data;
-		data_gen(&data);
 		break;
 	}
 
@@ -197,7 +198,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 
 /*
  * wts_read_key --
- *	Read random key/data pairs by key.
+ *	Read random database entries by key.
  */
 int
 wts_read_key()
@@ -247,8 +248,9 @@ wts_read_key()
 		if (data.size != bdb_data.size ||
 		    memcmp(data.data, bdb_data.data, data.size) != 0) {
 			env->errx(env,
-			    "wts_read_key: read row %llu by key: expected "
-			    "{%.*s}, got {%.*s}",
+			    "wts_read_key: read row %llu by key:\n\t"
+			    "bdb {%.*s}\n\t"
+			    " wt {%.*s}",
 			    cnt,
 			    (int)bdb_data.size, bdb_data.data,
 			    (int)data.size, data.data);
@@ -265,7 +267,7 @@ wts_read_key()
 
 /*
  * wts_read_recno --
- *	Read random key/data pairs by record number.
+ *	Read random database entries by record number.
  */
 int
 wts_read_recno()
@@ -318,8 +320,9 @@ wts_read_recno()
 		    data.size != bdb_data.size ||
 		    memcmp(data.data, bdb_data.data, data.size) != 0) {
 			env->errx(env,
-			    "wts_read_recno: read row %llu by recno: expected "
-			    "{%.*s}/{%.*s}, got {%.*s}/{%.*s}",
+			    "wts_read_recno: read row %llu by recno:\n\t"
+			    "bdb {%.*s}/{%.*s}\n\t"
+			    " wt {%.*s}/{%.*s}",
 			    cnt,
 			    (int)bdb_key.size, bdb_key.data,
 			    (int)bdb_data.size, bdb_data.data,

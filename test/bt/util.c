@@ -50,19 +50,28 @@ void
 data_gen(DBT *data)
 {
 	static char buf[5 * 1024];
-	size_t len;
+	size_t i, len;
+
+	/* Set buffer contents. */
+	if (buf[0] == '\0')
+		for (i = 0; i < sizeof(buf); ++i)
+			buf[i] = 'A' + i % 26;
 
 	/*
 	 * The data is a variable length item.
 	 * We store it in a static buffer, correct the size, just in case.
 	 */
-	if ((len = g.c_data_len) == 0)
+	if ((len = g.c_fixed_length) == 0 && (len = g.c_data_len) == 0)
 		len = MMRAND(g.c_data_min, g.c_data_max);
 	if (len > sizeof(buf))
 		len = sizeof(buf);
-	memset(buf, 'X', len);
-	data->data = buf;
-	data->size =len;
+
+	/*
+	 * If we're repeat compression, use something different 20% of the
+	 * time, otherwise we end up with a single chunk of repeated data.
+	 */
+	data->data = buf + (g.c_repeat_comp ? (rand() % 5 == 0 ? 1 : 0) : 0);
+	data->size = len;
 }
 
 void
