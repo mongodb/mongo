@@ -426,6 +426,11 @@ namespace mongo {
             t->Set( v8::String::New( "_skip" ) , args[7] );
         else 
             t->Set( v8::String::New( "_skip" ) , Number::New( 0 ) );
+
+        if ( args.Length() > 8 && args[8]->IsNumber() )
+            t->Set( v8::String::New( "_batchSize" ) , args[7] );
+        else 
+            t->Set( v8::String::New( "_batchSize" ) , Number::New( 0 ) );
     
         t->Set( v8::String::New( "_cursor" ) , v8::Null() );
         t->Set( v8::String::New( "_numReturned" ) , v8::Number::New(0) );
