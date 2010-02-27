@@ -189,6 +189,31 @@ namespace QueryTests {
         }
     };
 
+    class PositiveLimit : public ClientBase {
+    public:
+        const char* ns;
+        PositiveLimit() : ns("unittests.querytests.PositiveLimit") {}
+        ~PositiveLimit() {
+            client().dropCollection( ns );
+        }
+
+        void testLimit(int limit){
+            ASSERT_EQUALS(client().query( ns, BSONObj(), limit )->itcount(), limit);
+        }
+        void run() {
+            for(int i=0; i<1000; i++)
+                insert( ns, BSON( GENOID << "i" << i ) );
+
+            ASSERT_EQUALS( client().query(ns, BSONObj(),    1 )->itcount(), 1);
+            ASSERT_EQUALS( client().query(ns, BSONObj(),   10 )->itcount(), 10);
+            ASSERT_EQUALS( client().query(ns, BSONObj(),  101 )->itcount(), 101);
+            ASSERT_EQUALS( client().query(ns, BSONObj(),  999 )->itcount(), 999);
+            ASSERT_EQUALS( client().query(ns, BSONObj(), 1000 )->itcount(), 1000);
+            ASSERT_EQUALS( client().query(ns, BSONObj(), 1001 )->itcount(), 1000);
+            ASSERT_EQUALS( client().query(ns, BSONObj(),    0 )->itcount(), 1000);
+        }
+    };
+
     class ReturnOneOfManyAndTail : public ClientBase {
     public:
         ~ReturnOneOfManyAndTail() {
@@ -985,6 +1010,7 @@ namespace QueryTests {
             add< CountIndexedRegex >();
             add< BoundedKey >();
             add< GetMore >();
+            add< PositiveLimit >();
             add< ReturnOneOfManyAndTail >();
             add< TailNotAtEnd >();
             add< EmptyTail >();

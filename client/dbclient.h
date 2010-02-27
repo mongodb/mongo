@@ -267,6 +267,7 @@ namespace mongo {
                 ns(_ns),
                 query(_query),
                 nToReturn(_nToReturn),
+                haveLimit( _nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
                 nToSkip(_nToSkip),
                 fieldsToReturn(_fieldsToReturn),
                 opts(queryOptions),
@@ -282,6 +283,7 @@ namespace mongo {
                 connector(_connector),
                 ns(_ns),
                 nToReturn( _nToReturn ),
+                haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
                 opts( options ),
                 m(new Message()),
                 cursorId( _cursorId ),
@@ -305,6 +307,7 @@ namespace mongo {
         string ns;
         BSONObj query;
         int nToReturn;
+        bool haveLimit;
         int nToSkip;
         const BSONObj *fieldsToReturn;
         int opts;

@@ -103,12 +103,12 @@ namespace ClientTests {
         CS_10() : Base( "CS_10" ) {}
         void run() {
             string longs( 770, 'c' );
-            for( int i = 0; i < 11; ++i )
+            for( int i = 0; i < 1111; ++i )
                 db.insert( ns(), BSON( "a" << i << "b" << longs ) );
             db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
             
-            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ), 2 );
-            ASSERT_EQUALS( 11, c->itcount() );
+            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
+            ASSERT_EQUALS( 1111, c->itcount() );
         }
     };
     

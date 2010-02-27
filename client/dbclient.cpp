@@ -767,6 +767,10 @@ namespace mongo {
     void DBClientCursor::requestMore() {
         assert( cursorId && pos == nReturned );
 
+        if (haveLimit){
+            nToReturn -= nReturned;
+            assert(nToReturn > 0);
+        }
         BufBuilder b;
         b.append(opts);
         b.append(ns.c_str());
@@ -808,6 +812,9 @@ namespace mongo {
 
     /** If true, safe to call next().  Requests more from server if necessary. */
     bool DBClientCursor::more() {
+        if (haveLimit && pos >= nToReturn)
+            return false;
+
         if ( pos < nReturned )
             return true;
 
