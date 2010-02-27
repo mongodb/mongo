@@ -1060,7 +1060,6 @@ namespace mongo {
          cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
     extern struct IDLabeler { } GENOID;
-    BSONObjBuilder& operator<<(BSONObjBuilder& b, IDLabeler& id);
 
     /* Utility class to add a Date element with the current time
        Example: 
@@ -1569,6 +1568,14 @@ namespace mongo {
         BSONObjBuilderValueStream &operator<<(const char * name ) {
             s_.endField( name );
             return s_;
+        }
+
+        /** Stream oriented way to add field names and values. */
+        BSONObjBuilder& operator<<( IDLabeler ) {
+            OID oid;
+            oid.init();
+            appendOID("_id", &oid);
+            return *this;
         }
 
         // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )

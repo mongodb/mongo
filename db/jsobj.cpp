@@ -51,12 +51,6 @@ namespace mongo {
     }
 
     IDLabeler GENOID;
-    BSONObjBuilder& operator<<(BSONObjBuilder& b, IDLabeler& id) {
-        OID oid;
-        oid.init();
-        b.appendOID("_id", &oid);
-        return b;
-    }
 
     DateNowLabeler DATENOW;
 
