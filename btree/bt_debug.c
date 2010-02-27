@@ -11,7 +11,6 @@
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_bt_debug_col_indx(WT_TOC *, WT_COL_INDX *, FILE *);
-static void __wt_bt_debug_dbt(const char *, void *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
 static int  __wt_bt_debug_inmem_tree(WT_TOC *, WT_BIN_INDX *, int, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
@@ -543,7 +542,7 @@ err:	if (page != NULL)
  * __wt_bt_debug_dbt --
  *	Dump a single DBT in debugging mode, with an optional tag.
  */
-static void
+void
 __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 {
 	DBT *dbt;
