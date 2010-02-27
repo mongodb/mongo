@@ -10,7 +10,7 @@
 #include "wts.h"
 
 void
-bdb_setup(void)
+bdb_setup(int reopen)
 {
 	DB *db;
 	DB_ENV *dbenv;
@@ -29,8 +29,10 @@ bdb_setup(void)
 	assert(db->set_flags(db, DB_RECNUM) == 0);
 
 	p = fname(BDB_PREFIX, "db");
-	(void)remove(p);
-	assert(db->open(db, NULL, p, NULL, DB_BTREE, DB_CREATE, 0) == 0);
+	if (!reopen)
+		(void)remove(p);
+	assert(db->open(db, NULL,
+	    p, NULL, DB_BTREE, reopen ? 0 : DB_CREATE, 0) == 0);
 
 	g.bdb_db = db;
 }

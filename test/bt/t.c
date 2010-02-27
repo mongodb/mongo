@@ -11,8 +11,6 @@
 
 GLOBAL g;
 
-static void	run_cleanup(void);
-static void	run_init(int);
 static void	usage(void);
 
 int
@@ -73,7 +71,14 @@ main(int argc, char *argv[])
 	srand((int)g.c_rand_seed);
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
 	for (run_cnt = 1; runs == 0 || run_cnt <= runs; ++run_cnt) {
-		run_init(log);
+		/* Clean up leftover files from the last run. */
+		(void)system("rm -f bdb.db wt.*");
+
+		/* Randomize any configuration not set from the command line. */
+		config_init();
+
+		bdb_setup(0);
+		wts_setup(0, log);
 
 		printf("%50s\r%d\n", " ", run_cnt);
 		config_dump(1);
@@ -85,7 +90,19 @@ main(int argc, char *argv[])
 		if (wts_read_recno())
 			goto err;
 
-		run_cleanup();
+		bdb_teardown();
+		wts_teardown();
+
+		bdb_setup(1);
+		wts_setup(1, log);
+
+		if (g.c_database_type == ROW && wts_read_key())
+			goto err;
+		if (wts_read_recno())
+			goto err;
+
+		bdb_teardown();
+		wts_teardown();
 	}
 
 	return (EXIT_SUCCESS);
@@ -106,35 +123,4 @@ usage()
 	    "[name=value ...]\n",
 	    g.progname);
 	exit (EXIT_FAILURE);
-}
-
-/*
- * run_init --
- *	Initialize each run.
- */
-static void
-run_init(int log)
-{
-	/* Clean up leftover files from the last run. */
-	(void)system("rm -f bdb.db wt.*");
-
-	/* Randomize any configuration not set from the command line. */
-	config_init();
-
-	bdb_setup();
-	wts_setup(log);
-}
-
-/*
- * run_cleanup --
- *	Cleanup from each run.
- */
-static void
-run_cleanup()
-{
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-
-	bdb_teardown();
-	wts_teardown();
 }

@@ -12,7 +12,7 @@
 static int cb_bulk(DB *, DBT **, DBT **);
 
 int
-wts_setup(int logfile)
+wts_setup(int reopen, int logfile)
 {
 	ENV *env;
 	DB *db;
@@ -81,8 +81,10 @@ wts_setup(int logfile)
 	}
 
 	p = fname(WT_PREFIX, "db");
-	(void)remove(p);
-	if ((ret = db->open(db, p, 0660, WT_CREATE)) != 0) {
+
+	if (!reopen)
+		(void)remove(p);
+	if ((ret = db->open(db, p, 0660, reopen ? 0 : WT_CREATE)) != 0) {
 		db->err(db, ret, "Db.open: %s", p);
 		return (1);
 	}
@@ -95,6 +97,9 @@ void
 wts_teardown()
 {
 	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
+
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
 }
 
 int
