@@ -511,12 +511,14 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 static int
 __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 {
+	IDB *idb;
 	WT_COL_INDX *ip;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
-	u_int32_t i;
+	u_int32_t i, j;
 	u_int8_t *p;
 
+	idb = db->idb;
 	hdr = page->hdr;
 	ip = page->u.c_indx;
 	records = 0;
@@ -525,11 +527,18 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains fixed-length objects.
 	 */
-	WT_FIX_FOREACH(db, page, p, i) {
-		ip->page_data = p;
-		++ip;
-		++records;
-	}
+	if (F_ISSET(idb, WT_REPEAT_COMP))
+		WT_FIX_REPEAT_ITERATE(db, page, p, i, j) {
+			ip->page_data = p;
+			++ip;
+			++records;
+		}
+	else
+		WT_FIX_FOREACH(db, page, p, i) {
+			ip->page_data = p;
+			++ip;
+			++records;
+		}
 
 	page->indx_count = hdr->u.entries;
 	page->records = records;

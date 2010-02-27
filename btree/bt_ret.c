@@ -117,6 +117,20 @@ repl:			if (sdbt->data == WT_DATA_DELETED)
 	}
 
 	switch (page->hdr->type) {
+	case WT_PAGE_COL_FIX:
+		if (callback != NULL) {
+			WT_CLEAR(local_data);
+			data = &local_data;
+			data->data = F_ISSET(idb, WT_REPEAT_COMP) ?
+			    WT_FIX_REPEAT_DATA(cip->page_data) : cip->page_data;
+			cip->page_data;
+			data->size = db->fixed_len;
+			return (callback(db, key, data));
+		}
+		orig = F_ISSET(idb, WT_REPEAT_COMP) ?
+		    WT_FIX_REPEAT_DATA(cip->page_data) : cip->page_data;
+		size = db->fixed_len;
+		break;
 	case WT_PAGE_COL_VAR:
 		item = cip->page_data;
 		goto item_set;

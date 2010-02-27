@@ -586,6 +586,13 @@ struct __wt_ovfl {
 		for ((j) = *(u_int16_t *)p; (j) > 0; --(j))
 
 /*
+ * WT_FIX_REPEAT_DATA points to the data value for a repeat-compressed,
+ * fixed-length entry.
+ */
+#define	WT_FIX_REPEAT_DATA(p)						\
+	((u_int8_t *)p + sizeof(u_int16_t))
+
+/*
  * There's a structure returned from the search routine which includes (at
  * the moment), a page reference, a WT_{ROW,COL}_INDX reference, and in some
  * cases information as to which leg of the binary tree is the insert leg.
