@@ -369,8 +369,9 @@ skip_read:	/*
 
 			key_ovfl.len = key->size;
 			WT_ERR(__wt_bt_ovfl_write(toc, key, &key_ovfl.addr));
-			key->data = &key_ovfl;
-			key->size = sizeof(key_ovfl);
+			key_copy.data = &key_ovfl;
+			key_copy.size = sizeof(key_ovfl);
+			key = &key_copy;
 
 			WT_ITEM_TYPE_SET(&key_item, WT_ITEM_KEY_OVFL);
 			WT_STAT_INCR(idb->stats, BULK_OVERFLOW_KEY);
