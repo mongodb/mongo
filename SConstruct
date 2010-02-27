@@ -387,6 +387,7 @@ serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/index_*.cpp" )
 
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
 serverOnlyFiles += Glob( "db/stats/*.cpp" )
+serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
 if usesm:
     commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
