@@ -123,7 +123,6 @@ repl:			if (sdbt->data == WT_DATA_DELETED)
 			data = &local_data;
 			data->data = F_ISSET(idb, WT_REPEAT_COMP) ?
 			    WT_FIX_REPEAT_DATA(cip->page_data) : cip->page_data;
-			cip->page_data;
 			data->size = db->fixed_len;
 			return (callback(db, key, data));
 		}
