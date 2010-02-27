@@ -10,6 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_bt_open_verify(DB *);
+static int __wt_bt_open_verify_sizes(DB *);
 
 /*
  * __wt_bt_open --
@@ -51,6 +52,31 @@ err:	WT_TRET(toc->close(toc, 0));
  */
 static int
 __wt_bt_open_verify(DB *db)
+{
+	IDB *idb;
+
+	idb = db->idb;
+
+	/* Verify the page sizes. */
+	WT_RET(__wt_bt_open_verify_sizes(db));
+
+	/* Verify other configuration combinations. */
+	if (db->fixed_len != 0 && (idb->huffman_key || idb->huffman_data)) {
+		__wt_api_db_errx(db,
+		    "Fixed size column-store databases may not be Huffman "
+		    "compressed");
+		return (WT_ERROR);
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_bt_open_verify_sizes --
+ *	Verify the page sizes.
+ */
+static int
+__wt_bt_open_verify_sizes(DB *db)
 {
 	IDB *idb;
 
@@ -210,7 +236,6 @@ unexpected:	__wt_api_db_errx(db,
 
 	return (0);
 }
-
 
 /*
  * __wt_bt_root_page --
