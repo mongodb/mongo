@@ -140,7 +140,7 @@ function countCursor( c ){
     return num;
 }
 assert.eq( 6 , countCursor( db.foo.find()._exec() ) , "getMore 2" );
-assert.eq( 6 , countCursor( db.foo.find().limit(1)._exec() ) , "getMore 3" );
+assert.eq( 6 , countCursor( db.foo.find().batchSize(1)._exec() ) , "getMore 3" );
 
 // find by non-shard-key
 db.foo.find().forEach(

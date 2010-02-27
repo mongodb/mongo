@@ -48,7 +48,7 @@ namespace mongo {
         // --- from DBClientInterface
 
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn, int nToSkip,
-                                               const BSONObj *fieldsToReturn, int queryOptions);
+                                               const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
 
         virtual auto_ptr<DBClientCursor> getMore( const string &ns, long long cursorId, int nToReturn, int options );
         

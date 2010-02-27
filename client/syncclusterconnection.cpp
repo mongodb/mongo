@@ -120,14 +120,14 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
-                                                     const BSONObj *fieldsToReturn, int queryOptions){ 
+                                                          const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
 
         uassert( 10021 ,  "$cmd not support yet in SyncClusterConnection::query" , ns.find( "$cmd" ) == string::npos );
 
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
                 auto_ptr<DBClientCursor> cursor = 
-                    _conns[i]->query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions );
+                    _conns[i]->query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
                 if ( cursor.get() )
                     return cursor;
                 log() << "query failed to: " << _conns[i]->toString() << " no data" << endl;

@@ -500,10 +500,10 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
-            int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) {
+                                                 int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
         auto_ptr<DBClientCursor> c( new DBClientCursor( this,
-                                    ns, query.obj, nToReturn, nToSkip,
-                                    fieldsToReturn, queryOptions ) );
+                                                        ns, query.obj, nToReturn, nToSkip,
+                                                        fieldsToReturn, queryOptions , batchSize ) );
         if ( c->init() )
             return c;
         return auto_ptr< DBClientCursor >( 0 );
@@ -746,10 +746,19 @@ namespace mongo {
         }
     }
 
+    int DBClientCursor::nextBatchSize(){
+        if ( nToReturn == 0 )
+            return batchSize;
+        if ( batchSize == 0 )
+            return nToReturn;
+        
+        return batchSize < nToReturn ? batchSize : nToReturn;
+    }
+
     bool DBClientCursor::init() {
         Message toSend;
         if ( !cursorId ) {
-            assembleRequest( ns, query, nToReturn, nToSkip, fieldsToReturn, opts, toSend );
+            assembleRequest( ns, query, nextBatchSize() , nToSkip, fieldsToReturn, opts, toSend );
         } else {
             BufBuilder b;
             b.append( opts );
@@ -774,7 +783,7 @@ namespace mongo {
         BufBuilder b;
         b.append(opts);
         b.append(ns.c_str());
-        b.append(nToReturn);
+        b.append(nextBatchSize());
         b.append(cursorId);
 
         Message toSend;
@@ -959,9 +968,9 @@ namespace mongo {
 	}
 
     auto_ptr<DBClientCursor> DBClientPaired::query(const string &a, Query b, int c, int d,
-            const BSONObj *e, int f)
+                                                   const BSONObj *e, int f, int g)
     {
-        return checkMaster().query(a,b,c,d,e,f);
+        return checkMaster().query(a,b,c,d,e,f,g);
     }
 
     BSONObj DBClientPaired::findOne(const string &a, Query b, const BSONObj *c, int d) {

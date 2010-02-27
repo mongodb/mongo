@@ -212,7 +212,7 @@ namespace mongo {
      };
 
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){
-        uassert( 10240 ,  "mongo_find neesd 5 args" , argc == 5 );
+        uassert( 10240 ,  "mongo_find neesd 6 args" , argc == 6 );
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         uassert( 10241 ,  "no connection!" , connHolder && connHolder->get() );
         DBClientWithCommands *conn = connHolder->get();
@@ -227,10 +227,11 @@ namespace mongo {
         int nToReturn = (int) c.toNumber( argv[3] );
         int nToSkip = (int) c.toNumber( argv[4] );
         bool slaveOk = c.getBoolean( obj , "slaveOk" );
+        int batchSize = (int) c.toNumber( argv[5] );
 
         try {
 
-            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? QueryOption_SlaveOk : 0 );
+            auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
             if ( ! cursor.get() ){
                 JS_ReportError( cx , "error doing query: failed" );
                 return JS_FALSE;
@@ -771,6 +772,11 @@ namespace mongo {
             c.setProperty( obj , "_skip" , argv[7] );
         else 
             c.setProperty( obj , "_skip" , JSVAL_ZERO );
+
+        if ( argc > 8 && JSVAL_IS_NUMBER( argv[8] ) )
+            c.setProperty( obj , "_batchSize" , argv[8] );
+        else 
+            c.setProperty( obj , "_batchSize" , JSVAL_ZERO );
         
         c.setProperty( obj , "_cursor" , JSVAL_NULL );
         c.setProperty( obj , "_numReturned" , JSVAL_ZERO );

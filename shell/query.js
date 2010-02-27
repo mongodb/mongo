@@ -1,7 +1,7 @@
 // query.js
 
 if ( typeof DBQuery == "undefined" ){
-    DBQuery = function( mongo , db , collection , ns , query , fields , limit , skip ){
+    DBQuery = function( mongo , db , collection , ns , query , fields , limit , skip , batchSize ){
         
         this._mongo = mongo; // 0
         this._db = db; // 1
@@ -12,7 +12,8 @@ if ( typeof DBQuery == "undefined" ){
         this._fields = fields; // 5
         this._limit = limit || 0; // 6
         this._skip = skip || 0; // 7
-        
+        this._batchSize = batchSize || 0;
+
         this._cursor = null;
         this._numReturned = 0;
         this._special = false;
@@ -36,7 +37,7 @@ DBQuery.prototype.help = function(){
 DBQuery.prototype.clone = function(){
     var q =  new DBQuery( this._mongo , this._db , this._collection , this._ns , 
         this._query , this._fields , 
-        this._limit , this._skip );
+        this._limit , this._skip , this._batchSize );
     q._special = this._special;
     return q;
 }
@@ -58,7 +59,7 @@ DBQuery.prototype._checkModify = function(){
 DBQuery.prototype._exec = function(){
     if ( ! this._cursor ){
         assert.eq( 0 , this._numReturned );
-        this._cursor = this._mongo.find( this._ns , this._query , this._fields , this._limit , this._skip );
+        this._cursor = this._mongo.find( this._ns , this._query , this._fields , this._limit , this._skip , this._batchSize );
         this._cursorSeen = 0;
     }
     return this._cursor;
@@ -69,6 +70,13 @@ DBQuery.prototype.limit = function( limit ){
     this._limit = limit;
     return this;
 }
+
+DBQuery.prototype.batchSize = function( batchSize ){
+    this._checkModify();
+    this._batchSize = batchSize;
+    return this;
+}
+
 
 DBQuery.prototype.skip = function( skip ){
     this._checkModify();
