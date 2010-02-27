@@ -65,20 +65,19 @@ wts_setup(int logfile)
 			db->err(db, ret, "Db.column_set");
 			return (1);
 		}
-		break;
+		/* FALLTHROUGH */
 	case ROW:
+		if (g.c_huffman_key && (ret = db->huffman_set(
+		    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_KEY)) != 0) {
+			db->err(db, ret, "Db.huffman_set: data");
+			return (1);
+		}
+		if (g.c_huffman_data && (ret = db->huffman_set(
+		    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_DATA)) != 0) {
+			db->err(db, ret, "Db.huffman_set: data");
+			return (1);
+		}
 		break;
-	}
-
-	if (g.c_huffman_key && (ret = db->huffman_set(
-	    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_KEY)) != 0) {
-		db->err(db, ret, "Db.huffman_set: data");
-		return (1);
-	}
-	if (g.c_huffman_data && (ret = db->huffman_set(
-	    db, NULL, 0, WT_ASCII_ENGLISH|WT_HUFFMAN_DATA)) != 0) {
-		db->err(db, ret, "Db.huffman_set: data");
-		return (1);
 	}
 
 	p = fname(WT_PREFIX, "db");
