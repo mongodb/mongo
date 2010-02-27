@@ -380,7 +380,8 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	WT_OFF *offp;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *child_ip, *parent_ip;
+	WT_ROW_INDX *child_rip, *parent_rip;
+	WT_COL_INDX *parent_cip;
 	u_int32_t addr, frags, i, nextaddr, root_addr;
 	int (*func)(DB *, const DBT *, const DBT *);
 	int ret;
@@ -450,39 +451,38 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		}
 	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, 0, 1, &parent));
 
-	/* Search the parent for the reference to the child page. */
+	/*
+	 * Search the parent for the reference to the child page, and set
+	 * offp to reference the offpage structure.
+	 */
 	switch (parent->hdr->type) {
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(parent, parent_cip, i)
+			if (WT_COL_OFF_ADDR(parent_cip) == addr)
+				break;
+		if (parent_cip == NULL)
+			goto noref;
+
+		offp = (WT_OFF *)parent_cip->page_data;
+		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(parent, parent_ip, i)
-			if (WT_ROW_OFF_ADDR(parent_ip) == addr)
+		WT_INDX_FOREACH(parent, parent_rip, i)
+			if (WT_ROW_OFF_ADDR(parent_rip) == addr)
 				break;
-		break;
-	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(parent, parent_ip, i)
-			if (WT_COL_OFF_ADDR(parent_ip) == addr)
-				break;
+		if (parent_rip == NULL) {
+noref:			__wt_api_db_errx(db,
+			    "parent of page at addr %lu doesn't reference it",
+			    (u_long)addr);
+			goto err_set;
+		}
+
+		offp = WT_ITEM_BYTE_OFF(parent_rip->page_data);
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
-	}
-	if (parent_ip == NULL) {
-		__wt_api_db_errx(db,
-		    "parent of page at addr %lu doesn't reference it",
-		    (u_long)addr);
-		goto err_set;
 	}
 
-	/* Check that the record counts are correct. */
-	switch (parent->hdr->type) {
-	case WT_PAGE_COL_INT:
-		offp = (WT_OFF *)parent_ip->page_data;
-		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_ROW_INT:
-		offp = WT_ITEM_BYTE_OFF(parent_ip->page_data);
-		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
-	}
+	/* Check the child's record counts are correct. */
 	if (child->records != WT_RECORDS(offp)) {
 		__wt_api_db_errx(db,
 		    "parent of page at addr %lu has incorrect record count "
@@ -522,7 +522,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * set (in other words, the parent is the smallest page on its level),
 	 * confirm that's also the case for the child.
 	 */
-	if (parent_ip == parent->u.r_indx) {
+	if (parent_rip == parent->u.r_indx) {
 		if (((hdr->prevaddr == WT_ADDR_INVALID &&
 		    parent->hdr->prevaddr != WT_ADDR_INVALID) ||
 		    (hdr->prevaddr != WT_ADDR_INVALID &&
@@ -536,17 +536,17 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		}
 	} else {
 		/* The two keys we're going to compare may be overflow keys. */
-		child_ip = child->u.r_indx;
-		if (WT_KEY_PROCESS(child_ip)) {
+		child_rip = child->u.r_indx;
+		if (WT_KEY_PROCESS(child_rip)) {
 			cd_ref = &child_dbt;
-			WT_ERR(__wt_bt_key_process(toc, child_ip, cd_ref));
+			WT_ERR(__wt_bt_key_process(toc, child_rip, cd_ref));
 		} else
-			cd_ref = (DBT *)child_ip;
-		if (WT_KEY_PROCESS(parent_ip)) {
+			cd_ref = (DBT *)child_rip;
+		if (WT_KEY_PROCESS(parent_rip)) {
 			pd_ref = &parent_dbt;
-			WT_ERR(__wt_bt_key_process(toc, parent_ip, pd_ref));
+			WT_ERR(__wt_bt_key_process(toc, parent_rip, pd_ref));
 		} else
-			pd_ref = (DBT *)parent_ip;
+			pd_ref = (DBT *)parent_rip;
 
 		/* Compare the parent's key against the child's key. */
 		if (func(db, cd_ref, pd_ref) < 0) {
@@ -571,7 +571,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * is not set (in other words, the parent is the largest page on its
 	 * level), confirm that's also the case for the child.
 	 */
-	if (parent_ip == (parent->u.r_indx + (parent->indx_count - 1))) {
+	if (parent_rip == (parent->u.r_indx + (parent->indx_count - 1))) {
 		nextaddr = parent->hdr->nextaddr;
 		if ((hdr->nextaddr == WT_ADDR_INVALID &&
 		    nextaddr != WT_ADDR_INVALID) ||
@@ -591,24 +591,24 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 			parent = NULL;
 		else {
 			WT_RET(__wt_bt_page_in(toc, nextaddr, 0, 1, &parent));
-			parent_ip = parent->u.r_indx;
+			parent_rip = parent->u.r_indx;
 		}
 	} else
-		++parent_ip;
+		++parent_rip;
 
 	if (parent != NULL) {
 		/* The two keys we're going to compare may be overflow keys. */
-		child_ip = child->u.r_indx + (child->indx_count - 1);
-		if (WT_KEY_PROCESS(child_ip)) {
+		child_rip = child->u.r_indx + (child->indx_count - 1);
+		if (WT_KEY_PROCESS(child_rip)) {
 			cd_ref = &child_dbt;
-			WT_ERR(__wt_bt_key_process(toc, child_ip, cd_ref));
+			WT_ERR(__wt_bt_key_process(toc, child_rip, cd_ref));
 		} else
-			cd_ref = (DBT *)child_ip;
-		if (WT_KEY_PROCESS(parent_ip)) {
+			cd_ref = (DBT *)child_rip;
+		if (WT_KEY_PROCESS(parent_rip)) {
 			pd_ref = &parent_dbt;
-			WT_ERR(__wt_bt_key_process(toc, parent_ip, pd_ref));
+			WT_ERR(__wt_bt_key_process(toc, parent_rip, pd_ref));
 		} else
-			pd_ref = (DBT *)parent_ip;
+			pd_ref = (DBT *)parent_rip;
 		/* Compare the parent's key against the child's key. */
 		if (func(db, cd_ref, pd_ref) >= 0) {
 			__wt_api_db_errx(db,

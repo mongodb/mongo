@@ -192,20 +192,25 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 		    (u_long)addr, WT_RECORDS(offp), child->records);
 ../btree/bt_vrfy.c  490  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                _
-			cd_ref = (DBT *)child_ip;
+                                          _
+	if (parent_rip == parent->u.r_indx) {
+../btree/bt_vrfy.c  525  Warning 644: Variable 'parent_rip' (line 383) may not
+    have been initialized
+../btree/bt_vrfy.c  383  Info 830: Location cited in prior message
+                                                 _
+			cd_ref = (DBT *)child_rip;
 ../btree/bt_vrfy.c  544  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                 _
-			pd_ref = (DBT *)parent_ip;
+                                                  _
+			pd_ref = (DBT *)parent_rip;
 ../btree/bt_vrfy.c  549  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                _
-			cd_ref = (DBT *)child_ip;
+                                                 _
+			cd_ref = (DBT *)child_rip;
 ../btree/bt_vrfy.c  606  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                                 _
-			pd_ref = (DBT *)parent_ip;
+                                                  _
+			pd_ref = (DBT *)parent_rip;
 ../btree/bt_vrfy.c  611  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                _
