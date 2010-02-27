@@ -118,11 +118,16 @@ config_dump(int logfile)
 	} else
 		fp = stdout;
 
+	fprintf(fp, "############################################\n");
+	fprintf(fp, "#  RUN PARAMETERS\n");
+	fprintf(fp, "############################################\n");
+
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		fprintf(fp, "\t%s=%lu\n", cp->name, (u_long)*cp->v);
+		fprintf(fp, "%s=%lu\n", cp->name, (u_long)*cp->v);
 
-	if (fp != stdout)
+	fprintf(fp, "############################################\n");
+	if (logfile)
 		(void)fclose(fp);
 }
 
