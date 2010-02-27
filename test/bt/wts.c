@@ -247,13 +247,10 @@ wts_read_key()
 		/* Compare the two. */
 		if (data.size != bdb_data.size ||
 		    memcmp(data.data, bdb_data.data, data.size) != 0) {
-			env->errx(env,
-			    "wts_read_key: read row %llu by key:\n\t"
-			    "bdb {%.*s}\n\t"
-			    " wt {%.*s}",
-			    cnt,
-			    (int)bdb_data.size, bdb_data.data,
-			    (int)data.size, data.data);
+			fprintf(stderr,
+			    "wts_read_key: read row %llu by key:\n", cnt);
+			__wt_bt_debug_dbt("\tbdb", &bdb_data, stderr);
+			__wt_bt_debug_dbt("\twt", &data, stderr);
 			return (1);
 		}
 	}
@@ -319,15 +316,12 @@ wts_read_recno()
 		    memcmp(key.data, bdb_key.data, key.size) != 0 ||
 		    data.size != bdb_data.size ||
 		    memcmp(data.data, bdb_data.data, data.size) != 0) {
-			env->errx(env,
-			    "wts_read_recno: read row %llu by recno:\n\t"
-			    "bdb {%.*s}/{%.*s}\n\t"
-			    " wt {%.*s}/{%.*s}",
-			    cnt,
-			    (int)bdb_key.size, bdb_key.data,
-			    (int)bdb_data.size, bdb_data.data,
-			    (int)key.size, key.data,
-			    (int)data.size, data.data);
+			fprintf(stderr,
+			    "wts_read_recno: read row %llu by recno:\n", cnt);
+			__wt_bt_debug_dbt("\tbdb key", &bdb_key, stderr);
+			__wt_bt_debug_dbt("\t wt key", &key, stderr);
+			__wt_bt_debug_dbt("\tbdb data", &bdb_data, stderr);
+			__wt_bt_debug_dbt("\t wt data", &data, stderr);
 			return (1);
 		}
 	}
