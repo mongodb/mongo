@@ -37,6 +37,12 @@ namespace mongo {
         Stat() : Tool( "stat" , false , "admin" ){
             _sleep = 1;
             _rowNum = 0;
+
+            add_hidden_options()
+                ( "sleep" , po::value<int>() , "time to sleep between calls" )
+                ;
+            
+            addPositionArg( "sleep" , 1 );
         }
         
         BSONObj stats(){
@@ -113,10 +119,11 @@ namespace mongo {
         }
         
         int run(){ 
+            _sleep = getParam( "sleep" , _sleep );
             BSONObj prev = stats();
             if ( prev.isEmpty() )
                 return -1;
-
+            
             while ( 1 ){
                 sleepsecs(_sleep);
                 BSONObj now = stats();

@@ -55,6 +55,11 @@ namespace mongo {
                 return _params[name.c_str()].as<string>();
             return def;
         }
+        int getParam( string name , int def ){
+            if ( _params.count( name ) )
+                return _params[name.c_str()].as<int>();
+            return def;
+        }
         bool hasParam( string name ){
             return _params.count( name );
         }
