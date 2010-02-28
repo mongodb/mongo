@@ -8,44 +8,10 @@
  */
 
 #include "wts.h"
+#include "config.h"
 
-/*
- * Configuration for the wts program is an array of string-based paramters.
- * This is the structure used to declare them.
- */
-typedef struct {
-	const char	*name;			/* Configuration item */
-	u_int32_t	 random;		/* 1/0: if randomized */
-	u_int32_t	 min;			/* Minimum value */
-	u_int32_t	 max;			/* Maximum value */
-	u_int32_t	 *v;			/* Value for this run */
-} CONFIG;
-
-/* Get a random value between a config min/max pair. */
-#define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->max)
-
-static CONFIG c[] = {
-  { "bulk_load",	1,	0,	M(1),		&g.c_bulk_keys },
-  { "cache",		1,	2,	30,		&g.c_cache },
-  { "data_len",		0,	0,	0,		&g.c_data_len },
-  { "data_max",		1,	32,	4096,		&g.c_data_max },
-  { "data_min",		1,	10,	64,		&g.c_data_min },
-  { "database_type",	1,	0,	2,		&g.c_database_type },
-  { "fixed_length",	1,	1,	24,		&g.c_fixed_length },
-  { "huffman_data",	1,	0,	1,		&g.c_huffman_data },
-  { "huffman_key",	1,	0,	1,		&g.c_huffman_key },
-  { "internal_node",	1,	9,	17,		&g.c_internal_node },
-  { "key_cnt",		1,	1000,	M(1),		&g.c_key_cnt },
-  { "key_len",		0,	0,	0,		&g.c_key_len },
-  { "key_max",		1,	64,	128,		&g.c_key_max },
-  { "key_min",		1,	10,	32,		&g.c_key_min },
-  { "leaf_node",	1,	9,	17,		&g.c_leaf_node },
-  { "rand_seed",	0,	0,	INT_MAX,	&g.c_rand_seed },
-  { "read_ops",		0,	0,	100,		&g.c_read_ops },
-  { "repeat_comp",	1,	0,	1,		&g.c_repeat_comp },
-  { "write_ops",	0,	0,	100,		&g.c_write_ops },
-  { NULL, 0, 0, 0, NULL }
-};
+static const char *config_dtype(void);
+static CONFIG *config_find(const char *);
 
 /*
  * config_names --
@@ -62,37 +28,46 @@ config_names(void)
 }
 
 /*
- * config_init --
- *	Initialize configuration structure.
+ * config --
+ *	Initialize the system.
  */
 void
-config_init(void)
+config(void)
 {
 	CONFIG *cp;
-	u_int i;
 
-	/*
-	 * Walk the configuration array and fill in random values for this
-	 * run.
-	 */
-	for (cp = c; cp->name != NULL; ++cp) {
-		/* Skip items that aren't randomized. */
-		if (cp->random == 0)
-			continue;
-		*cp->v = CONF_RAND(cp);
-	}
+	/* Clean up from any previous runs. */
+	(void)system("rm -f __*");
+
+	/* Pick a random number seed. */
+	cp = config_find("rand_seed");
+	if (!(cp->flags & C_FIXED))
+		*cp->v = (0xdeadbeef ^ (u_int)time(NULL));
+	srand((int)g.c_rand_seed);
+
+	/* Pick a database type next, other items depend on it. */
+	cp = config_find("database_type");
+	if (!(cp->flags & C_FIXED))
+		switch (MMRAND(0, 2)) {
+		case 0:
+			g.c_database_type = FIX;
+			break;
+		case 1:
+			g.c_database_type = VAR;
+			break;
+		case 2:
+			g.c_database_type = ROW;
+			break;
+		}
+
+	/* Fill in random values for the rest of the run. */
+	for (cp = c; cp->name != NULL; ++cp)
+		if (!(cp->flags & (C_FIXED | C_IGNORE)))
+			*cp->v = CONF_RAND(cp);
 
 	/* Specials. */
-	if (g.c_rand_seed == 0)
-		g.c_rand_seed = (0xdeadbeef ^ (u_int)time(NULL));
-	if (g.c_read_ops == 0)
-		g.c_read_ops = (rand() % 100) + 1;
 	if (g.c_write_ops == 0)
 		g.c_write_ops = 100 - g.c_read_ops;
-
-	/* Fill in the random key lengths. */
-	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
@@ -124,7 +99,15 @@ config_dump(int logfile)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		fprintf(fp, "%s=%lu\n", cp->name, (u_long)*cp->v);
+		if (cp->type_mask != 0 && !(cp->type_mask & g.c_database_type))
+			fprintf(fp,
+			    "# %s not applicable to this run\n", cp->name);
+		else {
+			if (!strcmp(cp->name, "database_type"))
+				fprintf(fp,
+				    "# database type: %s\n", config_dtype());
+			fprintf(fp, "%s=%lu\n", cp->name, (u_long)*cp->v);
+		}
 
 	fprintf(fp, "############################################\n");
 	if (logfile)
@@ -173,23 +156,52 @@ config_single(char *s)
 	}
 	*vp++ = '\0';
 
+	cp = config_find(s);
+	cp->flags |= C_FIXED;
+	*cp->v = (u_int32_t)atoi(vp);
+	if (*cp->v < cp->min || *cp->v > cp->max) {
+		fprintf(stderr,
+		    "%s: %s: value of %lu outside min/max values of %lu-%lu\n",
+		    g.progname, s,
+		    (u_long)*cp->v, (u_long)cp->min, (u_long)cp->max);
+		exit (EXIT_FAILURE);
+	}
+}
+
+/*
+ * config_find
+ *	Find a specific configuration entry.
+ */
+static CONFIG *
+config_find(const char *s)
+{
+	CONFIG *cp;
+
 	for (cp = c; cp->name != NULL; ++cp) 
-		if (strcmp(s, cp->name) == 0) {
-			*cp->v = (u_int32_t)atoi(vp);
-			if (*cp->v < cp->min || *cp->v > cp->max) {
-				fprintf(stderr,
-				    "%s: %s: value of %lu outside min/max "
-				    "values of %lu-%lu\n",
-				    g.progname, s, (u_long)*cp->v,
-				    (u_long)cp->min, (u_long)cp->max);
-				exit (EXIT_FAILURE);
-			}
-			cp->random = 0;
-			return;
-		}
+		if (strcmp(s, cp->name) == 0)
+			return (cp);
+
 	fprintf(stderr,
 	    "%s: %s: unknown configuration value; use the -c option to "
 	    "display available configuration values\n",
 	    g.progname, s);
 	exit (EXIT_FAILURE);
+}
+
+/*
+ * config_dtype --
+ *	Return the database type as a string.
+ */
+static const char *
+config_dtype()
+{
+	switch (g.c_database_type) {
+	case FIX:
+		return ("fixed-length column store");
+	case VAR:
+		return ("variable-length column store");
+	case ROW:
+		return ("row store");
+	}
+	return ("error: UNKNOWN DATABASE TYPE");
 }

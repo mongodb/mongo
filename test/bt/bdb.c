@@ -26,7 +26,10 @@ bdb_setup(int reopen)
 	    (g.c_write_ops != 0 ? DB_INIT_LOCK : 0) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
-	assert(db->set_flags(db, DB_RECNUM) == 0);
+	if (g.c_duplicates)
+		assert(db->set_flags(db, DB_DUP) == 0);
+	else
+		assert(db->set_flags(db, DB_RECNUM) == 0);
 
 	p = fname(BDB_PREFIX, "db");
 	if (!reopen)

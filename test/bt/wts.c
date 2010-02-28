@@ -9,6 +9,8 @@
 
 #include "wts.h"
 
+extern void __wt_bt_debug_dbt(const char *, DBT *, FILE *);
+
 static int cb_bulk(DB *, DBT **, DBT **);
 
 int
@@ -53,14 +55,14 @@ wts_setup(int reopen, int logfile)
 	}
 
 	switch (g.c_database_type) {
-	case COLUMN_FIX:
-		if ((ret = db->column_set(db, g.c_fixed_length,
+	case FIX:
+		if ((ret = db->column_set(db, g.c_data_min,
 		    NULL, g.c_repeat_comp ? WT_REPEAT_COMP : 0)) != 0) {
 			db->err(db, ret, "Db.column_set");
 			return (1);
 		}
 		break;
-	case COLUMN_VAR:
+	case VAR:
 		if ((ret = db->column_set(db, 0, NULL, 0)) != 0) {
 			db->err(db, ret, "Db.column_set");
 			return (1);
@@ -113,8 +115,8 @@ wts_bulk_load()
 	db = g.wts_db;
 
 	switch (g.c_database_type) {
-	case COLUMN_FIX:
-	case COLUMN_VAR:
+	case FIX:
+	case VAR:
 		ret = db->bulk_load(db, 0, track, cb_bulk);
 		break;
 	case ROW:
@@ -173,18 +175,27 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 
 	db = NULL;
 
-	if (++g.key_cnt > g.c_bulk_keys) {
-		g.key_cnt = g.c_bulk_keys;
-		return (1);
-	}
+	/*
+	 * Generate a set of duplicates for each key if duplicates have been
+	 * configured.  The duplicate_pct configuration is a percentage, which
+	 * defines the number of keys that get duplicate data items, and the
+	 * number of duplicate data items for each such key is a random value
+	 * in-between 2 and the value of duplicate_cnt.
+	 */
+	if (g.c_duplicates_pct == 0 ||
+	    (u_int32_t)rand() % 100 > g.c_duplicates_pct) {
+		if (++g.key_cnt > g.c_bulk_cnt) {
+			g.key_cnt = g.c_bulk_cnt;
+			return (1);
+		}
 
-	/* Generate a key for BDB, even if WT isn't using one. */
-	key_gen(&key, g.key_cnt);
+		key_gen(&key, g.key_cnt);
+	}
 	data_gen(&data);
 
 	switch (g.c_database_type) {
-	case COLUMN_FIX:
-	case COLUMN_VAR:
+	case FIX:
+	case VAR:
 		*keyp = NULL;
 		*datap = &data;
 		break;
@@ -279,6 +290,7 @@ wts_read_recno()
 	WT_TOC *toc;
 	u_int64_t cnt, last_cnt;
 	int ret;
+	char num[20];
 
 	db = g.wts_db;
 	env = db->env;
@@ -309,6 +321,19 @@ wts_read_recno()
 			    "wts_read_recno: read row %llu by recno", cnt);
 			return (1);
 		}
+
+		/* Confirm the key number is correct. */
+		snprintf(num, sizeof(num), "%010llu", cnt);
+		if (key.size < 10 || memcmp(num, key.data, 10)) {
+			fprintf(stderr,
+			    "wts_read_recno: read row %llu by recno:\n", cnt);
+			__wt_bt_debug_dbt("\t wt key", &key, stderr);
+			return (1);
+		}
+
+		/* BDB doesn't support record counts with duplicates. */
+		if (g.c_duplicates)
+			continue;
 
 		/* Retrieve the BDB data item. */
 		if (bdb_read_recno(cnt, &bdb_key.data,

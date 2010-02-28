@@ -25,5 +25,6 @@ ${OBJS}: wts.h
 bdb.o:
 	${CC} -DBDB ${CFLAGS} -I${BDB} -c $< -o $@
 
+config.o: config.h
 config.o t.o util.o wts.o:
 	${CC} ${CFLAGS} -I${WT} -c $< -o $@

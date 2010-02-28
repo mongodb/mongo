@@ -21,56 +21,86 @@ fname(const char *prefix, const char *name)
 void
 key_gen(DBT *key, u_int64_t key_cnt)
 {
-	static char buf[256];
-	size_t len, tlen;
+	static int first = 1;
+	static char *buf;
+	size_t i, len, klen;
 
 	/*
 	 * The key is a variable length item with a leading 10-digit value.
 	 * Since we have to be able re-construct it from the record number
-	 * (when doing row lookups), we use a randomly generated length that
-	 * we can reproduce.
+	 * (when doing row lookups), we pre-load a set of random lengths in
+	 * a lookup table, and then use the record number to choose one of
+	 * the pre-loaded lengths.
 	 *
-	 * We store it in a static buffer, correct the size, just in case.
+	 * Fill in the random key lengths.
 	 */
-	if ((tlen = g.c_key_len) == 0)
-		tlen = g.key_rand_len[key_cnt %
-		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len))];
-	if (tlen > sizeof(buf))
-		tlen = sizeof(buf);
+	if (first) {
+		first = 0;
+		for (i = 0;
+		    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
+			g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
+		if ((buf = malloc(g.c_key_max)) == NULL) {
+			fprintf(stderr,
+			    "%s: %s\n", g.progname, strerror(errno));
+			exit (EXIT_FAILURE);
+		}
+	}
+
+	klen = g.key_rand_len[key_cnt %
+	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 
 	/* The key always starts with a 10-digit string (the specified cnt). */
-	len = snprintf(buf, sizeof(buf), "%010llu", key_cnt);
-	if (len < tlen)
-		memset(buf + len, 'a', tlen - len);
+	len = snprintf(buf, g.c_key_max, "%010llu", key_cnt);
+	if (len < klen)
+		memset(buf + len, 'a', klen - len);
 	key->data = buf;
-	key->size = tlen;
+	key->size = klen;
 }
 
 void
 data_gen(DBT *data)
 {
-	static char buf[5 * 1024];
+	static int first = 1;
+	static char *buf;
 	size_t i, len;
+	char *p;
 
-	/* Set buffer contents. */
-	if (buf[0] == '\0')
-		for (i = 0; i < sizeof(buf); ++i)
+	/*
+	 * Set buffer contents.
+	 *
+	 * If doing repeat compression, use different data some percentage of
+	 * the time, otherwise we end up with a single chunk of repeated data.
+	 * Add a few extra bytes in order to guarantee we can always offset
+	 * into the buffer by a few bytes.
+	 */
+	if (first) {
+		first = 0;
+		len = g.c_data_max + 10;
+		if ((buf = malloc(len)) == NULL) {
+			fprintf(stderr,
+			    "%s: %s\n", g.progname, strerror(errno));
+			exit (EXIT_FAILURE);
+		}
+		for (i = 0; i < len; ++i)
 			buf[i] = 'A' + i % 26;
+	}
 
-	/*
-	 * The data is a variable length item.
-	 * We store it in a static buffer, correct the size, just in case.
-	 */
-	if ((len = g.c_fixed_length) == 0 && (len = g.c_data_len) == 0)
+	switch (g.c_database_type) {
+	case FIX:
+		p = buf;
+		if (g.c_repeat_comp != 0 ||
+		    (u_int)rand() % 100 <= g.c_repeat_comp_pct)
+			p += rand() % 7;
+		len = g.c_data_min;
+		break;
+	case VAR:
+	case ROW:
+		p = buf;
 		len = MMRAND(g.c_data_min, g.c_data_max);
-	if (len > sizeof(buf))
-		len = sizeof(buf);
+		break;
+	}
 
-	/*
-	 * If we're repeat compression, use something different 20% of the
-	 * time, otherwise we end up with a single chunk of repeated data.
-	 */
-	data->data = buf + (g.c_repeat_comp ? (rand() % 5 == 0 ? 1 : 0) : 0);
+	data->data = p;
 	data->size = len;
 }
 

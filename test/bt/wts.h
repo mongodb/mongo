@@ -33,10 +33,9 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(rand() % ((max + 1) - (min)) + (min))
 
-/* Database types. */
-#define	COLUMN_FIX	0
-#define	COLUMN_VAR	1
-#define	ROW		2
+#define	FIX		0x01			/* Database types */
+#define	VAR		0x02
+#define	ROW		0x04
 
 #define	WT_PREFIX	"wt"			/* Output file prefix */
 #define	BDB_PREFIX	"bdb"
@@ -56,31 +55,29 @@ typedef struct {
 
 	int verbose;				/* Verbosity */
 
-	u_int32_t key_cnt;			/* Current key count */
-	u_int16_t key_rand_len[1031];		/* Key lengths */
-
-	/* Config values. */
-	u_int32_t c_bulk_keys;
+	u_int32_t c_bulk_cnt;			/* Config values */
 	u_int32_t c_cache;
-	u_int32_t c_data_len;
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
 	u_int32_t c_database_type;
-	u_int32_t c_fixed_length;
+	u_int32_t c_duplicates;
+	u_int32_t c_duplicates_pct;
 	u_int32_t c_huffman_data;
 	u_int32_t c_huffman_key;
 	u_int32_t c_internal_node;
 	u_int32_t c_key_cnt;
-	u_int32_t c_key_len;
 	u_int32_t c_key_max;
 	u_int32_t c_key_min;
 	u_int32_t c_leaf_node;
 	u_int32_t c_rand_seed;
 	u_int32_t c_read_ops;
 	u_int32_t c_repeat_comp;
+	u_int32_t c_repeat_comp_pct;
 	u_int32_t c_write_ops;
-} GLOBAL;
 
+	u_int32_t key_cnt;			/* Current key count */
+	u_int16_t key_rand_len[1031];		/* Key lengths */
+} GLOBAL;
 extern GLOBAL g;
 
 void	 bdb_insert(void *, u_int32_t, void *, u_int32_t);
@@ -90,7 +87,7 @@ void	 bdb_setup(int);
 void	 bdb_teardown(void);
 void	 config_dump(int);
 void	 config_file(char *);
-void	 config_init(void);
+void	 config(void);
 void	 config_names(void);
 void	 config_single(char *);
 void	 data_gen(DBT *);

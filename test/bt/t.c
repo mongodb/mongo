@@ -68,14 +68,9 @@ main(int argc, char *argv[])
 	for (; *argv != NULL; ++argv)
 		config_single(*argv);
 
-	srand((int)g.c_rand_seed);
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
 	for (run_cnt = 1; runs == 0 || run_cnt <= runs; ++run_cnt) {
-		/* Clean up leftover files from the last run. */
-		(void)system("rm -f bdb.db wt.*");
-
-		/* Randomize any configuration not set from the command line. */
-		config_init();
+		config();
 
 		bdb_setup(0);
 		wts_setup(0, log);
@@ -85,14 +80,9 @@ main(int argc, char *argv[])
 
 		if (wts_bulk_load())
 			goto err;
-		if (g.c_database_type == ROW && wts_read_key())
-			goto err;
-		if (wts_read_recno())
-			goto err;
 
 		bdb_teardown();
 		wts_teardown();
-
 		bdb_setup(1);
 		wts_setup(1, log);
 
