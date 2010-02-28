@@ -201,7 +201,7 @@ public:
         log(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         const int BUF_SIZE = 1024 * 1024 * 4;
-        boost::scoped_array<char> line(new char[BUF_SIZE]);
+        boost::scoped_array<char> line(new char[BUF_SIZE+2]);
         while ( *in ){
             char * buf = line.get();
             in->getline( buf , BUF_SIZE );
@@ -214,6 +214,8 @@ public:
             if ( ! len )
                 continue;
             
+            buf[len+1] = 0;
+
             if ( in->rdstate() == ios_base::eofbit )
                 break;
             assert( in->rdstate() == 0 );
