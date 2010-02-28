@@ -187,7 +187,7 @@ namespace mongo {
     class Geo2dType : public IndexType {
     public:
         Geo2dType( const IndexPlugin * plugin , const IndexSpec* spec )
-            : IndexType( plugin ) , _spec( spec ){
+            : IndexType( plugin , spec ){
             
             BSONObjBuilder orderBuilder;
 
@@ -340,7 +340,6 @@ namespace mongo {
 
         virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
         
-        const IndexSpec* _spec;
         string _geo;
         vector<string> _other;
         
@@ -556,7 +555,7 @@ namespace mongo {
             : _g( g ) , _max( max ) , _near( n ) , _lookedAt(0) , _objectsLoaded(0){
 
             if ( ! filter.isEmpty() )
-                _matcher.reset( new CoveredIndexMatcher( filter , g->_spec->keyPattern ) );
+                _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
         }
         
         void add( const KeyNode& node ){
@@ -797,7 +796,7 @@ namespace mongo {
         virtual DiskLoc refLoc(){ return DiskLoc(); }
 
         virtual BSONObj indexKeyPattern() {
-            return _s->_spec->_spec->keyPattern;
+            return _s->_spec->keyPattern();
         }
 
         virtual void noteLocation() { 

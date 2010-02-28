@@ -27,12 +27,16 @@ namespace mongo {
 
     map<string,IndexPlugin*> * IndexPlugin::_plugins;
 
-    IndexType::IndexType( const IndexPlugin * plugin )
-        : _plugin( plugin ){
+    IndexType::IndexType( const IndexPlugin * plugin , const IndexSpec * spec )
+        : _plugin( plugin ) , _spec( spec ){
         
     }
 
     IndexType::~IndexType(){
+    }
+    
+    const BSONObj& IndexType::keyPattern() const { 
+        return _spec->keyPattern; 
     }
 
     IndexPlugin::IndexPlugin( const string& name )
@@ -42,8 +46,8 @@ namespace mongo {
         (*_plugins)[name] = this;
     }
     
-    int IndexType::compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const {
-        return l.woCompare( r , spec.keyPattern );
+    int IndexType::compare( const BSONObj& l , const BSONObj& r ) const {
+        return l.woCompare( r , _spec->keyPattern );
     }
 
 

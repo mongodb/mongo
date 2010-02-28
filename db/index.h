@@ -38,20 +38,26 @@ namespace mongo {
      */
     class IndexType : boost::noncopyable {
     public:
-        IndexType( const IndexPlugin * plugin );
+        IndexType( const IndexPlugin * plugin , const IndexSpec * spec );
         virtual ~IndexType();
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
-        virtual int compare( const IndexSpec& spec , const BSONObj& l , const BSONObj& r ) const;
-        
-        const IndexPlugin * getPlugin() const { return _plugin; }
-
         virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
-
+        
+        /** optional op : changes query to match what's in the index */
         virtual BSONObj fixKey( const BSONObj& in ) { return in; }
+
+        /** optional op : compare 2 objects with regards to this index */
+        virtual int compare( const BSONObj& l , const BSONObj& r ) const;        
+
+        /** @return plugin */
+        const IndexPlugin * getPlugin() const { return _plugin; }
+        
+        const BSONObj& keyPattern() const;
 
     protected:
         const IndexPlugin * _plugin;
+        const IndexSpec * _spec;
     };
     
     /**
