@@ -44,14 +44,16 @@ typedef struct {
 	char *progname;				/* Program name */
 
 	void *bdb_db;				/* BDB DB handle */
+
 	void *wts_db;				/* WT DB handle */
+	FILE *logfp;				/* WT log file stream */
 
-	FILE *logfp;				/* Log file stream */
+	int run_cnt;				/* Runs */
 
-	enum                                    /* Database dumps */
+	enum                                    /* Dumps */
 	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;
 
-	int stats;				/* Database stats */
+	int stats;				/* Statistics */
 
 	int verbose;				/* Verbosity */
 

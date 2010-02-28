@@ -16,7 +16,7 @@ static void	usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, log, run_cnt, runs;
+	int ch, log, runs;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -69,13 +69,12 @@ main(int argc, char *argv[])
 		config_single(*argv);
 
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
-	for (run_cnt = 1; runs == 0 || run_cnt <= runs; ++run_cnt) {
+	for (g.run_cnt = 1; runs == 0 || g.run_cnt <= runs; ++g.run_cnt) {
 		config();
 
 		bdb_setup(0);
 		wts_setup(0, log);
 
-		printf("%50s\r%d\n", " ", run_cnt);
 		config_dump(1);
 
 		if (wts_bulk_load())
