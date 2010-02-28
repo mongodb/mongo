@@ -20,7 +20,7 @@ typedef struct {
 
 static CONFIG c[] = {
 	{ "bulk_cnt",		0,		0,		0,	M(1),		&g.c_bulk_cnt },
-	{ "cache",		0,		0,		2,	30,		&g.c_cache },
+	{ "cache",		0,		0,		1,	30,		&g.c_cache },
 	{ "data_max",		0,		0,		32,	4096,		&g.c_data_max },
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
 	{ "database_type",	0,		C_IGNORE,	0,	0,		&g.c_database_type },
