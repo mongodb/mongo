@@ -132,6 +132,25 @@ namespace mongo {
             }
         }
         
+        bool isEach() const {
+            if ( elt.type() != Object )
+                return false;
+            BSONElement e = elt.embeddedObject().firstElement();
+            if ( e.type() != Array )
+                return false;
+            return strcmp( e.fieldName() , "$each" ) == 0;
+        }
+
+        BSONObj getEach() const {
+            return elt.embeddedObjectUserCheck().firstElement().embeddedObjectUserCheck();
+        }
+        
+        void parseEach( BSONElementSet& s ) const {
+            BSONObjIterator i(getEach());
+            while ( i.more() ){
+                s.insert( i.next() );
+            }
+        }
     };
 
     /**
@@ -408,9 +427,14 @@ namespace mongo {
                     
             case Mod::PUSH: 
             case Mod::ADDTOSET: { 
-                BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
-                arr.appendAs( m.elt, "0" );
-                arr.done();
+                if ( m.isEach() ){
+                    b.appendArray( m.shortFieldName , m.getEach() );
+                }
+                else {
+                    BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
+                    arr.appendAs( m.elt, "0" );
+                    arr.done();
+                }
                 break;
             } 
                 

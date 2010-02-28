@@ -102,25 +102,48 @@ namespace mongo {
             bb.done();
             break;
         }
-
+            
         case ADDTOSET: {
             uassert( 12592 ,  "$addToSet can only be applied to an array" , in.type() == Array );
             BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            
             BSONObjIterator i( in.embeddedObject() );
-            
-            bool found = false;
-            
-            int n=0;
-            while ( i.more() ){
-                BSONElement cur = i.next();
-                bb.append( cur );
-                n++;
-                if ( elt.woCompare( cur , false ) == 0 )
-                    found = true;
+            int n=0;            
+
+            if ( isEach() ){
+                
+                BSONElementSet toadd;
+                parseEach( toadd );
+                
+                while ( i.more() ){
+                    BSONElement cur = i.next();
+                    bb.append( cur );
+                    n++;           
+                    toadd.erase( cur );
+                }
+                
+                for ( BSONElementSet::iterator j=toadd.begin(); j!=toadd.end(); j++ ){
+                    bb.appendAs( *j , BSONObjBuilder::numStr( n++ ) );
+                }
+
+            }
+            else {
+
+                bool found = false;
+
+                while ( i.more() ){
+                    BSONElement cur = i.next();
+                    bb.append( cur );
+                    n++;
+                    if ( elt.woCompare( cur , false ) == 0 )
+                        found = true;
+                }
+                
+                if ( ! found )
+                    bb.appendAs( elt ,  bb.numStr( n ) );
+                
             }
             
-            if ( ! found )
-                bb.appendAs( elt ,  bb.numStr( n ) );
             bb.done();
             break;
         }
@@ -340,17 +363,28 @@ namespace mongo {
                 
             case Mod::ADDTOSET: {
                 uassert( 12591 ,  "Cannot apply $addToSet modifier to non-array", e.type() == Array || e.eoo() );
-
+                
                 BSONObjIterator i( e.embeddedObject() );
-                bool found = false;
-                while( i.more() ) {
-                    BSONElement arrI = i.next();
-                    if ( arrI.woCompare( m.elt , false ) == 0 ){
-                        found = true;
-                        break;
+                if ( m.isEach() ){
+                    BSONElementSet toadd;
+                    m.parseEach( toadd );
+                    while( i.more() ) {
+                        BSONElement arrI = i.next();
+                        toadd.erase( arrI );
                     }
+                    mss->amIInPlacePossible( toadd.size() == 0 );
                 }
-                mss->amIInPlacePossible( found );
+                else {
+                    bool found = false;
+                    while( i.more() ) {
+                        BSONElement arrI = i.next();
+                        if ( arrI.woCompare( m.elt , false ) == 0 ){
+                            found = true;
+                            break;
+                        }
+                    }
+                    mss->amIInPlacePossible( found );
+                }
                 break;
             }
                 
