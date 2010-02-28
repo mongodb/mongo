@@ -651,7 +651,7 @@ namespace mongo {
 
     struct BSONElementCmpWithoutField {
         bool operator()( const BSONElement &l, const BSONElement &r ) const {
-            return l.woCompare( r, false );
+            return l.woCompare( r, false ) < 0;
         }
     };
     

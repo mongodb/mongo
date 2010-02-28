@@ -1386,6 +1386,43 @@ namespace JsobjTests {
         }
     };
 
+    class ElementSetTest {
+    public:
+        void run(){
+            BSONObj x = BSON( "a" << 1 << "b" << 1 << "c" << 2 );
+            BSONElement a = x["a"];
+            BSONElement b = x["b"];
+            BSONElement c = x["c"];
+            cout << "c: " << c << endl;
+            ASSERT( a.woCompare( b ) != 0 );
+            ASSERT( a.woCompare( b , false ) == 0 );
+            
+            BSONElementSet s;
+            s.insert( a );
+            ASSERT_EQUALS( 1U , s.size() );
+            s.insert( b );
+            ASSERT_EQUALS( 1U , s.size() );
+            ASSERT( ! s.count( c ) );
+
+            ASSERT( s.find( a ) != s.end() );
+            ASSERT( s.find( b ) != s.end() );
+            ASSERT( s.find( c ) == s.end() );
+                    
+            
+            s.insert( c );
+            ASSERT_EQUALS( 2U , s.size() );
+
+
+            ASSERT( s.find( a ) != s.end() );
+            ASSERT( s.find( b ) != s.end() );
+            ASSERT( s.find( c ) != s.end() );
+
+            ASSERT( s.count( a ) );
+            ASSERT( s.count( b ) );
+            ASSERT( s.count( c ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1476,6 +1513,7 @@ namespace JsobjTests {
             add< bson2settest >();
             add< checkForStorageTests >();
             add< InvalidIDFind >();
+            add< ElementSetTest >();
         }
     } myall;
     
