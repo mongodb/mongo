@@ -60,17 +60,18 @@ config(void)
 			break;
 		}
 
+	/* Reset the key count. */
+	g.key_cnt = 0;
+
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp)
 		if (!(cp->flags & (C_FIXED | C_IGNORE)))
 			*cp->v = CONF_RAND(cp);
 
 	/* Specials. */
-	if (g.c_write_ops == 0)
+	cp = config_find("write_ops");
+	if (!(cp->flags & (C_FIXED | C_IGNORE)))
 		g.c_write_ops = 100 - g.c_read_ops;
-
-	/* Reset the key count. */
-	g.key_cnt = 0;
 }
 
 /*
