@@ -16,8 +16,8 @@ assert.eq( ldb.things.count() , 3 );
 assert.eq( rdb.things.count() , 0 );
 
 startResult = l.getDB( "admin" ).runCommand( { "movechunk.start" : "foo.things" , 
-                                               "to" : s._serverNames[1] , 
-                                               "from" : s._serverNames[0] , 
+                                               "to" : s._connections[1].name , 
+                                               "from" : s._connections[0].name , 
                                                filter : { a : { $gt : 2 } }
                                              } );
 print( "movechunk.start: " + tojson( startResult ) );
@@ -25,7 +25,7 @@ assert( startResult.ok == 1 , "start failed!" );
 
 finishResult = l.getDB( "admin" ).runCommand( { "movechunk.finish" : "foo.things" , 
                                                 finishToken : startResult.finishToken ,
-                                                to : s._serverNames[1] , 
+                                                to : s._connections[1].name , 
                                                 newVersion : 1 } );
 print( "movechunk.finish: " + tojson( finishResult ) );
 assert( finishResult.ok == 1 , "finishResult failed!" );
