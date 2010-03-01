@@ -473,10 +473,10 @@ namespace mongo {
         {}
         
         void setupMatcher() {
-            if ( ! _c.get() || _c->useMatcher() )
+            //            if ( ! _c.get() )|| _c->useMatcher() )
                 _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
-            else
-                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));            
+                //            else
+                //                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));            
         }
         
         virtual void init() {

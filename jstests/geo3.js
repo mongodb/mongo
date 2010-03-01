@@ -70,11 +70,9 @@ assert.gt( filtered1.stats.objectsLoaded , filtered2.stats.objectsLoaded , "C3" 
 
 testFiltering( "loc and a" );
 
-/*
 t.dropIndex( { loc : "2d" , a : 1 } )
 assert.eq( 1 , t.getIndexKeys().length , "setup 4a" )
 t.ensureIndex( { loc : "2d" , b : 1 } )
 assert.eq( 2 , t.getIndexKeys().length , "setup 4b" )
 
 testFiltering( "loc and b" );
-*/
