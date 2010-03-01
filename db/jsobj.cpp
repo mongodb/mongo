@@ -541,12 +541,17 @@ namespace mongo {
         case Object:
         case Array:
             return l.embeddedObject().woCompare( r.embeddedObject() );
-        case DBRef:
-        case BinData: {
+        case DBRef: {
             int lsz = l.valuesize();
             int rsz = r.valuesize();
             if ( lsz - rsz != 0 ) return lsz - rsz;
             return memcmp(l.value(), r.value(), lsz);
+        }
+        case BinData: {
+            int lsz = l.objsize(); // our bin data size in bytes, not including the subtype byte
+            int rsz = r.objsize();
+            if ( lsz - rsz != 0 ) return lsz - rsz;
+            return memcmp(l.value()+4, r.value()+4, lsz+1);
         }
         case RegEx:
         {
