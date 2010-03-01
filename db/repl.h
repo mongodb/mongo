@@ -132,7 +132,7 @@ namespace mongo {
         // returns false if the slave has been reset
         bool updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
-        int _sleepAdviceTime;
+        unsigned _sleepAdviceTime;
         
     public:
         static void applyOperation(const BSONObj& op);
@@ -181,7 +181,7 @@ namespace mongo {
         int sleepAdvice() const {
             if ( !_sleepAdviceTime )
                 return 0;
-            int wait = _sleepAdviceTime - time( 0 );
+            int wait = _sleepAdviceTime - unsigned( time( 0 ) );
             return wait > 0 ? wait : 0;
         }
         
