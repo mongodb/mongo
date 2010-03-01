@@ -532,10 +532,6 @@ namespace mongo {
     public:
         GeoPoint( const BSONObj& key , DiskLoc loc , double distance )
             : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ){
-            BSONObjBuilder b( loc.obj().objsize() + 24 );
-            b.appendElements( loc.obj() );
-            b.append( "$distance" , distance );
-            _o = b.obj();
         }
 
         bool operator<( const GeoPoint& other ) const {
