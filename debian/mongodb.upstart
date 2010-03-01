@@ -5,6 +5,8 @@ pre-start script
     mkdir -p /var/log/mongodb/
 end script
 
-start on runlevel [345]
+start on runlevel [2345]
+stop on runlevel [06]
 
-exec  su -c "/usr/bin/mongod --config /etc/mongodb.conf" -s "/bin/sh" mongodb
+exec start-stop-daemon --start --quiet --chuid mongodb --exec  /usr/bin/mongod -- --config /etc/mongodb.conf
+
