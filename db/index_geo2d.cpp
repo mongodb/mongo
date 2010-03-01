@@ -35,30 +35,44 @@ namespace mongo {
     public:
         GeoBitSets(){
             for ( int i=0; i<32; i++ ){
-                masks[i] = ( 1 << ( 31 - i ) );
+                masks32[i] = ( 1 << ( 31 - i ) );
+            }
+            for ( int i=0; i<64; i++ ){
+                masks64[i] = ( 1LL << ( 63 - i ) );
             }
         }
-        int masks[32];
+        int masks32[32];
+        long long masks64[64];
     } geoBitSets;
 
     
     class GeoHash {
     public:
         GeoHash()
-            : _hash(""){
+            : _hash(0),_bits(0){
         }
 
-        GeoHash( const char * s )
-            : _hash( s ){
+        GeoHash( const char * hash ){
+            init( hash );
         }
 
-        GeoHash( const string& hash )
-            : _hash( hash ){
+        GeoHash( const string& hash ){
+            init( hash );
         }
 
-        GeoHash( const BSONElement& e ){
-            assert( e.type() == String );
-            _hash = e.valuestr();
+        GeoHash( const BSONElement& e , unsigned bits=32 ){
+            _bits = bits;
+            if ( e.type() == BinData ){
+                int len = 0;
+                _copy( (char*)&_hash , e.binData( len ) );
+                assert( len == 8 );
+                _bits = bits;
+            }
+            else {
+                cout << "GeoHash cons e : " << e << endl;
+                assert(0);
+            }
+            _fix();
         }
         
         GeoHash( unsigned x , unsigned y , unsigned bits=32){
@@ -67,27 +81,32 @@ namespace mongo {
 
         GeoHash( const GeoHash& old ){
             _hash = old._hash;
+            _bits = old._bits;
+        }
+
+        GeoHash( long long hash , unsigned bits )
+            : _hash( hash ) , _bits( bits ){
+            _fix();
         }
 
         void init( unsigned x , unsigned y , unsigned bits ){
             assert( bits <= 32 );
-            StringBuilder buf(64);
+            _hash = 0;
+            _bits = bits;
             for ( unsigned i=0; i<bits; i++ ){
-                buf.append( isBitSet( x , i ) ? "1" : "0" );
-                buf.append( isBitSet( y , i ) ? "1" : "0" );
+                if ( isBitSet( x , i ) ) _hash |= geoBitSets.masks64[i*2];
+                if ( isBitSet( y , i ) ) _hash |= geoBitSets.masks64[(i*2)+1];
             }
-            _hash = buf.str();
         }
 
         void unhash( unsigned& x , unsigned& y ) const {
             x = 0;
             y = 0;
-            size_t max = _hash.size() / 2;
-            for ( size_t i=0; i<max; i++ ){
-                if ( _hash[i*2] == '1' )
-                    x |= geoBitSets.masks[i];
-                if ( _hash[1+(i*2)] == '1' )
-                    y |= geoBitSets.masks[i];
+            for ( unsigned i=0; i<_bits; i++ ){
+                if ( getBitX(i) )
+                    x |= geoBitSets.masks32[i];
+                if ( getBitY(i) )
+                    y |= geoBitSets.masks32[i];
             }
         }
 
@@ -95,39 +114,80 @@ namespace mongo {
          * @param 0 = high
          */
         static bool isBitSet( unsigned val , unsigned  bit ){
-            return geoBitSets.masks[bit] & val;
+            return geoBitSets.masks32[bit] & val;
         }
         
         GeoHash up() const {
-            return _hash.substr( 0 , _hash.size() - 2 );
+            return GeoHash( _hash , _bits - 1 );
         }
         
         bool hasPrefix( const BSONElement& e ) const {
-            assert( e.type() == String );
-            return strstr( e.valuestr() , _hash.c_str() ) == e.valuestr();
+            GeoHash other(e,_bits);
+            long long x = other._hash ^ _hash;
+            x = x >> (64-(_bits*2));
+            return x == 0;
+        }
+        
+        string toString() const { 
+            StringBuilder buf( _bits * 2 );
+            for ( unsigned x=0; x<_bits*2; x++ )
+                buf.append( _hash & geoBitSets.masks64[x] ? "1" : "0" );
+            return buf.str();
         }
 
-        operator string() const { return _hash; }
-        string toString() const { return _hash; }
-
-        char operator[]( const size_t pos ) const {
-            return _hash[pos];
+        string toStringHex1() const {
+            stringstream ss;
+            ss << hex << _hash;
+            return ss.str();
         }
 
-        size_t size() const {
-            return _hash.size();
+        void init( const string& s ){
+            _hash = 0;
+            _bits = s.size() / 2;
+            for ( unsigned pos=0; pos<s.size(); pos++ )
+                if ( s[pos] == '1' )
+                    setBit( pos , 1 );
         }
 
+        unsigned operator[]( const unsigned pos ) const {
+            return _hash & geoBitSets.masks64[pos];
+        }
+
+        void setBit( unsigned pos , bool one ){
+            if ( one )
+                _hash |= geoBitSets.masks64[pos];
+            else if ( _hash & geoBitSets.masks64[pos] )
+                _hash &= ~geoBitSets.masks64[pos];
+        }
+        
+        bool getBit( unsigned pos ) const {
+            return _hash & geoBitSets.masks64[pos];
+        }
+
+        bool getBitX( unsigned pos ) const {
+            assert( pos < 32 );
+            return getBit( pos * 2 );
+        }
+
+        bool getBitY( unsigned pos ) const {
+            assert( pos < 32 );
+            return getBit( ( pos * 2 ) + 1 );
+        }
+        
         BSONObj wrap() const {
-            return BSON( "" << _hash );
+            BSONObjBuilder b(20);
+            append( b , "" );
+            BSONObj o = b.obj();
+            assert( o.objsize() == 20 );
+            return o;
         }
 
         bool constrains() const {
-            return _hash.size() > 0;
+            return _bits > 0;
         }
         
         void move( int x , int y ){
-            assert( _hash.size() );
+            assert( _bits );
             _move( 0 , x );
             _move( 1 , y );
         }
@@ -137,50 +197,93 @@ namespace mongo {
                 return;
             assert( d <= 1 && d>= -1 ); // TEMP
             
-            char from, to;
+            bool from, to;
             if ( d > 0 ){
-                from = '0';
-                to = '1';
+                from = 0;
+                to = 1;
             }
             else {
-                from = '1';
-                to = '0';
+                from = 1;
+                to = 0;
             }
 
-            int pos = _hash.size() - 1;
+            unsigned pos = ( _bits * 2 ) - 1;
             if ( offset == 0 )
                 pos--;
             for ( ; pos >= 0 ; pos-=2 ){
-                if ( _hash[pos] == from ){
-                    _hash[pos] = to;
+                if ( getBit(pos) == from ){
+                    setBit( pos , to );
                     return;
                 }
                 else {
-                    _hash[pos] = from;
+                    setBit( pos , from );
                 }
             }
             
             assert(0);
         }
 
-        void reset( const string& s ){
-            _hash = s;
-        }
-
         GeoHash& operator=(const GeoHash& h) { 
-            reset(h._hash);
+            _hash = h._hash;
+            _bits = h._bits;
             return *this;
         }
         
         bool operator==(const GeoHash& h ){
-            return _hash == h._hash;
+            return _hash == h._hash && _bits == h._bits;
         }
 
-        string _hash;
+        GeoHash& operator+=( const char * s ) {
+            unsigned pos = _bits * 2;
+            while ( s[0] ){
+                if ( s[0] == '1' )
+                    setBit( pos , 1 );
+                pos++;
+                s++;
+            }
+            _bits = pos / 2;
+            assert( _bits <= 32 );
+            return *this;
+        }
+
+        GeoHash operator+( const char * s ) const {
+            GeoHash n = *this;
+            n+=s;
+            return n;
+        }
+      
+        void _fix(){
+            if ( ( _hash << ( _bits * 2 ) ) == 0 )
+                return;
+            long long mask = 0;
+            for ( unsigned i=0; i<_bits*2; i++ )
+                mask |= geoBitSets.masks64[i];
+            _hash &= mask;
+        }
+        
+        void append( BSONObjBuilder& b , const char * name ) const {
+            char buf[8];
+            _copy( buf , (char*)&_hash );
+            b.appendBinData( name , 8 , bdtCustom , buf );
+        }
+        
+        long long getHash() const {
+            return _hash;
+        }
+    private:
+
+        void _copy( char * dst , const char * src ) const {
+            for ( unsigned a=0; a<8; a++ ){
+                dst[a] = src[7-a];
+            }
+        }
+
+        long long _hash;
+        unsigned _bits; // bits per field, so 1 to 32
     };
 
     ostream& operator<<( ostream &s, const GeoHash &h ){
-        s << h._hash;
+        s << h.toString();
         return s;
     }
 
@@ -231,11 +334,19 @@ namespace mongo {
         }
 
         virtual BSONObj fixKey( const BSONObj& in ) { 
-            if ( ! in.firstElement().isABSONObj() )
+            if ( in.firstElement().type() == BinData )
                 return in;
 
-            BSONObjBuilder b;
-            b.append( "" , _hash( in.firstElement().embeddedObject() ) );
+            BSONObjBuilder b(in.objsize()+16);
+            
+            if ( in.firstElement().isABSONObj() )
+                _hash( in.firstElement().embeddedObject() ).append( b , "" );
+            else if ( in.firstElement().type() == String )
+                GeoHash( in.firstElement().valuestr() ).append( b , "" );
+            else if ( in.firstElement().type() == RegEx )
+                GeoHash( in.firstElement().regex() ).append( b , "" );
+            else 
+                return in;
 
             BSONObjIterator i(in);
             i.next();
@@ -245,13 +356,14 @@ namespace mongo {
         }
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-            BSONObjBuilder b(64);
-
             BSONElement geo = obj[_geo];
             if ( geo.eoo() )
                 return;
+
+            BSONObjBuilder b(64);
+
             uassert( 13025 , (string)"geo field[" + _geo + "] has to be an Object or Array" , geo.isABSONObj() );
-            b.append( "" , _hash( geo.embeddedObject() ) );
+            _hash( geo.embeddedObject() ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ){
                 BSONElement e = obj[_other[i]];
@@ -266,11 +378,7 @@ namespace mongo {
             if ( e.isABSONObj() )
                 return _hash( e.embeddedObject() );
             
-            if ( e.type() == String)
-                return (string)(e.valuestr());
-            
-            uassert( 13043 , "invalid/missing near param" , 0 );
-            return "";
+            return GeoHash( e , _bits );
         }
 
         GeoHash _hash( const BSONObj& o ) const {
@@ -461,6 +569,8 @@ namespace mongo {
         int round( double d ){
             return (int)(.5+(d*1000));
         }
+        
+#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == b ); }
 
         void run(){
             assert( ! GeoHash::isBitSet( 0 , 0 ) );
@@ -493,24 +603,23 @@ namespace mongo {
                 assert( round( in["y"].number() ) == round( out["y"].number() ) );
             }
             
-            
             {
                 GeoHash h( "0000" );
                 h.move( 0 , 1 );
-                assert( h._hash == "0001" );
+                GEOHEQ( h , "0001" );
                 h.move( 0 , -1 );
-                assert( h._hash == "0000" );
+                GEOHEQ( h , "0000" );
 
-                h.reset( "0001" );
+                h.init( "0001" );
                 h.move( 0 , 1 );
-                assert( h._hash == "0100" );
+                GEOHEQ( h , "0100" );
                 h.move( 0 , -1 );
-                assert( h._hash == "0001" );
+                GEOHEQ( h , "0001" );
                 
 
-                h.reset( "0000" );
+                h.init( "0000" );
                 h.move( 1 , 0 );
-                assert( h._hash == "0010" );
+                GEOHEQ( h , "0010" );
             }
             
             {
@@ -527,6 +636,50 @@ namespace mongo {
                 assert( round(10) == round(g.distance( a , b )) );
             }
             
+            {
+                GeoHash x("0000");
+                assert( 0 == x.getHash() );
+                x.init( 0 , 1 , 32 );
+                GEOHEQ( x , "0000000000000000000000000000000000000000000000000000000000000001" )
+
+                GeoHash q( "11" );
+                assert( q.hasPrefix( GeoHash( "1100" ).wrap().firstElement() ) );
+                assert( ! q.hasPrefix( GeoHash( "1000" ).wrap().firstElement() ) );
+            }
+               
+            {
+                GeoHash x("1010");
+                GEOHEQ( x , "1010" );
+                GeoHash y = x + "01";
+                GEOHEQ( y , "101001" );
+            }
+
+            { 
+                
+                GeoHash a = g._hash( 5 , 5 );
+                GeoHash b = g._hash( 5 , 7 );
+                GeoHash c = g._hash( 100 , 100 );
+                /*
+                cout << "a: " << a << endl;
+                cout << "b: " << b << endl;
+                cout << "c: " << c << endl;
+
+                cout << "a: " << a.toStringHex1() << endl;
+                cout << "b: " << b.toStringHex1() << endl;
+                cout << "c: " << c.toStringHex1() << endl;
+                */
+                BSONObj oa = a.wrap();
+                BSONObj ob = b.wrap();
+                BSONObj oc = c.wrap();
+                /*
+                cout << "a: " << oa.hexDump() << endl;
+                cout << "b: " << ob.hexDump() << endl;
+                cout << "c: " << oc.hexDump() << endl;
+                */
+                assert( oa.woCompare( ob ) < 0 );
+                assert( oa.woCompare( oc ) < 0 );
+
+            }
         }
     } geoUnitTest;
     
@@ -566,6 +719,7 @@ namespace mongo {
             _lookedAt++;
 
             double d = _g->distance( _near , node.key.firstElement() );
+            //cout << "\t" << node.recordLoc.obj() << "\t" << d << endl;
             if ( _points.size() >= _max && d > farthest() )
                 return;
             
@@ -703,13 +857,14 @@ namespace mongo {
                         _nscanned++;
                     while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , _hopper ) )
                         _nscanned++;
-                    if ( _prefix.size() == 0 )
+                    if ( ! _prefix.constrains() )
                         break;
                     _prefix = _prefix.up();
+                    //cout << _prefix << "\t" << _found << "\t" << endl;
                 }
             }
             
-            if ( _found && _prefix.size() ){
+            if ( _found && _prefix.constrains() ){
                 // 2
                 Point center( _spec , _n );
                 double boxSize = _spec->size( _prefix );
@@ -744,10 +899,10 @@ namespace mongo {
                 return;
             
             if ( intPer < .5 && depth < 3 ){
-                doBox( id , want , toscan._hash + "00" , depth + 1);
-                doBox( id , want , toscan._hash + "01" , depth + 1);
-                doBox( id , want , toscan._hash + "10" , depth + 1);
-                doBox( id , want , toscan._hash + "11" , depth + 1);
+                doBox( id , want , toscan + "00" , depth + 1);
+                doBox( id , want , toscan + "01" , depth + 1);
+                doBox( id , want , toscan + "10" , depth + 1);
+                doBox( id , want , toscan + "11" , depth + 1);
                 return;
             }
 
@@ -815,11 +970,13 @@ namespace mongo {
             return false;
         }
 
-        virtual BSONObj prettyStartKey() const { return BSON( _s->_spec->_geo << _s->_prefix ); }
+        virtual BSONObj prettyStartKey() const { 
+            return BSON( _s->_spec->_geo << _s->_prefix.toString() ); 
+        }
         virtual BSONObj prettyEndKey() const { 
             GeoHash temp = _s->_prefix;
             temp.move( 1 , 1 );
-            return BSON( _s->_spec->_geo << temp ); 
+            return BSON( _s->_spec->_geo << temp.toString() ); 
         }
 
 
@@ -846,7 +1003,7 @@ namespace mongo {
                 e = e.embeddedObject().firstElement();
             n = _tohash( e );
         }
-        uassert( 13042 , "no geo field" , n.size() );
+        uassert( 13042 , "no geo field" , n.constrains() );
 
         shared_ptr<GeoSearch> s( new GeoSearch( this , n , numWanted , query ) );
         s->exec();
@@ -901,7 +1058,7 @@ namespace mongo {
                 numWanted = cmdObj["num"].numberInt();
             
             const GeoHash n = g->_tohash( cmdObj["near"] );
-            result.append( "near" , n );
+            result.append( "near" , n.toString() );
 
             BSONObj filter;
             if ( cmdObj["query"].type() == Object )
@@ -911,10 +1068,6 @@ namespace mongo {
 
             if ( cmdObj["start"].type() == String){
                 GeoHash start = (string) cmdObj["start"].valuestr();
-                if ( 2 * ( start.size() / 2 ) != start.size() ){
-                    errmsg = "start has to be an even size";
-                    return false;
-                }
                 gs._start = start;
             }
             
@@ -954,4 +1107,64 @@ namespace mongo {
         }
         
     } geo2dFindNearCmd;
+
+    class GeoWalkCmd : public Command {
+    public:
+        GeoWalkCmd() : Command( "geoWalk" ){}
+        virtual LockType locktype(){ return READ; } 
+        bool slaveOk() { return true; }
+        bool slaveOverrideOk() { return true; }
+        bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
+
+            NamespaceDetails * d = nsdetails( ns.c_str() );
+            if ( ! d ){
+                errmsg = "can't find ns";
+                return false;
+            }
+
+            int geoIdx = -1;
+            {
+                NamespaceDetails::IndexIterator ii = d->ii();
+                while ( ii.more() ){
+                    IndexDetails& id = ii.next();
+                    if ( id.getSpec().getTypeName() == GEO2DNAME ){
+                        if ( geoIdx >= 0 ){
+                            errmsg = "2 geo indexes :(";
+                            return false;
+                        }
+                        geoIdx = ii.pos() - 1;
+                    }
+                }
+            }
+            
+            if ( geoIdx < 0 ){
+                errmsg = "no geo index :(";
+                return false;
+            }
+            
+
+            IndexDetails& id = d->idx( geoIdx );
+            Geo2dType * g = (Geo2dType*)id.getSpec().getType();
+            assert( &id == g->getDetails() );
+
+            int max = 100000;
+
+            BtreeCursor c( d , geoIdx , id , BSONObj() , BSONObj() , true , 1 );
+            while ( c.ok() && max-- ){
+                GeoHash h( c.currKey().firstElement() );
+                int len;
+                cout << "\t" << h.toString()
+                     << "\t" << c.current()[g->_geo] 
+                     << "\t" << hex << h.getHash() 
+                     << "\t" << hex << ((long long*)c.currKey().firstElement().binData(len))[0]
+                     << endl;
+                c.advance();
+            }
+
+            return true;
+        }
+        
+    } geoWalkCmd;
+
 }

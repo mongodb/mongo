@@ -32,7 +32,8 @@ function a( cur ){
     var total = 0;
     var outof = 0;
     while ( cur.hasNext() ){
-        total += dis( [ 50 , 50 ] , cur.next().loc );
+        var o = cur.next();
+        total += dis( [ 50 , 50 ] , o.loc );
         outof++;
     }
     return total/outof;
