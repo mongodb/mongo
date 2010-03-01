@@ -640,7 +640,7 @@ SyncCCTest = function( testName ){
     }
     
     this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
-    print( this.url );
+    this.conn = new Mongo( this.url );
 }
 
 SyncCCTest.prototype.stop = function(){
