@@ -20,7 +20,8 @@ static ENV *__env;
  *	Standard setup for simple applications.
  */
 int
-wiredtiger_simple_setup(const char *progname, DB **dbp, u_int32_t flags)
+wiredtiger_simple_setup(
+    const char *progname, DB **dbp, u_int32_t cache_size, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -36,14 +37,18 @@ wiredtiger_simple_setup(const char *progname, DB **dbp, u_int32_t flags)
 	}
 	__env = env;
 
+	if (cache_size != 0 &&
+	    (ret = env->cache_size_set(env, cache_size)) != 0) {
+		env->err(env, ret, "Env.cache_size_set");
+		goto err;
+	}
+
 	if ((ret = env->open(env, NULL, 0, 0)) != 0) {
-		fprintf(stderr,
-		    "%s: Env.open: %s\n", progname, wiredtiger_strerror(ret));
+		env->err(env, ret, "%s: Env.open", progname);
 		goto err;
 	}
 	if ((ret = env->db(env, 0, &db)) != 0) {
-		fprintf(stderr, "%s: Env.db: %s\n",
-		    progname, wiredtiger_strerror(ret));
+		env->err(env, ret, "%s: Env.db", progname);
 err:		wiredtiger_simple_teardown(progname, db);
 		return (ret);
 	}

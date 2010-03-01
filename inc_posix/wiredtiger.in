@@ -416,7 +416,7 @@ struct __env {
  *******************************************/
 int	 wiredtiger_env_init(ENV **, u_int32_t);
 void	 wiredtiger_err_stream(FILE *);
-int	 wiredtiger_simple_setup(const char *, DB **, u_int32_t);
+int	 wiredtiger_simple_setup(const char *, DB **, u_int32_t, u_int32_t);
 int	 wiredtiger_simple_teardown(const char *, DB *);
 char	*wiredtiger_strerror(int);
 char	*wiredtiger_version(int *, int *, int *);
