@@ -551,7 +551,7 @@ namespace JSTests {
 
             ASSERT( s->exec( "f = {f:a.a.top}", "foo", false, true, false ) );
             out = s->getObject( "f" );
-            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT( NumberDouble == out.firstElement().type() || NumberInt == out.firstElement().type() );
             
             s->setObject( "z", BSON( "z" << (long long)( 4 ) ) );
             ASSERT( s->exec( "y = {y:z.z.top}", "foo", false, true, false ) );
@@ -560,8 +560,13 @@ namespace JSTests {
 
             ASSERT( s->exec( "x = {x:z.z.floatApprox}", "foo", false, true, false ) );
             out = s->getObject( "x" );
-            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT( NumberDouble == out.firstElement().type() || NumberInt == out.firstElement().type() );
             ASSERT_EQUALS( double( 4 ), out.firstElement().number() );     
+
+            ASSERT( s->exec( "w = {w:z.z}", "foo", false, true, false ) );
+            out = s->getObject( "w" );
+            ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
+            ASSERT_EQUALS( 4, out.firstElement().numberLong() );     
             
         }
     };
