@@ -1053,7 +1053,7 @@ namespace mongo {
             if ( cmdObj["num"].isNumber() )
                 numWanted = cmdObj["num"].numberInt();
 
-            uassert(13046, "'near' param missing/invalid", cmdObj["near"].type() == String);
+            uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
             const GeoHash n = g->_tohash( cmdObj["near"] );
             result.append( "near" , n.toString() );
 
