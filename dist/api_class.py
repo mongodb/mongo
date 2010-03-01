@@ -92,7 +92,7 @@ methods['env.cache_size_set'] = Api(
 	'method, setter, verify',
 	['cache_size/u_int32_t @S'],
 	[],
-	['init'], [])
+	['init'], ['open'])
 
 methods['env.close'] = Api(
 	'env.close',

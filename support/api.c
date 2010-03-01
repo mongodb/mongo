@@ -1269,6 +1269,9 @@ __wt_methods_env_init_transition(ENV *env)
 void
 __wt_methods_env_open_transition(ENV *env)
 {
+	env->cache_size_set = (int (*)
+	    (ENV *, u_int32_t ))
+	    __wt_env_lockout;
 	env->hazard_size_set = (int (*)
 	    (ENV *, u_int32_t ))
 	    __wt_env_lockout;
