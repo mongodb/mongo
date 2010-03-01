@@ -528,7 +528,7 @@ namespace JSTests {
             BSONObj out = s->getObject( "a" );
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
             
-            ASSERT( s->exec( "b = {b:a.a}", "foo", false, true, false ) );
+            ASSERT( s->exec( "printjson( a ); b = {b:a.a}", "foo", false, true, false ) );
             out = s->getObject( "b" );
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
             ASSERT_EQUALS( val, out.firstElement().numberLong() );
@@ -543,6 +543,26 @@ namespace JSTests {
             out = s->getObject( "d" );
             ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
             ASSERT_EQUALS( double( val ), out.firstElement().number() );
+
+            ASSERT( s->exec( "e = {e:a.a.floatApprox}", "foo", false, true, false ) );
+            out = s->getObject( "e" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT_EQUALS( double( val ), out.firstElement().number() );     
+
+            ASSERT( s->exec( "f = {f:a.a.top}", "foo", false, true, false ) );
+            out = s->getObject( "f" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            
+            s->setObject( "z", BSON( "z" << (long long)( 4 ) ) );
+            ASSERT( s->exec( "y = {y:z.z.top}", "foo", false, true, false ) );
+            out = s->getObject( "y" );
+            ASSERT_EQUALS( Undefined, out.firstElement().type() );
+
+            ASSERT( s->exec( "x = {x:z.z.floatApprox}", "foo", false, true, false ) );
+            out = s->getObject( "x" );
+            ASSERT_EQUALS( NumberDouble, out.firstElement().type() );
+            ASSERT_EQUALS( double( 4 ), out.firstElement().number() );     
+            
         }
     };
     
