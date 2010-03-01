@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-# makedist.py: invoke EC2 AMI instances and run distribution packaging
-# programs for Unixy hosts.
+# makedist.py: make a distro package (on an EC2 instance)
 
 # For ease of use, put a file called settings.py someplace in your
 # sys.path, containing something like the following:
@@ -16,14 +15,14 @@
 #     # All the ec2-api-tools take these two as arguments.
 #     # Alternatively, you can set the environment variables EC2_PRIVATE_KEY and EC2_CERT
 #     # respectively, leave these two out of settings.py, and let the ec2 tools default.
-#     "pkey": "/path/to/pk-file.pem"
-#     "cert" : "/path/to/cert-file.pem"
+#     "ec2_pkey": "/path/to/pk-file.pem"
+#     "ec2_cert" : "/path/to/cert-file.pem"
 #     # This gets supplied to ec2-run-instances to rig up an ssh key for
 #     # the remote user.
-#     "sshkey" : "key-id",
+#     "ec2_sshkey" : "key-id",
 #     # And so we need to tell our ssh processes where to find the
 #     # appropriate public key file.
-#     "sshkeyfile" : "/path/to/key-id-file"
+#     "ssh_keyfile" : "/path/to/key-id-file"
 #     }
 
 # Notes: although there is a Python library for accessing EC2 as a web
@@ -49,6 +48,7 @@
 from __future__ import with_statement
 import subprocess
 import sys
+import signal
 import getopt
 import socket
 import time
@@ -69,188 +69,15 @@ class SubcommandError(SimpleError):
         self.status = args[2]
         super(SubcommandError, self).__init__(*args)
 
-    
-# For mistakes implementing this program.
-class Bug(SimpleError):
-    def __init__(self, *args):
-        super(Bug, self).__init__(args)
-
-class Configurator (object):
-    # This is my attempt to factor as much as possible into
-    # non-repeated fragments, to keep program logic and hierarchy
-    # sane.  The idea is to default as much as possible just from the
-    # user's specification of the distro, version, architecture, and
-    # mongo version to use.
-
-    # Note: we need to insinuate a couple things into the shell
-    # fragment we run on the remote host, so we'll do it with shell
-    # environment variables.
-    preamble_commands = """
-set -x # verbose execution, for debugging
-set -e # errexit, stop on errors
-set -u # nounset, treat unset shell vars as errors
-export PREREQS="%s"
-export MONGO_NAME="%s"
-export MONGO_VERSION="%s"
-export MONGO_URL="%s"
-export MODE="%s"
-export ARCH="%s"
-export PKG_VERSION="%s"
-export DISTRO_VERSION="%s"
-export PRODUCT_DIR="%s"
-# the following are derived from the preceding
-export MONGO_WORKDIR="$MONGO_NAME-$PKG_VERSION"
-"""
-    get_mongo_commands = """
-case "$MODE" in
-  "release")
-    # TODO: some Unixes don't ship with wget.  Add support other http clients.
-    # Or just use git for this...
-    wget -Otarball.tgz "$MONGO_URL"
-    ;;
-  "commit")
-    git clone git://github.com/mongodb/mongo.git
-    ( cd mongo && git archive --prefix=mongo-git-archive/ "$MONGO_VERSION" ) | gzip > tarball.tgz
-    ;;
-  *)
-    echo "bad mode $MODE"; exit 1;;
-esac
-# Ensure that there's just one toplevel directory in the tarball.
-test `tar tzf tarball.tgz | sed 's|/.*||' | sort -u | wc -l` -eq 1
-tar xzf tarball.tgz
-mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "$MONGO_WORKDIR"
-if [ "$MODE" = "commit" ]; then
-  ( cd "$MONGO_WORKDIR" && python ./buildscripts/frob_version.py "$PKG_VERSION" ) || exit 1
-fi
-"""
-    deb_prereq_commands = """
-# Configure debconf to never prompt us for input.
-export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y $PREREQS
-"""
-    deb_build_commands="""
-mkdir -p "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH
-mkdir -p "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
-( cd "$MONGO_WORKDIR"; debuild ) || exit 1
-mv mongodb_*.deb "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH
-mv mongodb_*.dsc "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
-mv mongodb_*.tar.gz "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source
-( dpkg-scanpackages "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH /dev/null | gzip -9c > "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/binary-$ARCH/Packages.gz;
-dpkg-scansources "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source /dev/null | gzip -9c > "$PRODUCT_DIR"/"$DISTRO_VERSION"/10gen/source/Sources.gz )
-"""
-    rpm_prereq_commands = """
-rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/x86_64/epel-release-5-3.noarch.rpm
-yum -y install $PREREQS
-RPMBUILDROOT=/usr/src/redhat
-for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p "$RPMBUILDROOT"/$d; done
-cp -v "$MONGO_WORKDIR"/rpm/mongo.spec "$RPMBUILDROOT"/SPECS
-tar -cpzf "$RPMBUILDROOT"/SOURCES/"$MONGO_WORKDIR".tar.gz "$MONGO_WORKDIR"
-"""
-    rpm_build_commands="""
-rpmbuild -ba /usr/src/redhat/SPECS/mongo.spec
-""" 
-    # FIXME: this is clean, but adds 40 minutes or so to the build process.
-    old_rpm_precommands = """
-yum install -y bzip2-devel python-devel libicu-devel chrpath zlib-devel nspr-devel readline-devel ncurses-devel
-wget ftp://194.199.20.114/linux/EPEL/5Client/SRPMS/js-1.70-8.el5.src.rpm
-rpm -ivh js-1.70-8.el5.src.rpm
-sed -i 's/XCFLAGS.*$/XCFLAGS=\"%{optflags} -fPIC -DJS_C_STRINGS_ARE_UTF8\" \\\\/' /usr/src/redhat/SPECS/js.spec
-rpmbuild -ba /usr/src/redhat/SPECS/js.spec
-rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-1.70-8.x86_64.rpm
-rpm -Uvh /usr/src/redhat/RPMS/$ARCH/js-devel-1.70-8.x86_64.rpm
-wget ftp://195.220.108.108/linux/sourceforge/g/project/gr/gridiron2/support-files/FC10%20source%20RPMs/boost-1.38.0-1.fc10.src.rpm
-rpm -ivh boost-1.38.0-1.fc10.src.rpm
-rpmbuild -ba /usr/src/redhat/SPECS/boost.spec
-rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-1.38.0-1.x86_64.rpm
-rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
-"""
-
-    old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
-    new_deb_boost_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev" ]
-    common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
-
-    centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
-    fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
-
-    deb_productdir = "dists"
-    rpm_productdir = "/usr/src/redhat" # FIXME: is this correct?
-
-    # So here's a tree of data for the details that differ among
-    # platforms.  If you change the structure, remember to also change
-    # the definition of lookup() below.
-    configuration = (("ami",
-                      ((("ubuntu", "10.4", "x86_64"), "ami-818965e8"),
-                       (("ubuntu", "10.4", "x86"), "ami-ef8d6186"),
-                       (("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
-                       (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
-                       (("ubuntu", "9.4", "x86_64"), "ami-eef61587"),
-                       (("ubuntu", "9.4", "x86"), "ami-ccf615a5"),
-                       (("ubuntu", "8.10", "x86"), "ami-c0f615a9"),
-                       (("ubuntu", "8.10", "x86_64"), "ami-e2f6158b"),
-                       # Doesn't work: boost too old.
-                       #(("ubuntu", "8.4", "x86"), "ami59b35f30"),
-                       #(("ubuntu", "8.4", "x86_64"), "ami-27b35f4e"),
-                       (("debian", "5.0", "x86"), "ami-dcf615b5"),
-                       (("debian", "5.0", "x86_64"), "ami-f0f61599"),
-                       (("centos", "5.4", "x86"), "ami-f8b35e91"),
-                       (("centos", "5.4", "x86_64"), "ami-ccb35ea5"),
-                       (("fedora", "8", "x86_64"), "ami-2547a34c"),
-                       (("fedora", "8", "x86"), "ami-5647a33f"))),
-                     ("mtype",
-                      ((("*", "*", "x86"), "m1.small"),
-                       (("*", "*", "x86_64"), "m1.large"))),
-                     ("productdir",
-                      ((("ubuntu", "*", "*"), deb_productdir),
-                       (("debian", "*", "*"), deb_productdir),
-                       (("fedora", "*", "*"), rpm_productdir),
-                       (("centos", "*", "*"), rpm_productdir))),
-                     ("prereqs",
-                      ((("ubuntu", "9.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
-                       (("ubuntu", "9.10", "*"), new_deb_boost_prereqs + common_deb_prereqs),
-                       (("ubuntu", "10.4", "*"), new_deb_boost_prereqs + common_deb_prereqs),
-                       (("ubuntu", "8.10", "*"), old_deb_boost_prereqs + common_deb_prereqs),
-                       # Doesn't work: boost too old.
-                       #(("ubuntu", "8.4", "*"), old_deb_boost_prereqs + common_deb_prereqs),
-                       (("debian", "5.0", "*"), old_deb_boost_prereqs + common_deb_prereqs),
-                       (("fedora", "8", "*"), fedora_prereqs),
-                       (("centos", "5.4", "*"), centos_preqres))),
-                     ("preamble_commands",
-                      ((("*", "*", "*"), preamble_commands),)),
-                     ("commands",
-                      ((("debian", "*", "*"), deb_prereq_commands + get_mongo_commands + deb_build_commands),
-                       (("ubuntu", "*", "*"), deb_prereq_commands + get_mongo_commands + deb_build_commands),
-                       (("centos", "*", "*"), old_rpm_precommands + rpm_prereq_commands + get_mongo_commands + rpm_build_commands),
-                       (("fedora", "*", "*"), old_rpm_precommands + rpm_prereq_commands + get_mongo_commands + rpm_build_commands))),
-                     ("login",
-                      # ...er... this might rather depend on the ami
-                      # than the distro tuple...
-                      ((("debian", "*", "*"), "root"),
-                       (("ubuntu", "10.4", "*"), "ubuntu"),
-                       (("ubuntu", "9.10", "*"), "ubuntu"),
-                       (("ubuntu", "9.4", "*"), "root"),
-                       (("ubuntu", "8.10", "*"), "root"),
-                       # Doesn't work: boost too old.
-                       #(("ubuntu", "8.4", "*"), "ubuntu"),
-                       (("centos", "*", "*"), "root"))),
-                     # What do they call this architecture on this architecture...?
-                     ("distarch",
-                      ((("debian", "*", "x86_64"), "amd64"),
-                       (("ubuntu", "*", "x86_64"), "amd64"),
-                       (("debian", "*", "x86"), "i386"),
-                       (("ubuntu", "*", "x86"), "i386"),
-                       (("*", "*", "x86_64"), "x86_64"),
-                       (("*", "*", "x86"), "x86"))),
-                     # This is ridiculous, but it's already the case
-                     # that different distributions have different names for the package.
-                     ("mongoname",
-                      ((("debian", "*", "*"), "mongodb"),
-                       (("ubuntu", "*", "*"), "mongodb"),
-                       (("centos", "*", "*"), "mongo"),
-                       (("fedora", "*", "*"), "mongo"))))
-
-    def lookup(cls, what, dist, vers, arch):
-        for (wht, seq) in cls.configuration:
+class BaseConfigurator (object):
+    def __init__ (self, **kwargs):
+        self.configuration = []
+        self.arch=kwargs["arch"]
+        self.distro_name=kwargs["distro_name"]
+        self.distro_version=kwargs["distro_version"]
+        
+    def lookup(self,  what, dist, vers, arch):
+        for (wht, seq) in self.configuration:
             if what == wht:
                 for ((dpat, vpat, apat), payload) in seq:
                     # For the moment, our pattern facility is just "*" or exact match.
@@ -258,167 +85,157 @@ rpm -ivh /usr/src/redhat/RPMS/$ARCH/boost-devel-1.38.0-1.x86_64.rpm
                         (vers == vpat or vpat == "*") and
                         (arch == apat or apat == "*")):
                         return payload
-        raise SimpleError("couldn't find a%s %s configuration for dist=%s, version=%s, arch=%s",
-                          "n" if ("aeiouAEIOU".find(what[0]) > -1) else "",
-                          what, dist, vers, arch)
-
-    # Public interface.  Yeah, it's stupid, but I'm in a hurry.
-    @classmethod
-    def default(cls, what, distro, version, arch):
-        return cls().lookup(what, distro, version, arch)
-    @classmethod
-    def findOrDefault(cls, dict, what, distro, version, arch):
-        """Lookup the second argument in the first argument, or else
-employ the Configurator's defaulting with the last 3 arguments."""
-        return (dict[what] if what in dict else cls().lookup(what, distro, version, arch))
-
-class BaseBuilder(object):
-    """A base class.  Represents a host (in principle possibly the
-    localhost, though that's not implemented at the moment)."""
-    def __init__(self, **kwargs):
-        # Don't call super's __init__(): it doesn't take arguments.
-        # Instance variables that several of our subclasses will want.
-        self.distro=kwargs["distro"]
-        self.version=kwargs["version"]
-        self.arch=kwargs["arch"]
-        self.distarch=self.default("distarch")
-        self.mode="commit" if "commit" in kwargs else "release"
-        self.mongoversion=(kwargs["mongoversion"][:6] if "commit" in kwargs else kwargs["mongoversion"])
-
-        self.mongoname=self.default("mongoname")
-        self.mongourl=(("http://download.github.com/mongodb-mongo-%s.tar.gz" % self.mongoversion) if "commit" in kwargs else ("http://github.com/mongodb/mongo/tarball/r"+self.mongoversion))
-
-        self.localdir=kwargs["localdir"]
-
-        # FIXME: for the moment, gpg signing is disabled. Either get
-        # rid of this stuff, or make gpg signing work, either on the
-        # remote host or locally.
-        self.localgpgdir = kwargs["localgpgdir"] if "localgpgdir" in kwargs else os.path.expanduser("~/.gnupg")
-        self.remotegpgdir = kwargs["remotegpgdir"]  if "remotegpgdir" in kwargs else ".gnupg"
-
-        if "localscript" in kwargs:
-            self.localscript = kwargs["localscript"]
+        if getattr(self, what, False):
+            return getattr(self, what)
         else:
-            self.localscript = None
-        self.remotescript = kwargs["remotescript"] if "remotescript" in kwargs else "makedist.sh"
-
-        self.prereqs=self.default("prereqs")
-        self.productdir=self.default("productdir")
-        self.pkgversion = kwargs["pkgversion"] if "pkgversion" in kwargs else time.strftime("%Y%m%d")
-        self.commands=(self.default("preamble_commands") % (" ".join(self.prereqs), self.mongoname, self.mongoversion, self.mongourl, self.mode, self.distarch, self.pkgversion, self.version, self.productdir)) + self.default("commands")
-
+            raise SimpleError("couldn't find a%s %s configuration for dist=%s, version=%s, arch=%s",
+                              "n" if ("aeiouAEIOU".find(what[0]) > -1) else "",
+                              what, dist, vers, arch)
 
     def default(self, what):
-        return Configurator.default(what, self.distro, self.version, self.arch)
-    def findOrDefault(self, kwargs, what):
-        return Configurator.findOrDefault(kwargs, what, self.distro, self.version, self.arch)
+        return self.lookup(what, self.distro_name, self.distro_version, self.arch)
+    def findOrDefault(self, dict, what):
+        return (dict[what] if what in dict else self.lookup(what, self.distro_name, self.distro_version, self.arch))
 
-    def runLocally(self, argv):
+class BaseHostConfigurator (BaseConfigurator):
+    def __init__(self, **kwargs):
+        super(BaseHostConfigurator, self).__init__(**kwargs)
+        self.configuration += [("distro_arch",
+                               ((("debian", "*", "x86_64"), "amd64"),
+                                (("ubuntu", "*", "x86_64"), "amd64"),
+                                (("debian", "*", "x86"), "i386"),
+                                (("ubuntu", "*", "x86"), "i386"),
+                                (("centos", "*", "x86_64"), "x86_64"),
+                                (("fedora", "*", "x86_64"), "x86_64"),
+                                (("centos", "*", "x86"), "i386"),
+                                (("fedora", "*", "x86"), "i386"),
+                                (("*", "*", "x86_64"), "x86_64"),
+                                (("*", "*", "x86"), "x86"))) ,
+                              ]
+
+class LocalHost(object):
+    @classmethod
+    def runLocally(cls, argv):
         print "running %s" % argv
         r = subprocess.Popen(argv).wait()
         if r != 0:
             raise SubcommandError("subcommand %s exited %d", argv, r)
-        
-    def do(self):
-        # KLUDGE: this mkdir() shouldn't really be here, but if we're
-        # going to fail due to local permissions or whatever, we ought
-        # to do it before wasting tens of minutes building.
-        self.runLocally(["mkdir", "-p", self.localdir])
-        try:
-            self.generateConfigs()
-            self.sendConfigs()
-            self.doBuild()
-            self.recvDists()
-        finally:
-            self.cleanup()
 
-    def generateConfigs(self):
-        if self.localscript == None:
-            fh = None
-            name = None
-            try:
-                (fh, name) = tempfile.mkstemp('', "makedist.", ".")
-                self.localscript = name
-            finally:
-                if fh is not None:
-                    os.close(fh)
-            if name is None:
-                raise SimpleError("problem creating tempfile, maybe?")
-        with open(self.localscript, "w") as f:
-            f.write(self.commands)
-    def sendConfigs(self):
-        self.sendFiles([(self.localgpgdir, self.remotegpgdir)])
-        self.sendFiles([(self.localscript, self.remotescript)])
-    def doBuild(self):
-        # TODO: abstract out the "sudo" here into a more general "run
-        # a command as root" mechanism.  (Also, maybe figure out how
-        # to run as much of the build as possible without root
-        # privileges; we probably only need root to install
-        # build-deps.).
-        self.runRemotely((["sudo"] if self.login != "root" else [])+ ["sh", "-x", self.remotescript])
-    def recvDists(self):
-        self.recvFiles([(self.productdir,self.localdir)])
-    def cleanup(self):
-        os.unlink(self.localscript)
-
-    # The rest of this class are just reminders to implement various things.
-    def __enter__(self):
-        Bug("instance %s doesn't implement __enter__", self)
-    def __exit__(self, type, value, traceback):
-        Bug("instance %s doesn't implement __exit__", self)
-    def runRemotely(self, argv):
-        Bug("instance %s doesn't implement runRemotely", self)
-    def sendFiles(self):
-        Bug("instance %s doesn't implement sendFiles", self)
-    def recvFiles(self):
-        Bug("instance %s doesn't implement recvFiles", self)
-
-
-
-class EC2InstanceBuilder (BaseBuilder):
+class EC2InstanceConfigurator(BaseConfigurator):
     def __init__(self, **kwargs):
-        super(EC2InstanceBuilder, self).__init__(**kwargs)
+        super(EC2InstanceConfigurator, self).__init__(**kwargs)
+        self.configuration += [("ec2_ami",
+                                ((("ubuntu", "10.4", "x86_64"), "ami-bf07ead6"),
+                                 (("ubuntu", "10.4", "x86"), "ami-f707ea9e"),
+                                 (("ubuntu", "9.10", "x86_64"), "ami-55739e3c"),
+                                 (("ubuntu", "9.10", "x86"), "ami-bb709dd2"),
+                                 (("ubuntu", "9.4", "x86_64"), "ami-eef61587"),
+                                 (("ubuntu", "9.4", "x86"), "ami-ccf615a5"),
+                                 (("ubuntu", "8.10", "x86"), "ami-c0f615a9"),
+                                 (("ubuntu", "8.10", "x86_64"), "ami-e2f6158b"),
+                                 (("ubuntu", "8.4", "x86"), "ami59b35f30"),
+                                 (("ubuntu", "8.4", "x86_64"), "ami-27b35f4e"),
+                                 (("debian", "5.0", "x86"), "ami-dcf615b5"),
+                                 (("debian", "5.0", "x86_64"), "ami-f0f61599"),
+                                 (("centos", "5.4", "x86"), "ami-f8b35e91"),
+                                 (("centos", "5.4", "x86_64"), "ami-ccb35ea5"),
+                                 (("fedora", "8", "x86_64"), "ami-2547a34c"),
+                                 (("fedora", "8", "x86"), "ami-5647a33f"))),
+                               ("ec2_mtype",
+                                ((("*", "*", "x86"), "m1.small"),
+                                 (("*", "*", "x86_64"), "m1.large"))),
+                               ]
+    
 
+class EC2Instance (object):
+    def __init__(self, configurator, **kwargs):
         # Stuff we need to start an instance: AMI name, key and cert
         # files.  AMI and mtype default to configuration in this file,
         # but can be overridden.
-        self.ami=self.findOrDefault(kwargs, "ami")
-        self.mtype=self.findOrDefault(kwargs, "mtype")
+        self.ec2_ami   = configurator.findOrDefault(kwargs, "ec2_ami")
+        self.ec2_mtype = configurator.findOrDefault(kwargs, "ec2_mtype")
+
+        self.use_internal_name = True if "use_internal_name" in kwargs else False
 
         # Authentication stuff defaults according to the conventions
         # of the ec2-api-tools.
-        self.cert=kwargs["cert"]
-        self.pkey=kwargs["pkey"]
-        self.sshkey=kwargs["sshkey"]
-        self.use_internal_name = True if "use-internal-name" in kwargs else False
-        self.terminate=False if "no-terminate" in kwargs else True
+        self.ec2_cert=kwargs["ec2_cert"]
+        self.ec2_pkey=kwargs["ec2_pkey"]
+        self.ec2_sshkey=kwargs["ec2_sshkey"]
+
+        # FIXME: this needs to be a commandline option
+        self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
+        self.terminate = False if "no_terminate" in kwargs else True
+
+    def parsedesc (self, hdl):
+        line1=hdl.readline()
+        splitline1=line1.split()
+        (_, reservation, unknown1, groupstr) = splitline1[:4]
+        groups = groupstr.split(',')
+        self.ec2_reservation = reservation
+        self.ec2_unknown1 = unknown1
+        self.ec2_groups = groups
+        # I haven't seen more than 4 data fields in one of these
+        # descriptions, but what do I know?
+        if len(splitline1)>4:
+            print >> sys.stderr, "more than 4 fields in description line 1\n%s\n" % line1
+            self.ec2_extras1 = splitline1[4:]
+        line2=hdl.readline()
+        splitline2=line2.split()
+        # The jerks make it tricky to parse line 2: the fields are
+        # dependent on the instance's state.
+        (_, instance, ami, status_or_hostname) = splitline2[:4]
+        self.ec2_instance = instance
+        if ami != self.ec2_ami:
+            print >> sys.stderr, "warning: AMI in description isn't AMI we invoked\nwe started %s, but got\n%s", (self.ec2_ami, line2)
+        # FIXME: are there other non-running statuses?
+        if status_or_hostname in ["pending", "terminated"]:
+            self.ec2_status = status_or_hostname
+            self.ec2_running = False
+            index = 4
+            self.ec2_storage = splitline2[index+8]
+        else:
+            self.ec2_running = True
+            index = 6
+            self.ec2_status = splitline2[5]
+            self.ec2_external_hostname = splitline2[3]
+            self.ec2_internal_hostname = splitline2[4]
+            self.ec2_external_ipaddr = splitline2[index+8]
+            self.ec2_internal_ipaddr = splitline2[index+9]
+            self.ec2_storage = splitline2[index+10]
+        (sshkey, unknown2, mtype, starttime, zone, unknown3, unknown4, monitoring) = splitline2[index:index+8]
+        # FIXME: potential disagreement with the supplied sshkey?
+        self.ec2_sshkey = sshkey
+        self.ec2_unknown2 = unknown2
+        # FIXME: potential disagreement with the supplied mtype?
+        self.ec2_mtype = mtype
+        self.ec2_starttime = starttime
+        self.ec2_zone = zone
+        self.ec2_unknown3 = unknown3
+        self.ec2_unknown4 = unknown4
+        self.ec2_monitoring = monitoring
 
     def start(self):
         "Fire up a fresh EC2 instance."
+        groups = reduce(lambda x, y : x+y, [["-g", i] for i in self.ec2_groups], [])
         argv = ["ec2-run-instances",
-                self.ami,
-                "-K", self.pkey,
-                "-C", self.cert,
-                "-k", self.sshkey,
-                "-t", self.mtype,
-                "-g", "buildbot-slave", "-g", "dist-slave", "-g", "default"]
+                self.ec2_ami, "-K", self.ec2_pkey,  "-C", self.ec2_cert,
+                "-k", self.ec2_sshkey, "-t", self.ec2_mtype] + groups
+        self.ec2_running = False
         print "running %s" % argv
         proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
         try:
-            # for the moment, we only really care about the instance
-            # identifier, in the second line of output:
-            proc.stdout.readline() # discard line 1
-            self.ident = proc.stdout.readline().split()[1]
-            if self.ident == "":
-                raise SimpleError("ident is empty")
+            self.parsedesc(proc.stdout)
+            if self.ec2_instance == "":
+                raise SimpleError("instance id is empty")
             else:
-                print "Instance id: %s" % self.ident
+                print "Instance id: %s" % self.ec2_instance
         finally:
             r = proc.wait()
             if r != 0:
                 raise SimpleError("ec2-run-instances exited %d", r)
 
-    def initdata(self):
+    def initwait(self):
         # poll the instance description until we get a hostname.
         # Note: it seems there can be a time interval after
         # ec2-run-instance finishes during which EC2 will tell us that
@@ -426,69 +243,73 @@ class EC2InstanceBuilder (BaseBuilder):
         state = "pending"
         numtries = 0
         giveup = 5
-        while state == "pending":
-            argv = ["ec2-describe-instances", "-K", self.pkey, "-C", self.cert, self.ident]
+
+        while not self.ec2_running:
+            time.sleep(15) # arbitrary
+            argv = ["ec2-describe-instances", "-K", self.ec2_pkey, "-C", self.ec2_cert, self.ec2_instance]
             proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
             try:
-                proc.stdout.readline() #discard line 1
-                line = proc.stdout.readline()
-                if line:
-                    fields = line.split()
-                    if len(fields) > 2:
-                        state = fields[3]
-                        # Sometimes, ec2 hosts die before we get to do
-                        # anything with them.
-                        if state == "terminated":
-                            raise SimpleError("ec2 host %s died suddenly; check the aws management panel?" % self.ident)
-                        if self.use_internal_name:
-                            self.hostname = fields[4]
-                        else:
-                            self.hostname = fields[3]
-                    else:
-                        raise SimpleError("trouble parsing ec2-describe-instances output\n%s", line)
-            finally:
+                self.parsedesc(proc.stdout)
+            except Exception, e:
                 r = proc.wait()
-                if r != 0 and numtries >= giveup:
-                    raise SimpleError("ec2-run-instances exited %d", r)
-                numtries+=1
-            time.sleep(3) # arbitrary
+                if r < self.giveup:
+                    print sys.stderr, str(e)
+                    continue
+                else:
+                    raise SimpleError("ec2-describe-instances exited %d", r)
+                self.numtries+=1
 
     def stop(self):
         if self.terminate:
-            self.runLocally(["ec2-terminate-instances", "-K", self.pkey, "-C", self.cert, self.ident])
+            LocalHost.runLocally(["ec2-terminate-instances", "-K", self.ec2_pkey, "-C", self.ec2_cert, self.ec2_instance])
         else:
-            print "Not terminating EC2 instance %s." % self.ident
+            print "Not terminating EC2 instance %s." % self.ec2_instance
 
     def __enter__(self):
         self.start()
-        self.initdata()
         return self
 
     def __exit__(self, type, value, traceback):
         self.stop()
 
-# FIXME: why is this a subclass of EC2InstanceBuilder (as opposed to
-# an orthogonal mixin class?)?
-class SshableBuilder (BaseBuilder):
+    def getHostname(self):
+        return self.ec2_internal_hostname if self.use_internal_name else self.ec2_external_hostname
+        
+class SshConnectionConfigurator (BaseConfigurator):
     def __init__(self, **kwargs):
-        super(SshableBuilder, self).__init__(**kwargs)
-        # Stuff we need to talk to the thing properly
-        self.login=self.findOrDefault(kwargs, "login")
+        super(SshConnectionConfigurator, self).__init__(**kwargs)
+        self.configuration += [("ssh_login",
+                                # FLAW: this actually depends more on the AMI
+                                # than the triple.
+                                ((("debian", "*", "*"), "root"),
+                                 (("ubuntu", "10.4", "*"), "ubuntu"),
+                                 (("ubuntu", "9.10", "*"), "ubuntu"),
+                                 (("ubuntu", "9.4", "*"), "root"),
+                                 (("ubuntu", "8.10", "*"), "root"),
+                                 (("ubuntu", "8.4", "*"), "ubuntu"),
+                                 (("centos", "*", "*"), "root"))),
+                               ]
 
-        # FIXME: use 10gen setup.py to find this.
-        self.sshkeyfile=kwargs["sshkeyfile"]
+class SshConnection (object):
+    def __init__(self, configurator, **kwargs):
+        # Stuff we need to talk to the thing properly
+        self.ssh_login = configurator.findOrDefault(kwargs, "ssh_login")
+
+        self.ssh_host = kwargs["ssh_host"]
+        self.ssh_keyfile=kwargs["ssh_keyfile"]
         # Gets set to False when we think we can ssh in.
         self.sshwait = True
 
     def sshWait(self):
         "Poll until somebody's listening on port 22"
+
         if self.sshwait == False:
             return
         while self.sshwait:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 try:
-                    s.connect((self.hostname, 22))
+                    s.connect((self.ssh_host, 22))
                     self.sshwait = False
                     print "connected on port 22 (ssh)"
                     time.sleep(15) # arbitrary timeout, in case the
@@ -499,89 +320,288 @@ class SshableBuilder (BaseBuilder):
                 s.close()
                 time.sleep(3) # arbitrary timeout
 
+    def initSsh(self):
+        self.sshWait()
+        ctlpath="/tmp/ec2-ssh-%s-%s-%s" % (self.ssh_host, self.ssh_login, os.getpid())
+        argv = ["ssh", "-o", "StrictHostKeyChecking no",
+                "-M", "-o", "ControlPath %s" % ctlpath,
+                "-v", "-l", self.ssh_login, "-i",  self.ssh_keyfile,
+                self.ssh_host]
+        print "Setting up ssh master connection with %s" % argv
+        self.sshproc = subprocess.Popen(argv)
+        self.ctlpath = ctlpath
+
+
+    def __enter__(self):
+        self.initSsh()
+        return self
+        
+    def __exit__(self, type, value, traceback):
+        os.kill(self.sshproc.pid, signal.SIGTERM)
+        self.sshproc.wait()
+        
     def runRemotely(self, argv):
         """Run a command on the host."""
-        self.sshWait()
-        self.runLocally(["ssh", "-o", "StrictHostKeyChecking no",
-                         "-l", self.login,
-                         "-i",  self.sshkeyfile,
-                         self.hostname] + argv)
+        LocalHost.runLocally(["ssh", "-o", "StrictHostKeyChecking no",
+                         "-S", self.ctlpath,
+                         "-l", self.ssh_login,
+                         "-i",  self.ssh_keyfile,
+                         self.ssh_host] + argv)
 
     def sendFiles(self, files):
         self.sshWait()
         for (localfile, remotefile) in files:
-            self.runLocally(["scp", "-o", "StrictHostKeyChecking no",
-                             "-i",  self.sshkeyfile,
+            LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
+                             "-o", "ControlMaster auto",
+                             "-o", "ControlPath %s" % self.ctlpath,
+                             "-i",  self.ssh_keyfile,
                              "-rv", localfile,
-                             self.login + "@" + self.hostname + ":" +
+                             self.ssh_login + "@" + self.ssh_host + ":" +
                              ("" if remotefile is None else remotefile) ])
 
     def recvFiles(self, files):
         self.sshWait()
         print files
         for (remotefile, localfile) in files:
-            self.runLocally(["scp", "-o", "StrictHostKeyChecking no",
-                             "-i",  self.sshkeyfile,
+            LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
+                             "-o", "ControlMaster auto",
+                             "-o", "ControlPath %s" % self.ctlpath,
+                             "-i",  self.ssh_keyfile,
                              "-rv", 
-                             self.login + "@" + self.hostname +
+                             self.ssh_login + "@" + self.ssh_host +
                              ":" + remotefile,
                              "." if localfile is None else localfile ])
 
-class Builder (EC2InstanceBuilder, SshableBuilder, BaseBuilder):
+
+class ScriptFileConfigurator (BaseConfigurator):
+    deb_productdir = "dists"
+    rpm_productdir = "/usr/src/redhat/RPMS" # FIXME: this could be
+                                            # ~/redhat/RPMS or
+                                            # something elsewhere
+
+    preamble_commands = """
+set -x # verbose execution, for debugging
+set -e # errexit, stop on errors
+"""
+    # Strictly speaking, we don't need to mangle debian files on rpm
+    # systems (and vice versa), but (a) it doesn't hurt anything to do
+    # so, and (b) mangling files the same way everywhere could
+    # conceivably help uncover bugs in the hideous hideous sed
+    # programs we're running here.  (N.B., for POSIX wonks: POSIX sed
+    # doesn't support either in-place file editing, which we use
+    # below.  So if we end up wanting to run these mangling commands
+    # e.g., on a BSD, we'll need to make them fancier.)
+    mangle_files_commands ="""
+# On debianoids, the package names in the changelog and control file
+# must agree, and only files in a subdirectory of debian/ matching the
+# package name will get included in the .deb, so we also have to mangle
+# the rules file.
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '1s/.*([^)]*)/{pkg_name}{pkg_name_suffix} ({pkg_version})/' debian/changelog ) || exit 1
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/^Source:.*/Source: {pkg_name}{pkg_name_suffix}/;
+s/^Package:.*mongodb/Package: {pkg_name}{pkg_name_suffix}\\
+Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|$(CURDIR)/debian/mongodb|$(CURDIR)/debian/{pkg_name}{pkg_name_suffix}|g' debian/rules) || exit 1
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/^Name:/s/.*/Name: {pkg_name}{pkg_name_suffix}/; /^Version:/s/.*/Version: {pkg_version}/;' rpm/mongo.spec )
+"""
+
+    mangle_files_for_ancient_redhat_commands = """
+# Ancient RedHats ship with very old boosts and non-UTF8-aware js
+# libraries, so we need to link statically to those.
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|^scons.*((inst)all)|scons --prefix=$RPM_BUILD_ROOT/usr --extralib=nspr4 --staticlib=boost_system-mt,boost_thread-mt,boost_filesystem-mt,boost_program_options-mt,js $1|' rpm/mongo.spec )
+"""
+    deb_prereq_commands = """
+# Configure debconf to never prompt us for input.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y {pkg_prereq_str}
+"""
+
+    deb_build_commands="""
+mkdir -p "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
+mkdir -p "{pkg_product_dir}/{distro_version}/10gen/source"
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}"; debuild ) || exit 1
+mv {pkg_name}{pkg_name_suffix}*.deb "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
+mv {pkg_name}{pkg_name_suffix}*.dsc "{pkg_product_dir}/{distro_version}/10gen/source"
+mv {pkg_name}{pkg_name_suffix}*.tar.gz "{pkg_product_dir}/{distro_version}/10gen/source"
+dpkg-scanpackages "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}/Packages.gz"
+dpkg-scansources "{pkg_product_dir}/{distro_version}/10gen/source" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/source/Sources.gz"
+"""
+    rpm_prereq_commands = """
+rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/{distro_arch}/epel-release-5-3.noarch.rpm
+yum -y install {pkg_prereq_str}
+"""
+    rpm_build_commands="""
+for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p /usr/src/redhat/$d; done
+cp -v "{pkg_name}{pkg_name_suffix}-{pkg_version}/rpm/mongo.spec" /usr/src/redhat/SPECS
+tar -cpzf /usr/src/redhat/SOURCES/"{pkg_name}{pkg_name_suffix}-{pkg_version}".tar.gz "{pkg_name}{pkg_name_suffix}-{pkg_version}"
+rpmbuild -ba /usr/src/redhat/SPECS/mongo.spec
+""" 
+    # FIXME: this is clean, but adds 40 minutes or so to the build process.
+    old_rpm_precommands = """
+yum install -y bzip2-devel python-devel libicu-devel chrpath zlib-devel nspr-devel readline-devel ncurses-devel
+# FIXME: this is just some random URL found on rpmfind some day in 01/2010.
+wget ftp://194.199.20.114/linux/EPEL/5Client/SRPMS/js-1.70-8.el5.src.rpm
+rpm -ivh js-1.70-8.el5.src.rpm
+sed -i 's/XCFLAGS.*$/XCFLAGS=\"%{{optflags}} -fPIC -DJS_C_STRINGS_ARE_UTF8\" \\\\/' /usr/src/redhat/SPECS/js.spec
+rpmbuild -ba /usr/src/redhat/SPECS/js.spec
+rpm -Uvh /usr/src/redhat/RPMS/{distro_arch}/js-1.70-8.{distro_arch}.rpm
+rpm -Uvh /usr/src/redhat/RPMS/{distro_arch}/js-devel-1.70-8.{distro_arch}.rpm
+# FIXME: this is just some random URL found on rpmfind some day in 01/2010.
+wget ftp://195.220.108.108/linux/sourceforge/g/project/gr/gridiron2/support-files/FC10%20source%20RPMs/boost-1.38.0-1.fc10.src.rpm
+rpm -ivh boost-1.38.0-1.fc10.src.rpm
+rpmbuild -ba /usr/src/redhat/SPECS/boost.spec
+rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-1.38.0-1.{distro_arch}.rpm
+rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.rpm
+"""
+
+    old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
+    new_deb_boost_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev" ]
+    common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
+
+    centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
+    fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
+
     def __init__(self, **kwargs):
-        self.retries = 3 # Arbitrary.
-        super(Builder,self).__init__(**kwargs)
+        super(ScriptFileConfigurator, self).__init__(**kwargs)
+        if kwargs["mongo_version"][0] == 'r':
+            self.get_mongo_commands = """
+wget -Otarball.tgz "http://github.com/mongodb/mongo/tarball/{mongo_version}";
+tar xzf tarball.tgz
+mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "{pkg_name}{pkg_name_suffix}-{pkg_version}"
+"""
+        else: 
+            self.get_mongo_commands = """
+git clone git://github.com/mongodb/mongo.git
+"""
+            if kwargs['mongo_version'][0] == 'v':
+                self.get_mongo_commands +="""
+( cd mongo && git archive --prefix="{pkg_name}{pkg_name_suffix}-{pkg_version}/" "`git log origin/{mongo_version} | sed -n '1s/^commit //p;q'`" ) | tar xf -
+"""
+            else:
+                self.get_mongo_commands += """
+( cd mongo && git archive --prefix="{pkg_name}{pkg_name_suffix}-{pkg_version}/" "{mongo_version}" ) | tar xf -
+"""
 
-#     # Good grief.  ssh'ing to EC2 sometimes doesn't work, but it's
-#     # intermittent.  Retry everything a few times.
-#     def sendFiles(self, files):
-#         for i in range(self.retries):
-#             try:
-#                 super(Builder, self).sendFiles(files)
-#                 break
-#             except SubcommandError, err:
-#                 if err.status == 255 and i == self.retries-1:
-#                     raise err
-#     def recvFiles(self, files):
-#         for i in range(self.retries):
-#             try:
-#                 super(Builder, self).recvFiles(files)
-#                 break
-#             except SubcommandError, err:
-#                 if err.status == 255 and i == self.retries-1:
-#                     raise err
-#     def runRemotely(self, argv):
-#         for i in range(self.retries):
-#             try:
-#                 super(Builder, self).runRemotely(argv)
-#                 break
-#             except SubcommandError, err:
-#                 if err.status == 255 and i == self.retries-1:
-#                     raise err
+        if "local_mongo_dir" in kwargs:
+            self.mangle_files_commands = """( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && rm -rf debian rpm && cp -pvR ~/pkg/* . )
+""" + self.mangle_files_commands
+
+        self.configuration += [("pkg_product_dir",
+                                ((("ubuntu", "*", "*"), self.deb_productdir),
+                                 (("debian", "*", "*"), self.deb_productdir),
+                                 (("fedora", "*", "*"), self.rpm_productdir),
+                                 (("centos", "*", "*"), self.rpm_productdir))),
+                               ("pkg_prereqs",
+                                ((("ubuntu", "9.4", "*"),
+                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                 (("ubuntu", "9.10", "*"),
+                                  self.new_deb_boost_prereqs + self.common_deb_prereqs),
+                                 (("ubuntu", "10.4", "*"),
+                                  self.new_deb_boost_prereqs + self.common_deb_prereqs),
+                                 (("ubuntu", "8.10", "*"),
+                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                 (("debian", "5.0", "*"),
+                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                 (("fedora", "8", "*"),
+                                  self.fedora_prereqs),
+                                 (("centos", "5.4", "*"),
+                                  self.centos_preqres))),
+                               ("commands",
+                                ((("debian", "*", "*"),
+                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
+                                 (("ubuntu", "*", "*"),
+                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
+                                 (("centos", "*", "*"),
+                                  self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands  + self.mangle_files_for_ancient_redhat_commands + self.rpm_build_commands),
+                                 (("fedora", "*", "*"),
+                                  self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.rpm_build_commands))),
+                               ("pkg_name",
+                                ((("debian", "*", "*"), "mongodb"),
+                                 (("ubuntu", "*", "*"), "mongodb"),
+                                 (("centos", "*", "*"), "mongo"),
+
+                                 (("fedora", "*", "*"), "mongo")
+                                 )),
+                               ("pkg_name_conflicts",
+                                ((("*", "*", "*"),  ["", "-stable", "-unstable", "-snapshot"]),
+                                 ))
+                               ]
 
 
-# export EC2_HOME=/Users/kreuter/mongo/ec2-api-tools-1.3-46266 
-# export PATH=$EC2_HOME/bin:$PATH
-# export JAVA_HOME="/usr" # FIXME: document this braindamage
-    
+
+
+class ScriptFile(object):
+    def __init__(self, configurator, **kwargs):
+        self.mongo_version       = kwargs["mongo_version"]
+        self.pkg_version        = kwargs["pkg_version"]
+        self.pkg_name_suffix    = kwargs["pkg_name_suffix"] if "pkg_name_suffix" in kwargs else ""
+        self.pkg_prereqs        = configurator.default("pkg_prereqs")
+        self.pkg_name           = configurator.default("pkg_name")
+        self.pkg_product_dir    = configurator.default("pkg_product_dir")
+        self.pkg_name_conflicts = configurator.default("pkg_name_conflicts") if self.pkg_name_suffix else []
+        self.pkg_name_conflicts.remove(self.pkg_name_suffix) if self.pkg_name_suffix and self.pkg_name_suffix in self.pkg_name_conflicts else []
+        self.formatter          = configurator.default("commands")
+        self.distro_name        = configurator.default("distro_name")
+        self.distro_version     = configurator.default("distro_version")
+        self.distro_arch        = configurator.default("distro_arch")
+
+    def genscript(self):
+        return self.formatter.format(mongo_version=self.mongo_version,
+                                     distro_name=self.distro_name,
+                                     distro_version=self.distro_version,
+                                     distro_arch=self.distro_arch,
+                                     pkg_prereq_str=" ".join(self.pkg_prereqs),
+                                     pkg_name=self.pkg_name,
+                                     pkg_name_suffix=self.pkg_name_suffix,
+                                     pkg_version=self.pkg_version,
+                                     pkg_product_dir=self.pkg_product_dir,
+                                     # KLUDGE: rpm specs and deb
+                                     # control files use
+                                     # comma-separated conflicts,
+                                     # but there's no reason to
+                                     # suppose this works elsewhere
+                                     pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts])
+                                     )
+
+    def __enter__(self):
+        self.localscript=None
+        # One of tempfile or I is very stupid.
+        (fh, name) = tempfile.mkstemp('', "makedist.", ".")
+        try:
+            pass
+        finally:
+            os.close(fh)
+        with open(name, 'w+') as fh:
+            fh.write(self.genscript())
+        self.localscript=name
+        return self
+        
+    def __exit__(self, type, value, traceback):
+        if self.localscript:
+            os.unlink(self.localscript)
+
+class Configurator(SshConnectionConfigurator, EC2InstanceConfigurator, ScriptFileConfigurator, BaseHostConfigurator):
+    def __init__(self, **kwargs):
+        super(Configurator, self).__init__(**kwargs)
+
 def main():
 #    checkEnvironment()
 
-    (kwargs, (rootdir, distro, version, arch, mongoversion)) = processArguments()
+    (kwargs, args) = processArguments()
+    (rootdir, distro_name, distro_version, arch, mongo_version_spec) = args[:5]
     # FIXME: there are a few other characters that we can't use in
     # file names on Windows, in case this program really needs to run
     # there.
-    distro = distro.replace('/', '-').replace('\\', '-')
-    version = version.replace('/', '-').replace('\\', '-')
+    distro_name = distro_name.replace('/', '-').replace('\\', '-')
+    distro_version = distro_version.replace('/', '-').replace('\\', '-')
     arch = arch.replace('/', '-').replace('\\', '-')     
     try:
-        sys.path+=['.', '..', '../..']
         import settings
         if "makedist" in dir ( settings ):
             for key in ["EC2_HOME", "JAVA_HOME"]:
                 if key in settings.makedist:
                     os.environ[key] = settings.makedist[key]
-            for key in ["pkey", "cert", "sshkey", "sshkeyfile" ]:
+            for key in ["ec2_pkey", "ec2_cert", "ec2_sshkey", "ssh_keyfile" ]:
                 if key not in kwargs and key in settings.makedist:
                     kwargs[key] = settings.makedist[key]
     except Exception, err:
@@ -597,46 +617,70 @@ def main():
     if len([True for x in os.environ["PATH"].split(":") if x.find(os.environ["EC2_HOME"]) > -1]) == 0:
         os.environ["PATH"]=os.environ["EC2_HOME"]+"/bin:"+os.environ["PATH"]
 
+
+    kwargs["distro_name"]    = distro_name
+    kwargs["distro_version"] = distro_version
+    kwargs["arch"]           = arch
+
+    foo = mongo_version_spec.split(":")
+    kwargs["mongo_version"] = foo[0] # this can be a commit id, a
+                                     # release id "r1.2.2", or a
+                                     # branch name starting with v.
+    if len(foo) > 1:
+        kwargs["pkg_name_suffix"] = foo[1] 
+    if len(foo) > 2 and foo[2]:
+        kwargs["pkg_version"] = foo[2]
+    else:
+        kwargs["pkg_version"] = time.strftime("%Y%m%d")
+
+    # FIXME: this should also include the mongo version or something.
     if "subdirs" in kwargs:
-        kwargs["localdir"] = "%s/%s/%s/%s" % (rootdir, distro, version, arch)
+        kwargs["localdir"] = "%s/%s/%s/%s" % (rootdir, distro_name, distro_version, arch, kwargs["mongo_version"])
     else:
         kwargs["localdir"] = rootdir
 
-    kwargs["distro"] = distro
-    kwargs["version"] = version
-    kwargs["arch"] = arch
-    kwargs["mongoversion"] = mongoversion
+    if "pkg_name_suffix" not in kwargs:
+        if kwargs["mongo_version"][0] in ["r", "v"]:
+            nums = kwargs["mongo_version"].split(".")
+            if int(nums[1]) % 2 == 0:
+                kwargs["pkg_name_suffix"] = "-stable"
+            else:
+                kwargs["pkg_name_suffix"] = "-unstable"
+        else:
+            kwargs["pkg_name_suffix"] = ""
 
-    with Builder(**kwargs) as host:
-        print "Hostname: %s" % host.hostname
-        host.do()
 
-# def checkEnvironment():
+    kwargs['local_gpg_dir'] = kwargs["local_gpg_dir"] if "local_gpg_dir" in kwargs else os.path.expanduser("~/.gnupg") 
+    configurator = Configurator(**kwargs)
+    LocalHost.runLocally(["mkdir", "-p", kwargs["localdir"]])
+    with ScriptFile(configurator, **kwargs) as script:
+        with open(script.localscript) as f:
+            print """# Going to run the following on a fresh AMI:"""
+            print f.read()
+            time.sleep(10)
+        with EC2Instance(configurator, **kwargs) as ec2:
+            ec2.initwait()
+            kwargs["ssh_host"] = ec2.getHostname()
+            with SshConnection(configurator, **kwargs) as ssh:
+                ssh.runRemotely(["uname -a; ls /"])
+                ssh.runRemotely(["mkdir", "pkg"])
+                if "local_mongo_dir" in kwargs:
+                    ssh.sendFiles([(kwargs["local_mongo_dir"]+'/'+d, "pkg") for d in ["rpm", "debian"]])
+                ssh.sendFiles([(kwargs['local_gpg_dir'], ".gnupg")])
+                ssh.sendFiles([(script.localscript, "makedist.sh")])
+                ssh.runRemotely((["sudo"] if ssh.ssh_login != "root" else [])+ ["sh", "makedist.sh"])
+                ssh.recvFiles([(script.pkg_product_dir, kwargs['localdir'])])
 
 def processArguments():
     # flagspec [ (short, long, argument?, description, argname)* ]
     flagspec = [ ("?", "usage", False, "Print a (useless) usage message", None),
                  ("h", "help", False, "Print a help message and exit", None),
                  ("N", "no-terminate", False, "Leave the EC2 instance running at the end of the job", None),
-                 ("S", "subdirs", False, "Create subdirectories of the output directory based on distro name, version, and architecture.", None),
-                 ("c", "commit", False, "Treat the version argument as git commit id rather than released version", None),
-                 ("V", "pkgversion", True, "Use STRING as the package version number, rather than the date", "STRING"),
+                 ("S", "subdirs", False, "Create subdirectories of the output directory based on distro name, version, and architecture", None),
                  ("I", "use-internal-name", False, "Use the EC2 internal hostname for sshing", None),
-                 (None, "localgpgdir", True, "Local gnupg \"homedir\" containing key for signing dist", "DIR"),
-
-                 # These get defaulted, but the user might want to override them.
-                 ("A", "ami", True, "EC2 AMI id to use", "ID"),
-                 ("l", "login", True, "User account for ssh access to host", "LOGIN"),
-
-                 
-
-                 # These get read from settings.py, but the user might
-                 # want to override them.
-                 ("C", "cert", True, "EC2 X.509 certificate file", "FILE"),
-                 ("F", "sshkeyfile", True, "ssh key file name", "FILE"),
-                 ("K", "pkey", True, "EC2 X.509 PEM file", "FILE"),
-                 ("k", "sshkey", True, "ssh key identifier (in EC2's namespace)", "STRING"),
-                 ("t", "mtype", True, "EC2 machine type", "STRING") ]
+                 (None, "local-gpg-dir", True, "Local directory of gpg junk", "STRING"),
+                 (None, "local-mongo-dir", True, "Copy packaging files from local mongo checkout", "DIRECTORY"),
+                 ]
     shortopts = "".join([t[0] + (":" if t[2] else "") for t in flagspec if t[0] is not None])
     longopts = [t[1] + ("=" if t[2] else "") for t in flagspec]
 
@@ -644,7 +688,7 @@ def processArguments():
         opts, args = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, err:
         print str(err)
-        return 2
+        sys.exit(2)
 
     # Normalize the getopt-parsed options.
     kwargs = {}
@@ -652,13 +696,13 @@ def processArguments():
         flag = opt
         opt = opt.lstrip("-")
         if flag[:2] == '--': #long opt
-            kwargs[opt] = arg
+            kwargs[opt.replace('-', '_')] = arg
         elif flag[:1] == "-": #short opt 
             ok = False
             for tuple in flagspec:
                 if tuple[0] == opt:
                     ok = True
-                    kwargs[tuple[1]] = arg
+                    kwargs[tuple[1].replace('-', '_')] = arg
                     break
             if not ok:
                 raise SimpleError("this shouldn't happen: unrecognized option flag: %s", opt)
@@ -666,8 +710,39 @@ def processArguments():
             raise SimpleError("this shouldn't happen: non-option returned from getopt()")
         
     if "help" in kwargs:
-        print "Usage: %s [OPTIONS] DIRECTORY DISTRO DISTRO-VERSION ARCHITECTURE MONGO-VERSION" % sys.argv[0]
+        print "Usage: %s [OPTIONS] DIRECTORY DISTRO DISTRO-VERSION ARCHITECTURE MONGO-VERSION-SPEC" % sys.argv[0]
         print """Build some packages on new EC2 AMI instances, leave packages under DIRECTORY.
+
+MONGO-VERSION-SPEC has the syntax
+Commit(:Pkg-Name-Suffix(:Pkg-Version)).  If Commit starts with an 'r',
+build from a tagged release; if Commit starts with a 'v', build from
+the HEAD of a version branch; otherwise, build whatever git commit is
+identified by Commit.  Pkg-Name-Suffix gets appended to the package
+name, and defaults to "-stable" and "-unstable" if Commit looks like
+it designates a stable or unstable release/branch, respectively.
+Pkg-Version is used as the package version, and defaults to YYYYMMDD.
+Examples:
+
+  HEAD             # build a snapshot of HEAD, name the package
+                   # "mongodb", use YYYYMMDD for the version
+
+  HEAD:-snap     # build a snapshot of HEAD, name the package
+                 # "mongodb-snap", use YYYYMMDD for the version
+
+  HEAD:-snap:123     # build a snapshot of HEAD, name the package
+                     # "mongodb-snap", use 123 for the version
+
+  HEAD:-suffix:1.3 # build a snapshot of HEAD, name the package
+                   # "mongodb-snapshot", use "1.3 for the version
+
+  r1.2.3           # build a package of the 1.2.3 release, call it "mongodb-stable",
+                   # make the package version YYYYMMDD.
+
+  v1.2:-stable:    # build a package of the HEAD of the 1.2 branch
+
+  decafbad:-foo:123 # build git commit "decafbad", call the package
+                    # "mongodb-foo" with package version 123.
+
 Options:"""
         for t in flagspec:
             print "%-20s\t%s." % ("%4s--%s%s:" % ("-%s, " % t[0] if t[0] else "", t[1], ("="+t[4]) if t[4] else ""), t[3])
@@ -678,11 +753,12 @@ variables; see the ec2-api-tools documentation."""
         sys.exit(0)
 
     if "usage" in kwargs:
-        print "Usage: %s [OPTIONS] distro distro-version architecture mongo-version" % sys.argv[0]
+        print "Usage: %s [OPTIONS] OUTPUT-DIR DISTRO-NAME DISTRO-VERSION ARCHITECTURE MONGO-VERSION-SPEC" % sys.argv[0]
         sys.exit(0)
 
 
     return (kwargs, args)
+
 
 if __name__ == "__main__":
     main()
