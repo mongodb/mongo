@@ -178,6 +178,8 @@ namespace mongo {
             RegexMatcher& rm = regexs[nRegex];
             rm.re = new pcrecpp::RE(regex, flags2options(flags));
             rm.fieldName = fieldName;
+            rm.regex = regex;
+            rm.flags = flags;
             rm.isNot = isNot;
             nRegex++;
 
@@ -629,6 +631,8 @@ namespace mongo {
                     return rm.re->PartialMatch(e.valuestr());
                 else
                     return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
+            case RegEx:
+                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
             default:
                 return false;
         }

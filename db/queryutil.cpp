@@ -176,6 +176,12 @@ namespace mongo {
                     upper = addObj( b2.obj() ).firstElement();
                     upperInclusive = false; //MaxForType String is an empty Object
                 }
+
+                if (e.type() == RegEx){
+                    BSONElement re = addObj( BSON( "" << e ) ).firstElement();
+                    intervals_.push_back( FieldInterval(re) ); // regex matches self
+                }
+
             }
             return;
         }
