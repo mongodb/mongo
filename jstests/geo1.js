@@ -17,22 +17,6 @@ assert.eq( 1 , t.getIndexKeys().length , "S2" );
 t.ensureIndex( idx );
 assert.eq( 2 , t.getIndexKeys().length , "S3" );
 
-p = function( q , correct , name ){
-    print( name );
-    assert.eq( correct , t.find( q ).count() , "A1 " + name + " count" );
-    t.find( q ).hint( idx )._addSpecial( "$returnKey" , true ).forEach( 
-        function(z){
-            print( "\t" + z.loc + "\t" + z.zip );
-            assert.eq( 52 , z.loc.length , "A2" )
-        }
-    );
-}
-
-p( {} , 3 , "ALL" );
-p( { loc : /^1100011/ } , 2 , "north east" );
-
-
-
 assert.eq( 3 , t.count() , "B1" );
 t.insert( { loc : [ 200 , 200 ]  } )
 assert( db.getLastError() , "B2" )
@@ -54,4 +38,4 @@ t.drop();
 t.ensureIndex( { loc : "2d" } , { min : -500 , max : 500 , bits : 4 } );
 t.insert( { loc : [ 200 , 200 ]  } )
 assert.isnull( db.getLastError() , "D1" )
-assert.eq( 8 , t.find( {} ).hint( { loc : "2d" } )._addSpecial( "$returnKey" , true ).next().loc.length , "D2" )
+
