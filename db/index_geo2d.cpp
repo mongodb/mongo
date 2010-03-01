@@ -248,6 +248,8 @@ namespace mongo {
             BSONObjBuilder b(64);
 
             BSONElement geo = obj[_geo];
+            if ( geo.eoo() )
+                return;
             uassert( 13025 , (string)"geo field[" + _geo + "] has to be an Object or Array" , geo.isABSONObj() );
             b.append( "" , _hash( geo.embeddedObject() ) );
 
