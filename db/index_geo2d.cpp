@@ -149,10 +149,6 @@ namespace mongo {
                     setBit( pos , 1 );
         }
 
-        unsigned operator[]( const unsigned pos ) const {
-            return _hash & geoBitSets.masks64[pos];
-        }
-
         void setBit( unsigned pos , bool one ){
             if ( one )
                 _hash |= geoBitSets.masks64[pos];
@@ -1056,7 +1052,8 @@ namespace mongo {
             int numWanted = 100;
             if ( cmdObj["num"].isNumber() )
                 numWanted = cmdObj["num"].numberInt();
-            
+
+            uassert(13046, "'near' param missing/invalid", cmdObj["near"].type() == String);
             const GeoHash n = g->_tohash( cmdObj["near"] );
             result.append( "near" , n.toString() );
 
@@ -1097,9 +1094,9 @@ namespace mongo {
             
             BSONObjBuilder stats( result.subobjStart( "stats" ) );
             stats.append( "time" , cc().curop()->elapsedMillis() );
-            stats.appendIntOrLL( "btreelocs" , gs._nscanned );
-            stats.appendIntOrLL( "nscanned" , gs._hopper._lookedAt );
-            stats.appendIntOrLL( "objectsLoaded" , gs._hopper._objectsLoaded );
+            stats.appendNumber( "btreelocs" , gs._nscanned );
+            stats.appendNumber( "nscanned" , gs._hopper._lookedAt );
+            stats.appendNumber( "objectsLoaded" , gs._hopper._objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             

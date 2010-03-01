@@ -107,8 +107,8 @@ namespace mongo {
 
     void Top::append( BSONObjBuilder& b , const char * name , const UsageData& map ){
         BSONObjBuilder bb( b.subobjStart( name ) );
-        bb.appendIntOrLL( "time" , map.time );
-        bb.appendIntOrLL( "count" , map.count );
+        bb.appendNumber( "time" , map.time );
+        bb.appendNumber( "count" , map.count );
         bb.done();
     }
 

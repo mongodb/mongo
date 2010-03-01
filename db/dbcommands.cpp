@@ -341,8 +341,8 @@ namespace mongo {
                 
                 ProcessInfo p;
                 if ( p.supported() ){
-                    t.appendIntOrLL( "resident" , p.getResidentSize() );
-                    t.appendIntOrLL( "virtual" , p.getVirtualMemorySize() );
+                    t.appendNumber( "resident" , p.getResidentSize() );
+                    t.appendNumber( "virtual" , p.getVirtualMemorySize() );
                     t.appendBool( "supported" , true );
                 }
                 else {
@@ -350,7 +350,7 @@ namespace mongo {
                     t.appendBool( "supported" , false );
                 }
                     
-                t.appendIntOrLL( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
+                t.appendNumber( "mapped" , MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) );
 
                 t.done();
                     
@@ -1025,7 +1025,7 @@ namespace mongo {
                     continue; // nothing to do here
                 totalSize += nsd->datasize;
                 if (details)
-                    details->appendIntOrLL(index["name"].valuestrsafe(), nsd->datasize / scale );
+                    details->appendNumber(index["name"].valuestrsafe(), nsd->datasize / scale );
             }
             return totalSize;
         }
@@ -1058,10 +1058,10 @@ namespace mongo {
             if ( jsobj["scale"].isNumber() )
                 scale = jsobj["scale"].numberInt();
 
-            result.appendIntOrLL( "count" , nsd->nrecords );
-            result.appendIntOrLL( "size" , nsd->datasize / scale );
+            result.appendNumber( "count" , nsd->nrecords );
+            result.appendNumber( "size" , nsd->datasize / scale );
             int numExtents;
-            result.appendIntOrLL( "storageSize" , nsd->storageSize( &numExtents ) / scale );
+            result.appendNumber( "storageSize" , nsd->storageSize( &numExtents ) / scale );
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
@@ -1069,7 +1069,7 @@ namespace mongo {
             result.append( "flags" , nsd->flags );
 
             BSONObjBuilder indexSizes;
-            result.appendIntOrLL( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
+            result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
             
             if ( nsd->capped ){
@@ -1127,13 +1127,13 @@ namespace mongo {
                 indexSize += getIndexSizeForCollection(dbname, ns);
             }
 
-            result.appendIntOrLL( "collections" , ncollections );
-            result.appendIntOrLL( "objects" , objects );
-            result.appendIntOrLL( "dataSize" , size );
-            result.appendIntOrLL( "storageSize" , storageSize);
-            result.appendIntOrLL( "numExtents" , numExtents );
-            result.appendIntOrLL( "indexes" , indexes );
-            result.appendIntOrLL( "indexSize" , indexSize );
+            result.appendNumber( "collections" , ncollections );
+            result.appendNumber( "objects" , objects );
+            result.appendNumber( "dataSize" , size );
+            result.appendNumber( "storageSize" , storageSize);
+            result.appendNumber( "numExtents" , numExtents );
+            result.appendNumber( "indexes" , indexes );
+            result.appendNumber( "indexSize" , indexSize );
 
                 return true;
         }
