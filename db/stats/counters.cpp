@@ -85,9 +85,9 @@ namespace mongo {
         }
 
         BSONObjBuilder bb( b.subobjStart( "btree" ) );
-        bb.appendIntOrLL( "accesses" , _btreeAccesses );
-        bb.appendIntOrLL( "hits" , _btreeMemHits );
-        bb.appendIntOrLL( "misses" , _btreeMemMisses );
+        bb.appendNumber( "accesses" , _btreeAccesses );
+        bb.appendNumber( "hits" , _btreeMemHits );
+        bb.appendNumber( "misses" , _btreeMemMisses );
 
         bb.append( "resets" , _resets );
         

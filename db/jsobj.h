@@ -1291,6 +1291,30 @@ namespace mongo {
             else
                 append( fieldName.c_str() , n );
         }
+
+
+        /**
+         * appendNumber is a series of method for appending the smallest sensible type
+         * mostly for JS
+         */
+        void appendNumber( const string& fieldName , int n ){
+            append( fieldName.c_str() , n );
+        }
+
+        void appendNumber( const string& fieldName , double d ){
+            append( fieldName.c_str() , d );
+        }
+
+        void appendNumber( const string& fieldName , long long l ){
+            static long long maxInt = (int)pow( 2 , 30 );
+            static long long maxDouble = (long long)pow( 2 , 40 );
+
+            if ( l < maxInt )
+                append( fieldName.c_str() , (int)l );
+            else if ( l < maxDouble )
+                append( fieldName.c_str() , (double)l );
+            append( fieldName.c_str() , l );
+        }
         
         /** Append a double element */
         BSONObjBuilder& append(const char *fieldName, double n) {

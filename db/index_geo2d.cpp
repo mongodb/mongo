@@ -1097,9 +1097,9 @@ namespace mongo {
             
             BSONObjBuilder stats( result.subobjStart( "stats" ) );
             stats.append( "time" , cc().curop()->elapsedMillis() );
-            stats.appendIntOrLL( "btreelocs" , gs._nscanned );
-            stats.appendIntOrLL( "nscanned" , gs._hopper._lookedAt );
-            stats.appendIntOrLL( "objectsLoaded" , gs._hopper._objectsLoaded );
+            stats.appendNumber( "btreelocs" , gs._nscanned );
+            stats.appendNumber( "nscanned" , gs._hopper._lookedAt );
+            stats.appendNumber( "objectsLoaded" , gs._hopper._objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             
