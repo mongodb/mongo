@@ -18,11 +18,12 @@ wts_setup(int reopen, int logfile)
 {
 	ENV *env;
 	DB *db;
+	u_int32_t intl_size, leaf_size;
 	int ret;
 	char *p;
 
-	if ((ret =
-	    wiredtiger_simple_setup(g.progname, &db, WT_MEMORY_CHECK)) != 0) {
+	if ((ret = wiredtiger_simple_setup(
+	    g.progname, &db, g.c_cache, WT_MEMORY_CHECK)) != 0) {
 		fprintf(stderr, "%s: wiredtiger_simple_setup: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -43,19 +44,22 @@ wts_setup(int reopen, int logfile)
 		env->msgfile_set(env, g.logfp);
 	}
 
-	if ((ret = env->cache_size_set(env, (u_int32_t)g.c_cache)) != 0) {
-		env->err(env, ret, "Db.column_set");
-		return (1);
-	}
-
-	if ((ret = db->btree_pagesize_set(
-	    db, 0, 1 << g.c_internal_node, 1 << g.c_leaf_node, 0)) != 0) {
+	intl_size = 1 << g.c_internal_node;
+	leaf_size = 1 << g.c_leaf_node;
+	if ((ret =
+	    db->btree_pagesize_set(db, 0, intl_size, leaf_size, 0)) != 0) {
 		db->err(db, ret, "Db.btree_pagesize_set");
 		return (1);
 	}
 
 	switch (g.c_database_type) {
 	case FIX:
+		/*
+		 * XXX
+		 * Don't go past the WT limit of 20 objects per leaf page.
+		 */
+		if (20 * g.c_data_min > leaf_size)
+			g.c_data_min = leaf_size / 20;
 		if ((ret = db->column_set(db, g.c_data_min,
 		    NULL, g.c_repeat_comp ? WT_REPEAT_COMP : 0)) != 0) {
 			db->err(db, ret, "Db.column_set");
