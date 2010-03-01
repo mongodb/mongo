@@ -31,6 +31,7 @@ namespace mongo {
     class RegexMatcher {
     public:
         const char *fieldName;
+        string prefix;
         pcrecpp::RE *re;
         bool isNot;
         RegexMatcher() : re( 0 ), isNot() {}

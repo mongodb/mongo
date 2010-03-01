@@ -167,38 +167,26 @@ namespace mongo {
     void Matcher::addRegex( const BSONElement &e, const char *fieldName, bool isNot ) {
         if ( fieldName == 0 )
             fieldName = e.fieldName();
-        const char* regex = e.regex();
-        const char* flags = e.regexFlags();
-
-        if (!isNot){ //TODO something smarter
-            bool purePrefix;
-            string prefix = simpleRegex(regex, flags, &purePrefix);
-            if (purePrefix){
-                {
-                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                    _builders.push_back( b );
-                    *b << fieldName << prefix;
-                    addBasic(b->done().firstElement(), BSONObj::GTE , isNot);
-                }
-                {
-                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                    _builders.push_back( b );
-                    *b << fieldName << simpleRegexEnd(prefix);
-                    addBasic(b->done().firstElement(), BSONObj::LT , isNot);
-                }
-                return;
-            }
-        }
 
         if ( nRegex >= 4 ) {
             out() << "ERROR: too many regexes in query" << endl;
         }
         else {
+            const char* regex = e.regex();
+            const char* flags = e.regexFlags();
+
             RegexMatcher& rm = regexs[nRegex];
             rm.re = new pcrecpp::RE(regex, flags2options(flags));
             rm.fieldName = fieldName;
             rm.isNot = isNot;
             nRegex++;
+
+            if (!isNot){ //TODO something smarter
+                bool purePrefix;
+                string prefix = simpleRegex(regex, flags, &purePrefix);
+                if (purePrefix)
+                    rm.prefix = prefix;
+            }
         }        
     }
     
@@ -634,10 +622,16 @@ namespace mongo {
     extern int dump;
 
     inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
-        if ( e.type() == String || e.type() == Symbol )
-            return rm.re->PartialMatch(e.valuestr());
-        else
-            return false;
+        switch (e.type()){
+            case String:
+            case Symbol:
+                if (rm.prefix.empty())
+                    return rm.re->PartialMatch(e.valuestr());
+                else
+                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
+            default:
+                return false;
+        }
     }
 
     /* See if an object matches the query.
