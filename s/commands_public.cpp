@@ -226,9 +226,9 @@ namespace mongo {
                 }
 
                 result.append("ns", fullns);
-                result.appendIntOrLL("count", count);
-                result.appendIntOrLL("size", size);
-                result.appendIntOrLL("storageSize", storageSize);
+                result.appendNumber("count", count);
+                result.appendNumber("size", size);
+                result.appendNumber("storageSize", storageSize);
                 result.append("nindexes", nindexes);
 
                 result.append("nchunks", cm->numChunks());
