@@ -269,7 +269,7 @@ namespace mongo {
             if ( e.type() == String)
                 return (string)(e.valuestr());
             
-            uassert( 13043 , "invalid near" , 0 );
+            uassert( 13043 , "invalid/missing near param" , 0 );
             return "";
         }
 
