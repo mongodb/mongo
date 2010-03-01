@@ -537,7 +537,12 @@ namespace mongo {
         bool indexed = !constrainIndexKey_.isEmpty();
         if ( indexed ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
-            assert( !e.eoo() );
+            if( e.eoo() ){
+                cout << "obj: " << obj << endl;
+                cout << "fieldName: " << fieldName << endl;
+                cout << "constrainIndexKey_: " << constrainIndexKey_ << endl;
+                assert( !e.eoo() );
+            }
         } else {
 
             const char *p = strchr(fieldName, '.');

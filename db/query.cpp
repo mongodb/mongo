@@ -617,8 +617,7 @@ namespace mongo {
             bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1 && useCursors;
             
             if( 0 ) { 
-                BSONObj js = _c->current();
-                cout << "SCANNING " << js << endl;
+                cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
             }
 
             _nscanned++;

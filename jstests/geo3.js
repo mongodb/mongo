@@ -31,14 +31,50 @@ assert.eq( 10 , filtered1.results.length , "B1" );
 filtered1.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B2: " + tojson( z ) ); } )
 //printjson( filtered1.stats );
 
+function avgA( q , len ){
+    if ( ! len )
+        len = 10;
+    var realq = { loc : { $near : [ 50 , 50 ] } };
+    if ( q )
+        Object.extend( realq , q );
+    var as = 
+        t.find( realq ).limit(len).map( 
+            function(z){ 
+                return z.a; 
+            }
+        );
+    assert.eq( len , as.length , "length in avgA" );
+    return Array.avg( as );
+}
+
+function testFiltering( msg ){
+    assert.eq( 1.5 , avgA( {} ) , msg + " testFiltering 1 " );
+    assert.eq( 2 , avgA( { a : 2 } ) , msg + " testFiltering 2 " );
+    assert.eq( 4 , avgA( { a : 4 } ) , msg + " testFiltering 3 " );
+}
+
+testFiltering( "just loc" );
+
 t.dropIndex( { loc : "2d" } )
+assert.eq( 1 , t.getIndexKeys().length , "setup 3a" )
 t.ensureIndex( { loc : "2d" , a : 1 } )
+assert.eq( 2 , t.getIndexKeys().length , "setup 3b" )
 
 filtered2 = db.runCommand( { geoNear : t.getName() , near : [ 50 , 50 ] , num : 10 , query : { a : 2 } } );
 assert.eq( 10 , filtered2.results.length , "B3" );
 filtered2.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B4: " + tojson( z ) ); } )
-//printjson( filtered2.stats );
 
 assert.eq( filtered1.stats.avgDistance , filtered2.stats.avgDistance , "C1" )
 assert.eq( filtered1.stats.nscanned , filtered2.stats.nscanned , "C3" )
 assert.gt( filtered1.stats.objectsLoaded , filtered2.stats.objectsLoaded , "C3" )
+
+testFiltering( "loc and a" );
+
+/*
+t.dropIndex( { loc : "2d" , a : 1 } )
+assert.eq( 1 , t.getIndexKeys().length , "setup 4a" )
+t.ensureIndex( { loc : "2d" , b : 1 } )
+assert.eq( 2 , t.getIndexKeys().length , "setup 4b" )
+
+testFiltering( "loc and b" );
+*/

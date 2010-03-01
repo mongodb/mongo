@@ -530,8 +530,8 @@ namespace mongo {
     
     class GeoPoint {
     public:
-        GeoPoint( DiskLoc loc , double distance )
-            : _loc(loc) , _o( loc.obj() ) , _distance( distance ){
+        GeoPoint( const BSONObj& key , DiskLoc loc , double distance )
+            : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ){
             BSONObjBuilder b( loc.obj().objsize() + 24 );
             b.appendElements( loc.obj() );
             b.append( "$distance" , distance );
@@ -542,6 +542,7 @@ namespace mongo {
             return _distance < other._distance;
         }
 
+        BSONObj _key;
         DiskLoc _loc;
         BSONObj _o;
         double _distance;
@@ -585,7 +586,7 @@ namespace mongo {
             if ( ! loaded ) // dont double count
                 _objectsLoaded++;
             
-            _points.insert( GeoPoint( node.recordLoc , d ) );
+            _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
             }
@@ -787,11 +788,11 @@ namespace mongo {
             return _cur != _end;
         }
         
-        virtual Record* _current(){ return _cur->_loc.rec(); }
-        virtual BSONObj current(){ return _cur->_o; }
-        virtual DiskLoc currLoc(){ return _cur->_loc; }
+        virtual Record* _current(){ assert(ok()); return _cur->_loc.rec(); }
+        virtual BSONObj current(){ assert(ok()); return _cur->_o; }
+        virtual DiskLoc currLoc(){ assert(ok()); return _cur->_loc; }
         virtual bool advance(){ _cur++; return ok(); }
-        virtual BSONObj currKey() const { return BSONObj(); }
+        virtual BSONObj currKey() const { return _cur->_key; }
 
         virtual DiskLoc refLoc(){ return DiskLoc(); }
 
