@@ -1306,8 +1306,8 @@ namespace mongo {
         }
 
         void appendNumber( const string& fieldName , long long l ){
-            static long long maxInt = (int)pow( 2 , 30 );
-            static long long maxDouble = (long long)pow( 2 , 40 );
+            static long long maxInt = (int)pow( 2.0 , 30.0 );
+            static long long maxDouble = (long long)pow( 2.0 , 40.0 );
 
             if ( l < maxInt )
                 append( fieldName.c_str() , (int)l );
