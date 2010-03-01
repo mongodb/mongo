@@ -342,7 +342,6 @@ namespace mongo {
         
         void forgetEndKey() { endKey = BSONObj(); }
 
-        virtual bool useMatcher();
     private:
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.
