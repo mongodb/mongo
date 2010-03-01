@@ -572,7 +572,7 @@ namespace mongo {
                 boost::uint64_t val = (boost::uint64_t)e.numberLong();
                 JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
                 setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
-                if ( val != boost::uint64_t( double( val ) ) ) {
+                if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
                     // using 2 doubles here instead of a single double because certain double
                     // bit patterns represent undefined values and sm might trash them
                     setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
