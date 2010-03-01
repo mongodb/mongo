@@ -400,7 +400,8 @@ set -e # errexit, stop on errors
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/^Source:.*/Source: {pkg_name}{pkg_name_suffix}/;
 s/^Package:.*mongodb/Package: {pkg_name}{pkg_name_suffix}\\
 Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
-( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|$(CURDIR)/debian/mongodb|$(CURDIR)/debian/{pkg_name}{pkg_name_suffix}|g' debian/rules) || exit 1
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|$(CURDIR)/debian/mongodb/|$(CURDIR)/debian/{pkg_name}{pkg_name_suffix}/|g' debian/rules) || exit 1
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|debian/mongodb.manpages|debian/{pkg_name}{pkg_name_suffix}.manpages|g' debian/rules) || exit 1
 ( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/^Name:/s/.*/Name: {pkg_name}{pkg_name_suffix}/; /^Version:/s/.*/Version: {pkg_version}/;' rpm/mongo.spec )
 """
 
@@ -409,6 +410,17 @@ Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
 # libraries, so we need to link statically to those.
 ( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|^scons.*((inst)all)|scons --prefix=$RPM_BUILD_ROOT/usr --extralib=nspr4 --staticlib=boost_system-mt,boost_thread-mt,boost_filesystem-mt,boost_program_options-mt,js $1|' rpm/mongo.spec )
 """
+
+    # Note: this breaks upstart systems, because dh_installinit is
+    # idiotically inflexible.  Do not use on Debian versions that use
+    # upstart (whenever those come to exist).
+    mangle_files_for_debian_sysvinit_commands = """
+# Debian systems that use sysvinit require some ridiculous workarounds
+# to get an init script at /etc/init.d/mongodb (in the general case,
+# where the package name can be anything).
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/dh_installinit/dh_installinit --init-script=mongodb/' debian/rules) || exit 1
+"""
+
     deb_prereq_commands = """
 # Configure debconf to never prompt us for input.
 export DEBIAN_FRONTEND=noninteractive
@@ -508,7 +520,7 @@ git clone git://github.com/mongodb/mongo.git
                                   self.centos_preqres))),
                                ("commands",
                                 ((("debian", "*", "*"),
-                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
+                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.mangle_files_for_debian_sysvinit_commands + self.deb_build_commands),
                                  (("ubuntu", "*", "*"),
                                   self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
                                  (("centos", "*", "*"),
