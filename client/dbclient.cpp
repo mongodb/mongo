@@ -821,6 +821,9 @@ namespace mongo {
 
     /** If true, safe to call next().  Requests more from server if necessary. */
     bool DBClientCursor::more() {
+        if ( !_putBack.empty() )
+            return true;
+        
         if (haveLimit && pos >= nToReturn)
             return false;
 
@@ -836,6 +839,11 @@ namespace mongo {
 
     BSONObj DBClientCursor::next() {
         assert( more() );
+        if ( !_putBack.empty() ) {
+            BSONObj ret = _putBack.top();
+            _putBack.pop();
+            return ret;
+        }
         pos++;
         BSONObj o(data);
         data += o.objsize();

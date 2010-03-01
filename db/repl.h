@@ -61,9 +61,11 @@ namespace mongo {
         bool fastsync;
         
         bool autoresync;
+        
+        int slavedelay;
 
         ReplSettings()
-            : slave(NotSlave) , master(false) , opIdMem(100000000) , fastsync() , autoresync(false) {
+            : slave(NotSlave) , master(false) , opIdMem(100000000) , fastsync() , autoresync(false), slavedelay() {
         }
 
     };
@@ -130,6 +132,7 @@ namespace mongo {
         // returns false if the slave has been reset
         bool updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock );
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
+        int _sleepAdviceTime;
         
     public:
         static void applyOperation(const BSONObj& op);
@@ -175,7 +178,13 @@ namespace mongo {
         operator string() const { return sourceName() + "@" + hostName; }
         
         bool haveMoreDbsToSync() const { return !addDbNextPass.empty(); }        
-
+        int sleepAdvice() const {
+            if ( !_sleepAdviceTime )
+                return 0;
+            int wait = _sleepAdviceTime - time( 0 );
+            return wait > 0 ? wait : 0;
+        }
+        
         static bool throttledForceResyncDead( const char *requester );
         static void forceResyncDead( const char *requester );
         void forceResync( const char *requester );
