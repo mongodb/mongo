@@ -48,7 +48,7 @@
 #include "cmdline.h"
 
 namespace mongo {
-
+    
     ReplSettings replSettings;
 
     void ensureHaveIdIndex(const char *ns);
@@ -1217,67 +1217,70 @@ namespace mongo {
             }
             return true;
         }
+        
+        OpTime nextOpTime;
+        {
+            BSONObj op = c->next();
+            BSONElement ts = op.getField("ts");
+            if ( ts.type() != Date && ts.type() != Timestamp ) {
+                string err = op.getStringField("$err");
+                if ( !err.empty() ) {
+                    problem() << "repl: $err reading remote oplog: " + err << '\n';
+                    massert( 10390 ,  "got $err reading remote oplog", false );
+                }
+                else {
+                    problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
+                    massert( 10391 , "repl: bad object read from remote oplog", false);
+                }
+            }
+        
+            if ( replPair && replPair->state == ReplPair::State_Master ) {
+            
+                OpTime nextOpTime( ts.date() );
+                if ( !tailing && !initial && nextOpTime != syncedTo ) {
+                    log() << "remote slave log filled, forcing slave resync" << endl;
+                    resetSlave();
+                    return true;
+                }            
+            
+                dblock lk;
+                updateSetsWithLocalOps( localLogTail, true );
+            }
+        
+            nextOpTime = OpTime( ts.date() );
+            log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
+            if ( tailing || initial ) {
+                if ( initial )
+                    log(1) << "repl:   initial run\n";
+                else
+                    assert( syncedTo < nextOpTime );
+                c->putBack( op ); // op will be processed in the loop below
+                nextOpTime = OpTime(); // will reread the op below
+            }
+            else if ( nextOpTime != syncedTo ) { // didn't get what we queried for - error
+                Nullstream& l = log();
+                l << "repl:   nextOpTime " << nextOpTime.toStringLong() << ' ';
+                if ( nextOpTime < syncedTo )
+                    l << "<??";
+                else
+                    l << ">";
 
-        int n = 0;
-        BSONObj op = c->next();
-        BSONElement ts = op.getField("ts");
-        if ( ts.type() != Date && ts.type() != Timestamp ) {
-            string err = op.getStringField("$err");
-            if ( !err.empty() ) {
-                problem() << "repl: $err reading remote oplog: " + err << '\n';
-                massert( 10390 ,  "got $err reading remote oplog", false );
+                l << " syncedTo " << syncedTo.toStringLong() << '\n';
+                log() << "repl:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
+                log() << "repl:   tailing: " << tailing << '\n';
+                log() << "repl:   data too stale, halting replication" << endl;
+                replInfo = replAllDead = "data too stale halted replication";
+                assert( syncedTo < nextOpTime );
+                throw SyncException();
             }
             else {
-                problem() << "repl: bad object read from remote oplog: " << op.toString() << '\n';
-                massert( 10391 , "repl: bad object read from remote oplog", false);
+                /* t == syncedTo, so the first op was applied previously. */
             }
-        }
-        
-        if ( replPair && replPair->state == ReplPair::State_Master ) {
-            
-            OpTime nextOpTime( ts.date() );
-            if ( !tailing && !initial && nextOpTime != syncedTo ) {
-                log() << "remote slave log filled, forcing slave resync" << endl;
-                resetSlave();
-                return true;
-            }            
-            
-            dblock lk;
-            updateSetsWithLocalOps( localLogTail, true );
-        }
-        
-        OpTime nextOpTime( ts.date() );
-        log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
-        if ( tailing || initial ) {
-            if ( initial )
-                log(1) << "repl:   initial run\n";
-            else
-                assert( syncedTo < nextOpTime );
-            sync_pullOpLog_applyOperation(op, &localLogTail);
-            n++;
-        }
-        else if ( nextOpTime != syncedTo ) {
-            Nullstream& l = log();
-            l << "repl:   nextOpTime " << nextOpTime.toStringLong() << ' ';
-            if ( nextOpTime < syncedTo )
-                l << "<??";
-            else
-                l << ">";
-
-            l << " syncedTo " << syncedTo.toStringLong() << '\n';
-            log() << "repl:   time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n";
-            log() << "repl:   tailing: " << tailing << '\n';
-            log() << "repl:   data too stale, halting replication" << endl;
-            replInfo = replAllDead = "data too stale halted replication";
-            assert( syncedTo < nextOpTime );
-            throw SyncException();
-        }
-        else {
-            /* t == syncedTo, so the first op was applied previously. */
         }
 
         // apply operations
         {
+            int n = 0;
 			time_t saveLast = time(0);
             while ( 1 ) {
                 /* from a.s.:
@@ -1296,7 +1299,7 @@ namespace mongo {
                 */
                 if ( !c->more() ) {
                     dblock lk;
-                    OpTime nextLastSaved = nextLastSavedLocalTs(); // this may make c->more() become true
+                    OpTime nextLastSaved = nextLastSavedLocalTs();
                     {
                         dbtemprelease t;
                         if ( c->more() ) {
@@ -1313,7 +1316,7 @@ namespace mongo {
                     break;
                 }
 
-                OCCASIONALLY if( n > 100000 || time(0) - saveLast > 60 ) { 
+                OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) { 
 					// periodically note our progress, in case we are doing a lot of work and crash
 					dblock lk;
                     syncedTo = nextOpTime;
@@ -1326,7 +1329,7 @@ namespace mongo {
 				}
 
                 BSONObj op = c->next();
-                ts = op.getField("ts");
+                BSONElement ts = op.getField("ts");
                 assert( ts.type() == Date || ts.type() == Timestamp );
                 OpTime last = nextOpTime;
                 OpTime tmp( ts.date() );
@@ -1334,6 +1337,19 @@ namespace mongo {
                 if ( !( last < nextOpTime ) ) {
                     problem() << "sync error: last " << last.toString() << " >= nextOpTime " << nextOpTime.toString() << endl;
                     uassert( 10123 , "bad 'ts' value in sources", false);
+                }
+                if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
+                    c->putBack( op );
+                    _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
+                    dblock lk;
+                    if ( n > 0 ) {
+                        syncedTo = last;
+                        save();
+                    }
+                    log() << "repl:   applied " << n << " operations" << endl;
+                    log() << "repl:   syncedTo: " << syncedTo.toStringLong() << endl;
+                    log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
+                    break;
                 }
 
                 sync_pullOpLog_applyOperation(op, &localLogTail);
@@ -1398,6 +1414,7 @@ namespace mongo {
        returns true if everything happy.  return false if you want to reconnect.
     */
     bool ReplSource::sync(int& nApplied) {
+        _sleepAdviceTime = 0;
         ReplInfo r("sync");
         if ( !cmdLine.quiet )
             log() << "repl: " << sourceName() << '@' << hostName << endl;
@@ -1577,6 +1594,9 @@ namespace mongo {
                 }
                 else if( moreToSync ) {
                     sleepAdvice = 0;
+                }
+                else if ( s->sleepAdvice() ) {
+                    sleepAdvice = s->sleepAdvice();
                 }
                 if ( ok && !moreToSync /*&& !s->syncedTo.isNull()*/ ) {
                     pairSync->setInitialSyncCompletedLocking();
