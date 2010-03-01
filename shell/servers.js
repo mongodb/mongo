@@ -633,7 +633,18 @@ allocatePorts = function( n ) {
 
 
 SyncCCTest = function( testName ){
-
     this._connections = [];
     
+    for ( var i=0; i<3; i++ ){
+        this._connections.push( startMongodTest( 30000 + i , testName + i ) );
+    }
+    
+    this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
+    print( this.url );
+}
+
+SyncCCTest.prototype.stop = function(){
+    for ( var i=0; i<this._connections.length; i++){
+        stopMongod( 30000 + i );
+    }
 }
