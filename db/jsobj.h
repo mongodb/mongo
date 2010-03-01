@@ -1650,16 +1650,23 @@ namespace mongo {
 
     class BSONArrayBuilder : boost::noncopyable{
     public:
-        BSONArrayBuilder() :i(0), b() {}
+        BSONArrayBuilder() : _i(0), _b() {}
+        BSONArrayBuilder( BufBuilder &b ) : _i(0), _b(b) {}
 
         template <typename T>
         BSONArrayBuilder& append(const T& x){
-            b.append(num().c_str(), x);
+            _b.append(num().c_str(), x);
             return *this;
         }
 
+        template <typename T>
+        BSONArrayBuilder& append(const char *, const T& x){ // ignore name
+            append( x );
+            return *this;
+        }
+        
         BSONArrayBuilder& append(const BSONElement& e){
-            b.appendAs(e, num().c_str());
+            _b.appendAs(e, num().c_str());
             return *this;
         }
 
@@ -1668,12 +1675,30 @@ namespace mongo {
             return append(x);
         }
 
-        BSONArray arr(){ return BSONArray(b.obj()); }
+        BSONArray arr(){ return BSONArray(_b.obj()); }
+        
+        BSONObj done() { return _b.done(); }
+        
+        BufBuilder &subobjStart( const char * ) { // ignore name
+            return _b.subobjStart( num().c_str() );
+        }
 
+        BufBuilder &subarrayStart( const char * ) { // ignore name
+            return _b.subarrayStart( num().c_str() );
+        }
+        
+        void appendArray( const char *, BSONObj subObj ) { // ignore name
+            _b.appendArray( num().c_str(), subObj );
+        }
+        
+        void appendAs( const BSONElement &e, const char * ) { // ignore name
+            append( e );
+        }
+        
     private:
-        string num(){ return b.numStr(i++); }
-        int i;
-        BSONObjBuilder b;
+        string num(){ return _b.numStr(_i++); }
+        int _i;
+        BSONObjBuilder _b;
     };
 
 

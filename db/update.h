@@ -82,7 +82,8 @@ namespace mongo {
             
         }
         
-        void appendIncremented( BSONObjBuilder& bb , const BSONElement& in, ModState& ms ) const;
+        template< class Builder >
+        void appendIncremented( Builder& bb , const BSONElement& in, ModState& ms ) const;
         
         bool operator<( const Mod &other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
@@ -115,7 +116,8 @@ namespace mongo {
             return false;
         }
         
-        void apply( BSONObjBuilder& b , BSONElement in , ModState& ms ) const;
+        template< class Builder >
+        void apply( Builder& b , BSONElement in , ModState& ms ) const;
         
         /**
          * @return true iff toMatch should be removed from the array
@@ -373,11 +375,13 @@ namespace mongo {
             bb.done();
         }
 
-        void apply( BSONObjBuilder& b , BSONElement in ){
+        template< class Builder >
+        void apply( Builder& b , BSONElement in ){
             m->apply( b , in , *this );
         }
         
-        void appendIncValue( BSONObjBuilder& b ) const {
+        template< class Builder >
+        void appendIncValue( Builder& b ) const {
             switch ( incType ){
             case NumberDouble:
                 b.append( m->shortFieldName , incdouble ); break;
@@ -414,12 +418,14 @@ namespace mongo {
             return _inPlacePossible;
         }
 
-        
-        void createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj );
+        template< class Builder >
+        void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
 
-        void _appendNewFromMods( const string& root , ModState& m , BSONObjBuilder& b , set<string>& onedownseen );
+        template< class Builder >
+        void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );
         
-        void appendNewFromMod( ModState& ms , BSONObjBuilder& b ){
+        template< class Builder >
+        void appendNewFromMod( ModState& ms , Builder& b ){
             //const Mod& m = *(ms.m); // HACK
             Mod& m = *((Mod*)(ms.m)); // HACK
                 
