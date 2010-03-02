@@ -1659,12 +1659,6 @@ namespace mongo {
             return *this;
         }
 
-        template <typename T>
-        BSONArrayBuilder& append(const char *, const T& x){ // ignore name
-            append( x );
-            return *this;
-        }
-        
         BSONArrayBuilder& append(const BSONElement& e){
             _b.appendAs(e, num().c_str());
             return *this;
@@ -1679,23 +1673,51 @@ namespace mongo {
         
         BSONObj done() { return _b.done(); }
         
-        BufBuilder &subobjStart( const char * ) { // ignore name
+        template <typename T>
+        BSONArrayBuilder& append(const char *name, const T& x){
+            fill( name );
+            append( x );
+            return *this;
+        }
+        
+        BufBuilder &subobjStart( const char *name ) {
+            fill( name );
             return _b.subobjStart( num().c_str() );
         }
 
-        BufBuilder &subarrayStart( const char * ) { // ignore name
+        BufBuilder &subarrayStart( const char *name ) {
+            fill( name );
             return _b.subarrayStart( num().c_str() );
         }
         
-        void appendArray( const char *, BSONObj subObj ) { // ignore name
+        void appendArray( const char *name, BSONObj subObj ) {
+            fill( name );
             _b.appendArray( num().c_str(), subObj );
         }
         
-        void appendAs( const BSONElement &e, const char * ) { // ignore name
+        void appendAs( const BSONElement &e, const char *name ) {
+            fill( name );
             append( e );
         }
         
     private:
+        void fill( const char *name ) {
+            int n = strtol( name, NULL, 10 );
+            while( _i < n )
+                append( nullElt() );
+        }
+        
+        static BSONElement nullElt() {
+            static BSONObj n = nullObj();
+            return n.firstElement();
+        }
+        
+        static BSONObj nullObj() {
+            BSONObjBuilder b;
+            b.appendNull( "" );
+            return b.obj();
+        }
+        
         string num(){ return _b.numStr(_i++); }
         int _i;
         BSONObjBuilder _b;
