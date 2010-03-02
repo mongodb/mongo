@@ -177,9 +177,16 @@ namespace mongo {
                     upperInclusive = false; //MaxForType String is an empty Object
                 }
 
+                // regex matches self
                 if (e.type() == RegEx){
                     BSONElement re = addObj( BSON( "" << e ) ).firstElement();
-                    intervals_.push_back( FieldInterval(re) ); // regex matches self
+                    intervals_.push_back( FieldInterval(re) );
+                } else {
+                    BSONObj orig = e.embeddedObject();
+                    BSONObjBuilder b;
+                    b.appendRegex("", orig["$regex"].valuestrsafe(), orig["$options"].valuestrsafe());
+                    BSONElement re = addObj( b.obj() ).firstElement();
+                    intervals_.push_back( FieldInterval(re) );
                 }
 
             }
