@@ -358,7 +358,9 @@ namespace mongo {
 
             BSONObjBuilder b(64);
 
-            uassert( 13025 , (string)"geo field[" + _geo + "] has to be an Object or Array" , geo.isABSONObj() );
+            if ( ! geo.isABSONObj() )
+                return;
+
             _hash( geo.embeddedObject() ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ){
@@ -445,6 +447,22 @@ namespace mongo {
         }
 
         virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
+
+        virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const {
+            BSONElement e = query[_geo.c_str()];
+            switch ( e.type() ){
+            case Object: {
+                BSONObj sub = e.embeddedObject();
+                if ( sub.firstElement().getGtLtOp() == BSONObj::opNEAR ){
+                    return OPTIMAL;
+                }
+            }
+            case Array:
+                return HELPFUL;
+            default:
+                return USELESS;
+            }
+        }
         
         string _geo;
         vector<string> _other;

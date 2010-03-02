@@ -40,21 +40,6 @@ namespace mongo {
         uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.notablescan );
     }
 
-    bool anyElementNamesMatch( const BSONObj& a , const BSONObj& b ){
-        BSONObjIterator x(a);
-        while ( x.more() ){
-            BSONElement e = x.next();
-            BSONObjIterator y(b);
-            while ( y.more() ){
-                BSONElement f = y.next();
-                FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() );
-                if ( res == SAME || res == LEFT_SUBFIELD || res == RIGHT_SUBFIELD )
-                    return true;
-            }
-        }
-        return false;
-    }
-    
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();
@@ -403,9 +388,10 @@ namespace mongo {
         for( int i = 0; i < d->nIndexes; ++i ) {
             IndexDetails& id = d->idx(i);
             const IndexSpec& spec = id.getSpec();
+            IndexSuitability suitability = HELPFUL;
             if ( normalQuery ){
-                if ( anyElementNamesMatch( spec.keyPattern , query_ ) == 0 && 
-                     anyElementNamesMatch( spec.keyPattern , order_ ) == 0 )
+                suitability = spec.suitability( query_ , order_ );
+                if ( suitability == USELESS )
                     continue;
             }
 

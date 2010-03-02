@@ -30,6 +30,8 @@ namespace mongo {
     class IndexPlugin;
     class IndexDetails;
 
+    enum IndexSuitability { USELESS , HELPFUL , OPTIMAL };
+
     /**
      * this represents an instance of a index plugin
      * done this way so parsing, etc... can be cached
@@ -54,6 +56,8 @@ namespace mongo {
         const IndexPlugin * getPlugin() const { return _plugin; }
         
         const BSONObj& keyPattern() const;
+
+        virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
 
     protected:
         const IndexPlugin * _plugin;
@@ -134,7 +138,12 @@ namespace mongo {
             return _details;
         }
 
+        IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
+
     protected:
+
+        IndexSuitability _suitability( const BSONObj& query , const BSONObj& order ) const ;
+
         void _getKeys( vector<const char*> fieldNames , vector<BSONElement> fixed , const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const;
         
         BSONSizeTracker _sizeTracker;
