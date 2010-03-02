@@ -42,6 +42,7 @@ assert.eq( 1, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().endKey.a
 assert.eq( null, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().startKey.c );
 assert.eq( null, f.find( { a: 1, c: 1 } ).hint( { a: 1, b: 1 } ).explain().endKey.c );
 
+/* TODO: Find a way to test indexing with multiple intervals
 start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 start( { a: "a", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: 1, b: 1 } ).hint( { a: 1, b: 1 } ) );
 start( { a: "b", b: 1 }, f.find( { a: /^a/, b: 1 } ).sort( { a: -1, b: -1 } ).hint( { a: 1, b: 1 } ) );
@@ -56,6 +57,7 @@ end( { a: "{", b: 1 }, f.find( { a: /^z/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 
 start( { a: "az", b: 1 }, f.find( { a: /^az/, b: 1 } ).hint( { a: 1, b: 1 } ) );
 end( { a: "a{", b: 1 }, f.find( { a: /^az/, b: 1 } ).hint( { a: 1, b: 1 } ) );
+*/
 
 both( { a: 1, b: 3 }, f.find( { a: 1, b: 3 } ).hint( { a: 1, b: 1 } ) );
 
