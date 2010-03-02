@@ -30,7 +30,7 @@ namespace mongo {
     class IndexPlugin;
     class IndexDetails;
 
-    enum IndexSuitability { USELESS , HELPFUL , OPTIMAL };
+    enum IndexSuitability { USELESS = 0 , HELPFUL = 1 , OPTIMAL = 2 };
 
     /**
      * this represents an instance of a index plugin

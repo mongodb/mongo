@@ -327,7 +327,8 @@ namespace mongo {
             while( i.more() ) {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
-                if ( ii.getSpec().getTypeName() == special ){
+                const IndexSpec& spec = ii.getSpec();
+                if ( spec.getTypeName() == special && spec.suitability( query_ , order_ ) ){
                     usingPrerecordedPlan_ = true;
                     mayRecordPlan_ = true;
                     plans_.push_back( PlanPtr( new QueryPlan( d , j , fbs_ , order_ , 
@@ -335,7 +336,7 @@ namespace mongo {
                     return;
                 }
             }
-            uassert( 13038 , (string)"can't find special index: " + special , 0 );
+            uassert( 13038 , (string)"can't find special index: " + special + " for: " + query_.toString() , 0 );
         }
 
         if ( honorRecordedPlan_ ) {

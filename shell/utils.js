@@ -924,3 +924,28 @@ killWithUris = function( uris ) {
         }
     }
 }
+
+Geo = {};
+Geo.distance = function( a , b ){
+    var ax = null;
+    var ay = null;
+    var bx = null;
+    var by = null;
+    
+    for ( var key in a ){
+        if ( ax == null )
+            ax = a[key];
+        else if ( ay == null )
+            ay = a[key];
+    }
+    
+    for ( var key in b ){
+        if ( bx == null )
+            bx = b[key];
+        else if ( by == null )
+            by = b[key];
+    }
+
+    return Math.sqrt( Math.pow( by - ay , 2 ) + 
+                      Math.pow( bx - ax , 2 ) );
+}

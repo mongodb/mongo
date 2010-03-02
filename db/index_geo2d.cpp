@@ -28,6 +28,9 @@
 #include "matcher.h"
 
 namespace mongo {
+
+#define GEODEBUG(x) cout << x << endl;
+    //#define GEODEBUG(x) 
     
     const string GEO2DNAME = "2d";
 
@@ -733,7 +736,7 @@ namespace mongo {
             _lookedAt++;
 
             double d = _g->distance( _near , node.key.firstElement() );
-            //cout << "\t" << node.recordLoc.obj() << "\t" << d << endl;
+            GEODEBUG( "\t" << node.recordLoc.obj() << "\t" << d );
             if ( _points.size() >= _max && d > farthest() )
                 return;
             
@@ -874,7 +877,7 @@ namespace mongo {
                     if ( ! _prefix.constrains() )
                         break;
                     _prefix = _prefix.up();
-                    //cout << _prefix << "\t" << _found << "\t" << endl;
+                    GEODEBUG( _prefix << "\t" << _found );
                 }
             }
             
@@ -1017,7 +1020,7 @@ namespace mongo {
                 e = e.embeddedObject().firstElement();
             n = _tohash( e );
         }
-        uassert( 13042 , "no geo field" , n.constrains() );
+        uassert( 13042 , (string)"missing geo field (" + _geo + ") in : " + query.toString() , n.constrains() );
 
         shared_ptr<GeoSearch> s( new GeoSearch( this , n , numWanted , query ) );
         s->exec();
