@@ -134,7 +134,7 @@ namespace mongo {
             basics.push_back( ElementMatcher( e , c, isNot ) );
         }
 
-        void addRegex(const BSONElement &e, const char *fieldName = 0, bool isNot = false);
+        void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
         
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);

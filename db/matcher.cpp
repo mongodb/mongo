@@ -164,17 +164,12 @@ namespace mongo {
     }
     
     
-    void Matcher::addRegex( const BSONElement &e, const char *fieldName, bool isNot ) {
-        if ( fieldName == 0 )
-            fieldName = e.fieldName();
+    void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot){
 
         if ( nRegex >= 4 ) {
             out() << "ERROR: too many regexes in query" << endl;
         }
         else {
-            const char* regex = e.regex();
-            const char* flags = e.regexFlags();
-
             RegexMatcher& rm = regexs[nRegex];
             rm.re = new pcrecpp::RE(regex, flags2options(flags));
             rm.fieldName = fieldName;
@@ -301,7 +296,7 @@ namespace mongo {
             }
 
             if ( e.type() == RegEx ) {
-                addRegex( e );
+                addRegex( e.fieldName(), e.regex(), e.regexFlags() );
                 continue;
             }
             
@@ -336,7 +331,7 @@ namespace mongo {
                                     break;
                                 }
                                 case RegEx:
-                                    addRegex( fe, e.fieldName(), true );
+                                    addRegex( e.fieldName(), fe.regex(), fe.regexFlags(), true );
                                     break;
                                 default:
                                     uassert( 13031, "invalid use of $not", false );
@@ -354,14 +349,7 @@ namespace mongo {
                     }
                 }
                 if (regex){
-                    if ( nRegex >= 4 ) {
-                        out() << "ERROR: too many regexes in query" << endl;
-                    } else {
-                        RegexMatcher& rm = regexs[nRegex];
-                        rm.re = new pcrecpp::RE(regex, flags2options(flags));
-                        rm.fieldName = e.fieldName();
-                        nRegex++;
-                    }
+                    addRegex(e.fieldName(), regex, flags);
                 }
                 if ( isOperator )
                     continue;
