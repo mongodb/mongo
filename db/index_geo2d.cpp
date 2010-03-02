@@ -29,8 +29,8 @@
 
 namespace mongo {
 
-#define GEODEBUG(x) cout << x << endl;
-    //#define GEODEBUG(x) 
+    //#define GEODEBUG(x) cout << x << endl;
+#define GEODEBUG(x) 
     
     const string GEO2DNAME = "2d";
 
