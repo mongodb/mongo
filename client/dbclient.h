@@ -21,6 +21,7 @@
 #include "../util/message.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
+#include <stack>
 
 namespace mongo {
 
