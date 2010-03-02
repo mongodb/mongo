@@ -70,7 +70,7 @@ namespace mongo {
             }
             else {
                 cout << "GeoHash cons e : " << e << endl;
-                assert(0);
+                uassert(13047,"wrong type for geo index. if you're using a pre-release version, need to rebuild index",0);
             }
             _fix();
         }
