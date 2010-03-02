@@ -400,7 +400,12 @@ namespace mongo {
      * the goal is to make ModSet const so its re-usable
      */
     class ModSetState : boost::noncopyable {
-        typedef map<string,ModState> ModStateHolder;
+        struct FieldCmp {
+            bool operator()( const string &l, const string &r ) {
+                return lexNumCmp( l.c_str(), r.c_str() ) < 0;
+            }
+        };
+        typedef map<string,ModState,FieldCmp> ModStateHolder;
         const BSONObj& _obj;
         ModStateHolder _mods;
         bool _inPlacePossible;

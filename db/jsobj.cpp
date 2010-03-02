@@ -658,7 +658,7 @@ namespace mongo {
             const string& c = l.substr( lstart , lend - lstart );
             const string& d = r.substr( rstart , rend - rstart );
 
-            int x = c.compare( d );
+            int x = lexNumCmp( c.c_str(), d.c_str() );
 
             if ( x < 0 )
                 return LEFT_BEFORE;
@@ -1631,7 +1631,7 @@ namespace mongo {
         const char * x = *((const char**)a);
         const char * y = *((const char**)b);
         x++; y++;
-        return strcmp( x , y );
+        return lexNumCmp( x , y );
     }
     
     BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ){

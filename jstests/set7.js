@@ -13,3 +13,18 @@ assert.eq( [2,1,2,3,5], t.findOne().a );
 
 t.update( {}, {$set:{"a.9":9}} );
 assert.eq( [2,1,2,3,5,null,null,null,null,9], t.findOne().a );
+
+t.drop();
+t.save( {a:[0,1,2,3]} );
+t.update( {}, {$set:{"a.9":9,"a.7":7}} );
+assert.eq( [0,1,2,3,null,null,null,7,null,9], t.findOne().a );
+
+t.drop();
+t.save( {a:[0,1,2,3,4,5,6,7,8,9,10]} );
+t.update( {}, {$set:{"a.11":11} } );
+assert.eq( [0,1,2,3,4,5,6,7,8,9,10,11], t.findOne().a );
+
+// creating new object w/ number field name (from mods)
+// create new from query
+
+// try to set string field in existing array

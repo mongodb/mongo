@@ -275,6 +275,38 @@ namespace BasicTests {
         }
     };
     
+    class LexNumCmp {
+    public:
+        void run() {
+            ASSERT_EQUALS( 0, lexNumCmp( "a", "a" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "aa" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "aa", "a" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "b" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "100", "50" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "50", "100" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "b", "a" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "aa", "aa" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "aa", "ab" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "ab", "aa" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "0", "a" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "a0", "aa" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "a", "0" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "aa", "a0" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "0", "0" ) );
+            ASSERT_EQUALS( 0, lexNumCmp( "10", "10" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "1", "10" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "10", "1" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "11", "10" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "10", "11" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "f11f", "f10f" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "f10f", "f11f" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "f11f", "f111" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "f111", "f11f" ) );
+            ASSERT_EQUALS( -1, lexNumCmp( "f12f", "f12g" ) );
+            ASSERT_EQUALS( 1, lexNumCmp( "f12g", "f12f" ) );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "basic" ){
@@ -293,6 +325,7 @@ namespace BasicTests {
             add< AssertTests >();
             
             add< ArrayTests::basic1 >();
+            add< LexNumCmp >();
         }
     } myall;
     

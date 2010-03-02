@@ -469,7 +469,14 @@ namespace mongo {
         BSONElement e = es.next();
 
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        ModStateHolder::iterator mend = _mods.lower_bound( root + "{" );
+        ModStateHolder::iterator mend;
+        if ( root.length() == 0 ) {
+            mend = _mods.end();
+        } else {
+            string rootEnd = root;
+            rootEnd[ rootEnd.length() - 1 ]++;
+            mend = _mods.lower_bound( rootEnd );
+        }
 
         set<string> onedownseen;
         
@@ -510,7 +517,7 @@ namespace mongo {
                 m++;
                 continue;
             case RIGHT_BEFORE: // field that doesn't have a MOD
-                b.append( e );
+                b.append( e ); //careful, need to fill?
                 e = es.next();
                 continue;
             case RIGHT_SUBFIELD:
@@ -523,7 +530,7 @@ namespace mongo {
         
         // finished looping the mods, just adding the rest of the elements
         while ( e.type() ){
-            b.append( e );
+            b.append( e );  //careful, need to fill?
             e = es.next();
         }
         
