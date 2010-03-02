@@ -24,7 +24,17 @@ t.save( {a:[0,1,2,3,4,5,6,7,8,9,10]} );
 t.update( {}, {$set:{"a.11":11} } );
 assert.eq( [0,1,2,3,4,5,6,7,8,9,10,11], t.findOne().a );
 
-// creating new object w/ number field name (from mods)
-// create new from query
+t.drop();
+t.save( {} );
+t.update( {}, {$set:{"a.0":4}} );
+assert.eq( {"0":4}, t.findOne().a );
 
-// try to set string field in existing array
+t.drop();
+t.update( {"a.0":4}, {$set:{b:1}}, true );
+assert.eq( {"0":4}, t.findOne().a );
+
+t.drop();
+t.save( {a:[]} );
+t.update( {}, {$set:{"a.f":1}} );
+assert( db.getLastError() );
+assert.eq( [], t.findOne().a );

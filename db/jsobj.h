@@ -1702,7 +1702,9 @@ namespace mongo {
         
     private:
         void fill( const char *name ) {
-            int n = strtol( name, NULL, 10 );
+            char *r;
+            int n = strtol( name, &r, 10 );
+            uassert( 13047, "can't append to array using string field name", !*r );
             while( _i < n )
                 append( nullElt() );
         }

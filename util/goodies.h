@@ -561,9 +561,16 @@ namespace mongo {
         return c >= '0' && c <= '9';
     }
     
+    // for convenience, '{' is greater than anything and stops number parsing
     inline int lexNumCmp( const char *s1, const char *s2 ) {
         int nret = 0;
         while( *s1 && *s2 ) {
+            bool p1 = ( *s1 == '{' );
+            bool p2 = ( *s2 == '{' );
+            if ( p1 && !p2 )
+                return 1;
+            if ( p2 && !p1 )
+                return -1;
             bool n1 = isNumber( *s1 );
             bool n2 = isNumber( *s2 );
             if ( n1 && n2 ) {
