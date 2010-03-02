@@ -454,7 +454,7 @@ namespace mongo {
                 return;
             onedownseen.insert( nf );
             BSONObjBuilder bb ( b.subobjStart( nf.c_str() ) );
-            createNewFromMods( nr , bb , BSONObj() ); // how do we know if it's an array?
+            createNewFromMods( nr , bb , BSONObj() ); // don't infer an array from name
             bb.done();
         }
         else {
