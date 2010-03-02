@@ -163,7 +163,7 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
         }
     }
     this._mongo.insert( this._fullName , obj );
-    this.lastID = obj._id;
+    this._lastID = obj._id;
 }
 
 DBCollection.prototype.remove = function( t ){
