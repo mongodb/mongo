@@ -697,8 +697,8 @@ namespace mongo {
         }
         
         lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
-        massert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
-        massert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+        uassert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
+        uassert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
 
         if ( oldFile ){
             // we check this here because we want to see if we can get the lock
