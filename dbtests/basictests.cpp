@@ -309,6 +309,8 @@ namespace BasicTests {
             ASSERT_EQUALS( 1, lexNumCmp( "a1{", "a11" ) );
             ASSERT_EQUALS( 1, lexNumCmp( "a1{a", "a1{" ) );
             ASSERT_EQUALS( -1, lexNumCmp( "a1{", "a1{a" ) );
+            ASSERT_EQUALS( 1, lexNumCmp("21", "11") );
+            ASSERT_EQUALS( -1, lexNumCmp("11", "21") );
         }
     };
     
