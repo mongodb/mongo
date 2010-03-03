@@ -209,6 +209,7 @@ namespace mongo {
                 break;
             }
             case BSONObj::NE:{
+                haveNeg = true;
                 shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                 _builders.push_back( b );
                 b->appendAs(fe, e.fieldName());
@@ -218,7 +219,10 @@ namespace mongo {
             case BSONObj::opALL:
                 all = true;
             case BSONObj::opIN:
+                basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
+                break;
             case BSONObj::NIN:
+                haveNeg = true;
                 basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
                 break;
             case BSONObj::opMOD:
@@ -267,7 +271,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNot(), _atomic(false), nRegex(0) {
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
@@ -320,7 +324,7 @@ namespace mongo {
                         isOperator = true;
                         
                         if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
-                            haveNot = true;
+                            haveNeg = true;
                             switch( fe.type() ) {
                                 case Object: {
                                     BSONObjIterator k( fe.embeddedObject() );

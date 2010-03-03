@@ -122,7 +122,7 @@ namespace mongo {
 
         bool matches(const BSONObj& j);
         
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNot; }
+        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
 
@@ -146,7 +146,7 @@ namespace mongo {
         bool haveSize;
         bool all;
         bool hasArray;
-        bool haveNot;
+        bool haveNeg;
 
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield - 
