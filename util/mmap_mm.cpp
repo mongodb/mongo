@@ -31,14 +31,13 @@ namespace mongo {
 
     void MemoryMappedFile::close() {
         if ( view )
-            delete( view );
+            free( view );
         view = 0;
         len = 0;
     }
 
-    void* MemoryMappedFile::map(const char *filename, size_t length) {
-        path p( filename );
-
+    void* MemoryMappedFile::map(const char *filename, long& length , int options ) {
+        assert( length );
         view = malloc( length );
         return view;
     }
