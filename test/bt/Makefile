@@ -4,7 +4,7 @@ WT=	../build_posix
 BDB=	../../bdb.releases/db-4.8.26
 LIB=	${WT}/libwiredtiger.a ${BDB}/build_unix/libdb.a ${EXTLIB}
 
-SRCS=	bdb.c config.c t.c util.c wts.c wts.h 
+SRCS=	bdb.c config.c t.c util.c wts.c wts.h config.h
 OBJS=	bdb.o config.o t.o util.o wts.o 
 
 all: t tags
@@ -20,11 +20,11 @@ clean:
 tags: ${SRCS}
 	ctags -w *.h *.c ../*/*.c ../*/*.h
 
-${OBJS}: wts.h
-
 bdb.o:
 	${CC} -DBDB ${CFLAGS} -I${BDB} -c $< -o $@
 
-config.o: config.h
 config.o t.o util.o wts.o:
 	${CC} ${CFLAGS} -I${WT} -c $< -o $@
+
+${OBJS}: wts.h
+config.o: config.h
