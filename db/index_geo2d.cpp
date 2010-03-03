@@ -355,7 +355,7 @@ namespace mongo {
         }
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-            BSONElement geo = obj[_geo];
+            BSONElement geo = obj.getFieldDotted(_geo.c_str());
             if ( geo.eoo() )
                 return;
 
@@ -452,7 +452,7 @@ namespace mongo {
         virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
 
         virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const {
-            BSONElement e = query[_geo.c_str()];
+            BSONElement e = query.getFieldDotted(_geo.c_str());
             switch ( e.type() ){
             case Object: {
                 BSONObj sub = e.embeddedObject();
