@@ -1467,6 +1467,10 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogDB = 0;
 
+    bool inUseByRepl( Database * db ){
+        return db == localOplogDB;
+    }
+
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());

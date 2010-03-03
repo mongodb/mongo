@@ -396,6 +396,11 @@ namespace mongo {
         assert( ctx->inDB( db , path ) );
         Database *database = ctx->db();
         assert( database->name == db );
+        
+        if ( inUseByRepl( database ) ){
+            log() << "not closing : " << db << " because used by repl" << endl;
+            return;
+        }
 
         if( BackgroundOperation::inProgForDb(db) ) { 
             log() << "warning: bg op in prog during close db? " << db << endl;
