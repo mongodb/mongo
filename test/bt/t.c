@@ -26,10 +26,10 @@ main(int argc, char *argv[])
 	/* Configure the FreeBSD malloc for debugging. */
 	(void)putenv("MALLOC_OPTIONS=AJZ");
 
-	/* Set values from the "wts.config" file, if it exists. */
-	if (access("wts.config", R_OK) == 0) {
-		printf("... configuring from wts.config\n");
-		config_file("wts.config");
+	/* Set values from the "CONFIG" file, if it exists. */
+	if (access("CONFIG", R_OK) == 0) {
+		printf("... reading CONFIG file\n");
+		config_file("CONFIG");
 	}
 
 	/* Set values from the command line. */
