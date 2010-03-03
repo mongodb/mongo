@@ -1664,10 +1664,14 @@ namespace mongo {
             _b.appendAs(e, num().c_str());
             return *this;
         }
-
+        
         template <typename T>
         BSONArrayBuilder& operator<<(const T& x){
             return append(x);
+        }
+        
+        void appendNull() {
+            _b.appendNull(num().c_str());
         }
 
         BSONArray arr(){ return BSONArray(_b.obj()); }
@@ -1705,7 +1709,7 @@ namespace mongo {
         void fill( const char *name ) {
             char *r;
             int n = strtol( name, &r, 10 );
-            uassert( 13047, "can't append to array using string field name", !*r );
+            uassert( 13048, "can't append to array using string field name", !*r );
             while( _i < n )
                 append( nullElt() );
         }

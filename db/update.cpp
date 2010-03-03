@@ -68,6 +68,15 @@ namespace mongo {
     }
 
     template< class Builder >
+    void appendUnset( Builder &b ) {
+    }
+    
+    template<>
+    void appendUnset( BSONArrayBuilder &b ) {
+        b.appendNull();
+    }
+    
+    template< class Builder >
     void Mod::apply( Builder& b , BSONElement in , ModState& ms ) const {
         switch ( op ){
         
@@ -83,7 +92,7 @@ namespace mongo {
         }
 
         case UNSET: {
-            //Explicit NOOP
+            appendUnset( b );
             break;
         }
             
