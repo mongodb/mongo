@@ -233,11 +233,11 @@ namespace mongo {
         BSONObj o;
         if ( info == 0 )	info = &o;
         BSONObjBuilder b;
-        b.append("create", ns);
+        string db = nsToDatabase(ns.c_str());
+        b.append("create", ns.c_str() + db.length() + 1);
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
         if ( max ) b.append("max", max);
-        string db = nsToDatabase(ns.c_str());
         return runCommand(db.c_str(), b.done(), *info);
     }
 
