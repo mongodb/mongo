@@ -403,22 +403,21 @@ Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|$(CURDIR)/debian/mongodb/|$(CURDIR)/debian/{pkg_name}{pkg_name_suffix}/|g' debian/rules) || exit 1
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|debian/mongodb.manpages|debian/{pkg_name}{pkg_name_suffix}.manpages|g' debian/rules) || exit 1
 ( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/^Name:/s/.*/Name: {pkg_name}{pkg_name_suffix}/; /^Version:/s/.*/Version: {pkg_version}/;' rpm/mongo.spec )
+# Debian systems require some ridiculous workarounds to get an init
+# script at /etc/init.d/mongodb when the packge name isn't the init
+# script name.  Note: dh_installinit --name won't work, because that
+# option would require the init script under debian/ to be named
+# mongodb.
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" &&
+ln debian/init.d debian/{pkg_name}{pkg_name_suffix}.mongodb.init &&
+ln debian/mongodb.upstart debian/{pkg_name}{pkg_name_suffix}.mongodb.upstart &&
+sed -i 's/dh_installinit/dh_installinit --name=mongodb/' debian/rules) || exit 1
 """
 
     mangle_files_for_ancient_redhat_commands = """
 # Ancient RedHats ship with very old boosts and non-UTF8-aware js
 # libraries, so we need to link statically to those.
 ( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|^scons.*((inst)all)|scons --prefix=$RPM_BUILD_ROOT/usr --extralib=nspr4 --staticlib=boost_system-mt,boost_thread-mt,boost_filesystem-mt,boost_program_options-mt,js $1|' rpm/mongo.spec )
-"""
-
-    # Note: this breaks upstart systems, because dh_installinit is
-    # idiotically inflexible.  Do not use on Debian versions that use
-    # upstart (whenever those come to exist).
-    mangle_files_for_debian_sysvinit_commands = """
-# Debian systems that use sysvinit require some ridiculous workarounds
-# to get an init script at /etc/init.d/mongodb (in the general case,
-# where the package name can be anything).
-( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/dh_installinit/dh_installinit --init-script=mongodb/' debian/rules) || exit 1
 """
 
     deb_prereq_commands = """
@@ -466,9 +465,24 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-1.38.0-1.{distro_arch}.rpm
 rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.rpm
 """
 
-    old_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
-    new_deb_boost_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev" ]
-    common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "xulrunner-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
+    # This horribleness is an attempt to work around ways that you're
+    # not really meant to package things for Debian unless you are
+    # Debian.
+
+    # On very old Debianoids, libboost-<foo>-dev will be some old
+    # boost that's not as thready as we want, but which Eliot says
+    # will work.
+    very_old_deb_prereqs =  ["libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev", "xulrunner1.9-dev"]
+
+    # On less old (but still old!) Debianoids, libboost-<foo>-dev is
+    # still a 1.34, but 1.35 packages are available, so we want those.
+    old_deb_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev", "xulrunner-dev"]
+
+    # On newer Debianoids, libbost-<foo>-dev is some sufficiently new
+    # thing.
+    new_deb_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev", "xulrunner-dev" ]
+
+    common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
     centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
     fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
@@ -505,22 +519,24 @@ git clone git://github.com/mongodb/mongo.git
                                  (("centos", "*", "*"), self.rpm_productdir))),
                                ("pkg_prereqs",
                                 ((("ubuntu", "9.4", "*"),
-                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                  self.old_deb_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "9.10", "*"),
-                                  self.new_deb_boost_prereqs + self.common_deb_prereqs),
+                                  self.new_deb_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "10.4", "*"),
-                                  self.new_deb_boost_prereqs + self.common_deb_prereqs),
+                                  self.new_deb_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "8.10", "*"),
-                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                  self.old_deb_prereqs + self.common_deb_prereqs),
+                                 (("ubuntu", "8.4", "*"),
+                                  self.very_old_deb_prereqs + self.common_deb_prereqs),
                                  (("debian", "5.0", "*"),
-                                  self.old_deb_boost_prereqs + self.common_deb_prereqs),
+                                  self.old_deb_prereqs + self.common_deb_prereqs),
                                  (("fedora", "8", "*"),
                                   self.fedora_prereqs),
                                  (("centos", "5.4", "*"),
                                   self.centos_preqres))),
                                ("commands",
                                 ((("debian", "*", "*"),
-                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.mangle_files_for_debian_sysvinit_commands + self.deb_build_commands),
+                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
                                  (("ubuntu", "*", "*"),
                                   self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
                                  (("centos", "*", "*"),
