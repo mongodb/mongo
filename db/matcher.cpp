@@ -143,9 +143,9 @@ namespace mongo {
                           );
     }
     
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded ) {
-        if ( loaded )
-            *loaded = false;
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
+        if ( details )
+            details->reset();
         
         if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key) ) {
@@ -157,8 +157,8 @@ namespace mongo {
             return true;
         }
 
-        if ( loaded )
-            *loaded = true;
+        if ( details )
+            details->loadedObject = true;
 
         return _docMatcher.matches(recLoc.rec());
     }

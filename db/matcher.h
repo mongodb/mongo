@@ -84,6 +84,20 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
+    struct MatchDetails {
+        MatchDetails(){
+            reset();
+        }
+        
+        void reset(){
+            loadedObject = false;
+            elemMatchKey = BSONElement();
+        }
+        
+        bool loadedObject;
+        BSONElement elemMatchKey;
+    };
+
     /* Match BSON objects against a query pattern.
 
        e.g.
@@ -169,7 +183,7 @@ namespace mongo {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
-        bool matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded = 0 );
+        bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
 
         Matcher& docMatcher() { return _docMatcher; }

@@ -740,11 +740,11 @@ namespace mongo {
             if ( _points.size() >= _max && d > farthest() )
                 return;
             
-            bool loaded = false;
+            MatchDetails details;
             if ( _matcher.get() ){
 
-                bool good = _matcher->matches( node.key , node.recordLoc , &loaded );
-                if ( loaded )
+                bool good = _matcher->matches( node.key , node.recordLoc , &details );
+                if ( details.loadedObject )
                     _objectsLoaded++;
                 
                 if ( ! good ){
@@ -752,7 +752,7 @@ namespace mongo {
                 }
             }
             
-            if ( ! loaded ) // dont double count
+            if ( ! details.loadedObject ) // dont double count
                 _objectsLoaded++;
             
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
