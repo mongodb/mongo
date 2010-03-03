@@ -401,7 +401,7 @@ namespace mongo {
      */
     class ModSetState : boost::noncopyable {
         struct FieldCmp {
-            bool operator()( const string &l, const string &r ) {
+            bool operator()( const string &l, const string &r ) const {
                 return lexNumCmp( l.c_str(), r.c_str() ) < 0;
             }
         };
