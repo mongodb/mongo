@@ -333,11 +333,16 @@ namespace mongo {
             return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
         }
 
-        virtual BSONObj prettyStartKey() const {
-            return prettyKey( startKey );
-        }
-        virtual BSONObj prettyEndKey() const {
-            return prettyKey( endKey );
+        virtual BSONObj prettyIndexBounds() const {
+            BSONArrayBuilder ba;
+            if ( bounds_.size() == 0 ) {
+                ba << BSON_ARRAY( prettyKey( startKey ) << prettyKey( endKey ) );
+            } else {
+                for( BoundList::const_iterator i = bounds_.begin(); i != bounds_.end(); ++i ) {
+                    ba << BSON_ARRAY( prettyKey( i->first ) << prettyKey( i->second ) );
+                }
+            }
+            return ba.arr();
         }
         
         void forgetEndKey() { endKey = BSONObj(); }

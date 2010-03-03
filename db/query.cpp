@@ -895,8 +895,7 @@ namespace mongo {
         if ( explain ) {
             BSONObjBuilder builder;
             builder.append("cursor", cursor->toString());
-            builder.append("startKey", cursor->prettyStartKey());
-            builder.append("endKey", cursor->prettyEndKey());
+            builder.appendArray("indexBounds", cursor->prettyIndexBounds());
             builder.append("nscanned", double( dqo.nscanned() ) );
             builder.append("n", n);
             if ( dqo.scanAndOrderRequired() )

@@ -91,7 +91,7 @@ if ( t.system.indexes.find().count() != 2 ) {
 }
 assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
 // Verify index works
-assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().startKey.i );
+assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().indexBounds[0][0].i );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 
 // Check that capped-ness is preserved on clone

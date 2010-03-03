@@ -92,11 +92,11 @@ indexed = function( query, min, max ) {
     assert( exp.cursor.match( /Btree/ ), tojson( query ) );    
     assert( exp.allPlans.length == 1, tojson( query ) );    
     // just expecting one element per key
-    for( i in exp.startKey ) {
-        assert.eq( exp.startKey[ i ], min );        
+    for( i in exp.indexBounds[0][0] ) {
+        assert.eq( exp.indexBounds[0][0][ i ], min );        
     }
-    for( i in exp.endKey ) {
-        assert.eq( exp.endKey[ i ], max );
+    for( i in exp.indexBounds[0][1] ) {
+        assert.eq( exp.indexBounds[0][1][ i ], max );
     }
 }
 

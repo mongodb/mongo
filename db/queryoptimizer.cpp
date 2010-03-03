@@ -432,7 +432,10 @@ namespace mongo {
         vector< BSONObj > arr;
         for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i ) {
             auto_ptr< Cursor > c = (*i)->newCursor();
-            arr.push_back( BSON( "cursor" << c->toString() << "startKey" << c->prettyStartKey() << "endKey" << c->prettyEndKey() ) );
+            BSONObjBuilder explain;
+            explain.append( "cursor", c->toString() );
+            explain.appendArray( "indexBounds", c->prettyIndexBounds() );
+            arr.push_back( explain.obj() );
         }
         BSONObjBuilder b;
         b.append( "allPlans", arr );
