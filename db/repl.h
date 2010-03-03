@@ -339,6 +339,6 @@ namespace mongo {
     bool anyReplEnabled();
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level = 0 );
     
-    bool inUseByRepl( Database * db );
+    void replCheckCloseDatabase( Database * db );
 
 } // namespace mongo

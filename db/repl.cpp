@@ -1467,8 +1467,9 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogDB = 0;
 
-    bool inUseByRepl( Database * db ){
-        return db == localOplogDB;
+    void replCheckCloseDatabase( Database * db ){
+        localOplogDB = 0;
+        localOplogMainDetails = 0;
     }
 
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
