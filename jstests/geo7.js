@@ -16,3 +16,5 @@ t.dropIndex({y:"2d",z:1})
 t.ensureIndex({y:"2d"})
 assert.eq( 1 , t.find({y:[1,1],z:3}).itcount() , "A2" );
 
+t.insert( { _id : 5 , y : 5 } );
+assert.eq( 5 , t.findOne( { y : 5 } )._id , "B1" );

@@ -166,7 +166,7 @@ namespace mongo {
                 ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
                 ( boost::uint32_t)( getNumber( o , "bottom" ) );
             } else {
-                val = getNumber( o, "floatApprox" );
+                val = (boost::uint64_t) getNumber( o, "floatApprox" );
             }
             return val;
         }

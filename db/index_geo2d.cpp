@@ -28,6 +28,9 @@
 #include "matcher.h"
 
 namespace mongo {
+
+    //#define GEODEBUG(x) cout << x << endl;
+#define GEODEBUG(x) 
     
     const string GEO2DNAME = "2d";
 
@@ -70,7 +73,7 @@ namespace mongo {
             }
             else {
                 cout << "GeoHash cons e : " << e << endl;
-                assert(0);
+                uassert(13047,"wrong type for geo index. if you're using a pre-release version, need to rebuild index",0);
             }
             _fix();
         }
@@ -352,13 +355,15 @@ namespace mongo {
         }
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const {
-            BSONElement geo = obj[_geo];
+            BSONElement geo = obj.getFieldDotted(_geo.c_str());
             if ( geo.eoo() )
                 return;
 
             BSONObjBuilder b(64);
 
-            uassert( 13025 , (string)"geo field[" + _geo + "] has to be an Object or Array" , geo.isABSONObj() );
+            if ( ! geo.isABSONObj() )
+                return;
+
             _hash( geo.embeddedObject() ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ){
@@ -445,6 +450,22 @@ namespace mongo {
         }
 
         virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
+
+        virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const {
+            BSONElement e = query.getFieldDotted(_geo.c_str());
+            switch ( e.type() ){
+            case Object: {
+                BSONObj sub = e.embeddedObject();
+                if ( sub.firstElement().getGtLtOp() == BSONObj::opNEAR ){
+                    return OPTIMAL;
+                }
+            }
+            case Array:
+                return HELPFUL;
+            default:
+                return USELESS;
+            }
+        }
         
         string _geo;
         vector<string> _other;
@@ -715,7 +736,7 @@ namespace mongo {
             _lookedAt++;
 
             double d = _g->distance( _near , node.key.firstElement() );
-            //cout << "\t" << node.recordLoc.obj() << "\t" << d << endl;
+            GEODEBUG( "\t" << node.recordLoc.obj() << "\t" << d );
             if ( _points.size() >= _max && d > farthest() )
                 return;
             
@@ -856,7 +877,7 @@ namespace mongo {
                     if ( ! _prefix.constrains() )
                         break;
                     _prefix = _prefix.up();
-                    //cout << _prefix << "\t" << _found << "\t" << endl;
+                    GEODEBUG( _prefix << "\t" << _found );
                 }
             }
             
@@ -999,7 +1020,7 @@ namespace mongo {
                 e = e.embeddedObject().firstElement();
             n = _tohash( e );
         }
-        uassert( 13042 , "no geo field" , n.constrains() );
+        uassert( 13042 , (string)"missing geo field (" + _geo + ") in : " + query.toString() , n.constrains() );
 
         shared_ptr<GeoSearch> s( new GeoSearch( this , n , numWanted , query ) );
         s->exec();

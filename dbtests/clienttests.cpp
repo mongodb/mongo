@@ -144,6 +144,16 @@ namespace ClientTests {
         }
     };
 
+    class Create : public Base {
+    public:
+        Create() : Base( "Create" ) {}
+        void run() {
+            db.createCollection( "unittests.clienttests.create", 0, true );
+            BSONObj info;
+            ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "client" ){
@@ -155,6 +165,7 @@ namespace ClientTests {
             add<ReIndex2>();
             add<CS_10>();
             add<PushBack>();
+            add<Create>();
         }
         
     } all;

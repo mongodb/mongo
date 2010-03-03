@@ -31,6 +31,9 @@ namespace mongo {
     class RegexMatcher {
     public:
         const char *fieldName;
+        const char *regex;
+        const char *flags;
+        string prefix;
         pcrecpp::RE *re;
         bool isNot;
         RegexMatcher() : re( 0 ), isNot() {}
@@ -119,7 +122,7 @@ namespace mongo {
 
         bool matches(const BSONObj& j);
         
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNot; }
+        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
 
@@ -131,7 +134,7 @@ namespace mongo {
             basics.push_back( ElementMatcher( e , c, isNot ) );
         }
 
-        void addRegex(const BSONElement &e, const char *fieldName = 0, bool isNot = false);
+        void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
         
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
@@ -143,7 +146,7 @@ namespace mongo {
         bool haveSize;
         bool all;
         bool hasArray;
-        bool haveNot;
+        bool haveNeg;
 
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield - 

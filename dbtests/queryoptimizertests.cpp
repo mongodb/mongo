@@ -55,7 +55,6 @@ namespace QueryOptimizerTests {
             virtual bool lowerInclusive() { return true; }
             virtual BSONElement upper() { return maxKey.firstElement(); }
             virtual bool upperInclusive() { return true; }
-        private:
             static void checkElt( BSONElement expected, BSONElement actual ) {
                 if ( expected.woCompare( actual, false ) ) {
                     stringstream ss;
@@ -144,7 +143,17 @@ namespace QueryOptimizerTests {
             }
         };        
 
-        class Regex : public Base {
+        struct RegexBase : Base {
+            void run() { //need to only look at first interval
+                FieldRangeSet s( "ns", query() );
+                checkElt( lower(), s.range( "a" ).intervals()[0].lower_.bound_ );
+                checkElt( upper(), s.range( "a" ).intervals()[0].upper_.bound_ );
+                ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).intervals()[0].lower_.inclusive_ );
+                ASSERT_EQUALS( upperInclusive(), s.range( "a" ).intervals()[0].upper_.inclusive_ );
+            }
+        };
+
+        class Regex : public RegexBase {
         public:
             Regex() : o1_( BSON( "" << "abc" ) ), o2_( BSON( "" << "abd" ) ) {}
             virtual BSONObj query() {
@@ -158,7 +167,7 @@ namespace QueryOptimizerTests {
             BSONObj o1_, o2_;
         };        
 
-        class RegexObj : public Base {
+        class RegexObj : public RegexBase {
         public:
             RegexObj() : o1_( BSON( "" << "abc" ) ), o2_( BSON( "" << "abd" ) ) {}
             virtual BSONObj query() { return BSON("a" << BSON("$regex" << "^abc")); }
@@ -168,7 +177,7 @@ namespace QueryOptimizerTests {
             BSONObj o1_, o2_;
         };
         
-        class UnhelpfulRegex : public Base {
+        class UnhelpfulRegex : public RegexBase {
         public:
             UnhelpfulRegex() {
                 BSONObjBuilder b;

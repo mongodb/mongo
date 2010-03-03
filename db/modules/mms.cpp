@@ -162,7 +162,7 @@ namespace mongo {
         string _token;
         string _name;
         
-    } mms ;
+    } /*mms*/ ;
 
 }
 
