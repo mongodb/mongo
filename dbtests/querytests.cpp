@@ -317,6 +317,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableQueryOnId";
+            client().createCollection( ns, 0, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
@@ -333,8 +334,8 @@ namespace QueryTests {
             ASSERT( c1->more() );
             ASSERT_EQUALS( 2, c1->next().getIntField( "a" ) );
             ASSERT( !c1->more() );
-            // ASSERT( c2->more() ); // SERVER-645
-            // ASSERT_EQUALS( 2, c2->next().getIntField( "a" ) );  // SERVER-645
+            ASSERT( c2->more() );
+            ASSERT_EQUALS( 2, c2->next().getIntField( "a" ) );  // SERVER-645
             ASSERT( !c2->more() );
         }
     };
