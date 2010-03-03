@@ -1313,7 +1313,8 @@ namespace mongo {
                 append( fieldName.c_str() , (int)l );
             else if ( l < maxDouble )
                 append( fieldName.c_str() , (double)l );
-            append( fieldName.c_str() , l );
+            else
+                append( fieldName.c_str() , l );
         }
         
         /** Append a double element */
