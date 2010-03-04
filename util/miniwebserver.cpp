@@ -17,6 +17,7 @@
 
 #include "stdafx.h"
 #include "miniwebserver.h"
+#include "hex.h"
 
 #include <pcrecpp.h>
 
@@ -103,7 +104,7 @@ namespace mongo {
             if ( eq == string::npos )
                 continue;
 
-            params[cur.substr(0,eq)] = cur.substr(eq+1);
+            params[urlDecode(cur.substr(0,eq))] = urlDecode(cur.substr(eq+1));
         }
         return;
     }
@@ -219,6 +220,22 @@ namespace mongo {
             accepted( s, from );
             closesocket(s);
         }
+    }
+
+    string MiniWebServer::urlDecode(const char* s){
+        stringstream out;
+        while(*s){
+            if (*s == '+'){
+                out << ' ';
+            }else if (*s == '%'){
+                out << fromHex(s+1);
+                s+=2;
+            }else{
+                out << *s;
+            }
+            s++;
+        }
+        return out.str();
     }
 
 } // namespace mongo
