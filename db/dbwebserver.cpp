@@ -384,7 +384,7 @@ namespace mongo {
                 if ( coll[i] == '/' )
                     coll[i] = '.';
 
-            string fullns = dbname + "." + coll;
+            string fullns = urlDecode(dbname + "." + coll);
 
             headers.push_back( (string)"x-action: " + action );
             headers.push_back( (string)"x-ns: " + fullns );
