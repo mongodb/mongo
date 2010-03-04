@@ -293,6 +293,11 @@ namespace mongo {
             //out() << "url [" << url << "]" << endl;
             
             if ( url.size() > 1 ) {
+                if ( ! cmdLine.rest ){
+                    responseCode = 403;
+                    responseMsg = "rest is not enabled.  use --rest to turn on";
+                    return;
+                }
                 if ( ! allowed( rq , headers, from ) ){
                     responseCode = 401;
                     responseMsg = "not allowed\n";
@@ -379,7 +384,7 @@ namespace mongo {
                 if ( coll[i] == '/' )
                     coll[i] = '.';
 
-            string fullns = dbname + "." + coll;
+            string fullns = urlDecode(dbname + "." + coll);
 
             headers.push_back( (string)"x-action: " + action );
             headers.push_back( (string)"x-ns: " + fullns );

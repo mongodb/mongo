@@ -23,6 +23,7 @@ namespace mongo {
     /* concurrency: OK/READ */
     struct CmdLine { 
         int port;              // --port
+        bool rest;             // --rest
 
         string source;         // --source
         string only;           // --only
@@ -47,7 +48,7 @@ namespace mongo {
         };
 
         CmdLine() : 
-            port(DefaultDBPort), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
+            port(DefaultDBPort), rest(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100)
         { } 
 

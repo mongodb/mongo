@@ -20,6 +20,7 @@
 #include "json.h"
 #include "../util/builder.h"
 #include "../util/base64.h"
+#include "../util/hex.h"
 
 using namespace boost::spirit;
 
@@ -167,27 +168,11 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
-    namespace hex {
-        int val( char c ) {
-            if ( '0' <= c && c <= '9' )
-                return c - '0';
-            if ( 'a' <= c && c <= 'f' )
-                return c - 'a' + 10;
-            if ( 'A' <= c && c <= 'F' )
-                return c - 'A' + 10;
-            assert( false );
-            return 0xff;
-        }
-        char val( const char *c ) {
-            return ( val( c[ 0 ] ) << 4 ) | val( c[ 1 ] );
-        }
-    } // namespace hex
-
     struct chU {
         chU( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            unsigned char first = hex::val( start );
-            unsigned char second = hex::val( start + 2 );
+            unsigned char first = fromHex( start );
+            unsigned char second = fromHex( start + 2 );
             if ( first == 0 && second < 0x80 )
                 b.ss << second;
             else if ( first < 0x08 ) {
@@ -315,7 +300,7 @@ namespace mongo {
         OID oid;
         char *oidP = (char *)( &oid );
         for ( int i = 0; i < 12; ++i )
-            oidP[ i ] = hex::val( s + ( i * 2 ) );
+            oidP[ i ] = fromHex( s + ( i * 2 ) );
         return oid;
     }
 
@@ -356,7 +341,7 @@ namespace mongo {
     struct binDataType {
         binDataType( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            b.binDataType = BinDataType( hex::val( start ) );
+            b.binDataType = BinDataType( fromHex( start ) );
         }
         ObjectBuilder &b;
     };

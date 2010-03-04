@@ -48,6 +48,9 @@ namespace mongo {
         void parseParams( map<string,string> & params , string query );
         static const char *body( const char *buf );
 
+        static string urlDecode(const char* s);
+        static string urlDecode(string s) {return urlDecode(s.c_str());}
+
     private:
         void accepted(int s, const SockAddr &from);
         static bool fullReceive( const char *buf );

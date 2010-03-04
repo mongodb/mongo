@@ -1,4 +1,4 @@
-// mmap_mm.cpp
+// util/hex.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -15,36 +15,21 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
-#include "mmap.h"
-
-/* in memory (no file) version */
+#pragma once
 
 namespace mongo {
-
-    MemoryMappedFile::MemoryMappedFile() {
-        fd = 0;
-        maphandle = 0;
-        view = 0;
-        len = 0;
+    //can't use hex namespace because it conflicts with hex iostream function
+    inline int fromHex( char c ) {
+        if ( '0' <= c && c <= '9' )
+            return c - '0';
+        if ( 'a' <= c && c <= 'f' )
+            return c - 'a' + 10;
+        if ( 'A' <= c && c <= 'F' )
+            return c - 'A' + 10;
+        assert( false );
+        return 0xff;
     }
-
-    void MemoryMappedFile::close() {
-        if ( view )
-            free( view );
-        view = 0;
-        len = 0;
+    inline char fromHex( const char *c ) {
+        return ( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] );
     }
-
-    void* MemoryMappedFile::map(const char *filename, long& length , int options ) {
-        assert( length );
-        view = malloc( length );
-        return view;
-    }
-
-    void MemoryMappedFile::flush(bool sync) {
-    }
-    
-
-} 
-
+}

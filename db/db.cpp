@@ -622,6 +622,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nocursors", "diagnostic/debugging option")
         ("nohints", "ignore query hints")
         ("nohttpinterface", "disable http interface")
+        ("rest","turn on simple rest api")
         ("noscripting", "disable scripting engine")
         ("noprealloc", "disable data file preallocation")
         ("smallfiles", "use a smaller default file size")
@@ -829,6 +830,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("nohttpinterface")) {
             noHttpInterface = true;
+        }
+        if (params.count("rest")) {
+            cmdLine.rest = true;
         }
         if (params.count("noscripting")) {
             useJNI = false;

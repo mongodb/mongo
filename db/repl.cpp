@@ -1467,6 +1467,11 @@ namespace mongo {
     NamespaceDetails *localOplogMainDetails = 0;
     Database *localOplogDB = 0;
 
+    void replCheckCloseDatabase( Database * db ){
+        localOplogDB = 0;
+        localOplogMainDetails = 0;
+    }
+
     void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
         if ( replSettings.master ) {
             _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
