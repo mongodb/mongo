@@ -23,6 +23,11 @@ btree/bt_rsrch.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
+cache/c_drain.c
+cache/c_init.c
+cache/c_io.c
+cache/c_page.c
+cache/c_sync.c
 db/db_err.c
 db/db_getset.c
 db/db_handle.c
@@ -30,7 +35,6 @@ db/db_huffman.c
 db/db_open.c
 db/db_stat.c
 db/db_sync.c
-env/env_cache.c
 env/env_err.c
 env/env_getset.c
 env/env_global.c
