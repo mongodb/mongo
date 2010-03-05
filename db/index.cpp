@@ -140,7 +140,7 @@ namespace mongo {
             _fixed.push_back( BSONElement() );
             nullKeyB.appendNull( "" );
             if ( e.type() == String ){
-                uassert( 13007 , "can only have 1 index plugin" , pluginName.size() == 0 );
+                uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 );
                 pluginName = e.valuestr();
             }
                 
