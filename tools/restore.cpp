@@ -34,12 +34,14 @@ public:
     
     bool _drop;
     bool _objcheck;
-
+    
     Restore() : Tool( "restore" , true , "" , "" ) , _drop(false),_objcheck(false){
-        add_hidden_options()
-            ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
+        add_options()
             ("drop" , "drop each collection before import" )
             ("objcheck" , "validate object before inserting" )
+            ;
+        add_hidden_options()
+            ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
         addPositionArg("dir", 1);
     }
