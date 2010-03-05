@@ -185,7 +185,7 @@ public:
                     catch ( ... ){
                         cerr << "\t\t NEXT ONE IS INVALID" << endl;
                     }
-                    cerr << "\t name : " << e.fieldName() << endl;
+                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
                     cerr << "\t " << e << endl;
                 }
             }

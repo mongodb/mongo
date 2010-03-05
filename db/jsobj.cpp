@@ -589,7 +589,7 @@ namespace mongo {
             if ( x > 0 && x - 1 == strnlen( valuestr() , x ) )
                 return;
             StringBuilder buf;
-            buf <<  "Invalid dbref/code/string/symbol size: " << x;
+            buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << strnlen( valuestr() , x );
             massert( 10321 , buf.str() , 0 );
             break;
         }
