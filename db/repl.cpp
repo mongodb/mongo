@@ -1,10 +1,8 @@
 // repl.cpp
 
 /* TODO
-
    PAIRING
     _ on a syncexception, don't allow going back to master state?
-
 */
 
 /**
@@ -49,6 +47,7 @@
 
 namespace mongo {
     
+    // our config from command line etc.
     ReplSettings replSettings;
 
     void ensureHaveIdIndex(const char *ns);
@@ -202,7 +201,7 @@ namespace mongo {
         virtual LockType locktype(){ return WRITE; }
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            replAllDead = "forced by command";
+            replAllDead = "replication forced to stop by 'forcedead' command";
             return true;
         }
     } cmdForceDead;
@@ -1236,8 +1235,8 @@ namespace mongo {
         
             if ( replPair && replPair->state == ReplPair::State_Master ) {
             
-                OpTime nextOpTime( ts.date() );
-                if ( !tailing && !initial && nextOpTime != syncedTo ) {
+                OpTime next( ts.date() );
+                if ( !tailing && !initial && next != syncedTo ) {
                     log() << "remote slave log filled, forcing slave resync" << endl;
                     resetSlave();
                     return true;
@@ -1330,13 +1329,22 @@ namespace mongo {
 
                 BSONObj op = c->next();
                 BSONElement ts = op.getField("ts");
-                assert( ts.type() == Date || ts.type() == Timestamp );
+                if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
+                    log() << "sync error: problem querying remote oplog record\n";
+                    log() << "op: " << op.toString() << '\n';
+                    log() << "halting replication" << endl;
+                    replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
+                    throw SyncException();
+                }
                 OpTime last = nextOpTime;
-                OpTime tmp( ts.date() );
-                nextOpTime = tmp;
+                nextOpTime = OpTime( ts.date() );
                 if ( !( last < nextOpTime ) ) {
-                    problem() << "sync error: last " << last.toString() << " >= nextOpTime " << nextOpTime.toString() << endl;
-                    uassert( 10123 , "bad 'ts' value in sources", false);
+                    log() << "sync error: last >= nextOpTime from master" << endl;
+                    log() << " last:       " << last.toStringLong() << '\n';
+                    log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
+                    log() << " halting replication" << endl;
+                    replInfo = replAllDead = "sync error last >= nextOpTime";
+                    uassert( 10123 , "bad 'ts' value in sources or at master? (last>=nextOpTime)", false);
                 }
                 if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
                     c->putBack( op );
