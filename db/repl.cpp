@@ -1339,12 +1339,12 @@ namespace mongo {
                 OpTime last = nextOpTime;
                 nextOpTime = OpTime( ts.date() );
                 if ( !( last < nextOpTime ) ) {
-                    log() << "sync error: last >= nextOpTime from master" << endl;
+                    log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
                     log() << " last:       " << last.toStringLong() << '\n';
                     log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
                     log() << " halting replication" << endl;
                     replInfo = replAllDead = "sync error last >= nextOpTime";
-                    uassert( 10123 , "bad 'ts' value in sources or at master? (last>=nextOpTime)", false);
+                    uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
                 }
                 if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
                     c->putBack( op );
