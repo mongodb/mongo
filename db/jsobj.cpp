@@ -581,31 +581,35 @@ namespace mongo {
 
     void BSONElement::validate() const {
         switch( type() ) {
-            case DBRef:
-            case Code:
-            case Symbol:
-            case String:
-                massert( 10321 ,  "Invalid dbref/code/string/symbol size",
-                        valuestrsize() > 0 &&
-                        valuestrsize() - 1 == strnlen( valuestr(), valuestrsize() ) );
-                break;
-            case CodeWScope: {
-                int totalSize = *( int * )( value() );
-                massert( 10322 ,  "Invalid CodeWScope size", totalSize >= 8 );
-                int strSizeWNull = *( int * )( value() + 4 );
-                massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
-                massert( 10324 ,  "Invalid CodeWScope string size",
-                        strSizeWNull > 0 &&
-                        strSizeWNull - 1 == strnlen( codeWScopeCode(), strSizeWNull ) );
-                massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
-                int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
-                massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
-                // Subobject validation handled elsewhere.
-            }
-            case Object:
-                // We expect Object size validation to be handled elsewhere.
-            default:
-                break;
+        case DBRef:
+        case Code:
+        case Symbol:
+        case String: {
+            int x = valuestrsize();
+            if ( x > 0 && x - 1 == strnlen( valuestr() , x ) )
+                return;
+            StringBuilder buf;
+            buf <<  "Invalid dbref/code/string/symbol size: " << x;
+            massert( 10321 , buf.str() , 0 );
+            break;
+        }
+        case CodeWScope: {
+            int totalSize = *( int * )( value() );
+            massert( 10322 ,  "Invalid CodeWScope size", totalSize >= 8 );
+            int strSizeWNull = *( int * )( value() + 4 );
+            massert( 10323 ,  "Invalid CodeWScope string size", totalSize >= strSizeWNull + 4 + 4 );
+            massert( 10324 ,  "Invalid CodeWScope string size",
+                     strSizeWNull > 0 &&
+                     strSizeWNull - 1 == strnlen( codeWScopeCode(), strSizeWNull ) );
+            massert( 10325 ,  "Invalid CodeWScope size", totalSize >= strSizeWNull + 4 + 4 + 4 );
+            int objSize = *( int * )( value() + 4 + 4 + strSizeWNull );
+            massert( 10326 ,  "Invalid CodeWScope object size", totalSize == 4 + 4 + strSizeWNull + objSize );
+            // Subobject validation handled elsewhere.
+        }
+        case Object:
+            // We expect Object size validation to be handled elsewhere.
+        default:
+            break;
         }
     }
 
