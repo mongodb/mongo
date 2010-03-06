@@ -358,6 +358,26 @@ namespace JsobjTests {
             }
         };
 
+        struct AppendNumber {
+            void run(){
+                BSONObjBuilder b;
+                b.appendNumber( "a" , 5 );
+                b.appendNumber( "b" , 5.5 );
+                b.appendNumber( "c" , (1024LL*1024*1024)-1 );
+                b.appendNumber( "d" , (1024LL*1024*1024*1024)-1 );
+                b.appendNumber( "e" , 1024LL*1024*1024*1024*1024*1024 );
+                
+                BSONObj o = b.obj();
+                
+                ASSERT( o["a"].type() == NumberInt );
+                ASSERT( o["b"].type() == NumberDouble );
+                ASSERT( o["c"].type() == NumberInt );
+                ASSERT( o["d"].type() == NumberDouble );
+                ASSERT( o["e"].type() == NumberLong );
+
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -1444,6 +1464,7 @@ namespace JsobjTests {
             add< BSONObjTests::Nan >();
             add< BSONObjTests::AsTempObj >();
             add< BSONObjTests::AppendIntOrLL >();
+            add< BSONObjTests::AppendNumber >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();

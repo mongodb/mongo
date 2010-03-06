@@ -160,9 +160,14 @@ namespace mongo {
 
         // NOTE No validation of passed in object
         long long toNumberLongUnsafe( JSObject *o ) {
-            boost::uint64_t val =
-            ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
-            ( boost::uint32_t)( getNumber( o , "bottom" ) );
+            boost::uint64_t val;
+            if ( hasProperty( o, "top" ) ) {
+                val =
+                ( (boost::uint64_t)(boost::uint32_t)getNumber( o , "top" ) << 32 ) +
+                ( boost::uint32_t)( getNumber( o , "bottom" ) );
+            } else {
+                val = (boost::uint64_t) getNumber( o, "floatApprox" );
+            }
             return val;
         }
         
@@ -566,10 +571,13 @@ namespace mongo {
             case NumberLong: {
                 boost::uint64_t val = (boost::uint64_t)e.numberLong();
                 JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
-                // using 2 doubles here instead of a single double because certain double
-                // bit patterns represent undefined values and sm might trash them
-                setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
-                setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
+                setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
+                if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
+                    // using 2 doubles here instead of a single double because certain double
+                    // bit patterns represent undefined values and sm might trash them
+                    setProperty( o , "top" , toval( (double)(boost::uint32_t)( val >> 32 ) ) );
+                    setProperty( o , "bottom" , toval( (double)(boost::uint32_t)( val & 0x00000000ffffffff ) ) );
+                }
                 return OBJECT_TO_JSVAL( o );                
             }
             case DBRef: {

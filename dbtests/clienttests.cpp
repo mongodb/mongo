@@ -111,8 +111,49 @@ namespace ClientTests {
             ASSERT_EQUALS( 1111, c->itcount() );
         }
     };
-    
 
+    class PushBack : public Base {
+    public:
+        PushBack() : Base( "PushBack" ) {}
+        void run() {
+            for( int i = 0; i < 10; ++i )
+                db.insert( ns(), BSON( "i" << i ) );
+            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "i" << 1 ) ) );
+            BSONObj o = c->next();
+            ASSERT( c->more() );
+            ASSERT( c->moreInCurrentBatch() );
+            c->putBack( o );
+            ASSERT( c->more() );
+            ASSERT( c->moreInCurrentBatch() );
+            o = c->next();
+            BSONObj o2 = c->next();
+            BSONObj o3 = c->next();
+            c->putBack( o3 );
+            c->putBack( o2 );
+            c->putBack( o );
+            for( int i = 0; i < 10; ++i ) {
+                o = c->next();
+                ASSERT_EQUALS( i, o[ "i" ].number() );
+            }
+            ASSERT( !c->more() );
+            ASSERT( !c->moreInCurrentBatch() );
+            c->putBack( o );
+            ASSERT( c->more() );
+            ASSERT( c->moreInCurrentBatch() );
+            ASSERT_EQUALS( 1, c->itcount() );
+        }
+    };
+
+    class Create : public Base {
+    public:
+        Create() : Base( "Create" ) {}
+        void run() {
+            db.createCollection( "unittests.clienttests.create", 0, true );
+            BSONObj info;
+            ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
+        }
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "client" ){
@@ -123,6 +164,8 @@ namespace ClientTests {
             add<ReIndex>();
             add<ReIndex2>();
             add<CS_10>();
+            add<PushBack>();
+            add<Create>();
         }
         
     } all;

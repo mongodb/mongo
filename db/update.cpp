@@ -46,7 +46,8 @@ namespace mongo {
         return matcher->matches( toMatch.embeddedObject() );
     }
 
-    void Mod::appendIncremented( BSONObjBuilder& bb , const BSONElement& in, ModState& ms ) const {
+    template< class Builder >
+    void Mod::appendIncremented( Builder& bb , const BSONElement& in, ModState& ms ) const {
         BSONType a = in.type();
         BSONType b = elt.type();
         
@@ -66,8 +67,17 @@ namespace mongo {
         ms.appendIncValue( bb );
     }
 
-
-    void Mod::apply( BSONObjBuilder& b , BSONElement in , ModState& ms ) const {
+    template< class Builder >
+    void appendUnset( Builder &b ) {
+    }
+    
+    template<>
+    void appendUnset( BSONArrayBuilder &b ) {
+        b.appendNull();
+    }
+    
+    template< class Builder >
+    void Mod::apply( Builder& b , BSONElement in , ModState& ms ) const {
         switch ( op ){
         
         case INC: {
@@ -82,7 +92,7 @@ namespace mongo {
         }
 
         case UNSET: {
-            //Explicit NOOP
+            appendUnset( b );
             break;
         }
             
@@ -441,7 +451,8 @@ namespace mongo {
             fields[ base + top.fieldName() ] = top;            
     }
     
-    void ModSetState::_appendNewFromMods( const string& root , ModState& m , BSONObjBuilder& b , set<string>& onedownseen ){
+    template< class Builder >
+    void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen ){
         const char * temp = m.fieldName();
         temp += root.size();
         const char * dot = strchr( temp , '.' );
@@ -452,7 +463,7 @@ namespace mongo {
                 return;
             onedownseen.insert( nf );
             BSONObjBuilder bb ( b.subobjStart( nf.c_str() ) );
-            createNewFromMods( nr , bb , BSONObj() );
+            createNewFromMods( nr , bb , BSONObj() ); // don't infer an array from name
             bb.done();
         }
         else {
@@ -461,12 +472,13 @@ namespace mongo {
         
     }
     
-    void ModSetState::createNewFromMods( const string& root , BSONObjBuilder& b , const BSONObj &obj ){
+    template< class Builder >
+    void ModSetState::createNewFromMods( const string& root , Builder& b , const BSONObj &obj ){
         BSONObjIteratorSorted es( obj );
         BSONElement e = es.next();
 
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        ModStateHolder::iterator mend = _mods.lower_bound( root + "{" );
+        ModStateHolder::iterator mend = _mods.lower_bound( root + '{' );
 
         set<string> onedownseen;
         
@@ -480,10 +492,17 @@ namespace mongo {
                 uassert( 10145 ,  "LEFT_SUBFIELD only supports Object" , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ){
                     onedownseen.insert( e.fieldName() );
-                    BSONObjBuilder bb ( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
-                    stringstream nr; nr << root << e.fieldName() << ".";
-                    createNewFromMods( nr.str() , bb , e.embeddedObject() );
-                    bb.done();
+                    if ( e.type() == Object ) {
+                        BSONObjBuilder bb( b.subobjStart( e.fieldName() ) );
+                        stringstream nr; nr << root << e.fieldName() << ".";
+                        createNewFromMods( nr.str() , bb , e.embeddedObject() );
+                        bb.done();                        
+                    } else {
+                        BSONArrayBuilder ba( b.subarrayStart( e.fieldName() ) );
+                        stringstream nr; nr << root << e.fieldName() << ".";
+                        createNewFromMods( nr.str() , ba , e.embeddedObject() );
+                        ba.done();
+                    }
                     // inc both as we handled both
                     e = es.next();
                     m++;
@@ -500,7 +519,7 @@ namespace mongo {
                 m++;
                 continue;
             case RIGHT_BEFORE: // field that doesn't have a MOD
-                b.append( e );
+                b.append( e ); // if array, ignore field name
                 e = es.next();
                 continue;
             case RIGHT_SUBFIELD:
@@ -513,7 +532,7 @@ namespace mongo {
         
         // finished looping the mods, just adding the rest of the elements
         while ( e.type() ){
-            b.append( e );
+            b.append( e );  // if array, ignore field name
             e = es.next();
         }
         

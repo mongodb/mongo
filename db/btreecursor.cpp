@@ -95,10 +95,6 @@ namespace mongo {
         } while ( !ok() && ++boundIndex_ < bounds_.size() );
     }
 
-    bool BtreeCursor::useMatcher(){
-        return _spec.getType() == 0;
-    }
-    
     /* skip unused keys. */
     void BtreeCursor::skipUnusedKeys() {
         int u = 0;

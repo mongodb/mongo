@@ -143,9 +143,9 @@ namespace mongo {
                           );
     }
     
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded ) {
-        if ( loaded )
-            *loaded = false;
+    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
+        if ( details )
+            details->reset();
         
         if ( _keyMatcher.keyMatch() ) {
             if ( !_keyMatcher.matches(key) ) {
@@ -157,38 +157,14 @@ namespace mongo {
             return true;
         }
 
-        if ( loaded )
-            *loaded = true;
+        if ( details )
+            details->loadedObject = true;
 
         return _docMatcher.matches(recLoc.rec());
     }
     
     
-    void Matcher::addRegex( const BSONElement &e, const char *fieldName, bool isNot ) {
-        if ( fieldName == 0 )
-            fieldName = e.fieldName();
-        const char* regex = e.regex();
-        const char* flags = e.regexFlags();
-
-        if (!isNot){ //TODO something smarter
-            bool purePrefix;
-            string prefix = simpleRegex(regex, flags, &purePrefix);
-            if (purePrefix){
-                {
-                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                    _builders.push_back( b );
-                    *b << fieldName << prefix;
-                    addBasic(b->done().firstElement(), BSONObj::GTE , isNot);
-                }
-                {
-                    shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-                    _builders.push_back( b );
-                    *b << fieldName << simpleRegexEnd(prefix);
-                    addBasic(b->done().firstElement(), BSONObj::LT , isNot);
-                }
-                return;
-            }
-        }
+    void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot){
 
         if ( nRegex >= 4 ) {
             out() << "ERROR: too many regexes in query" << endl;
@@ -197,8 +173,17 @@ namespace mongo {
             RegexMatcher& rm = regexs[nRegex];
             rm.re = new pcrecpp::RE(regex, flags2options(flags));
             rm.fieldName = fieldName;
+            rm.regex = regex;
+            rm.flags = flags;
             rm.isNot = isNot;
             nRegex++;
+
+            if (!isNot){ //TODO something smarter
+                bool purePrefix;
+                string prefix = simpleRegex(regex, flags, &purePrefix);
+                if (purePrefix)
+                    rm.prefix = prefix;
+            }
         }        
     }
     
@@ -224,6 +209,7 @@ namespace mongo {
                 break;
             }
             case BSONObj::NE:{
+                haveNeg = true;
                 shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
                 _builders.push_back( b );
                 b->appendAs(fe, e.fieldName());
@@ -233,7 +219,10 @@ namespace mongo {
             case BSONObj::opALL:
                 all = true;
             case BSONObj::opIN:
+                basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
+                break;
             case BSONObj::NIN:
+                haveNeg = true;
                 basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
                 break;
             case BSONObj::opMOD:
@@ -282,7 +271,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
-        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNot(), _atomic(false), nRegex(0) {
+        where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
@@ -311,7 +300,7 @@ namespace mongo {
             }
 
             if ( e.type() == RegEx ) {
-                addRegex( e );
+                addRegex( e.fieldName(), e.regex(), e.regexFlags() );
                 continue;
             }
             
@@ -335,7 +324,7 @@ namespace mongo {
                         isOperator = true;
                         
                         if ( fn[1] == 'n' && fn[2] == 'o' && fn[3] == 't' && fn[4] == 0 ) {
-                            haveNot = true;
+                            haveNeg = true;
                             switch( fe.type() ) {
                                 case Object: {
                                     BSONObjIterator k( fe.embeddedObject() );
@@ -346,7 +335,7 @@ namespace mongo {
                                     break;
                                 }
                                 case RegEx:
-                                    addRegex( fe, e.fieldName(), true );
+                                    addRegex( e.fieldName(), fe.regex(), fe.regexFlags(), true );
                                     break;
                                 default:
                                     uassert( 13031, "invalid use of $not", false );
@@ -364,14 +353,7 @@ namespace mongo {
                     }
                 }
                 if (regex){
-                    if ( nRegex >= 4 ) {
-                        out() << "ERROR: too many regexes in query" << endl;
-                    } else {
-                        RegexMatcher& rm = regexs[nRegex];
-                        rm.re = new pcrecpp::RE(regex, flags2options(flags));
-                        rm.fieldName = e.fieldName();
-                        nRegex++;
-                    }
+                    addRegex(e.fieldName(), regex, flags);
                 }
                 if ( isOperator )
                     continue;
@@ -537,7 +519,12 @@ namespace mongo {
         bool indexed = !constrainIndexKey_.isEmpty();
         if ( indexed ) {
             e = obj.getFieldUsingIndexNames(fieldName, constrainIndexKey_);
-            assert( !e.eoo() );
+            if( e.eoo() ){
+                cout << "obj: " << obj << endl;
+                cout << "fieldName: " << fieldName << endl;
+                cout << "constrainIndexKey_: " << constrainIndexKey_ << endl;
+                assert( !e.eoo() );
+            }
         } else {
 
             const char *p = strchr(fieldName, '.');
@@ -629,10 +616,18 @@ namespace mongo {
     extern int dump;
 
     inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
-        if ( e.type() == String || e.type() == Symbol )
-            return rm.re->PartialMatch(e.valuestr());
-        else
-            return false;
+        switch (e.type()){
+            case String:
+            case Symbol:
+                if (rm.prefix.empty())
+                    return rm.re->PartialMatch(e.valuestr());
+                else
+                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
+            case RegEx:
+                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
+            default:
+                return false;
+        }
     }
 
     /* See if an object matches the query.

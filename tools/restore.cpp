@@ -31,7 +31,15 @@ namespace po = boost::program_options;
 
 class Restore : public Tool {
 public:
-    Restore() : Tool( "restore" , true , "" , "" ){
+    
+    bool _drop;
+    bool _objcheck;
+    
+    Restore() : Tool( "restore" , true , "" , "" ) , _drop(false),_objcheck(false){
+        add_options()
+            ("drop" , "drop each collection before import" )
+            ("objcheck" , "validate object before inserting" )
+            ;
         add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
             ;
@@ -45,6 +53,8 @@ public:
     int run(){
         auth();
         path root = getParam("dir");
+        _drop = hasParam( "drop" );
+        _objcheck = hasParam( "objcheck" );
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
@@ -129,6 +139,11 @@ public:
 
         out() << "\t going into namespace [" << ns << "]" << endl;
 
+        if ( _drop ){
+            out() << "\t dropping" << endl;
+            conn().dropCollection( ns );
+        }
+
         string fileString = root.string();
         ifstream file( fileString.c_str() , ios_base::in | ios_base::binary);
         if ( ! file.is_open() ){
@@ -158,6 +173,22 @@ public:
             file.read( buf + 4 , size - 4 );
 
             BSONObj o( buf );
+            if ( _objcheck && ! o.valid() ){
+                cerr << "INVALID OBJECT - going try and pring out " << endl;
+                cerr << "size: " << size << endl;
+                BSONObjIterator i(o);
+                while ( i.more() ){
+                    BSONElement e = i.next();
+                    try {
+                        e.validate();
+                    }
+                    catch ( ... ){
+                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
+                    }
+                    cerr << "\t name : " << e.fieldName() << endl;
+                    cerr << "\t " << e << endl;
+                }
+            }
             conn().insert( ns.c_str() , o );
 
             read += o.objsize();

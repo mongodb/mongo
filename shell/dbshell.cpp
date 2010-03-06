@@ -467,7 +467,7 @@ int _main(int argc, char* argv[]) {
             }
 
             string code = line;
-            if ( code == "exit" ){
+            if ( code == "exit" || code == "exit;" ){
                 break;
             }
             if ( code.size() == 0 )

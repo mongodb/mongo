@@ -233,11 +233,11 @@ namespace mongo {
         BSONObj o;
         if ( info == 0 )	info = &o;
         BSONObjBuilder b;
-        b.append("create", ns);
+        string db = nsToDatabase(ns.c_str());
+        b.append("create", ns.c_str() + db.length() + 1);
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
         if ( max ) b.append("max", max);
-        string db = nsToDatabase(ns.c_str());
         return runCommand(db.c_str(), b.done(), *info);
     }
 
@@ -821,6 +821,9 @@ namespace mongo {
 
     /** If true, safe to call next().  Requests more from server if necessary. */
     bool DBClientCursor::more() {
+        if ( !_putBack.empty() )
+            return true;
+        
         if (haveLimit && pos >= nToReturn)
             return false;
 
@@ -836,6 +839,11 @@ namespace mongo {
 
     BSONObj DBClientCursor::next() {
         assert( more() );
+        if ( !_putBack.empty() ) {
+            BSONObj ret = _putBack.top();
+            _putBack.pop();
+            return ret;
+        }
         pos++;
         BSONObj o(data);
         data += o.objsize();

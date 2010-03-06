@@ -21,6 +21,7 @@
 #include "../util/message.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
+#include <stack>
 
 namespace mongo {
 
@@ -210,7 +211,7 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but 
             then perhaps stop.
         */
-        bool moreInCurrentBatch() { return pos < nReturned; }
+        bool moreInCurrentBatch() { return !_putBack.empty() || pos < nReturned; }
 
         /** next
 		   @return next object in the result cursor.
@@ -219,6 +220,11 @@ namespace mongo {
            if you do not want to handle that yourself, call nextSafe().
         */
         BSONObj next();
+        
+        /** 
+            restore an object previously returned by next() to the cursor
+         */
+        void putBack( const BSONObj &o ) { _putBack.push( o.getOwned() ); }
 
 		/** throws AssertionException if get back { $err : ... } */
         BSONObj nextSafe() {
@@ -317,6 +323,7 @@ namespace mongo {
         int opts;
         int batchSize;
         auto_ptr<Message> m;
+        stack< BSONObj > _putBack;
 
         int resultFlags;
         long long cursorId;

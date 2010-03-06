@@ -49,6 +49,10 @@ namespace mongo {
         static OpTime now() {
             unsigned t = (unsigned) time(0);
 //            DEV assertInWriteLock();
+            if ( t < last.secs ){
+                log() << "clock skew detected  prev: " << last.secs << " now: " << t << " trying to handle..." << endl;
+                t = last.secs;
+            }
             if ( last.secs == t ) {
                 last.i++;
                 return last;

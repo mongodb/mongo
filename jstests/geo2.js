@@ -27,13 +27,14 @@ function a( cur ){
     var total = 0;
     var outof = 0;
     while ( cur.hasNext() ){
-        total += cur.next()["$distance"];
+        var o = cur.next();
+        total += Geo.distance( [ 50 , 50 ] , o.loc );
         outof++;
     }
     return total/outof;
 }
 
-assert.eq( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B1" )
+assert.close( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B1" )
 assert.close( 1.33333 , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(3) ) , "B2" );
 assert.close( fast.stats.avgDistance , a( t.find( { loc : { $near : [ 50 , 50 ] } } ).limit(10) ) , "B3" );
 

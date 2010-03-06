@@ -91,13 +91,10 @@ namespace mongo {
         */
         virtual bool getsetdup(DiskLoc loc) = 0;
 
-        virtual BSONObj prettyStartKey() const { return BSONObj(); }
-        virtual BSONObj prettyEndKey() const { return BSONObj(); }
+        virtual BSONObj prettyIndexBounds() const { return BSONObj(); }
 
         virtual bool capped() const { return false; }
 
-        /* TODO: get rid of this, kind of a temp hack for geo */
-        virtual bool useMatcher() { return true; }
     };
 
     // strategy object implementing direction of traversal.

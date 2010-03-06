@@ -622,6 +622,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("nocursors", "diagnostic/debugging option")
         ("nohints", "ignore query hints")
         ("nohttpinterface", "disable http interface")
+        ("rest","turn on simple rest api")
         ("noscripting", "disable scripting engine")
         ("noprealloc", "disable data file preallocation")
         ("smallfiles", "use a smaller default file size")
@@ -649,6 +650,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("only", po::value<string>(), "when slave: specify a single database to replicate")
         ("pairwith", po::value<string>(), "address of server to pair with")
         ("arbiter", po::value<string>(), "address of arbiter server")
+        ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
         ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
@@ -829,6 +831,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("nohttpinterface")) {
             noHttpInterface = true;
         }
+        if (params.count("rest")) {
+            cmdLine.rest = true;
+        }
         if (params.count("noscripting")) {
             useJNI = false;
         }
@@ -874,6 +879,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("slave")) {
             replSettings.slave = SimpleSlave;
+        }
+        if (params.count("slavedelay")) {
+            replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
             replSettings.fastsync = true;

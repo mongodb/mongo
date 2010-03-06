@@ -52,6 +52,21 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
+startMongodTest = function( port , dirname ){
+    var conn = startMongod( 
+        { 
+            port : port , 
+            dbpath : "/data/db/" + dirname , 
+            noprealloc : "" , 
+            smallfiles : "" , 
+            oplogSize : "2" , 
+            nohttpinterface : ""
+        } 
+    );
+    conn.name = "localhost:" + port;
+    return conn;
+}
+
 // Start a mongod instance and return a 'Mongo' object connected to it.
 // This function's arguments are passed as command line arguments to mongod.
 // The specified 'dbpath' is cleared if it exists, created if not.
@@ -111,15 +126,10 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos , othe
     if ( ! otherParams )
         otherParams = {}
     this._connections = [];
-    this._serverNames = [];
 
     for ( var i=0; i<numServers; i++){
-        var conn = startMongod( { port : 30000 + i , dbpath : "/data/db/" + testName + i , 
-            noprealloc : "" , smallfiles : "" , oplogSize : "2" , "nohttpinterface" : ""} );
-        conn.name = "localhost:" + ( 30000 + i );
-
+        var conn = startMongodTest( 30000 + i , testName + i );
         this._connections.push( conn );
-        this._serverNames.push( conn.name );
     }
 
     this._configDB = "localhost:30000";
@@ -140,9 +150,9 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos , othe
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
 
-    this._serverNames.forEach(
+    this._connections.forEach(
         function(z){
-            admin.runCommand( { addshard : z , allowLocal : true } );
+            admin.runCommand( { addshard : z.name , allowLocal : true } );
         }
     );
 }
@@ -157,9 +167,10 @@ ShardingTest.prototype.getServerName = function( dbname ){
 
 ShardingTest.prototype.getServer = function( dbname ){
     var name = this.getServerName( dbname );
-    for ( var i=0; i<this._serverNames.length; i++ ){
-        if ( name == this._serverNames[i] )
-            return this._connections[i];
+    for ( var i=0; i<this._connections.length; i++ ){
+        var c = this._connections[i];
+        if ( name == c.name )
+            return c;
     }
     throw "can't find server for: " + dbname + " name:" + name;
 
@@ -618,4 +629,22 @@ allocatePorts = function( n ) {
     for( var i = 31000; i < 31000 + n; ++i )
         ret.push( i );
     return ret;
+}
+
+
+SyncCCTest = function( testName ){
+    this._connections = [];
+    
+    for ( var i=0; i<3; i++ ){
+        this._connections.push( startMongodTest( 30000 + i , testName + i ) );
+    }
+    
+    this.url = this._connections.map( function(z){ return z.name; } ).join( "," );
+    this.conn = new Mongo( this.url );
+}
+
+SyncCCTest.prototype.stop = function(){
+    for ( var i=0; i<this._connections.length; i++){
+        stopMongod( 30000 + i );
+    }
 }

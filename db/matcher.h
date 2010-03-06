@@ -31,6 +31,9 @@ namespace mongo {
     class RegexMatcher {
     public:
         const char *fieldName;
+        const char *regex;
+        const char *flags;
+        string prefix;
         pcrecpp::RE *re;
         bool isNot;
         RegexMatcher() : re( 0 ), isNot() {}
@@ -81,6 +84,20 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
+    struct MatchDetails {
+        MatchDetails(){
+            reset();
+        }
+        
+        void reset(){
+            loadedObject = false;
+            elemMatchKey = BSONElement();
+        }
+        
+        bool loadedObject;
+        BSONElement elemMatchKey;
+    };
+
     /* Match BSON objects against a query pattern.
 
        e.g.
@@ -119,7 +136,7 @@ namespace mongo {
 
         bool matches(const BSONObj& j);
         
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNot; }
+        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
 
@@ -131,7 +148,7 @@ namespace mongo {
             basics.push_back( ElementMatcher( e , c, isNot ) );
         }
 
-        void addRegex(const BSONElement &e, const char *fieldName = 0, bool isNot = false);
+        void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
         
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
@@ -143,7 +160,7 @@ namespace mongo {
         bool haveSize;
         bool all;
         bool hasArray;
-        bool haveNot;
+        bool haveNeg;
 
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield - 
@@ -166,7 +183,7 @@ namespace mongo {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
-        bool matches(const BSONObj &key, const DiskLoc &recLoc , bool * loaded = 0 );
+        bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
 
         Matcher& docMatcher() { return _docMatcher; }

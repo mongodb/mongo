@@ -213,10 +213,17 @@ namespace mongo {
                 Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
                 unsigned long long val = f.numberLong();
                 v8::Function* numberLong = getNamedCons( "NumberLong" );
-                v8::Handle<v8::Value> argv[2];
-                argv[0] = v8::Integer::New( val >> 32 );
-                argv[1] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
-                o->Set( v8::String::New( f.fieldName() ), numberLong->NewInstance(2, argv) );
+                if ( (long long)val == (long long)(double)(long long)(val) ) {
+                    v8::Handle<v8::Value> argv[1];                
+                    argv[0] = v8::Number::New( (double)(long long)( val ) );
+                    o->Set( v8::String::New( f.fieldName() ), numberLong->NewInstance( 1, argv ) );
+                } else {                    
+                    v8::Handle<v8::Value> argv[3];
+                    argv[0] = v8::Number::New( (double)(long long)(val) );
+                    argv[1] = v8::Integer::New( val >> 32 );
+                    argv[2] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
+                    o->Set( v8::String::New( f.fieldName() ), numberLong->NewInstance(3, argv) );
+                }
                 break;                
             }
                     
@@ -339,10 +346,17 @@ namespace mongo {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
             unsigned long long val = f.numberLong();
             v8::Function* numberLong = getNamedCons( "NumberLong" );
-            v8::Handle<v8::Value> argv[2];
-            argv[0] = v8::Integer::New( val >> 32 );
-            argv[1] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
-            return numberLong->NewInstance( 2, argv );
+            if ( (long long)val == (long long)(double)(long long)(val) ) {
+                v8::Handle<v8::Value> argv[1];                
+                argv[0] = v8::Number::New( (double)(long long)( val ) );
+                return numberLong->NewInstance( 1, argv );
+            } else {
+                v8::Handle<v8::Value> argv[3];
+                argv[0] = v8::Number::New( (double)(long long)( val ) );
+                argv[1] = v8::Integer::New( val >> 32 );
+                argv[2] = v8::Integer::New( (unsigned long)(val & 0x00000000ffffffff) );
+                return numberLong->NewInstance( 3, argv );
+            }
         }
             
         case mongo::MinKey: {
@@ -451,10 +465,17 @@ namespace mongo {
                 // TODO might be nice to potentially speed this up with an indexed internal
                 // field, but I don't yet know how to use an ObjectTemplate with a
                 // constructor.
-                unsigned long long val =
-                ( (unsigned long long)( value->ToObject()->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
-                (unsigned)( value->ToObject()->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );
-                b.append( sname.c_str(), (long long)val );
+                v8::Handle< v8::Object > it = value->ToObject();
+                long long val;
+                if ( !it->Has( v8::String::New( "top" ) ) ) {
+                    val = (long long)( it->Get( v8::String::New( "floatApprox" ) )->NumberValue() );
+                } else {
+                    val = (long long)
+                    ( (unsigned long long)( it->Get( v8::String::New( "top" ) )->ToInt32()->Value() ) << 32 ) +
+                    (unsigned)( it->Get( v8::String::New( "bottom" ) )->ToInt32()->Value() );        
+                }
+                
+                b.append( sname.c_str(), val );
             }
             else if ( !value->ToObject()->GetHiddenValue( v8::String::New( "__DBPointer" ) ).IsEmpty() ) {
                 OID oid;

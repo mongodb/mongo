@@ -140,7 +140,7 @@ namespace mongo {
             _fixed.push_back( BSONElement() );
             nullKeyB.appendNull( "" );
             if ( e.type() == String ){
-                uassert( 13007 , "can only have 1 index plugin" , pluginName.size() == 0 );
+                uassert( 13007 , "can only have 1 index plugin / bad index key pattern" , pluginName.size() == 0 );
                 pluginName = e.valuestr();
             }
                 
@@ -404,4 +404,35 @@ namespace mongo {
         return true;
     }
 
+    bool anyElementNamesMatch( const BSONObj& a , const BSONObj& b ){
+        BSONObjIterator x(a);
+        while ( x.more() ){
+            BSONElement e = x.next();
+            BSONObjIterator y(b);
+            while ( y.more() ){
+                BSONElement f = y.next();
+                FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() );
+                if ( res == SAME || res == LEFT_SUBFIELD || res == RIGHT_SUBFIELD )
+                    return true;
+            }
+        }
+        return false;
+    }
+    
+    IndexSuitability IndexSpec::suitability( const BSONObj& query , const BSONObj& order ) const {
+        if ( _indexType.get() )
+            return _indexType->suitability( query , order );
+        return _suitability( query , order );
+    }
+    
+    IndexSuitability IndexSpec::_suitability( const BSONObj& query , const BSONObj& order ) const {
+        // TODO: optimize
+        if ( anyElementNamesMatch( keyPattern , query ) == 0 && anyElementNamesMatch( keyPattern , order ) == 0 )
+            return USELESS;
+        return HELPFUL;
+    }
+
+    IndexSuitability IndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
+        return _spec->_suitability( query , order );
+    }
 }

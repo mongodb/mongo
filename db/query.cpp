@@ -473,10 +473,7 @@ namespace mongo {
         {}
         
         void setupMatcher() {
-            if ( ! _c.get() || _c->useMatcher() )
-                _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
-            else
-                _matcher.reset(new CoveredIndexMatcher( BSONObj() , qp().indexKey()));            
+            _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
         }
         
         virtual void init() {
@@ -617,8 +614,7 @@ namespace mongo {
             bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1 && useCursors;
             
             if( 0 ) { 
-                BSONObj js = _c->current();
-                cout << "SCANNING " << js << endl;
+                cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
             }
 
             _nscanned++;
@@ -899,8 +895,7 @@ namespace mongo {
         if ( explain ) {
             BSONObjBuilder builder;
             builder.append("cursor", cursor->toString());
-            builder.append("startKey", cursor->prettyStartKey());
-            builder.append("endKey", cursor->prettyEndKey());
+            builder.appendArray("indexBounds", cursor->prettyIndexBounds());
             builder.append("nscanned", double( dqo.nscanned() ) );
             builder.append("n", n);
             if ( dqo.scanAndOrderRequired() )

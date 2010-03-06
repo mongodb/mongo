@@ -1,4 +1,4 @@
-// stdafx.cpp : source file that includes just the standard includes
+// util/hex.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -15,23 +15,21 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
-
-#if defined( __MSVC__ )
-// should probably check VS version here
-#elif defined( __GNUC__ )
-
-#if __GNUC__ < 4
-#error gcc < 4 not supported
-#endif
-
-#else
-// unknown compiler
-#endif 
-
+#pragma once
 
 namespace mongo {
-
-    const char versionString[] = "1.3.4-";
-
-} // namespace mongo
+    //can't use hex namespace because it conflicts with hex iostream function
+    inline int fromHex( char c ) {
+        if ( '0' <= c && c <= '9' )
+            return c - '0';
+        if ( 'a' <= c && c <= 'f' )
+            return c - 'a' + 10;
+        if ( 'A' <= c && c <= 'F' )
+            return c - 'A' + 10;
+        assert( false );
+        return 0xff;
+    }
+    inline char fromHex( const char *c ) {
+        return ( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] );
+    }
+}
