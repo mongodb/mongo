@@ -140,6 +140,7 @@ namespace mongo {
 
         bool atomic() const { return _atomic; }
 
+        bool hasType( BSONObj::MatchType type ) const;
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.

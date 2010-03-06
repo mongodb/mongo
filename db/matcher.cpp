@@ -139,8 +139,10 @@ namespace mongo {
     {
         _needRecord = ! ( 
                          _docMatcher.keyMatch() && 
-                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields()
+                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields() &&
+                         ! _keyMatcher.hasType( BSONObj::opEXISTS )
                           );
+
     }
     
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
@@ -148,7 +150,7 @@ namespace mongo {
             details->reset();
         
         if ( _keyMatcher.keyMatch() ) {
-            if ( !_keyMatcher.matches(key) ) {
+            if ( !_keyMatcher.matches(key, details ) ){
                 return false;
             }
         }
@@ -708,6 +710,13 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    bool Matcher::hasType( BSONObj::MatchType type ) const {
+        for ( unsigned i=0; i<basics.size() ; i++ )
+            if ( basics[i].compareOp == type )
+                return true;
+        return false;
     }
 
     struct JSObj1 js1;
