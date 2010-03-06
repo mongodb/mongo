@@ -586,7 +586,7 @@ namespace mongo {
         case Symbol:
         case String: {
             int x = valuestrsize();
-            if ( x > 0 && x - 1 == strnlen( valuestr() , x ) )
+            if ( x > 0 && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x;
