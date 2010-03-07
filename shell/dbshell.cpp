@@ -80,7 +80,7 @@ void intr( int sig ){
 
 #if !defined(_WIN32)
 void killOps() {
-    if ( mongo::shellUtils::_nokillop )
+    if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
         return;
     vector< string > uris;
     for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
