@@ -153,6 +153,7 @@ namespace mongo {
                 s.insert( i.next() );
             }
         }
+        
     };
 
     /**
@@ -163,6 +164,7 @@ namespace mongo {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
         int _isIndexed;
+        bool _hasDynamicArray;
 
         static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
         
@@ -255,12 +257,19 @@ namespace mongo {
             return Mod::INC;
         }
         
+        ModSet(){}
+
     public:
         
         ModSet( const BSONObj &from , 
             const set<string>& idxKeys = set<string>(),
             const set<string>* backgroundKeys = 0
             );
+
+        // TODO: this is inefficient - should probably just handle when iterating
+        ModSet * fixDynamicArray( const char * elemMatchKey ) const;
+
+        bool hasDynamicArray() const { return _hasDynamicArray; }
 
         /**
          * creates a ModSetState suitable for operation on obj

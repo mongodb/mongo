@@ -91,11 +91,18 @@ namespace mongo {
         
         void reset(){
             loadedObject = false;
-            elemMatchKey = BSONElement();
+            elemMatchKey = 0;
         }
         
+        string toString() const {
+            stringstream ss;
+            ss << "loadedObject: " << loadedObject << " ";
+            ss << "elemMatchKey: " << ( elemMatchKey ? elemMatchKey : "NULL" ) << " ";
+            return ss.str();
+        }
+
         bool loadedObject;
-        BSONElement elemMatchKey;
+        const char * elemMatchKey; // warning, this may go out of scope if matched object does
     };
 
     /* Match BSON objects against a query pattern.
@@ -116,12 +123,12 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const ElementMatcher& bm, bool isArr = false);
+            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details );
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const ElementMatcher&bm);
+            const ElementMatcher&bm, MatchDetails * details );
         
     public:
         static int opDirection(int op) {
@@ -134,7 +141,7 @@ namespace mongo {
 
         ~Matcher();
 
-        bool matches(const BSONObj& j);
+        bool matches(const BSONObj& j, MatchDetails * details = 0 );
         
         bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 

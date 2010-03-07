@@ -29,8 +29,8 @@
 
 namespace mongo {
     
-    //#include "minilex.h"
-    //MiniLex minilex;
+    //#define DEBUGMATCHER(x) cout << x << endl;
+#define DEBUGMATCHER(x)
     
     class Where {
     public:
@@ -162,7 +162,7 @@ namespace mongo {
         if ( details )
             details->loadedObject = true;
 
-        return _docMatcher.matches(recLoc.rec());
+        return _docMatcher.matches(recLoc.rec() , details );
     }
     
     
@@ -423,8 +423,8 @@ namespace mongo {
         return (op & z);
     }
 
-    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm ) {
-        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm );
+    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) {
+        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm , false , details );
         if ( bm.toMatch.type() != jstNULL )
             return ( ret <= 0 ) ? 1 : 0;
         else
@@ -456,7 +456,8 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr) {
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) {
+        DEBUGMATCHER( "\t matchesDotted : " << fieldName << " hasDetails: " << ( details ? "yes" : "no" ) );
         if ( compareOp == BSONObj::opALL ) {
             
             if ( em.allMatchers.size() ){
@@ -507,10 +508,10 @@ namespace mongo {
         }
         
         if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, em );
+            return matchesNe( fieldName, toMatch, obj, em , details );
         if ( compareOp == BSONObj::NIN ) {
             for( set<BSONElement,element_lt>::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, em );
+                int ret = matchesNe( fieldName, *i, obj, em , details );
                 if ( ret != 1 )
                     return ret;
             }
@@ -540,12 +541,12 @@ namespace mongo {
                     ;
                 else {
                     BSONObj eo = se.embeddedObject();
-                    return matchesDotted(p+1, toMatch, eo, compareOp, em, se.type() == Array);
+                    return matchesDotted(p+1, toMatch, eo, compareOp, em, se.type() == Array , details );
                 }
             }
 
             if ( isArr ) {
-
+                DEBUGMATCHER( "\t\t isArr 1 : obj : " << obj );
                 BSONObjIterator ai(obj);
                 bool found = false;
                 while ( ai.moreWithEOO() ) {
@@ -553,15 +554,20 @@ namespace mongo {
 
                     if( strcmp(z.fieldName(),fieldName) == 0 && valuesMatch(z, toMatch, compareOp, em) ) {
                         // "field.<n>" array notation was used
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
                     }
 
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false, details );
                         if ( cmp > 0 ) {
+                            if ( details )
+                                details->elemMatchKey = z.fieldName();
                             return 1;
-                        } else if ( cmp < 0 ) {
+                        } 
+                        else if ( cmp < 0 ) {
                             found = true;
                         }
                     }
@@ -583,7 +589,7 @@ namespace mongo {
             valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
-            
+            cout << "YES1" << endl;
             BSONObjIterator ai(e.embeddedObject());
 
             while ( ai.moreWithEOO() ) {
@@ -591,11 +597,17 @@ namespace mongo {
                 
                 if ( compareOp == BSONObj::opELEM_MATCH ){
                     // SERVER-377
-                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) )
+                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) ){
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
+                    }
                 }
                 else {
                     if ( valuesMatch( z, toMatch, compareOp, em) ) {
+                        cout << "YO : " << z << endl;
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
                     }
                 }
@@ -634,7 +646,7 @@ namespace mongo {
 
     /* See if an object matches the query.
     */
-    bool Matcher::matches(const BSONObj& jsobj ) {
+    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
@@ -643,7 +655,7 @@ namespace mongo {
             ElementMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
-            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm );
+            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm , false , details );
             if ( bm.compareOp != BSONObj::opEXISTS && bm.isNot )
                 cmp = -cmp;
             if ( cmp < 0 )
