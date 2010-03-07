@@ -339,8 +339,9 @@ namespace JsobjTests {
                 }
                 BSONObj invalid() const {
                     BSONObj ret = valid();
-                    set( ret, 0, get( ret, 0 ) + 1 );
-                    set( ret, 7, get( ret, 7 ) + 1 );
+                    ASSERT_EQUALS( ret.firstElement().valuestr()[0] , 'b' );
+                    ASSERT_EQUALS( ret.firstElement().valuestr()[1] , 0 );
+                    ((char*)ret.firstElement().valuestr())[1] = 1;
                     return ret.copy();
                 }
             };
@@ -389,32 +390,6 @@ namespace JsobjTests {
                     set( ret, 7, get( ret, 7 ) + 1 );
                     return ret.copy();
                 };
-            };
-
-            class WrongSymbolSize : public Base {
-                BSONObj valid() const {
-                    return fromjson( "{\"a\":\"b\"}" );
-                }
-                BSONObj invalid() const {
-                    BSONObj ret = valid();
-                    set( ret, 4, Symbol );
-                    set( ret, 0, get( ret, 0 ) + 1 );
-                    set( ret, 7, get( ret, 7 ) + 1 );
-                    return ret.copy();
-                }
-            };
-
-            class WrongCodeSize : public Base {
-                BSONObj valid() const {
-                    return fromjson( "{\"a\":\"b\"}" );
-                }
-                BSONObj invalid() const {
-                    BSONObj ret = valid();
-                    set( ret, 4, Code );
-                    set( ret, 0, get( ret, 0 ) + 1 );
-                    set( ret, 7, get( ret, 7 ) + 1 );
-                    return ret.copy();
-                }
             };
 
             class NoFieldNameEnd : public Base {
@@ -1248,8 +1223,6 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NegativeStringSize >();
             add< BSONObjTests::Validation::WrongSubobjectSize >();
             add< BSONObjTests::Validation::WrongDbrefNsSize >();
-            add< BSONObjTests::Validation::WrongSymbolSize >();
-            add< BSONObjTests::Validation::WrongCodeSize >();
             add< BSONObjTests::Validation::NoFieldNameEnd >();
             add< BSONObjTests::Validation::BadRegex >();
             add< BSONObjTests::Validation::BadRegexOptions >();

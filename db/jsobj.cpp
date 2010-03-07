@@ -608,11 +608,15 @@ namespace mongo {
             case DBRef:
             case Code:
             case Symbol:
-            case String:
-                massert( "Invalid dbref/code/string/symbol size",
-                        valuestrsize() > 0 &&
-                        valuestrsize() - 1 == strnlen( valuestr(), valuestrsize() ) );
+            case String: {
+                int x = valuestrsize();
+                if ( x > 0 && valuestr()[x-1] == 0 )
+                    return;
+                stringstream buf;
+                buf <<  "Invalid dbref/code/string/symbol size: " << x;
+                massert( buf.str() , 0 );
                 break;
+            }
             case CodeWScope: {
                 int totalSize = *( int * )( value() );
                 massert( "Invalid CodeWScope size", totalSize >= 8 );
