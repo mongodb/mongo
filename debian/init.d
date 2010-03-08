@@ -68,6 +68,10 @@ if test ! -x $DAEMON; then
     exit 0
 fi
 
+if test "x$ENABLE_MONGODB" != "xyes"; then
+    exit 0
+fi
+
 if test ! -x $DATA; then
     mkdir $DATA || exit 0
 fi
