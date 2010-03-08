@@ -129,8 +129,6 @@ namespace mongo {
         }
     };
 
-    void exitCleanly( ExitCode code );
-
 } // namespace mongo
 
 #include "dbinfo.h"

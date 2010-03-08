@@ -262,9 +262,6 @@ namespace mongo {
                     ss << " exception " + e.toString();
                     log = true;
                 }
-                catch ( ClockSkewException &e ) {
-                    exitCleanly( EXIT_CLOCK_SKEW );
-                }
             }
             else if ( op == dbKillCursors ) {
                 OPREAD;
