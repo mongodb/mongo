@@ -589,7 +589,6 @@ namespace mongo {
             valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
-            cout << "YES1" << endl;
             BSONObjIterator ai(e.embeddedObject());
 
             while ( ai.moreWithEOO() ) {
@@ -605,7 +604,6 @@ namespace mongo {
                 }
                 else {
                     if ( valuesMatch( z, toMatch, compareOp, em) ) {
-                        cout << "YO : " << z << endl;
                         if ( details )
                             details->elemMatchKey = z.fieldName();
                         return 1;
