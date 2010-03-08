@@ -1738,8 +1738,14 @@ namespace mongo {
         const char * ns = "local.oplog.$main";
         Client::Context ctx(ns);
         
-        if ( nsdetails( ns ) )
+        if ( nsdetails( ns ) ) {
+            DBDirectClient c;
+            BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
+            if ( !lastOp.isEmpty() ) {
+                OpTime::setLast( lastOp[ "ts" ].date() );
+            }
             return;
+        }
         
         /* create an oplog collection, if it doesn't yet exist. */
         BSONObjBuilder b;

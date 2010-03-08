@@ -20,15 +20,24 @@
 #include "../db/concurrency.h"
 
 namespace mongo {
+    void exitCleanly( int code );
     
     /* Operation sequence #.  A combination of current second plus an ordinal value.
      */
+    struct ClockSkewException : public DBException {
+        virtual const char* what() const throw() { return "clock skew exception"; }
+        virtual int getCode(){ return 20001; }
+    };
+    
 #pragma pack(4)
     class OpTime {
         unsigned i;
         unsigned secs;
         static OpTime last;
     public:
+        static void setLast(const Date_t &date) {
+            last = OpTime(date);
+        }
         unsigned getSecs() const {
             return secs;
         }
@@ -50,7 +59,17 @@ namespace mongo {
             unsigned t = (unsigned) time(0);
 //            DEV assertInWriteLock();
             if ( t < last.secs ){
-                log() << "clock skew detected  prev: " << last.secs << " now: " << t << " trying to handle..." << endl;
+                bool toLog = false;
+                ONCE toLog = true;
+                RARELY toLog = true;
+                if ( last.i & 0x80000000 )
+                    toLog = true;
+                if ( toLog )
+                    log() << "clock skew detected  prev: " << last.secs << " now: " << t << " trying to handle..." << endl;
+                if ( last.i & 0x80000000 ) {
+                    log() << "ERROR Large clock skew detected, shutting down" << endl;
+                    throw ClockSkewException();
+                }
                 t = last.secs;
             }
             if ( last.secs == t ) {

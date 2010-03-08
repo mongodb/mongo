@@ -1024,13 +1024,13 @@ namespace mongo {
 
 #undef out
 
-    void exitCleanly() {
+    void exitCleanly( ExitCode code ) {
         goingAway = true;
         killCurrentOp.killAll();
         {
             dblock lk;
             log() << "now exiting" << endl;
-            dbexit( EXIT_KILL );        
+            dbexit( code );        
         }
     }
 
@@ -1077,7 +1077,7 @@ namespace mongo {
         sigwait( &asyncSignals, &x );
         log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
         Client::initThread( "interruptThread" );
-        exitCleanly();
+        exitCleanly( EXIT_KILL );
     }
 
     // this will be called in certain c++ error cases, for example if there are two active
@@ -1111,7 +1111,7 @@ namespace mongo {
 void ctrlCTerminate() {
     log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
     Client::initThread( "ctrlCTerminate" );
-    exitCleanly();
+    exitCleanly( EXIT_KILL );
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
 {

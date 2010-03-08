@@ -205,6 +205,7 @@ namespace mongo {
 
     extern TicketHolder connTicketHolder;
 
+    void exitCleanly( ExitCode code );
 
 } // namespace mongo
 
