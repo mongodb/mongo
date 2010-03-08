@@ -621,7 +621,7 @@ ReplTest.prototype.stop = function( master , signal ){
         this.stop( false );
         return;
     }
-    stopMongod( this.getPort( master ) , signal || 15 );
+    return stopMongod( this.getPort( master ) , signal || 15 );
 }
 
 allocatePorts = function( n ) {

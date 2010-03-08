@@ -523,12 +523,13 @@ namespace mongo {
         }
             
         
-        void killDb( int port, pid_t _pid, int signal ) {
+        int killDb( int port, pid_t _pid, int signal ) {
             pid_t pid;
+            int exitCode = 0;
             if ( port > 0 ) {
                 if( dbs.count( port ) != 1 ) {
                     cout << "No db started on port: " << port << endl;
-                    return;
+                    return 0;
                 }
                 pid = dbs[ port ].first;
             } else {
@@ -546,7 +547,7 @@ namespace mongo {
                     cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
                     kill_wrapper( pid, SIGKILL, port );
                 }        
-                if(wait_for_pid(pid, false))
+                if(wait_for_pid(pid, false, &exitCode))
                     break;
                 sleepms( 1000 );
             }
@@ -568,6 +569,8 @@ namespace mongo {
             if ( i > 4 || signal == SIGKILL ) {
                 sleepms( 4000 ); // allow operating system to reclaim resources
             }
+            
+            return exitCode;
         }
 
         int getSignal( const BSONObj &a ) {
@@ -586,18 +589,18 @@ namespace mongo {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
-            killDb( port, 0, getSignal( a ) );
+            int code = killDb( port, 0, getSignal( a ) );
             cout << "shell: stopped mongo program on port " << port << endl;
-            return undefined_;
+            return BSON( "" << code );
         }        
         
         BSONObj StopMongoProgramByPid( const BSONObj &a ) {
             assert( a.nFields() == 1 || a.nFields() == 2 );
             assert( a.firstElement().isNumber() );
             int pid = int( a.firstElement().number() );            
-            killDb( 0, pid, getSignal( a ) );
+            int code = killDb( 0, pid, getSignal( a ) );
             cout << "shell: stopped mongo program on pid " << pid << endl;
-            return undefined_;            
+            return BSON( "" << code );
         }
                                                 
         void KillMongoProgramInstances() {
