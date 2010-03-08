@@ -202,6 +202,8 @@ namespace mongo {
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             replAllDead = "replication forced to stop by 'forcedead' command";
+            log() << "*********************************************************\n";
+            log() << "received 'forcedead' command, replication forced to stop" << endl;
             return true;
         }
     } cmdForceDead;
@@ -268,8 +270,9 @@ namespace mongo {
             if( authed ) { 
                 if ( replPair )
                     result.append("remote", replPair->remote);
-                result.append("info", replAllDead);
             }
+            string s = string("dead: ") + replAllDead;
+            result.append("info", s);
         }
         else if ( replPair ) {
             result.append("ismaster", replPair->state);
@@ -1066,7 +1069,10 @@ namespace mongo {
     }
     
     void ReplSource::resetSlave() {
-        massert( 10387 ,  "request to kill slave replication falied",
+        log() << "**********************************************************\n";
+        log() << "Sending forcedead command to slave to stop its replication\n";
+        log() << "Host: " << hostName << " paired: " << paired << endl;
+        massert( 10387 ,  "request to kill slave replication failed",
                 conn->simpleCommand( "admin", 0, "forcedead" ) );        
         syncToTailOfRemoteLog();
         {
