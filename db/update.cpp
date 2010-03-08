@@ -617,9 +617,9 @@ namespace mongo {
                 uassert( 10151 ,  "have conflict mod" , ! haveConflictingMod( fieldName ) );
                 uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
-
-                _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".~" ) > 0;
-
+                
+                _hasDynamicArray = _hasDynamicArray || strstr( fieldName , "~" ) > 0;
+                
                 Mod m;
                 m.init( op , f );
                 m.setFieldName( f.fieldName() );
@@ -630,6 +630,8 @@ namespace mongo {
                 }
 
                 _mods[m.fieldName] = m;
+
+                cout << "\t\t " << fieldName << "\t" << _hasDynamicArray << endl;
             }
         }
 
@@ -641,14 +643,15 @@ namespace mongo {
         n->_hasDynamicArray = _hasDynamicArray;
         for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ){
             string s = i->first;
-            size_t idx = s.find( ".~" );
+            size_t idx = s.find( "~" );
             if ( idx == string::npos ){
                 n->_mods[s] = i->second;
                 continue;
             }
             StringBuilder buf(s.size()+strlen(elemMatchKey));
-            buf << s.substr(0,idx+1) << elemMatchKey << s.substr(idx+2);
+            buf << s.substr(0,idx) << elemMatchKey << s.substr(idx+1);
             string fixed = buf.str();
+            cout << "fixed dynamic: " << s << " -->> " << fixed << endl;
             n->_mods[fixed] = i->second;
             ModHolder::iterator temp = n->_mods.find( fixed );
             temp->second.setFieldName( temp->first.c_str() );
