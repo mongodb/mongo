@@ -1430,8 +1430,14 @@ namespace mongo {
     bool ReplSource::sync(int& nApplied) {
         _sleepAdviceTime = 0;
         ReplInfo r("sync");
-        if ( !cmdLine.quiet )
-            log() << "repl: " << sourceName() << '@' << hostName << endl;
+        if ( !cmdLine.quiet ) {
+            Nullstream& l = log();
+            l << "repl: from ";
+            if( sourceName() != "main" ) {
+                l << "source:" << sourceName() << ' ';
+            }
+            l << "host:" << hostName << endl;
+        }
         nClonedThisPass = 0;
 
         // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
