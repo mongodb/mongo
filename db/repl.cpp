@@ -1317,7 +1317,7 @@ namespace mongo {
                     save(); // note how far we are synced up to now
                     log() << "repl:   applied " << n << " operations" << endl;
                     nApplied = n;
-                    log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
+                    log() << "repl:  end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
                 }
 
@@ -1492,22 +1492,6 @@ namespace mongo {
         localOplogMainDetails = 0;
     }
 
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
-        if ( replSettings.master ) {
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
-            char cl[ 256 ];
-            nsToDatabase( ns, cl );
-        }
-        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
-        if ( t.cllEnabled() ) {
-            try {
-                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
-            } catch ( const DBException & ) {
-                t.cllInvalidate();
-            }
-        }
-    }    
-    
     /* we write to local.opload.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
@@ -1518,6 +1502,7 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
+       logNS - e.g. "local.oplog.$main"
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -1525,7 +1510,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
+    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1581,6 +1566,27 @@ namespace mongo {
         }
     }
 
+    static void logKeepalive() { 
+        BSONObj obj;
+        _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());
+    }
+
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
+        if ( replSettings.master ) {
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
+            char cl[ 256 ];
+            nsToDatabase( ns, cl );
+        }
+        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
+        if ( t.cllEnabled() ) {
+            try {
+                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
+            } catch ( const DBException & ) {
+                t.cllInvalidate();
+            }
+        }
+    }    
+    
     /* --------------------------------------------------------------*/
 
     /*
@@ -1694,7 +1700,7 @@ namespace mongo {
             }
             if ( s ) {
                 stringstream ss;
-                ss << "repl:  sleep " << s << "sec before next pass";
+                ss << "repl: sleep " << s << "sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;
@@ -1705,6 +1711,27 @@ namespace mongo {
     }
 
     int debug_stop_repl = 0;
+
+    static void replMasterThread() {
+        sleepsecs(4);
+        Client::initThread("replmaster");
+        while( 1 ) {
+            sleepsecs(10);
+            /* write a keep-alive like entry to the log.  this will make things like 
+               printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date
+               even when things are idle.
+            */
+            {
+                writelock lk("");
+                try { 
+                    logKeepalive();
+                }
+                catch(...) { 
+                    log() << "caught exception in replMasterThread()" << endl;
+                }
+            }
+        }
+    }
 
     void replSlaveThread() {
         sleepsecs(1);
@@ -1812,6 +1839,7 @@ namespace mongo {
                 log(1) << "master=true" << endl;
             replSettings.master = true;
             createOplog();
+            boost::thread t(replMasterThread);
         }
     }
 
