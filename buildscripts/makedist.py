@@ -252,12 +252,12 @@ class EC2Instance (object):
                 self.parsedesc(proc.stdout)
             except Exception, e:
                 r = proc.wait()
-                if r < self.giveup:
+                if r < giveup:
                     print sys.stderr, str(e)
                     continue
                 else:
                     raise SimpleError("ec2-describe-instances exited %d", r)
-                self.numtries+=1
+                numtries+=1
 
     def stop(self):
         if self.terminate:
@@ -431,9 +431,12 @@ apt-get install -y {pkg_prereq_str}
 mkdir -p "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
 mkdir -p "{pkg_product_dir}/{distro_version}/10gen/source"
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}"; debuild ) || exit 1
-mv {pkg_name}{pkg_name_suffix}*.deb "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
-mv {pkg_name}{pkg_name_suffix}*.dsc "{pkg_product_dir}/{distro_version}/10gen/source"
-mv {pkg_name}{pkg_name_suffix}*.tar.gz "{pkg_product_dir}/{distro_version}/10gen/source"
+# Try installing it
+dpkg -i *.deb
+ps ax | grep mongo || {{ echo "no running mongo" >/dev/stderr; exit 1; }}
+cp {pkg_name}{pkg_name_suffix}*.deb "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
+cp {pkg_name}{pkg_name_suffix}*.dsc "{pkg_product_dir}/{distro_version}/10gen/source"
+cp {pkg_name}{pkg_name_suffix}*.tar.gz "{pkg_product_dir}/{distro_version}/10gen/source"
 dpkg-scanpackages "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}/Packages.gz"
 dpkg-scansources "{pkg_product_dir}/{distro_version}/10gen/source" /dev/null | gzip -9c > "{pkg_product_dir}/{distro_version}/10gen/source/Sources.gz"
 """
