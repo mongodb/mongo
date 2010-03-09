@@ -125,13 +125,11 @@ namespace mongo {
                 rm.fieldName = 0; // no need for field name
                 rm.regex = ie.regex();
                 rm.flags = ie.regexFlags();
-                rm.isNot = false; // what about $nin?
-                if (!false){ //TODO something smarter
-                    bool purePrefix;
-                    string prefix = simpleRegex(rm.regex, rm.flags, &purePrefix);
-                    if (purePrefix)
-                        rm.prefix = prefix;
-                }                
+                rm.isNot = false;
+                bool purePrefix;
+                string prefix = simpleRegex(rm.regex, rm.flags, &purePrefix);
+                if (purePrefix)
+                    rm.prefix = prefix;
             } else {
                 myset->insert(ie);
             }
