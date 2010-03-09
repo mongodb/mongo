@@ -301,6 +301,8 @@ usejvm = not GetOption( "usejvm" ) is None
 
 asio = not GetOption( "asio" ) is None
 
+justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
+
 env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.' )
 if GetOption( "cxx" ) is not None:
     env["CC"] = GetOption( "cxx" )
@@ -332,7 +334,7 @@ if ( usesm and usejvm ):
     print( "can't say usesm and usejvm at the same time" )
     Exit(1)
 
-if ( not ( usesm or usejvm or usev8 ) ):
+if ( not ( usesm or usejvm or usev8 or justClientLib) ):
     usesm = True
 
 extraLibPlaces = []
@@ -395,7 +397,7 @@ if usesm:
 elif usev8:
     commonFiles += [ Glob( "scripting/*v8*.cpp" ) ]
     nojni = True
-elif not nojni:
+elif not (nojni or justClientLib) :
     commonFiles += [ "scripting/engine_java.cpp" ]
 else:
     commonFiles += [ "scripting/engine_none.cpp" ]
@@ -570,7 +572,7 @@ elif "win32" == os.sys.platform:
         env.Append(CPPPATH=["../js/src/"])
         env.Append(LIBPATH=["../js/src"])
         env.Append( CPPDEFINES=[ "OLDJS" ] )
-    else:
+    elif not justClientLib:
         javaHome = findVersion( "C:/Program Files/java/" ,
                                 [ "jdk" , "jdk1.6.0_10" ] )
         env.Append( CPPPATH=[ javaHome + "/include" , javaHome + "/include/win32" ] )

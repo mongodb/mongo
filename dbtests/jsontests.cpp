@@ -47,7 +47,7 @@ namespace JsonTests {
             void run() {
                 BSONObjBuilder b;
                 b.append( "a", "\" \\ / \b \f \n \r \t" );
-                ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\" }", b.done().jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : \"\\\" \\\\ / \\b \\f \\n \\r \\t\" }", b.done().jsonString( Strict ) );
             }
         };
 
@@ -304,7 +304,7 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendRegex( "a", "/\"", "i" );
                 BSONObj built = b.done();
-                ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"\\/\\\"\", \"$options\" : \"i\" } }",
+                ASSERT_EQUALS( "{ \"a\" : { \"$regex\" : \"/\\\"\", \"$options\" : \"i\" } }",
                               built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : /\\/\\\"/i }", built.jsonString( JS ) );
