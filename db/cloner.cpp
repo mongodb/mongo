@@ -630,7 +630,7 @@ namespace mongo {
         }
         virtual LockType locktype(){ return WRITE; }
         virtual void help( stringstream &help ) const {
-            help << "copy a database from antoher host to this host\n";
+            help << "copy a database from another host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>]}";
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
