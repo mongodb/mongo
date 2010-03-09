@@ -247,13 +247,30 @@ namespace mongo {
         case BSONObj::opALL: {
             massert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
-            if ( i.more() ){
+            bool bound = false;
+            while ( i.more() ){
                 BSONElement x = i.next();
                 if ( x.type() == Object && x.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ){
                     // this is a bit more complex...
                 }
-                else {
+                else if ( x.type() != RegEx ) {
                     lower = upper = x;
+                    bound = true;
+                    break;
+                }
+            }
+            if ( !bound ) { // if no good non regex bound found, try regex bounds
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement x = i.next();
+                    if ( x.type() != RegEx )
+                        continue;
+                    string simple = simpleRegex( x.regex(), x.regexFlags() );
+                    if ( !simple.empty() ) {
+                        lower = addObj( BSON( "" << simple ) ).firstElement();
+                        upper = addObj( BSON( "" << simpleRegexEnd( simple ) ) ).firstElement();
+                        break;
+                    }
                 }
             }
             break;

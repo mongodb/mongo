@@ -520,7 +520,7 @@ namespace mongo {
                 return 1;
             }
             
-            if ( em.myset->size() == 0 )
+            if ( em.myset->size() == 0 && !em.myregex.get() ) // what about $elemMatch?
                 return -1; // is this desired?
             
             BSONObjSetDefaultOrder actualKeys;
@@ -539,6 +539,21 @@ namespace mongo {
                     return -1;
             }
 
+            if ( !em.myregex.get() )
+                return 1;
+            
+            for( vector< RegexMatcher >::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                bool match = false;
+                for( BSONObjSetDefaultOrder::const_iterator j = actualKeys.begin(); j != actualKeys.end(); ++j ) {
+                    if ( regexMatches( *i, j->firstElement() ) ) {
+                        match = true;
+                        break;
+                    }
+                }
+                if ( !match )
+                    return -1;
+            }
+            
             return 1;
         }
         
