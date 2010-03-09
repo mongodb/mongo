@@ -34,12 +34,9 @@ namespace mongo {
         const char *regex;
         const char *flags;
         string prefix;
-        pcrecpp::RE *re;
+        shared_ptr< pcrecpp::RE > re;
         bool isNot;
-        RegexMatcher() : re( 0 ), isNot() {}
-        ~RegexMatcher() {
-            delete re;
-        }
+        RegexMatcher() : isNot() {}
     };
     
     struct element_lt
@@ -70,6 +67,7 @@ namespace mongo {
         int compareOp;
         bool isNot;
         shared_ptr< set<BSONElement,element_lt> > myset;
+        shared_ptr< vector<RegexMatcher> > myregex;
         
         // these are for specific operators
         int mod;
