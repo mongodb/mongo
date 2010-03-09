@@ -1066,7 +1066,7 @@ namespace ReplTests {
             add< Idempotence::UpdateSet >();
             add< Idempotence::UpdateInc >();
             add< Idempotence::UpdateInc2 >();
-//            add< Idempotence::IncEmbedded >(); // SERVER-716
+            add< Idempotence::IncEmbedded >(); // SERVER-716
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();

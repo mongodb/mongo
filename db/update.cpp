@@ -26,6 +26,9 @@
 
 namespace mongo {
 
+    //#define DEBUGUPDATE(x) cout << x << endl;
+#define DEBUGUPDATE(x)
+    
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
                                     "$bitand" , "$bitor" , "$bit" , "$addToSet" };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
@@ -631,7 +634,7 @@ namespace mongo {
 
                 _mods[m.fieldName] = m;
 
-                cout << "\t\t " << fieldName << "\t" << _hasDynamicArray << endl;
+                DEBUGUPDATE( "\t\t " << fieldName << "\t" << _hasDynamicArray );
             }
         }
 
@@ -651,7 +654,7 @@ namespace mongo {
             StringBuilder buf(s.size()+strlen(elemMatchKey));
             buf << s.substr(0,idx) << elemMatchKey << s.substr(idx+1);
             string fixed = buf.str();
-            cout << "fixed dynamic: " << s << " -->> " << fixed << endl;
+            DEBUGUPDATE( "fixed dynamic: " << s << " -->> " << fixed );
             n->_mods[fixed] = i->second;
             ModHolder::iterator temp = n->_mods.find( fixed );
             temp->second.setFieldName( temp->first.c_str() );
@@ -711,6 +714,7 @@ namespace mongo {
 
     
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+        DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         int profile = cc().database()->profile;
         StringBuilder& ss = debug.str;
 
@@ -846,10 +850,13 @@ namespace mongo {
                         pattern = patternBuilder.obj();                        
                     }
                     
-                    if ( mss->needOpLogRewrite() )
+                    if ( mss->needOpLogRewrite() ){
+                        DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
                         logOp("u", ns, mss->getOpLogRewrite() , &pattern );
-                    else
+                    }
+                    else {
                         logOp("u", ns, updateobj, &pattern );
+                    }
                 }
                 numModded++;
                 if ( ! multi )

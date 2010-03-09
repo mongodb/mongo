@@ -375,10 +375,10 @@ namespace mongo {
             }
             
             const char * name = fixedName ? fixedName : Mod::modNames[op()];
-            
+
             BSONObjBuilder bb( b.subobjStart( name ) );
             if ( fixed )
-                bb.append( *fixed );
+                bb.appendAs( *fixed , m->fieldName );
             else
                 bb.append( m->elt );
             bb.done();
