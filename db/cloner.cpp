@@ -597,7 +597,12 @@ namespace mongo {
         }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
-            uassert( 13009, "fromhost must be specified", !fromhost.empty() );
+            if ( fromhost.empty() ) {
+                /* copy from self */
+                stringstream ss;
+                ss << "localhost:" << cmdLine.port;
+                fromhost = ss.str();
+            }
             authConn_.reset( new DBClientConnection() );
             if ( !authConn_->connect( fromhost, errmsg ) )
                 return false;
