@@ -1291,7 +1291,6 @@ namespace mongo {
         virtual bool slaveOk() {
             return false;
         }
-        virtual LockType locktype() { return WRITE; }
         virtual bool requiresAuth() {
             return true;
         }
@@ -1300,8 +1299,8 @@ namespace mongo {
         }        
         virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
-            uassert( 13049, "godinsert must specify a collection", !coll.empty() );
-            string ns = nsToDatabase( dbname ) + "." + coll;
+            uassert( "godinsert must specify a collection", !coll.empty() );
+            string ns = nsToClient( dbname ) + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
             DiskLoc loc = theDataFileMgr.insert( ns.c_str(), obj, true );
             return true;
