@@ -352,7 +352,7 @@ namespace mongo {
         }
         
         bool needOpLogRewrite() const {
-            if ( fixed || incType )
+            if ( fixed || fixedName || incType )
                 return true;
             
             switch( op() ){
@@ -470,6 +470,7 @@ namespace mongo {
                 break;
                 
             case Mod::INC:
+                ms.fixedName = "$set";
             case Mod::SET: {
                 m._checkForAppending( m.elt );
                 b.appendAs( m.elt, m.shortFieldName );

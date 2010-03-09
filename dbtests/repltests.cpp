@@ -509,6 +509,30 @@ namespace ReplTests {
             BSONObj o_, q_, u_, ou_;            
         };
 
+        class IncCreates : public Base {
+        public:
+            IncCreates() :
+            o_( fromjson( "{'_id':1}" ) ),
+            q_( fromjson( "{'_id':1}" ) ),
+            u_( fromjson( "{$inc:{'a':1}}" ) ),
+            ou_( fromjson( "{'_id':1,a:1}") )
+            {}
+            void doIt() const {
+                client()->update( ns(), q_, u_ );
+            }
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                checkOne( ou_ );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( o_ );
+            }
+        protected:
+            BSONObj o_, q_, u_, ou_;            
+        };
+
+
         class UpsertInsertIdMod : public Base {
         public:
             UpsertInsertIdMod() :
@@ -1067,6 +1091,7 @@ namespace ReplTests {
             add< Idempotence::UpdateInc >();
             add< Idempotence::UpdateInc2 >();
             add< Idempotence::IncEmbedded >(); // SERVER-716
+            add< Idempotence::IncCreates >(); // SERVER-717
             add< Idempotence::UpsertInsertIdMod >();
             add< Idempotence::UpsertInsertSet >();
             add< Idempotence::UpsertInsertInc >();
