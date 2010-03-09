@@ -201,7 +201,7 @@ namespace mongo {
             case mongo::Timestamp: {
                 Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
                 
-                sub->Set( v8::String::New( "t" ) , v8::Date::New( f.timestampTime() ) );
+                sub->Set( v8::String::New( "t" ) , v8::Number::New( f.timestampTime() ) );
                 sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
                 sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
                 
@@ -335,7 +335,7 @@ namespace mongo {
         case mongo::Timestamp: {
             Local<v8::Object> sub = internalFieldObjects->NewInstance();
             
-            sub->Set( v8::String::New( "t" ) , v8::Date::New( f.timestampTime() ) );
+            sub->Set( v8::String::New( "t" ) , v8::Number::New( f.timestampTime() ) );
             sub->Set( v8::String::New( "i" ) , v8::Number::New( f.timestampInc() ) );
             sub->SetInternalField( 0, v8::Uint32::New( f.type() ) );
 
@@ -435,7 +435,7 @@ namespace mongo {
                 switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
                     case Timestamp:
                         b.appendTimestamp( sname.c_str(),
-                                          Date_t( v8::Date::Cast( *obj->Get( v8::String::New( "t" ) ) )->NumberValue() ),
+                                          Date_t( obj->Get( v8::String::New( "t" ) )->ToNumber()->Value() ),
                                           obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
                         return;
                     case MinKey:
