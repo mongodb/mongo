@@ -565,6 +565,17 @@ namespace mongo {
                 if ( ret != 1 )
                     return ret;
             }
+            if ( em.myregex.get() ) {
+                BSONElementSet s;
+                obj.getFieldsDotted( fieldName, s );
+                for( vector<RegexMatcher>::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                    for( BSONElementSet::const_iterator j = s.begin(); j != s.end(); ++j ) {
+                        if ( regexMatches( *i, *j ) ) {
+                            return -1;
+                        }
+                    }
+                }
+            }
             return 1;
         }
         
