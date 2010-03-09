@@ -796,10 +796,4 @@ if __name__ == "__main__":
 
 # Examples:
 
-# time ./makedist.py ubuntu 9.10 x86_64 1.3.1
-
-# Specifying various full paths:
-
-# time ./makedist.py -K /Users/kreuter/mongo/ops/ec2/noc-admin/pk-US7YBXUQ3YJGC5YATLXOCZY2IBTAN6A3.pem  -C /Users/kreuter/mongo/ops/ec2/noc-admin/cert-US7YBXUQ3YJGC5YATLXOCZY2IBTAN6A3.pem -k kp1 -F /Users/kreuter/mongo/ops/ec2/noc-admin/id_rsa-kp1 ubuntu 9.10 x86 1.3.1
-
-# time ./makedist.py -K /Users/kreuter/mongo/ops/ec2/noc-admin/pk-US7YBXUQ3YJGC5YATLXOCZY2IBTAN6A3.pem  -C /Users/kreuter/mongo/ops/ec2/noc-admin/cert-US7YBXUQ3YJGC5YATLXOCZY2IBTAN6A3.pem -k kp1 -F /Users/kreuter/mongo/ops/ec2/noc-admin/id_rsa-kp1 ubuntu 9.10 x86_64 1.3.1
+# ./makedist.py --local-gpg-dir=$HOME/10gen/dst/dist-gnupg /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot
