@@ -27,6 +27,25 @@
 #include "db.h"
 #include "client.h"
 
+#include "pdfile.h"
+
+namespace {
+    inline pcrecpp::RE_Options flags2options(const char* flags){
+        pcrecpp::RE_Options options;
+        options.set_utf8(true);
+        while ( flags && *flags ) {
+            if ( *flags == 'i' )
+                options.set_caseless(true);
+            else if ( *flags == 'm' )
+                options.set_multiline(true);
+            else if ( *flags == 'x' )
+                options.set_extended(true);
+            flags++;
+        }
+        return options;
+    }
+}
+
 namespace mongo {
     
     //#define DEBUGMATCHER(x) cout << x << endl;
@@ -96,8 +115,24 @@ namespace mongo {
                 shared_ptr<Matcher> s;
                 s.reset( new Matcher( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
                 allMatchers.push_back( s );
-            }
-            else {
+            } else if ( ie.type() == RegEx ) {
+                if ( !myregex.get() ) {
+                    myregex.reset( new vector< RegexMatcher >() );
+                }
+                myregex->push_back( RegexMatcher() );
+                RegexMatcher &rm = myregex->back();
+                rm.re.reset( new pcrecpp::RE( ie.regex(), flags2options( ie.regexFlags() ) ) );
+                rm.fieldName = 0; // no need for field name
+                rm.regex = ie.regex();
+                rm.flags = ie.regexFlags();
+                rm.isNot = false; // what about $nin?
+                if (!false){ //TODO something smarter
+                    bool purePrefix;
+                    string prefix = simpleRegex(rm.regex, rm.flags, &purePrefix);
+                    if (purePrefix)
+                        rm.prefix = prefix;
+                }                
+            } else {
                 myset->insert(ie);
             }
         }
@@ -107,30 +142,6 @@ namespace mongo {
         }
         
     }
-    
-
-} // namespace mongo
-
-#include "pdfile.h"
-
-namespace {
-    inline pcrecpp::RE_Options flags2options(const char* flags){
-        pcrecpp::RE_Options options;
-        options.set_utf8(true);
-        while ( flags && *flags ) {
-            if ( *flags == 'i' )
-                options.set_caseless(true);
-            else if ( *flags == 'm' )
-                options.set_multiline(true);
-            else if ( *flags == 'x' )
-                options.set_extended(true);
-            flags++;
-        }
-        return options;
-    }
-}
-
-namespace mongo {
     
     CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
         _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), 
@@ -173,7 +184,7 @@ namespace mongo {
         }
         else {
             RegexMatcher& rm = regexs[nRegex];
-            rm.re = new pcrecpp::RE(regex, flags2options(flags));
+            rm.re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
             rm.fieldName = fieldName;
             rm.regex = regex;
             rm.flags = flags;
@@ -375,7 +386,22 @@ namespace mongo {
         
         constrainIndexKey_ = constrainIndexKey;
     }
-
+    
+    inline bool regexMatches(const RegexMatcher& rm, const BSONElement& e) {
+        switch (e.type()){
+            case String:
+            case Symbol:
+                if (rm.prefix.empty())
+                    return rm.re->PartialMatch(e.valuestr());
+                else
+                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
+            case RegEx:
+                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
+            default:
+                return false;
+        }
+    }
+        
     inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
@@ -385,7 +411,16 @@ namespace mongo {
         
         if ( op == BSONObj::opIN ) {
             // { $in : [1,2,3] }
-            return bm.myset->count(l);
+            int count = bm.myset->count(l);
+            if ( count )
+                return count;
+            if ( bm.myregex.get() ) {
+                for( vector<RegexMatcher>::const_iterator i = bm.myregex->begin(); i != bm.myregex->end(); ++i ) {
+                    if ( regexMatches( *i, l ) ) {
+                        return true;
+                    }
+                }
+            }
         }
 
         if ( op == BSONObj::opSIZE ) {
@@ -485,7 +520,7 @@ namespace mongo {
                 return 1;
             }
             
-            if ( em.myset->size() == 0 )
+            if ( em.myset->size() == 0 && !em.myregex.get() ) // what about $elemMatch?
                 return -1; // is this desired?
             
             BSONObjSetDefaultOrder actualKeys;
@@ -504,6 +539,21 @@ namespace mongo {
                     return -1;
             }
 
+            if ( !em.myregex.get() )
+                return 1;
+            
+            for( vector< RegexMatcher >::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                bool match = false;
+                for( BSONObjSetDefaultOrder::const_iterator j = actualKeys.begin(); j != actualKeys.end(); ++j ) {
+                    if ( regexMatches( *i, j->firstElement() ) ) {
+                        match = true;
+                        break;
+                    }
+                }
+                if ( !match )
+                    return -1;
+            }
+            
             return 1;
         }
         
@@ -514,6 +564,17 @@ namespace mongo {
                 int ret = matchesNe( fieldName, *i, obj, em , details );
                 if ( ret != 1 )
                     return ret;
+            }
+            if ( em.myregex.get() ) {
+                BSONElementSet s;
+                obj.getFieldsDotted( fieldName, s );
+                for( vector<RegexMatcher>::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                    for( BSONElementSet::const_iterator j = s.begin(); j != s.end(); ++j ) {
+                        if ( regexMatches( *i, *j ) ) {
+                            return -1;
+                        }
+                    }
+                }
             }
             return 1;
         }
@@ -626,21 +687,6 @@ namespace mongo {
     }
 
     extern int dump;
-
-    inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
-        switch (e.type()){
-            case String:
-            case Symbol:
-                if (rm.prefix.empty())
-                    return rm.re->PartialMatch(e.valuestr());
-                else
-                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
-            case RegEx:
-                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
-            default:
-                return false;
-        }
-    }
 
     /* See if an object matches the query.
     */

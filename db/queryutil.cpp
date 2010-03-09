@@ -118,14 +118,24 @@ namespace mongo {
         // NOTE with $not, we could potentially form a complementary set of intervals.
         if ( !isNot && !e.eoo() && e.type() != RegEx && e.getGtLtOp() == BSONObj::opIN ) {
             set< BSONElement, element_lt > vals;
+            vector< FieldRange > regexes;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
             BSONObjIterator i( e.embeddedObject() );
-            while( i.more() )
-                vals.insert( i.next() );
+            while( i.more() ) {
+                BSONElement ie = i.next();
+                if ( ie.type() == RegEx ) {
+                    regexes.push_back( FieldRange( ie, false, optimize ) );
+                } else {
+                    vals.insert( ie );
+                }
+            }
 
             for( set< BSONElement, element_lt >::const_iterator i = vals.begin(); i != vals.end(); ++i )
                 intervals_.push_back( FieldInterval(*i) );
 
+            for( vector< FieldRange >::const_iterator i = regexes.begin(); i != regexes.end(); ++i )
+                *this |= *i;
+            
             return;
         }
         
@@ -177,7 +187,7 @@ namespace mongo {
                     upperInclusive = false; //MaxForType String is an empty Object
                 }
 
-                // regex matches self
+                // regex matches self - regex type > string type
                 if (e.type() == RegEx){
                     BSONElement re = addObj( BSON( "" << e ) ).firstElement();
                     intervals_.push_back( FieldInterval(re) );
@@ -237,13 +247,30 @@ namespace mongo {
         case BSONObj::opALL: {
             massert( 10370 ,  "$all requires array", e.type() == Array );
             BSONObjIterator i( e.embeddedObject() );
-            if ( i.more() ){
+            bool bound = false;
+            while ( i.more() ){
                 BSONElement x = i.next();
                 if ( x.type() == Object && x.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ){
                     // this is a bit more complex...
                 }
-                else {
+                else if ( x.type() != RegEx ) {
                     lower = upper = x;
+                    bound = true;
+                    break;
+                }
+            }
+            if ( !bound ) { // if no good non regex bound found, try regex bounds
+                BSONObjIterator i( e.embeddedObject() );
+                while( i.more() ) {
+                    BSONElement x = i.next();
+                    if ( x.type() != RegEx )
+                        continue;
+                    string simple = simpleRegex( x.regex(), x.regexFlags() );
+                    if ( !simple.empty() ) {
+                        lower = addObj( BSON( "" << simple ) ).firstElement();
+                        upper = addObj( BSON( "" << simpleRegexEnd( simple ) ) ).firstElement();
+                        break;
+                    }
                 }
             }
             break;
@@ -349,6 +376,58 @@ namespace mongo {
         if ( _special.size() == 0 && other._special.size() )
             _special = other._special;
         return *this;
+    }
+    
+    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector< FieldInterval > &newIntervals ) {
+        if ( low.bound_.eoo() ) {
+            low = lower.lower_; high = lower.upper_;
+        } else {
+            if ( high.bound_.woCompare( lower.lower_.bound_, false ) < 0 ) { // when equal but neither inclusive, just assume they overlap, since current btree scanning code just as efficient either way
+                FieldInterval tmp;
+                tmp.lower_ = low;
+                tmp.upper_ = high;
+                newIntervals.push_back( tmp );
+                low = lower.lower_; high = lower.upper_;                    
+            } else {
+                high = lower.upper_;
+            }
+        }        
+    }
+    
+    const FieldRange &FieldRange::operator|=( const FieldRange &other ) {
+        vector< FieldInterval > newIntervals;
+        FieldBound low;
+        FieldBound high;
+        vector< FieldInterval >::const_iterator i = intervals_.begin();
+        vector< FieldInterval >::const_iterator j = other.intervals_.begin();
+        while( i != intervals_.end() && j != other.intervals_.end() ) {
+            int cmp = i->lower_.bound_.woCompare( j->lower_.bound_, false );
+            if ( ( cmp == 0 && i->lower_.inclusive_ ) || cmp < 0 ) {
+                handleInterval( *i, low, high, newIntervals );
+                ++i;
+            } else {
+                handleInterval( *j, low, high, newIntervals );
+                ++j;
+            } 
+        }
+        while( i != intervals_.end() ) {
+            handleInterval( *i, low, high, newIntervals );
+            ++i;            
+        }
+        while( j != other.intervals_.end() ) {
+            handleInterval( *j, low, high, newIntervals );
+            ++j;            
+        }
+        FieldInterval tmp;
+        tmp.lower_ = low;
+        tmp.upper_ = high;
+        newIntervals.push_back( tmp );        
+        intervals_ = newIntervals;
+        for( vector< BSONObj >::const_iterator i = other.objData_.begin(); i != other.objData_.end(); ++i )
+            objData_.push_back( *i );
+        if ( _special.size() == 0 && other._special.size() )
+            _special = other._special;
+        return *this;        
     }
     
     BSONObj FieldRange::addObj( const BSONObj &o ) {

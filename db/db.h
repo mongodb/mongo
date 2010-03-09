@@ -205,7 +205,6 @@ namespace mongo {
 
     extern TicketHolder connTicketHolder;
 
-
 } // namespace mongo
 
 //#include "dbinfo.h"

@@ -1559,12 +1559,42 @@ namespace mongo {
         virtual bool requiresAuth() {
             return false;
         }
+        virtual void help( stringstream &help ) const {
+            help << "{whatsmyuri:1}";
+        }        
         virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             BSONObj info = cc().curop()->infoNoauth();
             result << "you" << info[ "client" ];
             return true;
         }
     } cmdWhatsMyUri;
+    
+    /* For testing only, not for general use */
+    class GodInsert : public Command {
+    public:
+        GodInsert() : Command( "godinsert" ) { }
+        virtual bool logTheOp() {
+            return true;
+        }
+        virtual bool slaveOk() {
+            return false;
+        }
+        virtual LockType locktype() { return WRITE; }
+        virtual bool requiresAuth() {
+            return true;
+        }
+        virtual void help( stringstream &help ) const {
+            help << "[for testing only]";
+        }        
+        virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            string coll = cmdObj[ "godinsert" ].valuestrsafe();
+            uassert( 13049, "godinsert must specify a collection", !coll.empty() );
+            string ns = nsToDatabase( dbname ) + "." + coll;
+            BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
+            DiskLoc loc = theDataFileMgr.insert( ns.c_str(), obj, true );
+            return true;
+        }
+    } cmdGodInsert;
     
     /** 
      * this handles
