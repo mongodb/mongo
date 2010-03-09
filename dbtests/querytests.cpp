@@ -28,7 +28,7 @@
 #include "dbtests.h"
 
 namespace mongo {
-    extern int _findingStartInitialTimeout;
+    extern int __findingStartInitialTimeout;
 }
 
 namespace QueryTests {
@@ -931,11 +931,11 @@ namespace QueryTests {
 
     class FindingStart : public CollectionBase {
     public:
-        FindingStart() : CollectionBase( "findingstart" ), _old( _findingStartInitialTimeout ) {
-            _findingStartInitialTimeout = 0;
+        FindingStart() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
+            __findingStartInitialTimeout = 0;
         }
         ~FindingStart() {
-            _findingStartInitialTimeout = _old;
+            __findingStartInitialTimeout = _old;
         }
         
         void run() {

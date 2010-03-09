@@ -69,6 +69,8 @@ namespace mongo {
     
     IdTracker &idTracker = *( new IdTracker() );
     
+    int __findingStartInitialTimeout = 5; // configurable for testing    
+
 } // namespace mongo
 
 #include "replset.h"
