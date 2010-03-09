@@ -273,27 +273,6 @@ namespace mongo {
         }
     
         if ( value->IsObject() ){
-            // The user could potentially modify the fields of these special objects,
-            // wreaking havoc when we attempt to reinterpret them.  Not doing any validation
-            // for now...
-            Local< v8::Object > obj = value->ToObject();
-            if ( obj->InternalFieldCount() && obj->GetInternalField( 0 )->IsNumber() ) {
-                switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
-                    case Timestamp:
-                        b.appendTimestamp( sname.c_str(),
-                                          Date_t( obj->Get( v8::String::New( "t" ) )->ToNumber()->Value() ),
-                                          obj->Get( v8::String::New( "i" ) )->ToInt32()->Value() );
-                        return;
-                    case MinKey:
-                        b.appendMinKey( sname.c_str() );
-                        return;
-                    case MaxKey:
-                        b.appendMaxKey( sname.c_str() );
-                        return;
-                    default:
-                        assert( "invalid internal field" == 0 );
-                }
-            }
             string s = toSTLString( value );
             if ( s.size() && s[0] == '/' ){
                 s = s.substr( 1 );
