@@ -1,5 +1,7 @@
 // Test handling of clock skew and optimes across mongod instances
 
+if ( typeof( BinData ) != "undefined" ) { // don't run in v8
+
 var baseName = "jstests_repl_master1test";
 
 oplog = function() {
@@ -47,3 +49,5 @@ am().save( {} );
 sleep( 3000 ); // make sure dies on its own before stop() called
 
 assert.eq( 47 /*EXIT_CLOCK_SKEW*/, rt.stop( true ) );
+
+}
