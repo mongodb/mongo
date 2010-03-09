@@ -79,9 +79,8 @@ namespace mongo {
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // database->name is the one we are logging out...
-            Client& client = cc();
-            AuthenticationInfo *ai = client.getAuthenticationInfo();
-            ai->logout(client.database()->name.c_str());
+            AuthenticationInfo *ai = cc().getAuthenticationInfo();
+            ai->logout(nsToDatabase(ns));
             return true;
         }
     } cmdLogout;
