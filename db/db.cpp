@@ -435,7 +435,7 @@ namespace mongo {
                 }
                 sleepmillis( (int)(_sleepsecs * 1000) );
                 MemoryMappedFile::flushAll( false );
-                log(1) << "flushing mmmap" << endl;
+                log(1) << "flushing mmap" << endl;
             }
         }
         
