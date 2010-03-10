@@ -77,7 +77,7 @@ ThreadPool::ThreadPool(int nThreads)
     : _tasksRemaining(0)
     , _nThreads(nThreads)
 {
-    scoped_lock lock(_mutex);
+    boostlock lock(_mutex);
     while (nThreads-- > 0){
         Worker* worker = new Worker(*this);
         _freeWorkers.push_front(worker);
@@ -99,14 +99,14 @@ ThreadPool::~ThreadPool(){
 }
 
 void ThreadPool::join(){
-    scoped_lock lock(_mutex);
+    boostlock lock(_mutex);
     while(_tasksRemaining){
         _condition.wait(lock);
     }
 }
 
 void ThreadPool::schedule(Task task){
-    scoped_lock lock(_mutex);
+    boostlock lock(_mutex);
 
     _tasksRemaining++;
 
@@ -120,7 +120,7 @@ void ThreadPool::schedule(Task task){
 
 // should only be called by a worker from the worker thread
 void ThreadPool::task_done(Worker* worker){
-    scoped_lock lock(_mutex);
+    boostlock lock(_mutex);
 
     if (!_tasks.empty()){
         worker->set_task(_tasks.front());

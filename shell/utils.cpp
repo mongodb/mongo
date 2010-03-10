@@ -195,11 +195,11 @@ namespace mongo {
         map< pid_t, HANDLE > handles;
 #endif
         
-        mongo::mutex mongoProgramOutputMutex;
+        boost::mutex &mongoProgramOutputMutex( *( new boost::mutex ) );
         stringstream mongoProgramOutput_;
 
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
             stringstream buf;
             if ( port > 0 )
                 buf << "m" << port << "| " << line;
@@ -211,7 +211,7 @@ namespace mongo {
         
         // only returns last 100000 characters
         BSONObj RawMongoProgramOutput( const BSONObj &args ) {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
             string out = mongoProgramOutput_.str();
             size_t len = out.length();
             if ( len > 100000 )
@@ -220,7 +220,7 @@ namespace mongo {
         }
 
         BSONObj ClearRawMongoProgramOutput( const BSONObj &args ) {
-            mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
+            boost::mutex::scoped_lock lk( mongoProgramOutputMutex );
             mongoProgramOutput_.str( "" );
             return undefined_;
         }

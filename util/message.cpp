@@ -138,22 +138,23 @@ namespace mongo {
 
     class Ports { 
         set<MessagingPort*>& ports;
-        mongo::mutex m;
+        boost::mutex& m;
     public:
         // we "new" this so it is still be around when other automatic global vars
         // are being destructed during termination.
-        Ports() : ports( *(new set<MessagingPort*>()) ) {}
+        Ports() : ports( *(new set<MessagingPort*>()) ), 
+            m( *(new boost::mutex()) ) { }
         void closeAll() { \
-            scoped_lock bl(m);
+            boostlock bl(m);
             for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
                 (*i)->shutdown();
         }
         void insert(MessagingPort* p) { 
-            scoped_lock bl(m);
+            boostlock bl(m);
             ports.insert(p);
         }
         void erase(MessagingPort* p) { 
-            scoped_lock bl(m);
+            boostlock bl(m);
             ports.erase(p);
         }
     } ports;

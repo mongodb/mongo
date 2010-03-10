@@ -151,7 +151,7 @@ namespace mongo {
         unsigned long long getNextOpTime() const;
     private:
         map<string,DBConfig*> _databases;
-        mongo::mutex _lock; // TODO: change to r/w lock
+        boost::mutex _lock; // TODO: change to r/w lock
     };
 
     class ConfigServer : public DBConfig {

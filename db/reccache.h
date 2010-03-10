@@ -49,7 +49,7 @@ class RecCache {
         bool dirty;
         Node *older, *newer; // lru
     };
-    mongo::mutex rcmutex; // mainly to coordinate with the lazy writer thread
+    boost::mutex &rcmutex; // mainly to coordinate with the lazy writer thread
     unsigned recsize;
     map<DiskLoc, Node*> m; // the cache
     Node *newest, *oldest;
@@ -134,7 +134,7 @@ private:
 public:
     /* all public functions (except constructor) should use the mutex */
 
-    RecCache(unsigned recsz) : recsize(recsz) { 
+    RecCache(unsigned recsz) : rcmutex( *( new boost::mutex() ) ), recsize(recsz) { 
         nnodes = 0;
         newest = oldest = 0;
     }
@@ -156,7 +156,7 @@ public:
     */
     void dirty(DiskLoc d) {
         assert( d.a() >= Base );
-        scoped_lock lk(rcmutex);
+        boostlock lk(rcmutex);
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
             Node *n = i->second;
@@ -171,7 +171,7 @@ public:
         assert( d.a() >= Base );
         assert( len == recsize );
 
-        scoped_lock lk(rcmutex);
+        boostlock lk(rcmutex);
         map<DiskLoc, Node*>::iterator i = m.find(d);
         if( i != m.end() ) {
             touch(i->second);
@@ -188,7 +188,7 @@ public:
     void drop(const char *ns);
 
     DiskLoc insert(const char *ns, const void *obuf, int len, bool god) {
-        scoped_lock lk(rcmutex);
+        boostlock lk(rcmutex);
         BasicRecStore& rs = store(ns);
         fileofs o = rs.insert((const char *) obuf, len);
         assert( o % recsize == 0 );

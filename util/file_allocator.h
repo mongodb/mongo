@@ -54,7 +54,7 @@ namespace mongo {
                on windows anyway as we don't have to pre-zero the file there.
             */
 #if !defined(_WIN32)
-            scoped_lock lk( pendingMutex_ );
+            boostlock lk( pendingMutex_ );
             if ( failed_ )
                 return;
             long oldSize = prevSize( name );
@@ -71,7 +71,7 @@ namespace mongo {
         // updated to match existing file size.
         void allocateAsap( const string &name, long &size ) {
 #if !defined(_WIN32)
-            scoped_lock lk( pendingMutex_ );
+            boostlock lk( pendingMutex_ );
             long oldSize = prevSize( name );
             if ( oldSize != -1 ) {
                 size = oldSize;
@@ -100,7 +100,7 @@ namespace mongo {
 #if !defined(_WIN32)
             if ( failed_ )
                 return;
-            scoped_lock lk( pendingMutex_ );
+            boostlock lk( pendingMutex_ );
             while( pending_.size() != 0 )
                 pendingUpdated_.wait( lk );
 #endif
@@ -130,7 +130,7 @@ namespace mongo {
             return false;
         }
 
-        mutable mongo::mutex pendingMutex_;
+        mutable boost::mutex pendingMutex_;
         mutable boost::condition pendingUpdated_;
         list< string > pending_;
         mutable map< string, long > pendingSize_;
@@ -142,7 +142,7 @@ namespace mongo {
             void operator()() {
                 while( 1 ) {
                     {
-                        scoped_lock lk( a_.pendingMutex_ );
+                        boostlock lk( a_.pendingMutex_ );
                         if ( a_.pending_.size() == 0 )
                             a_.pendingUpdated_.wait( lk );
                     }
@@ -150,7 +150,7 @@ namespace mongo {
                         string name;
                         long size;
                         {
-                            scoped_lock lk( a_.pendingMutex_ );
+                            boostlock lk( a_.pendingMutex_ );
                             if ( a_.pending_.size() == 0 )
                                 break;
                             name = a_.pending_.front();
@@ -206,7 +206,7 @@ namespace mongo {
                                 BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
                             } catch ( ... ) {
                             }
-                            scoped_lock lk( a_.pendingMutex_ );
+                            boostlock lk( a_.pendingMutex_ );
                             a_.failed_ = true;
                             // not erasing from pending
                             a_.pendingUpdated_.notify_all();
@@ -214,7 +214,7 @@ namespace mongo {
                         }
                         
                         {
-                            scoped_lock lk( a_.pendingMutex_ );
+                            boostlock lk( a_.pendingMutex_ );
                             a_.pendingSize_.erase( name );
                             a_.pending_.pop_front();
                             a_.pendingUpdated_.notify_all();

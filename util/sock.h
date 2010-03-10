@@ -245,18 +245,18 @@ namespace mongo {
         }
         
         void add( int sock ){
-            scoped_lock lk( _mutex );
+            boostlock lk( _mutex );
             _sockets->insert( sock );
         }
         void remove( int sock ){
-            scoped_lock lk( _mutex );
+            boostlock lk( _mutex );
             _sockets->erase( sock );
         }
         
         void closeAll(){
             set<int>* s;
             {
-                scoped_lock lk( _mutex );
+                boostlock lk( _mutex );
                 s = _sockets;
                 _sockets = new set<int>();
             }
@@ -272,7 +272,7 @@ namespace mongo {
         static ListeningSockets* get();
 
     private:
-        mongo::mutex _mutex;
+        boost::mutex _mutex;
         set<int>* _sockets;
         static ListeningSockets* _instance;
     };

@@ -68,7 +68,7 @@ namespace mongo {
         };
 
         vector<boost::shared_ptr<StickyThread> > thread_pool;
-        mongo::mutex tp_mutex; // this is only needed if io_service::run() is called from multiple threads
+        boost::mutex tp_mutex; // this is only needed if io_service::run() is called from multiple threads
     }
 
     class MessageServerSession : public boost::enable_shared_from_this<MessageServerSession> , public AbstractMessagingPort {
@@ -117,7 +117,7 @@ namespace mongo {
         
         void handleReadBody( const boost::system::error_code& error ){
             if (!_myThread){
-                mongo::mutex::scoped_lock(tp_mutex);
+                boost::mutex::scoped_lock(tp_mutex);
                 if (!thread_pool.empty()){
                     _myThread = thread_pool.back();
                     thread_pool.pop_back();
@@ -148,7 +148,7 @@ namespace mongo {
         void handleWriteDone( const boost::system::error_code& error ){
             {
                 // return thread to pool after we have sent data to the client
-                mongo::mutex::scoped_lock(tp_mutex);
+                boost::mutex::scoped_lock(tp_mutex);
                 assert(_myThread);
                 thread_pool.push_back(_myThread);
                 _myThread.reset();

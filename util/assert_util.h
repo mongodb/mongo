@@ -32,7 +32,7 @@ namespace mongo {
             when = 0;
         }
     private:
-        static mongo::mutex *_mutex;
+        static boost::mutex *_mutex;
         char msg[128];
         char context[128];
         const char *file;
@@ -44,7 +44,7 @@ namespace mongo {
                 /* asserted during global variable initialization */
                 return;
             }
-            scoped_lock lk(*_mutex);
+            boostlock lk(*_mutex);
             strncpy(msg, m, 127);
             strncpy(context, ctxt, 127);
             file = f;

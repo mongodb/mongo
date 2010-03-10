@@ -243,7 +243,7 @@ namespace mongo {
         }
 
         void done( const string& pool , Scope * s ){
-            scoped_lock lk( _mutex );
+            boostlock lk( _mutex );
             list<Scope*> & l = _pools[pool];
             if ( l.size() > 10 ){
                 delete s;
@@ -255,7 +255,7 @@ namespace mongo {
         }
         
         Scope * get( const string& pool ){
-            scoped_lock lk( _mutex );
+            boostlock lk( _mutex );
             list<Scope*> & l = _pools[pool];
             if ( l.size() == 0 )
                 return 0;
@@ -283,7 +283,7 @@ namespace mongo {
 
     private:
         PoolToScopes _pools;
-        mongo::mutex _mutex;
+        boost::mutex _mutex;
         int _magic;
     };
 

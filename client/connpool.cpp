@@ -27,7 +27,7 @@ namespace mongo {
     DBConnectionPool pool;
     
     DBClientBase* DBConnectionPool::get(const string& host) {
-        scoped_lock L(poolMutex);
+        boostlock L(poolMutex);
         
         PoolForHost *&p = pools[host];
         if ( p == 0 )
@@ -64,7 +64,7 @@ namespace mongo {
     }
 
     void DBConnectionPool::flush(){
-        scoped_lock L(poolMutex);
+        boostlock L(poolMutex);
         for ( map<string,PoolForHost*>::iterator i = pools.begin(); i != pools.end(); i++ ){
             PoolForHost* p = i->second;
 

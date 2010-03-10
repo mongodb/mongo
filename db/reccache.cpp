@@ -238,7 +238,7 @@ inline void RecCache::writeIfDirty(Node *n) {
 
 void RecCache::closeFiles(string dbname, string path) { 
     assertInWriteLock();
-    scoped_lock lk(rcmutex);
+    boostlock lk(rcmutex);
 
     // first we write all dirty pages.  it is not easy to check which Nodes are for a particular
     // db, so we just write them all.
@@ -259,7 +259,7 @@ void RecCache::closeFiles(string dbname, string path) {
 }
 
 void RecCache::closing() { 
-    scoped_lock lk(rcmutex);
+    boostlock lk(rcmutex);
     (cout << "TEMP: recCacheCloseAll() writing dirty pages...\n").flush();
     writeDirty( dirtyl.begin(), true );
     for( unsigned i = 0; i < stores.size(); i++ ) { 
@@ -296,7 +296,7 @@ void RecCache::writeLazily() {
     int sleep = 0;
     int k;
     {
-        scoped_lock lk(rcmutex);
+        boostlock lk(rcmutex);
         Timer t;
         set<DiskLoc>::iterator i = dirtyl.end();
         for( k = 0; k < 100; k++ ) {
@@ -318,7 +318,7 @@ void RecCache::writeLazily() {
 }
 
 void RecCache::_ejectOld() { 
-    scoped_lock lk(rcmutex);
+    boostlock lk(rcmutex);
     if( nnodes <= MAXNODES )
         return;
     Node *n = oldest;
@@ -384,7 +384,7 @@ void RecCache::closeStore(BasicRecStore *rs) {
 
 void RecCache::drop(const char *_ns) { 
     // todo: test with a non clean shutdown file
-    scoped_lock lk(rcmutex);
+    boostlock lk(rcmutex);
 
     map<string, BasicRecStore*>::iterator it = storesByNsKey.find(mknskey(_ns));
     string fname;

@@ -105,13 +105,13 @@ namespace mongo {
     }
     
     
-    mongo::mutex *Assertion::_mutex = new mongo::mutex();
+    boost::mutex *Assertion::_mutex = new boost::mutex();
 
     string Assertion::toString() {
         if( _mutex == 0 )
             return "";
 
-        scoped_lock lk(*_mutex);
+        boostlock lk(*_mutex);
 
         if ( !isSet() )
             return "";

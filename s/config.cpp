@@ -297,7 +297,7 @@ namespace mongo {
         if ( database == "config" )
             return &configServer;
 
-        scoped_lock l( _lock );
+        boostlock l( _lock );
 
         DBConfig*& cc = _databases[database];
         if ( cc == 0 ){
@@ -333,7 +333,7 @@ namespace mongo {
 
     void Grid::removeDB( string database ){
         uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
-        scoped_lock l( _lock );
+        boostlock l( _lock );
         _databases.erase( database );
         
     }

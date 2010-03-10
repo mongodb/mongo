@@ -83,7 +83,7 @@ namespace mongo {
                 _c = 0;
             }
             Pointer(long long cursorid) {
-                recursive_scoped_lock lock(ccmutex);
+                recursive_boostlock lock(ccmutex);
                 _c = ClientCursor::find_inlock(cursorid, true);
                 if( _c ) {
                     if( _c->_pinValue >= 100 ) {
@@ -113,7 +113,7 @@ namespace mongo {
         {
             if( !okToTimeout )
                 noTimeout();
-            recursive_scoped_lock lock(ccmutex);
+            recursive_boostlock lock(ccmutex);
             cursorid = allocCursorId_inlock();
             clientCursorsById.insert( make_pair(cursorid, this) );
         }
@@ -155,7 +155,7 @@ namespace mongo {
         }
     public:
         static ClientCursor* find(CursorId id, bool warn = true) { 
-            recursive_scoped_lock lock(ccmutex);
+            recursive_boostlock lock(ccmutex);
             ClientCursor *c = find_inlock(id, warn);
 			// if this asserts, your code was not thread safe - you either need to set no timeout 
 			// for the cursor or keep a ClientCursor::Pointer in scope for it.
@@ -164,7 +164,7 @@ namespace mongo {
         }
 
         static bool erase(CursorId id) {
-            recursive_scoped_lock lock(ccmutex);
+            recursive_boostlock lock(ccmutex);
             ClientCursor *cc = find_inlock(id);
             if ( cc ) {
                 assert( cc->_pinValue < 100 ); // you can't still have an active ClientCursor::Pointer

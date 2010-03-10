@@ -525,7 +525,6 @@ int _main(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
-    static mongo::StaticObserver staticObserver;
     try {
         return _main( argc , argv );
     }

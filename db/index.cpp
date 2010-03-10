@@ -79,7 +79,7 @@ namespace mongo {
     }
 
     const IndexSpec& IndexDetails::getSpec() const {
-        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
+        boostlock lk(NamespaceDetailsTransient::_qcMutex);
         return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 

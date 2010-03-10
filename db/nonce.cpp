@@ -49,8 +49,8 @@ namespace mongo {
     }
     
     nonce Security::getNonce(){
-        static mongo::mutex m;
-        scoped_lock lk(m);
+        static boost::mutex m;
+        boostlock lk(m);
 
 		/* question/todo: /dev/random works on OS X.  is it better 
 		   to use that than random() / srandom()?

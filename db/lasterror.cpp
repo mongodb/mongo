@@ -28,7 +28,7 @@ namespace mongo {
 
     LastError LastError::noError;
     LastErrorHolder lastError;
-    mongo::mutex LastErrorHolder::_idsmutex;
+    boost::mutex LastErrorHolder::_idsmutex;
 
     void LastError::appendSelf( BSONObjBuilder &b ) {
         if ( !valid ) {
@@ -75,7 +75,7 @@ namespace mongo {
         if ( id == 0 )
             return _tl.get();
 
-        scoped_lock lock(_idsmutex);        
+        boostlock lock(_idsmutex);        
         map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() ){
             if ( ! create )
@@ -95,7 +95,7 @@ namespace mongo {
     }
 
     void LastErrorHolder::remove( int id ){
-        scoped_lock lock(_idsmutex);
+        boostlock lock(_idsmutex);
         map<int,Status>::iterator i = _ids.find( id );
         if ( i == _ids.end() )
             return;
@@ -121,7 +121,7 @@ namespace mongo {
             return;
         }
 
-        scoped_lock lock(_idsmutex);
+        boostlock lock(_idsmutex);
         Status & status = _ids[id];
         status.time = time(0);
         status.lerr = le;

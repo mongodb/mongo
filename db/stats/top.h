@@ -81,7 +81,7 @@ namespace mongo {
         
         void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
-        mongo::mutex _lock;
+        boost::mutex _lock;
         CollectionData _global;
         UsageMap _usage;
     };
@@ -115,7 +115,7 @@ namespace mongo {
             D d = currentTime() - _currentStart;
 
             {
-                scoped_lock L(topMutex);
+                boostlock L(topMutex);
                 recordUsage( _current, d );
             }
 
@@ -134,7 +134,7 @@ namespace mongo {
         };
 
         static void usage( vector< Usage > &res ) {
-            scoped_lock L(topMutex);
+            boostlock L(topMutex);
 
             // Populate parent namespaces
             UsageMap snapshot;
@@ -172,7 +172,7 @@ namespace mongo {
         }
 
         static void completeSnapshot() {
-            scoped_lock L(topMutex);
+            boostlock L(topMutex);
 
             if ( &_snapshot == &_snapshotA ) {
                 _snapshot = _snapshotB;
@@ -187,7 +187,7 @@ namespace mongo {
         }
 
     private:
-        static mongo::mutex topMutex;
+        static boost::mutex topMutex;
         static bool trivialNs( const char *ns ) {
             const char *ret = strrchr( ns, '.' );
             return ret && ret[ 1 ] == '\0';
