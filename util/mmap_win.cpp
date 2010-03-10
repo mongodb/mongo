@@ -99,7 +99,22 @@ namespace mongo {
         return view;
     }
 
-    void MemoryMappedFile::flush(bool) {
-    }
+    void MemoryMappedFile::flush(bool sync) {
+        if (!view) return;
 
+        // Note: this is blocking and ignores sync
+        bool success = FlushViewOfFile(view, 0); // 0 means whole mapping
+        if (!success){
+            int err = GetLastError();
+            out() << "FlushViewOfFile failed " << err << " " << endl;
+        }
+
+        if (sync){
+            bool success = FlushFileBuffers(fd);
+            if (!success){
+                int err = GetLastError();
+                out() << "FlushFileBuffers failed " << err << " " << endl;
+            }
+        }
+    }
 } 
