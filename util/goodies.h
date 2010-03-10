@@ -275,7 +275,11 @@ namespace mongo {
         void lock() { me().lock(); }
         void unlock() { me().unlock(); }
         bool try_lock() { return me().try_lock(); }
+#if BOOST_VERSION >= 103500
         typedef boost::unique_lock<mongo::mutex> scoped_lock;
+#else
+        typedef boost::detail::thread::scoped_lock<mongo::mutex> scoped_lock;
+#endif
     private:
         boost::mutex &me() { return *( boost::mutex * )( _buf ); }
         char _buf[ sizeof( boost::mutex ) ];
