@@ -621,7 +621,7 @@ namespace mongo {
                 uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
                 
-                _hasDynamicArray = _hasDynamicArray || strstr( fieldName , "~" ) > 0;
+                _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".$" ) > 0;
                 
                 Mod m;
                 m.init( op , f );
@@ -646,13 +646,13 @@ namespace mongo {
         n->_hasDynamicArray = _hasDynamicArray;
         for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ){
             string s = i->first;
-            size_t idx = s.find( "~" );
+            size_t idx = s.find( ".$" );
             if ( idx == string::npos ){
                 n->_mods[s] = i->second;
                 continue;
             }
             StringBuilder buf(s.size()+strlen(elemMatchKey));
-            buf << s.substr(0,idx) << elemMatchKey << s.substr(idx+1);
+            buf << s.substr(0,idx+1) << elemMatchKey << s.substr(idx+2);
             string fixed = buf.str();
             DEBUGUPDATE( "fixed dynamic: " << s << " -->> " << fixed );
             n->_mods[fixed] = i->second;

@@ -11,6 +11,6 @@ t.update( q , { $set : { b : 5 } } )
 o.b = 5
 assert.eq( o , t.findOne() , "A2" )
 
-t.update( { "a.x" : 2 } , { $inc : { "a.~.y" : 1 } } )
+t.update( { "a.x" : 2 } , { $inc : { "a.$.y" : 1 } } )
 o.a[1].y++;
 assert.eq( o , t.findOne() , "A3" );
