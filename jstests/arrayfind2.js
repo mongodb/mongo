@@ -9,7 +9,9 @@ function go( prefix ){
     assert.eq( 1 , t.find( { a : { $all : [ { $elemMatch : { x : { $lt : 4 } } } ,
                                             { $elemMatch : { x : { $gt : 5 } } } ] } } ).count() , prefix + " A4" );
     
-    
+    assert.throws( function() { return t.findOne( { a : { $all : [ 1, { $elemMatch : { x : 3 } } ] } } ) } );
+    assert.throws( function() { return t.findOne( { a : { $all : [ /a/, { $elemMatch : { x : 3 } } ] } } ) } );
+        
 }
 
 t.save( { a : [ { x : 1 } , { x : 5 } ] } )
@@ -20,3 +22,14 @@ go( "no index" );
 t.ensureIndex( { a : 1 } );
 go( "index(a)" );
 
+assert.eq( [], t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
+
+t.ensureIndex( { "a.x": 1 } );
+
+assert.eq( [ [ {"a.x":3},{"a.x":3} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
+// only first $elemMatch used to find bounds
+assert.eq( [ [ {"a.x":3},{"a.x":3} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3 } }, { $elemMatch : { y : 5 } } ] } } ).explain().indexBounds );
+
+t.ensureIndex( { "a.x":1,"a.y":-1 } );
+
+assert.eq( [ [ {"a.x":3,"a.y":1.7976931348623157e+308},{"a.x":3,"a.y":4} ] ], t.find( { a : { $all : [ { $elemMatch : { x : 3, y : { $gt: 4 } } } ] } } ).explain().indexBounds );

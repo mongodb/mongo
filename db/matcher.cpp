@@ -136,7 +136,7 @@ namespace mongo {
         }
         
         if ( allMatchers.size() ){
-            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0);
+            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0 && !myregex.get());
         }
         
     }
@@ -518,7 +518,7 @@ namespace mongo {
                 return 1;
             }
             
-            if ( em.myset->size() == 0 && !em.myregex.get() ) // what about $elemMatch?
+            if ( em.myset->size() == 0 && !em.myregex.get() )
                 return -1; // is this desired?
             
             BSONObjSetDefaultOrder actualKeys;
