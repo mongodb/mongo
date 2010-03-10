@@ -604,12 +604,15 @@ namespace mongo {
                 fromhost = ss.str();
             }
             authConn_.reset( new DBClientConnection() );
-            if ( !authConn_->connect( fromhost, errmsg ) )
-                return false;
             BSONObj ret;
-            if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
-                errmsg = "couldn't get nonce " + string( ret );
-                return false;
+            {
+                dbtemprelease t;
+                if ( !authConn_->connect( fromhost, errmsg ) )
+                    return false;
+                if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
+                    errmsg = "couldn't get nonce " + string( ret );
+                    return false;
+                }
             }
             result.appendElements( ret );
             return true;
@@ -654,9 +657,12 @@ namespace mongo {
             if ( !username.empty() && !nonce.empty() && !key.empty() ) {
                 uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
                 BSONObj ret;
-                if ( !authConn_->runCommand( fromdb, BSON( "authenticate" << 1 << "user" << username << "nonce" << nonce << "key" << key ), ret ) ) {
-                    errmsg = "unable to login " + string( ret );
-                    return false;
+                {
+                    dbtemprelease t;
+                    if ( !authConn_->runCommand( fromdb, BSON( "authenticate" << 1 << "user" << username << "nonce" << nonce << "key" << key ), ret ) ) {
+                        errmsg = "unable to login " + string( ret );
+                        return false;
+                    }
                 }
                 c.setConnection( authConn_.release() );
             }
