@@ -38,7 +38,7 @@ namespace mongo {
            7 = log a few reads, and all writes.
         */
         int level;
-        boost::mutex mutex;
+        mongo::mutex mutex;
 
         DiagLog() : f(0) , level(0) { }
         void init() {
@@ -65,13 +65,13 @@ namespace mongo {
         }
         void flush() {
             if ( level ){
-                boostlock lk(mutex);
+                scoped_lock lk(mutex);
                 f->flush();
             }
         }
         void write(char *data,int len) {
             if ( level & 1 ){
-                boostlock lk(mutex);
+                scoped_lock lk(mutex);
                 f->write(data,len);
             }
         }
@@ -80,7 +80,7 @@ namespace mongo {
                 bool log = (level & 4) == 0;
                 OCCASIONALLY log = true;
                 if ( log ){
-                    boostlock lk(mutex);
+                    scoped_lock lk(mutex);
                     f->write(data,len);
                 }
             }

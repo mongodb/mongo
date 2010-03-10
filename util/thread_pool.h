@@ -62,7 +62,7 @@ namespace threadpool {
         int tasks_remaining() { return _tasksRemaining; }
 
         private:
-        boost::mutex _mutex;
+        mongo::mutex _mutex;
         boost::condition _condition;
 
         list<Worker*> _freeWorkers; //used as LIFO stack (always front)

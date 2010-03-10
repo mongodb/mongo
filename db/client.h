@@ -42,7 +42,7 @@ namespace mongo {
 
     class Client : boost::noncopyable { 
     public:
-        static boost::mutex clientsMutex;
+        static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
 
         class GodScope {

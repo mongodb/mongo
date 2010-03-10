@@ -46,7 +46,7 @@ namespace mongo {
 
 
     void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
-        boostlock lk(_lock);
+        scoped_lock lk(_lock);
 
         CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
@@ -95,13 +95,13 @@ namespace mongo {
     }
 
     Top::UsageMap Top::cloneMap(){
-        boostlock lk(_lock);
+        scoped_lock lk(_lock);
         UsageMap x = _usage;
         return x;
     }
 
     void Top::append( BSONObjBuilder& b ){
-        boostlock lk( _lock );
+        scoped_lock lk( _lock );
         append( b , _usage );
     }
 
@@ -163,7 +163,7 @@ namespace mongo {
     TopOld::UsageMap TopOld::_snapshotB;
     TopOld::UsageMap &TopOld::_snapshot = TopOld::_snapshotA;
     TopOld::UsageMap &TopOld::_nextSnapshot = TopOld::_snapshotB;
-    boost::mutex TopOld::topMutex;
+    mongo::mutex TopOld::topMutex;
 
 
 }

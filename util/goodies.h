@@ -253,8 +253,36 @@ namespace mongo {
         return secs*1000000 + t;
     }
     using namespace boost;
-    typedef boost::mutex::scoped_lock boostlock;
-    typedef boost::recursive_mutex::scoped_lock recursive_boostlock;
+    
+    extern bool __destroyingStatics;
+    
+    // If you create a local static instance of this class, that instance will be destroyed
+    // before all global static objects are destroyed, so __destroyingStatics will be set
+    // to true before the global static variables are destroyed.
+    class StaticObserver : boost::noncopyable {
+    public:
+        ~StaticObserver() { __destroyingStatics = true; }
+    };
+    
+    class mutex : boost::noncopyable {
+    public:
+        mutex() { new (_buf) boost::mutex(); }
+        ~mutex() {
+            if( !__destroyingStatics ) {
+                me().boost::mutex::~mutex();
+            }
+        }
+        void lock() { me().lock(); }
+        void unlock() { me().unlock(); }
+        bool try_lock() { return me().try_lock(); }
+        typedef boost::unique_lock<mongo::mutex> scoped_lock;
+    private:
+        boost::mutex &me() { return *( boost::mutex * )( _buf ); }
+        char _buf[ sizeof( boost::mutex ) ];
+    };
+    
+    typedef mongo::mutex::scoped_lock scoped_lock;
+    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
 
 // simple scoped timer
     class Timer {
@@ -293,7 +321,7 @@ namespace mongo {
 
     class DebugMutex : boost::noncopyable {
     	friend class lock;
-    	boost::mutex m;
+    	mongo::mutex m;
     	int locked;
     public:
     	DebugMutex() : locked(0); { }
@@ -302,7 +330,7 @@ namespace mongo {
 
     */
 
-//typedef boostlock lock;
+//typedef scoped_lock lock;
 
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
@@ -443,7 +471,7 @@ namespace mongo {
         }
         
         bool tryAcquire(){
-            boostlock lk( _mutex );
+            scoped_lock lk( _mutex );
             if ( _num <= 0 ){
                 if ( _num < 0 ){
                     cerr << "DISASTER! in TicketHolder" << endl;
@@ -455,12 +483,12 @@ namespace mongo {
         }
         
         void release(){
-            boostlock lk( _mutex );
+            scoped_lock lk( _mutex );
             _num++;
         }
 
         void resize( int newSize ){
-            boostlock lk( _mutex );            
+            scoped_lock lk( _mutex );            
             int used = _outof - _num;
             if ( used > newSize ){
                 cout << "ERROR: can't resize since we're using (" << used << ") more than newSize(" << newSize << ")" << endl;
@@ -482,7 +510,7 @@ namespace mongo {
     private:
         int _outof;
         int _num;
-        boost::mutex _mutex;
+        mongo::mutex _mutex;
     };
 
     class TicketHolderReleaser {

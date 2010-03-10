@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-    boost::mutex Client::clientsMutex;
+    mongo::mutex Client::clientsMutex;
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
@@ -40,7 +40,7 @@ namespace mongo {
       _god(0)
     {
         _curOp = new CurOp( this );
-        boostlock bl(clientsMutex);
+        scoped_lock bl(clientsMutex);
         clients.insert(this);
     }
 
@@ -59,7 +59,7 @@ namespace mongo {
         if ( inShutdown() )
             return false;
         {
-            boostlock bl(clientsMutex);
+            scoped_lock bl(clientsMutex);
             clients.erase(this);
         }
 

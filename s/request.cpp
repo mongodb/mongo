@@ -118,7 +118,7 @@ namespace mongo {
     }
     
     ClientInfo::~ClientInfo(){
-        boostlock lk( _clientsLock );
+        scoped_lock lk( _clientsLock );
         ClientCache::iterator i = _clients.find( _id );
         if ( i != _clients.end() ){
             _clients.erase( i );
@@ -157,7 +157,7 @@ namespace mongo {
             return info;
         }
         
-        boostlock lk( _clientsLock );
+        scoped_lock lk( _clientsLock );
         ClientCache::iterator i = _clients.find( clientId );
         if ( i != _clients.end() )
             return i->second;
@@ -169,7 +169,7 @@ namespace mongo {
     }
         
     map<int,ClientInfo*> ClientInfo::_clients;
-    boost::mutex ClientInfo::_clientsLock;
+    mongo::mutex ClientInfo::_clientsLock;
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 
 } // namespace mongo
