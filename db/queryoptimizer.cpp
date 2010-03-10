@@ -375,7 +375,7 @@ namespace mongo {
         if ( !d )
             return;
 
-        // If table scan is optimal or natural order requested
+        // If table scan is optimal or natural order requested or tailable cursor requested
         if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan

@@ -677,6 +677,16 @@ namespace mongo {
         BSONObj query = pq.getFilter();
         BSONObj order = pq.getOrder();
 
+        if ( pq.hasOption( QueryOption_CursorTailable ) ) {
+            NamespaceDetails *d = nsdetails( ns );
+            uassert( 13051, "tailable cursor requested on non capped collection", d && d->capped );
+            if ( order.isEmpty() ) {
+                order = BSON( "$natural" << 1 );
+            } else {
+                uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == BSON( "$natural" << 1 ) );
+            }
+        }
+        
         if( snapshot ) { 
             NamespaceDetails *d = nsdetails(ns);
             if ( d ){
@@ -710,7 +720,7 @@ namespace mongo {
         }
             
 
-        if ( isSimpleIdQuery( query ) ){
+        if ( isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 
             bool nsFound = false;
