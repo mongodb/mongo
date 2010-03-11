@@ -320,7 +320,12 @@ namespace mongo {
                 return;
             }
         }
-        
+
+        if ( query_.isEmpty() && order_.isEmpty() ){
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+            return;
+        }
+
         if ( fbs_.getSpecial().size() ){
             string special = fbs_.getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
