@@ -47,7 +47,7 @@ namespace mongo {
             ;
         if ( localDBAllowed )
             _options->add_options()
-                ("dbpath",po::value<string>(), "directly access mongod data files in this path, instead of connecting to a mongod instance" )
+                ("dbpath",po::value<string>(), "directly access mongod data files in the given path, instead of connecting to a mongod instance - needs to lock the data directory, so cannot be used if a mongod is currently accessing the same path" )
                 ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
                 ;
 
