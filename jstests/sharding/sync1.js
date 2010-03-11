@@ -12,5 +12,10 @@ assert.eq( 2 , t.find().count() , "A4" );
 
 test.checkHashes( "test" , "A3" );
 
+test.tempKill();
+assert.throws( function(){ t.save( { x : 3 } ) } , "B1" )
+assert.eq( 2 , t.find().itcount() , "B2" );
+test.tempStart();
+test.checkHashes( "test" , "B3" );
 
 test.stop();
