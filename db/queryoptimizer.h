@@ -25,6 +25,8 @@
 namespace mongo {
     
     class IndexDetails;
+    class IndexType;
+
     class QueryPlan : boost::noncopyable {
     public:
         QueryPlan(NamespaceDetails *_d, 
