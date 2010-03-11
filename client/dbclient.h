@@ -369,7 +369,6 @@ namespace mongo {
        Basically just invocations of connection.$cmd.findOne({...});
     */
     class DBClientWithCommands : public DBClientInterface {
-        bool isOk(const BSONObj&);
         set<string> _seenIndexes;
     public:
 
@@ -391,7 +390,7 @@ namespace mongo {
 			       set.
 			@return true if the command returned "ok".
         */
-        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
+        virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
         /** Authorize access to a particular database.
 			Authentication is separate for each database on the server -- you may authenticate for any 
@@ -510,6 +509,7 @@ namespace mongo {
             ProfileOff = 0,
             ProfileSlow = 1, // log very slow (>100ms) operations
             ProfileAll = 2
+            
         };
         bool setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info = 0);
         bool getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info = 0);
@@ -663,6 +663,9 @@ namespace mongo {
 
             return ns.substr( pos + 1 );            
         }
+
+    protected:
+        bool isOk(const BSONObj&);
 
     };
     

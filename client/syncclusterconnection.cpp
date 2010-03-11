@@ -122,8 +122,40 @@ namespace mongo {
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                           const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
 
-        uassert( 10021 ,  "$cmd not support yet in SyncClusterConnection::query" , ns.find( "$cmd" ) == string::npos );
+        if ( ns.find( ".$cmd" ) != string::npos ){
+            string cmdName = query.obj.firstElement().fieldName();
 
+            int lockType = 0;
+            
+            map<string,int>::iterator i = _lockTypes.find( cmdName );
+            if ( i == _lockTypes.end() ){
+                BSONObj info;
+                uassert( 13053 , "help failed" , _commandOnActive( "admin" , BSON( cmdName << "1" << "help" << 1 ) , info ) );
+                lockType = info["lockType"].numberInt();
+                _lockTypes[cmdName] = lockType;
+            }
+            else {
+                lockType = i->second;
+            }
+            
+            uassert( 13054 , "write $cmd not supported in SyncClusterConnection" , lockType <= 0 );
+        }
+
+        return _queryOnActive( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
+    }
+
+    bool SyncClusterConnection::_commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options ){
+        auto_ptr<DBClientCursor> cursor = _queryOnActive( dbname + ".$cmd" , cmd , 1 , 0 , 0 , options , 0 );
+        if ( cursor->more() )
+            info = cursor->next().copy();
+        else
+            info = BSONObj();
+        return isOk( info );
+    }
+    
+    auto_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
+                                                                   const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
+        
         for ( size_t i=0; i<_conns.size(); i++ ){
             try {
                 auto_ptr<DBClientCursor> cursor = 

@@ -648,3 +648,15 @@ SyncCCTest.prototype.stop = function(){
         stopMongod( 30000 + i );
     }
 }
+
+SyncCCTest.prototype.checkHashes = function( dbname , msg ){
+    var hashes = this._connections.map(
+        function(z){
+            return z.getDB( dbname ).runCommand( "dbhash" ).md5
+        }
+    );
+
+    for ( var i=1; i<hashes.length; i++ ){
+        assert.eq( hashes[0] , hashes[i] , "checkHash on " + dbname + " " + msg )
+    }
+}
