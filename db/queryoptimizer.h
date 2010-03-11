@@ -72,6 +72,7 @@ namespace mongo {
         bool endKeyInclusive_;
         bool unhelpful_;
         string _special;
+        IndexType * _type;
     };
 
     // Inherit from this interface to implement a new query operation.

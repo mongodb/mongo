@@ -435,4 +435,9 @@ namespace mongo {
     IndexSuitability IndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
         return _spec->_suitability( query , order );
     }
+
+    bool IndexType::scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const {
+        return ! order.isEmpty();
+    }
+
 }

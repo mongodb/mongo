@@ -466,7 +466,7 @@ namespace mongo {
                 return USELESS;
             }
         }
-        
+
         string _geo;
         vector<string> _other;
         
@@ -1006,7 +1006,6 @@ namespace mongo {
     };
 
     auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
-        uassert( 13045 , "can't specify order with geo $near search" , order.isEmpty() );
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
         else if ( numWanted == 0 )

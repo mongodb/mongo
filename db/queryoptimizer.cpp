@@ -59,7 +59,8 @@ namespace mongo {
     direction_( 0 ),
     endKeyInclusive_( endKey.isEmpty() ),
     unhelpful_( false ),
-    _special( special ){
+    _special( special ),
+    _type(0){
 
         if ( !fbs_.matchPossible() ) {
             unhelpful_ = true;
@@ -78,7 +79,9 @@ namespace mongo {
 
         if ( _special.size() ){
             optimal_ = true;
-            scanAndOrderRequired_ = false; // TODO: maybe part of key spec?
+            _type  = index_->getSpec().getType();
+            massert( 13040 , (string)"no type for special: " + _special , _type );
+            scanAndOrderRequired_ = _type->scanAndOrderRequired( fbs.query() , order );
             return;
         }
 
@@ -172,11 +175,8 @@ namespace mongo {
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
-        if ( _special.size() ){
-            IndexType * type = index_->getSpec().getType();
-            massert( 13040 , (string)"no type for special: " + _special , type );
-            return type->newCursor( fbs_.query() , order_ , numWanted );
-        }
+        if ( _type )
+            return _type->newCursor( fbs_.query() , order_ , numWanted );
         
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
