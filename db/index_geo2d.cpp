@@ -867,8 +867,11 @@ namespace mongo {
                     min.checkCur( _found , _hopper );
                 }
                 
-                uassert( 13036 , "can't find index starting point" , ! min.bucket.isNull() || ! max.bucket.isNull() );
-
+                if ( min.bucket.isNull() && max.bucket.isNull() ){
+                    // collection is empty
+                    return;
+                }
+                
                 while ( _found < _numWanted ){
                     while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , _hopper ) )
                         _nscanned++;

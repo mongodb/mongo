@@ -4,6 +4,9 @@ t.drop();
 
 t.ensureIndex( { loc : "2d" } );
 
+assert.eq( 0 , t.find().itcount() , "pre0" );
+assert.eq( 0 , t.find( { loc : { $near : [50,50] } } ).itcount() , "pre1" )
+
 t.insert( { _id : 1 , loc : [ 1 , 1 ] } )
 t.insert( { _id : 2 , loc : [ 1 , 2 ] } )
 t.insert( { _id : 3 } )
