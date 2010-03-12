@@ -364,7 +364,7 @@ namespace mongo {
             string coll = url.substr( first + 1 );
             string action = "";
 
-            map<string,string> params;
+            BSONObj params;
             if ( coll.find( "?" ) != string::npos ) {
                 parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
                 coll = coll.substr( 0 , coll.find( "?" ) );
@@ -410,26 +410,29 @@ namespace mongo {
             responseMsg = ss.str();
         }
 
-        void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ) {
+        void handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
             Timer t;
 
             int skip = _getOption( params["skip"] , 0 );
             int num = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
             int one = 0;
-            if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ) {
+            if ( params["one"].type() == String && tolower( params["one"].valuestr()[0] ) == 't' ) {
                 num = 1;
                 one = 1;
             }
 
             BSONObjBuilder queryBuilder;
 
-            for ( map<string,string>::iterator i = params.begin(); i != params.end(); i++ ) {
-                if ( ! i->first.find( "filter_" ) == 0 )
+            BSONObjIterator i(params);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                string name = e.fieldName();
+                if ( ! name.find( "filter_" ) == 0 )
                     continue;
 
-                const char * field = i->first.substr( 7 ).c_str();
-                const char * val = i->second.c_str();
+                const char * field = name.substr( 7 ).c_str();
+                const char * val = e.valuestr();
 
                 char * temp;
 
@@ -477,7 +480,7 @@ namespace mongo {
         }
 
         // TODO Generate id and revision per couch POST spec
-        void handlePost( string ns, const char *body, map<string,string> & params, int & responseCode, stringstream & out ) {
+        void handlePost( string ns, const char *body, BSONObj& params, int & responseCode, stringstream & out ) {
             try {
                 BSONObj obj = fromjson( body );
                 db.insert( ns.c_str(), obj );
@@ -491,10 +494,12 @@ namespace mongo {
             out << "{ \"ok\" : true }";
         }
 
-        int _getOption( string val , int def ) {
-            if ( val.size() == 0 )
-                return def;
-            return atoi( val.c_str() );
+        int _getOption( BSONElement e , int def ) {
+            if ( e.isNumber() )
+                return e.numberInt();
+            if ( e.type() == String )
+                return atoi( e.valuestr() );
+            return def;
         }
 
     private:

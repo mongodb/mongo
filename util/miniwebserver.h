@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include "../stdafx.h"
 #include "message.h"
+#include "../db/jsobj.h"
 
 namespace mongo {
 
@@ -45,7 +47,7 @@ namespace mongo {
         string parseURL( const char * buf );
         string parseMethod( const char * headers );
         string getHeader( const char * headers , string name );
-        void parseParams( map<string,string> & params , string query );
+        void parseParams( BSONObj & params , string query );
         static const char *body( const char *buf );
 
         static string urlDecode(const char* s);
