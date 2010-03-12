@@ -385,6 +385,7 @@ namespace mongo {
         virtual bool adminOnly(){ return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             rotateLogs();
+            return 1;
         }        
         
     } logRotateCmd;
