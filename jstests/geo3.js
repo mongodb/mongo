@@ -76,3 +76,12 @@ t.ensureIndex( { loc : "2d" , b : 1 } )
 assert.eq( 2 , t.getIndexKeys().length , "setup 4b" )
 
 testFiltering( "loc and b" );
+
+
+q = { loc : { $near : [ 50 , 50 ] } }
+assert.eq( 100 , t.find( q ).limit(100).itcount() , "D1" )
+assert.eq( 100 , t.find( q ).limit(100).count() , "D2" )
+
+assert.eq( 20 , t.find( q ).limit(20).itcount() , "D3" )
+assert.eq( 20 , t.find( q ).limit(20).size() , "D4" )
+
