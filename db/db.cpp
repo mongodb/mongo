@@ -67,6 +67,8 @@ namespace mongo {
     void pairWith(const char *remoteEnd, const char *arb);
     void setRecCacheSize(unsigned MB);
 
+    void exitCleanly( ExitCode code );
+
     const char *ourgetns() { 
         Client *c = currentClient.get();
         if ( ! c )
@@ -242,6 +244,9 @@ namespace mongo {
             problem() << "SocketException in connThread, closing client connection" << endl;
             dbMsgPort.shutdown();
         }
+        catch ( const ClockSkewException &e ) {
+            exitCleanly( EXIT_CLOCK_SKEW );
+        }        
         catch ( std::exception &e ) {
             problem() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
@@ -430,7 +435,7 @@ namespace mongo {
                 }
                 sleepmillis( (int)(_sleepsecs * 1000) );
                 MemoryMappedFile::flushAll( false );
-                log(1) << "flushing mmmap" << endl;
+                log(1) << "flushing mmap" << endl;
             }
         }
         
@@ -1024,13 +1029,13 @@ namespace mongo {
 
 #undef out
 
-    void exitCleanly() {
+    void exitCleanly( ExitCode code ) {
         goingAway = true;
         killCurrentOp.killAll();
         {
             dblock lk;
             log() << "now exiting" << endl;
-            dbexit( EXIT_KILL );        
+            dbexit( code );        
         }
     }
 
@@ -1077,7 +1082,7 @@ namespace mongo {
         sigwait( &asyncSignals, &x );
         log() << "got kill or ctrl c signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
         Client::initThread( "interruptThread" );
-        exitCleanly();
+        exitCleanly( EXIT_KILL );
     }
 
     // this will be called in certain c++ error cases, for example if there are two active
@@ -1111,7 +1116,7 @@ namespace mongo {
 void ctrlCTerminate() {
     log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
     Client::initThread( "ctrlCTerminate" );
-    exitCleanly();
+    exitCleanly( EXIT_KILL );
 }
 BOOL CtrlHandler( DWORD fdwCtrlType )
 {

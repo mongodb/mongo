@@ -466,7 +466,7 @@ namespace mongo {
                 return USELESS;
             }
         }
-        
+
         string _geo;
         vector<string> _other;
         
@@ -867,8 +867,11 @@ namespace mongo {
                     min.checkCur( _found , _hopper );
                 }
                 
-                uassert( 13036 , "can't find index starting point" , ! min.bucket.isNull() || ! max.bucket.isNull() );
-
+                if ( min.bucket.isNull() && max.bucket.isNull() ){
+                    // collection is empty
+                    return;
+                }
+                
                 while ( _found < _numWanted ){
                     while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , _hopper ) )
                         _nscanned++;
@@ -1003,7 +1006,6 @@ namespace mongo {
     };
 
     auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
-        uassert( 13045 , "can't specify order with geo search" , order.isEmpty() );
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
         else if ( numWanted == 0 )

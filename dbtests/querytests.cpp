@@ -28,7 +28,7 @@
 #include "dbtests.h"
 
 namespace mongo {
-    extern int _findingStartInitialTimeout;
+    extern int __findingStartInitialTimeout;
 }
 
 namespace QueryTests {
@@ -221,6 +221,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.ReturnOneOfManyAndTail";
+            client().createCollection( ns, 0, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -239,6 +240,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailNotAtEnd";
+            client().createCollection( ns, 0, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
@@ -263,9 +265,14 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.EmptyTail";
-            ASSERT_EQUALS( 0, client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable )->getCursorId() );
+            client().createCollection( ns, 0, true );
+            auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
+            ASSERT_EQUALS( 0, c->getCursorId() );
+            ASSERT( c->isDead() );
             insert( ns, BSON( "a" << 0 ) );
-            ASSERT( 0 != client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable )->getCursorId() );
+            c = client().query( ns, QUERY( "a" << 1 ).hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
+            ASSERT( 0 != c->getCursorId() );
+            ASSERT( !c->isDead() );            
         }
     };
 
@@ -276,14 +283,15 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableDelete";
+            client().createCollection( ns, 0, true, 2 );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
             c->next();
             c->next();
             ASSERT( !c->more() );
-            client().remove( ns, QUERY( "a" << 1 ) );
             insert( ns, BSON( "a" << 2 ) );
+            insert( ns, BSON( "a" << 3 ) );
             ASSERT( !c->more() );
             ASSERT_EQUALS( 0, c->getCursorId() );
         }
@@ -296,6 +304,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableInsertDelete";
+            client().createCollection( ns, 0, true );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c = client().query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
@@ -310,6 +319,20 @@ namespace QueryTests {
         }
     };
 
+    class TailCappedOnly : public ClientBase {
+    public:
+        ~TailCappedOnly() {
+            client().dropCollection( "unittest.querytests.TailCappedOnly" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.TailCappedOnly";
+            client().insert( ns, BSONObj() );
+            auto_ptr< DBClientCursor > c = client().query( ns, BSONObj(), 0, 0, 0, QueryOption_CursorTailable );
+            ASSERT( c->isDead() );
+            ASSERT( !client().getLastError().empty() );
+        }
+    };
+    
     class TailableQueryOnId : public ClientBase {
     public:
         ~TailableQueryOnId() {
@@ -317,7 +340,8 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.TailableQueryOnId";
-            client().createCollection( ns, 0, true );
+            BSONObj info;
+            client().runCommand( "unittests", BSON( "create" << "querytests.TailableQueryOnId" << "capped" << true << "autoIndexId" << true ), info );
             insert( ns, BSON( "a" << 0 ) );
             insert( ns, BSON( "a" << 1 ) );
             auto_ptr< DBClientCursor > c1 = client().query( ns, QUERY( "a" << GT << -1 ), 0, 0, 0, QueryOption_CursorTailable );
@@ -337,6 +361,7 @@ namespace QueryTests {
             ASSERT( c2->more() );
             ASSERT_EQUALS( 2, c2->next().getIntField( "a" ) );  // SERVER-645
             ASSERT( !c2->more() );
+            ASSERT( !c2->isDead() );
         }
     };
 
@@ -931,11 +956,11 @@ namespace QueryTests {
 
     class FindingStart : public CollectionBase {
     public:
-        FindingStart() : CollectionBase( "findingstart" ), _old( _findingStartInitialTimeout ) {
-            _findingStartInitialTimeout = 0;
+        FindingStart() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
+            __findingStartInitialTimeout = 0;
         }
         ~FindingStart() {
-            _findingStartInitialTimeout = _old;
+            __findingStartInitialTimeout = _old;
         }
         
         void run() {
@@ -1017,6 +1042,7 @@ namespace QueryTests {
             add< EmptyTail >();
             add< TailableDelete >();
             add< TailableInsertDelete >();
+            add< TailCappedOnly >();
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
             add< ArrayId >();

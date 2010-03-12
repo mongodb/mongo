@@ -37,6 +37,7 @@ namespace mongo {
     };
 
     class AuthenticationInfo : boost::noncopyable {
+        boost::mutex _lock;
         map<string, Auth> m; // dbname -> auth
 		static int warned;
     public:
@@ -45,15 +46,15 @@ namespace mongo {
         ~AuthenticationInfo() {
         }
         void logout(const string& dbname ) { 
-			assertInWriteLock(); // TODO: can we get rid of this?  only 1 thread should be looking at an AuthenticationInfo
+            boostlock lk(_lock);
 			m.erase(dbname); 
 		}
         void authorize(const string& dbname ) { 
-			assertInWriteLock();
+            boostlock lk(_lock);
             m[dbname].level = 2;
         }
         void authorizeReadOnly(const string& dbname) {
-			assertInWriteLock();
+            boostlock lk(_lock);
             m[dbname].level = 1;            
         }
         bool isAuthorized(const string& dbname) { return _isAuthorized( dbname, 2 ); }

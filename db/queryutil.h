@@ -50,6 +50,7 @@ namespace mongo {
     public:
         FieldRange( const BSONElement &e = BSONObj().firstElement() , bool isNot=false , bool optimize=true );
         const FieldRange &operator&=( const FieldRange &other );
+    const FieldRange &operator|=( const FieldRange &other );
         BSONElement min() const { assert( !empty() ); return intervals_[ 0 ].lower_.bound_; }
         BSONElement max() const { assert( !empty() ); return intervals_[ intervals_.size() - 1 ].upper_.bound_; }
         bool minInclusive() const { assert( !empty() ); return intervals_[ 0 ].lower_.inclusive_; }

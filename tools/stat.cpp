@@ -111,6 +111,8 @@ namespace mongo {
             cell( ss , "% locked" , 5 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
             cell( ss , "% idx miss" , 5 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
+            cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
+
             if ( _rowNum % 20 == 0 )
                 cout << endl;
             _rowNum++;

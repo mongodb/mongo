@@ -282,6 +282,7 @@ DB.prototype.help = function() {
     print("\tdb.repairDatabase()");
     print("\tdb.resetError()");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
+    print("\tdb.serverStatus()");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");

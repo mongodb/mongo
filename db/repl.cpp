@@ -1,10 +1,8 @@
 // repl.cpp
 
 /* TODO
-
    PAIRING
     _ on a syncexception, don't allow going back to master state?
-
 */
 
 /**
@@ -49,6 +47,7 @@
 
 namespace mongo {
     
+    // our config from command line etc.
     ReplSettings replSettings;
 
     void ensureHaveIdIndex(const char *ns);
@@ -70,6 +69,8 @@ namespace mongo {
     
     IdTracker &idTracker = *( new IdTracker() );
     
+    int __findingStartInitialTimeout = 5; // configurable for testing    
+
 } // namespace mongo
 
 #include "replset.h"
@@ -202,7 +203,9 @@ namespace mongo {
         virtual LockType locktype(){ return WRITE; }
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            replAllDead = "forced by command";
+            replAllDead = "replication forced to stop by 'forcedead' command";
+            log() << "*********************************************************\n";
+            log() << "received 'forcedead' command, replication forced to stop" << endl;
             return true;
         }
     } cmdForceDead;
@@ -269,8 +272,9 @@ namespace mongo {
             if( authed ) { 
                 if ( replPair )
                     result.append("remote", replPair->remote);
-                result.append("info", replAllDead);
             }
+            string s = string("dead: ") + replAllDead;
+            result.append("info", s);
         }
         else if ( replPair ) {
             result.append("ismaster", replPair->state);
@@ -1067,7 +1071,10 @@ namespace mongo {
     }
     
     void ReplSource::resetSlave() {
-        massert( 10387 ,  "request to kill slave replication falied",
+        log() << "**********************************************************\n";
+        log() << "Sending forcedead command to slave to stop its replication\n";
+        log() << "Host: " << hostName << " paired: " << paired << endl;
+        massert( 10387 ,  "request to kill slave replication failed",
                 conn->simpleCommand( "admin", 0, "forcedead" ) );        
         syncToTailOfRemoteLog();
         {
@@ -1236,8 +1243,8 @@ namespace mongo {
         
             if ( replPair && replPair->state == ReplPair::State_Master ) {
             
-                OpTime nextOpTime( ts.date() );
-                if ( !tailing && !initial && nextOpTime != syncedTo ) {
+                OpTime next( ts.date() );
+                if ( !tailing && !initial && next != syncedTo ) {
                     log() << "remote slave log filled, forcing slave resync" << endl;
                     resetSlave();
                     return true;
@@ -1312,7 +1319,7 @@ namespace mongo {
                     save(); // note how far we are synced up to now
                     log() << "repl:   applied " << n << " operations" << endl;
                     nApplied = n;
-                    log() << "repl: end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
+                    log() << "repl:  end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
                 }
 
@@ -1330,13 +1337,22 @@ namespace mongo {
 
                 BSONObj op = c->next();
                 BSONElement ts = op.getField("ts");
-                assert( ts.type() == Date || ts.type() == Timestamp );
+                if( !( ts.type() == Date || ts.type() == Timestamp ) ) { 
+                    log() << "sync error: problem querying remote oplog record\n";
+                    log() << "op: " << op.toString() << '\n';
+                    log() << "halting replication" << endl;
+                    replInfo = replAllDead = "sync error: no ts found querying remote oplog record";
+                    throw SyncException();
+                }
                 OpTime last = nextOpTime;
-                OpTime tmp( ts.date() );
-                nextOpTime = tmp;
+                nextOpTime = OpTime( ts.date() );
                 if ( !( last < nextOpTime ) ) {
-                    problem() << "sync error: last " << last.toString() << " >= nextOpTime " << nextOpTime.toString() << endl;
-                    uassert( 10123 , "bad 'ts' value in sources", false);
+                    log() << "sync error: last applied optime at slave >= nextOpTime from master" << endl;
+                    log() << " last:       " << last.toStringLong() << '\n';
+                    log() << " nextOpTime: " << nextOpTime.toStringLong() << '\n';
+                    log() << " halting replication" << endl;
+                    replInfo = replAllDead = "sync error last >= nextOpTime";
+                    uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
                 }
                 if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
                     c->putBack( op );
@@ -1416,8 +1432,14 @@ namespace mongo {
     bool ReplSource::sync(int& nApplied) {
         _sleepAdviceTime = 0;
         ReplInfo r("sync");
-        if ( !cmdLine.quiet )
-            log() << "repl: " << sourceName() << '@' << hostName << endl;
+        if ( !cmdLine.quiet ) {
+            Nullstream& l = log();
+            l << "repl: from ";
+            if( sourceName() != "main" ) {
+                l << "source:" << sourceName() << ' ';
+            }
+            l << "host:" << hostName << endl;
+        }
         nClonedThisPass = 0;
 
         // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
@@ -1472,22 +1494,6 @@ namespace mongo {
         localOplogMainDetails = 0;
     }
 
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
-        if ( replSettings.master ) {
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
-            char cl[ 256 ];
-            nsToDatabase( ns, cl );
-        }
-        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
-        if ( t.cllEnabled() ) {
-            try {
-                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
-            } catch ( const DBException & ) {
-                t.cllInvalidate();
-            }
-        }
-    }    
-    
     /* we write to local.opload.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
@@ -1498,6 +1504,7 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
+       logNS - e.g. "local.oplog.$main"
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -1505,7 +1512,7 @@ namespace mongo {
          when set, indicates this is the first thing we have logged for this database.
          thus, the slave does not need to copy down all the data when it sees this.
     */
-    void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
+    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
         if ( strncmp(ns, "local.", 6) == 0 )
             return;
 
@@ -1561,6 +1568,27 @@ namespace mongo {
         }
     }
 
+    static void logKeepalive() { 
+        BSONObj obj;
+        _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());
+    }
+
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
+        if ( replSettings.master ) {
+            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
+            char cl[ 256 ];
+            nsToDatabase( ns, cl );
+        }
+        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
+        if ( t.cllEnabled() ) {
+            try {
+                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
+            } catch ( const DBException & ) {
+                t.cllInvalidate();
+            }
+        }
+    }    
+    
     /* --------------------------------------------------------------*/
 
     /*
@@ -1674,7 +1702,7 @@ namespace mongo {
             }
             if ( s ) {
                 stringstream ss;
-                ss << "repl:  sleep " << s << "sec before next pass";
+                ss << "repl: sleep " << s << "sec before next pass";
                 string msg = ss.str();
                 if ( ! cmdLine.quiet )
                     log() << msg << endl;
@@ -1685,6 +1713,27 @@ namespace mongo {
     }
 
     int debug_stop_repl = 0;
+
+    static void replMasterThread() {
+        sleepsecs(4);
+        Client::initThread("replmaster");
+        while( 1 ) {
+            sleepsecs(10);
+            /* write a keep-alive like entry to the log.  this will make things like 
+               printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date
+               even when things are idle.
+            */
+            {
+                writelock lk("");
+                try { 
+                    logKeepalive();
+                }
+                catch(...) { 
+                    log() << "caught exception in replMasterThread()" << endl;
+                }
+            }
+        }
+    }
 
     void replSlaveThread() {
         sleepsecs(1);
@@ -1730,8 +1779,14 @@ namespace mongo {
         const char * ns = "local.oplog.$main";
         Client::Context ctx(ns);
         
-        if ( nsdetails( ns ) )
+        if ( nsdetails( ns ) ) {
+            DBDirectClient c;
+            BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
+            if ( !lastOp.isEmpty() ) {
+                OpTime::setLast( lastOp[ "ts" ].date() );
+            }
             return;
+        }
         
         /* create an oplog collection, if it doesn't yet exist. */
         BSONObjBuilder b;
@@ -1792,6 +1847,7 @@ namespace mongo {
                 log(1) << "master=true" << endl;
             replSettings.master = true;
             createOplog();
+            boost::thread t(replMasterThread);
         }
     }
 

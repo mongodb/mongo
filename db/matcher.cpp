@@ -27,10 +27,29 @@
 #include "db.h"
 #include "client.h"
 
+#include "pdfile.h"
+
+namespace {
+    inline pcrecpp::RE_Options flags2options(const char* flags){
+        pcrecpp::RE_Options options;
+        options.set_utf8(true);
+        while ( flags && *flags ) {
+            if ( *flags == 'i' )
+                options.set_caseless(true);
+            else if ( *flags == 'm' )
+                options.set_multiline(true);
+            else if ( *flags == 'x' )
+                options.set_extended(true);
+            flags++;
+        }
+        return options;
+    }
+}
+
 namespace mongo {
     
-    //#include "minilex.h"
-    //MiniLex minilex;
+    //#define DEBUGMATCHER(x) cout << x << endl;
+#define DEBUGMATCHER(x)
     
     class Where {
     public:
@@ -96,41 +115,31 @@ namespace mongo {
                 shared_ptr<Matcher> s;
                 s.reset( new Matcher( ie.embeddedObject().firstElement().embeddedObjectUserCheck() ) );
                 allMatchers.push_back( s );
-            }
-            else {
+            } else if ( ie.type() == RegEx ) {
+                if ( !myregex.get() ) {
+                    myregex.reset( new vector< RegexMatcher >() );
+                }
+                myregex->push_back( RegexMatcher() );
+                RegexMatcher &rm = myregex->back();
+                rm.re.reset( new pcrecpp::RE( ie.regex(), flags2options( ie.regexFlags() ) ) );
+                rm.fieldName = 0; // no need for field name
+                rm.regex = ie.regex();
+                rm.flags = ie.regexFlags();
+                rm.isNot = false;
+                bool purePrefix;
+                string prefix = simpleRegex(rm.regex, rm.flags, &purePrefix);
+                if (purePrefix)
+                    rm.prefix = prefix;
+            } else {
                 myset->insert(ie);
             }
         }
         
         if ( allMatchers.size() ){
-            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0);
+            uassert( 13020 , "with $all, can't mix $elemMatch and others" , myset->size() == 0 && !myregex.get());
         }
         
     }
-    
-
-} // namespace mongo
-
-#include "pdfile.h"
-
-namespace {
-    inline pcrecpp::RE_Options flags2options(const char* flags){
-        pcrecpp::RE_Options options;
-        options.set_utf8(true);
-        while ( flags && *flags ) {
-            if ( *flags == 'i' )
-                options.set_caseless(true);
-            else if ( *flags == 'm' )
-                options.set_multiline(true);
-            else if ( *flags == 'x' )
-                options.set_extended(true);
-            flags++;
-        }
-        return options;
-    }
-}
-
-namespace mongo {
     
     CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
         _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), 
@@ -139,8 +148,10 @@ namespace mongo {
     {
         _needRecord = ! ( 
                          _docMatcher.keyMatch() && 
-                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields()
+                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields() &&
+                         ! _keyMatcher.hasType( BSONObj::opEXISTS )
                           );
+
     }
     
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
@@ -148,7 +159,7 @@ namespace mongo {
             details->reset();
         
         if ( _keyMatcher.keyMatch() ) {
-            if ( !_keyMatcher.matches(key) ) {
+            if ( !_keyMatcher.matches(key, details ) ){
                 return false;
             }
         }
@@ -160,7 +171,7 @@ namespace mongo {
         if ( details )
             details->loadedObject = true;
 
-        return _docMatcher.matches(recLoc.rec());
+        return _docMatcher.matches(recLoc.rec() , details );
     }
     
     
@@ -171,7 +182,7 @@ namespace mongo {
         }
         else {
             RegexMatcher& rm = regexs[nRegex];
-            rm.re = new pcrecpp::RE(regex, flags2options(flags));
+            rm.re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
             rm.fieldName = fieldName;
             rm.regex = regex;
             rm.flags = flags;
@@ -373,7 +384,22 @@ namespace mongo {
         
         constrainIndexKey_ = constrainIndexKey;
     }
-
+    
+    inline bool regexMatches(const RegexMatcher& rm, const BSONElement& e) {
+        switch (e.type()){
+            case String:
+            case Symbol:
+                if (rm.prefix.empty())
+                    return rm.re->PartialMatch(e.valuestr());
+                else
+                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
+            case RegEx:
+                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
+            default:
+                return false;
+        }
+    }
+        
     inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
         
@@ -383,7 +409,16 @@ namespace mongo {
         
         if ( op == BSONObj::opIN ) {
             // { $in : [1,2,3] }
-            return bm.myset->count(l);
+            int count = bm.myset->count(l);
+            if ( count )
+                return count;
+            if ( bm.myregex.get() ) {
+                for( vector<RegexMatcher>::const_iterator i = bm.myregex->begin(); i != bm.myregex->end(); ++i ) {
+                    if ( regexMatches( *i, l ) ) {
+                        return true;
+                    }
+                }
+            }
         }
 
         if ( op == BSONObj::opSIZE ) {
@@ -421,8 +456,8 @@ namespace mongo {
         return (op & z);
     }
 
-    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm ) {
-        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm );
+    int Matcher::matchesNe(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) {
+        int ret = matchesDotted( fieldName, toMatch, obj, BSONObj::Equality, bm , false , details );
         if ( bm.toMatch.type() != jstNULL )
             return ( ret <= 0 ) ? 1 : 0;
         else
@@ -454,7 +489,8 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr) {
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) {
+        DEBUGMATCHER( "\t matchesDotted : " << fieldName << " hasDetails: " << ( details ? "yes" : "no" ) );
         if ( compareOp == BSONObj::opALL ) {
             
             if ( em.allMatchers.size() ){
@@ -482,7 +518,7 @@ namespace mongo {
                 return 1;
             }
             
-            if ( em.myset->size() == 0 )
+            if ( em.myset->size() == 0 && !em.myregex.get() )
                 return -1; // is this desired?
             
             BSONObjSetDefaultOrder actualKeys;
@@ -501,16 +537,42 @@ namespace mongo {
                     return -1;
             }
 
+            if ( !em.myregex.get() )
+                return 1;
+            
+            for( vector< RegexMatcher >::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                bool match = false;
+                for( BSONObjSetDefaultOrder::const_iterator j = actualKeys.begin(); j != actualKeys.end(); ++j ) {
+                    if ( regexMatches( *i, j->firstElement() ) ) {
+                        match = true;
+                        break;
+                    }
+                }
+                if ( !match )
+                    return -1;
+            }
+            
             return 1;
         }
         
         if ( compareOp == BSONObj::NE )
-            return matchesNe( fieldName, toMatch, obj, em );
+            return matchesNe( fieldName, toMatch, obj, em , details );
         if ( compareOp == BSONObj::NIN ) {
             for( set<BSONElement,element_lt>::const_iterator i = em.myset->begin(); i != em.myset->end(); ++i ) {
-                int ret = matchesNe( fieldName, *i, obj, em );
+                int ret = matchesNe( fieldName, *i, obj, em , details );
                 if ( ret != 1 )
                     return ret;
+            }
+            if ( em.myregex.get() ) {
+                BSONElementSet s;
+                obj.getFieldsDotted( fieldName, s );
+                for( vector<RegexMatcher>::const_iterator i = em.myregex->begin(); i != em.myregex->end(); ++i ) {
+                    for( BSONElementSet::const_iterator j = s.begin(); j != s.end(); ++j ) {
+                        if ( regexMatches( *i, *j ) ) {
+                            return -1;
+                        }
+                    }
+                }
             }
             return 1;
         }
@@ -538,12 +600,12 @@ namespace mongo {
                     ;
                 else {
                     BSONObj eo = se.embeddedObject();
-                    return matchesDotted(p+1, toMatch, eo, compareOp, em, se.type() == Array);
+                    return matchesDotted(p+1, toMatch, eo, compareOp, em, se.type() == Array , details );
                 }
             }
 
             if ( isArr ) {
-
+                DEBUGMATCHER( "\t\t isArr 1 : obj : " << obj );
                 BSONObjIterator ai(obj);
                 bool found = false;
                 while ( ai.moreWithEOO() ) {
@@ -551,15 +613,20 @@ namespace mongo {
 
                     if( strcmp(z.fieldName(),fieldName) == 0 && valuesMatch(z, toMatch, compareOp, em) ) {
                         // "field.<n>" array notation was used
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
                     }
 
                     if ( z.type() == Object ) {
                         BSONObj eo = z.embeddedObject();
-                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false);
+                        int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false, details );
                         if ( cmp > 0 ) {
+                            if ( details )
+                                details->elemMatchKey = z.fieldName();
                             return 1;
-                        } else if ( cmp < 0 ) {
+                        } 
+                        else if ( cmp < 0 ) {
                             found = true;
                         }
                     }
@@ -581,7 +648,6 @@ namespace mongo {
             valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
         } else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
-            
             BSONObjIterator ai(e.embeddedObject());
 
             while ( ai.moreWithEOO() ) {
@@ -589,11 +655,16 @@ namespace mongo {
                 
                 if ( compareOp == BSONObj::opELEM_MATCH ){
                     // SERVER-377
-                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) )
+                    if ( z.type() == Object && em.subMatcher->matches( z.embeddedObject() ) ){
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
+                    }
                 }
                 else {
                     if ( valuesMatch( z, toMatch, compareOp, em) ) {
+                        if ( details )
+                            details->elemMatchKey = z.fieldName();
                         return 1;
                     }
                 }
@@ -615,24 +686,9 @@ namespace mongo {
 
     extern int dump;
 
-    inline bool regexMatches(RegexMatcher& rm, const BSONElement& e) {
-        switch (e.type()){
-            case String:
-            case Symbol:
-                if (rm.prefix.empty())
-                    return rm.re->PartialMatch(e.valuestr());
-                else
-                    return !strncmp(e.valuestr(), rm.prefix.c_str(), rm.prefix.size());
-            case RegEx:
-                return !strcmp(rm.regex, e.regex()) && !strcmp(rm.flags, e.regexFlags());
-            default:
-                return false;
-        }
-    }
-
     /* See if an object matches the query.
     */
-    bool Matcher::matches(const BSONObj& jsobj ) {
+    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
@@ -641,7 +697,7 @@ namespace mongo {
             ElementMatcher& bm = basics[i];
             BSONElement& m = bm.toMatch;
             // -1=mismatch. 0=missing element. 1=match
-            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm );
+            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm.compareOp, bm , false , details );
             if ( bm.compareOp != BSONObj::opEXISTS && bm.isNot )
                 cmp = -cmp;
             if ( cmp < 0 )
@@ -708,6 +764,13 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    bool Matcher::hasType( BSONObj::MatchType type ) const {
+        for ( unsigned i=0; i<basics.size() ; i++ )
+            if ( basics[i].compareOp == type )
+                return true;
+        return false;
     }
 
     struct JSObj1 js1;

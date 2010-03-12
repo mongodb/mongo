@@ -59,7 +59,8 @@ namespace mongo {
     direction_( 0 ),
     endKeyInclusive_( endKey.isEmpty() ),
     unhelpful_( false ),
-    _special( special ){
+    _special( special ),
+    _type(0){
 
         if ( !fbs_.matchPossible() ) {
             unhelpful_ = true;
@@ -78,7 +79,9 @@ namespace mongo {
 
         if ( _special.size() ){
             optimal_ = true;
-            scanAndOrderRequired_ = false; // TODO: maybe part of key spec?
+            _type  = index_->getSpec().getType();
+            massert( 13040 , (string)"no type for special: " + _special , _type );
+            scanAndOrderRequired_ = _type->scanAndOrderRequired( fbs.query() , order );
             return;
         }
 
@@ -172,11 +175,8 @@ namespace mongo {
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
-        if ( _special.size() ){
-            IndexType * type = index_->getSpec().getType();
-            massert( 13040 , (string)"no type for special: " + _special , type );
-            return type->newCursor( fbs_.query() , order_ , numWanted );
-        }
+        if ( _type )
+            return _type->newCursor( fbs_.query() , order_ , numWanted );
         
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
@@ -320,7 +320,12 @@ namespace mongo {
                 return;
             }
         }
-        
+
+        if ( query_.isEmpty() && order_.isEmpty() ){
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+            return;
+        }
+
         if ( fbs_.getSpecial().size() ){
             string special = fbs_.getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
@@ -375,7 +380,7 @@ namespace mongo {
         if ( !d )
             return;
 
-        // If table scan is optimal or natural order requested
+        // If table scan is optimal or natural order requested or tailable cursor requested
         if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan

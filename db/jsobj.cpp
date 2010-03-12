@@ -151,7 +151,7 @@ namespace mongo {
         return s.str();
     }
 
-    string escape( string s ) {
+    string escape( string s , bool escape_slash=false) {
         stringstream ret;
         for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
@@ -162,7 +162,7 @@ namespace mongo {
                 ret << "\\\\";
                 break;
             case '/':
-                ret << "\\/";
+                ret << (escape_slash ? "\\/" : "/");
                 break;
             case '\b':
                 ret << "\\b";
@@ -301,17 +301,13 @@ namespace mongo {
                 s << " )";
             break;
         case RegEx:
-            if ( format == Strict )
-                s << "{ \"$regex\" : \"";
-            else
-                s << "/";
-            s << escape( regex() );
-            if ( format == Strict )
+            if ( format == Strict ){
+                s << "{ \"$regex\" : \"" << escape( regex() );
                 s << "\", \"$options\" : \"" << regexFlags() << "\" }";
-            else {
-                s << "/";
+            } else {
+                s << "/" << escape( regex() , true ) << "/";
                 // FIXME Worry about alpha order?
-                for ( const char *f = regexFlags(); *f; ++f )
+                for ( const char *f = regexFlags(); *f; ++f ){
                     switch ( *f ) {
                     case 'g':
                     case 'i':
@@ -320,6 +316,7 @@ namespace mongo {
                     default:
                         break;
                     }
+                }
             }
             break;
 
@@ -586,7 +583,7 @@ namespace mongo {
         case Symbol:
         case String: {
             int x = valuestrsize();
-            if ( x > 0 && x - 1 == strnlen( valuestr() , x ) )
+            if ( x > 0 && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
             buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << strnlen( valuestr() , x );

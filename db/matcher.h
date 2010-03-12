@@ -34,12 +34,9 @@ namespace mongo {
         const char *regex;
         const char *flags;
         string prefix;
-        pcrecpp::RE *re;
+        shared_ptr< pcrecpp::RE > re;
         bool isNot;
-        RegexMatcher() : re( 0 ), isNot() {}
-        ~RegexMatcher() {
-            delete re;
-        }
+        RegexMatcher() : isNot() {}
     };
     
     struct element_lt
@@ -70,6 +67,7 @@ namespace mongo {
         int compareOp;
         bool isNot;
         shared_ptr< set<BSONElement,element_lt> > myset;
+        shared_ptr< vector<RegexMatcher> > myregex;
         
         // these are for specific operators
         int mod;
@@ -91,11 +89,18 @@ namespace mongo {
         
         void reset(){
             loadedObject = false;
-            elemMatchKey = BSONElement();
+            elemMatchKey = 0;
         }
         
+        string toString() const {
+            stringstream ss;
+            ss << "loadedObject: " << loadedObject << " ";
+            ss << "elemMatchKey: " << ( elemMatchKey ? elemMatchKey : "NULL" ) << " ";
+            return ss.str();
+        }
+
         bool loadedObject;
-        BSONElement elemMatchKey;
+        const char * elemMatchKey; // warning, this may go out of scope if matched object does
     };
 
     /* Match BSON objects against a query pattern.
@@ -116,12 +121,12 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const ElementMatcher& bm, bool isArr = false);
+            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details );
 
         int matchesNe(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const ElementMatcher&bm);
+            const ElementMatcher&bm, MatchDetails * details );
         
     public:
         static int opDirection(int op) {
@@ -134,12 +139,13 @@ namespace mongo {
 
         ~Matcher();
 
-        bool matches(const BSONObj& j);
+        bool matches(const BSONObj& j, MatchDetails * details = 0 );
         
         bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
 
         bool atomic() const { return _atomic; }
 
+        bool hasType( BSONObj::MatchType type ) const;
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.

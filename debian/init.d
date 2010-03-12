@@ -57,6 +57,7 @@ DATA=/var/lib/mongodb
 LOGDIR=/var/log/mongodb
 PIDFILE=/var/run/$NAME.pid
 LOGFILE=$LOGDIR/$NAME.log  # Server logfile
+ENABLE_MONGODB=yes
 
 # Include mongodb defaults if available
 if [ -f /etc/default/$NAME ] ; then
@@ -65,6 +66,10 @@ fi
 
 if test ! -x $DAEMON; then
     echo "Could not find $DAEMON"
+    exit 0
+fi
+
+if test "x$ENABLE_MONGODB" != "xyes"; then
     exit 0
 fi
 

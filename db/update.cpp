@@ -26,6 +26,9 @@
 
 namespace mongo {
 
+    //#define DEBUGUPDATE(x) cout << x << endl;
+#define DEBUGUPDATE(x)
+    
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
                                     "$bitand" , "$bitor" , "$bit" , "$addToSet" };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
@@ -592,7 +595,7 @@ namespace mongo {
         const BSONObj &from , 
         const set<string>& idxKeys,
         const set<string> *backgroundKeys)
-        : _isIndexed(0) {
+        : _isIndexed(0) , _hasDynamicArray( false ) {
         
         BSONObjIterator it(from);
         
@@ -617,7 +620,9 @@ namespace mongo {
                 uassert( 10151 ,  "have conflict mod" , ! haveConflictingMod( fieldName ) );
                 uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
                 uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
-
+                
+                _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".$" ) > 0;
+                
                 Mod m;
                 m.init( op , f );
                 m.setFieldName( f.fieldName() );
@@ -628,9 +633,33 @@ namespace mongo {
                 }
 
                 _mods[m.fieldName] = m;
+
+                DEBUGUPDATE( "\t\t " << fieldName << "\t" << _hasDynamicArray );
             }
         }
 
+    }
+
+    ModSet * ModSet::fixDynamicArray( const char * elemMatchKey ) const {
+        ModSet * n = new ModSet();
+        n->_isIndexed = _isIndexed;
+        n->_hasDynamicArray = _hasDynamicArray;
+        for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ){
+            string s = i->first;
+            size_t idx = s.find( ".$" );
+            if ( idx == string::npos ){
+                n->_mods[s] = i->second;
+                continue;
+            }
+            StringBuilder buf(s.size()+strlen(elemMatchKey));
+            buf << s.substr(0,idx+1) << elemMatchKey << s.substr(idx+2);
+            string fixed = buf.str();
+            DEBUGUPDATE( "fixed dynamic: " << s << " -->> " << fixed );
+            n->_mods[fixed] = i->second;
+            ModHolder::iterator temp = n->_mods.find( fixed );
+            temp->second.setFieldName( temp->first.c_str() );
+        }
+        return n;
     }
     
     void checkNoMods( BSONObj o ) {
@@ -645,44 +674,47 @@ namespace mongo {
     
     class UpdateOp : public QueryOp {
     public:
-        UpdateOp() : nscanned_() {}
+        UpdateOp() : _nscanned() {}
         virtual void init() {
             BSONObj pattern = qp().query();
-            c_.reset( qp().newCursor().release() );
-            if ( !c_->ok() )
+            _c.reset( qp().newCursor().release() );
+            if ( ! _c->ok() )
                 setComplete();
             else
-                matcher_.reset( new CoveredIndexMatcher( pattern, qp().indexKey() ) );
+                _matcher.reset( new CoveredIndexMatcher( pattern, qp().indexKey() ) );
         }
         virtual void next() {
-            if ( !c_->ok() ) {
+            if ( ! _c->ok() ) {
                 setComplete();
                 return;
             }
-            nscanned_++;
-            if ( matcher_->matches(c_->currKey(), c_->currLoc()) ) {
+            _nscanned++;
+            if ( _matcher->matches(_c->currKey(), _c->currLoc(), &_details ) ) {
                 setComplete();
                 return;
             }
-            c_->advance();
+            _c->advance();
         }
         bool curMatches(){
-            return matcher_->matches(c_->currKey(), c_->currLoc() );
+            return _matcher->matches(_c->currKey(), _c->currLoc() , &_details );
         }
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *clone() const {
             return new UpdateOp();
         }
-        shared_ptr< Cursor > c() { return c_; }
-        long long nscanned() const { return nscanned_; }
+        shared_ptr< Cursor > c() { return _c; }
+        long long nscanned() const { return _nscanned; }
+        MatchDetails& getMatchDetails(){ return _details; }
     private:
-        shared_ptr< Cursor > c_;
-        long long nscanned_;
-        auto_ptr< CoveredIndexMatcher > matcher_;
+        shared_ptr< Cursor > _c;
+        long long _nscanned;
+        auto_ptr< CoveredIndexMatcher > _matcher;
+        MatchDetails _details;
     };
 
     
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+        DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         int profile = cc().database()->profile;
         StringBuilder& ss = debug.str;
 
@@ -736,7 +768,7 @@ namespace mongo {
                 c->advance();
                 continue;
             }
-                               
+
             BSONObj js(r);
             
             BSONObj pattern = patternOrig;
@@ -763,7 +795,7 @@ namespace mongo {
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                regular ones at the moment. */
             if ( isOperatorUpdate ) {
-
+                
                 if ( multi ){
                     c->advance(); // go to next record in case this one moves
                     if ( seenObjects.count( loc ) )
@@ -776,7 +808,16 @@ namespace mongo {
 
                 const BSONObj& onDisk = loc.obj();
 
-                auto_ptr<ModSetState> mss = mods->prepare( onDisk );
+                ModSet * useMods = mods.get();
+
+                auto_ptr<ModSet> mymodset;
+                if ( u->getMatchDetails().elemMatchKey && mods->hasDynamicArray() ){
+                    useMods = mods->fixDynamicArray( u->getMatchDetails().elemMatchKey );
+                    mymodset.reset( useMods );
+                }
+
+                     
+                auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
                 
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
                     mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
@@ -809,10 +850,13 @@ namespace mongo {
                         pattern = patternBuilder.obj();                        
                     }
                     
-                    if ( mss->needOpLogRewrite() )
+                    if ( mss->needOpLogRewrite() ){
+                        DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
                         logOp("u", ns, mss->getOpLogRewrite() , &pattern );
-                    else
+                    }
+                    else {
                         logOp("u", ns, updateobj, &pattern );
+                    }
                 }
                 numModded++;
                 if ( ! multi )

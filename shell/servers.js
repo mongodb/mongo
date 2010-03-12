@@ -52,8 +52,11 @@ createMongoArgs = function( binaryName , args ){
     return fullArgs;
 }
 
-startMongodTest = function( port , dirname ){
-    var conn = startMongod( 
+startMongodTest = function( port , dirname , restart ){
+    var f = startMongod;
+    if ( restart )
+        f = startMongodNoReset;
+    var conn = f.apply(  null , [
         { 
             port : port , 
             dbpath : "/data/db/" + dirname , 
@@ -62,6 +65,7 @@ startMongodTest = function( port , dirname ){
             oplogSize : "2" , 
             nohttpinterface : ""
         } 
+    ]
     );
     conn.name = "localhost:" + port;
     return conn;
@@ -77,6 +81,11 @@ startMongod = function(){
     var dbpath = _parsePath.apply( null, args );
     resetDbpath( dbpath );
 
+    return startMongoProgram.apply( null, args );
+}
+
+startMongodNoReset = function(){
+    var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
 }
 
@@ -621,7 +630,7 @@ ReplTest.prototype.stop = function( master , signal ){
         this.stop( false );
         return;
     }
-    stopMongod( this.getPort( master ) , signal || 15 );
+    return stopMongod( this.getPort( master ) , signal || 15 );
 }
 
 allocatePorts = function( n ) {
@@ -633,6 +642,7 @@ allocatePorts = function( n ) {
 
 
 SyncCCTest = function( testName ){
+    this._testName = testName;
     this._connections = [];
     
     for ( var i=0; i<3; i++ ){
@@ -647,4 +657,26 @@ SyncCCTest.prototype.stop = function(){
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
     }
+}
+
+SyncCCTest.prototype.checkHashes = function( dbname , msg ){
+    var hashes = this._connections.map(
+        function(z){
+            return z.getDB( dbname ).runCommand( "dbhash" );
+        }
+    );
+
+    for ( var i=1; i<hashes.length; i++ ){
+        assert.eq( hashes[0].md5 , hashes[i].md5 , "checkHash on " + dbname + " " + msg + "\n" + tojson( hashes ) )
+    }
+}
+
+SyncCCTest.prototype.tempKill = function( num ){
+    num = num || 0;
+    stopMongod( 30000 + num );
+}
+
+SyncCCTest.prototype.tempStart = function( num ){
+    num = num || 0;
+    this._connections[num] = startMongodTest( 30000 + num , this._testName + num , true );
 }

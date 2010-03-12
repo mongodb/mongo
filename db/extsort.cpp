@@ -106,7 +106,7 @@ namespace mongo {
         
         if (  _cur->hasSpace() == false ||  _curSizeSoFar > _maxFilesize ){
             finishMap();
-            log() << "finishing map" << endl;
+            log(1) << "finishing map" << endl;
         }
 
     }
