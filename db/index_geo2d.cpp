@@ -209,14 +209,22 @@ namespace mongo {
             unsigned pos = ( _bits * 2 ) - 1;
             if ( offset == 0 )
                 pos--;
-            for ( ; pos >= 0 ; pos-=2 ){
+            while ( true ){
                 if ( getBit(pos) == from ){
                     setBit( pos , to );
                     return;
                 }
-                else {
-                    setBit( pos , from );
+
+                if ( pos < 2 ){
+                    // overflow
+                    for ( ; pos < ( _bits * 2 ) ; pos += 2 ){
+                        setBit( pos , from );
+                    }
+                    return;
                 }
+                
+                setBit( pos , from );
+                pos -= 2;
             }
             
             assert(0);
@@ -697,6 +705,16 @@ namespace mongo {
                 assert( oa.woCompare( oc ) < 0 );
 
             }
+
+            {
+                GeoHash x( "000000" );
+                x.move( -1 , 0 );
+                GEOHEQ( x , "101010" );
+                x.move( 1 , -1 );
+                GEOHEQ( x , "010101" );
+                x.move( 0 , 1 );
+                GEOHEQ( x , "000000" );
+            }
         }
     } geoUnitTest;
     
@@ -844,7 +862,7 @@ namespace mongo {
             const IndexDetails& id = *_spec->getDetails();
             
             BtreeBucket * head = id.head.btree();
-            
+            assert( head );
             /*
              * Search algorithm
              * 1) use geohash prefix to find X items
