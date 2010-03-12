@@ -98,7 +98,7 @@ namespace mongo {
         
         list<BSONObj> storedForLater;
         
-        assert( c.get() );
+        massert( 13055 , "socket error in Cloner:copy" , c.get() );
         long long n = 0;
         time_t saveLast = time( 0 );
         while ( 1 ) {
