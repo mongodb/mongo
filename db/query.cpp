@@ -720,7 +720,7 @@ namespace mongo {
         }
             
 
-        if ( isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+        if ( ! explain && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 
             bool nsFound = false;
