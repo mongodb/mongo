@@ -15,7 +15,7 @@ assert(t.validate().valid, "A valid");
 
 // test sorting on compound key involving _id
 
-// assert.eq( [4,2,3,1] , t.find().sort({"y.b": 1 , _id : -1 }).map( function(z){ return z.x; } ) , "B no index" );
-// t.ensureIndex({"y.b": 1, "_id": -1});
-// assert.eq( [4,2,3,1] , t.find().sort({"y.b": 1 , _id : -1 }).map( function(z){ return z.x; } ) , "B index" );
-// assert(t.validate().valid, "B valid");
+assert.eq( [4,2,3,1] , t.find().sort({"y.b": 1 , _id : -1 }).map( function(z){ return z.x; } ) , "B no index" );
+t.ensureIndex({"y.b": 1, "_id": -1});
+assert.eq( [4,2,3,1] , t.find().sort({"y.b": 1 , _id : -1 }).map( function(z){ return z.x; } ) , "B index" );
+assert(t.validate().valid, "B valid");
