@@ -46,8 +46,6 @@ namespace mongo {
     void receivedInsert(Message& m, CurOp& op);
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
 
-    CmdLine cmdLine;
-
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 

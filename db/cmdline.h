@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "../stdafx.h"
+
 namespace mongo {
     
     /* command line options        
@@ -51,8 +53,12 @@ namespace mongo {
             port(DefaultDBPort), rest(false), quiet(false), notablescan(false), prealloc(true), smallfiles(false),
             quota(false), quotaFiles(8), cpu(false), oplogSize(0), defaultProfile(0), slowMS(100)
         { } 
+        
 
+        void addGlobalOptions( boost::program_options::options_description& general , 
+                               boost::program_options::options_description& hidden );
     };
-
+    
     extern CmdLine cmdLine;
+    
 }
