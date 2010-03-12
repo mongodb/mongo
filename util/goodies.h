@@ -154,6 +154,23 @@ namespace mongo {
         buf[24] = 0; // don't want the \n
     }
 
+
+    inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
+#if defined(_WIN32)
+        if ( local )
+            localtime_s( buf , &t );
+        else
+            gmtime_s(buf, &t);
+#else
+        if ( local )
+            localtime_r(&t, buf);
+        else
+            gmtime_r(&t, buf);
+#endif
+    }
+
+
+
 #define asctime _asctime_not_threadsafe_
 #define gmtime _gmtime_not_threadsafe_
 #define localtime _localtime_not_threadsafe_

@@ -87,6 +87,13 @@ namespace mongo {
             ss << setw(width) << val << " ";
         }
 
+        void cell( stringstream& ss , string name , unsigned width , const string& val ){
+            assert( val.size() <= width );
+            cellstart( ss , name , width );
+            ss << setw(width) << val << " ";
+        }
+
+
         string doRow( const BSONObj& a , const BSONObj& b ){
             stringstream ss;
 
@@ -113,8 +120,22 @@ namespace mongo {
 
             cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
-            if ( _rowNum % 20 == 0 )
+            {
+                struct tm t;
+                time_t_to_Struct( time(0), &t , true );
+                stringstream temp;
+                temp << setfill('0') << setw(2) << t.tm_hour 
+                     << ":" 
+                     << setfill('0') << setw(2) << t.tm_min
+                     << ":" 
+                     << setfill('0') << setw(2) << t.tm_sec;
+                cell( ss , "time" , 8 , temp.str() );
+            }
+
+            if ( _rowNum % 20 == 0 ){
+                // this is the newline after the header line
                 cout << endl;
+            }
             _rowNum++;
 
             return ss.str();
