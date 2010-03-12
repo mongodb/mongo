@@ -376,6 +376,17 @@ namespace mongo {
         }
         
     } fsyncCmd;
-    
+
+    class LogRotateCmd : public Command {
+    public:
+        LogRotateCmd() : Command( "logRotate" ){}
+        virtual LockType locktype(){ return NONE; } 
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return true; }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            rotateLogs();
+        }        
+        
+    } logRotateCmd;
 }
 
