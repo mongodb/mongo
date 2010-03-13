@@ -153,6 +153,7 @@ namespace mongo {
         }
 
         void setBit( unsigned pos , bool one ){
+            assert( pos < _bits * 2 );
             if ( one )
                 _hash |= geoBitSets.masks64[pos];
             else if ( _hash & geoBitSets.masks64[pos] )
@@ -242,14 +243,15 @@ namespace mongo {
 
         GeoHash& operator+=( const char * s ) {
             unsigned pos = _bits * 2;
+            _bits += strlen(s) / 2;
+            assert( _bits <= 32 );
             while ( s[0] ){
                 if ( s[0] == '1' )
                     setBit( pos , 1 );
                 pos++;
                 s++;
             }
-            _bits = pos / 2;
-            assert( _bits <= 32 );
+
             return *this;
         }
 
