@@ -392,7 +392,7 @@ namespace mongo {
         return v8::Undefined();
     }
 
-    void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value ){
+    void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth ){
         
         if ( value->IsString() ){
             b.append( sname.c_str() , toSTLString( value ).c_str() );
@@ -413,7 +413,7 @@ namespace mongo {
         }
     
         if ( value->IsArray() ){
-            BSONObj sub = v8ToMongo( value->ToObject() );
+            BSONObj sub = v8ToMongo( value->ToObject() , depth );
             b.appendArray( sname.c_str() , sub );
             return;
         }
@@ -493,7 +493,7 @@ namespace mongo {
                                 mongo::BinDataType( obj->Get( v8::String::New( "type" ) )->ToInt32()->Value() ),
                                 dataArray );
             } else {
-                BSONObj sub = v8ToMongo( value->ToObject() );
+                BSONObj sub = v8ToMongo( value->ToObject() , depth );
                 b.append( sname.c_str() , sub );
             }
             return;
@@ -517,12 +517,14 @@ namespace mongo {
         cout << "don't know how to convert to mongo field [" << name << "]\t" << value << endl;
     }
 
-    BSONObj v8ToMongo( v8::Handle<v8::Object> o ){
+    BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth ){
         BSONObjBuilder b;
-
-        v8::Handle<v8::String> idName = v8::String::New( "_id" );
-        if ( o->HasRealNamedProperty( idName ) ){
-            v8ToMongoElement( b , idName , "_id" , o->Get( idName ) );
+        
+        if ( depth == 0 ){
+            v8::Handle<v8::String> idName = v8::String::New( "_id" );
+            if ( o->HasRealNamedProperty( idName ) ){
+                v8ToMongoElement( b , idName , "_id" , o->Get( idName ) );
+            }
         }
     
         Local<v8::Array> names = o->GetPropertyNames();
@@ -536,10 +538,10 @@ namespace mongo {
             v8::Local<v8::Value> value = o->Get( name );
         
             const string sname = toSTLString( name );
-            if ( sname == "_id" )
+            if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , name , sname , value );
+            v8ToMongoElement( b , name , sname , value , depth + 1 );
         }
         return b.obj();
     }
