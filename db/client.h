@@ -244,6 +244,9 @@ namespace mongo {
     }
 
     string sayClientState();
-    
+  
+    inline bool haveClient(){ 
+        return currentClient.get() > 0;
+    }
 };
 
