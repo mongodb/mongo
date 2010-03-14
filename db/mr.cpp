@@ -47,8 +47,8 @@ namespace mongo {
             BSONObj key;
 
             BSONObjBuilder reduceArgs( sizeEstimate );
-        
-            BSONObjBuilder valueBuilder( sizeEstimate );
+            BSONArrayBuilder * valueBuilder = 0;
+            
             int n = 0;
             for ( list<BSONObj>::iterator i=values.begin(); i!=values.end(); i++){
                 BSONObj o = *i;
@@ -56,30 +56,33 @@ namespace mongo {
                 BSONElement keyE = j.next();
                 if ( n == 0 ){
                     reduceArgs.append( keyE );
-                    BSONObjBuilder temp;
-                    temp.append( keyE );
-                    key = temp.obj();
+                    key = keyE.wrap();
+                    valueBuilder = new BSONArrayBuilder( reduceArgs.subarrayStart( "values" ) );
+                    n++;
                 }
-                valueBuilder.appendAs( j.next() , BSONObjBuilder::numStr( n++ ).c_str() );
+                valueBuilder->append( j.next() );
             }
-        
-            reduceArgs.appendArray( "values" , valueBuilder.obj() );
+            assert(valueBuilder);
+            valueBuilder->done();
+            delete valueBuilder;
             BSONObj args = reduceArgs.obj();
-            
+
             s->invokeSafe( reduce , args );
             if ( s->type( "return" ) == Array ){
                 uassert( 10075 , "reduce -> multiple not supported yet",0);                
                 return BSONObj();
             }
             
+            int endSizeEstimate = key.objsize() + ( args.objsize() / values.size() );
+
             if ( finalize ){
-                BSONObjBuilder b;
+                BSONObjBuilder b(endSizeEstimate);
                 b.appendAs( key.firstElement() , "_id" );
                 s->append( b , "value" , "return" );
                 s->invokeSafe( finalize , b.obj() );
             }
             
-            BSONObjBuilder b;
+            BSONObjBuilder b(endSizeEstimate);
             b.appendAs( key.firstElement() , final ? "_id" : "0" );
             s->append( b , final ? "value" : "1" , "return" );
             return b.obj();
