@@ -29,6 +29,7 @@
 #include "instance.h"
 #include "clientcursor.h"
 #include "pdfile.h"
+#include "stats/counters.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -440,6 +441,8 @@ namespace mongo {
                 Date_t start = jsTime();
                 MemoryMappedFile::flushAll( true );
                 time_flushing = jsTime() - start;
+
+                globalFlushCounters.flushed(time_flushing);
 
                 log(1) << "flushing mmap took " << time_flushing << "ms" << endl;
             }
