@@ -377,6 +377,12 @@ namespace mongo {
                 globalIndexCounters.append( bb );
                 bb.done();
             }
+
+            {
+                BSONObjBuilder bb( result.subobjStart( "backgroundFlushing" ) );
+                globalFlushCounters.append( bb );
+                bb.done();
+            }
             
             if ( anyReplEnabled() ){
                 BSONObjBuilder bb( result.subobjStart( "repl" ) );

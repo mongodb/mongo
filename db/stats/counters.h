@@ -102,4 +102,20 @@ namespace mongo {
 
     extern IndexCounters globalIndexCounters;
 
+    class FlushCounters {
+    public:
+        FlushCounters();
+
+        void flushed(int ms);
+        
+        void append( BSONObjBuilder& b );
+
+    private:
+        long long _total_time;
+        long long _flushes;
+        int _last_time;
+        Date_t _last;
+    };
+
+    extern FlushCounters globalFlushCounters;
 }

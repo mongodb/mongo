@@ -103,7 +103,29 @@ namespace mongo {
         }
     }
     
+    FlushCounters::FlushCounters()
+        : _total_time(0)
+        , _flushes(0)
+        , _last()
+    {}
+
+    void FlushCounters::flushed(int ms){
+        _flushes++;
+        _total_time += ms;
+        _last_time = ms;
+        _last = jsTime();
+    }
+
+    void FlushCounters::append( BSONObjBuilder& b ){
+        b.appendNumber( "flushes" , _flushes );
+        b.appendNumber( "total_ms" , _total_time );
+        b.appendNumber( "average_ms" , (_flushes ? (_total_time / double(_flushes)) : 0.0) );
+        b.appendNumber( "last_ms" , _last_time );
+        b.append("last_finished", _last);
+    }
+    
 
     OpCounters globalOpCounters;
     IndexCounters globalIndexCounters;
+    FlushCounters globalFlushCounters;
 }
