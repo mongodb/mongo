@@ -281,20 +281,26 @@ namespace mongo {
         ~StaticObserver() { __destroyingStatics = true; }
     };
     
+    // On pthread systems, it is an error to destroy a mutex while held.  Static global
+    // mutexes may be held upon shutdown in our implementation, and this way we avoid
+    // destroying them.
     class mutex : boost::noncopyable {
     public:
         mutex() { new (_buf) boost::mutex(); }
         ~mutex() {
             if( !__destroyingStatics ) {
-                me().boost::mutex::~mutex();
+                boost().boost::mutex::~mutex();
             }
         }
-        void lock() { me().lock(); }
-        void unlock() { me().unlock(); }
-        bool try_lock() { return me().try_lock(); }
-        typedef boost::unique_lock<mongo::mutex> scoped_lock;
+        class scoped_lock : boost::noncopyable {
+        public:
+            scoped_lock( mongo::mutex &m ) : _l( m.boost() ) {}
+            boost::mutex::scoped_lock &boost() { return _l; }
+        private:
+            boost::mutex::scoped_lock _l;
+        };
     private:
-        boost::mutex &me() { return *( boost::mutex * )( _buf ); }
+        boost::mutex &boost() { return *( boost::mutex * )( _buf ); }
         char _buf[ sizeof( boost::mutex ) ];
     };
     

@@ -55,7 +55,7 @@ namespace mongo {
 
             scoped_lock l( _lock );
             while( _queue.empty() )
-                _condition.wait( l );
+                _condition.wait( l.boost() );
             
             T t = _queue.front();
             _queue.pop();

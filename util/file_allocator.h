@@ -91,7 +91,7 @@ namespace mongo {
             pendingUpdated_.notify_all();
             while( inProgress( name ) ) {
                 checkFailure();
-                pendingUpdated_.wait( lk );
+                pendingUpdated_.wait( lk.boost() );
             }
 #endif
         }
@@ -102,7 +102,7 @@ namespace mongo {
                 return;
             scoped_lock lk( pendingMutex_ );
             while( pending_.size() != 0 )
-                pendingUpdated_.wait( lk );
+                pendingUpdated_.wait( lk.boost() );
 #endif
         }
         
@@ -144,7 +144,7 @@ namespace mongo {
                     {
                         scoped_lock lk( a_.pendingMutex_ );
                         if ( a_.pending_.size() == 0 )
-                            a_.pendingUpdated_.wait( lk );
+                            a_.pendingUpdated_.wait( lk.boost() );
                     }
                     while( 1 ) {
                         string name;

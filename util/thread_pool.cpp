@@ -101,7 +101,7 @@ ThreadPool::~ThreadPool(){
 void ThreadPool::join(){
     scoped_lock lock(_mutex);
     while(_tasksRemaining){
-        _condition.wait(lock);
+        _condition.wait(lock.boost());
     }
 }
 
