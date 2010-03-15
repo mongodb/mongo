@@ -1,0 +1,39 @@
+.\" Documentation for the MongoDB shell
+.TH MONGOSTAT "15" "March 2010" "10gen" "Mongo Database"
+.SH "NAME"
+mongostat \- view statistics on a running mongod instance
+.SH "SYNOPSIS"
+\fBmongostat [\fIOPTIONS\fR]
+.SH "DESCRIPTION"
+.PP
+\fBmongostat\fR
+prints statistics on a running mongod instance.
+.SH "OPTIONS"
+.TP
+.B \-\-help
+show usage information
+.TP
+.B \-h, \-\-host HOST
+mongo host to connect to (use "left,right" for pairs)
+\" .TP
+\" .B \-\-port PORT
+\" port to connect to (default PORT=27017)
+.TP
+.B \-d, \-\-db ARG
+db to use
+.TP
+.B \-c, \-\-collection ARG
+collection to use (some commands)
+.TP
+.B \-u, \-\-username USERNAME
+specify user to log in as
+.TP
+.B \-p, \-\-password PASSWORD
+specify password of user (notice there is no space)
+.SH "COPYRIGHT"
+.PP
+Copyright 2010 10gen
+.SH "SEE ALSO"
+For more information, please refer to the MongoDB wiki, available at http://www.mongodb.org.
+.SH "AUTHOR"
+Eliot Horowitz
