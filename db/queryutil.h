@@ -197,16 +197,12 @@ namespace mongo {
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
         BSONObj getSpec() const;
-
-        bool canGetFromIndex( const BSONObj& keyPattern ) const;
-        void appendFromIndex( BSONObjBuilder& b , const BSONObj& keyPattern , const BSONObj& key ) const ;
     private:
 
         void add( const string& field, bool include );
         void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
 
         bool _include; // true if default at this level is to include
-        bool _anyEmbedded;
         //TODO: benchmark vector<pair> vs map
         typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
         FieldMap _fields;
