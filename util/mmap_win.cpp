@@ -102,7 +102,7 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
 
-        if (!view) return;
+        if (!view || !fd) return;
 
         bool success = FlushViewOfFile(view, 0); // 0 means whole mapping
         if (!success){
