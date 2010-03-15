@@ -439,7 +439,9 @@ namespace mongo {
         }
         
         bool hit( int n = 1 ){
-            if ( ! _active ) cout << "warning: hit on in-active ProgressMeter" << endl;
+            if ( ! _active ){
+                cout << "warning: hit on in-active ProgressMeter" << endl;
+            }
 
             _done += n;
             _hits++;

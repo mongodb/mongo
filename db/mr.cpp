@@ -111,8 +111,12 @@ namespace mongo {
                     if ( ! keeptemp && markAsTemp )
                         cc().addTempCollection( tempLong );
 
-                    if ( cmdObj["out"].type() == String )
+                    replicate = keeptemp;
+
+                    if ( cmdObj["out"].type() == String ){
                         finalShort = cmdObj["out"].valuestr();
+                        replicate = true;
+                    }
                     else
                         finalShort = tempShort;
                     
@@ -184,6 +188,7 @@ namespace mongo {
             // options
             bool verbose;            
             bool keeptemp;
+            bool replicate;
 
             // query options
             
@@ -252,7 +257,10 @@ namespace mongo {
                 
                 writelock l( setup.tempLong );
                 Client::Context ctx( setup.incLong );
-                theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
+                if ( setup.replicate )
+                    theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
+                else
+                    theDataFileMgr.insert( setup.tempLong.c_str() , res , false );
             }
 
             
@@ -452,6 +460,8 @@ namespace mongo {
                     BSONObj prev;
                     list<BSONObj> all;
                     
+                    assert( userCreateNS( mr.tempLong.c_str() , BSONObj() , errmsg , mr.replicate ) );
+
                     pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
                     cursor = db.query( mr.incLong, Query().sort( sortKey ) );
 
