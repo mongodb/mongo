@@ -93,7 +93,7 @@ namespace mongo {
         
         void outputLockInfoHTML( stringstream& ss );
     private:
-        boost::mutex _lock;
+        mongo::mutex _lock;
         int _n;
         SnapshotData** _snapshots;
         int _loc;

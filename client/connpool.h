@@ -51,7 +51,7 @@ namespace mongo {
         }
     */
     class DBConnectionPool {
-        boost::mutex poolMutex;
+        mongo::mutex poolMutex;
         map<string,PoolForHost*> pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
         
@@ -63,7 +63,7 @@ namespace mongo {
         void release(const string& host, DBClientBase *c) {
             if ( c->isFailed() )
                 return;
-            boostlock L(poolMutex);
+            scoped_lock L(poolMutex);
             pools[host]->pool.push(c);
         }
         void addHook( DBConnectionHook * hook );

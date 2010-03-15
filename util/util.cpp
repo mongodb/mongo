@@ -34,7 +34,7 @@ namespace mongo {
     const char * (*getcurns)() = default_getcurns;
 
     int logLevel = 0;
-    boost::mutex &Logstream::mutex = *( new boost::mutex );
+    mongo::mutex Logstream::mutex;
     int Logstream::doneSetup = Logstream::magicNumber();
     
     bool goingAway = false;
@@ -137,5 +137,7 @@ namespace mongo {
         s << (string)o;
         return s;
     }
-        
+
+    bool __destroyingStatics = false;
+    
 } // namespace mongo

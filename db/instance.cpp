@@ -76,7 +76,7 @@ namespace mongo {
 
     // see FSyncCommand:
     unsigned lockedForWriting; 
-    boost::mutex lockedForWritingMutex;
+    mongo::mutex lockedForWritingMutex;
     bool unlockRequested = false;
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
@@ -93,7 +93,7 @@ namespace mongo {
             vector<BSONObj> vals;
             {
                 Client& me = cc();
-                boostlock bl(Client::clientsMutex);
+                scoped_lock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     if ( c == &me )
@@ -588,7 +588,7 @@ namespace mongo {
 
     void recCacheCloseAll();
 
-    boost::mutex &exitMutex( *( new boost::mutex ) );
+    mongo::mutex exitMutex;
     int numExitCalls = 0;
     void shutdown();
 
@@ -616,7 +616,7 @@ namespace mongo {
     void dbexit( ExitCode rc, const char *why) {        
         Client * c = currentClient.get();
         {
-            boostlock lk( exitMutex );
+            scoped_lock lk( exitMutex );
             if ( numExitCalls++ > 0 ) {
                 if ( numExitCalls > 5 ){
                     // this means something horrible has happened

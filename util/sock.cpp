@@ -20,14 +20,14 @@
 
 namespace mongo {
 
-    static boost::mutex sock_mutex;
+    static mongo::mutex sock_mutex;
 
     string hostbyname(const char *hostname) {
         static string unknown = "0.0.0.0";
         if ( unknown == hostname )
             return unknown;
 
-        boostlock lk(sock_mutex);
+        scoped_lock lk(sock_mutex);
 #if defined(_WIN32)
         if( inet_addr(hostname) != INADDR_NONE )
             return hostname;

@@ -274,7 +274,7 @@ namespace mongo {
 
     extern bool unlockRequested;
     extern unsigned lockedForWriting;
-    extern boost::mutex lockedForWritingMutex;
+    extern mongo::mutex lockedForWritingMutex;
 
 /*
     class UnlockCommand : public Command { 
@@ -308,7 +308,7 @@ namespace mongo {
                 Client::initThread("fsyncjob");
                 Client& c = cc();
                 {
-                    boostlock lk(lockedForWritingMutex);
+                    scoped_lock lk(lockedForWritingMutex);
                     lockedForWriting++;
                 }
                 readlock lk("");
@@ -323,7 +323,7 @@ namespace mongo {
                     sleepmillis(20);
                 }
                 {
-                    boostlock lk(lockedForWritingMutex);
+                    scoped_lock lk(lockedForWritingMutex);
                     lockedForWriting--;
                 }
                 c.shutdown();

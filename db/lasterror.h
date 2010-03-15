@@ -100,7 +100,7 @@ namespace mongo {
             time_t time;
             LastError *lerr;
         };
-        static boost::mutex _idsmutex;
+        static mongo::mutex _idsmutex;
         map<int,Status> _ids;    
     } lastError;
     

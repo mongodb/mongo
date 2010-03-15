@@ -195,7 +195,7 @@ namespace mongo {
 
                << "</tr>\n";
             {
-                boostlock bl(Client::clientsMutex);
+                scoped_lock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     CurOp& co = *(c->curop());

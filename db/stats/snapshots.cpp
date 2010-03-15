@@ -64,7 +64,7 @@ namespace mongo {
     }
     
     void Snapshots::add( SnapshotData * s ){
-        boostlock lk(_lock);
+        scoped_lock lk(_lock);
         _loc = ( _loc + 1 ) % _n;
         _snapshots[_loc] = s;
         if ( _stored < _n )
@@ -72,7 +72,7 @@ namespace mongo {
     }
 
     auto_ptr<SnapshotDelta> Snapshots::computeDelta( int numBack ){
-        boostlock lk(_lock);
+        scoped_lock lk(_lock);
         auto_ptr<SnapshotDelta> p;
         if ( numBack < numDeltas() )
             p.reset( new SnapshotDelta( getPrev(numBack+1) , getPrev(numBack) ) );
@@ -87,7 +87,7 @@ namespace mongo {
     }
 
     void Snapshots::outputLockInfoHTML( stringstream& ss ){
-        boostlock lk(_lock);
+        scoped_lock lk(_lock);
         ss << "\n<table>";
         ss << "<tr><th>elapsed(ms)</th><th>% write locked</th></tr>\n";
         

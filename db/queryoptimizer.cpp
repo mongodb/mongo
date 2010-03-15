@@ -220,7 +220,7 @@ namespace mongo {
     
     void QueryPlan::registerSelf( long long nScanned ) const {
         if ( fbs_.matchPossible() ) {
-            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
         }
     }
@@ -345,7 +345,7 @@ namespace mongo {
         }
 
         if ( honorRecordedPlan_ ) {
-            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
             BSONObj bestIndex = nsd.indexForPattern( fbs_.pattern( order_ ) );
             if ( !bestIndex.isEmpty() ) {
@@ -424,7 +424,7 @@ namespace mongo {
             if ( res->complete() || plans_.size() > 1 )
                 return res;
             {
-                boostlock lk(NamespaceDetailsTransient::_qcMutex);
+                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
             }
             init();
