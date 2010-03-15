@@ -462,6 +462,7 @@ namespace mongo {
             _nscanned(0), _nscannedObjects(0),
             _n(0),
             _inMemSort(false),
+            _getFromIndex(false),
             _saveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) )
         {}
@@ -476,6 +477,10 @@ namespace mongo {
             }
             _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
 
+            //if ( _pq.getFields() ){
+            //_getFromIndex = _pq.getFields()->canGetFromIndex( qp().indexKey() );
+            //}
+            
             if ( qp().scanAndOrderRequired() ) {
                 _inMemSort = true;
                 _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder() ) );
@@ -511,9 +516,9 @@ namespace mongo {
                     _nscannedObjects++;
             }
             else {
-                _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
                 if( !_c->getsetdup(cl) ) { 
+                    _nscannedObjects++;
                     // got a match.
                     
                     BSONObj js = _pq.returnKey() ? _c->currKey() : _c->current();
@@ -539,6 +544,11 @@ namespace mongo {
                             if ( _pq.returnKey() ){
                                 BSONObjBuilder bb( _buf );
                                 bb.appendKeys( _c->indexKeyPattern() , js );
+                                bb.done();
+                            }
+                            else if ( _getFromIndex ){
+                                BSONObjBuilder bb( _buf );
+                                _pq.getFields()->appendFromIndex( bb , _c->indexKeyPattern() , _c->currKey() );
                                 bb.done();
                             }
                             else {
@@ -614,6 +624,7 @@ namespace mongo {
         auto_ptr< Cursor > _c;
 
         auto_ptr< CoveredIndexMatcher > _matcher;
+        bool _getFromIndex;
 
         bool _saveClientCursor;
         bool _oplogReplay;

@@ -652,6 +652,7 @@ namespace mongo {
     void FieldMatcher::add( const BSONObj& o ){
         massert( 10371 , "can only add to FieldMatcher once", _source.isEmpty());
         _source = o;
+        _anyEmbedded = false;
 
         BSONObjIterator i( o );
         int true_false = -1;
@@ -676,6 +677,8 @@ namespace mongo {
             _include = include;
         } else {
             const size_t dot = field.find('.');
+            if ( dot != string::npos )
+                _anyEmbedded = true;
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos)); 
 
@@ -753,6 +756,15 @@ namespace mongo {
             }
         }
     }
+    
+    bool FieldMatcher::canGetFromIndex( const BSONObj& keyPattern ) const {
+        return false;
+    }
+    
+    void FieldMatcher::appendFromIndex( BSONObjBuilder& b , const BSONObj& keyPattern , const BSONObj& key ) const {
+        assert(0);
+    }
+
     
     struct SimpleRegexUnitTest : UnitTest {
         void run(){
