@@ -73,6 +73,7 @@ namespace mongo {
             _end = 0;
             _waitingForLock = false;
             _message = "";
+            _progressMeter.finished();
         }
 
         void setNS(const char *ns) {
