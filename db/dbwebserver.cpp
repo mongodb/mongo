@@ -190,6 +190,8 @@ namespace mongo {
                << "<th>NameSpace</th>"
                << "<th>Query</th>"
                << "<th>client</th>"
+               << "<th>msg</th>"
+               << "<th>progress</th>"
 
                << "</tr>\n";
             {
@@ -214,6 +216,10 @@ namespace mongo {
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );
+
+                    tablecell( ss , co.getMessage() );
+                    tablecell( ss , co.getProgressMeter().toString() );
+
 
                     ss << "</tr>";
                 }

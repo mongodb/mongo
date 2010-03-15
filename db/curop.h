@@ -58,10 +58,13 @@ namespace mongo {
         struct sockaddr_in _remote;
         
         char _queryBuf[256];
-
+        
         void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
         
         OpDebug _debug;
+        
+        ThreadSafeString _message;
+        ProgressMeter _progressMeter;
 
         void _reset(){
             _command = false;
@@ -69,6 +72,7 @@ namespace mongo {
             _dbprofile = 0;
             _end = 0;
             _waitingForLock = false;
+            _message = "";
         }
 
         void setNS(const char *ns) {
@@ -235,6 +239,18 @@ namespace mongo {
             ss << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
             return ss.str();
         }
+
+        ProgressMeter& setMessage( const char * msg , long long progressMeterTotal = 0 , int secondsBetween = 3 ){
+            _message = msg;
+            if ( progressMeterTotal ){
+                assert( ! _progressMeter.isActive() );
+                _progressMeter.reset( progressMeterTotal , secondsBetween );
+            }
+            return _progressMeter;
+        }
+
+        string getMessage() const { return _message; }
+        ProgressMeter getProgressMeter() { return _progressMeter; }
 
         friend class Client;
     };

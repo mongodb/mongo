@@ -410,12 +410,37 @@ namespace mongo {
 
     class ProgressMeter {
     public:
-        ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 )
-            : _total( total ) , _secondsBetween( secondsBetween ) , _checkInterval( checkInterval ) ,
-              _done(0) , _hits(0) , _lastTime( (int) time(0) ){
+        ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+            reset( total , secondsBetween , checkInterval );
+        }
+
+        ProgressMeter(){
+            _active = 0;
+        }
+        
+        void reset( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
+            _total = total;
+            _secondsBetween = secondsBetween;
+            _checkInterval = checkInterval;
+
+            _done = 0;
+            _hits = 0;
+            _lastTime = (int)time(0);
+
+            _active = 1;
+        }
+
+        void finished(){
+            _active = 0;
+        }
+
+        bool isActive(){
+            return _active;
         }
         
         bool hit( int n = 1 ){
+            if ( ! _active ) cout << "warning: hit on in-active ProgressMeter" << endl;
+
             _done += n;
             _hits++;
             if ( _hits % _checkInterval )
@@ -441,7 +466,16 @@ namespace mongo {
             return _hits;
         }
 
+        string toString() const {
+            if ( ! _active )
+                return "";
+            stringstream buf;
+            buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
+            return buf.str();
+        }
     private:
+
+        bool _active;
         
         long long _total;
         int _secondsBetween;

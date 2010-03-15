@@ -984,6 +984,7 @@ namespace mongo {
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         assert( d->backgroundIndexBuildInProgress == 0 );
+        CurOp * op = cc().curop();
 
         Timer t;
 
@@ -1003,7 +1004,7 @@ namespace mongo {
         BSONObjExternalSorter sorter(order);
         sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
-        ProgressMeter pm( d->nrecords , 10 );
+        ProgressMeter & pm = op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1027,6 +1028,8 @@ namespace mongo {
             }
 
         };
+        pm.finished();
+
         if ( logLevel > 1 ) printMemInfo( "before final sort" );
         sorter.sort();
         if ( logLevel > 1 ) printMemInfo( "after final sort" );
@@ -1040,7 +1043,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            ProgressMeter pm2( nkeys , 10 );
+            pm = op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 );
             while( i->more() ) { 
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
@@ -1066,8 +1069,10 @@ namespace mongo {
                     dupsToDrop.push_back(d.second);
                     uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
-                pm2.hit();
+                pm.hit();
             }
+            pm.finished();
+            op->setMessage( "index: (3/3) btree-middle" );
             log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 

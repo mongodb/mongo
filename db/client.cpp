@@ -228,6 +228,17 @@ namespace mongo {
         if ( _client )
             b.append( "desc" , _client->desc() );
         
+        if ( ! _message.empty() ){
+            if ( _progressMeter.isActive() ){
+                StringBuilder buf(128);
+                buf << _message << " " << _progressMeter.toString();
+                b.append( "msg" , buf.str() );
+            }
+            else {
+                b.append( "msg" , _message );
+            }
+        }
+
         return b.obj();
     }
 
