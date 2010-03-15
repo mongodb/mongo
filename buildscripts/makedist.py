@@ -474,16 +474,17 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.r
 
     # On very old Debianoids, libboost-<foo>-dev will be some old
     # boost that's not as thready as we want, but which Eliot says
-    # will work.
-    very_old_deb_prereqs =  ["libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev", "xulrunner1.9-dev"]
+    # will work; on very new Debianoids, libbost-<foo>-dev is what we
+    # want.
+    unversioned_deb_boost_prereqs =  ["libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev"]
+    # On some in-between Debianoids, libboost-<foo>-dev is still a
+    # 1.34, but 1.35 packages are available, so we want those.
+    versioned_deb_boost_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev"]
 
-    # On less old (but still old!) Debianoids, libboost-<foo>-dev is
-    # still a 1.34, but 1.35 packages are available, so we want those.
-    old_deb_prereqs =  ["libboost-thread1.35-dev", "libboost-filesystem1.35-dev", "libboost-program-options1.35-dev", "libboost-date-time1.35-dev", "libboost1.35-dev", "xulrunner-dev"]
+    unversioned_deb_xulrunner_prereqs = ["xulrunner-dev"]
 
-    # On newer Debianoids, libbost-<foo>-dev is some sufficiently new
-    # thing.
-    new_deb_prereqs = [ "libboost-thread-dev", "libboost-filesystem-dev", "libboost-program-options-dev", "libboost-date-time-dev", "libboost-dev", "xulrunner-dev" ]
+    old_versioned_deb_xulrunner_prereqs = ["xulrunner1.9-dev"]
+    new_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9.1-dev"]
 
     common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
@@ -522,17 +523,17 @@ git clone git://github.com/mongodb/mongo.git
                                  (("centos", "*", "*"), self.rpm_productdir))),
                                ("pkg_prereqs",
                                 ((("ubuntu", "9.4", "*"),
-                                  self.old_deb_prereqs + self.common_deb_prereqs),
+                                  self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "9.10", "*"),
-                                  self.new_deb_prereqs + self.common_deb_prereqs),
+                                  self.unversioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "10.4", "*"),
-                                  self.new_deb_prereqs + self.common_deb_prereqs),
+                                  self.unversioned_deb_boost_prereqs + self.new_versioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "8.10", "*"),
-                                  self.old_deb_prereqs + self.common_deb_prereqs),
+                                  self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("ubuntu", "8.4", "*"),
-                                  self.very_old_deb_prereqs + self.common_deb_prereqs),
+                                  self.unversioned_deb_boost_prereqs + self.old_versioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("debian", "5.0", "*"),
-                                  self.old_deb_prereqs + self.common_deb_prereqs),
+                                  self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("fedora", "8", "*"),
                                   self.fedora_prereqs),
                                  (("centos", "5.4", "*"),
