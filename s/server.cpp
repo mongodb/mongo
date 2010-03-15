@@ -118,6 +118,7 @@ namespace mongo {
 using namespace mongo;
 
 int main(int argc, char* argv[], char *envp[] ) {
+    static StaticObserver staticObserver;
     
     bool justTests = false;
     vector<string> configdbs;

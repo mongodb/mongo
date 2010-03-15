@@ -22,6 +22,7 @@
 #include "dbtests.h"
 
 int main( int argc, char** argv ) {
+    static StaticObserver StaticObserver;
     return Suite::run(argc, argv, "/tmp/unittest");
 }
 
