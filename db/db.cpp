@@ -492,10 +492,9 @@ namespace mongo {
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
         Client::initThread("initandlisten");
+        _diaglog.init();
 
         clearTmpCollections();
-
-        _diaglog.init();
 
         Module::initAll();
 

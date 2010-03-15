@@ -81,6 +81,7 @@ namespace mongo {
                 OCCASIONALLY log = true;
                 if ( log ){
                     boostlock lk(mutex);
+                    assert( f );
                     f->write(data,len);
                 }
             }
