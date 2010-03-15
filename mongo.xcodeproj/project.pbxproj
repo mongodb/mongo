@@ -28,6 +28,9 @@
 		9303D1B710E1415C00294FAC /* mr.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = mr.cpp; sourceTree = "<group>"; };
 		9303D1B810E1415C00294FAC /* update.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = update.cpp; sourceTree = "<group>"; };
 		9303D1B910E1415C00294FAC /* update.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = update.h; sourceTree = "<group>"; };
+		9307500C114EA14700272A70 /* indexbg1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = indexbg1.js; sourceTree = "<group>"; };
+		9307500D114EA14700272A70 /* indexbg2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = indexbg2.js; sourceTree = "<group>"; };
+		9307500E114EA14700272A70 /* ns1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = ns1.js; sourceTree = "<group>"; };
 		930B844D0FA10D1C00F22B4B /* optime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = optime.h; sourceTree = "<group>"; };
 		931184DC0F83C95800A6DC44 /* message_server_port.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = message_server_port.cpp; sourceTree = "<group>"; };
 		931186FB0F8535FF00A6DC44 /* bridge.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bridge.cpp; sourceTree = "<group>"; };
@@ -80,8 +83,6 @@
 		934223A00EF16DB400608550 /* dbeval.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbeval.cpp; sourceTree = "<group>"; };
 		934223A10EF16DB400608550 /* dbhelpers.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbhelpers.cpp; sourceTree = "<group>"; };
 		934223A20EF16DB400608550 /* dbhelpers.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dbhelpers.h; sourceTree = "<group>"; };
-		934223A30EF16DB400608550 /* dbinfo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbinfo.cpp; sourceTree = "<group>"; };
-		934223A40EF16DB400608550 /* dbinfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dbinfo.h; sourceTree = "<group>"; };
 		934223A50EF16DB400608550 /* dbmessage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dbmessage.h; sourceTree = "<group>"; };
 		934223A60EF16DB400608550 /* dbwebserver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dbwebserver.cpp; sourceTree = "<group>"; };
 		934223A70EF16DB400608550 /* instance.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = instance.cpp; sourceTree = "<group>"; };
@@ -596,6 +597,16 @@
 			path = modules;
 			sourceTree = "<group>";
 		};
+		9307500B114EA14700272A70 /* slow */ = {
+			isa = PBXGroup;
+			children = (
+				9307500C114EA14700272A70 /* indexbg1.js */,
+				9307500D114EA14700272A70 /* indexbg2.js */,
+				9307500E114EA14700272A70 /* ns1.js */,
+			);
+			path = slow;
+			sourceTree = "<group>";
+		};
 		933A4D120F55A68600145C4B /* examples */ = {
 			isa = PBXGroup;
 			children = (
@@ -721,8 +732,6 @@
 				934223A00EF16DB400608550 /* dbeval.cpp */,
 				934223A10EF16DB400608550 /* dbhelpers.cpp */,
 				934223A20EF16DB400608550 /* dbhelpers.h */,
-				934223A30EF16DB400608550 /* dbinfo.cpp */,
-				934223A40EF16DB400608550 /* dbinfo.h */,
 				934223A50EF16DB400608550 /* dbmessage.h */,
 				934223A60EF16DB400608550 /* dbwebserver.cpp */,
 				934223A70EF16DB400608550 /* instance.cpp */,
@@ -759,6 +768,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				9307500B114EA14700272A70 /* slow */,
 				93C8EB4D114721D000F28017 /* copydb2.js */,
 				93C8E9DF1146D39700F28017 /* arrayfind2.js */,
 				93C8E81C1145BCCA00F28017 /* regex7.js */,
