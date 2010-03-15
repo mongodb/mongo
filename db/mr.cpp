@@ -377,7 +377,10 @@ namespace mongo {
             bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
-                MRSetup mr( cc().database()->name , cmd );
+                Client& client = cc();
+                CurOp * op = client.curop();
+
+                MRSetup mr( client.database()->name , cmd );
 
                 log(1) << "mr ns: " << mr.ns << endl;
                 
@@ -401,7 +404,7 @@ namespace mongo {
                     MRTL * mrtl = new MRTL( state );
                     _tlmr.reset( mrtl );
 
-                    ProgressMeter pm( db.count( mr.ns , mr.filter ) );
+                    ProgressMeter & pm = op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) );
                     auto_ptr<DBClientCursor> cursor = db.query( mr.ns , mr.q );
                     long long mapTime = 0;
                     Timer mt;
@@ -428,6 +431,7 @@ namespace mongo {
                         if ( mr.limit && num >= mr.limit )
                             break;
                     }
+                    pm.finished();
                     
                     countsBuilder.append( "input" , num );
                     countsBuilder.append( "emit" , mrtl->numEmits );
@@ -438,7 +442,7 @@ namespace mongo {
                     timingBuilder.append( "emitLoop" , t.millis() );
                     
                     // final reduce
-                    
+                    op->setMessage( "m/r: (2/3) final reduce in memory" );
                     mrtl->reduceInMemory();
                     mrtl->dump();
                     
@@ -448,7 +452,7 @@ namespace mongo {
                     BSONObj prev;
                     list<BSONObj> all;
                     
-                    ProgressMeter fpm( db.count( mr.incLong ) );
+                    pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
                     cursor = db.query( mr.incLong, Query().sort( sortKey ) );
 
                     while ( cursor->more() ){
@@ -464,12 +468,11 @@ namespace mongo {
                         all.clear();
                         prev = o;
                         all.push_back( o );
-                        fpm.hit();
+                        pm.hit();
                         dbtemprelease tl;
                     }
-                    
                     state.finalReduce( all );
-
+                    pm.finished();
                     _tlmr.reset( 0 );
                 }
                 catch ( ... ){

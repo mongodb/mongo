@@ -246,6 +246,9 @@ namespace mongo {
                 assert( ! _progressMeter.isActive() );
                 _progressMeter.reset( progressMeterTotal , secondsBetween );
             }
+            else {
+                _progressMeter.finished();
+            }
             return _progressMeter;
         }
 
