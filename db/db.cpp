@@ -427,15 +427,21 @@ namespace mongo {
     public:
         void run(){
             log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
+            int time_flushing = 0;
             while ( ! inShutdown() ){
                 if ( _sleepsecs == 0 ){
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
                     continue;
                 }
-                sleepmillis( (int)(_sleepsecs * 1000) );
-                MemoryMappedFile::flushAll( false );
-                log(1) << "flushing mmap" << endl;
+
+                sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
+
+                Date_t start = jsTime();
+                MemoryMappedFile::flushAll( true );
+                time_flushing = jsTime() - start;
+
+                log(1) << "flushing mmap took " << time_flushing << "ms" << endl;
             }
         }
         
