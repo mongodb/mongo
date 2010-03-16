@@ -69,6 +69,8 @@ namespace mongo {
             didAnything = true;
             for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
                 string ns = *i;
+                Top::global.collectionDropped( ns );
+                    
                 dblock l;
                 Client::Context ctx( ns );
                 if ( ! nsdetails( ns.c_str() ) )

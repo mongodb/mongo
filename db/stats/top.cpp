@@ -44,9 +44,15 @@ namespace mongo {
         
     }
 
-
+    
     void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
+        //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         scoped_lock lk(_lock);
+        
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ){
+            _lastDropped = "";
+            return;
+        }
 
         CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
@@ -54,8 +60,10 @@ namespace mongo {
     }
 
     void Top::collectionDropped( const string& ns ){
+        //cout << "collectionDropped: " << ns << endl;
         scoped_lock lk(_lock);
         _usage.erase(ns);
+        _lastDropped = ns;
     }
     
     void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
