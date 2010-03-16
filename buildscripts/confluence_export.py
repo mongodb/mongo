@@ -8,6 +8,7 @@
 # User: soap, Password: soap
 from __future__ import with_statement
 import cookielib
+import datetime
 import os
 import shutil
 import subprocess
@@ -57,8 +58,15 @@ def rmdir(dir):
 
 
 def overwrite(src, dest):
-    rmdir(dest)
-    shutil.copytree(src, dest)
+    target = "%s/DOCS-%s/" % (dest, datetime.date.today())
+    current = "%s/current" % dest
+    rmdir(target)
+    shutil.copytree(src, target)
+    try:
+        os.unlink(current)
+    except:
+        pass
+    os.symlink(os.path.abspath(target), os.path.abspath(current))
 
 
 def main(dir):
