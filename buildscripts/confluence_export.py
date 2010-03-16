@@ -6,12 +6,13 @@
 #   - suds
 #
 # User: soap, Password: soap
+from __future__ import with_statement
 import cookielib
-import cStringIO as StringIO
+import os
 import shutil
+import subprocess
 import sys
 import urllib2
-import zipfile
 
 from suds.client import Client
 
@@ -20,6 +21,7 @@ USERNAME = "soap"
 PASSWORD = "soap"
 AUTH_URI = "http://www.mongodb.org/login.action?os_authType=basic"
 TMP_DIR = "confluence-tmp"
+TMP_FILE = "confluence-tmp.zip"
 
 
 def export_and_get_uri():
@@ -39,10 +41,12 @@ def login_and_download(docs):
 
 
 def extract_to_dir(data, dir):
-    buffer = StringIO.StringIO(data.read())
+    with open(TMP_FILE, "w") as f:
+        f.write(data.read())
     data.close()
-    zip = zipfile.ZipFile(buffer)
-    zip.extractall(dir)
+    # This is all really annoying but zipfile doesn't do extraction on 2.5
+    subprocess.call(["unzip", "-d", dir, TMP_FILE])
+    os.unlink(TMP_FILE)
 
 
 def rmdir(dir):
