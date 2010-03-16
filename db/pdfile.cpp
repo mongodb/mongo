@@ -709,6 +709,7 @@ namespace mongo {
         log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
+        Top::global.collectionDropped( name );
         dropNS(name);        
     }
     

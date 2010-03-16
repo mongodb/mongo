@@ -52,6 +52,11 @@ namespace mongo {
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
     }
+
+    void Top::collectionDropped( const string& ns ){
+        scoped_lock lk(_lock);
+        _usage.erase(ns);
+    }
     
     void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
         c.total.inc( micros );

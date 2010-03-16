@@ -70,7 +70,8 @@ namespace mongo {
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out);
         CollectionData getGlobalData(){ return _global; }
-        
+        void collectionDropped( const string& ns );
+
     public: // static stuff
         static Top global;
         
