@@ -106,6 +106,8 @@ void check( bool b ) {
 }
 
 int main( int argc, char **argv ) {
+    static StaticObserver staticObserver;
+    
     setupSignals();
 
     check( argc == 5 );
