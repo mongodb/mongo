@@ -1150,9 +1150,10 @@ namespace mongo {
             d->backgroundIndexBuildInProgress = 1;
             d->nIndexes--;
         }
-        void done(NamespaceDetails *d) {
+        void done(const char *ns, NamespaceDetails *d) {
             d->nIndexes++;
             d->backgroundIndexBuildInProgress = 0;
+            NamespaceDetailsTransient::get_w(ns).addedIndex(); // clear query optimizer cache
             assertInWriteLock();
         }
 
@@ -1171,7 +1172,7 @@ namespace mongo {
             catch(...) { 
                 if( cc().database() && nsdetails(ns.c_str()) == d ) {
                     assert( idxNo == d->nIndexes );
-                    done(d);
+                    done(ns.c_str(), d);
                 }
                 else {
                     log() << "ERROR: db gone during bg index?" << endl;
@@ -1179,19 +1180,17 @@ namespace mongo {
                 throw;
             }
             assert( idxNo == d->nIndexes );
-            done(d);
+            done(ns.c_str(), d);
             return n;
         }
     };
 
     // throws DBException
-    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << endl;
         Timer t;
 		unsigned long long n;
 
-        BSONObj info = idx.info.obj();
-        bool background = info["background"].trueValue();
         if( background ) {
             log(2) << "buildAnIndex: background=true\n";
         }
@@ -1460,11 +1459,14 @@ namespace mongo {
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
+            BSONObj info = loc.obj();
+            bool background = info["background"].trueValue();
+
             int idxNo = tableToIndex->nIndexes;
-            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str()); // clear transient info caches so they refresh; increments nIndexes
+            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
             idx.info = loc;
             try {
-                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
             } catch( DBException& ) {
                 // save our error msg string as an exception on dropIndexes will overwrite our message
                 LastError *le = lastError.get();
