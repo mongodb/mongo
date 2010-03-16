@@ -103,6 +103,7 @@ namespace mongo {
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
+       god:     allow access to system namespaces, and don't yield
     */
     long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if( !god ) {
@@ -143,7 +144,7 @@ namespace mongo {
         
         unsigned long long nScanned = 0;
         do {
-            if ( ++nScanned % 128 == 0 && !matcher.docMatcher().atomic() ) {
+            if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
                 if ( ! cc->yield() ){
                     cc.release(); // has already been deleted elsewhere
                     break;
