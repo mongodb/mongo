@@ -37,7 +37,7 @@ stop()
   echo -n $"Stopping mongod: "
   killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
   RETVAL=$?
-  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod &7 success
+  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod && success
 }
 
 restart () {
