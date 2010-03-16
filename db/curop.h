@@ -264,12 +264,12 @@ namespace mongo {
        future: maybe use this as a "going away" thing on process termination with a higher flag value 
     */
     extern class KillCurrentOp { 
-         enum { Off, On, All } state;
+        enum { Off, On, All } state;
         AtomicUInt toKill;
     public:
         void killAll() { state = All; }
         void kill(AtomicUInt i) { toKill = i; state = On; }
-
+        
         void checkForInterrupt() { 
             if( state != Off ) { 
                 if( state == All ) 
