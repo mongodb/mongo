@@ -16,6 +16,7 @@ searches = [
     [ [ 1 , 2 ] , [ 4 , 5 ] ] ,
     [ [ 1 , 1 ] , [ 2 , 2 ] ] ,
     [ [ 0 , 2 ] , [ 4 , 5 ] ] ,
+    [ [ 1 , 1 ] , [ 2 , 8 ] ] ,
 ];
 
 
@@ -24,7 +25,9 @@ for ( i=0; i<searches.length; i++ ){
     //printjson( b );
     
     q = { loc : { $within : { $box : b } } }
-    assert.eq( ( 1 + b[1][0] - b[0][0] ) * ( 1 + b[1][1] - b[0][1] )  , t.find(q).itcount() , "itcount: " + q );
+    numWanetd = ( 1 + b[1][0] - b[0][0] ) * ( 1 + b[1][1] - b[0][1] );
+    assert.eq( numWanetd  , t.find(q).itcount() , "itcount: " + q );
+    printjson( t.find(q).explain() )
 }
 
 

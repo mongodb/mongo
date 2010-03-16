@@ -588,10 +588,7 @@ namespace mongo {
         }
 
         bool inside( Point p ){
-            cout << "ME : " << toString() << "\t" << p.toString() << endl;
-            bool r =  inside( p._x , p._y );
-            cout << "\t" << r << endl;
-            return r;
+            return inside( p._x , p._y );
         }
         
         bool inside( double x , double y ){
@@ -778,7 +775,8 @@ namespace mongo {
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
         }
 
-        virtual ~GeoAccumulator(){}
+        virtual ~GeoAccumulator(){
+        }
 
         virtual void add( const KeyNode& node ){
             // when looking at other boxes, don't want to look at some object twice
@@ -1061,6 +1059,8 @@ namespace mongo {
             return false;
         }
 
+        virtual string toString() const = 0;
+
         const Geo2dType * _spec;
         const IndexDetails * _id;
     };
@@ -1275,8 +1275,6 @@ namespace mongo {
             _state = START;
             _found = 0;
 
-            cout << "BOX : " << _want.toString() << endl;
-            
             Point center = _want.center();
             _prefix = _g->_hash( center._x , center._y );
 
@@ -1309,7 +1307,6 @@ namespace mongo {
                 }
                 
                 Box cur( _g , _prefix );
-                cout << "CUR : " << cur.toString() << endl;
                 if ( cur._min._x < _want._min._x &&
                      cur._min._y < _want._min._y &&
                      cur._max._x > _want._max._x &&
