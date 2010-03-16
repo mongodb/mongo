@@ -722,6 +722,13 @@ namespace mongo {
     
     class GeoPoint {
     public:
+        GeoPoint(){
+        }
+
+        GeoPoint( const KeyNode& node , double distance )
+            : _key( node.key ) , _loc( node.recordLoc ) , _o( node.recordLoc.obj() ) , _distance( distance ){
+        }
+
         GeoPoint( const BSONObj& key , DiskLoc loc , double distance )
             : _key(key) , _loc(loc) , _o( loc.obj() ) , _distance( distance ){
         }
@@ -730,39 +737,41 @@ namespace mongo {
             return _distance < other._distance;
         }
 
+        bool isEmpty() const {
+            return _o.isEmpty();
+        }
+
         BSONObj _key;
         DiskLoc _loc;
         BSONObj _o;
         double _distance;
     };
-    
-    class GeoHopper {
+
+    class GeoAccumulator {
     public:
-        typedef multiset<GeoPoint> Holder;
-
-        GeoHopper( const Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() )
-            : _g( g ) , _max( max ) , _near( n ) , _lookedAt(0) , _objectsLoaded(0){
-
+        GeoAccumulator( const Geo2dType * g , const BSONObj& filter )
+            : _g(g) , _lookedAt(0) , _objectsLoaded(0) {
             if ( ! filter.isEmpty() )
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
         }
-        
-        void add( const KeyNode& node ){
+
+        virtual ~GeoAccumulator(){}
+
+        virtual void add( const KeyNode& node ){
             // when looking at other boxes, don't want to look at some object twice
             if ( _seen.count( node.recordLoc ) )
                 return;
             _seen.insert( node.recordLoc );
-            
             _lookedAt++;
-
-            double d = _g->distance( _near , node.key.firstElement() );
-            GEODEBUG( "\t" << node.recordLoc.obj() << "\t" << d );
-            if ( _points.size() >= _max && d > farthest() )
+            
+            // distance check
+            double d = 0;
+            if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) )
                 return;
             
+            // matcher
             MatchDetails details;
             if ( _matcher.get() ){
-
                 bool good = _matcher->matches( node.key , node.recordLoc , &details );
                 if ( details.loadedObject )
                     _objectsLoaded++;
@@ -774,7 +783,36 @@ namespace mongo {
             
             if ( ! details.loadedObject ) // dont double count
                 _objectsLoaded++;
-            
+
+            addSpecific( node , d );
+        }
+
+        virtual void addSpecific( const KeyNode& node , double d ) = 0;
+        virtual bool checkDistance( const GeoHash& node , double& d ) = 0;
+        
+        const Geo2dType * _g;
+        set<DiskLoc> _seen;
+        auto_ptr<CoveredIndexMatcher> _matcher;
+
+        long long _lookedAt;
+        long long _objectsLoaded;
+    };
+    
+    class GeoHopper : public GeoAccumulator {
+    public:
+        typedef multiset<GeoPoint> Holder;
+
+        GeoHopper( const Geo2dType * g , unsigned max , const GeoHash& n , const BSONObj& filter = BSONObj() )
+            : GeoAccumulator( g , filter ) , _max( max ) , _near( n ) {
+
+        }
+
+        virtual bool checkDistance( const GeoHash& h , double& d ){
+            d = _g->distance( _near , h );
+            return _points.size() < _max || d < farthest();
+        }
+        
+        virtual void addSpecific( const KeyNode& node , double d ){
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
@@ -790,15 +828,10 @@ namespace mongo {
             return i->_distance;
         }
 
-        const Geo2dType * _g;
         unsigned _max;
         GeoHash _near;
         Holder _points;
-        set<DiskLoc> _seen;
-        auto_ptr<CoveredIndexMatcher> _matcher;
 
-        long long _lookedAt;
-        long long _objectsLoaded;
     };
 
     struct BtreeLocation {
@@ -819,7 +852,7 @@ namespace mongo {
             return hash.hasPrefix( e );
         }
         
-        bool advance( int direction , int& totalFound , GeoHopper& all ){
+        bool advance( int direction , int& totalFound , GeoAccumulator* all ){
 
             if ( bucket.isNull() )
                 return false;
@@ -829,13 +862,13 @@ namespace mongo {
             return checkCur( totalFound , all );
         }
 
-        bool checkCur( int& totalFound , GeoHopper& all ){
+        bool checkCur( int& totalFound , GeoAccumulator* all ){
             if ( bucket.isNull() )
                 return false;
 
             if ( bucket.btree()->isUsed(pos) ){
                 totalFound++;
-                all.add( bucket.btree()->keyNode( pos ) );
+                all->add( bucket.btree()->keyNode( pos ) );
             }
 
             return true;
@@ -846,6 +879,25 @@ namespace mongo {
             ss << "bucket: " << bucket.toString() << " pos: " << pos << " found: " << found;
             return ss.str();
         }
+
+        static bool initial( const IndexDetails& id , const Geo2dType * spec , 
+                             BtreeLocation& min , BtreeLocation&  max , 
+                             GeoHash start ,
+                             int & found , GeoAccumulator * hopper ){
+            
+            min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
+                                                  spec->_order , min.pos , min.found , minDiskLoc );
+            min.checkCur( found , hopper );
+            max = min;
+            
+            if ( min.bucket.isNull() ){
+                min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
+                                                      spec->_order , min.pos , min.found , minDiskLoc , -1 );
+                min.checkCur( found , hopper );
+            }
+            
+            return ! min.bucket.isNull() || ! max.bucket.isNull();
+        }
     };
 
     class GeoSearch {
@@ -853,7 +905,7 @@ namespace mongo {
         GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() )
             : _spec( g ) , _n( n ) , _start( n ) ,
               _numWanted( numWanted ) , _filter( filter ) , 
-              _hopper( g , numWanted , n , filter )
+              _hopper( new GeoHopper( g , numWanted , n , filter ) )
         {
             assert( g->getDetails() );
             _nscanned = 0;
@@ -873,29 +925,20 @@ namespace mongo {
              * 4) use regular btree cursors to scan those boxes
              */
             
+            GeoHopper * hopper = _hopper.get();
+
             _prefix = _start;
             { // 1 regular geo hash algorithm
                 
 
-                BtreeLocation min;
-                min.bucket = head->locate( id , id.head , _n.wrap() , _spec->_order , min.pos , min.found , minDiskLoc );
-                min.checkCur( _found , _hopper );
-                BtreeLocation max = min;
-
-                if ( min.bucket.isNull() ){
-                    min.bucket = head->locate( id , id.head , _n.wrap() , _spec->_order , min.pos , min.found , minDiskLoc , -1 );
-                    min.checkCur( _found , _hopper );
-                }
-                
-                if ( min.bucket.isNull() && max.bucket.isNull() ){
-                    // collection is empty
+                BtreeLocation min,max;
+                if ( ! BtreeLocation::initial( id , _spec , min , max , _n , _found , hopper ) )
                     return;
-                }
                 
                 while ( _found < _numWanted ){
-                    while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , _hopper ) )
+                    while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , hopper ) )
                         _nscanned++;
-                    while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , _hopper ) )
+                    while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , hopper ) )
                         _nscanned++;
                     if ( ! _prefix.constrains() )
                         break;
@@ -908,7 +951,7 @@ namespace mongo {
                 // 2
                 Point center( _spec , _n );
                 double boxSize = _spec->size( _prefix );
-                double farthest = _hopper.farthest();
+                double farthest = hopper->farthest();
                 if ( farthest > boxSize )
                     boxSize = farthest;
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
@@ -949,8 +992,8 @@ namespace mongo {
             BtreeLocation loc;
             loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , _spec->_order , 
                                                         loc.pos , loc.found , minDiskLoc );
-            loc.checkCur( _found , _hopper );
-            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper ) )
+            loc.checkCur( _found , _hopper.get() );
+            while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) )
                 _nscanned++;
 
         }
@@ -963,34 +1006,23 @@ namespace mongo {
         GeoHash _prefix;
         int _numWanted;
         BSONObj _filter;
-        GeoHopper _hopper;
+        shared_ptr<GeoHopper> _hopper;
 
         long long _nscanned;
         int _found;
     };
-    
-    class GeoCursor : public Cursor {
+
+    class GeoCursorBase : public Cursor {
     public:
-        GeoCursor( shared_ptr<GeoSearch> s )
-            : _s( s ) , _cur( s->_hopper._points.begin() ) , _end( s->_hopper._points.end() ) {
+        GeoCursorBase( const Geo2dType * spec )
+            : _spec( spec ), _id( _spec->getDetails() ){
+
         }
-        
-        virtual ~GeoCursor() {}
-        
-        virtual bool ok(){
-            return _cur != _end;
-        }
-        
-        virtual Record* _current(){ assert(ok()); return _cur->_loc.rec(); }
-        virtual BSONObj current(){ assert(ok()); return _cur->_o; }
-        virtual DiskLoc currLoc(){ assert(ok()); return _cur->_loc; }
-        virtual bool advance(){ _cur++; return ok(); }
-        virtual BSONObj currKey() const { return _cur->_key; }
 
         virtual DiskLoc refLoc(){ return DiskLoc(); }
 
         virtual BSONObj indexKeyPattern() {
-            return _s->_spec->keyPattern();
+            return _spec->keyPattern();
         }
 
         virtual void noteLocation() { 
@@ -1002,13 +1034,37 @@ namespace mongo {
             assert(0);
         }
 
-        virtual string toString() const {
-            return "GeoCursor";
-        }
-
         virtual bool getsetdup(DiskLoc loc){
             return false;
         }
+
+        const Geo2dType * _spec;
+        const IndexDetails * _id;
+    };
+
+    class GeoSearchCursor : public GeoCursorBase {
+    public:
+        GeoSearchCursor( shared_ptr<GeoSearch> s )
+            : GeoCursorBase( s->_spec ) , 
+              _s( s ) , _cur( s->_hopper->_points.begin() ) , _end( s->_hopper->_points.end() ) {
+        }
+        
+        virtual ~GeoSearchCursor() {}
+        
+        virtual bool ok(){
+            return _cur != _end;
+        }
+        
+        virtual Record* _current(){ assert(ok()); return _cur->_loc.rec(); }
+        virtual BSONObj current(){ assert(ok()); return _cur->_o; }
+        virtual DiskLoc currLoc(){ assert(ok()); return _cur->_loc; }
+        virtual bool advance(){ _cur++; return ok(); }
+        virtual BSONObj currKey() const { return _cur->_key; }
+
+        virtual string toString() const {
+            return "GeoSearchCursor";
+        }
+
 
         virtual BSONObj prettyStartKey() const { 
             return BSON( _s->_spec->_geo << _s->_prefix.toString() ); 
@@ -1025,35 +1081,204 @@ namespace mongo {
         GeoHopper::Holder::iterator _end;
     };
 
+    class GeoBrowse : public GeoCursorBase , public GeoAccumulator {
+    public:
+        GeoBrowse( const Geo2dType * g , string type , BSONObj filter = BSONObj() )
+            : GeoCursorBase( g ) ,GeoAccumulator( g , filter ) ,
+              _type( type ) , _filter( filter ) , _firstCall(true) {
+        }
+        
+        virtual string toString() const {
+            return (string)"GeoBrowse-" + _type;
+        }
+
+        virtual bool ok(){
+            if ( _firstCall ){
+                fillStack();
+                _firstCall = false;
+            }
+            return ! _cur.isEmpty() || _stack.size() || moreToDo();
+        }
+        
+        virtual bool advance(){ 
+            _cur._o = BSONObj();
+            
+            if ( _stack.size() ){
+                _cur = _stack.front();
+                _stack.pop_front();
+                return true;
+            }
+            
+            if ( ! moreToDo() )
+                return false;
+            
+            while ( _cur.isEmpty() && moreToDo() )
+                fillStack();
+            return ! _cur.isEmpty();
+        }
+        
+        virtual Record* _current(){ assert(ok()); return _cur._loc.rec(); }
+        virtual BSONObj current(){ assert(ok()); return _cur._o; }
+        virtual DiskLoc currLoc(){ assert(ok()); return _cur._loc; }
+        virtual BSONObj currKey() const { return _cur._key; }
+
+
+        virtual bool moreToDo() = 0;
+        virtual void fillStack() = 0;
+
+        virtual void addSpecific( const KeyNode& node , double d ){
+            if ( _cur.isEmpty() )
+                _cur = GeoPoint( node , d );
+            else
+                _stack.push_back( GeoPoint( node , d ) );
+        }
+
+        string _type;
+        BSONObj _filter;
+        list<GeoPoint> _stack;
+
+        GeoPoint _cur;
+        bool _firstCall;
+
+    };
+
+    class GeoCircleBrowse : public GeoBrowse {
+    public:
+        
+        enum State {
+            START , 
+            DOING_EXPAND ,
+            DOING_AROUND ,
+            DONE
+        } _state;
+
+        GeoCircleBrowse( const Geo2dType * g , const BSONObj& circle , BSONObj filter = BSONObj() )        
+            : GeoBrowse( g , "circle" , filter ){
+            
+            uassert( 13060 , "$center needs 2 fields (middle,max distance)" , circle.nFields() == 2 );
+            BSONObjIterator i(circle);
+            _start = g->_tohash( i.next() );
+            _prefix = _start;
+            _maxDistance = i.next().numberDouble();
+            uassert( 13061 , "need a max distance > 0 " , _maxDistance > 0 );
+
+            _state = START;
+            _found = 0;
+
+            ok();
+        }
+
+        virtual bool moreToDo(){
+            return _state != DONE;
+        }
+        
+        virtual void fillStack(){
+            if ( _state == START ){
+                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , 
+                                               _prefix , _found , this ) ){
+                    _state = DONE;
+                    return;
+                }
+                _state = DOING_EXPAND;
+            }
+            
+            if ( _state == DOING_EXPAND ){
+                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
+                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                
+                if ( ! _prefix.constrains() ){
+                    // we've exhausted the btree
+                    _state = DONE;
+                    return;
+                }
+                
+                if ( _g->distance( _prefix , _start ) > _maxDistance ){
+                    GeoHash tr = _prefix;
+                    tr.move( 1 , 1 );
+                    if ( _g->distance( tr , _start ) > _maxDistance )
+                        _state = DOING_AROUND;
+                    else
+                        _prefix = _prefix.up();
+                }
+                else
+                    _prefix = _prefix.up();
+                return;
+            }
+            
+            if ( _state == DOING_AROUND ){
+                _state = DONE;
+                return;
+            }
+        }
+        
+        virtual bool checkDistance( const GeoHash& h , double& d ){
+            d = _g->distance( _start , h );
+            _lastDistance = d;
+            return d <= ( _maxDistance + .01 );
+        }
+
+        GeoHash _start;
+        double _maxDistance;
+        
+        int _found;
+        
+        GeoHash _prefix;        
+        BtreeLocation _min;
+        BtreeLocation _max;
+
+        double _lastDistance;
+    };    
+
+
     auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
         else if ( numWanted == 0 )
              numWanted = 100;
         
-        GeoHash n;
         BSONObjIterator i(query);
         while ( i.more() ){
             BSONElement e = i.next();
+
             if ( _geo != e.fieldName() )
                 continue;
-            if ( e.type() == Object ){
-                switch ( e.embeddedObject().firstElement().getGtLtOp() ){
-                case BSONObj::opNEAR:
-                    e = e.embeddedObject().firstElement();
-                    n = _tohash( e );;
-                default: break;
+
+            if ( e.type() != Object )
+                continue;
+            
+            switch ( e.embeddedObject().firstElement().getGtLtOp() ){
+            case BSONObj::opNEAR: {
+                e = e.embeddedObject().firstElement();
+                shared_ptr<GeoSearch> s( new GeoSearch( this , _tohash(e) , numWanted , query ) );
+                s->exec();
+                auto_ptr<Cursor> c;
+                c.reset( new GeoSearchCursor( s ) );
+                return c;   
+            }
+            case BSONObj::opWITHIN: {
+                e = e.embeddedObject().firstElement();
+                uassert( 13057 , "$within has to take an object or array" , e.isABSONObj() );
+                e = e.embeddedObject().firstElement();
+                string type = e.fieldName();
+                if ( type == "$center" ){
+                    uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
+                    auto_ptr<Cursor> c;
+                    c.reset( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    return c;   
                 }
+                throw UserException( 13058 , (string)"unknown $with type: " + type );
+            }
+            default: 
+                break;
             }
         }
-        uassert( 13042 , (string)"missing geo field (" + _geo + ") in : " + query.toString() , n.constrains() );
 
-        shared_ptr<GeoSearch> s( new GeoSearch( this , n , numWanted , query ) );
-        s->exec();
-        auto_ptr<Cursor> c;
-        c.reset( new GeoCursor( s ) );
-        return c;
+        throw UserException( 13042 , (string)"missing geo field (" + _geo + ") in : " + query.toString() );
     }
+
+    // ------
+    // commands
+    // ------
 
     class Geo2dFindNearCmd : public Command {
     public:
@@ -1126,7 +1351,7 @@ namespace mongo {
 
             BSONObjBuilder arr( result.subarrayStart( "results" ) );
             int x = 0;
-            for ( GeoHopper::Holder::iterator i=gs._hopper._points.begin(); i!=gs._hopper._points.end(); i++ ){
+            for ( GeoHopper::Holder::iterator i=gs._hopper->_points.begin(); i!=gs._hopper->_points.end(); i++ ){
                 const GeoPoint& p = *i;
                 
                 double dis = distanceMultipier * p._distance;
@@ -1142,8 +1367,8 @@ namespace mongo {
             BSONObjBuilder stats( result.subobjStart( "stats" ) );
             stats.append( "time" , cc().curop()->elapsedMillis() );
             stats.appendNumber( "btreelocs" , gs._nscanned );
-            stats.appendNumber( "nscanned" , gs._hopper._lookedAt );
-            stats.appendNumber( "objectsLoaded" , gs._hopper._objectsLoaded );
+            stats.appendNumber( "nscanned" , gs._hopper->_lookedAt );
+            stats.appendNumber( "objectsLoaded" , gs._hopper->_objectsLoaded );
             stats.append( "avgDistance" , totalDistance / x );
             stats.done();
             
