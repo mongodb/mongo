@@ -1,4 +1,4 @@
-t = db.jstests_pushall;
+t = db.jstests_pullall;
 t.drop();
 
 t.save( { a: [ 1, 2, 3 ] } );
