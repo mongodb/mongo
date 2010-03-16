@@ -294,7 +294,7 @@ namespace mongo {
     ostream& operator<<( ostream &s, const GeoHash &h ){
         s << h.toString();
         return s;
-    }
+    } // end GeoHash
 
     class Geo2dType : public IndexType {
     public:
@@ -1037,10 +1037,14 @@ namespace mongo {
             BSONElement e = i.next();
             if ( _geo != e.fieldName() )
                 continue;
-            if ( e.type() == Object && 
-                 strcmp( e.embeddedObject().firstElement().fieldName() , "$near" ) == 0 )
-                e = e.embeddedObject().firstElement();
-            n = _tohash( e );
+            if ( e.type() == Object ){
+                switch ( e.embeddedObject().firstElement().getGtLtOp() ){
+                case BSONObj::opNEAR:
+                    e = e.embeddedObject().firstElement();
+                    n = _tohash( e );;
+                default: break;
+                }
+            }
         }
         uassert( 13042 , (string)"missing geo field (" + _geo + ") in : " + query.toString() , n.constrains() );
 

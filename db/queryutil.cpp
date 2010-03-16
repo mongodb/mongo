@@ -312,6 +312,7 @@ namespace mongo {
             break;
         }
         case BSONObj::opNEAR:
+        case BSONObj::opWITHIN:
             _special = "2d";
             break;
         default:

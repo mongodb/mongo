@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__)
+#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
 
 } // namespace mongo
 

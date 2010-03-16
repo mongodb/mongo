@@ -455,6 +455,8 @@ namespace mongo {
                 return BSONObj::opREGEX;
             else if ( fn[1] == 'o' && fn[2] == 'p' && fn[3] == 't' && fn[4] == 'i' && fn[5] == 'o' && fn[6] == 'n' && fn[7] == 's' && fn[8] == 0 )
                 return BSONObj::opOPTIONS;
+            else if ( fn[1] == 'w' && fn[2] == 'i' && fn[3] == 't' && fn[4] == 'h' && fn[5] == 'i' && fn[6] == 'n' && fn[7] == 0 )
+                return BSONObj::opWITHIN;
         }
         return def;
     }
