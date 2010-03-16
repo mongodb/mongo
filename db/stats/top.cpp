@@ -23,14 +23,14 @@
 
 namespace mongo {
     
-    Top::UsageData::UsageData( UsageData& older , UsageData& newer )
+    Top::UsageData::UsageData( const UsageData& older , const UsageData& newer )
         : time(newer.time-older.time) , 
           count(newer.count-older.count) 
     {
         
     }
 
-    Top::CollectionData::CollectionData( CollectionData& older , CollectionData& newer )
+    Top::CollectionData::CollectionData( const CollectionData& older , const CollectionData& newer )
         : total( older.total , newer.total ) , 
           readLock( older.readLock , newer.readLock ) ,
           writeLock( older.writeLock , newer.writeLock ) ,
@@ -94,10 +94,9 @@ namespace mongo {
 
     }
 
-    Top::UsageMap Top::cloneMap(){
+    void Top::cloneMap(Top::UsageMap& out){
         scoped_lock lk(_lock);
-        UsageMap x = _usage;
-        return x;
+        out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ){

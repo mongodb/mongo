@@ -98,7 +98,15 @@ namespace mongo {
                 ss << "\n<b>DBTOP  (occurences|percent of elapsed)</b>\n";
                 ss << "<table border=1>";
                 ss << "<tr align='left'>";
-                ss << "<th>NS</th> <th>total</th> <th>Reads</th><th>Writes</th> <th>Queries</th><th>GetMores</th><th>Inserts</th><th>Updates</th><th>Removes</th> ";
+                ss << "<th>NS</th>"
+                      "<th colspan=2>total</th>"
+                      "<th colspan=2>Reads</th>"
+                      "<th colspan=2>Writes</th>"
+                      "<th colspan=2>Queries</th>"
+                      "<th colspan=2>GetMores</th>"
+                      "<th colspan=2>Inserts</th>"
+                      "<th colspan=2>Updates</th>"
+                      "<th colspan=2>Removes</th>";
                 ss << "</tr>";
                 
                 display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
@@ -119,7 +127,7 @@ namespace mongo {
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
             ss << "<td>";
             ss << usage.count;
-            ss << "|";
+            ss << "</td><td>";
             double per = 100 * ((double)usage.time)/elapsed;
             ss << setprecision(2) << fixed << per << "%";
             ss << "</td>";
