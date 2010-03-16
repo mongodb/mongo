@@ -346,7 +346,7 @@ namespace mongo {
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object. 
          */
-        IndexDetails& addIndex(const char *thisns);
+        IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
         void aboutToDeleteAnIndex() {
             flags &= ~Flag_HaveIdIndex;

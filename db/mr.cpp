@@ -432,6 +432,7 @@ namespace mongo {
                             Timer t;
                             mrtl->checkSize();
                             inReduce += t.micros();
+                            killCurrentOp.checkForInterrupt();
                             dbtemprelease temprlease;
                         }
                         pm.hit();
@@ -441,8 +442,8 @@ namespace mongo {
                     }
                     pm.finished();
                     
-                    countsBuilder.append( "input" , num );
-                    countsBuilder.append( "emit" , mrtl->numEmits );
+                    countsBuilder.appendNumber( "input" , num );
+                    countsBuilder.appendNumber( "emit" , mrtl->numEmits );
                     if ( mrtl->numEmits )
                         shouldHaveData = true;
                     
@@ -479,6 +480,7 @@ namespace mongo {
                         prev = o;
                         all.push_back( o );
                         pm.hit();
+                        killCurrentOp.checkForInterrupt();
                         dbtemprelease tl;
                     }
                     state.finalReduce( all );
@@ -500,7 +502,7 @@ namespace mongo {
                 
                 result.append( "result" , mr.finalShort );
                 result.append( "timeMillis" , t.millis() );
-                countsBuilder.append( "output" , finalCount );
+                countsBuilder.appendNumber( "output" , finalCount );
                 if ( mr.verbose ) result.append( "timing" , timingBuilder.obj() );
                 result.append( "counts" , countsBuilder.obj() );
 
