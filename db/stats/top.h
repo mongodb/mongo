@@ -32,7 +32,7 @@ namespace mongo {
         class UsageData {
         public:
             UsageData() : time(0) , count(0){}
-            UsageData( UsageData& older , UsageData& newer );
+            UsageData( const UsageData& older , const UsageData& newer );
             long long time;
             long long count;
 
@@ -48,7 +48,7 @@ namespace mongo {
              * constructs a diff
              */
             CollectionData(){}
-            CollectionData( CollectionData& older , CollectionData& newer );
+            CollectionData( const CollectionData& older , const CollectionData& newer );
             
             UsageData total;
             

@@ -25,50 +25,49 @@
    handles snapshotting performance metrics and other such things
  */
 namespace mongo {
-
-    SnapshotData::SnapshotData()
-        : _created ( curTimeMicros64() ) , 
-          _globalUsage( Top::global.getGlobalData() )
-    {
+    void SnapshotData::takeSnapshot(){
+         _created = curTimeMicros64();
+         _globalUsage = Top::global.getGlobalData();
         _totalWriteLockedTime = dbMutex.info().getTimeLocked();
         _usage = Top::global.cloneMap();
     }
 
-    SnapshotDelta::SnapshotDelta( SnapshotData * older , SnapshotData * newer )
+    SnapshotDelta::SnapshotDelta( const SnapshotData& older , const SnapshotData& newer )
         : _older( older ) , _newer( newer )
     {
-        assert( _newer->_created > _older->_created );
-        _elapsed = _newer->_created - _older->_created;
+        assert( _newer._created > _older._created );
+        _elapsed = _newer._created - _older._created;
         
     }
     
     Top::CollectionData SnapshotDelta::globalUsageDiff(){
-        return Top::CollectionData( _older->_globalUsage , _newer->_globalUsage );
+        return Top::CollectionData( _older._globalUsage , _newer._globalUsage );
     }
     Top::UsageMap SnapshotDelta::collectionUsageDiff(){
         Top::UsageMap u;
         
-        for ( Top::UsageMap::iterator i=_newer->_usage.begin(); i != _newer->_usage.end(); i++ ){
-            u[i->first] = Top::CollectionData( _older->_usage[i->first] , i->second );
+        for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); i++ ){
+            Top::UsageMap::const_iterator j = _older._usage.find(i->first);
+            if (j != _older._usage.end())
+                u[i->first] = Top::CollectionData( j->second , i->second );
         }
         return u;
     }
 
-    Snapshots::Snapshots(){
-        _n = 100;
-        _snapshots = new SnapshotData*[_n];
-        for ( int i=0; i<_n; i++ )
-            _snapshots[i] = 0;
-        _loc = 0;
-        _stored = 0;
-    }
+    Snapshots::Snapshots(int n)
+        : _n(n)
+        , _snapshots(new SnapshotData[n])
+        , _loc(0)
+        , _stored(0)
+    {}
     
-    void Snapshots::add( SnapshotData * s ){
+    const SnapshotData* Snapshots::takeSnapshot(){
         scoped_lock lk(_lock);
         _loc = ( _loc + 1 ) % _n;
-        _snapshots[_loc] = s;
+        _snapshots[_loc].takeSnapshot();
         if ( _stored < _n )
             _stored++;
+        return &_snapshots[_loc];
     }
 
     auto_ptr<SnapshotDelta> Snapshots::computeDelta( int numBack ){
@@ -79,7 +78,7 @@ namespace mongo {
         return p;
     }
 
-    SnapshotData* Snapshots::getPrev( int numBack ){
+    const SnapshotData& Snapshots::getPrev( int numBack ){
         int x = _loc - numBack;
         if ( x < 0 )
             x += _n;
@@ -109,19 +108,17 @@ namespace mongo {
 
         long long numLoops = 0;
         
-        SnapshotData * prev = 0;
+        const SnapshotData* prev = 0;
 
         while ( ! inShutdown() ){
             try {
-                SnapshotData * s = new SnapshotData();
-                
-                statsSnapshots.add( s );
+                const SnapshotData* s = statsSnapshots.takeSnapshot();
                 
                 if ( prev ){
                     unsigned long long elapsed = s->_created - prev->_created;
 
                     if ( cmdLine.cpu ){
-                        SnapshotDelta d( prev , s );
+                        SnapshotDelta d( *prev , *s );
                         log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;
                     }
 

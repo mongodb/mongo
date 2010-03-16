@@ -34,7 +34,7 @@ namespace mongo {
      * i.e. all counters at a given time
      */
     class SnapshotData {
-        SnapshotData();
+        void takeSnapshot();
 
         unsigned long long _created;
         Top::CollectionData _globalUsage;
@@ -43,6 +43,7 @@ namespace mongo {
 
         friend class SnapshotThread;
         friend class SnapshotDelta;
+        friend class Snapshots;
     };
     
     /**
@@ -50,10 +51,10 @@ namespace mongo {
      */
     class SnapshotDelta {
     public:
-        SnapshotDelta( SnapshotData * older , SnapshotData * newer );
+        SnapshotDelta( const SnapshotData& older , const SnapshotData& newer );
         
         unsigned long long start() const {
-            return _older->_created;
+            return _older._created;
         }
 
         unsigned long long elapsed() const {
@@ -61,7 +62,7 @@ namespace mongo {
         }
         
         unsigned long long timeInWriteLock() const {
-            return _newer->_totalWriteLockedTime - _older->_totalWriteLockedTime;
+            return _newer._totalWriteLockedTime - _older._totalWriteLockedTime;
         }
         double percentWriteLocked() const {
             double e = (double) elapsed();
@@ -73,21 +74,21 @@ namespace mongo {
         Top::UsageMap collectionUsageDiff();
 
     private:
-        SnapshotData * _older;
-        SnapshotData * _newer;
+        const SnapshotData& _older;
+        const SnapshotData& _newer;
 
         unsigned long long _elapsed;
     };
 
     class Snapshots {
     public:
-        Snapshots();
+        Snapshots(int n=100);
         
-        void add( SnapshotData * s );
+        const SnapshotData* takeSnapshot();
         
         int numDeltas() const { return _stored-1; }
 
-        SnapshotData* getPrev( int numBack = 0 );
+        const SnapshotData& getPrev( int numBack = 0 );
         auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
         
         
@@ -95,7 +96,7 @@ namespace mongo {
     private:
         mongo::mutex _lock;
         int _n;
-        SnapshotData** _snapshots;
+        boost::scoped_array<SnapshotData> _snapshots;
         int _loc;
         int _stored;
     };
