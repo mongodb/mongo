@@ -499,6 +499,9 @@ namespace mongo {
             : _x( x ) , _y( y ){
         }
         
+        Point() : _x(0),_y(0){
+        }
+        
         string toString() const {
             StringBuilder buf(32);
             buf << "(" << _x << "," << _y << ")";
@@ -527,6 +530,8 @@ namespace mongo {
             : _min( min ) , _max( max ){
         }
 
+        Box(){}
+
         string toString() const {
             StringBuilder buf(64);
             buf << _min.toString() << " -->> " << _max.toString();
@@ -538,7 +543,7 @@ namespace mongo {
         }
 
         bool between( double min , double max , double val ) const {
-            return val >= min && val <= min;
+            return val >= min && val <= max;
         }
         
         bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
@@ -577,6 +582,24 @@ namespace mongo {
             return ( _max._x - _min._x ) * ( _max._y - _min._y );
         }
 
+        Point center() const {
+            return Point( ( _min._x + _max._x ) / 2 ,
+                          ( _min._y + _max._y ) / 2 );
+        }
+
+        bool inside( Point p ){
+            cout << "ME : " << toString() << "\t" << p.toString() << endl;
+            bool r =  inside( p._x , p._y );
+            cout << "\t" << r << endl;
+            return r;
+        }
+        
+        bool inside( double x , double y ){
+            return 
+                between( _min._x , _max._x  , x ) &&
+                between( _min._y , _max._y  , y );
+        }
+        
         Point _min;
         Point _max;
     };
@@ -1213,7 +1236,6 @@ namespace mongo {
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _start , h );
-            _lastDistance = d;
             return d <= ( _maxDistance + .01 );
         }
 
@@ -1226,7 +1248,94 @@ namespace mongo {
         BtreeLocation _min;
         BtreeLocation _max;
 
-        double _lastDistance;
+    };    
+
+    class GeoBoxBrowse : public GeoBrowse {
+    public:
+        
+        enum State {
+            START , 
+            DOING_EXPAND ,
+            DONE
+        } _state;
+
+        GeoBoxBrowse( const Geo2dType * g , const BSONObj& box , BSONObj filter = BSONObj() )        
+            : GeoBrowse( g , "box" , filter ){
+            
+            uassert( 13063 , "$box needs 2 fields (bottomLeft,topRight)" , box.nFields() == 2 );
+            BSONObjIterator i(box);
+            _bl = g->_tohash( i.next() );
+            _tr = g->_tohash( i.next() );
+
+            _want._min = Point( _g , _bl );
+            _want._max = Point( _g , _tr );
+            
+            uassert( 13064 , "need an area > 0 " , _want.area() > 0 );
+
+            _state = START;
+            _found = 0;
+
+            cout << "BOX : " << _want.toString() << endl;
+            
+            Point center = _want.center();
+            _prefix = _g->_hash( center._x , center._y );
+
+            ok();
+        }
+
+        virtual bool moreToDo(){
+            return _state != DONE;
+        }
+        
+        virtual void fillStack(){
+            if ( _state == START ){
+
+                if ( ! BtreeLocation::initial( *_id , _spec , _min , _max , 
+                                               _prefix , _found , this ) ){
+                    _state = DONE;
+                    return;
+                }
+                _state = DOING_EXPAND;
+            }
+            
+            if ( _state == DOING_EXPAND ){
+                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
+                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                
+                if ( ! _prefix.constrains() ){
+                    // we've exhausted the btree
+                    _state = DONE;
+                    return;
+                }
+                
+                Box cur( _g , _prefix );
+                cout << "CUR : " << cur.toString() << endl;
+                if ( cur._min._x < _want._min._x &&
+                     cur._min._y < _want._min._y &&
+                     cur._max._x > _want._max._x &&
+                     cur._max._y > _want._max._y ){
+                    _state = DONE;
+                }
+                else
+                    _prefix = _prefix.up();
+                return;
+            }
+
+        }
+        
+        virtual bool checkDistance( const GeoHash& h , double& d ){
+            return _want.inside( Point( _g , h ) );
+        }
+
+        GeoHash _bl;
+        GeoHash _tr;
+        Box _want;
+
+        int _found;
+        
+        GeoHash _prefix;        
+        BtreeLocation _min;
+        BtreeLocation _max;
     };    
 
 
@@ -1264,6 +1373,12 @@ namespace mongo {
                     uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
                     auto_ptr<Cursor> c;
                     c.reset( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query ) );
+                    return c;   
+                }
+                else if ( type == "$box" ){
+                    uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
+                    auto_ptr<Cursor> c;
+                    c.reset( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;   
                 }
                 throw UserException( 13058 , (string)"unknown $with type: " + type );

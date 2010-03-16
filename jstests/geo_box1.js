@@ -2,11 +2,30 @@
 t = db.geo_box1;
 t.drop();
 
-for ( x=0; x<=20; x++ )
-    for ( y=0; y<=20; y++ )
-        t.save( { loc : [ x , y ] } )
+num = 0;
+for ( x=0; x<=20; x++ ){
+    for ( y=0; y<=20; y++ ){
+        o = { _id : num++ , loc : [ x , y ] } 
+        t.save( o )
+    }
+}
 
 t.ensureIndex( { loc : "2d" } );
 
+searches = [
+    [ [ 1 , 2 ] , [ 4 , 5 ] ] ,
+    [ [ 1 , 1 ] , [ 2 , 2 ] ] ,
+    [ [ 0 , 2 ] , [ 4 , 5 ] ] ,
+];
 
+
+for ( i=0; i<searches.length; i++ ){
+    b = searches[i];
+    //printjson( b );
     
+    q = { loc : { $within : { $box : b } } }
+    assert.eq( ( 1 + b[1][0] - b[0][0] ) * ( 1 + b[1][1] - b[0][1] )  , t.find(q).itcount() , "itcount: " + q );
+}
+
+
+
