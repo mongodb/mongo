@@ -94,10 +94,9 @@ namespace mongo {
 
     }
 
-    Top::UsageMap Top::cloneMap(){
+    void Top::cloneMap(Top::UsageMap& out){
         scoped_lock lk(_lock);
-        UsageMap x = _usage;
-        return x;
+        out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ){

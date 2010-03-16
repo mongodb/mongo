@@ -29,7 +29,7 @@ namespace mongo {
          _created = curTimeMicros64();
          _globalUsage = Top::global.getGlobalData();
         _totalWriteLockedTime = dbMutex.info().getTimeLocked();
-        _usage = Top::global.cloneMap();
+        Top::global.cloneMap(_usage);
     }
 
     SnapshotDelta::SnapshotDelta( const SnapshotData& older , const SnapshotData& newer )

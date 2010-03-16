@@ -68,7 +68,7 @@ namespace mongo {
     public:
         void record( const string& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
-        UsageMap cloneMap();
+        void cloneMap(UsageMap& out);
         CollectionData getGlobalData(){ return _global; }
         
     public: // static stuff
