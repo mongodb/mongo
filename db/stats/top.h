@@ -85,6 +85,7 @@ namespace mongo {
         mongo::mutex _lock;
         CollectionData _global;
         UsageMap _usage;
+        string _lastDropped;
     };
 
     /* Records per namespace utilization of the mongod process.
