@@ -381,11 +381,12 @@ void processDiagLog( const char * file ){
 
 void usage() {
     cout <<
-    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | FILE <filename>)] [<port0> <port1> ... ]\n"
+    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
     "--forward       Forward all parsed request messages to mongod instance at \n"
     "                specified host:port\n"
     "--source        Source of traffic to sniff, either a network interface or a\n"
-    "                file containing perviously captured packets, in pcap format.\n"
+    "                file containing previously captured packets in pcap format,\n"
+    "                or a file containing output from mongod's --diaglog option.\n"
     "                If no source is specified, mongosniff will attempt to sniff\n"
     "                from one of the machine's network interfaces.\n"
     "<port0>...      These parameters are used to filter sniffing.  By default, \n"
