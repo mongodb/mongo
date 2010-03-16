@@ -181,7 +181,7 @@ namespace mongo {
                         nlen += r->netLength();
                         c->advance();
                     }
-                    if ( d->capped ) {
+                    if ( d->capped && !d->capLooped() ) {
                         ss << "  capped outOfOrder:" << outOfOrder;
                         if ( outOfOrder > 1 ) {
                             valid = false;
