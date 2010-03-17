@@ -124,13 +124,16 @@ namespace mongo {
             return GeoHash( _hash , _bits - 1 );
         }
         
-        bool hasPrefix( const BSONElement& e ) const {
-            GeoHash other(e,_bits);
+        bool hasPrefix( const GeoHash& other ) const {
+            assert( other._bits <= _bits );
+            if ( other._bits == 0 )
+                return true;
             long long x = other._hash ^ _hash;
-            x = x >> (64-(_bits*2));
+            x = x >> (64-(other._bits*2));
             return x == 0;
         }
         
+
         string toString() const { 
             StringBuilder buf( _bits * 2 );
             for ( unsigned x=0; x<_bits*2; x++ )
@@ -689,9 +692,8 @@ namespace mongo {
                 x.init( 0 , 1 , 32 );
                 GEOHEQ( x , "0000000000000000000000000000000000000000000000000000000000000001" )
 
-                GeoHash q( "11" );
-                assert( q.hasPrefix( GeoHash( "1100" ).wrap().firstElement() ) );
-                assert( ! q.hasPrefix( GeoHash( "1000" ).wrap().firstElement() ) );
+                assert( GeoHash( "1100").hasPrefix( GeoHash( "11" ) ) );
+                assert( ! GeoHash( "1000").hasPrefix( GeoHash( "11" ) ) );
             }
                
             {
@@ -737,6 +739,18 @@ namespace mongo {
                 x.move( 0 , 1 );
                 GEOHEQ( x , "000000" );
             }
+
+            {
+                GeoHash prefix( "110011000000" );
+                GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
+                assert( ! entry.hasPrefix( prefix ) );
+
+                entry = "1100110000001100000111000001110000011100000111000001000000000000";
+                assert( entry.toString().find( prefix.toString() ) == 0 );
+                assert( entry.hasPrefix( GeoHash( "1100" ) ) );
+                assert( entry.hasPrefix( prefix ) );
+            }
+            
         }
     } geoUnitTest;
     
@@ -834,6 +848,7 @@ namespace mongo {
         }
         
         virtual void addSpecific( const KeyNode& node , double d ){
+            GEODEBUG( "\t\t" << GeoHash( node.key.firstElement() ) << "\t" << node.recordLoc.obj() << "\t" << d );
             _points.insert( GeoPoint( node.key , node.recordLoc , d ) );
             if ( _points.size() > _max ){
                 _points.erase( --_points.end() );
@@ -870,7 +885,7 @@ namespace mongo {
             BSONElement e = key().firstElement();
             if ( e.eoo() )
                 return false;
-            return hash.hasPrefix( e );
+            return GeoHash( e ).hasPrefix( hash );
         }
         
         bool advance( int direction , int& totalFound , GeoAccumulator* all ){
@@ -957,17 +972,18 @@ namespace mongo {
                     return;
                 
                 while ( _found < _numWanted ){
+                    GEODEBUG( _prefix << "\t" << _found << "\t DESC" );
                     while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , hopper ) )
                         _nscanned++;
+                    GEODEBUG( _prefix << "\t" << _found << "\t ASC" );
                     while ( max.hasPrefix( _prefix ) && max.advance( 1 , _found , hopper ) )
                         _nscanned++;
                     if ( ! _prefix.constrains() )
                         break;
                     _prefix = _prefix.up();
-                    GEODEBUG( _prefix << "\t" << _found );
                 }
             }
-            
+            GEODEBUG( "done part 1" );
             if ( _found && _prefix.constrains() ){
                 // 2
                 Point center( _spec , _n );
@@ -990,12 +1006,13 @@ namespace mongo {
                     }
                 }
             }
+            GEODEBUG( "done search" )
             
         }
 
         void doBox( const IndexDetails& id , const Box& want , const GeoHash& toscan , int depth = 0 ){
             Box testBox( _spec , toscan );
-            log(1) << "\t doBox: " << testBox << endl;
+            if ( logLevel > 0 ) log(1) << "\t doBox: " << testBox << "\t" << toscan.toString() << endl;
 
             double intPer = testBox.intersects( want );
 
