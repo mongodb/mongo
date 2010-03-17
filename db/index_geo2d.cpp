@@ -1556,6 +1556,7 @@ namespace mongo {
                      << "\t" << c.current()[g->_geo] 
                      << "\t" << hex << h.getHash() 
                      << "\t" << hex << ((long long*)c.currKey().firstElement().binData(len))[0]
+                     << "\t" << c.current()["_id"]
                      << endl;
                 c.advance();
             }
