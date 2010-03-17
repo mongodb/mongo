@@ -27,11 +27,11 @@
 #include "curop.h"
 #include "matcher.h"
 
+//#define GEODEBUG(x) cout << x << endl;
+#define GEODEBUG(x) 
+
 namespace mongo {
 
-    //#define GEODEBUG(x) cout << x << endl;
-#define GEODEBUG(x) 
-    
     const string GEO2DNAME = "2d";
 
     class GeoBitSets {
@@ -751,6 +751,11 @@ namespace mongo {
                 assert( entry.hasPrefix( prefix ) );
             }
             
+            {
+                GeoHash a = g._hash( 50 , 50 );
+                GeoHash b = g._hash( 48 , 54 );
+                assert( round( 4.47214 ) == round( g.distance( a , b ) ) );
+            }
         }
     } geoUnitTest;
     
@@ -794,15 +799,19 @@ namespace mongo {
 
         virtual void add( const KeyNode& node ){
             // when looking at other boxes, don't want to look at some object twice
-            if ( _seen.count( node.recordLoc ) )
+            if ( _seen.count( node.recordLoc ) ){
+                GEODEBUG( "\t\t\t\t already seen : " << node.recordLoc.obj()["_id"] );
                 return;
+            }
             _seen.insert( node.recordLoc );
             _lookedAt++;
             
             // distance check
             double d = 0;
-            if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) )
+            if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ){
+                GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()["_id"]  << "\t" << d );
                 return;
+            }
             
             // matcher
             MatchDetails details;
@@ -812,6 +821,7 @@ namespace mongo {
                     _objectsLoaded++;
                 
                 if ( ! good ){
+                    GEODEBUG( "\t\t\t\t didn't match : " << node.recordLoc.obj()["_id"] );
                     return;
                 }
             }
@@ -844,7 +854,10 @@ namespace mongo {
 
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _near , h );
-            return _points.size() < _max || d < farthest();
+            bool good = _points.size() < _max || d < farthest();
+            GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near << "\t" << h << "\t" << d 
+                      << " ok: " << good << " farthest: " << farthest() );
+            return good;
         }
         
         virtual void addSpecific( const KeyNode& node , double d ){
@@ -892,7 +905,6 @@ namespace mongo {
 
             if ( bucket.isNull() )
                 return false;
-
             bucket = bucket.btree()->advance( bucket , pos , direction , "btreelocation" );
             
             return checkCur( totalFound , all );
@@ -905,6 +917,9 @@ namespace mongo {
             if ( bucket.btree()->isUsed(pos) ){
                 totalFound++;
                 all->add( bucket.btree()->keyNode( pos ) );
+            }
+            else {
+                GEODEBUG( "\t\t\t\t not used: " << key() );
             }
 
             return true;

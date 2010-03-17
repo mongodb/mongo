@@ -48,7 +48,7 @@ function avgA( q , len ){
 }
 
 function testFiltering( msg ){
-    assert.eq( 1.5 , avgA( {} ) , msg + " testFiltering 1 " );
+    assert.gt( 2 , avgA( {} ) , msg + " testFiltering 1 " );
     assert.eq( 2 , avgA( { a : 2 } ) , msg + " testFiltering 2 " );
     assert.eq( 4 , avgA( { a : 4 } ) , msg + " testFiltering 3 " );
 }
