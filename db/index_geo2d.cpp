@@ -1152,7 +1152,14 @@ namespace mongo {
                 fillStack();
                 _firstCall = false;
             }
-            return ! _cur.isEmpty() || _stack.size() || moreToDo();
+            if ( ! _cur.isEmpty() || _stack.size() )
+                return true;
+
+            if ( ! moreToDo() )
+                return false;
+            
+            fillStack();
+            return ! _cur.isEmpty();
         }
         
         virtual bool advance(){ 
