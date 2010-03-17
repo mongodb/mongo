@@ -2022,7 +2022,7 @@ namespace mongo {
         
         ~BSONObjIteratorSorted(){
             assert( _fields );
-            delete _fields;
+            delete[] _fields;
             _fields = 0;
         }
 
