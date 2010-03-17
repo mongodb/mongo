@@ -1087,11 +1087,11 @@ namespace mongo {
             assert(0);
         }
 
+        virtual bool supportGetMore() { return false; }
+
         virtual bool getsetdup(DiskLoc loc){
             return false;
         }
-
-        virtual string toString() const = 0;
 
         const Geo2dType * _spec;
         const IndexDetails * _id;
@@ -1116,7 +1116,7 @@ namespace mongo {
         virtual bool advance(){ _cur++; return ok(); }
         virtual BSONObj currKey() const { return _cur->_key; }
 
-        virtual string toString() const {
+        virtual string toString() {
             return "GeoSearchCursor";
         }
 
@@ -1143,7 +1143,7 @@ namespace mongo {
               _type( type ) , _filter( filter ) , _firstCall(true) {
         }
         
-        virtual string toString() const {
+        virtual string toString() {
             return (string)"GeoBrowse-" + _type;
         }
 

@@ -34,3 +34,8 @@ for ( i=0; i<searches.length; i++ ){
 
 assert.eq( 0 , t.find( { loc : { $within : { $box : [ [100 , 100 ] , [ 110 , 110 ] ] } } } ).itcount() , "E1" )
 assert.eq( 0 , t.find( { loc : { $within : { $box : [ [100 , 100 ] , [ 110 , 110 ] ] } } } ).count() , "E2" )
+
+
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).count() , "E2" )
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).itcount() , "E2" )
+

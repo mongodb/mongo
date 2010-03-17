@@ -76,6 +76,8 @@ namespace mongo {
 
         /* called before query getmore block is iterated */
         virtual void checkLocation() { }
+        
+        virtual bool supportGetMore() = 0;
 
         virtual string toString() {
             return "abstract?";
@@ -157,6 +159,8 @@ namespace mongo {
             return tailable_;
         }
         virtual bool getsetdup(DiskLoc loc) { return false; }
+
+        virtual bool supportGetMore() { return true; }
     };
 
     /* used for order { $natural: -1 } */

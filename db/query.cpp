@@ -546,7 +546,13 @@ namespace mongo {
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js );
                             }
                             _n++;
-                            if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
+                            if ( ! _c->supportGetMore() ){
+                                if ( _buf.len() >= MaxBytesToReturnToClientAtOnce ){
+                                    finish();
+                                    return;
+                                }
+                            }
+                            else if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                 if ( mayCreateCursor1 ) {
                                     _c->advance();
