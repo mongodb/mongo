@@ -545,8 +545,8 @@ namespace mongo {
             return toString();
         }
 
-        bool between( double min , double max , double val ) const {
-            return val >= min && val <= max;
+        bool between( double min , double max , double val , double fudge=0) const {
+            return val + fudge >= min && val <= max + fudge;
         }
         
         bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
@@ -590,14 +590,14 @@ namespace mongo {
                           ( _min._y + _max._y ) / 2 );
         }
 
-        bool inside( Point p ){
-            return inside( p._x , p._y );
+        bool inside( Point p , double fudge = 0 ){
+	    return inside( p._x , p._y , fudge );
         }
         
-        bool inside( double x , double y ){
+        bool inside( double x , double y , double fudge = 0 ){
             return 
-                between( _min._x , _max._x  , x ) &&
-                between( _min._y , _max._y  , y );
+	      between( _min._x , _max._x  , x , fudge ) &&
+	      between( _min._y , _max._y  , y , fudge );
         }
         
         Point _min;
@@ -1353,7 +1353,7 @@ namespace mongo {
         }
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
-            return _want.inside( Point( _g , h ) );
+	    return _want.inside( Point( _g , h ) , .01 );
         }
 
         GeoHash _bl;

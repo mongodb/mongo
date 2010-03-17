@@ -26,7 +26,7 @@ for ( i=0; i<searches.length; i++ ){
     
     q = { loc : { $within : { $box : b } } }
     numWanetd = ( 1 + b[1][0] - b[0][0] ) * ( 1 + b[1][1] - b[0][1] );
-    assert.eq( numWanetd  , t.find(q).itcount() , "itcount: " + q );
+    assert.eq( numWanetd  , t.find(q).itcount() , "itcount: " + tojson( q ) );
     printjson( t.find(q).explain() )
 }
 
