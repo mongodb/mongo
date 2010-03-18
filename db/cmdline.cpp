@@ -16,7 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../stdafx.h"
 #include "cmdline.h"
+#include "commands.h"
 
 namespace po = boost::program_options;
 
@@ -24,6 +26,7 @@ namespace mongo {
     CmdLine cmdLine;
 
     void setupSignals();
+    BSONObj rawCmdLineOpts;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
                                     boost::program_options::options_description& hidden ){
@@ -133,7 +136,29 @@ namespace mongo {
             initLogging( lp , params.count( "logappend" ) );
         }
 
+        {
+            BSONObjBuilder b;
+            for (po::variables_map::const_iterator it = params.begin(); it != params.end(); ++it){
+                if (!it->second.defaulted())
+                    b.appendAny(it->first.c_str(), it->second.value());
+            }
+            rawCmdLineOpts = b.obj();
+        }
 
         return true;
     }
+
+    class CmdGetCmdLineOpts : Command{
+        public:
+        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
+        virtual LockType locktype() { return NONE; }
+        virtual bool adminOnly() { return true; }
+        virtual bool slaveOk() { return true; }
+
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            result.append("options", rawCmdLineOpts);
+            return true;
+        }
+
+    } cmdGetCmdLineOpts;
 }

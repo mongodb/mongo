@@ -32,7 +32,10 @@
 #include "../util/builder.h"
 #include "../util/optime.h"
 #include "boost/utility.hpp"
-#include <boost/any.hpp>
+
+namespace boost{
+    class any;
+}
 
 #include <set>
 
