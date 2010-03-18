@@ -37,14 +37,24 @@ namespace mongo {
         Stat() : Tool( "stat" , false , "admin" ){
             _sleep = 1;
             _rowNum = 0;
+            _showHeaders = true;
 
             add_hidden_options()
                 ( "sleep" , po::value<int>() , "time to sleep between calls" )
                 ;
-            
+            add_options()
+                ("noheaders", "don't output column names")
+                ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
+                ;
+
             addPositionArg( "sleep" , 1 );
         }
-        
+
+        virtual void printExtraHelp( ostream & out ){
+            out << "usage: " << _name << " [options] [sleep time]" << endl;
+            out << "sleep time: time to wait (in seconds) between calls" << endl;
+        }
+
         BSONObj stats(){
             BSONObj out;
             if ( ! conn().simpleCommand( _db , &out , "serverStatus" ) ){
@@ -71,6 +81,9 @@ namespace mongo {
         }
 
         void cellstart( stringstream& ss , string name , unsigned& width ){
+            if ( ! _showHeaders ) {
+                return;
+            }
             if ( name.size() > width )
                 width = name.size();
             if ( _rowNum % 20 == 0 )
@@ -115,8 +128,8 @@ namespace mongo {
                 cell( ss , "res" , 6 , bx["resident"].numberInt() );
             }
             
-            cell( ss , "% locked" , 5 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
-            cell( ss , "% idx miss" , 5 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
+            cell( ss , "% locked" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            cell( ss , "% idx miss" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
 
             cell( ss , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
 
@@ -132,7 +145,7 @@ namespace mongo {
                 cell( ss , "time" , 8 , temp.str() );
             }
 
-            if ( _rowNum % 20 == 0 ){
+            if ( _showHeaders && _rowNum % 20 == 0 ){
                 // this is the newline after the header line
                 cout << endl;
             }
@@ -143,11 +156,16 @@ namespace mongo {
         
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
+            if ( hasParam( "noheaders" ) ) {
+                _showHeaders = false;
+            }
+            _rowCount = getParam( "rowcount" , 0 );
+
             BSONObj prev = stats();
             if ( prev.isEmpty() )
                 return -1;
-            
-            while ( 1 ){
+
+            while ( _rowCount == 0 || _rowNum < _rowCount ){
                 sleepsecs(_sleep);
                 BSONObj now = stats();
                 if ( now.isEmpty() )
@@ -163,6 +181,8 @@ namespace mongo {
 
         int _sleep;
         int _rowNum;
+        int _rowCount;
+        bool _showHeaders;
     };
 
 }
