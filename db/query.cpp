@@ -103,6 +103,7 @@ namespace mongo {
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
+       god:     allow access to system namespaces, and don't yield
     */
     long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if( !god ) {
@@ -143,7 +144,7 @@ namespace mongo {
         
         unsigned long long nScanned = 0;
         do {
-            if ( ++nScanned % 128 == 0 && !matcher.docMatcher().atomic() ) {
+            if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
                 if ( ! cc->yield() ){
                     cc.release(); // has already been deleted elsewhere
                     break;
@@ -459,7 +460,7 @@ namespace mongo {
             _buf( 32768 ) , // TODO be smarter here
             _pq( pq ) ,
             _ntoskip( pq.getSkip() ) ,
-            _nscanned(0),
+            _nscanned(0), _nscannedObjects(0),
             _n(0),
             _inMemSort(false),
             _saveClientCursor(false),
@@ -505,10 +506,13 @@ namespace mongo {
             }
 
             _nscanned++;
-            if ( !_matcher->matches(_c->currKey(), _c->currLoc() ) ) {
+            if ( !_matcher->matches(_c->currKey(), _c->currLoc() , &_details ) ) {
                 // not a match, continue onward
+                if ( _details.loadedObject )
+                    _nscannedObjects++;
             }
             else {
+                _nscannedObjects++;
                 DiskLoc cl = _c->currLoc();
                 if( !_c->getsetdup(cl) ) { 
                     // got a match.
@@ -542,7 +546,13 @@ namespace mongo {
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js );
                             }
                             _n++;
-                            if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
+                            if ( ! _c->supportGetMore() ){
+                                if ( _pq.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ){
+                                    finish();
+                                    return;
+                                }
+                            }
+                            else if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                 if ( mayCreateCursor1 ) {
                                     _c->advance();
@@ -591,6 +601,7 @@ namespace mongo {
         auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
         int n() const { return _n; }
         long long nscanned() const { return _nscanned; }
+        long long nscannedObjects() const { return _nscannedObjects; }
         bool saveClientCursor() const { return _saveClientCursor; }
 
     private:
@@ -599,7 +610,10 @@ namespace mongo {
 
         long long _ntoskip;
         long long _nscanned;
+        long long _nscannedObjects;
         int _n; // found so far
+        
+        MatchDetails _details;
 
         bool _inMemSort;
         auto_ptr< ScanAndOrder > _so;
@@ -720,7 +734,7 @@ namespace mongo {
         }
             
 
-        if ( isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+        if ( ! explain && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 
             bool nsFound = false;
@@ -790,7 +804,8 @@ namespace mongo {
             BSONObjBuilder builder;
             builder.append("cursor", cursor->toString());
             builder.appendArray("indexBounds", cursor->prettyIndexBounds());
-            builder.append("nscanned", double( dqo.nscanned() ) );
+            builder.appendNumber("nscanned", dqo.nscanned() );
+            builder.appendNumber("nscannedObjects", dqo.nscannedObjects() );
             builder.append("n", n);
             if ( dqo.scanAndOrderRequired() )
                 builder.append("scanAndOrder", true);

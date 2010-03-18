@@ -82,12 +82,13 @@ namespace mongo {
         return string( urlStart , (int)(end-urlStart) );
     }
 
-    void MiniWebServer::parseParams( map<string,string> & params , string query ) {
+    void MiniWebServer::parseParams( BSONObj & params , string query ) {
         if ( query.size() == 0 )
             return;
-
+        
+        BSONObjBuilder b;
         while ( query.size() ) {
-
+            
             string::size_type amp = query.find( "&" );
 
             string cur;
@@ -104,9 +105,10 @@ namespace mongo {
             if ( eq == string::npos )
                 continue;
 
-            params[urlDecode(cur.substr(0,eq))] = urlDecode(cur.substr(eq+1));
+            b.append( urlDecode(cur.substr(0,eq)).c_str() , urlDecode(cur.substr(eq+1) ) );
         }
-        return;
+        
+        params = b.obj();
     }
 
     string MiniWebServer::parseMethod( const char * headers ) {

@@ -181,7 +181,7 @@ namespace mongo {
                         nlen += r->netLength();
                         c->advance();
                     }
-                    if ( d->capped ) {
+                    if ( d->capped && !d->capLooped() ) {
                         ss << "  capped outOfOrder:" << outOfOrder;
                         if ( outOfOrder > 1 ) {
                             valid = false;
@@ -274,7 +274,7 @@ namespace mongo {
 
     extern bool unlockRequested;
     extern unsigned lockedForWriting;
-    extern boost::mutex lockedForWritingMutex;
+    extern mongo::mutex lockedForWritingMutex;
 
 /*
     class UnlockCommand : public Command { 
@@ -308,7 +308,7 @@ namespace mongo {
                 Client::initThread("fsyncjob");
                 Client& c = cc();
                 {
-                    boostlock lk(lockedForWritingMutex);
+                    scoped_lock lk(lockedForWritingMutex);
                     lockedForWriting++;
                 }
                 readlock lk("");
@@ -323,7 +323,7 @@ namespace mongo {
                     sleepmillis(20);
                 }
                 {
-                    boostlock lk(lockedForWritingMutex);
+                    scoped_lock lk(lockedForWritingMutex);
                     lockedForWriting--;
                 }
                 c.shutdown();
@@ -376,6 +376,18 @@ namespace mongo {
         }
         
     } fsyncCmd;
-    
+
+    class LogRotateCmd : public Command {
+    public:
+        LogRotateCmd() : Command( "logRotate" ){}
+        virtual LockType locktype(){ return NONE; } 
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return true; }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            rotateLogs();
+            return 1;
+        }        
+        
+    } logRotateCmd;
 }
 

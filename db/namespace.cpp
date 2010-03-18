@@ -552,7 +552,7 @@ namespace mongo {
     }
 
     /* you MUST call when adding an index.  see pdfile.cpp */
-    IndexDetails& NamespaceDetails::addIndex(const char *thisns) {
+    IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
         assert( nsdetails(thisns) == this );
 
         if( nIndexes == NIndexesBase && extraOffset == 0 ) { 
@@ -561,7 +561,8 @@ namespace mongo {
 
         IndexDetails& id = idx(nIndexes);
         nIndexes++;
-        NamespaceDetailsTransient::get_w(thisns).addedIndex();
+        if ( resetTransient )
+            NamespaceDetailsTransient::get_w(thisns).addedIndex();
         return id;
     }
 
@@ -609,8 +610,8 @@ namespace mongo {
     
     /* ------------------------------------------------------------------------- */
 
-    boost::mutex NamespaceDetailsTransient::_qcMutex;
-    boost::mutex NamespaceDetailsTransient::_isMutex;
+    mongo::mutex NamespaceDetailsTransient::_qcMutex;
+    mongo::mutex NamespaceDetailsTransient::_isMutex;
     map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 

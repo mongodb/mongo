@@ -20,7 +20,7 @@
 #include "v8_db.h"
 #include "engine.h"
 #include "util/base64.h"
-
+#include "../client/syncclusterconnection.h"
 #include <iostream>
 
 using namespace std;
@@ -148,15 +148,44 @@ namespace mongo {
             strcpy( host , "127.0.0.1" );
         }
 
-        DBClientConnection * conn = new DBClientConnection( true );
-
+        DBClientWithCommands * conn = 0;
+        int commas = 0;
+        for ( int i=0; i<255; i++ ){
+            if ( host[i] == ',' )
+                commas++;
+            else if ( host[i] == 0 )
+                break;
+        }
+        
+        if ( commas == 0 ){
+            DBClientConnection * c = new DBClientConnection( true );
+            string errmsg;
+            if ( ! c->connect( host , errmsg ) ){
+                delete c;
+                string x = "couldn't connect: ";
+                x += errmsg;
+                return v8::ThrowException( v8::String::New( x.c_str() ) );
+            }
+            conn = c;
+        }
+        else if ( commas == 1 ){
+            DBClientPaired * c = new DBClientPaired();
+            if ( ! c->connect( host ) ){
+                delete c;
+                return v8::ThrowException( v8::String::New( "couldn't connect to pair" ) );
+            }
+            conn = c;
+        }
+        else if ( commas == 2 ){
+            conn = new SyncClusterConnection( host );
+        }
+        else {
+            return v8::ThrowException( v8::String::New( "too many commas" ) );
+        }
+                
         Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
         self.MakeWeak( conn , destroyConnection );
 
-        string errmsg;
-        if ( ! conn->connect( host , errmsg ) ){
-            return v8::ThrowException( v8::String::New( "couldn't connect" ) );
-        }
         ScriptEngine::runConnectCallback( *conn );
         // NOTE I don't believe the conn object will ever be freed.
         args.This()->Set( CONN_STRING , External::New( conn ) );

@@ -31,6 +31,7 @@
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
 #include <boost/static_assert.hpp>
+#include <boost/any.hpp>
 #undef assert
 #define assert xassert
 
@@ -455,6 +456,8 @@ namespace mongo {
                 return BSONObj::opREGEX;
             else if ( fn[1] == 'o' && fn[2] == 'p' && fn[3] == 't' && fn[4] == 'i' && fn[5] == 'o' && fn[6] == 'n' && fn[7] == 's' && fn[8] == 0 )
                 return BSONObj::opOPTIONS;
+            else if ( fn[1] == 'w' && fn[2] == 'i' && fn[3] == 't' && fn[4] == 'h' && fn[5] == 'i' && fn[6] == 'n' && fn[7] == 0 )
+                return BSONObj::opWITHIN;
         }
         return def;
     }
@@ -586,7 +589,7 @@ namespace mongo {
             if ( x > 0 && valuestr()[x-1] == 0 )
                 return;
             StringBuilder buf;
-            buf <<  "Invalid dbref/code/string/symbol size: " << x;
+            buf <<  "Invalid dbref/code/string/symbol size: " << x << " strnlen:" << strnlen( valuestr() , x );
             massert( 10321 , buf.str() , 0 );
             break;
         }
@@ -1628,6 +1631,38 @@ namespace mongo {
         assert( ! j.more() );
     }
 
+    void BSONObjBuilder::appendAny(const char* fieldName, const boost::any& val){
+        massert(13070, "any can't be empty", !val.empty());
+
+        const type_info& type = val.type();
+
+#define CONVERT(T) \
+        if (typeid(T) == type) { \
+            append(fieldName, boost::any_cast< T const & >(val)); \
+            return; \
+        }
+
+        CONVERT(int)
+        CONVERT(double)
+        CONVERT(long long)
+        CONVERT(string)
+        CONVERT(char *)
+        CONVERT(const char *)
+        CONVERT(BSONObj)
+
+        CONVERT(vector<int>)
+        CONVERT(vector<double>)
+        CONVERT(vector<long long>)
+        CONVERT(vector<string>)
+        CONVERT(vector<char *>)
+        CONVERT(vector<const char *>)
+        CONVERT(vector<BSONObj>)
+#undef CONVERT
+
+        // TODO maybe demangle type.name()
+        massert(13071, string("any is not of a recognized type: ") + type.name() , false);
+    }
+
     int BSONElementFieldSorter( const void * a , const void * b ){
         const char * x = *((const char**)a);
         const char * y = *((const char**)b);
@@ -1648,6 +1683,5 @@ namespace mongo {
         qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
         _cur = 0;
     }
-
 
 } // namespace mongo

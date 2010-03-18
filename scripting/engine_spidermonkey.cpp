@@ -46,7 +46,7 @@ namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
     boost::recursive_mutex &smmutex = *( new boost::recursive_mutex );
-#define smlock recursive_boostlock ___lk( smmutex );
+#define smlock recursive_scoped_lock ___lk( smmutex );
 
 #define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
 
@@ -193,7 +193,7 @@ namespace mongo {
             return oid;
         }
 
-        BSONObj toObject( JSObject * o ){
+        BSONObj toObject( JSObject * o , int depth = 0){
             if ( ! o )
                 return BSONObj();
 
@@ -217,9 +217,11 @@ namespace mongo {
 
             if ( ! appendSpecialDBObject( this , b , "value" , OBJECT_TO_JSVAL( o ) , o ) ){
 
-                jsval theid = getProperty( o , "_id" );
-                if ( ! JSVAL_IS_VOID( theid ) ){
-                    append( b , "_id" , theid );
+                if ( depth == 0 ){
+                    jsval theid = getProperty( o , "_id" );
+                    if ( ! JSVAL_IS_VOID( theid ) ){
+                        append( b , "_id" , theid , EOO , depth + 1 );
+                    }
                 }
                 
                 JSIdArray * properties = JS_Enumerate( _context , o );
@@ -230,10 +232,10 @@ namespace mongo {
                     jsval nameval;
                     assert( JS_IdToValue( _context ,id , &nameval ) );
                     string name = toString( nameval );
-                    if ( name == "_id" )
+                    if ( depth == 0 && name == "_id" )
                         continue;
                     
-                    append( b , name , getProperty( o , name.c_str() ) , orig[name].type() );
+                    append( b , name , getProperty( o , name.c_str() ) , orig[name].type() , depth + 1 );
                 }
 
                 JS_DestroyIdArray( _context , properties );
@@ -267,7 +269,7 @@ namespace mongo {
             b.appendRegex( name.c_str() , s.substr( 0 , end ).c_str() , s.substr( end + 1 ).c_str() );
         }
 
-        void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO  ){
+        void append( BSONObjBuilder& b , string name , jsval val , BSONType oldType = EOO , int depth=0 ){
             //cout << "name: " << name << "\t" << typeString( val ) << " oldType: " << oldType << endl;
             switch ( JS_TypeOfValue( _context , val ) ){
 
@@ -291,7 +293,7 @@ namespace mongo {
                     b.appendNull( name.c_str() );
                 }
                 else if ( ! appendSpecialDBObject( this , b , name , val , o ) ){
-                    BSONObj sub = toObject( o );
+                    BSONObj sub = toObject( o , depth );
                     if ( JS_IsArrayObject( _context , o ) ){
                         b.appendArray( name.c_str() , sub );
                     }
@@ -402,12 +404,12 @@ namespace mongo {
                 paramString = trim( paramString );
             }
             
-            const char ** paramArray = new const char*[params.size()];
+            boost::scoped_array<const char *> paramArray (new const char*[params.size()]);
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
             
-            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
-            delete paramArray;
+            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+
             if ( ! func ){
                 cout << "compile failed for: " << raw << endl;
                 return 0;

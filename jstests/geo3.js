@@ -48,7 +48,7 @@ function avgA( q , len ){
 }
 
 function testFiltering( msg ){
-    assert.eq( 1.5 , avgA( {} ) , msg + " testFiltering 1 " );
+    assert.gt( 2 , avgA( {} ) , msg + " testFiltering 1 " );
     assert.eq( 2 , avgA( { a : 2 } ) , msg + " testFiltering 2 " );
     assert.eq( 4 , avgA( { a : 4 } ) , msg + " testFiltering 3 " );
 }
@@ -76,3 +76,12 @@ t.ensureIndex( { loc : "2d" , b : 1 } )
 assert.eq( 2 , t.getIndexKeys().length , "setup 4b" )
 
 testFiltering( "loc and b" );
+
+
+q = { loc : { $near : [ 50 , 50 ] } }
+assert.eq( 100 , t.find( q ).limit(100).itcount() , "D1" )
+assert.eq( 100 , t.find( q ).limit(100).count() , "D2" )
+
+assert.eq( 20 , t.find( q ).limit(20).itcount() , "D3" )
+assert.eq( 20 , t.find( q ).limit(20).size() , "D4" )
+

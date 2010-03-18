@@ -22,8 +22,6 @@
 
 namespace mongo {
 
-    CmdLine cmdLine;
-
     const char * curNs = "in client mode";
 
     bool dbexitCalled = false;
@@ -39,6 +37,10 @@ namespace mongo {
     
     bool inShutdown(){
         return dbexitCalled;
+    }
+
+    void setupSignals(){
+        // maybe should do SIGPIPE here, not sure
     }
 
     string getDbContext() {

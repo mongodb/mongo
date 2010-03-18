@@ -30,18 +30,18 @@ namespace mongo {
     template<typename T> class BlockingQueue : boost::noncopyable {
     public:
         void push(T const& t){
-            boostlock l( _lock );
+            scoped_lock l( _lock );
             _queue.push( t );
             _condition.notify_one();
         }
         
         bool empty() const {
-            boostlock l( _lock );
+            scoped_lock l( _lock );
             return _queue.empty();
         }
         
         bool tryPop( T & t ){
-            boostlock l( _lock );
+            scoped_lock l( _lock );
             if ( _queue.empty() )
                 return false;
             
@@ -53,9 +53,9 @@ namespace mongo {
         
         T blockingPop(){
 
-            boostlock l( _lock );
+            scoped_lock l( _lock );
             while( _queue.empty() )
-                _condition.wait( l );
+                _condition.wait( l.boost() );
             
             T t = _queue.front();
             _queue.pop();
@@ -65,7 +65,7 @@ namespace mongo {
     private:
         std::queue<T> _queue;
         
-        mutable boost::mutex _lock;
+        mutable mongo::mutex _lock;
         boost::condition _condition;
     };
 

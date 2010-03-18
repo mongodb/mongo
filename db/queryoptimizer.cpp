@@ -24,6 +24,9 @@
 #include "queryoptimizer.h"
 #include "cmdline.h"
 
+//#define DEBUGQO(x) cout << x << endl;
+#define DEBUGQO(x)
+
 namespace mongo {
 
     void checkTableScanAllowed( const char * ns ){
@@ -59,7 +62,8 @@ namespace mongo {
     direction_( 0 ),
     endKeyInclusive_( endKey.isEmpty() ),
     unhelpful_( false ),
-    _special( special ){
+    _special( special ),
+    _type(0){
 
         if ( !fbs_.matchPossible() ) {
             unhelpful_ = true;
@@ -78,7 +82,9 @@ namespace mongo {
 
         if ( _special.size() ){
             optimal_ = true;
-            scanAndOrderRequired_ = false; // TODO: maybe part of key spec?
+            _type  = index_->getSpec().getType();
+            massert( 13040 , (string)"no type for special: " + _special , _type );
+            scanAndOrderRequired_ = _type->scanAndOrderRequired( fbs.query() , order );
             return;
         }
 
@@ -172,11 +178,8 @@ namespace mongo {
     
     auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
-        if ( _special.size() ){
-            IndexType * type = index_->getSpec().getType();
-            massert( 13040 , (string)"no type for special: " + _special , type );
-            return type->newCursor( fbs_.query() , order_ , numWanted );
-        }
+        if ( _type )
+            return _type->newCursor( fbs_.query() , order_ , numWanted );
         
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
@@ -220,7 +223,7 @@ namespace mongo {
     
     void QueryPlan::registerSelf( long long nScanned ) const {
         if ( fbs_.matchPossible() ) {
-            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( fbs_.pattern( order_ ), indexKey(), nScanned );  
         }
     }
@@ -255,6 +258,7 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
+        DEBUGQO( "QueryPlanSet::init " << ns << "\t" << query_ );
         plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
@@ -320,27 +324,33 @@ namespace mongo {
                 return;
             }
         }
-        
+
+        if ( query_.isEmpty() && order_.isEmpty() ){
+            plans_.push_back( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ) );
+            return;
+        }
+
+        DEBUGQO( "\t special : " << fbs_.getSpecial() );
         if ( fbs_.getSpecial().size() ){
-            string special = fbs_.getSpecial();
+            _special = fbs_.getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                if ( spec.getTypeName() == special && spec.suitability( query_ , order_ ) ){
+                if ( spec.getTypeName() == _special && spec.suitability( query_ , order_ ) ){
                     usingPrerecordedPlan_ = true;
                     mayRecordPlan_ = true;
                     plans_.push_back( PlanPtr( new QueryPlan( d , j , fbs_ , order_ , 
-                                                              BSONObj() , BSONObj() , special ) ) );
+                                                              BSONObj() , BSONObj() , _special ) ) );
                     return;
                 }
             }
-            uassert( 13038 , (string)"can't find special index: " + special + " for: " + query_.toString() , 0 );
+            uassert( 13038 , (string)"can't find special index: " + _special + " for: " + query_.toString() , 0 );
         }
 
         if ( honorRecordedPlan_ ) {
-            boostlock lk(NamespaceDetailsTransient::_qcMutex);
+            scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
             NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( ns );
             BSONObj bestIndex = nsd.indexForPattern( fbs_.pattern( order_ ) );
             if ( !bestIndex.isEmpty() ) {
@@ -419,7 +429,7 @@ namespace mongo {
             if ( res->complete() || plans_.size() > 1 )
                 return res;
             {
-                boostlock lk(NamespaceDetailsTransient::_qcMutex);
+                scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( fbs_.ns() ).registerIndexForPattern( fbs_.pattern( order_ ), BSONObj(), 0 );
             }
             init();
@@ -488,7 +498,7 @@ namespace mongo {
             }
             if ( errCount == ops.size() )
                 break;
-            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 ) {
+            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
                 plans_.addOtherPlans( true );
                 PlanSet::iterator i = plans_.plans_.begin();
                 ++i;

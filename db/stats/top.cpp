@@ -23,14 +23,14 @@
 
 namespace mongo {
     
-    Top::UsageData::UsageData( UsageData& older , UsageData& newer )
+    Top::UsageData::UsageData( const UsageData& older , const UsageData& newer )
         : time(newer.time-older.time) , 
           count(newer.count-older.count) 
     {
         
     }
 
-    Top::CollectionData::CollectionData( CollectionData& older , CollectionData& newer )
+    Top::CollectionData::CollectionData( const CollectionData& older , const CollectionData& newer )
         : total( older.total , newer.total ) , 
           readLock( older.readLock , newer.readLock ) ,
           writeLock( older.writeLock , newer.writeLock ) ,
@@ -44,13 +44,26 @@ namespace mongo {
         
     }
 
-
+    
     void Top::record( const string& ns , int op , int lockType , long long micros , bool command ){
-        boostlock lk(_lock);
+        //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
+        scoped_lock lk(_lock);
+        
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ){
+            _lastDropped = "";
+            return;
+        }
 
         CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
+    }
+
+    void Top::collectionDropped( const string& ns ){
+        //cout << "collectionDropped: " << ns << endl;
+        scoped_lock lk(_lock);
+        _usage.erase(ns);
+        _lastDropped = ns;
     }
     
     void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ){
@@ -94,14 +107,13 @@ namespace mongo {
 
     }
 
-    Top::UsageMap Top::cloneMap(){
-        boostlock lk(_lock);
-        UsageMap x = _usage;
-        return x;
+    void Top::cloneMap(Top::UsageMap& out){
+        scoped_lock lk(_lock);
+        out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ){
-        boostlock lk( _lock );
+        scoped_lock lk( _lock );
         append( b , _usage );
     }
 
@@ -163,7 +175,7 @@ namespace mongo {
     TopOld::UsageMap TopOld::_snapshotB;
     TopOld::UsageMap &TopOld::_snapshot = TopOld::_snapshotA;
     TopOld::UsageMap &TopOld::_nextSnapshot = TopOld::_snapshotB;
-    boost::mutex TopOld::topMutex;
+    mongo::mutex TopOld::topMutex;
 
 
 }

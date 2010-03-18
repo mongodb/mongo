@@ -102,6 +102,7 @@ namespace mongo {
     
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
+       god - allow access to system namespaces and don't yield
     */
     UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
 
@@ -197,6 +198,12 @@ namespace mongo {
             if ( _ntoreturn == 0 )
                 return ( len > 1024 * 1024 ) || n >= 101;
             return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
+        }
+
+        bool enough( int n ) const {
+            if ( _ntoreturn == 0 )
+                return false;
+            return n >= _ntoreturn;
         }
         
     private:

@@ -25,6 +25,8 @@
 namespace mongo {
     
     class IndexDetails;
+    class IndexType;
+
     class QueryPlan : boost::noncopyable {
     public:
         QueryPlan(NamespaceDetails *_d, 
@@ -72,6 +74,7 @@ namespace mongo {
         bool endKeyInclusive_;
         bool unhelpful_;
         string _special;
+        IndexType * _type;
     };
 
     // Inherit from this interface to implement a new query operation.
@@ -161,6 +164,7 @@ namespace mongo {
         bool honorRecordedPlan_;
         BSONObj min_;
         BSONObj max_;
+        string _special;
     };
 
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.

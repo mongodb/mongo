@@ -29,6 +29,7 @@
 #include "security.h"
 #include "stats/snapshots.h"
 #include "background.h"
+#include "commands.h"
 
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -98,7 +99,15 @@ namespace mongo {
                 ss << "\n<b>DBTOP  (occurences|percent of elapsed)</b>\n";
                 ss << "<table border=1>";
                 ss << "<tr align='left'>";
-                ss << "<th>NS</th> <th>total</th> <th>Reads</th><th>Writes</th> <th>Queries</th><th>GetMores</th><th>Inserts</th><th>Updates</th><th>Removes</th> ";
+                ss << "<th>NS</th>"
+                      "<th colspan=2>total</th>"
+                      "<th colspan=2>Reads</th>"
+                      "<th colspan=2>Writes</th>"
+                      "<th colspan=2>Queries</th>"
+                      "<th colspan=2>GetMores</th>"
+                      "<th colspan=2>Inserts</th>"
+                      "<th colspan=2>Updates</th>"
+                      "<th colspan=2>Removes</th>";
                 ss << "</tr>";
                 
                 display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
@@ -119,7 +128,7 @@ namespace mongo {
         void display( stringstream& ss , double elapsed , const Top::UsageData& usage ){
             ss << "<td>";
             ss << usage.count;
-            ss << "|";
+            ss << "</td><td>";
             double per = 100 * ((double)usage.time)/elapsed;
             ss << setprecision(2) << fixed << per << "%";
             ss << "</td>";
@@ -190,10 +199,12 @@ namespace mongo {
                << "<th>NameSpace</th>"
                << "<th>Query</th>"
                << "<th>client</th>"
+               << "<th>msg</th>"
+               << "<th>progress</th>"
 
                << "</tr>\n";
             {
-                boostlock bl(Client::clientsMutex);
+                scoped_lock bl(Client::clientsMutex);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) { 
                     Client *c = *i;
                     CurOp& co = *(c->curop());
@@ -214,6 +225,10 @@ namespace mongo {
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );
+
+                    tablecell( ss , co.getMessage() );
+                    tablecell( ss , co.getProgressMeter().toString() );
+
 
                     ss << "</tr>";
                 }
@@ -293,6 +308,17 @@ namespace mongo {
             //out() << "url [" << url << "]" << endl;
             
             if ( url.size() > 1 ) {
+                
+                if ( url == "/_status" ){
+                    if ( ! allowed( rq , headers, from ) ){
+                        responseCode = 401;
+                        responseMsg = "not allowed\n";
+                        return;
+                    }              
+                    generateServerStatus( responseMsg );
+                    return;
+                }
+
                 if ( ! cmdLine.rest ){
                     responseCode = 403;
                     responseMsg = "rest is not enabled.  use --rest to turn on";
@@ -346,6 +372,36 @@ namespace mongo {
             }            
         }
 
+        void generateServerStatus( string& responseMsg ){
+            static vector<string> commands;
+            if ( commands.size() == 0 ){
+                commands.push_back( "serverStatus" );
+                commands.push_back( "buildinfo" );
+            }
+            
+            BSONObjBuilder buf(1024);
+            
+            for ( unsigned i=0; i<commands.size(); i++ ){
+                string cmd = commands[i];
+
+                Command * c = Command::findCommand( cmd );
+                assert( c );
+                assert( c->locktype() == 0 );
+
+                BSONObj co = BSON( cmd << 1 );
+                
+                string errmsg;
+                
+                BSONObjBuilder sub;
+                if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
+                    buf.append( cmd.c_str() , errmsg );
+                else
+                    buf.append( cmd.c_str() , sub.obj() );
+            }
+            
+            responseMsg = buf.obj().jsonString();
+        }
+
         void handleRESTRequest( const char *rq, // the full request
                                 string url,
                                 string& responseMsg,
@@ -364,7 +420,7 @@ namespace mongo {
             string coll = url.substr( first + 1 );
             string action = "";
 
-            map<string,string> params;
+            BSONObj params;
             if ( coll.find( "?" ) != string::npos ) {
                 parseParams( params , coll.substr( coll.find( "?" ) + 1 ) );
                 coll = coll.substr( 0 , coll.find( "?" ) );
@@ -410,26 +466,29 @@ namespace mongo {
             responseMsg = ss.str();
         }
 
-        void handleRESTQuery( string ns , string action , map<string,string> & params , int & responseCode , stringstream & out ) {
+        void handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
             Timer t;
 
             int skip = _getOption( params["skip"] , 0 );
             int num = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
             int one = 0;
-            if ( params["one"].size() > 0 && tolower( params["one"][0] ) == 't' ) {
+            if ( params["one"].type() == String && tolower( params["one"].valuestr()[0] ) == 't' ) {
                 num = 1;
                 one = 1;
             }
 
             BSONObjBuilder queryBuilder;
 
-            for ( map<string,string>::iterator i = params.begin(); i != params.end(); i++ ) {
-                if ( ! i->first.find( "filter_" ) == 0 )
+            BSONObjIterator i(params);
+            while ( i.more() ){
+                BSONElement e = i.next();
+                string name = e.fieldName();
+                if ( ! name.find( "filter_" ) == 0 )
                     continue;
 
-                const char * field = i->first.substr( 7 ).c_str();
-                const char * val = i->second.c_str();
+                const char * field = name.substr( 7 ).c_str();
+                const char * val = e.valuestr();
 
                 char * temp;
 
@@ -477,7 +536,7 @@ namespace mongo {
         }
 
         // TODO Generate id and revision per couch POST spec
-        void handlePost( string ns, const char *body, map<string,string> & params, int & responseCode, stringstream & out ) {
+        void handlePost( string ns, const char *body, BSONObj& params, int & responseCode, stringstream & out ) {
             try {
                 BSONObj obj = fromjson( body );
                 db.insert( ns.c_str(), obj );
@@ -491,10 +550,12 @@ namespace mongo {
             out << "{ \"ok\" : true }";
         }
 
-        int _getOption( string val , int def ) {
-            if ( val.size() == 0 )
-                return def;
-            return atoi( val.c_str() );
+        int _getOption( BSONElement e , int def ) {
+            if ( e.isNumber() )
+                return e.numberInt();
+            if ( e.type() == String )
+                return atoi( e.valuestr() );
+            return def;
         }
 
     private:

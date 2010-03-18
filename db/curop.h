@@ -58,10 +58,13 @@ namespace mongo {
         struct sockaddr_in _remote;
         
         char _queryBuf[256];
-
+        
         void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
         
         OpDebug _debug;
+        
+        ThreadSafeString _message;
+        ProgressMeter _progressMeter;
 
         void _reset(){
             _command = false;
@@ -69,6 +72,8 @@ namespace mongo {
             _dbprofile = 0;
             _end = 0;
             _waitingForLock = false;
+            _message = "";
+            _progressMeter.finished();
         }
 
         void setNS(const char *ns) {
@@ -236,6 +241,21 @@ namespace mongo {
             return ss.str();
         }
 
+        ProgressMeter& setMessage( const char * msg , long long progressMeterTotal = 0 , int secondsBetween = 3 ){
+            _message = msg;
+            if ( progressMeterTotal ){
+                assert( ! _progressMeter.isActive() );
+                _progressMeter.reset( progressMeterTotal , secondsBetween );
+            }
+            else {
+                _progressMeter.finished();
+            }
+            return _progressMeter;
+        }
+
+        string getMessage() const { return _message; }
+        ProgressMeter getProgressMeter() { return _progressMeter; }
+
         friend class Client;
     };
 
@@ -244,12 +264,12 @@ namespace mongo {
        future: maybe use this as a "going away" thing on process termination with a higher flag value 
     */
     extern class KillCurrentOp { 
-         enum { Off, On, All } state;
+        enum { Off, On, All } state;
         AtomicUInt toKill;
     public:
         void killAll() { state = All; }
         void kill(AtomicUInt i) { toKill = i; state = On; }
-
+        
         void checkForInterrupt() { 
             if( state != Off ) { 
                 if( state == All ) 

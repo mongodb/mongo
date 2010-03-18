@@ -29,6 +29,7 @@
 #include "instance.h"
 #include "clientcursor.h"
 #include "pdfile.h"
+#include "stats/counters.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -427,15 +428,23 @@ namespace mongo {
     public:
         void run(){
             log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
+            int time_flushing = 0;
             while ( ! inShutdown() ){
                 if ( _sleepsecs == 0 ){
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
                     continue;
                 }
-                sleepmillis( (int)(_sleepsecs * 1000) );
-                MemoryMappedFile::flushAll( false );
-                log(1) << "flushing mmmap" << endl;
+
+                sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
+
+                Date_t start = jsTime();
+                MemoryMappedFile::flushAll( true );
+                time_flushing = jsTime() - start;
+
+                globalFlushCounters.flushed(time_flushing);
+
+                log(1) << "flushing mmap took " << time_flushing << "ms" << endl;
             }
         }
         
@@ -492,10 +501,9 @@ namespace mongo {
         BOOST_CHECK_EXCEPTION( clearTmpFiles() );
 
         Client::initThread("initandlisten");
+        _diaglog.init();
 
         clearTmpCollections();
-
-        _diaglog.init();
 
         Module::initAll();
 
@@ -589,6 +597,7 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    static StaticObserver staticObserver;
     getcurns = ourgetns;
 
     po::options_description general_options("General options");
@@ -596,27 +605,17 @@ int main(int argc, char* argv[], char *envp[] )
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
-    po::options_description cmdline_options("Command line options");
 
     po::positional_options_description positional_options;
 
+    CmdLine::addGlobalOptions( general_options , hidden_options );
+
     general_options.add_options()
-        ("help,h", "show this usage information")
-        ("version", "show version information")
-        ("config,f", po::value<string>(), "configuration file specifying additional options")
-        ("port", po::value<int>(&cmdLine.port)/*->default_value(CmdLine::DefaultDBPort)*/, "specify port number")
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
-        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("directoryperdb", "each database will be stored in a separate directory")
-        ("quiet", "quieter output")
-        ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
-        ("logappend" , "append to logpath instead of over-writing" )
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-#ifndef _WIN32
-        ("fork" , "fork server process" )
-#endif
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
         ("auth", "run with security")
@@ -672,18 +671,12 @@ int main(int argc, char* argv[], char *envp[] )
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         ;
 
-    /* support for -vv -vvvv etc. */
-    for (string s = "vv"; s.length() <= 10; s.append("v")) {
-        hidden_options.add_options()(s.c_str(), "verbose");
-    }
 
     positional_options.add("command", 3);
     visible_options.add(general_options);
     visible_options.add(replication_options);
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
-    cmdline_options.add(visible_options);
-    cmdline_options.add(hidden_options);
 
     setupSignals();
 
@@ -714,7 +707,7 @@ int main(int argc, char* argv[], char *envp[] )
         bool removeService = false;
         bool startService = false;
         po::variables_map params;
-
+        
         string error_message = arg_error_check(argc, argv);
         if (error_message != "") {
             cout << error_message << endl << endl;
@@ -722,37 +715,9 @@ int main(int argc, char* argv[], char *envp[] )
             return 0;
         }
 
-        /* don't allow guessing - creates ambiguities when some options are
-         * prefixes of others. allow long disguises and don't allow guessing
-         * to get away with our vvvvvvv trick. */
-        int command_line_style = (((po::command_line_style::unix_style ^
-                                    po::command_line_style::allow_guessing) |
-                                   po::command_line_style::allow_long_disguise) ^
-                                  po::command_line_style::allow_sticky);
 
-        try {
-            po::store(po::command_line_parser(argc, argv).options(cmdline_options).
-                      positional(positional_options).
-                      style(command_line_style).run(), params);
-
-            if (params.count("config")) {
-                ifstream config_file (params["config"].as<string>().c_str());
-                if (config_file.is_open()) {
-                    po::store(po::parse_config_file(config_file, cmdline_options), params);
-                    config_file.close();
-                } else {
-                    cout << "ERROR: could not read from config file" << endl << endl;
-                    cout << visible_options << endl;
-                    return 0;
-                }
-            }
-
-            po::notify(params);
-        } catch (po::error &e) {
-            cout << "ERROR: " << e.what() << endl << endl;
-            cout << visible_options << endl;
+        if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
             return 0;
-        }
 
         if (params.count("help")) {
             show_help_text(visible_options);
@@ -766,17 +731,6 @@ int main(int argc, char* argv[], char *envp[] )
         dbpath = params["dbpath"].as<string>();
         if ( params.count("directoryperdb")) {
             directoryperdb = true;
-        }
-        if (params.count("quiet")) {
-            cmdLine.quiet = true;
-        }
-        if (params.count("verbose")) {
-            logLevel = 1;
-        }
-        for (string s = "vv"; s.length() <= 10; s.append("v")) {
-            if (params.count(s)) {
-                logLevel = s.length();
-            }
         }
         if (params.count("cpu")) {
             cmdLine.cpu = true;
@@ -800,26 +754,6 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("appsrvpath")) {
             /* casting away the const-ness here */
             appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
-        }
-#ifndef _WIN32
-        if (params.count("fork")) {
-            if ( ! params.count( "logpath" ) ){
-                cout << "--fork has to be used with --logpath" << endl;
-                return -1;
-            }
-            pid_t c = fork();
-            if ( c ){
-                cout << "forked process: " << c << endl;
-                ::exit(0);
-            }
-            setsid();
-            setupSignals();
-        }
-#endif
-        if (params.count("logpath")) {
-            string lp = params["logpath"].as<string>();
-            uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
-            initLogging( lp , params.count( "logappend" ) );
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();

@@ -59,6 +59,8 @@ namespace mongo {
 
         virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
 
+        virtual bool scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const ;
+
     protected:
         const IndexPlugin * _plugin;
         const IndexSpec * _spec;

@@ -106,7 +106,7 @@ namespace mongo {
             if( user.empty() || key.empty() || received_nonce.empty() ) { 
                 log() << "field missing/wrong type in received authenticate command " 
                     << cc().database()->name
-                    << '\n';               
+                    << endl;               
                 errmsg = "auth fails";
                 sleepmillis(10);
                 return false;
@@ -125,7 +125,7 @@ namespace mongo {
                 }
                     
                 if ( reject ) {
-                    log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << cc().database()->name << '\n';
+                    log() << "auth: bad nonce received or getnonce not called. could be a driver bug or a security attack. db:" << cc().database()->name << endl;
                     errmsg = "auth fails";
                     sleepmillis(30);
                     return false;
@@ -142,7 +142,7 @@ namespace mongo {
                 b << "user" << user;
                 BSONObj query = b.done();
                 if( !Helpers::findOne(systemUsers.c_str(), query, userObj) ) { 
-                    log() << "auth: couldn't find user " << user << ", " << systemUsers << '\n';
+                    log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
                     errmsg = "auth fails";
                     return false;
                 }
@@ -164,7 +164,7 @@ namespace mongo {
             string computed = digestToString( d );
             
             if ( key != computed ){
-                log() << "auth: key mismatch " << user << ", ns:" << ns << '\n';
+                log() << "auth: key mismatch " << user << ", ns:" << ns << endl;
                 errmsg = "auth fails";
                 return false;
             }

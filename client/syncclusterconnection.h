@@ -62,11 +62,20 @@ namespace mongo {
 
         virtual string toString();
     private:
+
+        bool _commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
+
+        auto_ptr<DBClientCursor> _queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
+                                                const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
         
+        bool _isReadOnly( const string& name );
+
         void _checkLast();
         
         void _connect( string host );
         vector<DBClientConnection*> _conns;
+        
+        map<string,int> _lockTypes;
     };
     
 

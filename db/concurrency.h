@@ -49,6 +49,7 @@ namespace mongo {
     }
 
     string sayClientState();
+    bool haveClient();
     
     void curopWaitingForLock( int type );
     void curopGotLock();
@@ -114,6 +115,8 @@ namespace mongo {
 
         void lock() { 
             //DEV cout << "LOCK" << endl;
+            DEV assert( haveClient() );
+                
             int s = _state.get();
             if( s > 0 ) {
                 _state.set(s+1);

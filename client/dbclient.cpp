@@ -105,7 +105,7 @@ namespace mongo {
 
     /* --- dbclientcommands --- */
 
-    inline bool DBClientWithCommands::isOk(const BSONObj& o) {
+    bool DBClientWithCommands::isOk(const BSONObj& o) {
         return o.getIntField("ok") == 1;
     }
 

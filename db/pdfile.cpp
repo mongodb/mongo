@@ -709,6 +709,7 @@ namespace mongo {
         log(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
+        Top::global.collectionDropped( name );
         dropNS(name);        
     }
     
@@ -984,6 +985,7 @@ namespace mongo {
     // throws DBException
     unsigned long long fastBuildIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
         assert( d->backgroundIndexBuildInProgress == 0 );
+        CurOp * op = cc().curop();
 
         Timer t;
 
@@ -1003,7 +1005,7 @@ namespace mongo {
         BSONObjExternalSorter sorter(order);
         sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
-        ProgressMeter pm( d->nrecords , 10 );
+        ProgressMeter & pm = op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1027,6 +1029,8 @@ namespace mongo {
             }
 
         };
+        pm.finished();
+
         if ( logLevel > 1 ) printMemInfo( "before final sort" );
         sorter.sort();
         if ( logLevel > 1 ) printMemInfo( "after final sort" );
@@ -1040,7 +1044,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            ProgressMeter pm2( nkeys , 10 );
+            pm = op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 );
             while( i->more() ) { 
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
@@ -1066,8 +1070,10 @@ namespace mongo {
                     dupsToDrop.push_back(d.second);
                     uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
                 }
-                pm2.hit();
+                pm.hit();
             }
+            pm.finished();
+            op->setMessage( "index: (3/3) btree-middle" );
             log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
             btBuilder.commit();
             wassert( btBuilder.getn() == nkeys || dropDups ); 
@@ -1145,9 +1151,10 @@ namespace mongo {
             d->backgroundIndexBuildInProgress = 1;
             d->nIndexes--;
         }
-        void done(NamespaceDetails *d) {
+        void done(const char *ns, NamespaceDetails *d) {
             d->nIndexes++;
             d->backgroundIndexBuildInProgress = 0;
+            NamespaceDetailsTransient::get_w(ns).addedIndex(); // clear query optimizer cache
             assertInWriteLock();
         }
 
@@ -1166,7 +1173,7 @@ namespace mongo {
             catch(...) { 
                 if( cc().database() && nsdetails(ns.c_str()) == d ) {
                     assert( idxNo == d->nIndexes );
-                    done(d);
+                    done(ns.c_str(), d);
                 }
                 else {
                     log() << "ERROR: db gone during bg index?" << endl;
@@ -1174,19 +1181,17 @@ namespace mongo {
                 throw;
             }
             assert( idxNo == d->nIndexes );
-            done(d);
+            done(ns.c_str(), d);
             return n;
         }
     };
 
     // throws DBException
-    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) { 
+    static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) { 
         log() << "building new index on " << idx.keyPattern() << " for " << ns << endl;
         Timer t;
 		unsigned long long n;
 
-        BSONObj info = idx.info.obj();
-        bool background = info["background"].trueValue();
         if( background ) {
             log(2) << "buildAnIndex: background=true\n";
         }
@@ -1455,11 +1460,14 @@ namespace mongo {
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
+            BSONObj info = loc.obj();
+            bool background = info["background"].trueValue();
+
             int idxNo = tableToIndex->nIndexes;
-            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str()); // clear transient info caches so they refresh; increments nIndexes
+            IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
             idx.info = loc;
             try {
-                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
             } catch( DBException& ) {
                 // save our error msg string as an exception on dropIndexes will overwrite our message
                 LastError *le = lastError.get();

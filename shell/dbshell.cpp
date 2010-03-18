@@ -86,8 +86,12 @@ void killOps() {
     for( map< const void*, string >::iterator i = mongo::shellUtils::_allMyUris.begin(); i != mongo::shellUtils::_allMyUris.end(); ++i )
         uris.push_back( i->second );
     mongo::BSONObj spec = BSON( "" << uris );
-    auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
-    scope->invoke( "function( x ) { killWithUris( x ); }", spec );
+    try {
+        auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );        
+        scope->invoke( "function( x ) { killWithUris( x ); }", spec );
+    } catch ( ... ) {
+        mongo::rawOut( "exception while cleaning up any db ops started by this shell\n" );
+    }
 }
 
 void quitNicely( int sig ){
@@ -525,6 +529,7 @@ int _main(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
+    static mongo::StaticObserver staticObserver;
     try {
         return _main( argc , argv );
     }

@@ -32,7 +32,7 @@ namespace mongo {
         class UsageData {
         public:
             UsageData() : time(0) , count(0){}
-            UsageData( UsageData& older , UsageData& newer );
+            UsageData( const UsageData& older , const UsageData& newer );
             long long time;
             long long count;
 
@@ -48,7 +48,7 @@ namespace mongo {
              * constructs a diff
              */
             CollectionData(){}
-            CollectionData( CollectionData& older , CollectionData& newer );
+            CollectionData( const CollectionData& older , const CollectionData& newer );
             
             UsageData total;
             
@@ -68,9 +68,10 @@ namespace mongo {
     public:
         void record( const string& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
-        UsageMap cloneMap();
+        void cloneMap(UsageMap& out);
         CollectionData getGlobalData(){ return _global; }
-        
+        void collectionDropped( const string& ns );
+
     public: // static stuff
         static Top global;
         
@@ -81,9 +82,10 @@ namespace mongo {
         
         void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
-        boost::mutex _lock;
+        mongo::mutex _lock;
         CollectionData _global;
         UsageMap _usage;
+        string _lastDropped;
     };
 
     /* Records per namespace utilization of the mongod process.
@@ -115,7 +117,7 @@ namespace mongo {
             D d = currentTime() - _currentStart;
 
             {
-                boostlock L(topMutex);
+                scoped_lock L(topMutex);
                 recordUsage( _current, d );
             }
 
@@ -134,7 +136,7 @@ namespace mongo {
         };
 
         static void usage( vector< Usage > &res ) {
-            boostlock L(topMutex);
+            scoped_lock L(topMutex);
 
             // Populate parent namespaces
             UsageMap snapshot;
@@ -172,7 +174,7 @@ namespace mongo {
         }
 
         static void completeSnapshot() {
-            boostlock L(topMutex);
+            scoped_lock L(topMutex);
 
             if ( &_snapshot == &_snapshotA ) {
                 _snapshot = _snapshotB;
@@ -187,7 +189,7 @@ namespace mongo {
         }
 
     private:
-        static boost::mutex topMutex;
+        static mongo::mutex topMutex;
         static bool trivialNs( const char *ns ) {
             const char *ret = strrchr( ns, '.' );
             return ret && ret[ 1 ] == '\0';

@@ -79,7 +79,7 @@ namespace mongo {
     }
 
     const IndexSpec& IndexDetails::getSpec() const {
-        boostlock lk(NamespaceDetailsTransient::_qcMutex);
+        scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         return NamespaceDetailsTransient::get_inlock( info.obj()["ns"].valuestr() ).getIndexSpec( this );
     }
 
@@ -435,4 +435,9 @@ namespace mongo {
     IndexSuitability IndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
         return _spec->_suitability( query , order );
     }
+
+    bool IndexType::scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const {
+        return ! order.isEmpty();
+    }
+
 }

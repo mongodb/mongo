@@ -52,6 +52,51 @@ check( "B" );
 am.a.update( {} , { $inc : { x : 1 } } , false , true );
 check( "C" );
 
+// -----   check features -------
+
+// map/reduce
+am.mr.insert( { tags : [ "a" ] } )
+am.mr.insert( { tags : [ "a" , "b" ] } )
+am.getLastError();
+check( "mr setup" );
+
+m = function(){
+    for ( var i=0; i<this.tags.length; i++ ){
+        print( "\t " + i );
+        emit( this.tags[i] , 1 );
+    }
+}
+
+r = function( key , v ){
+    return Array.sum( v );
+}
+
+correct = { a : 2 , b : 1 };
+
+function checkMR( t ){
+    var res = t.mapReduce( m , r );
+    assert.eq( correct , res.convertToSingleObject() , "checkMR: " + tojson( t ) );
+}
+
+function checkNumCollections( msg , diff ){
+    if ( ! diff ) diff = 0;
+    var m = am.getCollectionNames();
+    var s = as.getCollectionNames();
+    assert.eq( m.length + diff , s.length , "lengths bad \n" + tojson( m ) + "\n" + tojson( s ) );
+}
+
+checkNumCollections( "MR1" );
+checkMR( am.mr );
+checkMR( as.mr );
+checkNumCollections( "MR2" );
+
+sleep( 3000 );
+checkNumCollections( "MR3" );
+
+var res = am.mr.mapReduce( m , r , { out : "xyz" } );
+sleep( 3000 );
+checkNumCollections( "MR4" );
+
 rt.stop();
 
 

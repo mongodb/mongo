@@ -12,30 +12,37 @@
 
 # things from mongod.conf get there by mongod reading it
 
+
+
 OPTIONS=" -f /etc/mongod.conf"
+SYSCONFIG="/etc/sysconfig/mongod"
 
 mongod=${MONGOD-/usr/bin/mongod}
-pidfile=${PIDFILE-/var/run/mongod.pid}
-lockfile=${LOCKFILE-/var/lock/subsys/mongod}
+
+MONGO_USER=mongod
+MONGO_GROUP=mongod
+
+. "$SYSCONFIG" || true
 
 start()
 {
   echo -n $"Starting mongod: "
-  #daemon --pidfile=${pidfile} $mongod $OPTIONS  > /var/log/mongod
-  $mongod $OPTIONS > /var/log/mongod 2>&1 &
+  daemon --user "$MONGO_USER" $mongod $OPTIONS
   RETVAL=$?
-  [ $RETVAL = 0 ] && touch ${lockfile}
-  echo OK
+  [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod && success
 }
 
 stop()
 {
   echo -n $"Stopping mongod: "
-  #killproc -p ${pidfile} -d 10 $mongod
-  #RETVAL=$?
-  killall mongod > /dev/null 2>&1 
-  #[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
-  echo OK
+  killproc -p /var/lib/mongo/mongod.lock -t30 -TERM /usr/bin/mongod
+  RETVAL=$?
+  [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod && success
+}
+
+restart () {
+	stop
+	start
 }
 
 ulimit -n 12000
@@ -48,15 +55,17 @@ case "$1" in
   stop)
     stop
     ;;
-  restart)
-    stop
-    start
+  restart|reload|force-reload)
+    restart
     ;;
-#  status)
-#    status -p ${pidfile} $mongod
-#    ;;
+  condrestart)
+    [ -f /var/lock/subsys/mongodb ] && restart || :
+    ;;
+  status)
+    status $mongod
+    ;;
   *)
-    echo $"Usage: $0 {start|stop|restart}"
+    echo "Usage: $0 {start|stop|status|restart|reload|force-reload|condrestart}"
     RETVAL=1
 esac
 

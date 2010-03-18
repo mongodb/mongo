@@ -33,6 +33,10 @@
 #include "../util/optime.h"
 #include "boost/utility.hpp"
 
+namespace boost{
+    class any;
+}
+
 #include <set>
 
 namespace mongo {
@@ -994,7 +998,8 @@ namespace mongo {
             opREGEX = 0x10,
             opOPTIONS = 0x11,
             opELEM_MATCH = 0x12,
-            opNEAR = 0x13
+            opNEAR = 0x13,
+            opWITHIN = 0x14,
         };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
@@ -1537,6 +1542,10 @@ namespace mongo {
             marshalArray( fieldName, arrBuilder.done() );
         }*/
 
+        /** Append a boost::any. Can't be named 'append' because of implicit conversions */
+        void appendAny(const char* fieldName, const boost::any&);
+
+
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
             massert( 10335 ,  "builder does not own memory", owned() );
@@ -2021,7 +2030,7 @@ namespace mongo {
         
         ~BSONObjIteratorSorted(){
             assert( _fields );
-            delete _fields;
+            delete[] _fields;
             _fields = 0;
         }
 

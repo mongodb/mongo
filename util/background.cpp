@@ -22,7 +22,7 @@
 namespace mongo {
 
     BackgroundJob *BackgroundJob::grab = 0;
-    boost::mutex &BackgroundJob::mutex = *( new boost::mutex );
+    mongo::mutex BackgroundJob::mutex;
 
     /* static */
     void BackgroundJob::thr() {
@@ -38,7 +38,7 @@ namespace mongo {
     }
 
     BackgroundJob& BackgroundJob::go() {
-        boostlock bl(mutex);
+        scoped_lock bl(mutex);
         assert( grab == 0 );
         grab = this;
         boost::thread t(thr);

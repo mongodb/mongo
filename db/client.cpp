@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-    boost::mutex Client::clientsMutex;
+    mongo::mutex Client::clientsMutex;
     set<Client*> Client::clients; // always be in clientsMutex when manipulating this
     boost::thread_specific_ptr<Client> currentClient;
 
@@ -40,7 +40,7 @@ namespace mongo {
       _god(0)
     {
         _curOp = new CurOp( this );
-        boostlock bl(clientsMutex);
+        scoped_lock bl(clientsMutex);
         clients.insert(this);
     }
 
@@ -49,7 +49,7 @@ namespace mongo {
         _god = 0;
 
         if ( _context )
-            cout << "ERROR: Client::~Client _context should be NULL" << endl;
+            cout << "ERROR: Client::~Client _context should be NULL: " << _desc << endl;
         if ( !_shutdown ) 
             cout << "ERROR: Client::shutdown not called: " << _desc << endl;
     }
@@ -59,7 +59,7 @@ namespace mongo {
         if ( inShutdown() )
             return false;
         {
-            boostlock bl(clientsMutex);
+            scoped_lock bl(clientsMutex);
             clients.erase(this);
         }
 
@@ -69,6 +69,8 @@ namespace mongo {
             didAnything = true;
             for ( list<string>::iterator i = _tempCollections.begin(); i!=_tempCollections.end(); i++ ){
                 string ns = *i;
+                Top::global.collectionDropped( ns );
+                    
                 dblock l;
                 Client::Context ctx( ns );
                 if ( ! nsdetails( ns.c_str() ) )
@@ -228,6 +230,17 @@ namespace mongo {
         if ( _client )
             b.append( "desc" , _client->desc() );
         
+        if ( ! _message.empty() ){
+            if ( _progressMeter.isActive() ){
+                StringBuilder buf(128);
+                buf << _message << " " << _progressMeter.toString();
+                b.append( "msg" , buf.str() );
+            }
+            else {
+                b.append( "msg" , _message );
+            }
+        }
+
         return b.obj();
     }
 

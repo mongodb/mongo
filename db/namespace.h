@@ -346,7 +346,7 @@ namespace mongo {
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object. 
          */
-        IndexDetails& addIndex(const char *thisns);
+        IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
         void aboutToDeleteAnIndex() {
             flags &= ~Flag_HaveIdIndex;
@@ -506,12 +506,12 @@ namespace mongo {
         /* IndexSpec caching */
     private:
         map<const IndexDetails*,IndexSpec> _indexSpecs;
-        static boost::mutex _isMutex;
+        static mongo::mutex _isMutex;
     public:
         const IndexSpec& getIndexSpec( const IndexDetails * details ){
             IndexSpec& spec = _indexSpecs[details];
             if ( ! spec._finishedInit ){
-                boostlock lk(_isMutex);
+                scoped_lock lk(_isMutex);
                 if ( ! spec._finishedInit ){
                     spec.reset( details );
                     assert( spec._finishedInit );
@@ -525,7 +525,7 @@ namespace mongo {
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
-        static boost::mutex _qcMutex;
+        static mongo::mutex _qcMutex;
         /* you must be in the qcMutex when calling this (and using the returned val): */
         static NamespaceDetailsTransient& get_inlock(const char *ns) {
             return _get(ns);

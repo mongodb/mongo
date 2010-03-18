@@ -36,6 +36,7 @@
 
 #include "../util/builder.h"
 #include "../util/message.h"
+#include "../util/mmap.h"
 #include "../db/dbmessage.h"
 #include "../client/dbclient.h"
 
@@ -66,6 +67,7 @@ using mongo::BSONObj;
 using mongo::BufBuilder;
 using mongo::DBClientConnection;
 using mongo::QueryResult;
+using mongo::MemoryMappedFile;
 
 #define SNAP_LEN 65535
 
@@ -148,6 +150,8 @@ map< Connection, unsigned > expectedSeq;
 map< Connection, boost::shared_ptr<DBClientConnection> > forwarder;
 map< Connection, long long > lastCursor;
 map< Connection, map< long long, long long > > mapCursor;
+
+void processMessage( Connection& c , Message& d );
 
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
 
@@ -239,6 +243,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
          << " " << d.getns()
          << "  " << m.data->len << " bytes "
          << " id:" << hex << m.data->id << dec << "\t" << m.data->id;
+
+    processMessage( c , m );
+}
+
+void processMessage( Connection& c , Message& m ){
+    DbMessage d(m);
 
     if ( m.data->operation() == mongo::opReply )
         cout << " - " << m.data->responseTo;
@@ -342,13 +352,41 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     }
 }
 
+void processDiagLog( const char * file ){
+    Connection c;
+    MemoryMappedFile f;
+    long length;
+    
+    char * root = (char*)f.map( file , length , MemoryMappedFile::SEQUENTIAL );
+    assert( root );
+    assert( length > 0 );
+    
+    char * pos = root;
+
+    long read = 0;
+    while ( read < length ){
+        Message m(pos,false);
+        int len = m.data->len;
+        DbMessage d(m);
+        cout << len << " " << d.getns() << endl;
+        
+        processMessage( c , m );
+
+        read += len;
+        pos += len;
+    }
+    
+    f.close();
+}
+
 void usage() {
     cout <<
-    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | FILE <filename>)] [<port0> <port1> ... ]\n"
+    "Usage: mongosniff [--help] [--forward host:port] [--source (NET <interface> | (FILE | DIAGLOG) <filename>)] [<port0> <port1> ... ]\n"
     "--forward       Forward all parsed request messages to mongod instance at \n"
     "                specified host:port\n"
     "--source        Source of traffic to sniff, either a network interface or a\n"
-    "                file containing perviously captured packets, in pcap format.\n"
+    "                file containing previously captured packets in pcap format,\n"
+    "                or a file containing output from mongod's --diaglog option.\n"
     "                If no source is specified, mongosniff will attempt to sniff\n"
     "                from one of the machine's network interfaces.\n"
     "<port0>...      These parameters are used to filter sniffing.  By default, \n"
@@ -366,9 +404,10 @@ int main(int argc, char **argv){
     struct bpf_program fp;
     bpf_u_int32 mask;
     bpf_u_int32 net;
-
+    
     bool source = false;
     bool replay = false;
+    bool diaglog = false;
     const char *file = 0;
 
     vector< const char * > args;
@@ -381,18 +420,22 @@ int main(int argc, char **argv){
             if ( arg == string( "--help" ) ) {
                 usage();
                 return 0;
-            } else if ( arg == string( "--forward" ) ) {
+            } 
+            else if ( arg == string( "--forward" ) ) {
                 forwardAddress = args[ ++i ];
-            } else if ( arg == string( "--source" ) ) {
+            } 
+            else if ( arg == string( "--source" ) ) {
                 uassert( 10266 ,  "can't use --source twice" , source == false );
                 uassert( 10267 ,  "source needs more args" , args.size() > i + 2);
                 source = true;
                 replay = ( args[ ++i ] == string( "FILE" ) );
-                if ( replay )
+                diaglog = ( args[ i ] == string( "DIAGLOG" ) );
+                if ( replay || diaglog )
                     file = args[ ++i ];
                 else
                     dev = args[ ++i ];
-            } else {
+            }
+            else {
                 serverPorts.insert( atoi( args[ i ] ) );
             }
         }
@@ -403,8 +446,19 @@ int main(int argc, char **argv){
 
     if ( !serverPorts.size() )
         serverPorts.insert( 27017 );
-
-    if ( !replay ) {
+    
+    if ( diaglog ){
+        processDiagLog( file );
+        return 0;
+    }
+    else if ( replay ){
+        handle = pcap_open_offline(file, errbuf);
+        if ( ! handle ){
+            cerr << "error opening capture file!" << endl;
+            return -1;
+        }
+    }
+    else {
         if ( !dev ) {
             dev = pcap_lookupdev(errbuf);
             if ( ! dev ) {
@@ -422,13 +476,7 @@ int main(int argc, char **argv){
             cerr << "error opening device: " << errbuf << endl;
             return -1;
         }
-    } else {
-        handle = pcap_open_offline(file, errbuf);
-        if ( ! handle ){
-            cerr << "error opening capture file!" << endl;
-            return -1;
-        }
-    }
+    } 
 
     switch ( pcap_datalink( handle ) ){
     case DLT_EN10MB:

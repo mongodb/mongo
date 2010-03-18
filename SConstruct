@@ -359,7 +359,7 @@ if GetOption( "extralib" ) is not None:
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "stdafx.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
+commonFiles = Split( "stdafx.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/cmdline.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" ,  "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp" ]
@@ -1290,7 +1290,7 @@ if not onlyServer and not noshell:
 mongodForTests = None
 mongodForTestsPort = "27017"
 
-def startMongodForTests( env, target, source ):
+def startMongodWithArgs(*args):
     global mongodForTests
     global mongodForTestsPort
     global mongod
@@ -1302,13 +1302,20 @@ def startMongodForTests( env, target, source ):
     dirName = "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
-    mongodForTests = Popen( [ mongod[0].abspath, "--port", mongodForTestsPort, "--dbpath", dirName ] )
+    mongodForTests = Popen([mongod[0].abspath, "--port", mongodForTestsPort,
+                            "--dbpath", dirName] + list(args))
 
     if not utils.didMongodStart( 32000 ):
         print( "Failed to start mongod" )
         mongodForTests = None
         Exit( 1 )
-        
+
+def startMongodForTests( env, target, source ):
+    return startMongodWithArgs()
+
+def startMongodSmallOplog(env, target, source):
+    return startMongodWithArgs("--master", "--oplogSize", "10")
+
 def stopMongodForTests():
     global mongodForTests
     if not mongodForTests:
@@ -1332,6 +1339,10 @@ def stopMongodForTests():
 testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
+
+testEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [startMongodSmallOplog] );
+testEnv.AlwaysBuild( "startMongodSmallOplog" );
+testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
 
 def addMongodReqTargets( env, target, source ):
     mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]

@@ -118,7 +118,7 @@ namespace mongo {
 #define LOGIT { ss << x; return *this; }
 
     class Logstream : public Nullstream {
-        static boost::mutex &mutex;
+        static mongo::mutex mutex;
         static int doneSetup;
         stringstream ss;
     public:
@@ -128,7 +128,7 @@ namespace mongo {
         void flush() {
             // this ensures things are sane
             if ( doneSetup == 1717 ){
-                boostlock lk(mutex);
+                scoped_lock lk(mutex);
                 cout << ss.str();
                 cout.flush();
             }
