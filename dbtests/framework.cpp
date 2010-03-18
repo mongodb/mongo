@@ -358,4 +358,6 @@ namespace mongo {
         }
 
     }
+
+    void setupSignals(){}
 }

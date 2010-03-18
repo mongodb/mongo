@@ -93,6 +93,10 @@ namespace mongo {
         dbexit(EXIT_CLEAN, (string("recieved signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
     
+    void setupSignals(){
+        // needed for cmdLine, btu we do it in init()
+    }
+
     void init(){
         serverID.init();
         setupSIGTRAPforGDB();

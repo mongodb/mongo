@@ -23,6 +23,8 @@ namespace po = boost::program_options;
 namespace mongo {
     CmdLine cmdLine;
 
+    void setupSignals();
+
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
                                     boost::program_options::options_description& hidden ){
         /* support for -vv -vvvv etc. */
@@ -37,7 +39,11 @@ namespace mongo {
             ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
             ("quiet", "quieter output")
             ("port", po::value<int>(&cmdLine.port), "specify port number")
-            
+            ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
+            ("logappend" , "append to logpath instead of over-writing" )
+#ifndef _WIN32
+            ("fork" , "fork server process" )
+#endif
             ;
         
     }
@@ -105,6 +111,28 @@ namespace mongo {
         if (params.count("quiet")) {
             cmdLine.quiet = true;
         }
+
+#ifndef _WIN32
+        if (params.count("fork")) {
+            if ( ! params.count( "logpath" ) ){
+                cout << "--fork has to be used with --logpath" << endl;
+                ::exit(-1);
+            }
+            pid_t c = fork();
+            if ( c ){
+                cout << "forked process: " << c << endl;
+                ::exit(0);
+            }
+            setsid();
+            setupSignals();
+        }
+#endif
+        if (params.count("logpath")) {
+            string lp = params["logpath"].as<string>();
+            uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
+            initLogging( lp , params.count( "logappend" ) );
+        }
+
 
         return true;
     }

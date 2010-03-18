@@ -615,12 +615,7 @@ int main(int argc, char* argv[], char *envp[] )
          "local ip address to bind listener - all local ips bound by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
         ("directoryperdb", "each database will be stored in a separate directory")
-        ("logpath", po::value<string>() , "file to send all output to instead of stdout" )
-        ("logappend" , "append to logpath instead of over-writing" )
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-#ifndef _WIN32
-        ("fork" , "fork server process" )
-#endif
         ("cpu", "periodically show cpu and iowait utilization")
         ("noauth", "run without security")
         ("auth", "run with security")
@@ -759,26 +754,6 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("appsrvpath")) {
             /* casting away the const-ness here */
             appsrvPath = (char*)(params["appsrvpath"].as<string>().c_str());
-        }
-#ifndef _WIN32
-        if (params.count("fork")) {
-            if ( ! params.count( "logpath" ) ){
-                cout << "--fork has to be used with --logpath" << endl;
-                return -1;
-            }
-            pid_t c = fork();
-            if ( c ){
-                cout << "forked process: " << c << endl;
-                ::exit(0);
-            }
-            setsid();
-            setupSignals();
-        }
-#endif
-        if (params.count("logpath")) {
-            string lp = params["logpath"].as<string>();
-            uassert( 10033 ,  "logpath has to be non-zero" , lp.size() );
-            initLogging( lp , params.count( "logappend" ) );
         }
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();

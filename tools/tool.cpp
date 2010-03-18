@@ -283,4 +283,6 @@ namespace mongo {
         throw UserException( 9997 , (string)"auth failed: " + errmsg );
     }
 
+
+    void setupSignals(){}
 }
