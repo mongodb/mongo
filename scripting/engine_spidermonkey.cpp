@@ -404,12 +404,12 @@ namespace mongo {
                 paramString = trim( paramString );
             }
             
-            const char ** paramArray = new const char*[params.size()];
+            boost::scoped_array<const char *> paramArray (new const char*[params.size()]);
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
             
-            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
-            delete paramArray;
+            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , strlen( code.c_str() ) , "nofile_b" , 0 );
+
             if ( ! func ){
                 cout << "compile failed for: " << raw << endl;
                 return 0;
