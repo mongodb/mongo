@@ -133,8 +133,10 @@ namespace mongo {
             return nextjsobj != 0;
         }
         BSONObj nextJsObj() {
-            if ( nextjsobj == data )
+            if ( nextjsobj == data ) {
                 nextjsobj += strlen(data) + 1; // skip namespace
+                massert( 13066 ,  "Message contains no documents", theEnd > nextjsobj );
+            }
             massert( 10304 ,  "Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
             BSONObj js(nextjsobj);
             massert( 10305 ,  "Invalid object size", js.objsize() > 3 );
