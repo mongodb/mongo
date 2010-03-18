@@ -377,7 +377,11 @@ namespace mongo {
             if ( ! geo.isABSONObj() )
                 return;
 
-            _hash( geo.embeddedObject() ).append( b , "" );
+            BSONObj embed = geo.embeddedObject();
+            if ( embed.isEmpty() )
+                return;
+
+            _hash( embed ).append( b , "" );
 
             for ( size_t i=0; i<_other.size(); i++ ){
                 BSONElement e = obj[_other[i]];
@@ -397,9 +401,9 @@ namespace mongo {
 
         GeoHash _hash( const BSONObj& o ) const {
             BSONObjIterator i(o);
-            assert( i.more() );
+            uassert( 13067 , "geo field is empty" , i.more() );
             BSONElement x = i.next();
-            assert( i.more() );
+            uassert( 13068 , "geo field only has 1 element" , i.more() );
             BSONElement y = i.next();
             
             uassert( 13026 , "geo values have to be numbers" , x.isNumber() && y.isNumber() );

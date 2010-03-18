@@ -19,3 +19,5 @@ assert.eq( 1 , t.find( { loc : { $near : [50,50] } } ).sort( { _id : 1 } ).next(
 assert.eq( 2 , t.find( { loc : { $near : [50,50] } } ).sort( { _id : -1 } ).next()._id , "B1" )
 
 
+t.insert( { _id : 4 , loc : [] } )
+assert.eq( 4 , t.find().itcount() , "C1" )
