@@ -24,6 +24,9 @@
 #include "queryoptimizer.h"
 #include "cmdline.h"
 
+//#define DEBUGQO(x) cout << x << endl;
+#define DEBUGQO(x)
+
 namespace mongo {
 
     void checkTableScanAllowed( const char * ns ){
@@ -255,6 +258,7 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
+        DEBUGQO( "QueryPlanSet::init " << ns << "\t" << query_ );
         plans_.clear();
         mayRecordPlan_ = true;
         usingPrerecordedPlan_ = false;
@@ -326,22 +330,23 @@ namespace mongo {
             return;
         }
 
+        DEBUGQO( "\t special : " << fbs_.getSpecial() );
         if ( fbs_.getSpecial().size() ){
-            string special = fbs_.getSpecial();
+            _special = fbs_.getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                if ( spec.getTypeName() == special && spec.suitability( query_ , order_ ) ){
+                if ( spec.getTypeName() == _special && spec.suitability( query_ , order_ ) ){
                     usingPrerecordedPlan_ = true;
                     mayRecordPlan_ = true;
                     plans_.push_back( PlanPtr( new QueryPlan( d , j , fbs_ , order_ , 
-                                                              BSONObj() , BSONObj() , special ) ) );
+                                                              BSONObj() , BSONObj() , _special ) ) );
                     return;
                 }
             }
-            uassert( 13038 , (string)"can't find special index: " + special + " for: " + query_.toString() , 0 );
+            uassert( 13038 , (string)"can't find special index: " + _special + " for: " + query_.toString() , 0 );
         }
 
         if ( honorRecordedPlan_ ) {
@@ -493,7 +498,7 @@ namespace mongo {
             }
             if ( errCount == ops.size() )
                 break;
-            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 ) {
+            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
                 plans_.addOtherPlans( true );
                 PlanSet::iterator i = plans_.plans_.begin();
                 ++i;

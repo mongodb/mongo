@@ -469,8 +469,11 @@ namespace mongo {
             switch ( e.type() ){
             case Object: {
                 BSONObj sub = e.embeddedObject();
-                if ( sub.firstElement().getGtLtOp() == BSONObj::opNEAR ){
+                switch ( sub.firstElement().getGtLtOp() ){
+                case BSONObj::opNEAR:
+                case BSONObj::opWITHIN:
                     return OPTIMAL;
+                default:;
                 }
             }
             case Array:
@@ -591,13 +594,15 @@ namespace mongo {
         }
 
         bool inside( Point p , double fudge = 0 ){
-	    return inside( p._x , p._y , fudge );
+            bool res = inside( p._x , p._y , fudge );
+            //cout << "is : " << p.toString() << " in " << toString() << " = " << res << endl;
+            return res;
         }
         
         bool inside( double x , double y , double fudge = 0 ){
             return 
-	      between( _min._x , _max._x  , x , fudge ) &&
-	      between( _min._y , _max._y  , y , fudge );
+                between( _min._x , _max._x  , x , fudge ) &&
+                between( _min._y , _max._y  , y , fudge );
         }
         
         Point _min;
@@ -756,6 +761,15 @@ namespace mongo {
                 GeoHash b = g._hash( 48 , 54 );
                 assert( round( 4.47214 ) == round( g.distance( a , b ) ) );
             }
+            
+
+            {
+                Box b( Point( 29.762283 , -95.364271 ) , Point( 29.764283000000002 , -95.36227099999999 ) );
+                assert( b.inside( 29.763 , -95.363 ) );
+                assert( ! b.inside( 32.9570255 , -96.1082497 ) );
+                assert( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
+            }
+            
         }
     } geoUnitTest;
     
@@ -1360,7 +1374,7 @@ namespace mongo {
         }
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
-	    return _want.inside( Point( _g , h ) , .01 );
+            return _want.inside( Point( _g , h ) , .01 );
         }
 
         GeoHash _bl;

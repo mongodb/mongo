@@ -164,6 +164,7 @@ namespace mongo {
         bool honorRecordedPlan_;
         BSONObj min_;
         BSONObj max_;
+        string _special;
     };
 
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
