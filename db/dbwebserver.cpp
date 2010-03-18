@@ -29,6 +29,7 @@
 #include "security.h"
 #include "stats/snapshots.h"
 #include "background.h"
+#include "commands.h"
 
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -307,6 +308,17 @@ namespace mongo {
             //out() << "url [" << url << "]" << endl;
             
             if ( url.size() > 1 ) {
+                
+                if ( url == "/_status" ){
+                    if ( ! allowed( rq , headers, from ) ){
+                        responseCode = 401;
+                        responseMsg = "not allowed\n";
+                        return;
+                    }              
+                    generateServerStatus( responseMsg );
+                    return;
+                }
+
                 if ( ! cmdLine.rest ){
                     responseCode = 403;
                     responseMsg = "rest is not enabled.  use --rest to turn on";
@@ -358,6 +370,36 @@ namespace mongo {
                 responseMsg = "not allowed\n";
                 return;
             }            
+        }
+
+        void generateServerStatus( string& responseMsg ){
+            static vector<string> commands;
+            if ( commands.size() == 0 ){
+                commands.push_back( "serverStatus" );
+                commands.push_back( "buildinfo" );
+            }
+            
+            BSONObjBuilder buf(1024);
+            
+            for ( unsigned i=0; i<commands.size(); i++ ){
+                string cmd = commands[i];
+
+                Command * c = Command::findCommand( cmd );
+                assert( c );
+                assert( c->locktype() == 0 );
+
+                BSONObj co = BSON( cmd << 1 );
+                
+                string errmsg;
+                
+                BSONObjBuilder sub;
+                if ( ! c->run( "admin.$cmd" , co , errmsg , sub , false ) )
+                    buf.append( cmd.c_str() , errmsg );
+                else
+                    buf.append( cmd.c_str() , sub.obj() );
+            }
+            
+            responseMsg = buf.obj().jsonString();
         }
 
         void handleRESTRequest( const char *rq, // the full request
