@@ -547,7 +547,7 @@ namespace mongo {
                             }
                             _n++;
                             if ( ! _c->supportGetMore() ){
-                                if ( _buf.len() >= MaxBytesToReturnToClientAtOnce ){
+                                if ( _pq.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ){
                                     finish();
                                     return;
                                 }

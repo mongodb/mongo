@@ -36,6 +36,8 @@ assert.eq( 0 , t.find( { loc : { $within : { $box : [ [100 , 100 ] , [ 110 , 110
 assert.eq( 0 , t.find( { loc : { $within : { $box : [ [100 , 100 ] , [ 110 , 110 ] ] } } } ).count() , "E2" )
 
 
-assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).count() , "E2" )
-assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).itcount() , "E2" )
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).count() , "E3" )
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).itcount() , "E4" )
+
+assert.eq( 57 , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).limit(57).itcount() , "E5" )
 

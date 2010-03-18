@@ -199,6 +199,12 @@ namespace mongo {
                 return ( len > 1024 * 1024 ) || n >= 101;
             return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
         }
+
+        bool enough( int n ) const {
+            if ( _ntoreturn == 0 )
+                return false;
+            return n >= _ntoreturn;
+        }
         
     private:
         void init( const BSONObj& q ){
