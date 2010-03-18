@@ -55,8 +55,17 @@ namespace mongo {
         { } 
         
 
-        void addGlobalOptions( boost::program_options::options_description& general , 
-                               boost::program_options::options_description& hidden );
+        static void addGlobalOptions( boost::program_options::options_description& general , 
+                                      boost::program_options::options_description& hidden );
+
+        
+        /**
+         * @return true if should run program, false if should exit
+         */
+        static bool store( int argc , char ** argv , 
+                    boost::program_options::options_description& options,
+                    boost::program_options::positional_options_description& positional,
+                    boost::program_options::variables_map &output );
     };
     
     extern CmdLine cmdLine;
