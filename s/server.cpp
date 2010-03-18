@@ -30,6 +30,7 @@
 namespace mongo {
     
     Database *database = 0;
+    string mongosCommand;
     string ourHostname;
     OID serverID;
     bool dbexitCalled = false;
@@ -51,7 +52,7 @@ namespace mongo {
         out() << argv[0] << " usage:\n\n";
         out() << " -v+  verbose\n";
         out() << " --port <portno>\n";
-        out() << " --configdb <configdbname> [<configdbname>...]\n";
+        out() << " --configdb <configdbname>,[<configdbname>,<configdbname>]\n";
         out() << endl;
     }
 
@@ -113,54 +114,81 @@ namespace mongo {
         return 0;
     }
 
+    void printShardingVersionInfo(){
+        log() << mongosCommand << " v0.3- (alpha 3t) starting (--help for usage)" << endl;
+        printGitVersion();
+        printSysInfo();
+    }
+
 } // namespace mongo
 
 using namespace mongo;
 
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
+
 int main(int argc, char* argv[], char *envp[] ) {
     static StaticObserver staticObserver;
-    
-    bool justTests = false;
-    vector<string> configdbs;
-    
-    for (int i = 1; i < argc; i++)  {
-        if ( argv[i] == 0 ) continue;
-        string s = argv[i];
-        if ( s == "--port" ) {
-            cmdLine.port = atoi(argv[++i]);
-        }
-        else if ( s == "--configdb" ) {
-            
-            while ( ++i < argc ) 
-                configdbs.push_back(argv[i]);
+    mongosCommand = argv[0];
 
-            if ( configdbs.size() == 0 ) {
-                out() << "error: no args for --configdb\n";
-                return 4;
-            }
-            
-            if ( configdbs.size() > 2 ) {
-                out() << "error: --configdb does not support more than 2 parameters yet\n";
-                return 5;
-            }
-        }
-        else if ( s.find( "-v" ) == 0 ){
-            logLevel = s.size() - 1;
-        }
-        else if ( s == "--test" ) {
-            justTests = true;
-            logLevel = 5;
-        }
-        else {
-            usage( argv );
-            return 3;
-        }
-    }
+    po::options_description options("Sharding options");
+    po::options_description hidden("Hidden options");
+    po::positional_options_description positional;
     
-    if ( justTests ){
+    CmdLine::addGlobalOptions( options , hidden );
+    
+    options.add_options()
+        ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
+        ( "test" , "just run unit tests" )
+        ;
+
+
+    // parse options
+    po::variables_map params;
+    if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
+        return 0;
+    
+    if ( params.count( "help" ) ){
+        cout << options << endl;
+        return 0;
+    }
+
+    if ( params.count( "version" ) ){
+        printShardingVersionInfo();
+        return 0;
+    }
+
+
+    if ( params.count( "test" ) ){
+        logLevel = 5;
         UnitTest::runTests();
         cout << "tests passed" << endl;
         return 0;
+    }
+    
+    if ( ! params.count( "configdb" ) ){
+        out() << "error: no args for --configdb" << endl;
+        return 4;
+    }
+
+    vector<string> configdbs;
+    {
+        string s = params["configdb"].as<string>();
+        while ( true ){
+            size_t idx = s.find( ',' );
+            if ( idx == string::npos ){
+                configdbs.push_back( s );
+                break;
+            }
+            configdbs.push_back( s.substr( 0 , idx ) );
+            s = s.substr( idx + 1 );
+        }
+    }
+
+    if ( configdbs.size() != 1 && configdbs.size() != 3 ){
+        out() << "need either 1 or 3 configdbs" << endl;
+        return 5;
     }
     
     pool.addHook( &shardingConnectionHook );
@@ -176,17 +204,18 @@ int main(int argc, char* argv[], char *envp[] ) {
         usage( argv );
         return 1;
     }
-
-    log() << argv[0] << " v0.3- (alpha 3t) starting (--help for usage)" << endl;
-    printGitVersion();
-    printSysInfo();
+    
+    printShardingVersionInfo();
     
     if ( ! configServer.init( configdbs ) ){
         cout << "couldn't connectd to config db" << endl;
         return 7;
     }
     
-    assert( configServer.ok() );
+    if ( ! configServer.ok() ){
+        cout << "configServer startup check failed" << endl;
+        return 8;
+    }
     
     int configError = configServer.checkConfigVersion();
     if ( configError ){

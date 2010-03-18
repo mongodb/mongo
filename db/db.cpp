@@ -605,7 +605,6 @@ int main(int argc, char* argv[], char *envp[] )
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
-    po::options_description cmdline_options("Command line options");
 
     po::positional_options_description positional_options;
 
@@ -683,8 +682,6 @@ int main(int argc, char* argv[], char *envp[] )
     visible_options.add(replication_options);
     visible_options.add(sharding_options);
     Module::addOptions( visible_options );
-    cmdline_options.add(visible_options);
-    cmdline_options.add(hidden_options);
 
     setupSignals();
 
@@ -715,7 +712,7 @@ int main(int argc, char* argv[], char *envp[] )
         bool removeService = false;
         bool startService = false;
         po::variables_map params;
-
+        
         string error_message = arg_error_check(argc, argv);
         if (error_message != "") {
             cout << error_message << endl << endl;
@@ -724,7 +721,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
 
 
-        if ( ! CmdLine::store( argc , argv , cmdline_options , positional_options , params ) )
+        if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
             return 0;
 
         if (params.count("help")) {

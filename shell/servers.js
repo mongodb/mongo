@@ -32,6 +32,7 @@ createMongoArgs = function( binaryName , args ){
             if ( k == "v" && isNumber( o[k] ) ){
                 var n = o[k];
                 if ( n > 0 ){
+                    if ( n > 10 ) n = 10;
                     var temp = "-";
                     while ( n-- > 0 ) temp += "v";
                     fullArgs.push( temp );

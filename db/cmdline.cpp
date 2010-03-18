@@ -26,7 +26,7 @@ namespace mongo {
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
                                     boost::program_options::options_description& hidden ){
         /* support for -vv -vvvv etc. */
-        for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
             hidden.add_options()(s.c_str(), "verbose");
         }
         
@@ -44,7 +44,8 @@ namespace mongo {
 
 
     bool CmdLine::store( int argc , char ** argv , 
-                         boost::program_options::options_description& options,
+                         boost::program_options::options_description& visible,
+                         boost::program_options::options_description& hidden,
                          boost::program_options::positional_options_description& positional,
                          boost::program_options::variables_map &params ){
         
@@ -59,8 +60,13 @@ namespace mongo {
 
         
         try {
+
+            po::options_description all;
+            all.add( visible );
+            all.add( hidden );
+
             po::store( po::command_line_parser(argc, argv)
-                       .options( options )
+                       .options( all )
                        .positional( positional )
                        .style( style )
                        .run(), 
@@ -70,11 +76,11 @@ namespace mongo {
                 ifstream f( params["config"].as<string>().c_str() );
                 if ( ! f.is_open() ){
                     cout << "ERROR: could not read from config file" << endl << endl;
-                    cout << options << endl;
+                    cout << visible << endl;
                     return false;
                 }
                 
-                po::store( po::parse_config_file( f , options ) , params );
+                po::store( po::parse_config_file( f , all ) , params );
                 f.close();
             }
             
@@ -82,7 +88,7 @@ namespace mongo {
         } 
         catch (po::error &e) {
             cout << "ERROR: " << e.what() << endl << endl;
-            cout << options << endl;
+            cout << visible << endl;
             return false;
         }
 
@@ -90,7 +96,7 @@ namespace mongo {
             logLevel = 1;
         }
 
-        for (string s = "vv"; s.length() <= 10; s.append("v")) {
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
             if (params.count(s)) {
                 logLevel = s.length();
             }

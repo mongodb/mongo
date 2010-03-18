@@ -63,9 +63,10 @@ namespace mongo {
          * @return true if should run program, false if should exit
          */
         static bool store( int argc , char ** argv , 
-                    boost::program_options::options_description& options,
-                    boost::program_options::positional_options_description& positional,
-                    boost::program_options::variables_map &output );
+                           boost::program_options::options_description& visible,
+                           boost::program_options::options_description& hidden,
+                           boost::program_options::positional_options_description& positional,
+                           boost::program_options::variables_map &output );
     };
     
     extern CmdLine cmdLine;
