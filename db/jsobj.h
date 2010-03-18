@@ -32,6 +32,7 @@
 #include "../util/builder.h"
 #include "../util/optime.h"
 #include "boost/utility.hpp"
+#include <boost/any.hpp>
 
 #include <set>
 
@@ -1537,6 +1538,10 @@ namespace mongo {
                 arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
             marshalArray( fieldName, arrBuilder.done() );
         }*/
+
+        /** Append a boost::any. Can't be named 'append' because of implicit conversions */
+        void appendAny(const char* fieldName, const boost::any&);
+
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
