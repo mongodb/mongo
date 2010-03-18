@@ -1737,6 +1737,14 @@ namespace mongo {
      
         bool needWriteLock = c->locktype() == Command::WRITE;
         
+        if ( ! c->requiresAuth() && 
+             ( ai->isAuthorizedReads( dbname ) && 
+               ! ai->isAuthorized( dbname ) ) ){
+            // this means that they can read, but not write
+            // so only get a read lock
+            needWriteLock = false;
+        }
+        
         if ( ! needWriteLock ){
             assert( ! c->logTheOp() );
         }
