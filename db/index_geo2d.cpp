@@ -1561,9 +1561,9 @@ namespace mongo {
             
             gs.exec();
 
-            double distanceMultipier = 1;
-            if ( cmdObj["distanceMultipier"].isNumber() )
-                distanceMultipier = cmdObj["distanceMultipier"].number();
+            double distanceMultiplier = 1;
+            if ( cmdObj["distanceMultiplier"].isNumber() )
+                distanceMultiplier = cmdObj["distanceMultiplier"].number();
             
             double totalDistance = 0;
 
@@ -1573,7 +1573,7 @@ namespace mongo {
             for ( GeoHopper::Holder::iterator i=gs._hopper->_points.begin(); i!=gs._hopper->_points.end(); i++ ){
                 const GeoPoint& p = *i;
                 
-                double dis = distanceMultipier * p._distance;
+                double dis = distanceMultiplier * p._distance;
                 totalDistance += dis;
                 
                 BSONObjBuilder bb( arr.subobjStart( BSONObjBuilder::numStr( x++ ).c_str() ) );
