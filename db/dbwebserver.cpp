@@ -309,13 +309,13 @@ namespace mongo {
             
             if ( url.size() > 1 ) {
                 
-                if ( url == "/_status" ){
+                if ( url.find( "/_status" ) == 0 ){
                     if ( ! allowed( rq , headers, from ) ){
                         responseCode = 401;
                         responseMsg = "not allowed\n";
                         return;
                     }              
-                    generateServerStatus( responseMsg );
+                    generateServerStatus( url , responseMsg );
                     return;
                 }
 
@@ -372,11 +372,16 @@ namespace mongo {
             }            
         }
 
-        void generateServerStatus( string& responseMsg ){
+        void generateServerStatus( string url , string& responseMsg ){
             static vector<string> commands;
             if ( commands.size() == 0 ){
                 commands.push_back( "serverStatus" );
                 commands.push_back( "buildinfo" );
+            }
+
+            BSONObj params;
+            if ( url.find( "?" ) != string::npos ) {
+                parseParams( params , url.substr( url.find( "?" ) + 1 ) );
             }
             
             BSONObjBuilder buf(1024);
@@ -387,8 +392,18 @@ namespace mongo {
                 Command * c = Command::findCommand( cmd );
                 assert( c );
                 assert( c->locktype() == 0 );
-
-                BSONObj co = BSON( cmd << 1 );
+                
+                BSONObj co;
+                {
+                    BSONObjBuilder b;
+                    b.append( cmd.c_str() , 1 );
+                    
+                    if ( cmd == "serverStatus" && params["repl"].type() ){
+                        b.append( "repl" , atoi( params["repl"].valuestr() ) );
+                    }
+                    
+                    co = b.obj();
+                }
                 
                 string errmsg;
                 
