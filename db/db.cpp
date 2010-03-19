@@ -853,7 +853,7 @@ int main(int argc, char* argv[], char *envp[] )
             assert(lenForNewNsFiles > 0);
         }
         if (params.count("oplogSize")) {
-            long x = params["oplogSize"].as<long>();
+            long x = params["oplogSize"].as<int>();
             uassert( 10035 , "bad --oplogSize arg", x > 0);
             cmdLine.oplogSize = x * 1024 * 1024;
             assert(cmdLine.oplogSize > 0);
