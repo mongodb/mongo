@@ -500,6 +500,9 @@ namespace mongo {
 
                         if ( o.woSortOrder( prev , sortKey ) == 0 ){
                             all.push_back( o );
+                            if ( pm.hits() % 1000 == 0 ){
+                                dbtemprelease tl;
+                            }
                             continue;
                         }
                         
