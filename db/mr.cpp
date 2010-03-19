@@ -68,7 +68,6 @@ namespace mongo {
                 uassert( 13070 , "value to large to reduce" , ee.size() < ( 2 * 1024 * 1024 ) );
 
                 if ( sizeSoFar + ee.size() > ( 4 * 1024 * 1024 ) ){
-                    cout << "n: " << n << " sizeSoFar: " << sizeSoFar << " ee:" << ee.size() << endl;
                     assert( n > 1 ); // if not, inf. loop
                     break;
                 }
@@ -90,7 +89,6 @@ namespace mongo {
             int endSizeEstimate = key.objsize() + ( args.objsize() / values.size() );
 
             if ( n < values.size() ){
-                cout << "N : " << n << " values.size() : " << values.size() << endl;
                 BSONList x;
                 for ( ; n < values.size(); n++ ){
                     x.push_back( values[n] );
@@ -498,7 +496,8 @@ namespace mongo {
 
                     while ( cursor->more() ){
                         BSONObj o = cursor->next().getOwned();
-                        
+                        pm.hit();
+
                         if ( o.woSortOrder( prev , sortKey ) == 0 ){
                             all.push_back( o );
                             continue;
@@ -509,7 +508,6 @@ namespace mongo {
                         all.clear();
                         prev = o;
                         all.push_back( o );
-                        pm.hit();
                         killCurrentOp.checkForInterrupt();
                         dbtemprelease tl;
                     }
