@@ -26,7 +26,7 @@ namespace mongo {
     CmdLine cmdLine;
 
     void setupSignals();
-    BSONObj rawCmdLineOpts;
+    BSONArray argvArray;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general , 
                                     boost::program_options::options_description& hidden ){
@@ -137,12 +137,10 @@ namespace mongo {
         }
 
         {
-            BSONObjBuilder b;
-            for (po::variables_map::const_iterator it = params.begin(); it != params.end(); ++it){
-                if (!it->second.defaulted())
-                    b.appendAny(it->first.c_str(), it->second.value());
-            }
-            rawCmdLineOpts = b.obj();
+            BSONArrayBuilder b;
+            for (int i=0; i < argc; i++)
+                b << argv[i];
+            argvArray = b.arr();
         }
 
         return true;
@@ -156,7 +154,7 @@ namespace mongo {
         virtual bool slaveOk() { return true; }
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            result.append("options", rawCmdLineOpts);
+            result.append("argv", argvArray);
             return true;
         }
 
