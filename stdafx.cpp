@@ -32,6 +32,6 @@
 
 namespace mongo {
 
-    const char versionString[] = "1.3.5-";
+    const char versionString[] = "1.3.5-pre";
 
 } // namespace mongo
