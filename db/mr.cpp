@@ -28,6 +28,8 @@ namespace mongo {
 
     namespace mr {
 
+        typedef vector<BSONObj> BSONList;
+
         class MyCmp {
         public:
             MyCmp(){}
@@ -38,9 +40,9 @@ namespace mongo {
 
         typedef pair<BSONObj,BSONObj> Data;
         //typedef list< Data > InMemory;
-        typedef map< BSONObj,list<BSONObj>,MyCmp > InMemory;
+        typedef map< BSONObj,BSONList,MyCmp > InMemory;
 
-        BSONObj reduceValues( list<BSONObj>& values , Scope * s , ScriptingFunction reduce , bool final , ScriptingFunction finalize ){
+        BSONObj reduceValues( BSONList& values , Scope * s , ScriptingFunction reduce , bool final , ScriptingFunction finalize ){
             uassert( 10074 ,  "need values" , values.size() );
             
             int sizeEstimate = ( values.size() * values.begin()->getField( "value" ).size() ) + 128;
@@ -49,18 +51,30 @@ namespace mongo {
             BSONObjBuilder reduceArgs( sizeEstimate );
             BSONArrayBuilder * valueBuilder = 0;
             
-            int n = 0;
-            for ( list<BSONObj>::iterator i=values.begin(); i!=values.end(); i++){
-                BSONObj o = *i;
-                BSONObjIterator j(o);
+            int sizeSoFar = 0;
+            unsigned n = 0;
+            for ( ; n<values.size(); n++ ){
+                BSONObjIterator j(values[n]);
                 BSONElement keyE = j.next();
                 if ( n == 0 ){
                     reduceArgs.append( keyE );
                     key = keyE.wrap();
                     valueBuilder = new BSONArrayBuilder( reduceArgs.subarrayStart( "values" ) );
-                    n++;
+                    sizeSoFar = 5 + keyE.size();
                 }
-                valueBuilder->append( j.next() );
+                
+                BSONElement ee = j.next();
+                
+                uassert( 13070 , "value to large to reduce" , ee.size() < ( 2 * 1024 * 1024 ) );
+
+                if ( sizeSoFar + ee.size() > ( 4 * 1024 * 1024 ) ){
+                    cout << "n: " << n << " sizeSoFar: " << sizeSoFar << " ee:" << ee.size() << endl;
+                    assert( n > 1 ); // if not, inf. loop
+                    break;
+                }
+                
+                valueBuilder->append( ee );
+                sizeSoFar += ee.size();
             }
             assert(valueBuilder);
             valueBuilder->done();
@@ -72,8 +86,23 @@ namespace mongo {
                 uassert( 10075 , "reduce -> multiple not supported yet",0);                
                 return BSONObj();
             }
-            
+
             int endSizeEstimate = key.objsize() + ( args.objsize() / values.size() );
+
+            if ( n < values.size() ){
+                cout << "N : " << n << " values.size() : " << values.size() << endl;
+                BSONList x;
+                for ( ; n < values.size(); n++ ){
+                    x.push_back( values[n] );
+                }
+                BSONObjBuilder temp( endSizeEstimate );
+                temp.append( key.firstElement() );
+                s->append( temp , "1" , "return" );
+                x.push_back( temp.obj() );
+                return reduceValues( x , s , reduce , final , finalize );
+            }
+            
+
 
             if ( finalize ){
                 BSONObjBuilder b(endSizeEstimate);
@@ -248,7 +277,7 @@ namespace mongo {
 
             }
 
-            void finalReduce( list<BSONObj>& values ){
+            void finalReduce( BSONList& values ){
                 if ( values.size() == 0 )
                     return;
 
@@ -295,7 +324,7 @@ namespace mongo {
                 
                 for ( InMemory::iterator i=old->begin(); i!=old->end(); i++ ){
                     BSONObj key = i->first;
-                    list<BSONObj>& all = i->second;
+                    BSONList& all = i->second;
                     
                     if ( all.size() == 1 ){
                         // this key has low cardinality, so just write to db
@@ -317,11 +346,11 @@ namespace mongo {
                 Client::Context ctx(_state.setup.incLong);
                     
                 for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ){
-                    list<BSONObj>& all = i->second;
+                    BSONList& all = i->second;
                     if ( all.size() < 1 )
                         continue;
                     
-                    for ( list<BSONObj>::iterator j=all.begin(); j!=all.end(); j++ )
+                    for ( BSONList::iterator j=all.begin(); j!=all.end(); j++ )
                         write( *j );
                 }
                 _temp->clear();
@@ -330,7 +359,7 @@ namespace mongo {
             }
             
             void insert( const BSONObj& a ){
-                list<BSONObj>& all = (*_temp)[a];
+                BSONList& all = (*_temp)[a];
                 all.push_back( a );
                 _size += a.objsize() + 16;
             }
@@ -367,7 +396,8 @@ namespace mongo {
         boost::thread_specific_ptr<MRTL> _tlmr;
 
         BSONObj fast_emit( const BSONObj& args ){
-            uassert( 10077 ,  "fast_emit takes 2 args" , args.nFields() == 2 );
+            uassert( 10077 , "fast_emit takes 2 args" , args.nFields() == 2 );
+            uassert( 13069 , "an emit can't be more than 2mb" , args.objsize() < ( 2 * 1024 * 1024 ) );
             _tlmr->insert( args );
             _tlmr->numEmits++;
             return BSONObj();
@@ -459,7 +489,7 @@ namespace mongo {
                     db.ensureIndex( mr.incLong , sortKey );
                     
                     BSONObj prev;
-                    list<BSONObj> all;
+                    BSONList all;
                     
                     assert( userCreateNS( mr.tempLong.c_str() , BSONObj() , errmsg , mr.replicate ) );
 
@@ -572,7 +602,7 @@ namespace mongo {
                 if ( mr.finalizeCode.size() )
                     finalizeFunction = s->createFunction( mr.finalizeCode.c_str() );
 
-                list<BSONObj> values;
+                BSONList values;
 
                 result.append( "result" , mr.finalShort );
 
