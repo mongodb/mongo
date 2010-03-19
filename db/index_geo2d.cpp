@@ -27,8 +27,8 @@
 #include "curop.h"
 #include "matcher.h"
 
-//#define GEODEBUG(x) cout << x << endl;
-#define GEODEBUG(x) 
+#define GEODEBUG(x) cout << x << endl;
+//#define GEODEBUG(x) 
 
 namespace mongo {
 
@@ -282,6 +282,17 @@ namespace mongo {
         long long getHash() const {
             return _hash;
         }
+
+        GeoHash commonPrefix( const GeoHash& other ) const {
+            unsigned i=0;
+            for ( ; i<_bits && i<other._bits; i++ ){
+                if ( getBitX( i ) == other.getBitX( i ) &&
+                     getBitY( i ) == other.getBitY( i ) )
+                    continue;
+                break;
+            }
+            return GeoHash(_hash,i);
+        }
     private:
 
         void _copy( char * dst , const char * src ) const {
@@ -510,6 +521,10 @@ namespace mongo {
         }
         
         Point() : _x(0),_y(0){
+        }
+
+        GeoHash hash( const Geo2dType * g ){
+            return g->_hash( _x , _y );
         }
         
         string toString() const {
@@ -773,6 +788,12 @@ namespace mongo {
                 assert( ! b.inside( 32.9570255 , -96.1082497 ) );
                 assert( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
             }
+
+            {
+                GeoHash a( "11001111" );
+                assert( GeoHash( "11" ) == a.commonPrefix( "11" ) );
+                assert( GeoHash( "11" ) == a.commonPrefix( "11110000" ) );
+            }
             
         }
     } geoUnitTest;
@@ -827,7 +848,7 @@ namespace mongo {
             // distance check
             double d = 0;
             if ( ! checkDistance( GeoHash( node.key.firstElement() ) , d ) ){
-                GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()["_id"]  << "\t" << d );
+                GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << d );
                 return;
             }
             
@@ -1263,6 +1284,7 @@ namespace mongo {
             }
             
             if ( _state == DOING_EXPAND ){
+                GEODEBUG( "circle prefix [" << _prefix << "]" );
                 while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
                 
@@ -1334,7 +1356,11 @@ namespace mongo {
 
             Point center = _want.center();
             _prefix = _g->_hash( center._x , center._y );
+            
+            GEODEBUG( "center : " << center.toString() << "\t" << _prefix );
 
+            _fudge = 0.01;
+            
             ok();
         }
 
@@ -1354,31 +1380,53 @@ namespace mongo {
             }
             
             if ( _state == DOING_EXPAND ){
-                while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
-                while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
-                
-                if ( ! _prefix.constrains() ){
-                    // we've exhausted the btree
-                    _state = DONE;
-                    return;
+                int started = _found;
+                while ( started == _found || _state == DONE ){
+                    GEODEBUG( "box prefix [" << _prefix << "]" );
+                    while ( _min.hasPrefix( _prefix ) && _min.advance( -1 , _found , this ) );
+                    while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
+                    
+                    if ( _state == DONE )
+                        return;
+
+                    if ( ! _prefix.constrains() ){
+                        GEODEBUG( "box exhausted" );
+                        _state = DONE;
+                        return;
+                    }
+                    
+                    Box cur( _g , _prefix );
+                    if ( cur._min._x + _fudge < _want._min._x &&
+                         cur._min._y + _fudge < _want._min._y &&
+                         cur._max._x - _fudge > _want._max._x &&
+                         cur._max._y - _fudge > _want._max._y ){
+                        
+                        _state = DONE;
+                        GeoHash temp = _prefix.commonPrefix( cur._max.hash( _g ) );
+
+                        GEODEBUG( "box done : " << cur.toString() << " prefix:" << _prefix << " common:" << temp );
+                        
+                        if ( temp == _prefix )
+                            return;
+                        _prefix = temp;
+                        GEODEBUG( "\t one more loop" );
+                        continue;
+                    }
+                    else {
+                        _prefix = _prefix.up();
+                    }
                 }
-                
-                Box cur( _g , _prefix );
-                if ( cur._min._x < _want._min._x &&
-                     cur._min._y < _want._min._y &&
-                     cur._max._x > _want._max._x &&
-                     cur._max._y > _want._max._y ){
-                    _state = DONE;
-                }
-                else
-                    _prefix = _prefix.up();
                 return;
             }
 
         }
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
-            return _want.inside( Point( _g , h ) , .01 );
+            bool res = _want.inside( Point( _g , h ) , _fudge );
+            GEODEBUG( "\t want : " << _want.toString() 
+                      << " point: " << Point( _g , h ).toString() 
+                      << " in : " << res );
+            return res;
         }
 
         GeoHash _bl;
@@ -1390,6 +1438,8 @@ namespace mongo {
         GeoHash _prefix;        
         BtreeLocation _min;
         BtreeLocation _max;
+
+        double _fudge;
     };    
 
 
