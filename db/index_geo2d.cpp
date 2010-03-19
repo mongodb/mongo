@@ -27,8 +27,8 @@
 #include "curop.h"
 #include "matcher.h"
 
-#define GEODEBUG(x) cout << x << endl;
-//#define GEODEBUG(x) 
+//#define GEODEBUG(x) cout << x << endl;
+#define GEODEBUG(x) 
 
 namespace mongo {
 
