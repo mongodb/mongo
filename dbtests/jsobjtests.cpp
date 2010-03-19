@@ -1420,49 +1420,6 @@ namespace JsobjTests {
         }
     };
 
-    class AppendBoostAllTest {
-      public:
-        void run(){
-
-
-          BSONObjBuilder b;
-          b.appendAny("i", 1);
-          b.appendAny("d", 1.0);
-          b.appendAny("l", (long long)1);
-          b.appendAny("s", string("hello"));
-          const char* world = "world"; //can't be inline or it is treated as an array
-          b.appendAny("c", any(world));
-          b.appendAny("b", BSON("foo" << "bar"));
-
-          b.appendAny("vi", vector<int>(1,1));
-          b.appendAny("vd", vector<double>(1,1.0));
-          b.appendAny("vl", vector<long long>(1, 1));
-          b.appendAny("vs", vector<string>(1, string("hello")));
-          b.appendAny("vc", vector<const char *>(1, "world"));
-          b.appendAny("vb", vector<BSONObj>(1, BSON("foo" << "bar")));
-
-          BSONObj gen = b.obj();
-
-          BSONObj ref = BSON(
-              "i" << 1
-           << "d" << 1.0
-           << "l" << (long long)1
-           << "s" << string("hello")
-           << "c" << "world"
-           << "b" << BSON("foo" << "bar")
-
-           << "vi" << vector<int>(1,1)
-           << "vd" << vector<double>(1,1.0)
-           << "vl" << vector<long long>(1, 1)
-           << "vs" << vector<string>(1, string("hello"))
-           << "vc" << vector<const char *>(1, "world")
-           << "vb" << vector<BSONObj>(1, BSON("foo" << "bar"))
-          );
-
-          ASSERT_EQUALS(gen, ref);
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1553,7 +1510,6 @@ namespace JsobjTests {
             add< checkForStorageTests >();
             add< InvalidIDFind >();
             add< ElementSetTest >();
-            add< AppendBoostAllTest >();
         }
     } myall;
     
