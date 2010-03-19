@@ -1794,13 +1794,19 @@ namespace mongo {
         if ( cmdLine.oplogSize != 0 )
             sz = (double)cmdLine.oplogSize;
         else {
+			/* not specified. pick a default size */
             sz = 50.0 * 1000 * 1000;
             if ( sizeof(int *) >= 8 ) {
+#if defined(__APPLE__)
+				// typically these are desktops (dev machines), so keep it smallish
+				sz = (256-64) * 1000 * 1000;
+#else
                 sz = 990.0 * 1000 * 1000;
                 boost::intmax_t free = freeSpace(); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
                     sz = fivePct;
+#endif
             }
         }
 

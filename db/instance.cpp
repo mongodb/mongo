@@ -703,7 +703,7 @@ namespace mongo {
             // if we can't, then its probably just another mongod running
             cout << "************** \n" 
                  << "old lock file: " << name << ".  probably means unclean shutdown\n"
-                 << "reccomend removing file and running --repair\n" 
+                 << "recommend removing file and running --repair\n" 
                  << "see: http://dochub.mongodb.org/core/repair for more information\n"
                  << "*************" << endl;
             uassert( 12596 , "old lock file" , 0 );
