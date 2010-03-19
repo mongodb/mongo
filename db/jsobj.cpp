@@ -1633,7 +1633,6 @@ namespace mongo {
 
     void BSONObjBuilder::appendAny(const char* fieldName, const boost::any& val){
         massert(13070, "any can't be empty", !val.empty());
-
         const type_info& type = val.type();
 
 #define CONVERT(T) \
@@ -1658,11 +1657,11 @@ namespace mongo {
         CONVERT(vector<const char *>)
         CONVERT(vector<BSONObj>)
 #undef CONVERT
-
+            ;
         // TODO maybe demangle type.name()
-        massert(13071, string("any is not of a recognized type: ") + type.name() , false);
+        massert(13071, string("any is not of a recognized type: ") + type.name() + " fieldName: " + fieldName , false);
     }
-
+    
     int BSONElementFieldSorter( const void * a , const void * b ){
         const char * x = *((const char**)a);
         const char * y = *((const char**)b);

@@ -657,7 +657,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
         ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
         ("autoresync", "automatically resync if slave data is stale")
-        ("oplogSize", po::value<long>(), "size limit (in MB) for op log")
+        ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
         ("opIdMem", po::value<long>(), "size limit (in bytes) for in memory storage of op ids")
         ;
 
