@@ -129,6 +129,8 @@ namespace mongo {
     
     void DBConfig::unserialize(const BSONObj& from){
         _name = from.getStringField("name");
+        log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
+
         _shardingEnabled = from.getBoolField("partitioned");
         _primary = from.getStringField("primary");
         

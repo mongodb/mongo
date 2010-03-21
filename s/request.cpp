@@ -74,7 +74,7 @@ namespace mongo {
     
     void Request::process( int attempt ){
 
-        log(2) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.data->id) << " attempt: " << attempt << endl;
+        log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.data->id) << " attempt: " << attempt << endl;
 
         int op = _m.data->operation();
         assert( op > dbMsg );

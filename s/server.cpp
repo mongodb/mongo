@@ -47,10 +47,10 @@ namespace mongo {
         assert( 0 );
         return false;
     }
-
+    
     void usage( char * argv[] ){
         out() << argv[0] << " usage:\n\n";
-        out() << " -v+  verbose\n";
+        out() << " -v+  verbose 1: general 2: more 3: per request 4: more\n";
         out() << " --port <portno>\n";
         out() << " --configdb <configdbname>,[<configdbname>,<configdbname>]\n";
         out() << endl;

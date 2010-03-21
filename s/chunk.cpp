@@ -234,6 +234,8 @@ namespace mongo {
         
         if ( _dataWritten < MaxChunkSize / 5 )
             return false;
+        
+        log(1) << "\t want to split chunk : " << this << endl;
 
         _dataWritten = 0;
         
