@@ -136,15 +136,24 @@ ShardingTest = function( testName , numServers , verboseLevel , numMongos , othe
     if ( ! otherParams )
         otherParams = {}
     this._connections = [];
+    
+    if ( otherParams.sync && numServers < 3 )
+        throw "if you want sync, you need at least 3 servers";
 
     for ( var i=0; i<numServers; i++){
         var conn = startMongodTest( 30000 + i , testName + i );
         this._connections.push( conn );
     }
 
-    this._configDB = "localhost:30000";
-    this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
-    
+    if ( otherParams.sync ){
+        this._configDB = "localhost:30000,localhost:30001,localhost:30002";
+        this._configConnection = new Mongo( this._configDB );
+        this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );        
+    }
+    else {
+        this._configDB = "localhost:30000";
+        this._connections[0].getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || 50 } );
+    }
 
     this._mongos = [];
     var startMongosPort = 31000;
@@ -193,6 +202,14 @@ ShardingTest.prototype.getOther = function( one ){
     if ( this._connections[0] == one )
         return this._connections[1];
     return this._connections[0];
+}
+
+ShardingTest.prototype.getFirstOther = function( one ){
+    for ( var i=0; i<this._connections.length; i++ ){
+        if ( this._connections[i] != one )
+        return this._connections[i];
+    }
+    throw "impossible";
 }
 
 ShardingTest.prototype.stop = function(){

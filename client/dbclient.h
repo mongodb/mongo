@@ -824,7 +824,6 @@ namespace mongo {
             return serverAddress;
         }
 
-    protected:
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );

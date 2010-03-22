@@ -68,9 +68,7 @@ namespace mongo {
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );
         
-        virtual string getServerAddress() const {
-            return _toString();
-        }
+        virtual string getServerAddress() const { return _address; }
 
         virtual bool isFailed() const { 
             return false; 
@@ -78,6 +76,8 @@ namespace mongo {
 
     private:
         
+        SyncClusterConnection( SyncClusterConnection& prev );
+
         string _toString() const;
         
         bool _commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
@@ -90,8 +90,9 @@ namespace mongo {
         void _checkLast();
         
         void _connect( string host );
+
+        string _address;
         vector<DBClientConnection*> _conns;
-        
         map<string,int> _lockTypes;
     };
     
