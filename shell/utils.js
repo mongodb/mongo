@@ -132,15 +132,16 @@ assert.gt = function( a , b , msg ){
     doassert( a + " is not greater than " + b + " : " + msg );
 }
 
-assert.close = function( a , b , msg ){
-    if (a === 0 && b === 0) {
+assert.close = function( a , b , msg , places ){
+    if (places === undefined) {
+        places = 4;
+    }
+    if (Math.round((a - b) * Math.pow(10, places)) === 0) {
         return;
     }
-    var diff = Math.abs( (a-b)/((a+b)/2) );
-    if ( diff < .001 )
-        return;
-    doassert( a + " is not close to " + b + " diff: " + diff + " : " + msg );
-}
+    doassert( a + " is not equal to " + b + " within " + places +
+              " places, diff: " + (a-b) + " : " + msg );
+};
 
 Object.extend = function( dst , src , deep ){
     for ( var k in src ){
