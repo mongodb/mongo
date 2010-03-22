@@ -133,6 +133,9 @@ assert.gt = function( a , b , msg ){
 }
 
 assert.close = function( a , b , msg ){
+    if (a === 0 && b === 0) {
+        return;
+    }
     var diff = Math.abs( (a-b)/((a+b)/2) );
     if ( diff < .001 )
         return;
