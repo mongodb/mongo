@@ -844,49 +844,62 @@ namespace mongo {
         return e;
     }
 
-    /* jul09 : 'deep' and this function will be going away in the future - kept only for backward compatibility of datafiles for now. */
-    void trueDat( bool *deep ) {
-        if( deep )
-            *deep = true;
-    }
+    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret ) const {
+        BSONObjIterator i(*this);
+        while ( i.more() ){
+            BSONElement e = i.next();
+            FieldCompareResult cmp = compareDottedFieldNames( name , e.fieldName() );
+            switch ( cmp ){
 
-    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret, bool *deep ) const {
-        BSONElement e = getField( name );
-        if ( e.eoo() ) {
-            const char *p = strchr(name, '.');
-            if ( p ) {
-                string left(name, p-name);
-                BSONElement e = getField( left );
-                if ( e.type() == Array ) {
-                    trueDat( deep );
-                    BSONObjIterator i( e.embeddedObject() );
-                    while( i.moreWithEOO() ) {
-                        BSONElement f = i.next();
-                        if ( f.eoo() )
-                            break;
+            case LEFT_BEFORE: 
+            case RIGHT_BEFORE:
+                break;
+
+            case RIGHT_SUBFIELD: 
+                assert(0); 
+                break;
+
+            case LEFT_SUBFIELD: {
+                const char * next = name + strlen( e.fieldName() ) + 1;
+                bool allDigits = false;
+                if ( isdigit( *next ) ){
+                    const char * temp = next + 1;
+                    while ( isdigit( *temp ) )
+                        temp++;
+                    allDigits = *temp == '.';
+                }
+
+                if ( e.type() == Object || allDigits ){
+                    e.embeddedObject().getFieldsDotted( next , ret );
+                }
+                else if ( e.type() == Array ){
+                    BSONObjIterator j( e.embeddedObject() );
+                    while ( j.more() ){
+                        BSONElement f = j.next();
                         if ( f.type() == Object )
-                            f.embeddedObject().getFieldsDotted(p+1, ret);
+                            f.embeddedObject().getFieldsDotted( next , ret );
                     }
-                } else if ( e.type() == Object ) {
-                    e.embeddedObject().getFieldsDotted(p+1, ret);
                 }
+                else {
+                    // intentially left blank, this means no match
+                }
+                return;
             }
-        } else {
-            if ( e.type() == Array ) {
-                trueDat( deep );
-                BSONObjIterator i( e.embeddedObject() );
-                while( i.moreWithEOO() ) {
-                    BSONElement f = i.next();
-                    if ( f.eoo() )
-                        break;
-                    ret.insert( f );
+
+            case SAME: {
+                if ( e.type() == Array ){
+                    BSONObjIterator j( e.embeddedObject() );
+                    while ( j.more() )
+                        ret.insert( j.next() );
                 }
-            } else {
-                ret.insert( e );
+                else {
+                    ret.insert( e );
+                }
+                return;
+            }
+
             }
         }
-        if ( ret.empty() && deep )
-            *deep = false;
     }
 
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {

@@ -780,7 +780,7 @@ namespace mongo {
         BSONElement getFieldDotted(const char *name) const;
         /** Like getFieldDotted(), but expands multikey arrays and returns all matching objects
          */
-        void getFieldsDotted(const char *name, BSONElementSet &ret, bool *deep = 0) const;
+        void getFieldsDotted(const char *name, BSONElementSet &ret ) const;
         /** Like getFieldDotted(), but returns first array encountered while traversing the
             dotted fields of name.  The name variable is updated to represent field
             names with respect to the returned element. */
