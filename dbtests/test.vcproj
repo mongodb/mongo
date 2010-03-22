@@ -1330,6 +1330,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\cmdline.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\db\cmdline.h"
 				>
 			</File>

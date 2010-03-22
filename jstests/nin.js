@@ -44,7 +44,7 @@ doTest = function( n ) {
     checkEqual( n + " C" , "a.b" , 5 );
 
     assert.eq( 7, t.find( { 'a.b': { $nin: [ 10 ] } } ).count() , n + " L" );
-    assert.eq( 8, t.find( { 'a.b': { $nin: [ [ 10, 11 ] ] } } ).count() , n + " M" );
+    assert.eq( 7, t.find( { 'a.b': { $nin: [ [ 10, 11 ] ] } } ).count() , n + " M" );
     assert.eq( 7, t.find( { a: { $nin: [ 11 ] } } ).count() , n + " N" );
 
     t.save( { a: { b: [ 20, 30 ] } } );

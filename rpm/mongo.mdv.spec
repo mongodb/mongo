@@ -1,5 +1,5 @@
 %define name    mongodb
-%define version 1.2.4
+%define version 1.3.4
 %define release %mkrel 1
 
 Name:    %{name}
@@ -103,6 +103,7 @@ fi
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
+%{_bindir}/mongostat
 
 %{_mandir}/man1/mongo.1*
 %{_mandir}/man1/mongod.1*
@@ -111,6 +112,7 @@ fi
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
 %{_mandir}/man1/mongosniff.1*
+%{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
 
 %files server
