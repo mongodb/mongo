@@ -12,7 +12,6 @@ auth = function( n ) {
     return n.getDB( baseName ).auth( "test", "test" );
 }
 
-// What if preexisting data on master and already set up db on slave for login?
 doTest = function( signal ) {
 
     rt = new ReplTest( baseName );
