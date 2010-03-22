@@ -844,13 +844,7 @@ namespace mongo {
         return e;
     }
 
-    /* jul09 : 'deep' and this function will be going away in the future - kept only for backward compatibility of datafiles for now. */
-    void trueDat( bool *deep ) {
-        if( deep )
-            *deep = true;
-    }
-
-    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret, bool *deep ) const {
+    void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret ) const {
         BSONElement e = getField( name );
         if ( e.eoo() ) {
             const char *p = strchr(name, '.');
@@ -858,7 +852,6 @@ namespace mongo {
                 string left(name, p-name);
                 BSONElement e = getField( left );
                 if ( e.type() == Array ) {
-                    trueDat( deep );
                     BSONObjIterator i( e.embeddedObject() );
                     while( i.moreWithEOO() ) {
                         BSONElement f = i.next();
@@ -873,7 +866,6 @@ namespace mongo {
             }
         } else {
             if ( e.type() == Array ) {
-                trueDat( deep );
                 BSONObjIterator i( e.embeddedObject() );
                 while( i.moreWithEOO() ) {
                     BSONElement f = i.next();
@@ -885,8 +877,6 @@ namespace mongo {
                 ret.insert( e );
             }
         }
-        if ( ret.empty() && deep )
-            *deep = false;
     }
 
     BSONElement BSONObj::getFieldDottedOrArray(const char *&name) const {
