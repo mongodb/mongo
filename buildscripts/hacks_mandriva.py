@@ -1,6 +1,9 @@
 
 import os
+import glob
 
 def insert( env , options ):
-    if os.path.exists( "/usr/include/js-1.70/" ):
-        env.Append( CPPPATH=[ "/usr/include/js-1.70/" ] )
+    jslibPaths = glob.glob('/usr/include/js-*/')
+    if len(jslibPaths) >= 1:
+        jslibPath = jslibPaths.pop()
+        env.Append( CPPPATH=[ jslibPath ] )
