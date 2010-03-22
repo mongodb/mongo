@@ -593,7 +593,7 @@ ReplTest.prototype.getPath = function( master ){
 }
 
 
-ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
+ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norepl ){
 
     if ( ! extra )
         extra = {};
@@ -613,13 +613,15 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
     a.push( this.getPath( master ) );
     
 
-    if ( master ){
-        a.push( "--master" );
-    }
-    else {
-        a.push( "--slave" );
-        a.push( "--source" );
-        a.push( "127.0.0.1:" + this.ports[0] );
+    if ( !norepl ) {
+        if ( master ){
+            a.push( "--master" );
+        }
+        else {
+            a.push( "--slave" );
+            a.push( "--source" );
+            a.push( "127.0.0.1:" + this.ports[0] );
+        }
     }
     
     for ( var k in extra ){
@@ -632,10 +634,10 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst ){
     return a;
 }
 
-ReplTest.prototype.start = function( master , options , restart ){
+ReplTest.prototype.start = function( master , options , restart, norepl ){
     var lockFile = this.getPath( master ) + "/mongod.lock";
     removeFile( lockFile );
-    var o = this.getOptions( master , options , restart );
+    var o = this.getOptions( master , options , restart, norepl );
     if ( restart )
         return startMongoProgram.apply( null , o );
     else

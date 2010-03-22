@@ -1188,12 +1188,11 @@ namespace mongo {
             string toNs = string( realDbName ) + "." + to;
             NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
             massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
-            long long excessSize = nsd->datasize - size * 2;
+            long long excessSize = nsd->datasize - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
             DiskLoc extent = nsd->firstExtent;
-            for( ; excessSize > 0 && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
+            for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
                 excessSize -= extent.ext()->length;
-                if ( excessSize > 0 )
-                    log( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
+                log( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
                 log( 6 ) << "excessSize: " << excessSize << endl;
             }
             DiskLoc startLoc = extent.ext()->firstRecord;
