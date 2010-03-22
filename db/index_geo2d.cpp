@@ -828,9 +828,10 @@ namespace mongo {
     class GeoAccumulator {
     public:
         GeoAccumulator( const Geo2dType * g , const BSONObj& filter )
-            : _g(g) , _lookedAt(0) , _objectsLoaded(0) {
-            if ( ! filter.isEmpty() )
+            : _g(g) , _lookedAt(0) , _objectsLoaded(0) , _found(0) {
+            if ( ! filter.isEmpty() ){
                 _matcher.reset( new CoveredIndexMatcher( filter , g->keyPattern() ) );
+            }
         }
 
         virtual ~GeoAccumulator(){
@@ -869,10 +870,15 @@ namespace mongo {
                 _objectsLoaded++;
 
             addSpecific( node , d );
+            _found++;
         }
 
         virtual void addSpecific( const KeyNode& node , double d ) = 0;
         virtual bool checkDistance( const GeoHash& node , double& d ) = 0;
+
+        long long found() const {
+            return _found;
+        }
         
         const Geo2dType * _g;
         set<DiskLoc> _seen;
@@ -880,6 +886,7 @@ namespace mongo {
 
         long long _lookedAt;
         long long _objectsLoaded;
+        long long _found;
     };
     
     class GeoHopper : public GeoAccumulator {
@@ -1025,7 +1032,7 @@ namespace mongo {
                 if ( ! BtreeLocation::initial( id , _spec , min , max , _n , _found , hopper ) )
                     return;
                 
-                while ( _found < _numWanted ){
+                while ( _hopper->found() < _numWanted ){
                     GEODEBUG( _prefix << "\t" << _found << "\t DESC" );
                     while ( min.hasPrefix( _prefix ) && min.advance( -1 , _found , hopper ) )
                         _nscanned++;
