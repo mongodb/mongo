@@ -96,7 +96,7 @@ namespace mongo {
              * if you are doing this after allowing a write there could be a race condition
              * if someone closes that db.  this checks that the DB is still valid
              */
-            Context( string ns , Database * db );
+            Context( string ns , Database * db, bool doauth=true );
             
             ~Context();
             

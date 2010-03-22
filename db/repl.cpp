@@ -1539,14 +1539,14 @@ namespace mongo {
         Record *r;
         if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx("local.");
+                Client::Context ctx("local.", dbpath, 0, false);
                 localOplogDB = ctx.db();
                 localOplogMainDetails = nsdetails(logNS);
             }
-            Client::Context ctx( "" , localOplogDB );
+            Client::Context ctx( "" , localOplogDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         } else {
-            Client::Context ctx( logNS );
+            Client::Context ctx( logNS, dbpath, 0, false );
             assert( nsdetails( logNS ) );
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
@@ -1718,6 +1718,10 @@ namespace mongo {
         sleepsecs(4);
         Client::initThread("replmaster");
         while( 1 ) {
+            {
+                dblock lk;
+                cc().getAuthenticationInfo()->authorize("admin");   
+            }
             sleepsecs(10);
             /* write a keep-alive like entry to the log.  this will make things like 
                printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date
@@ -1835,6 +1839,7 @@ namespace mongo {
 
         {
             dblock lk;
+            cc().getAuthenticationInfo()->authorize("admin");
             pairSync->init();
         }
 

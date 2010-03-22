@@ -93,14 +93,15 @@ namespace mongo {
     BSONObj CurOp::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
     
-    Client::Context::Context( string ns , Database * db )
+    Client::Context::Context( string ns , Database * db, bool doauth )
         : _client( currentClient.get() ) , _oldContext( _client->_context ) , 
           _path( dbpath ) , _lock(0) , _justCreated(false) {
         assert( db && db->isOk() );
         _ns = ns;
         _db = db;
         _client->_context = this;
-        _auth();
+        if ( doauth )
+            _auth();
     }
 
     void Client::Context::_finishInit( bool doauth ){
