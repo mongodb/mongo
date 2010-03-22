@@ -245,7 +245,7 @@ namespace mongo {
             problem() << "SocketException in connThread, closing client connection" << endl;
             dbMsgPort.shutdown();
         }
-        catch ( const ClockSkewException &e ) {
+        catch ( const ClockSkewException & ) {
             exitCleanly( EXIT_CLOCK_SKEW );
         }        
         catch ( std::exception &e ) {
@@ -440,7 +440,7 @@ namespace mongo {
 
                 Date_t start = jsTime();
                 MemoryMappedFile::flushAll( true );
-                time_flushing = jsTime() - start;
+                time_flushing = (int) (jsTime() - start);
 
                 globalFlushCounters.flushed(time_flushing);
 
