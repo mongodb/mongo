@@ -381,12 +381,12 @@ namespace mongo {
         for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ){
             string host = *i;
             bool ok = false;
-            for ( int x=0; x<10; x++ ){
+            for ( int x=10; x>0; x-- ){
                 if ( ! hostbyname( host.c_str() ).empty() ){
                     ok = true;
                     break;
                 }
-                log() << "can't resolve DNS for [" << host << "]  sleeping and trying " << (10-x) << " more times" << endl;
+                log() << "can't resolve DNS for [" << host << "]  sleeping and trying " << x << " more times" << endl;
                 sleepsecs( 10 );
             }
             if ( ! ok )

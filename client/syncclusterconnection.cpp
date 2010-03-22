@@ -197,7 +197,7 @@ namespace mongo {
 
     void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
 
-    string SyncClusterConnection::toString(){ 
+    string SyncClusterConnection::_toString() const { 
         stringstream ss;
         ss << "SyncClusterConnection [";
         for ( size_t i=0; i<_conns.size(); i++ ){
@@ -207,6 +207,19 @@ namespace mongo {
         }
         ss << "]";
         return ss.str();
+    }
+
+    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk ){
+        assert(0);
+        return false;
+    }
+    
+    void SyncClusterConnection::say( Message &toSend ){
+        assert(0);
+    }
+    
+    void SyncClusterConnection::sayPiggyBack( Message &toSend ){
+        assert(0);
     }
 
 
