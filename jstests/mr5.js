@@ -26,12 +26,31 @@ r = function( k , v ){
 }
 
 res = t.mapReduce( m , r , { scope : { xx : 1 } } );
-res.find().forEach( printjson )
+//res.find().forEach( printjson )
 
 z = res.convertToSingleObject()
-assert.eq( 2 , Object.keySet( z ).length , "A" )
-assert.eq( [ 9 , 11 , 30 ] , z["1"].stats , "B" )
-assert.eq( [ 9 , 41 , 41 ] , z["2"].stats , "B" )
+assert.eq( 2 , Object.keySet( z ).length , "A1" )
+assert.eq( [ 9 , 11 , 30 ] , z["1"].stats , "A2" )
+assert.eq( [ 9 , 41 , 41 ] , z["2"].stats , "A3" )
+
+
+res.drop()
+
+m = function(){
+    var x = "partner";
+    var y = "visits";
+    emit( this[x] , { stats : [ this[y] ] } )
+}
+
+
+
+res = t.mapReduce( m , r , { scope : { xx : 1 } } );
+//res.find().forEach( printjson )
+
+z = res.convertToSingleObject()
+assert.eq( 2 , Object.keySet( z ).length , "B1" )
+assert.eq( [ 9 , 11 , 30 ] , z["1"].stats , "B2" )
+assert.eq( [ 9 , 41 , 41 ] , z["2"].stats , "B3" )
 
 
 res.drop()
