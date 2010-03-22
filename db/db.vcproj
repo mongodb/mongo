@@ -1322,6 +1322,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\cmdline.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\cmdline.h"
 				>
 			</File>

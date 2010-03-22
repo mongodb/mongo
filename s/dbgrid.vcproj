@@ -433,6 +433,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\db\cmdline.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\commands.cpp"
 					>
 				</File>
@@ -510,6 +514,10 @@
 				</File>
 				<File
 					RelativePath="..\util\sock.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\client\syncclusterconnection.cpp"
 					>
 				</File>
 				<File
