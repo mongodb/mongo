@@ -21,6 +21,7 @@
 #include "stdafx.h"
 #include "connpool.h"
 #include "../db/commands.h"
+#include "syncclusterconnection.h"
 
 namespace mongo {
 
@@ -33,11 +34,13 @@ namespace mongo {
         if ( p == 0 )
             p = new PoolForHost();
         if ( p->pool.empty() ) {
-            string errmsg;
+            int numCommas = DBClientBase::countCommas( host );
             DBClientBase *c;
-            if( host.find(',') == string::npos ) {
+            
+            if( numCommas == 0 ) {
                 DBClientConnection *cc = new DBClientConnection(true);
                 log(2) << "creating new connection for pool to:" << host << endl;
+                string errmsg;
                 if ( !cc->connect(host.c_str(), errmsg) ) {
                     delete cc;
                     uassert( 11002 ,  (string)"dbconnectionpool: connect failed " + host , false);
@@ -46,7 +49,7 @@ namespace mongo {
                 c = cc;
                 onCreate( c );
             }
-            else { 
+            else if ( numCommas == 1 ) { 
                 DBClientPaired *p = new DBClientPaired();
                 if( !p->connect(host) ) { 
                     delete p;
@@ -54,6 +57,12 @@ namespace mongo {
                     return 0;
                 }
                 c = p;
+            }
+            else if ( numCommas == 2 ) {
+                c = new SyncClusterConnection( host );
+            }
+            else {
+                uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
             }
             return c;
         }
@@ -104,6 +113,15 @@ namespace mongo {
             (*i)->onHandedOut( conn );
         }
     }
+
+    ScopedDbConnection::~ScopedDbConnection() {
+        if ( _conn && ! _conn->isFailed() ) {
+            /* see done() comments above for why we log this line */
+            log() << "~ScopedDBConnection: _conn != null" << endl;
+            kill();
+        }
+    }
+
 
     class PoolFlushCmd : public Command {
     public:

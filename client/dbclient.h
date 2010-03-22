@@ -723,6 +723,13 @@ namespace mongo {
         
         virtual bool isFailed() const = 0;
 
+        static int countCommas( const string& s ){
+            int n = 0;
+            for ( unsigned i=0; i<s.size(); i++ )
+                if ( s[i] == ',' )
+                    n++;
+            return n;
+        }
     };
     
     class DBClientPaired;
@@ -817,7 +824,6 @@ namespace mongo {
             return serverAddress;
         }
 
-    protected:
         virtual bool call( Message &toSend, Message &response, bool assertOk = true );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );

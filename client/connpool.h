@@ -122,14 +122,9 @@ namespace mongo {
                 pool.release(host, _conn);
             _conn = 0;
         }
+        
+        ~ScopedDbConnection();
 
-        ~ScopedDbConnection() {
-            if ( _conn && ! _conn->isFailed() ) {
-                /* see done() comments above for why we log this line */
-                log() << "~ScopedDBConnection: _conn != null" << endl;
-                kill();
-            }
-        }
     };
 
 } // namespace mongo

@@ -35,6 +35,7 @@ namespace mongo {
             stringstream s;
             s << "StaleConfigException ns: " << ns << " " << msg;
             _msg = s.str();
+            log(1) << _msg << endl;
         }
 
         virtual ~StaleConfigException() throw(){}

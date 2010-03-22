@@ -18,12 +18,14 @@
 
 #include "stdafx.h"
 #include "syncclusterconnection.h"
+#include "../db/dbmessage.h"
 
 // error codes 8000-8009
 
 namespace mongo {
     
     SyncClusterConnection::SyncClusterConnection( string commaSeperated ){
+        _address = commaSeperated;
         string::size_type idx;
         while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ){
             string h = commaSeperated.substr( 0 , idx );
@@ -35,10 +37,15 @@ namespace mongo {
     }
 
     SyncClusterConnection::SyncClusterConnection( string a , string b , string c ){
+        _address = a + "," + b + "," + c;
         // connect to all even if not working
         _connect( a );
         _connect( b );
         _connect( c );
+    }
+
+    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev ){
+        assert(0);
     }
 
     SyncClusterConnection::~SyncClusterConnection(){
@@ -111,7 +118,7 @@ namespace mongo {
     }
 
     void SyncClusterConnection::_connect( string host ){
-        log() << "SyncClusterConnection connecting to: " << host << endl;
+        log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
         string errmsg;
         if ( ! c->connect( host , errmsg ) )
@@ -138,7 +145,7 @@ namespace mongo {
                 lockType = i->second;
             }
             
-            uassert( 13054 , "write $cmd not supported in SyncClusterConnection" , lockType <= 0 );
+            uassert( 13054 , (string)"write $cmd not supported in SyncClusterConnection: " + cmdName , lockType <= 0 );
         }
 
         return _queryOnActive( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
@@ -193,20 +200,55 @@ namespace mongo {
         uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0); 
     }
 
-    void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ){ assert(0); }
+    void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ){ 
+        assert(0); 
+    }
 
-    void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ assert(0); }
+    void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ 
+        string errmsg;
+        if ( ! prepare( errmsg ) )
+            throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
 
-    string SyncClusterConnection::toString(){ 
-        stringstream ss;
-        ss << "SyncClusterConnection [";
         for ( size_t i=0; i<_conns.size(); i++ ){
-            if ( i > 0 )
-                ss << ",";
-            ss << _conns[i]->toString();
+            _conns[i]->update( ns , query , obj , upsert , multi );
         }
-        ss << "]";
+        
+        _checkLast();
+    }
+
+    string SyncClusterConnection::_toString() const { 
+        stringstream ss;
+        ss << "SyncClusterConnection [" << _address << "]";
         return ss.str();
+    }
+
+    bool SyncClusterConnection::call( Message &toSend, Message &response, bool assertOk ){
+        uassert( 8006 , "SyncClusterConnection::call can only be used directly for dbQuery" , 
+                 toSend.operation() == dbQuery );
+        
+        DbMessage d( toSend );
+        uassert( 8007 , "SyncClusterConnection::call can't handle $cmd" , strstr( d.getns(), "$cmd" ) == 0 );
+
+        for ( size_t i=0; i<_conns.size(); i++ ){
+            try {
+                bool ok = _conns[i]->call( toSend , response , assertOk );
+                if ( ok )
+                    return ok;
+                log() << "call failed to: " << _conns[i]->toString() << " no data" << endl;
+            }
+            catch ( ... ){
+                log() << "call failed to: " << _conns[i]->toString() << " exception" << endl;
+            }
+        }
+        throw UserException( 8008 , "all servers down!" );
+    }
+    
+    void SyncClusterConnection::say( Message &toSend ){
+        assert(0);
+    }
+    
+    void SyncClusterConnection::sayPiggyBack( Message &toSend ){
+        assert(0);
     }
 
 

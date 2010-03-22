@@ -41,14 +41,12 @@ namespace mongo {
     void Strategy::doQuery( Request& r , string server ){
         try{
             ScopedDbConnection dbcon( server );
-            DBClientBase &_c = dbcon.conn();
+            DBClientBase &c = dbcon.conn();
             
-            checkShardVersion( _c , r.getns() );
+            checkShardVersion( c , r.getns() );
             
-            // TODO: This will not work with Paired connections.  Fix. 
-            DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
             Message response;
-            bool ok = c.port().call( r.m(), response);
+            bool ok = c.call( r.m(), response);
 
             {
                 QueryResult *qr = (QueryResult *) response.data;

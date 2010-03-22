@@ -437,9 +437,10 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; } 
+        virtual LockType locktype(){ return NONE; } 
         CmdGetOpTime() : Command("getoptime") { }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            writelock l( "" );
             result.appendDate("optime", OpTime::now().asDate());
             return true;
         }

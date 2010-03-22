@@ -168,9 +168,13 @@ namespace mongo {
         ~Message() {
             reset();
         }
-
+        
         SockAddr from;
         MsgData *data;
+
+        int operation() const {
+            return data->operation();
+        }
 
         Message& operator=(Message& r) {
             assert( data == 0 );

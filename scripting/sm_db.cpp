@@ -144,11 +144,13 @@ namespace mongo {
         string host = "127.0.0.1";
         if ( argc > 0 )
             host = c.toString( argv[0] );
+        
+        int numCommas = DBClientBase::countCommas( host );
 
         shared_ptr< DBClientWithCommands > conn;
         
         string errmsg;
-        if ( host.find( "," ) == string::npos ){
+        if ( numCommas == 0 ){
             DBClientConnection * c = new DBClientConnection( true );
             conn.reset( c );
             if ( ! c->connect( host , errmsg ) ){
@@ -157,29 +159,20 @@ namespace mongo {
             }
             ScriptEngine::runConnectCallback( *c );
         }
-        else { // paired
-            int numCommas = 0;
-            for ( uint i=0; i<host.size(); i++ )
-                if ( host[i] == ',' )
-                    numCommas++;
-            
-            assert( numCommas > 0 );
-
-            if ( numCommas == 1 ){
-                DBClientPaired * c = new DBClientPaired();
-                conn.reset( c );
-                if ( ! c->connect( host ) ){
-                    JS_ReportError( cx , "couldn't connect to pair" );
+        else if ( numCommas == 1 ){ // paired
+            DBClientPaired * c = new DBClientPaired();
+            conn.reset( c );
+            if ( ! c->connect( host ) ){
+                JS_ReportError( cx , "couldn't connect to pair" );
                     return JS_FALSE;
-                }
             }
-            else if ( numCommas == 2 ){
-                conn.reset( new SyncClusterConnection( host ) );
-            }
-            else {
-                JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
-                return JS_FALSE;
-            }
+        }
+        else if ( numCommas == 2 ){
+            conn.reset( new SyncClusterConnection( host ) );
+        }
+        else {
+            JS_ReportError( cx , "1 (paired) or 2(quorum) commas are allowed" );
+            return JS_FALSE;
         }
         
         
@@ -233,6 +226,7 @@ namespace mongo {
 
             auto_ptr<DBClientCursor> cursor = conn->query( ns , q , nToReturn , nToSkip , f.nFields() ? &f : 0  , slaveOk ? QueryOption_SlaveOk : 0 , batchSize );
             if ( ! cursor.get() ){
+                log() << "query failed : " << ns << " " << q << " to: " << conn->toString() << endl;
                 JS_ReportError( cx , "error doing query: failed" );
                 return JS_FALSE;
             }
