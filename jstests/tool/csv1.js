@@ -4,7 +4,7 @@ t = new ToolTest( "csv1" )
 
 c = t.startDB( "foo" );
 
-base = { a : 1 , b : "foo,bar" , c: 5, 'd d': 6 };
+base = { a : 1 , b : "foo,bar\"baz,qux" , c: 5, 'd d': 6 };
 
 assert.eq( 0 , c.count() , "setup1" );
 c.insert( base );
