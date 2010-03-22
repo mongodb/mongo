@@ -46,10 +46,10 @@ namespace {
     }
 }
 
-namespace mongo {
-    
-    //#define DEBUGMATCHER(x) cout << x << endl;
+//#define DEBUGMATCHER(x) cout << x << endl;
 #define DEBUGMATCHER(x)
+
+namespace mongo {
     
     class Where {
     public:
@@ -554,7 +554,7 @@ namespace mongo {
             }
             
             return 1;
-        }
+        } // end opALL
         
         if ( compareOp == BSONObj::NE )
             return matchesNe( fieldName, toMatch, obj, em , details );
@@ -672,7 +672,7 @@ namespace mongo {
 
             }
             
-            if ( compareOp == BSONObj::Equality && e.woCompare( toMatch ) == 0 ){
+            if ( compareOp == BSONObj::Equality && e.woCompare( toMatch , false ) == 0 ){
                 // match an entire array to itself
                 return 1;
             }
