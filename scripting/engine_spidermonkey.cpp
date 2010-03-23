@@ -32,6 +32,11 @@
     return JS_FALSE; \
   }
 
+#define CHECKNEWOBJECT(xx,ctx,w)                                   \
+    if ( ! xx ){                                                   \
+        massert(13072,(string)"JS_NewObject failed: " + w ,xx);    \
+    }
+
 namespace mongo {
 
     string trim( string s ){
@@ -459,12 +464,12 @@ namespace mongo {
             static string ref = "$ref";
             if ( ref == obj->firstElement().fieldName() ){
                 JSObject * o = JS_NewObject( _context , &dbref_class , NULL, NULL);
-                assert( o );
+                CHECKNEWOBJECT(o,_context,"toJSObject1");
                 assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
                 return o;
             }
             JSObject * o = JS_NewObject( _context , readOnly ? &bson_ro_class : &bson_class , NULL, NULL);
-            assert( o );
+            CHECKNEWOBJECT(o,_context,"toJSObject2");
             assert( JS_SetPrivate( _context , o , (void*)(new BSONHolder( obj->getOwned() ) ) ) );
             return o;
         }
@@ -518,6 +523,7 @@ namespace mongo {
             case jstOID:{
                 OID oid = e.__oid();
                 JSObject * o = JS_NewObject( _context , &object_id_class , 0 , 0 );
+                CHECKNEWOBJECT(o,_context,"jstOID");
                 setProperty( o , "str" , toval( oid.str().c_str() ) );
                 return OBJECT_TO_JSVAL( o );
             }
@@ -566,6 +572,7 @@ namespace mongo {
 
             case Timestamp: {
                 JSObject * o = JS_NewObject( _context , &timestamp_class , 0 , 0 );
+                CHECKNEWOBJECT(o,_context,"Timestamp1");
                 setProperty( o , "t" , toval( (double)(e.timestampTime()) ) );
                 setProperty( o , "i" , toval( (double)(e.timestampInc()) ) );
                 return OBJECT_TO_JSVAL( o );
@@ -573,6 +580,7 @@ namespace mongo {
             case NumberLong: {
                 boost::uint64_t val = (boost::uint64_t)e.numberLong();
                 JSObject * o = JS_NewObject( _context , &numberlong_class , 0 , 0 );
+                CHECKNEWOBJECT(o,_context,"NumberLong1");
                 setProperty( o , "floatApprox" , toval( (double)(boost::int64_t)( val ) ) );                    
                 if ( (boost::int64_t)val != (boost::int64_t)(double)(boost::int64_t)( val ) ) {
                     // using 2 doubles here instead of a single double because certain double
@@ -584,9 +592,11 @@ namespace mongo {
             }
             case DBRef: {
                 JSObject * o = JS_NewObject( _context , &dbpointer_class , 0 , 0 );
+                CHECKNEWOBJECT(o,_context,"DBRef1");
                 setProperty( o , "ns" , toval( e.dbrefNS() ) );
 
                 JSObject * oid = JS_NewObject( _context , &object_id_class , 0 , 0 );
+                CHECKNEWOBJECT(oid,_context,"DBRef2");
                 setProperty( oid , "str" , toval( e.dbrefOID().str().c_str() ) );
 
                 setProperty( o , "id" , OBJECT_TO_JSVAL( oid ) );
@@ -594,6 +604,7 @@ namespace mongo {
             }
             case BinData:{
                 JSObject * o = JS_NewObject( _context , &bindata_class , 0 , 0 );
+                CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
                 int len;
                 const char * data = e.binData( len );
                 assert( JS_SetPrivate( _context , o , new BinDataHolder( data ) ) );

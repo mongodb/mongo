@@ -231,6 +231,7 @@ namespace mongo {
                 return JS_FALSE;
             }
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
+            CHECKNEWOBJECT( mycursor, cx, "internal_cursor_class" );
             assert( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
@@ -408,6 +409,7 @@ namespace mongo {
          assert( c.hasProperty( db , "_name" ) );
          
          JSObject * coll = JS_NewObject( cx , &db_collection_class , 0 , 0 );
+         CHECKNEWOBJECT( coll, cx, "doCreateCollection" );
          c.setProperty( coll , "_mongo" , c.getProperty( db , "_mongo" ) );
          c.setProperty( coll , "_db" , OBJECT_TO_JSVAL( db ) );
          c.setProperty( coll , "_shortName" , c.toval( shortName.c_str() ) );
@@ -495,7 +497,7 @@ namespace mongo {
         
         if ( ! JS_InstanceOf( cx , obj , &object_id_class , 0 ) ){
             obj = JS_NewObject( cx , &object_id_class , 0 , 0 );
-            assert( obj );
+            CHECKNEWOBJECT( obj, cx, "object_id_constructor" );
             *rval = OBJECT_TO_JSVAL( obj );
         }
         
@@ -562,7 +564,7 @@ namespace mongo {
 
         if ( argc == 2 ){
             JSObject * o = JS_NewObject( cx , NULL , NULL, NULL );
-            assert( o );
+            CHECKNEWOBJECT( o, cx, "dbref_constructor" );
             assert( JS_SetProperty( cx, o , "$ref" , &argv[ 0 ] ) );
             assert( JS_SetProperty( cx, o , "$id" , &argv[ 1 ] ) );
             BSONObj bo = c.toObject( o );
@@ -651,7 +653,7 @@ namespace mongo {
         }
 
         JSObject * array = JS_NewObject( cx , 0 , 0 , 0 );
-        assert( array );
+        CHECKNEWOBJECT( array, cx, "map_constructor" );
 
         jsval a = OBJECT_TO_JSVAL( array );
         JS_SetProperty( cx , obj , "_data" , &a );
@@ -748,8 +750,11 @@ namespace mongo {
 
         if ( argc > 4 && JSVAL_IS_OBJECT( argv[4] ) )
             c.setProperty( obj , "_query" , argv[4] );
-        else 
-            c.setProperty( obj , "_query" , OBJECT_TO_JSVAL( JS_NewObject( cx , 0 , 0 , 0 ) ) );
+        else {
+            JSObject * temp = JS_NewObject( cx , 0 , 0 , 0 );
+            CHECKNEWOBJECT( temp, cx, "dbquery_constructor" );
+            c.setProperty( obj , "_query" , OBJECT_TO_JSVAL( temp ) );
+        }
         
         if ( argc > 5 && JSVAL_IS_OBJECT( argv[5] ) )
             c.setProperty( obj , "_fields" , argv[5] );
