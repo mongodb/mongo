@@ -1391,6 +1391,7 @@ namespace mongo {
         }
 
         virtual void gc(){
+            smlock;
             JS_GC( _context );
         }
 
