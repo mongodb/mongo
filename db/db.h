@@ -46,27 +46,36 @@ namespace mongo {
      */
     class DatabaseHolder {
     public:
+        typedef map<string,Database*> DBs;
+        typedef map<string,DBs> Paths;
+
         DatabaseHolder() : _size(0){
         }
 
-        bool isLoaded( const string& ns , const string& path ){
+        bool isLoaded( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
-            map<string,Database*>& m = _paths[path];
+            Paths::const_iterator x = _paths.find( path );
+            if ( x == _paths.end() )
+                return false;
+            const DBs& m = x->second;
             
             string db = _todb( ns );
 
-            map<string,Database*>::iterator it = m.find(db);
+            DBs::const_iterator it = m.find(db);
             return it != m.end();
         }
 
         
-        Database * get( const string& ns , const string& path ){
+        Database * get( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
-            map<string,Database*>& m = _paths[path];
+            Paths::const_iterator x = _paths.find( path );
+            if ( x == _paths.end() )
+                return 0;
+            const DBs& m = x->second;
             
             string db = _todb( ns );
 
-            map<string,Database*>::iterator it = m.find(db);
+            DBs::const_iterator it = m.find(db);
             if ( it != m.end() ) 
                 return it->second;
             return 0;
@@ -74,7 +83,7 @@ namespace mongo {
         
         void put( const string& ns , const string& path , Database * db ){
             dbMutex.assertWriteLocked();
-            map<string,Database*>& m = _paths[path];
+            DBs& m = _paths[path];
             Database*& d = m[_todb(ns)];
             if ( ! d )
                 _size++;
@@ -83,7 +92,7 @@ namespace mongo {
         
         Database* getOrCreate( const string& ns , const string& path , bool& justCreated ){
             dbMutex.assertWriteLocked();
-            map<string,Database*>& m = _paths[path];
+            DBs& m = _paths[path];
             
             string dbname = _todb( ns );
 
@@ -104,7 +113,7 @@ namespace mongo {
 
         void erase( const string& ns , const string& path ){
             dbMutex.assertWriteLocked();
-            map<string,Database*>& m = _paths[path];
+            DBs& m = _paths[path];
             _size -= (int)m.erase( _todb( ns ) );
         }
 
@@ -118,11 +127,11 @@ namespace mongo {
         /**
          * gets all unique db names, ignoring paths
          */
-        void getAllShortNames( set<string>& all ) const{
+        void getAllShortNames( set<string>& all ) const {
             dbMutex.assertAtLeastReadLocked();
-            for ( map<string, map<string,Database*> >::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ){
-                map<string,Database*> m = i->second;
-                for( map<string,Database*>::const_iterator j=m.begin(); j!=m.end(); j++ ){
+            for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ){
+                DBs m = i->second;
+                for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ){
                     all.insert( j->first );
                 }
             }
@@ -130,14 +139,14 @@ namespace mongo {
 
     private:
         
-        string _todb( const string& ns ){
+        string _todb( const string& ns ) const {
             size_t i = ns.find( '.' );
             if ( i == string::npos )
                 return ns;
             return ns.substr( 0 , i );
         }
         
-        map<string, map<string,Database*> > _paths;
+        Paths _paths;
         int _size;
         
     };
