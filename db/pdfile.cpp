@@ -1093,6 +1093,8 @@ namespace mongo {
             bool dupsAllowed = !idx.unique();
             bool dropDups = idx.dropDups();
 
+            ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->nrecords );
+
             unsigned long long n = 0;
             auto_ptr<ClientCursor> cc;
             {
@@ -1131,13 +1133,15 @@ namespace mongo {
                     }
                 }
                 n++;
+                progress.hit();
 
                 if ( n % 128 == 0 && !cc->yield() ) {
                     cc.release();
                     uasserted(12584, "cursor gone during bg index");
                     break;
                 }
-            };
+            }
+            progress.done();
             return n;
         }
 
