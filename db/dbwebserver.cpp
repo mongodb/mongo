@@ -316,6 +316,7 @@ namespace mongo {
                         return;
                     }              
                     generateServerStatus( url , responseMsg );
+                    responseCode = 200;
                     return;
                 }
 
