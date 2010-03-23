@@ -1469,12 +1469,14 @@ namespace mongo {
             try {
                 buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
             } catch( DBException& ) {
-                // save our error msg string as an exception on dropIndexes will overwrite our message
+                // save our error msg string as an exception or dropIndexes will overwrite our message
                 LastError *le = lastError.get();
-                assert( le );
-                int savecode = le->code;
-                string saveerrmsg = le->msg;
-                assert( !saveerrmsg.empty() );
+                int savecode;
+                string saveerrmsg;
+                if ( le ) {
+                    savecode = le->code;
+                    saveerrmsg = le->msg;
+                }
 
                 // roll back this index
                 string name = idx.indexName();
@@ -1484,6 +1486,8 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
+
+                assert( le && !saveerrmsg.empty() );
                 raiseError(savecode,saveerrmsg.c_str());
                 throw;
             }
