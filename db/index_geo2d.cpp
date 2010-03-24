@@ -1366,8 +1366,13 @@ namespace mongo {
             
             GEODEBUG( "center : " << center.toString() << "\t" << _prefix );
 
-            _fudge = 0.01;
-            
+	    {
+	      GeoHash a(0LL,32);
+	      GeoHash b(0LL,32);
+	      b.move(1,1);
+	      _fudge = _g->distance(a,b);
+	    }
+
             ok();
         }
 
