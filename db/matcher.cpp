@@ -263,7 +263,13 @@ namespace mongo {
             }
             case BSONObj::opREGEX:{
                 uassert( 13032, "can't use $not with $regex, use BSON regex type instead", !isNot );
-                regex = fe.valuestrsafe();
+                if ( fe.type() == RegEx ){
+                    regex = fe.regex();
+                    flags = fe.regexFlags();
+                }
+                else {
+                    regex = fe.valuestrsafe();
+                }
                 break;
             }
             case BSONObj::opOPTIONS:{
