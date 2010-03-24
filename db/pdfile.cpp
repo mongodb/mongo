@@ -1475,7 +1475,7 @@ namespace mongo {
             } catch( DBException& ) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
                 LastError *le = lastError.get();
-                int savecode;
+                int savecode = 0;
                 string saveerrmsg;
                 if ( le ) {
                     savecode = le->code;
