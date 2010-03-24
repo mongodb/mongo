@@ -44,6 +44,7 @@ doTest = function( signal ) {
     assert.soon( function() { return 1 == sa.count(); } );
     
     rp.killNode( rp.slave(), signal );
+    rp.waitForSteadyState( [ 1, null ] );
     ma.save( {} );
 
     rp.start( true );
