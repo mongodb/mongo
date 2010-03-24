@@ -36,11 +36,12 @@ wts_setup(int reopen, int logfile)
 	/* Open the log file. */
 	if (logfile) {
 		p = fname(WT_PREFIX, "log");
-		if ((g.logfp = fopen(p, "w")) != NULL) {
+		if ((g.logfp = fopen(p, "w")) == NULL) {
 			fprintf(stderr,
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
+		env->verbose_set(env, WT_VERB_ALL);
 		env->msgfile_set(env, g.logfp);
 	}
 
@@ -132,11 +133,6 @@ wts_bulk_load()
 		return (1);
 	}
 
-	if ((ret = db->verify(db, track, 0)) != 0) {
-		db->err(db, ret, "Db.verify");
-		return (1);
-	}
-
 	if (g.dump) {
 		track("dump", 0);
 		p = fname(WT_PREFIX, "dump");
@@ -150,6 +146,11 @@ wts_bulk_load()
 			return (1);
 		}
 		(void)fclose(fp);
+	}
+
+	if ((ret = db->verify(db, track, 0)) != 0) {
+		db->err(db, ret, "Db.verify");
+		return (1);
 	}
 
 	if (g.stats) {
