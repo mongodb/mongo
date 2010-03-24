@@ -33,9 +33,9 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(rand() % ((max + 1) - (min)) + (min))
 
-#define	FIX		0x01			/* Database types */
-#define	VAR		0x02
-#define	ROW		0x04
+#define	FIX		1			/* Database types */
+#define	ROW		2
+#define	VAR		3
 
 #define	WT_PREFIX	"wt"			/* Output file prefix */
 #define	BDB_PREFIX	"bdb"
@@ -48,10 +48,10 @@ typedef struct {
 	void *wts_db;				/* WT DB handle */
 	FILE *logfp;				/* WT log file stream */
 
-	int run_cnt;				/* Runs */
-
 	enum                                    /* Dumps */
 	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;
+
+	u_int32_t run_cnt;			/* Run counter */
 
 	int stats;				/* Statistics */
 
@@ -75,6 +75,7 @@ typedef struct {
 	u_int32_t c_read_ops;
 	u_int32_t c_repeat_comp;
 	u_int32_t c_repeat_comp_pct;
+	u_int32_t c_runs;
 	u_int32_t c_write_ops;
 
 	u_int32_t key_cnt;			/* Current key count */

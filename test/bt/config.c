@@ -100,7 +100,10 @@ config_dump(int logfile)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if (cp->type_mask != 0 && !(cp->type_mask & g.c_database_type))
+		if (cp->type_mask != 0 &&
+		    ((g.c_database_type == FIX && !(cp->type_mask & C_FIX)) ||
+		    (g.c_database_type == ROW && !(cp->type_mask & C_ROW)) ||
+		    (g.c_database_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
 		else {

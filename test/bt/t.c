@@ -16,7 +16,7 @@ static void	usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, log, runs;
+	int ch, log;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -33,11 +33,11 @@ main(int argc, char *argv[])
 	}
 
 	/* Set values from the command line. */
-	log = runs = 0;
+	log = 0;
 	while ((ch = getopt(argc, argv, "1C:cd:lsv")) != EOF)
 		switch (ch) {
 		case '1':
-			runs = 1;
+			g.c_runs = 1;
 			break;
 		case 'C':
 			config_file(optarg);
@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 		config_single(*argv);
 
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
-	for (g.run_cnt = 1; runs == 0 || g.run_cnt <= runs; ++g.run_cnt) {
+	while (g.c_runs == 0 || ++g.run_cnt <= g.c_runs) {
 		config();
 
 		bdb_setup(0);
