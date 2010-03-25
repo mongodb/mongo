@@ -274,7 +274,7 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
-            ss << " query: " << cc->query << " ";
+            ss << " getMore: " << cc->query << " ";
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
