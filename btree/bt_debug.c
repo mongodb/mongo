@@ -72,66 +72,6 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 }
 
 /*
- * __wt_bt_debug_addr --
- *	Dump a single page in debugging mode.
- */
-int
-__wt_bt_debug_addr(WT_TOC *toc, u_int32_t addr, char *ofile, FILE *fp)
-{
-	DB *db;
-	WT_PAGE *page;
-	u_int32_t bytes;
-	int do_close, ret;
-
-	db = toc->db;
-
-	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
-
-	/*
-	 * Read in a single fragment.   If we get the page from the cache,
-	 * it will be correct, and we can use it without further concern.
-	 * If we don't get the page from the cache, figure out the type of
-	 * the page and get it for real.
-	 *
-	 * We don't have any way to test if a page was found in the cache,
-	 * so we check the in-memory page information -- pages in the cache
-	 * should have in-memory page information.
-	 */
-	WT_RET(__wt_cache_in(
-	    toc, addr, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
-	if (page->indx_count == 0) {
-		switch (page->hdr->type) {
-		case WT_PAGE_OVFL:
-			bytes = WT_OVFL_BYTES(db, page->hdr->u.datalen);
-			break;
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_ROW_INT:
-			bytes = db->intlsize;
-			break;
-		case WT_PAGE_COL_FIX:
-		case WT_PAGE_COL_VAR:
-		case WT_PAGE_DUP_LEAF:
-		case WT_PAGE_ROW_LEAF:
-			bytes = db->leafsize;
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-		WT_RET(__wt_cache_out(toc, page, 0));
-		WT_RET(__wt_cache_in(toc, addr, bytes, 0, &page));
-	}
-
-	ret = __wt_bt_debug_page(toc, page, ofile, fp);
-
-	WT_TRET(__wt_cache_out(toc, page, 0));
-
-	if (do_close)
-		(void)fclose(fp);
-
-	return (ret);
-}
-
-/*
  * __wt_bt_debug_page --
  *	Dump a page in debugging mode.
  */
@@ -325,7 +265,7 @@ __wt_bt_debug_col_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 
 	if (cip->page_data != NULL)
 		fprintf(fp,
-		    "\tpage_data: %#lx", WT_ADDR_TO_ULONG(cip->page_data));
+		    "\tpage_data: %#lx", WT_PTR_TO_ULONG(cip->page_data));
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
 	fprintf(fp, "\n");
