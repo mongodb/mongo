@@ -117,10 +117,10 @@ track(const char *s, u_int64_t i)
 	if (s == NULL)
 		len = 0;
 	else if (i == 0)
-		len = snprintf(msg, sizeof(msg), "%d: %s", g.run_cnt, s);
+		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, s);
 	else
 		len =
-		    snprintf(msg, sizeof(msg), "%d: %s %llu", g.run_cnt, s, i);
+		    snprintf(msg, sizeof(msg), "%4d: %s %llu", g.run_cnt, s, i);
 
 	for (p = msg + len; len < lastlen; ++len)
 		*p++ = ' ';
