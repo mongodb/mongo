@@ -137,7 +137,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc( new ClientCursor(creal, ns, false) );
+        auto_ptr<ClientCursor> cc( new ClientCursor(0, creal, ns) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;
@@ -789,7 +789,7 @@ namespace mongo {
         log( 5 ) << "   used cursor: " << cursor.get() << endl;
         if ( dqo.saveClientCursor() ) {
             // the clientcursor now owns the Cursor* and 'c' is released:
-            ClientCursor *cc = new ClientCursor(cursor, ns, !(queryOptions & QueryOption_NoCursorTimeout));
+            ClientCursor *cc = new ClientCursor(queryOptions, cursor, ns);
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
             DEV out() << "  query has more, cursorid: " << cursorid << endl;

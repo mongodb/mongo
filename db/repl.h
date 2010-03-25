@@ -444,7 +444,7 @@ namespace mongo {
         }
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() ) {
             auto_ptr<Cursor> c = _qp.newCursor( startLoc );
-            _findingStartCursor = new ClientCursor(c, _qp.ns(), false);            
+            _findingStartCursor = new ClientCursor(0, c, _qp.ns());
         }
         void destroyClientCursor() {
             if ( _findingStartCursor ) {
@@ -466,7 +466,7 @@ namespace mongo {
             // Use a ClientCursor here so we can release db mutex while scanning
             // oplog (can take quite a while with large oplogs).
             auto_ptr<Cursor> c = _qp.newReverseCursor();
-            _findingStartCursor = new ClientCursor(c, _qp.ns(), false);
+            _findingStartCursor = new ClientCursor(0, c, _qp.ns());
             _findingStartTimer.reset();
             _findingStartMode = Initial;
             BSONElement tsElt = _qp.query()[ "ts" ];
