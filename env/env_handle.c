@@ -23,8 +23,6 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	IENV *ienv;
 	int ret;
 
-	WT_CC_QUIET(flags, 0);
-
 	/*
 	 * !!!
 	 * We don't yet have valid ENV/IENV structures to use to call other
@@ -32,8 +30,8 @@ __wt_env_create(u_int32_t flags, ENV **envp)
 	 * are the memory allocation and free functions, no other functions
 	 * may be called.
 	 */
-	WT_RET(__wt_malloc(NULL, sizeof(ENV), &env));
-	WT_ERR(__wt_malloc(NULL, sizeof(IENV), &ienv));
+	WT_RET(__wt_calloc(NULL, 1, sizeof(ENV), &env));
+	WT_ERR(__wt_calloc(NULL, 1, sizeof(IENV), &ienv));
 
 	/* Connect everything together. */
 	env->ienv = ienv;
@@ -60,7 +58,6 @@ err:	(void)__wt_env_close(env);
 static int
 __wt_env_config_default(ENV *env)
 {
-	env->cache_hash_size = WT_CACHE_HASH_SIZE_DEFAULT;
 	env->cache_size = WT_CACHE_SIZE_DEFAULT;
 	env->hazard_size = WT_HAZARD_SIZE_DEFAULT;
 	env->toc_size = WT_TOC_SIZE_DEFAULT;
@@ -87,8 +84,8 @@ __wt_ienv_config_default(ENV *env)
 	if (F_ISSET(env, WT_MEMORY_CHECK))
 		WT_RET(__wt_mtrack_alloc(env));
 #endif
-
-	WT_RET(__wt_mtx_init(&ienv->mtx));	/* Global mutex */
+						/* Global mutex */
+	WT_RET(__wt_mtx_alloc(env, 0, &ienv->mtx));
 
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
 	TAILQ_INIT(&ienv->fhqh);		/* File list */
@@ -99,6 +96,8 @@ __wt_ienv_config_default(ENV *env)
 	    __wt_calloc(env, env->toc_size, sizeof(WT_TOC), &ienv->toc_array));
 	WT_RET(__wt_calloc(env,
 	   env->toc_size * env->hazard_size, sizeof(WT_PAGE *), &ienv->hazard));
+
+	TAILQ_INIT(&ienv->flistq);		/* Free memory list */
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
@@ -128,6 +127,8 @@ __wt_ienv_destroy(ENV *env, int refresh)
 
 	/* Diagnostic check: check flags against approved list. */
 	WT_ENV_FCHK_RET(env, "Env.close", ienv->flags, WT_APIMASK_IENV, ret);
+
+	(void)__wt_mtx_destroy(env, ienv->mtx);
 
 	/* Free allocated memory. */
 	__wt_free(env, ienv->toc, 0);
