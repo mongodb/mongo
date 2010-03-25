@@ -11,15 +11,6 @@ import os
 from dist import compare_srcfile
 
 serial = {}
-serial['cache_discard'] = [
-	'WT_REF */drain',
-	'u_int32_t/drain_elem']
-
-serial['cache_in'] = [
-	'WT_PAGE */page',
-	'u_int32_t/addr',
-	'u_int32_t/bytes']
-
 serial['bt_del'] = [
 	'WT_ROW_INDX */indx',
 	'WT_REPL */repl']
@@ -34,6 +25,9 @@ serial['bt_repl'] = [
 	'WT_REPL */repl',
 	'void */data',
 	'u_int32_t/size']
+
+serial['flist_free'] = [
+	'WT_FLIST */fp']
 
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule
@@ -51,12 +45,12 @@ def func_serial(f):
 		f.write('#define\t __wt_' + entry[0] + '_serial(toc')
 		for l in entry[1]:
 			f.write(', _' + l.split('/')[1])
-		f.write(') do {\\\n')
+		f.write(', ret) do {\\\n')
 		f.write('\t__wt_' + entry[0] + '_args _args;\\\n')
 		for l in entry[1]:
 			f.write('\t_args.' + l.split('/')[1] +
 			    ' = _' + l.split('/')[1] + ';\\\n')
-		f.write('\t__wt_toc_serialize_request(\\\n')
+		f.write('\t(ret) = __wt_toc_serialize_func(\\\n')
 		f.write('\t    toc, __wt_' +
 		    entry[0] + '_serial_func, &_args);\\\n')
 		f.write('} while (0)\n')
@@ -69,7 +63,7 @@ def func_serial(f):
 		for l in entry[1]:
 			f.write('\t_' + l.split('/')[1] + ' =\\\n')
 			f.write('\t    ((__wt_' + entry[0] +
-			    '_args *)(toc)->serial_args)->' +
+			    '_args *)(toc)->wq_args)->' +
 			    l.split('/')[1] + ';\\\n')
 		f.write('} while (0)\n')
 
