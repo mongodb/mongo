@@ -67,7 +67,7 @@ __wt_bt_page_in(
 	db = toc->db;
 
 	WT_RET((__wt_cache_in(
-	    toc, addr, isleaf ? db->leafsize : db->intlsize, 0, &page)));
+	    toc, addr, isleaf ? db->leafsize : db->intlsize, &page)));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
@@ -104,7 +104,7 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	u_int32_t i;
 	void *bp, *ep;
 
-	WT_ASSERT(env, !F_ISSET(page, WT_MODIFIED));
+	WT_ASSERT(env, F_ISSET(page, WT_MODIFIED) == 0);
 
 	switch (page->hdr->type) {
 	case WT_PAGE_DUP_INT:
@@ -650,6 +650,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	env = toc->env;
 	idb = toc->db->idb;
 	ovfl_page = NULL;
+	ret = 0;
 
 	WT_ASSERT(env, ip->size == 0);
 
@@ -688,7 +689,9 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 
 	/* Copy the item into place; if the item is compressed, decode it. */
 	if (idb->huffman_key == NULL) {
-		WT_ERR(__wt_realloc(env, &dbt->data_len, size, &dbt->data));
+		if (size > dbt->data_len)
+			WT_ERR(__wt_realloc(
+			    env, &dbt->data_len, size, &dbt->data));
 		dbt->size = size;
 		memcpy(dbt->data, orig, size);
 	} else
