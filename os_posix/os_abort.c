@@ -14,8 +14,10 @@
  *	Abort the process, dropping core.
  */
 void
-__wt_abort(void)
+__wt_abort(ENV *env)
 {
+	if (env != NULL)
+		__wt_msg(env, "aborting WiredTiger library");
 	abort();
 	/* NOTREACHED */
 }
