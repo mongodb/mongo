@@ -23,6 +23,25 @@ for i in \
 	fi
 	echo $i
 done
+
+# The stat #defines are a bit harder for two reasons: first, we don't care
+# about "usage" in support/stat.c because it's auto-generated, we care if
+# the #define is set somewhere else; second, we don't use the "WT_STAT_"
+# prefix when we call a stat macro, the stat macro handles that for us.
+l=`echo $l | sed -e 's/\.\.\/support\/stat.c//'`
+
+for i in \
+    `cat ../inc_posix/stat.h |
+     egrep '^#define' |
+     sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
+         -e 's/WT_STAT_//' |
+     sort -u`; do
+	if `egrep "$i" $l > /dev/null`; then
+		continue
+	fi
+	echo "WT_STAT_$i"
+done
+
 ) | sort | uniq -u > $t
 
 test -s $t && {
