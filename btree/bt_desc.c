@@ -138,42 +138,52 @@ int
 __wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp)
 {
 	DB *db;
-	IDB *idb;
+	ENV *env;
+	WT_FH *fh;
 	WT_PAGE *page;
-	WT_PAGE_DESC desc;
+	WT_PAGE_DESC *desc;
+	int diskread;
+	u_int8_t buf[WT_FRAGMENT];
 
 	db = toc->db;
-	idb = db->idb;
+	env = toc->env;
+	fh = db->idb->fh;
 
 	/* If the file size is 0, we're done. */
-	if (idb->fh->file_size == 0) {
+	if (fh->file_size == 0) {
 		if (root_addrp != NULL)
 			*root_addrp = WT_ADDR_INVALID;
 		return (0);
 	}
 
 	/*
-	 * When we first read the description chunk after first opening the
-	 * file, we're reading blind, we don't know the database page size.
-	 *
 	 * Read in the first fragment of the database and get the root addr
 	 * and pagesizes from it.
+	 *
+	 * We may be reading blind (when we first read the description chunk
+	 * after opening the file we don't yet know the database page size).
+	 * Look in the cache and see if it has something for us; if that
+	 * doesn't work, read the disk directly.
 	 */
-	WT_RET(__wt_cache_in(toc,
-	    WT_ADDR_FIRST_PAGE, (u_int32_t)WT_FRAGMENT, WT_UNFORMATTED, &page));
-
-	memcpy(
-	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
-	db->leafsize = desc.leafsize;
-	db->intlsize = desc.intlsize;
-	db->fixed_len = desc.fixed_len;
+	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE, 0, &page));
+	if (page == NULL) {
+		WT_RET(__wt_read(env, fh,
+		    WT_ADDR_TO_OFF(db, WT_ADDR_FIRST_PAGE),
+		    (u_int32_t)WT_FRAGMENT, buf));
+		desc = (WT_PAGE_DESC *)(buf + WT_PAGE_HDR_SIZE);
+		diskread = 1;
+	} else {
+		desc =
+		   (WT_PAGE_DESC *)((u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE);
+		diskread = 0;
+	}
+	db->leafsize = desc->leafsize;
+	db->intlsize = desc->intlsize;
+	db->fixed_len = desc->fixed_len;
 	if (root_addrp != NULL)
-		*root_addrp = desc.root_addr;
+		*root_addrp = desc->root_addr;
 
-	/* Then discard it from the cache, it's probably the wrong size. */
-	WT_RET(__wt_cache_out(toc, page, 0));
-
-	return (0);
+	return (diskread ? 0 : __wt_cache_out(toc, page, 0));
 }
 
 /*
@@ -185,20 +195,17 @@ __wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr)
 {
 	DB *db;
 	WT_PAGE *page;
-	WT_PAGE_DESC desc;
+	WT_PAGE_DESC *desc;
 
 	db = toc->db;
 
-	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE, db->leafsize, 0, &page));
+	WT_RET(__wt_cache_in(toc, WT_ADDR_FIRST_PAGE, db->leafsize, &page));
 
-	memcpy(
-	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
-	desc.root_addr = root_addr;
-	desc.leafsize = db->leafsize;
-	desc.intlsize = db->intlsize;
-	desc.fixed_len = (u_int8_t)db->fixed_len;
-	memcpy(
-	    (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, &desc, WT_PAGE_DESC_SIZE);
+	desc = (WT_PAGE_DESC *)((u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE);
+	desc->root_addr = root_addr;
+	desc->leafsize = db->leafsize;
+	desc->intlsize = db->intlsize;
+	desc->fixed_len = (u_int8_t)db->fixed_len;
 
 	return (__wt_cache_out(toc, page, WT_MODIFIED));
 }
