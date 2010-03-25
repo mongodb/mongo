@@ -11,9 +11,9 @@ static int __wt_api_db_btree_compare_dup_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*btree_compare_dup = db->btree_compare_dup;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -26,9 +26,9 @@ static int __wt_api_db_btree_compare_dup_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->btree_compare_dup = btree_compare_dup;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -41,9 +41,9 @@ static int __wt_api_db_btree_compare_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*btree_compare = db->btree_compare;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -56,9 +56,9 @@ static int __wt_api_db_btree_compare_int_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*btree_compare_int = db->btree_compare_int;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -73,9 +73,9 @@ static int __wt_api_db_btree_compare_int_set(
 
 	WT_RET((__wt_db_btree_compare_int_set_verify(db, btree_compare_int)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->btree_compare_int = btree_compare_int;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -88,9 +88,9 @@ static int __wt_api_db_btree_compare_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->btree_compare = btree_compare;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -103,9 +103,9 @@ static int __wt_api_db_btree_dup_offpage_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*btree_dup_offpage = db->btree_dup_offpage;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -120,9 +120,9 @@ static int __wt_api_db_btree_dup_offpage_set(
 
 	WT_RET((__wt_db_btree_dup_offpage_set_verify(db, btree_dup_offpage)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->btree_dup_offpage = btree_dup_offpage;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -137,10 +137,10 @@ static int __wt_api_db_btree_itemsize_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*intlitemsize = db->intlitemsize;
 	*leafitemsize = db->leafitemsize;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -155,10 +155,10 @@ static int __wt_api_db_btree_itemsize_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->intlitemsize = intlitemsize;
 	db->leafitemsize = leafitemsize;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -177,12 +177,12 @@ static int __wt_api_db_btree_pagesize_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*allocsize = db->allocsize;
 	*intlsize = db->intlsize;
 	*leafsize = db->leafsize;
 	*extsize = db->extsize;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -201,12 +201,12 @@ static int __wt_api_db_btree_pagesize_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->allocsize = allocsize;
 	db->intlsize = intlsize;
 	db->leafsize = leafsize;
 	db->extsize = extsize;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -223,12 +223,14 @@ static int __wt_api_db_bulk_load(
 {
 	const char *method_name = "DB.bulk_load";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_BULK_LOAD);
 
 	WT_DB_RDONLY(db, method_name);
 
-	return (__wt_db_bulk_load(db, flags, progress, cb));
+	ret = __wt_db_bulk_load(db, flags, progress, cb);
+	return (ret);
 }
 
 static int __wt_api_db_close(
@@ -240,10 +242,12 @@ static int __wt_api_db_close(
 {
 	const char *method_name = "DB.close";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_CLOSE);
 
-	return (__wt_db_close(db));
+	ret = __wt_db_close(db);
+	return (ret);
 }
 
 static int __wt_api_db_column_set(
@@ -264,11 +268,11 @@ static int __wt_api_db_column_set(
 
 	WT_RET((__wt_db_column_set_verify(db, fixed_len, dictionary, flags)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->fixed_len = fixed_len;
 	db->dictionary = dictionary;
 	db->flags = flags;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -291,8 +295,10 @@ static int __wt_api_db_del(
 
 	WT_DB_RDONLY(db, method_name);
 
+	toc->gen = env->ienv->api_gen;
 	while ((ret = __wt_db_del(db, toc, key)) == WT_RESTART)
 		;
+	toc->gen = UINT32_MAX;
 	return (ret);
 }
 
@@ -309,10 +315,12 @@ static int __wt_api_db_dump(
 {
 	const char *method_name = "DB.dump";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_DUMP);
 
-	return (__wt_db_dump(db, stream, progress, flags));
+	ret = __wt_db_dump(db, stream, progress, flags);
+	return (ret);
 }
 
 static int __wt_api_db_errcall_get(
@@ -324,9 +332,9 @@ static int __wt_api_db_errcall_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errcall = db->errcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -339,9 +347,9 @@ static int __wt_api_db_errcall_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->errcall = errcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -354,9 +362,9 @@ static int __wt_api_db_errfile_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errfile = db->errfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -369,9 +377,9 @@ static int __wt_api_db_errfile_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->errfile = errfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -384,9 +392,9 @@ static int __wt_api_db_errpfx_get(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errpfx = db->errpfx;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -399,9 +407,9 @@ static int __wt_api_db_errpfx_set(
 {
 	ENV *env = db->env;
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	db->errpfx = errpfx;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -422,10 +430,14 @@ static int __wt_api_db_get(
 {
 	const char *method_name = "DB.get";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET);
 
-	return (__wt_db_get(db, toc, key, pkey, data));
+	toc->gen = env->ienv->api_gen;
+	ret = __wt_db_get(db, toc, key, pkey, data);
+	toc->gen = UINT32_MAX;
+	return (ret);
 }
 
 static int __wt_api_db_get_recno(
@@ -447,10 +459,14 @@ static int __wt_api_db_get_recno(
 {
 	const char *method_name = "DB.get_recno";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET_RECNO);
 
-	return (__wt_db_get_recno(db, toc, recno, key, pkey, data));
+	toc->gen = env->ienv->api_gen;
+	ret = __wt_db_get_recno(db, toc, recno, key, pkey, data);
+	toc->gen = UINT32_MAX;
+	return (ret);
 }
 
 static int __wt_api_db_huffman_set(
@@ -470,10 +486,10 @@ static int __wt_api_db_huffman_set(
 	WT_ENV_FCHK(env, "DB.huffman_set",
 	    huffman_flags, WT_APIMASK_DB_HUFFMAN_SET);
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	ret = __wt_db_huffman_set(
 	    db, huffman_table, huffman_table_size, huffman_flags);
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (ret);
 }
 
@@ -490,10 +506,12 @@ static int __wt_api_db_open(
 {
 	const char *method_name = "DB.open";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_OPEN);
 
-	return (__wt_db_open(db, dbname, mode, flags));
+	ret = __wt_db_open(db, dbname, mode, flags);
+	return (ret);
 }
 
 static int __wt_api_db_put(
@@ -517,8 +535,10 @@ static int __wt_api_db_put(
 
 	WT_DB_RDONLY(db, method_name);
 
+	toc->gen = env->ienv->api_gen;
 	while ((ret = __wt_db_put(db, toc, key, data)) == WT_RESTART)
 		;
+	toc->gen = UINT32_MAX;
 	return (ret);
 }
 
@@ -531,10 +551,12 @@ static int __wt_api_db_stat_clear(
 {
 	const char *method_name = "DB.stat_clear";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_STAT_CLEAR);
 
-	return (__wt_db_stat_clear(db));
+	ret = __wt_db_stat_clear(db);
+	return (ret);
 }
 
 static int __wt_api_db_stat_print(
@@ -548,10 +570,12 @@ static int __wt_api_db_stat_print(
 {
 	const char *method_name = "DB.stat_print";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_STAT_PRINT);
 
-	return (__wt_db_stat_print(db, stream));
+	ret = __wt_db_stat_print(db, stream);
+	return (ret);
 }
 
 static int __wt_api_db_sync(
@@ -565,12 +589,14 @@ static int __wt_api_db_sync(
 {
 	const char *method_name = "DB.sync";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_SYNC);
 
 	WT_DB_RDONLY(db, method_name);
 
-	return (__wt_db_sync(db, progress));
+	ret = __wt_db_sync(db, progress);
+	return (ret);
 }
 
 static int __wt_api_db_verify(
@@ -584,10 +610,12 @@ static int __wt_api_db_verify(
 {
 	const char *method_name = "DB.verify";
 	ENV *env = db->env;
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_VERIFY);
 
-	return (__wt_db_verify(db, progress));
+	ret = __wt_db_verify(db, progress);
+	return (ret);
 }
 
 static int __wt_api_env_cache_hash_size_get(
@@ -597,9 +625,9 @@ static int __wt_api_env_cache_hash_size_get(
 	ENV *env,
 	u_int32_t *cache_hash_size)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*cache_hash_size = env->cache_hash_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -612,9 +640,9 @@ static int __wt_api_env_cache_hash_size_set(
 {
 	WT_RET((__wt_env_cache_hash_size_set_verify(env, cache_hash_size)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->cache_hash_size = cache_hash_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -625,9 +653,9 @@ static int __wt_api_env_cache_size_get(
 	ENV *env,
 	u_int32_t *cache_size)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*cache_size = env->cache_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -640,9 +668,9 @@ static int __wt_api_env_cache_size_set(
 {
 	WT_RET((__wt_env_cache_size_set_verify(env, cache_size)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->cache_size = cache_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -654,10 +682,12 @@ static int __wt_api_env_close(
 	u_int32_t flags)
 {
 	const char *method_name = "ENV.close";
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_CLOSE);
 
-	return (__wt_env_close(env));
+	ret = __wt_env_close(env);
+	return (ret);
 }
 
 static int __wt_api_env_db(
@@ -670,10 +700,12 @@ static int __wt_api_env_db(
 	DB **dbp)
 {
 	const char *method_name = "ENV.db";
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_DB);
 
-	return (__wt_env_db(env, dbp));
+	ret = __wt_env_db(env, dbp);
+	return (ret);
 }
 
 static int __wt_api_env_errcall_get(
@@ -683,9 +715,9 @@ static int __wt_api_env_errcall_get(
 	ENV *env,
 	void (**errcall)(const ENV *, const char *))
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errcall = env->errcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -696,9 +728,9 @@ static int __wt_api_env_errcall_set(
 	ENV *env,
 	void (*errcall)(const ENV *, const char *))
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->errcall = errcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -709,9 +741,9 @@ static int __wt_api_env_errfile_get(
 	ENV *env,
 	FILE **errfile)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errfile = env->errfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -722,9 +754,9 @@ static int __wt_api_env_errfile_set(
 	ENV *env,
 	FILE *errfile)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->errfile = errfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -735,9 +767,9 @@ static int __wt_api_env_errpfx_get(
 	ENV *env,
 	const char **errpfx)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*errpfx = env->errpfx;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -748,9 +780,9 @@ static int __wt_api_env_errpfx_set(
 	ENV *env,
 	const char *errpfx)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->errpfx = errpfx;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -761,9 +793,9 @@ static int __wt_api_env_hazard_size_get(
 	ENV *env,
 	u_int32_t *hazard_size)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*hazard_size = env->hazard_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -776,9 +808,9 @@ static int __wt_api_env_hazard_size_set(
 {
 	WT_RET((__wt_env_hazard_size_set_verify(env, hazard_size)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->hazard_size = hazard_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -789,9 +821,9 @@ static int __wt_api_env_msgcall_get(
 	ENV *env,
 	void (**msgcall)(const ENV *, const char *))
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*msgcall = env->msgcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -802,9 +834,9 @@ static int __wt_api_env_msgcall_set(
 	ENV *env,
 	void (*msgcall)(const ENV *, const char *))
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->msgcall = msgcall;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -815,9 +847,9 @@ static int __wt_api_env_msgfile_get(
 	ENV *env,
 	FILE **msgfile)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*msgfile = env->msgfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -828,9 +860,9 @@ static int __wt_api_env_msgfile_set(
 	ENV *env,
 	FILE *msgfile)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->msgfile = msgfile;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -846,10 +878,12 @@ static int __wt_api_env_open(
 	u_int32_t flags)
 {
 	const char *method_name = "ENV.open";
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_OPEN);
 
-	return (__wt_env_open(env, home, mode));
+	ret = __wt_env_open(env, home, mode);
+	return (ret);
 }
 
 static int __wt_api_env_stat_clear(
@@ -860,10 +894,12 @@ static int __wt_api_env_stat_clear(
 	u_int32_t flags)
 {
 	const char *method_name = "ENV.stat_clear";
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_STAT_CLEAR);
 
-	return (__wt_env_stat_clear(env));
+	ret = __wt_env_stat_clear(env);
+	return (ret);
 }
 
 static int __wt_api_env_stat_print(
@@ -876,10 +912,12 @@ static int __wt_api_env_stat_print(
 	u_int32_t flags)
 {
 	const char *method_name = "ENV.stat_print";
+	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_STAT_PRINT);
 
-	return (__wt_env_stat_print(env, stream));
+	ret = __wt_env_stat_print(env, stream);
+	return (ret);
 }
 
 static int __wt_api_env_toc(
@@ -896,9 +934,9 @@ static int __wt_api_env_toc(
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_TOC);
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	ret = __wt_env_toc(env, tocp);
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (ret);
 }
 
@@ -909,9 +947,9 @@ static int __wt_api_env_toc_size_get(
 	ENV *env,
 	u_int32_t *toc_size)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*toc_size = env->toc_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -924,9 +962,9 @@ static int __wt_api_env_toc_size_set(
 {
 	WT_RET((__wt_env_toc_size_set_verify(env, toc_size)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->toc_size = toc_size;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -937,9 +975,9 @@ static int __wt_api_env_verbose_get(
 	ENV *env,
 	u_int32_t *verbose)
 {
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	*verbose = env->verbose;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -952,9 +990,9 @@ static int __wt_api_env_verbose_set(
 {
 	WT_RET((__wt_env_verbose_set_verify(env, verbose)));
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	env->verbose = verbose;
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (0);
 }
 
@@ -971,9 +1009,9 @@ static int __wt_api_wt_toc_close(
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_WT_TOC_CLOSE);
 
-	__wt_lock(env, &env->ienv->mtx);
+	__wt_lock(env, env->ienv->mtx);
 	ret = __wt_wt_toc_close(wt_toc);
-	__wt_unlock(&env->ienv->mtx);
+	__wt_unlock(env->ienv->mtx);
 	return (ret);
 }
 

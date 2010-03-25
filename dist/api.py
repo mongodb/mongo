@@ -201,7 +201,7 @@ def func_method_getset(a, f):
 		f.write(s + '));\n\n')
 
 	# getter/setter implies ienvlock: lock the data structure.
-	f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
+	f.write('\t__wt_lock(env, env->ienv->mtx);\n')
 
 	# If the function is hand-coded, just call it.
 	if handcode:
@@ -224,7 +224,7 @@ def func_method_getset(a, f):
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 
 	# getter/setter implies ienvlock: unlock the data structure.
-	f.write('\t__wt_unlock(&env->ienv->mtx);\n')
+	f.write('\t__wt_unlock(env->ienv->mtx);\n')
 	f.write('\treturn (')
 	if handcode:
 		f.write('ret')
@@ -233,7 +233,7 @@ def func_method_getset(a, f):
 	f.write(');\n}\n\n')
 
 # func_method --
-#	Generate all other API entry functions.
+#	Generate all non-getter/setter API entry functions.
 def func_method(a, f):
 	func_method_decl(a, f)
 
@@ -245,6 +245,10 @@ def func_method(a, f):
 	locking = config.count('ienvlock')	# We're doing locking
 	rdonly = config.count('rdonly')		# We're checking read-only
 	restart = config.count('restart')	# We're handling WT_RESTART
+	toc_handle = 0				# We're thread aware
+	for l in args:
+		if l.count('toc/'):
+			toc_handle = 1
 	flagchk = 0				# We're checking flags
 	for l in args:
 		if l.count('flags/'):
@@ -258,10 +262,7 @@ def func_method(a, f):
 		    handle.upper() + '.' + method + '";\n')
 	if (flagchk or locking) and handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
-	if locking or restart:
-		f.write('\tint ret;\n')
-	if flagchk or locking or restart:
-		f.write('\n')
+	f.write('\tint ret;\n\n')
 
 	if flagchk:
 		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
@@ -271,30 +272,31 @@ def func_method(a, f):
 	if rdonly:
 		f.write('\tWT_DB_RDONLY(db, method_name);\n\n')
 
+	# If entering the API with a WT_TOC handle, set the generation number.
+	if toc_handle:
+		f.write('\ttoc->gen = env->ienv->api_gen;\n')
+
 	if locking:
-		f.write('\t__wt_lock(env, &env->ienv->mtx);\n')
-		f.write('\tret = ')
-	elif restart:
-		f.write('\twhile ((ret = ')
-	else:
-		f.write('\treturn (')
-	f.write('__wt_' + handle + '_' + method + '(' + handle)
+		f.write('\t__wt_lock(env, env->ienv->mtx);\n')
+
+	f.write('\t')
+	if restart:
+		f.write('while ((')
+	f.write('ret = __wt_' + handle + '_' + method + '(' + handle)
 	for l in args:
 		if l.count('flags/') and flags[a.key][0] == '__NONE__':
 			continue
 		f.write(', ' + l.split('/')[0])
 	if restart:
 		f.write(')) == WT_RESTART)\n\t\t;\n')
-
-	if locking:
-		f.write(');\n')
-		f.write('\t__wt_unlock(&env->ienv->mtx);\n')
-	if locking or restart:
-		f.write('\treturn (ret);\n')
 	else:
-		f.write('));\n')
-	f.write('}\n\n')
-
+		f.write(');\n')
+	if locking:
+		f.write('\t__wt_unlock(env->ienv->mtx);\n')
+	# If entering the API with a WT_TOC handle, clear the generation number.
+	if toc_handle:
+		f.write('\ttoc->gen = UINT32_MAX;\n')
+	f.write('\treturn (ret);\n}\n\n')
 
 #####################################################################
 # Build the API dictionary.
@@ -310,8 +312,7 @@ tfile = open(tmp_file, 'w')
 tfile.write('/* DO NOT EDIT: automatically built by dist/api.py. */\n\n')
 tfile.write('#include "wt_internal.h"\n\n')
 
-# We need a function for any getter/setter method, as well as any method that
-# takes a "flags" or "toc" argument.
+# We need an API function for any method not marked 'noauto'.
 for i in sorted(api.iteritems()):
 	if i[1].config.count('noauto'):
 		continue
