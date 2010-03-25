@@ -80,6 +80,7 @@ __wt_realloc_func(ENV *env,
 	 */
 	bytes_allocated =
 	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
+	WT_ASSERT(env, bytes_allocated < bytes_to_allocate);
 
 	if ((p = realloc(p, (size_t)bytes_to_allocate)) == NULL) {
 		__wt_api_env_err(env, errno, "memory allocation");
@@ -87,8 +88,12 @@ __wt_realloc_func(ENV *env,
 	}
 
 	/*
-	 * Clear allocated memory -- see security comment above concerning
-	 * __wt_malloc as to why this is required.
+	 * Clear the allocated memory -- an application might: allocate memory,
+	 * write secret stuff into it, free the memory, we allocate the
+	 * memory, and then use it for a database page or log record and write
+	 * it to disk.  That would result in the secret stuff being protected
+	 * by the WiredTiger permission mechanisms, potentially inappropriate
+	 * for the secret stuff.
 	 */
 	memset((u_int8_t *)
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
@@ -197,7 +202,7 @@ __wt_mtrack_alloc(ENV *env)
 	 * on memory object tracking, and we need to set up the rest of the
 	 * structure first.
 	 */
-	WT_RET(__wt_malloc(env, sizeof(WT_MTRACK), &p));
+	WT_RET(__wt_calloc(env, 1, sizeof(WT_MTRACK), &p));
 	WT_RET(__wt_calloc(env, 1000, sizeof(WT_MEM), &p->list));
 	p->next = p->list;
 	p->slots = 1000;
@@ -256,7 +261,7 @@ __wt_mtrack(ENV *env, const void *f, const void *a, const char *file, int line)
 			} while (mp > mtrack->list);
 
 		__wt_api_env_errx(env,
-		    "mtrack: %#lx: not found", WT_ADDR_TO_ULONG(f));
+		    "mtrack: %#lx: not found", WT_PTR_TO_ULONG(f));
 	}
 
 	if (a == NULL)
@@ -334,6 +339,6 @@ __wt_mtrack_dump(ENV *env)
 		if (mp->addr != NULL)
 			__wt_api_env_errx(env,
 			    "mtrack: %#lx {%s/%d}: never freed",
-			        WT_ADDR_TO_ULONG(mp->addr), mp->file, mp->line);
+			        WT_PTR_TO_ULONG(mp->addr), mp->file, mp->line);
 }
 #endif
