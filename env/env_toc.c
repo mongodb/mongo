@@ -73,14 +73,14 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ienv = env->ienv;
 	ret = 0;
 
-	/* Free any memory we've been accumulating. */
-	if (toc->flist != NULL)
-		WT_TRET(__wt_flist_sched(toc));
-
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.data_len);
 	__wt_free(env, toc->data.data, toc->data.data_len);
 	__wt_free(env, toc->scratch.data, toc->scratch.data_len);
+
+	/* Free any memory we've been accumulating. */
+	if (toc->flist != NULL)
+		WT_TRET(__wt_flist_sched(toc));
 
 	/* Clear any remaining hazard references (there shouldn't be any). */
 	__wt_hazard_empty(toc);
