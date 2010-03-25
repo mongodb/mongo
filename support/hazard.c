@@ -25,7 +25,10 @@ __wt_hazard_set(WT_TOC *toc, WT_PAGE *page)
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp == NULL) {
 			*hp = page;
-			/* Flush memory to make the hazard reference visible. */
+			/*
+			 * Memory flush needed; the hazard array isn't declared
+			 * volatile, so an explicit memory flush is necessary.
+			 */
 			WT_MEMORY_FLUSH;
 			return;
 		}
@@ -50,8 +53,8 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 			*hp = NULL;
 			/*
 			 * We don't have to flush memory here for correctness,
-			 * but that gives the drain thread immediate access to
-			 * the buffer.
+			 * but it gives the cache drain thread immediate access
+			 * to any page our reference blocks.
 			 */
 			WT_MEMORY_FLUSH;
 			return;
@@ -77,7 +80,8 @@ __wt_hazard_empty(WT_TOC *toc)
 	 * we find can't be real because the WT_TOC is being closed when we're
 	 * called).   We do this work because it's not expensive, and we don't
 	 * want to let a hazard reference lie around, keeping a page from being
-	 * flushed.
+	 * flushed.  The flush isn't necessary for correctness, but gives the
+	 * cache drain thread immediate access to any page our reference blocks.
 	 */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp != NULL) {
