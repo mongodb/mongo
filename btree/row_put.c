@@ -52,8 +52,7 @@ __wt_db_del(DB *db, WT_TOC *toc, DBT *key)
 		repl = NULL;
 
 	/* Delete the item. */
-	__wt_bt_del_serial(toc, ip, repl);
-	ret = toc->serial_ret;
+	__wt_bt_del_serial(toc, ip, repl, ret);
 
 err:	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
