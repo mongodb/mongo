@@ -13,35 +13,35 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 ../btree/bt_bulk.c  65  Info 830: Location cited in prior message
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  350  Warning 530: Symbol 'dup_data' (line 214) not
+../btree/bt_bulk.c  352  Warning 530: Symbol 'dup_data' (line 216) not
     initialized
-../btree/bt_bulk.c  214  Info 830: Location cited in prior message
+../btree/bt_bulk.c  216  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  438  Warning 530: Symbol 'dup_key' (line 214) not
+../btree/bt_bulk.c  440  Warning 530: Symbol 'dup_key' (line 216) not
     initialized
-../btree/bt_bulk.c  214  Info 830: Location cited in prior message
+../btree/bt_bulk.c  216  Info 830: Location cited in prior message
                                 _
 	WT_RECORDS(&offpage_item) = dup_count,
-../btree/bt_bulk.c  782  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  786  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1023  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1027  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1065  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1069  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... _OFF *)((ip)->page_data))
 	WT_COL_OFF_RECORDS(ip) += increment;
-../btree/bt_bulk.c  1242  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1246  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... EM_BYTE((ip)->page_data))
 	WT_ROW_OFF_RECORDS(ip) += increment;
-../btree/bt_bulk.c  1259  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1263  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_cget.c (C)
@@ -370,7 +370,7 @@ _
 
 --- Module:   ../support/serial.c (C)
                                                  _
-	while (toc->wq_state != WT_WORKQ_FUNCTION)
+	while (toc->wq_state == WT_WORKQ_FUNCTION)
 ../support/serial.c  62  Warning 641: Converting enum 'volatile {...}' to int
 ../support/serial.c  62  Warning 641: Converting enum '{...}' to int
 
