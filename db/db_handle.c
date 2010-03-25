@@ -29,8 +29,8 @@ __wt_env_db(ENV *env, DB **dbp)
 	ienv = env->ienv;
 
 	/* Create the DB and IDB structures. */
-	WT_ERR(__wt_malloc(env, sizeof(DB), &db));
-	WT_ERR(__wt_malloc(env, sizeof(IDB), &idb));
+	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
+	WT_ERR(__wt_calloc(env, 1, sizeof(IDB), &idb));
 
 	/* Connect everything together. */
 	db->idb = idb;
@@ -89,9 +89,9 @@ __wt_idb_config_default(DB *db)
 
 	idb->db = db;
 
-	__wt_lock(env, &ienv->mtx);		/* Add to the ENV's list */
+	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 
 	return (0);
 }
@@ -176,9 +176,9 @@ __wt_idb_close(DB *db, int refresh)
 		return (ret);
 	}
 
-	__wt_lock(env, &ienv->mtx);		/* Delete from the ENV's list */
+	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 
 	__wt_free(env, idb, sizeof(IDB));
 
