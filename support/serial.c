@@ -27,32 +27,56 @@
  * possibility a reader will see a corrupted value, the value is only used for
  * advisory actions, such as waking the cache thread to see if there's work to
  * do.
- *
- * Threads serializing access to data set a function pointer/argument pair in
- * the WT_TOC handle, flush memory and spin; the workQ thread notes the set
- * and calls the function.  When the function returns, the workQ thread clears
- * the WT_TOC function pointer pair and flushes memory, allowing the original
- * thread to proceed.
  */
- /*
-  * __wt_toc_serialize_request --
-  *	Configure a serialization request, and wait for it.
-  */
-void
-__wt_toc_serialize_request(WT_TOC *toc, int (*serial)(WT_TOC *), void *args)
+
+/*
+ * __wt_toc_serialize_func --
+ *	Configure a serialization request, and spin until it completes.
+ */
+int
+__wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
 {
 	/*
-	 * The assignment to WT_TOC->serial makes the request visible to the
-	 * workQ.  If we're not passed a serial function, it just means the
-	 * caller has made other arrangements with the workQ, and the function
-	 * will never be called.  Fill in a function that will die horribly
-	 * if it's ever called.
+	 * Threads serializing access to data using a function:
+	 *	set a function/argument pair in the WT_TOC handle,
+	 *	flush memory,
+	 *	update the WT_TOC workq state,
+	 *	flush memory, and
+	 *	spins.
+	 *
+	 * The workQ thread notices the state change and calls the serialization
+	 * function.  When the function returns, the workQ resets WT_TOC workq
+	 * state, allowing the original thread to proceed.
+	 *
+	 * The first memory flush ensures all supporting information is written
+	 * before the wq_state field (which makes the entry visible to the workQ
+	 * thread).  No second memory flush is required, the wq_state field is
+	 * declared volatile.
 	 */
-	toc->serial_args = args;
-	toc->serial = serial == NULL ? (int (*)(WT_TOC *))__wt_abort : serial;
+	toc->wq_args = args;
+	toc->wq_func = func;
 	WT_MEMORY_FLUSH;
+	toc->wq_state = WT_WORKQ_FUNCTION;
 
-	/* We're spinning on the WT_TOC->serial field, it's marked volatile. */
-	while (toc->serial != NULL)
+	/* Spin on the WT_TOC->wq_state field. */
+	while (toc->wq_state != WT_WORKQ_FUNCTION)
 		__wt_yield();
+	return (toc->wq_ret);
+}
+
+/*
+ * __wt_toc_serialize_io --
+ *	Configure an io request, and block until it completes.
+ */
+int
+__wt_toc_serialize_io(WT_TOC *toc, u_int32_t addr, u_int32_t bytes)
+{
+	toc->wq_addr = addr;
+	toc->wq_bytes = bytes;
+	WT_MEMORY_FLUSH;
+	toc->wq_state = WT_WORKQ_READ;
+
+	/* Block until we're awakened. */
+	__wt_lock(toc->env, toc->mtx);
+	return (toc->wq_ret);
 }
