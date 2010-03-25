@@ -1201,11 +1201,13 @@ namespace mongo {
             if ( ! _cur.isEmpty() || _stack.size() )
                 return true;
 
-            if ( ! moreToDo() )
-                return false;
+            while ( moreToDo() ){
+                fillStack();
+                if ( ! _cur.isEmpty() )
+                    return true;
+            }
             
-            fillStack();
-            return ! _cur.isEmpty();
+            return false;
         }
         
         virtual bool advance(){ 
@@ -1296,12 +1298,13 @@ namespace mongo {
                 while ( _max.hasPrefix( _prefix ) && _max.advance( 1 , _found , this ) );
                 
                 if ( ! _prefix.constrains() ){
-                    // we've exhausted the btree
+                    GEODEBUG( "\t exhausted the btree" );
                     _state = DONE;
                     return;
                 }
                 
                 if ( _g->distance( _prefix , _start ) > _maxDistance ){
+                    GEODEBUG( "\tpast circle bounds" );
                     GeoHash tr = _prefix;
                     tr.move( 1 , 1 );
                     if ( _g->distance( tr , _start ) > _maxDistance )
@@ -1322,6 +1325,7 @@ namespace mongo {
         
         virtual bool checkDistance( const GeoHash& h , double& d ){
             d = _g->distance( _start , h );
+            GEODEBUG( "\t " << h << "\t" << d );
             return d <= ( _maxDistance + .01 );
         }
 
