@@ -96,6 +96,9 @@ main(int argc, char *argv[])
 		if (wts_read_recno())
 			goto err;
 
+		if (g.stats && wts_stats())
+			goto err;
+
 		bdb_teardown();
 		wts_teardown();
 

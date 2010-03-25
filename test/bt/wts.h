@@ -101,4 +101,5 @@ int	 wts_bulk_load(void);
 int	 wts_read_key(void);
 int	 wts_read_recno(void);
 int	 wts_setup(int, int);
+int	 wts_stats(void);
 void	 wts_teardown(void);

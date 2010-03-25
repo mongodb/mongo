@@ -152,20 +152,35 @@ wts_bulk_load()
 		db->err(db, ret, "Db.verify");
 		return (1);
 	}
+	return (0);
+}
 
-	if (g.stats) {
-		track("stat", 0);
-		p = fname(WT_PREFIX, "load.stat");
-		if ((fp = fopen(p, "w")) == NULL) {
-			db->err(db, errno, "fopen: %s", p);
-			return (1);
-		}
-		if ((ret = db->env->stat_print(db->env, stdout, 0)) != 0) {
-			db->err(db, ret, "Env.stat_print");
-			return (1);
-		}
-		(void)fclose(fp);
+/*
+ * wts_stats --
+ *	Dump the run's statistics.
+ */
+int
+wts_stats()
+{
+	DB *db;
+	FILE *fp;
+	char *p;
+	int ret;
+
+	db = g.wts_db;
+
+	track("stat", 0);
+	p = fname(NULL, "stats");
+	if ((fp = fopen(p, "w")) == NULL) {
+		db->err(db, errno, "fopen: %s", p);
+		return (1);
 	}
+	if ((ret = db->env->stat_print(db->env, fp, 0)) != 0) {
+		db->err(db, ret, "Env.stat_print");
+		return (1);
+	}
+	(void)fclose(fp);
+
 	return (0);
 }
 

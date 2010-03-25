@@ -14,7 +14,10 @@ fname(const char *prefix, const char *name)
 {
 	static char buf[128];
 
-	(void)snprintf(buf, sizeof(buf), "__%s.%s", prefix, name);
+	if (prefix == NULL)
+		(void)snprintf(buf, sizeof(buf), "__%s", name);
+	else
+		(void)snprintf(buf, sizeof(buf), "__%s.%s", prefix, name);
 	return (buf);
 }
 

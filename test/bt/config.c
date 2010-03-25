@@ -37,7 +37,7 @@ config(void)
 	CONFIG *cp;
 
 	/* Clean up from any previous runs. */
-	(void)system("rm -f __*");
+	(void)system("rm -f __bdb* __wt*");
 
 	/* Pick a random number seed. */
 	cp = config_find("rand_seed");
