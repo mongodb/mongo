@@ -21,7 +21,7 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
 
 	db = toc->db;
 
-	WT_RET(__wt_cache_in(toc, addr, WT_OVFL_BYTES(db, len), 0, &page));
+	WT_RET(__wt_cache_in(toc, addr, WT_OVFL_BYTES(db, len), &page));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
