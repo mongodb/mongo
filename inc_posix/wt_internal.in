@@ -33,6 +33,12 @@ extern "C" {
 #include <unistd.h>
 
 /*******************************************
+ * WiredTiger externally maintained include files.
+ *******************************************/
+#include "queue.h"
+#include "bitstring.h"
+
+/*******************************************
  * Internal forward declarations.
  *******************************************/
 struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
@@ -44,24 +50,24 @@ struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 
 /*******************************************
- * External include files.
- *******************************************/
-#include "queue.h"
-#include "bitstring.h"
-
-/*******************************************
- * Internal include files.
+ * WiredTiger internal include files.
  *******************************************/
 #include "mutex.h"
 
 #include "btree.h"
 #include "cache.h"
 #include "debug.h"
-#include "default.h"
 #include "fh.h"
 #include "mem.h"
 #include "misc.h"
 #include "stat.h"
+
+/*******************************************
+ * Default values -- grouped together so it's obvious what to re-configure.
+ *******************************************/
+#define	WT_CACHE_SIZE_DEFAULT	(20)	/* Default cache size in MB */
+#define	WT_HAZARD_SIZE_DEFAULT	(15)	/* Default number of hazard refs */
+#define	WT_TOC_SIZE_DEFAULT	(50)	/* Default number of TOCs */
 
 /*******************************************
  * WT_TOC support (the structures are public, so declared in wiredtiger.h).
