@@ -8,23 +8,26 @@
  */
 
 /*
- * There are 4 types of synchronization in WiredTiger: atomic writes, mutexes,
- * serialization, and private serialization.
- */
-
-/*
  * Atomic writes:
  *
  * WiredTiger requires variables of type u_int32_t and pointers (void *), be
- * written atomically.  This says nothing about write ordering, only that if
- * a 32-bit memory location or a pointer is simultaneously written by two
- * threads of control, the result will be one or the other of the two values,
- * not a combination of both.  WiredTiger does not require this for 64-bit
- * memory locations, allowing it to run on 32-bit architectures.
+ * written atomically.  If that's not guaranteed for your processor, you won't
+ * be able to make this software run reliably.
  *
- * Atomic writes are often associated with memory flushing, implemented by
- * the WT_MEMORY_FLUSH macro.   The WT_MEMORY_FLUSH macro must flush all
- * writes by any processor in the system.
+ * This does not require write ordering, only that if a 32-bit memory location
+ * or a pointer is simultaneously written by two threads of control, the result
+ * will be one or the other of the two values, not a combination of both.  This
+ * softare does NOT require atomic writes for 64-bit memory locations, allowing
+ * it to run on 32-bit memory bus architectures.
+ *
+ * Atomic writes are often associated with memory barriers, implemented by the
+ * WT_MEMORY_FLUSH macro.   The WT_MEMORY_FLUSH macro ensures memory stores by
+ * the processor, made before the WT_MEMORY_FLUSH call, be visible to all
+ * processors in the system, before any memory stores by this processor, made
+ * after the WT_MEMORY_FLUSH call, are visible to any processor.  Note that the
+ * WT_MEMORY_FLUSH macro makes no requirement with respect to loads by any
+ * processor, so any memory reference which might cause a problem if cached by
+ * a processor needs to be declared volatile.
  */
 extern void *__wt_addr;
 
