@@ -10,17 +10,17 @@
 #include "wt_internal.h"
 
 /*
- * __wt_mtx_init --
- *	Initialize a pthread mutex.
+ * __wt_mtx_alloc --
+ *	Allocate and initialize a pthread mutex.
  */
 int
-__wt_mtx_init(WT_MTX *mtx)
+__wt_mtx_alloc(ENV *env, int is_locked, WT_MTX **mtxp)
 {
+	WT_MTX *mtx;
 	pthread_condattr_t condattr;
 	pthread_mutexattr_t mutexattr;
 
-	/* Start unlocked. */
-	mtx->locked = 0;
+	WT_RET(__wt_calloc(env, 1, sizeof(WT_MTX), &mtx));
 
 	/*
 	 * !!!
@@ -30,29 +30,37 @@ __wt_mtx_init(WT_MTX *mtx)
 	 * Mutexes are shared between processes.
 	 */
 	if (pthread_mutexattr_init(&mutexattr) != 0)
-		return (WT_ERROR);
+		goto err;
 #if 0
 	if (pthread_mutexattr_setpshared(
 	    &mutexattr, PTHREAD_PROCESS_SHARED) != 0)
-		return (WT_ERROR);
+		goto err;
 #endif
 	if (pthread_mutex_init(&mtx->mtx, &mutexattr) != 0)
-		return (WT_ERROR);
+		goto err;
 	(void)pthread_mutexattr_destroy(&mutexattr);
 
 	/* Initialize the condition variable (mutexes are self-blocking). */
 	if (pthread_condattr_init(&condattr) != 0)
-		return (WT_ERROR);
+		goto err;
 #if 0
 	if (pthread_condattr_setpshared(
 	    &condattr, PTHREAD_PROCESS_SHARED) != 0)
-		return (WT_ERROR);
+		goto err;
 #endif
 	if (pthread_cond_init(&mtx->cond, &condattr) != 0)
-		return (WT_ERROR);
+		goto err;
 	(void)pthread_condattr_destroy(&condattr);
 
+	/* If the normal state of the mutex is locked, lock it immediately. */
+	if (is_locked)
+		__wt_lock(env, mtx);
+
+	*mtxp = mtx;
 	return (0);
+
+err:	__wt_free(env, mtx, sizeof(WT_MTX));
+	return (WT_ERROR);
 }
 
 /*
@@ -90,7 +98,7 @@ __wt_lock(ENV *env, WT_MTX *mtx)
 	return;
 
 err:	__wt_api_env_err(env, ret, "mutex lock failed");
-	__wt_abort();
+	__wt_abort(env);
 }
 
 /*
@@ -111,7 +119,7 @@ __wt_unlock(WT_MTX *mtx)
 	return;
 
 err:	__wt_api_env_err(NULL, ret, "mutex unlock failed");
-	__wt_abort();
+	__wt_abort(NULL);
 }
 
 /*
@@ -119,13 +127,14 @@ err:	__wt_api_env_err(NULL, ret, "mutex unlock failed");
  *	Destroy a mutex.
  */
 int
-__wt_mtx_destroy(WT_MTX *mtx)
+__wt_mtx_destroy(ENV *env, WT_MTX *mtx)
 {
 	int ret;
 
 	ret = pthread_cond_destroy(&mtx->cond);
-
 	WT_TRET(pthread_mutex_destroy(&mtx->mtx));
+
+	__wt_free(env, mtx, sizeof(WT_MTX));
 
 	return (ret == 0 ? 0 : WT_ERROR);
 }
