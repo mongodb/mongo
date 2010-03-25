@@ -24,11 +24,10 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 	fh = NULL;
 	ienv = env->ienv;
 
-	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
-		__wt_msg(env, "fileops: %s: open", name);
+	 WT_VERBOSE(env, WT_VERB_FILEOPS, (env, "fileops: %s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
-	__wt_lock(env, &ienv->mtx);
+	__wt_lock(env, ienv->mtx);
 	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 		if ((fh = idb->fh) == NULL)
 			continue;
@@ -38,7 +37,7 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 			break;
 		}
 	}
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 	if (fh != NULL)
 		return (0);
 
@@ -55,7 +54,7 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 		return (WT_ERROR);
 	}
 
-	WT_RET(__wt_malloc(env, sizeof(WT_FH), &fh));
+	WT_RET(__wt_calloc(env, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_stat_alloc_fh_stats(env, &fh->stats));
 	WT_ERR(__wt_strdup(env, name, &fh->name));
 
@@ -81,9 +80,9 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 	WT_ERR(__wt_filesize(env, fh, &fh->file_size));
 
 	/* Link onto the environment's list of files. */
-	__wt_lock(env, &ienv->mtx);
+	__wt_lock(env, ienv->mtx);
 	TAILQ_INSERT_TAIL(&ienv->fhqh, fh, q);
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 
 	return (0);
 
@@ -113,9 +112,9 @@ __wt_close(ENV *env, WT_FH *fh)
 		return (0);
 
 	/* Remove from the list and discard the memory. */
-	__wt_lock(env, &ienv->mtx);
+	__wt_lock(env, ienv->mtx);
 	TAILQ_REMOVE(&ienv->fhqh, fh, q);
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 
 	if (close(fh->fd) != 0) {
 		__wt_api_env_err(env, errno, "%s", fh->name);
