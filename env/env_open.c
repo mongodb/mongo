@@ -35,8 +35,10 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	F_SET(ienv, WT_WORKQ_RUN | WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
 
+	WT_ERR(
+	    __wt_thread_create(&ienv->cache_drain_tid, __wt_cache_drain, env));
+	WT_ERR(__wt_thread_create(&ienv->cache_io_tid, __wt_cache_io, env));
 	WT_ERR(__wt_thread_create(&ienv->workq_tid, __wt_workq_srvr, env));
-	WT_ERR(__wt_thread_create(&ienv->cache_tid, __wt_cache_srvr, env));
 
 	return (0);
 
@@ -81,16 +83,18 @@ __wt_env_close(ENV *env)
 		secondary_err = WT_ERROR;
 	}
 
-	/* Close down and wait for any server threads. */
+	/* Close down and wait for server threads. */
 	F_CLR(ienv, WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
-	__wt_unlock(&ienv->cache.mtx);
-	__wt_thread_join(ienv->cache_tid);
+	__wt_unlock(ienv->cache->mtx_drain);
+	__wt_thread_join(ienv->cache_drain_tid);
+	__wt_unlock(ienv->cache->mtx_io);
+	__wt_thread_join(ienv->cache_io_tid);
 
 	/*
 	 * Close down and wait for the workQ thread; this only happens after
 	 * all other server threads have exited, as they may be waiting on a
-	 * request from the workQ.
+	 * request from the workQ, or vice-versa.
 	 */
 	F_CLR(ienv, WT_WORKQ_RUN);
 	WT_MEMORY_FLUSH;
