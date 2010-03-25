@@ -137,7 +137,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc( new ClientCursor(creal, ns, false) );
+        auto_ptr<ClientCursor> cc( new ClientCursor(0, creal, ns) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;
@@ -274,13 +274,17 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
-            ss << " query: " << cc->query << " ";
+            ss << " getMore: " << cc->query << " ";
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
+                        /* when a tailable cursor hits "EOF", ok() goes false, and current() is null.  however 
+                           advance() can still be retries as a reactivation attempt.  when there is new data, it will 
+                           return true.  that's what we are doing here.
+                           */
                         if ( c->advance() ) {
                             continue;
                         }
@@ -784,7 +788,7 @@ namespace mongo {
         log( 5 ) << "   used cursor: " << cursor.get() << endl;
         if ( dqo.saveClientCursor() ) {
             // the clientcursor now owns the Cursor* and 'c' is released:
-            ClientCursor *cc = new ClientCursor(cursor, ns, !(queryOptions & QueryOption_NoCursorTimeout));
+            ClientCursor *cc = new ClientCursor(queryOptions, cursor, ns);
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
             DEV out() << "  query has more, cursorid: " << cursorid << endl;

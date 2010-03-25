@@ -31,6 +31,7 @@
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
+#include "../client/dbclient.h"
 
 namespace mongo {
 
@@ -104,14 +105,15 @@ namespace mongo {
         auto_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
+        int _queryOptions;
 
-        ClientCursor(auto_ptr<Cursor>& _c, const char *_ns, bool okToTimeout) : 
+        ClientCursor(int queryOptions, auto_ptr<Cursor>& _c, const char *_ns) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), 
             ns(_ns), c(_c), 
-            pos(0) 
+            pos(0), _queryOptions(queryOptions)
         {
-            if( !okToTimeout )
+            if( queryOptions & QueryOption_NoCursorTimeout )
                 noTimeout();
             recursive_scoped_lock lock(ccmutex);
             cursorid = allocCursorId_inlock();

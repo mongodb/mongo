@@ -336,8 +336,8 @@ namespace mongo {
             SplitCollectionHelper( const char * name ) : GridAdminCmd( name ) , _name( name ){}
             virtual void help( stringstream& help ) const {
                 help
-                    << " example: { shard : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
-                    << " example: { shard : 'alleyinsider.blog.posts' , middle : { ts : 1 } } - split the shard that contains the key with this as the middle \n"
+                    << " example: { split : 'alleyinsider.blog.posts' , find : { ts : 1 } } - split the shard that contains give key \n"
+                    << " example: { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } } - split the shard that contains the key with this as the middle \n"
                     << " NOTE: this does not move move the chunks, it merely creates a logical seperation \n"
                     ;
             }
