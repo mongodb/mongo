@@ -55,9 +55,9 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	WT_RET(__wt_strdup(env, dbname, &idb->dbname));
 	idb->mode = mode;
 
-	__wt_lock(env, &ienv->mtx);
+	__wt_lock(env, ienv->mtx);
 	idb->file_id = ++ienv->next_file_id;
-	__wt_unlock(&ienv->mtx);
+	__wt_unlock(ienv->mtx);
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(idb, WT_RDONLY);
