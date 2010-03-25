@@ -22,7 +22,6 @@ class Stat:
 ##########################################
 ienv_stats = {}
 ienv_stats['DATABASE_OPEN'] = Stat([], 'database open')
-ienv_stats['HASH_BUCKETS'] = Stat([], 'hash buckets')
 ienv_stats['MEMALLOC'] = Stat([], 'memory allocations')
 ienv_stats['MEMFREE'] = Stat([], 'memory frees')
 ienv_stats['MTX_LOCK'] = Stat([], 'mutex lock calls')
@@ -40,6 +39,7 @@ cache_stats['CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
 cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
 cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
 cache_stats['CACHE_EVICT'] = Stat([], 'clean pages evicted from the cache')
+cache_stats['CACHE_HASH_BUCKETS'] = Stat([], 'hash buckets')
 cache_stats['CACHE_HAZARD_EVICT'] = Stat([], 'pages not evicted because of a hazard reference')
 cache_stats['CACHE_HIT'] = Stat([], 'reads found in the cache')
 cache_stats['CACHE_MAX_BUCKET_ENTRIES'] = Stat([], 'maximum entries allocated to a hash bucket')

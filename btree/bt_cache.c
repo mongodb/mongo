@@ -73,17 +73,15 @@ err:	(void)__wt_cache_destroy(env);
 void
 __wt_cache_stats(ENV *env)
 {
-	IENV *ienv;
-	WT_STATS *stats;
 	WT_CACHE *cache;
+	WT_STATS *stats;
 
-	ienv = env->ienv;
-	stats = ienv->stats;
-	cache = ienv->cache;
+	cache = env->ienv->cache;
+	stats = cache->stats;
 
 	WT_STAT_SET(stats, CACHE_BYTES_INUSE, WT_CACHE_BYTES_INUSE(cache));
 	WT_STAT_SET(stats, CACHE_PAGES_INUSE, WT_CACHE_PAGES_INUSE(cache));
-	WT_STAT_SET(stats, HASH_BUCKETS, cache->hb_size);
+	WT_STAT_SET(stats, CACHE_HASH_BUCKETS, cache->hb_size);
 }
 
 /*

@@ -7,13 +7,14 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 14, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
 	stats[WT_STAT_CACHE_BYTES_MAX].desc =
 	    "maximum bytes configured for the cache";
 	stats[WT_STAT_CACHE_EVICT].desc = "clean pages evicted from the cache";
+	stats[WT_STAT_CACHE_HASH_BUCKETS].desc = "hash buckets";
 	stats[WT_STAT_CACHE_HAZARD_EVICT].desc =
 	    "pages not evicted because of a hazard reference";
 	stats[WT_STAT_CACHE_HIT].desc = "reads found in the cache";
@@ -35,6 +36,7 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_CACHE_EVICT].v = 0;
+	stats[WT_STAT_CACHE_HASH_BUCKETS].v = 0;
 	stats[WT_STAT_CACHE_HAZARD_EVICT].v = 0;
 	stats[WT_STAT_CACHE_HIT].v = 0;
 	stats[WT_STAT_CACHE_MAX_BUCKET_ENTRIES].v = 0;
@@ -170,12 +172,9 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 10, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
-	stats[WT_STAT_HASH_BUCKETS].desc = "hash buckets";
-	stats[WT_STAT_LONGEST_BUCKET].desc =
-	    "longest hash bucket chain search";
 	stats[WT_STAT_MEMALLOC].desc = "memory allocations";
 	stats[WT_STAT_MEMFREE].desc = "memory frees";
 	stats[WT_STAT_MTX_LOCK].desc = "mutex lock calls";
@@ -193,8 +192,6 @@ void
 __wt_stat_clear_env_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_DATABASE_OPEN].v = 0;
-	stats[WT_STAT_HASH_BUCKETS].v = 0;
-	stats[WT_STAT_LONGEST_BUCKET].v = 0;
 	stats[WT_STAT_MEMALLOC].v = 0;
 	stats[WT_STAT_MEMFREE].v = 0;
 	stats[WT_STAT_MTX_LOCK].v = 0;
