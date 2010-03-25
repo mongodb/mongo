@@ -495,7 +495,7 @@ __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp)
 
 	if (tag != NULL)
 		fprintf(fp, "%s: ", tag);
-	fprintf(fp, "{");
+	fprintf(fp, "%lu {",  (u_long)dbt->size);
 	__wt_bt_print(dbt->data, dbt->size, fp);
 	fprintf(fp, "}\n");
 }
