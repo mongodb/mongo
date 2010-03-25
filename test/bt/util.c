@@ -21,7 +21,7 @@ fname(const char *prefix, const char *name)
 void
 key_gen(DBT *key, u_int64_t key_cnt)
 {
-	static int first = 1;
+	static size_t blen;
 	static char *buf;
 	size_t i, len, klen;
 
@@ -34,12 +34,16 @@ key_gen(DBT *key, u_int64_t key_cnt)
 	 *
 	 * Fill in the random key lengths.
 	 */
-	if (first) {
-		first = 0;
+	if (blen < g.c_key_max) {
+		if (buf != NULL) {
+			free(buf);
+			buf = NULL;
+		}
 		for (i = 0;
 		    i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 			g.key_rand_len[i] = MMRAND(g.c_key_min, g.c_key_max);
-		if ((buf = malloc(g.c_key_max)) == NULL) {
+		blen = g.c_key_max;
+		if ((buf = malloc(blen)) == NULL) {
 			fprintf(stderr,
 			    "%s: %s\n", g.progname, strerror(errno));
 			exit (EXIT_FAILURE);
@@ -60,7 +64,7 @@ key_gen(DBT *key, u_int64_t key_cnt)
 void
 data_gen(DBT *data)
 {
-	static int first = 1;
+	static size_t blen;
 	static char *buf;
 	size_t i, len;
 	char *p;
@@ -73,15 +77,18 @@ data_gen(DBT *data)
 	 * Add a few extra bytes in order to guarantee we can always offset
 	 * into the buffer by a few bytes.
 	 */
-	if (first) {
-		first = 0;
-		len = g.c_data_max + 10;
-		if ((buf = malloc(len)) == NULL) {
+	if (blen < g.c_data_max + 10) {
+		if (buf != NULL) {
+			free(buf);
+			buf = NULL;
+		}
+		blen = g.c_data_max + 10;
+		if ((buf = malloc(blen)) == NULL) {
 			fprintf(stderr,
 			    "%s: %s\n", g.progname, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
-		for (i = 0; i < len; ++i)
+		for (i = 0; i < blen; ++i)
 			buf[i] = 'A' + i % 26;
 	}
 
