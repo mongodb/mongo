@@ -91,21 +91,9 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
  *******************************************/
 #define	WT_FLIST_MAX	50
 
-#define	WT_FLIST_INSERT(toc, __p, __l) do {				\
-	WT_FLIST *__fp = (toc)->flist;					\
-	if (__fp == NULL || __fp->cnt == WT_FLIST_MAX)			\
-		__wt_flist_insert(toc, __p, __l);			\
-	else {								\
-		__fp->ref[__fp->cnt].p = __p;				\
-		__fp->ref[__fp->cnt].len = __l;				\
-		++__fp->cnt;						\
-	}								\
-	__p = NULL;							\
-} while (0)
-
 /*
  * WT_FLIST --
- *	A structure to list memory references with tracking information.
+ *	A structure to track memory references with API generations.
  */
 struct __wt_flist {
 	TAILQ_ENTRY(__wt_flist) q;		/* Linked list */
@@ -118,6 +106,18 @@ struct __wt_flist {
 	} ref[WT_FLIST_MAX];
 	u_int	  cnt;
 };
+
+#define	WT_FLIST_INSERT(toc, __p, __l) do {				\
+	WT_FLIST *__fp = (toc)->flist;					\
+	if (__fp == NULL || __fp->cnt == WT_FLIST_MAX)			\
+		__wt_flist_insert(toc, __p, __l);			\
+	else {								\
+		__fp->ref[__fp->cnt].p = __p;				\
+		__fp->ref[__fp->cnt].len = __l;				\
+		++__fp->cnt;						\
+	}								\
+	__p = NULL;							\
+} while (0)
 
 /*******************************************
  * Cursor handle information that doesn't persist.
