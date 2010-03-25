@@ -59,7 +59,7 @@ __wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
 	toc->wq_state = WT_WORKQ_FUNCTION;
 
 	/* Spin on the WT_TOC->wq_state field. */
-	while (toc->wq_state != WT_WORKQ_FUNCTION)
+	while (toc->wq_state == WT_WORKQ_FUNCTION)
 		__wt_yield();
 	return (toc->wq_ret);
 }
