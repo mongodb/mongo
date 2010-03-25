@@ -556,5 +556,6 @@ flags['ienv'] = [
 	'SERVER_RUN',
 	'WORKQ_RUN' ]
 flags['wt_page'] = [
+	'DISCARD',
 	'MODIFIED',
 	'PINNED' ]

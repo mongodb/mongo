@@ -87,11 +87,16 @@ retry:	/* Search the cache for the page. */
 	if (found) {
 		__wt_hazard_set(toc, e->page);
 		if (e->state == WT_OK) {
+			/*
+			 * Update the generation number and clear any discard
+			 * flag, it's clearly wrong.
+			 */
+			e->gen = ++ienv->page_gen;
+			F_CLR(e->page, WT_DISCARD);
+			*pagep = e->page;
+
 			WT_STAT_INCR(ienv->stats, CACHE_HIT);
 			WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
-
-			e->gen = ++ienv->page_gen;
-			*pagep = e->page;
 			return (0);
 		}
 		__wt_hazard_clear(toc, e->page);
@@ -118,9 +123,12 @@ retry:	/* Search the cache for the page. */
 int
 __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
-	/* If the page has been modified, set the local flag. */
-	if (LF_ISSET(WT_MODIFIED))
-		F_SET(page, WT_MODIFIED);
+	/*
+	 * If the page has been modified or flagged as useless, set the
+	 * local flag.
+	 */
+	if (LF_ISSET(WT_DISCARD | WT_MODIFIED))
+		F_SET(page, LF_ISSET(WT_DISCARD | WT_MODIFIED));
 
 	__wt_hazard_clear(toc, page);
 

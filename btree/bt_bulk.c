@@ -144,7 +144,8 @@ __wt_bt_bulk_fix(DB *db,
 			 */
 			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			WT_ERR(__wt_bt_page_out(
+			    toc, page, WT_DISCARD | WT_MODIFIED));
 
 			/* Switch to the next page. */
 			page = next;
@@ -176,7 +177,8 @@ __wt_bt_bulk_fix(DB *db,
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(toc, page, page->records, NULL);
-			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			WT_ERR(__wt_bt_page_out(
+			    toc, page, WT_DISCARD | WT_MODIFIED));
 			page = NULL;
 		}
 	}
@@ -475,7 +477,8 @@ skip_read:	/*
 			 */
 			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
-			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			WT_ERR(__wt_bt_page_out(
+			    toc, page, WT_DISCARD | WT_MODIFIED));
 
 			/* Switch to the next page. */
 			page = next;
@@ -579,7 +582,8 @@ skip_read:	/*
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(toc, page, page->records, NULL);
-			WT_ERR(__wt_bt_page_out(toc, page, WT_MODIFIED));
+			WT_ERR(__wt_bt_page_out(
+			    toc, page, WT_DISCARD | WT_MODIFIED));
 			page = NULL;
 		}
 	}

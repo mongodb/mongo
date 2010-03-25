@@ -162,13 +162,21 @@ __wt_cache_drain(void *arg)
 			if (bucket_cnt == cache->hb_size)
 				bucket_cnt = 0;
 			WT_CACHE_FOREACH_PAGE(
-			    cache, &cache->hb[bucket_cnt], e, i)
-				if (e->state == WT_OK &&
-				    !F_ISSET(e->page, WT_PINNED)) {
-					*drainp++ = e;
-					if (--review_cnt == 0)
-						break;
-				}
+			    cache, &cache->hb[bucket_cnt], e, i) {
+				/* Skip pages that aren't ours to take. */
+				if (e->state != WT_OK ||
+				    F_ISSET(e->page, WT_PINNED))
+					continue;
+				/*
+				 * If the page is marked as useless, clear its
+				 * generation number so we'll take it.
+				 */
+				if (F_ISSET(e->page, WT_DISCARD))
+					e->gen = 0;
+				*drainp++ = e;
+				if (--review_cnt == 0)
+					break;
+			}
 		}
 
 		/* No pages to drain: confused but done. */
@@ -176,7 +184,7 @@ __wt_cache_drain(void *arg)
 		if (drain_elem == 0)
 			continue;
 
-		/* Sort the list of drain pages by their generation number. */
+		/* Sort the drain pages by ascending generation number. */
 		qsort(drain, (size_t)drain_elem,
 		    sizeof(WT_CACHE_ENTRY *), __wt_cache_compare_gen);
 
