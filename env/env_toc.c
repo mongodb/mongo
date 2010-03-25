@@ -44,6 +44,8 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	toc->env = env;
 	toc->hazard = ienv->hazard + slot * env->hazard_size;
 
+	WT_RET(__wt_mtx_alloc(env, 1, &toc->mtx));
+
 	__wt_methods_wt_toc_lockout(toc);
 	__wt_methods_wt_toc_init_transition(toc);
 
@@ -65,17 +67,29 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ENV *env;
 	IENV *ienv;
 	WT_TOC **tp;
+	int ret;
 
 	env = toc->env;
 	ienv = env->ienv;
+	ret = 0;
 
-	/* Clear any remaining hazard references (there shouldn't be any). */
-	__wt_hazard_empty(toc);
+	/* Free any memory we've been accumulating. */
+	if (toc->flist != NULL)
+		WT_TRET(__wt_flist_sched(toc));
 
 	/* Discard DBT memory. */
 	__wt_free(env, toc->key.data, toc->key.data_len);
 	__wt_free(env, toc->data.data, toc->data.data_len);
 	__wt_free(env, toc->scratch.data, toc->scratch.data_len);
+
+	/* Clear any remaining hazard references (there shouldn't be any). */
+	__wt_hazard_empty(toc);
+
+	/* Unlock and destroy the thread's mutex. */
+	if (toc->mtx != NULL) {
+		__wt_unlock(toc->mtx);
+		(void)__wt_mtx_destroy(env, toc->mtx);
+	}
 
 	/*
 	 * Replace the WT_TOC reference we're closing with the last entry in
@@ -91,10 +105,9 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 	/* Make the WT_TOC array entry available for re-use. */
 	toc->env = NULL;
-
 	WT_MEMORY_FLUSH;
 
-	return (0);
+	return (ret);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -112,16 +125,21 @@ __wt_toc_dump(ENV *env)
 	__wt_mb_add(&mb, "%s\n", ienv->sep);
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 		__wt_mb_add(&mb,
-		    "toc: %#lx {\n\tserial: ", WT_ADDR_TO_ULONG(toc));
-		if (toc->serial == NULL)
+		    "toc: %#lx {\n\tworkq func: ", WT_PTR_TO_ULONG(toc));
+		if (toc->wq_func == NULL)
 			__wt_mb_add(&mb, "none");
 		else
 			__wt_mb_add(&mb,
-			    "%#lx", WT_ADDR_TO_ULONG(toc->serial));
+			    "%#lx", WT_PTR_TO_ULONG(toc->wq_func));
+
+		__wt_mb_add(&mb, "\n\twq_addr: %lu, ", toc->wq_addr);
+		__wt_mb_add(&mb, "wq_bytes: %lu, ", toc->wq_bytes);
+
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = toc->hazard;
 		    hp < toc->hazard + env->hazard_size; ++hp)
-			__wt_mb_add(&mb, "%#lx ", WT_ADDR_TO_ULONG(*hp));
+			__wt_mb_add(&mb, "%#lx ", WT_PTR_TO_ULONG(*hp));
+
 		__wt_mb_add(&mb, "\n}");
 		if (toc->name != NULL)
 			__wt_mb_add(&mb, " %s", toc->name);
