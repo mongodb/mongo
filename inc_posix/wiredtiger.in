@@ -57,6 +57,8 @@ struct __env;			typedef struct __env ENV;
 struct __idb;			typedef struct __idb IDB;
 struct __idbc;			typedef struct __idbc IDBC;
 struct __ienv;			typedef struct __ienv IENV;
+struct __wt_flist;		typedef struct __wt_flist WT_FLIST;
+struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
 struct __wt_page;		typedef struct __wt_page WT_PAGE;
 struct __wt_toc;		typedef struct __wt_toc WT_TOC;
 
@@ -82,6 +84,8 @@ struct __dbt {
  * Application thread-of-control information
  *******************************************/
 struct __wt_toc {
+	WT_MTX	 *mtx;			/* Blocking mutex */
+
 	char	 *name;			/* Name */
 
 	/*
@@ -96,15 +100,31 @@ struct __wt_toc {
 	DBT	 key, data;		/* Returned key/data pairs */
 	DBT	 scratch;		/* Temporary use by anybody */
 
-	/* WT_TOC serialization request. */
-	int (*
-	    volatile serial)(WT_TOC *);	/* Serialization function */
-	void	*serial_args;		/* Serialization function argument */
-	int	 serial_ret;		/* Serialization function return */
+	/*
+	 * Each WT_TOC structure is assigned a generation number as it enters
+	 * the WiredTiger API, and the generation is cleared as it leaves the
+	 * API.  The value is used to determine when chunks of memory are known
+	 * to be unreferenced, and can be discarded.
+	 */
+	u_int32_t volatile gen;		/* API generation */
+
+					/* WT_TOC workQ request */
+	int     (*wq_func)(WT_TOC *);	/* Function */
+	void	 *wq_args;		/* Function argument */
+	u_int32_t wq_addr;		/* I/O request: file address */
+	u_int32_t wq_bytes;		/* I/O request: bytes to read */
+	int	  wq_ret;		/* Returned error */
+
+	enum {
+		WT_WORKQ_NONE,		/* No request */
+		WT_WORKQ_FUNCTION,	/* Function request */
+		WT_WORKQ_READ,		/* Read I/O request */
+		WT_WORKQ_READ_SCHED	/* Read I/O has been scheduled */
+	} volatile wq_state;
+
+	WT_FLIST *flist;		/* Memory free list */
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
-
-	 u_int32_t flags;
 
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
@@ -429,32 +449,28 @@ char	*wiredtiger_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ASCII_ENGLISH				0x00000008
-#define	WT_CACHE_DRAIN_WAIT				0x00000001
-#define	WT_CACHE_LOCKOUT				0x00000004
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
 #define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
-#define	WT_INITIALIZED					0x00000002
 #define	WT_INSERT					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
-#define	WT_MODIFIED					0x00000004
-#define	WT_PINNED					0x00000002
+#define	WT_MODIFIED					0x00000002
+#define	WT_PINNED					0x00000001
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
 #define	WT_REPEAT_COMP					0x00000001
 #define	WT_SERVER_RUN					0x00000002
-#define	WT_SERVER_SLEEPING				0x00000001
 #define	WT_TELEPHONE					0x00000001
-#define	WT_UNFORMATTED					0x00000001
-#define	WT_VERB_ALL					0x00000002
-#define	WT_VERB_FILEOPS					0x00000001
+#define	WT_VERB_ALL					0x00000008
+#define	WT_VERB_CACHE					0x00000004
+#define	WT_VERB_FILEOPS					0x00000002
+#define	WT_VERB_SERVERS					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
-#define	WT_APIMASK_CACHE				0x00000003
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000000
 #define	WT_APIMASK_DB_COLUMN_SET			0x00000001
@@ -476,12 +492,11 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
-#define	WT_APIMASK_ENV_VERBOSE_SET			0x00000003
+#define	WT_APIMASK_ENV_VERBOSE_SET			0x0000000f
 #define	WT_APIMASK_IDB					0x00000007
-#define	WT_APIMASK_IENV					0x00000007
+#define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
-#define	WT_APIMASK_WT_PAGE				0x00000007
-#define	WT_APIMASK_WT_TOC				0x00000001
+#define	WT_APIMASK_WT_PAGE				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

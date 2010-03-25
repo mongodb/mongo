@@ -39,8 +39,7 @@ struct __wt_btree;		typedef struct __wt_btree WT_BTREE;
 struct __wt_cache;		typedef struct __wt_cache WT_CACHE;
 struct __wt_fh;			typedef struct __wt_fh WT_FH;
 struct __wt_lsn;		typedef struct __wt_lsn WT_LSN;
-struct __wt_mtx;		typedef struct __wt_mtx WT_MTX;
-struct __wt_page_hqh;		typedef struct __wt_page_hqh WT_PAGE_HQH;
+struct __wt_page_entry;		typedef struct __wt_page_entry WT_PAGE_ENTRY;
 struct __wt_stat;		typedef struct __wt_stat WT_STAT;
 struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 
@@ -53,12 +52,15 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 /*******************************************
  * Internal include files.
  *******************************************/
+#include "mutex.h"
+
 #include "btree.h"
+#include "cache.h"
 #include "debug.h"
+#include "default.h"
 #include "fh.h"
 #include "mem.h"
 #include "misc.h"
-#include "mutex.h"
 #include "stat.h"
 
 /*******************************************
@@ -77,6 +79,39 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 	(toc)->db = NULL;						\
 	(toc)->name = NULL;						\
 } while (0)
+
+/*******************************************
+ * Memory reference tracking information.
+ *******************************************/
+#define	WT_FLIST_MAX	50
+
+#define	WT_FLIST_INSERT(toc, __p, __l) do {				\
+	WT_FLIST *__fp = (toc)->flist;					\
+	if (__fp == NULL || __fp->cnt == WT_FLIST_MAX)			\
+		__wt_flist_insert(toc, __p, __l);			\
+	else {								\
+		__fp->ref[__fp->cnt].p = __p;				\
+		__fp->ref[__fp->cnt].len = __l;				\
+		++__fp->cnt;						\
+	}								\
+	__p = NULL;							\
+} while (0)
+
+/*
+ * WT_FLIST --
+ *	A structure to list memory references with tracking information.
+ */
+struct __wt_flist {
+	TAILQ_ENTRY(__wt_flist) q;		/* Linked list */
+
+	u_int32_t gen;				/* API generation */
+
+	struct {				/* Memory references */
+		void *p;
+		u_int32_t len;
+	} ref[WT_FLIST_MAX];
+	u_int	  cnt;
+};
 
 /*******************************************
  * Cursor handle information that doesn't persist.
@@ -110,51 +145,13 @@ struct __idb {
 };
 
 /*******************************************
- * Cache support.
- *******************************************/
-struct __wt_cache {
-	WT_MTX mtx;			/* Cache server mutex */
-
-#define	WT_CACHE_SIZE_DEFAULT	(20)	/* 20MB */
-
-	/*
-	 * Each in-memory page is in a hash bucket based on its "address".
-	 *
-	 * Our hash buckets are very simple list structures.   We depend on
-	 * the ability to add/remove an element from the list by writing a
-	 * single pointer.  The underlying assumption is that writing a
-	 * single pointer will never been seen as a partial write by any
-	 * other thread of control, that is, the linked list will always
-	 * be consistent.  The end result is that while we have to serialize
-	 * the actual manipulation of the memory, we can support multiple
-	 * threads of control using the linked lists even while they are
-	 * being modified.
-	 */
-#define	WT_CACHE_HASH_SIZE_DEFAULT	0
-#define	WT_HASH(cache, addr)	((addr) % (cache)->hash_size)
-	u_int32_t hash_size;
-
-	WT_PAGE **hb;
-
-	u_int32_t flags;
-};
-
-/*
- * WT_REF --
- *	A structure to pair a memory reference to a generation number.
- */
-typedef struct __wt_ref {
-	void	 *ref;				/* Memory reference */
-	u_int32_t gen;				/* Associated generation */
-} WT_REF;
-
-/*******************************************
  * Environment handle information that doesn't persist.
  *******************************************/
 struct __ienv {
-	WT_MTX mtx;			/* Global mutex */
+	WT_MTX *mtx;			/* Global mutex */
 
-	pthread_t cache_tid;		/* Cache thread ID */
+	pthread_t cache_drain_tid;	/* Cache drian thread ID */
+	pthread_t cache_io_tid;		/* Cache I/O thread ID */
 	pthread_t workq_tid;		/* workQ thread ID */
 
 	TAILQ_HEAD(
@@ -163,6 +160,8 @@ struct __ienv {
 	TAILQ_HEAD(
 	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
 	u_int next_file_id;		/* Locked: file ID counter */
+
+	u_int32_t volatile api_gen;	/* API generation number */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous threads of control by
@@ -175,33 +174,39 @@ struct __ienv {
 	 * code to avoid walking the entire array when only a few threads are
 	 * running.
 	 */
-#define	WT_TOC_SIZE_DEFAULT	50
 	WT_TOC	**toc;			/* TOC reference */
 	u_int32_t toc_cnt;		/* TOC count */
 	void	 *toc_array;		/* TOC array */
 
 	/*
-	 * WiredTiger allocates space for 10 hazard references in each thread of
+	 * WiredTiger allocates space for 15 hazard references in each thread of
 	 * control, by default.  The Env.hazard_max_set method tunes this if an
 	 * application needs more, but that shouldn't happen, there's no code
-	 * path that requires more than 10 pages at a time (and if we find one,
+	 * path that requires more than 15 pages at a time (and if we find one,
 	 * the right change is to increase the default).  The method is there
 	 * just in case an application starts failing in the field.
 	 *
 	 * The hazard array is separate from the WT_TOC array because we want to
 	 * be able to easily copy and search it when draining the cache.
 	 */
-#define	WT_HAZARD_SIZE_DEFAULT	15
-	WT_PAGE	**hazard;		/* Hazard references array */
+	WT_PAGE **hazard;		/* Hazard references array */
 
-	WT_CACHE  cache;		/* Page cache */
-	u_int32_t page_gen;		/* Page cache LRU generation number */
+	/*
+	 * WiredTiger has a thread that frees memory lazily once it's known that
+	 * no more references exist.  The workQ thread owns the queue of memory
+	 * references used by that thread.
+	 */
+	TAILQ_HEAD(			/* Free list queue */
+	    __wt_flisth, __wt_flist) flistq;
+
+	WT_CACHE  *cache;		/* Page cache */
+	u_int32_t  page_gen;		/* Page cache LRU generation number */
+
+	WT_STATS *stats;		/* Environment handle statistics */
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_MTRACK *mtrack;		/* Memory tracking information */
 #endif
-
-	WT_STATS *stats;		/* Environment handle statistics */
 
 	char *sep;			/* Display separator line */
 	char err_buf[32];		/* Last-ditch error buffer */

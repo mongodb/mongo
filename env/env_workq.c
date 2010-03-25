@@ -18,50 +18,77 @@ __wt_workq_srvr(void *arg)
 {
 	ENV *env;
 	IENV *ienv;
+	WT_FLIST *fp;
 	WT_TOC **tp, *toc;
-	int notfound;
+	u_int32_t low_gen;
+	int io_scheduled, nowork;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
 
-	notfound = 1;
+	/* Walk the WT_TOC list and execute requests. */
 	while (F_ISSET(ienv, WT_WORKQ_RUN)) {
-		/* Walk the WT_TOC list and execute serialization requests. */
+		++ienv->api_gen;
+		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
+
+		low_gen = UINT32_MAX;
+		io_scheduled = 0;
+		nowork = 1;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
-			if (toc->serial == NULL)
-				continue;
-
-			/* The thread may be waiting on the cache to drain. */
-			if (F_ISSET(toc, WT_CACHE_DRAIN_WAIT)) {
-				if (F_ISSET(ienv, WT_CACHE_LOCKOUT))
-					continue;
-				toc->serial_ret = 0;
-			} else
-				toc->serial_ret = toc->serial(toc);
-
-			toc->serial = NULL;
-			WT_MEMORY_FLUSH;
-			notfound = 0;
+			if (toc->gen < low_gen)
+				low_gen = toc->gen;
+			switch (toc->wq_state) {
+			case WT_WORKQ_NONE:
+				break;
+			case WT_WORKQ_FUNCTION:
+				/*
+				 * Flush out the commands results, then notify
+				 * the thread it can proceed.
+				 */
+				nowork = 0;
+				toc->wq_ret = toc->wq_func(toc);
+				WT_MEMORY_FLUSH;
+				toc->wq_state = WT_WORKQ_NONE;
+				break;
+			case WT_WORKQ_READ:
+				if (__wt_workq_schedule_read(toc) == 0)
+					toc->wq_state = WT_WORKQ_READ_SCHED;
+				nowork = 0;
+				/* FALLTHROUGH */
+			case WT_WORKQ_READ_SCHED:
+				io_scheduled = 1;
+				break;
+			}
 		}
 
-		__wt_cache_size_check(env);
+		/* Check if we can free some memory. */
+		if ((fp = TAILQ_FIRST(&ienv->flistq)) != NULL &&
+		    (low_gen == UINT32_MAX || low_gen > fp->gen))
+			__wt_workq_flist(env);
+
+		/* If a read was scheduled, check on the cache servers. */
+		if (io_scheduled)
+			__wt_workq_cache_server(env);
 
 		/*
 		 * If we didn't find work, yield the processor.  If we
 		 * don't find work for awhile, sleep.
 		 */
-		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
-		if (notfound++) {
-			if (notfound >= 100000) {
+		if (nowork++) {
+			if (nowork >= 100000) {
 				WT_STAT_INCR(ienv->stats, WORKQ_SLEEP);
-				__wt_sleep(0, notfound);
-				notfound = 100000;
+				__wt_sleep(0, nowork);
+				nowork = 100000;
 			} else {
 				WT_STAT_INCR(ienv->stats, WORKQ_YIELD);
 				__wt_yield();
 			}
 		}
 	}
+
+	/* Free any remaining memory. */
+	if ((fp = TAILQ_FIRST(&ienv->flistq)) != NULL)
+		__wt_workq_flist(env);
 
 	return (NULL);
 }
