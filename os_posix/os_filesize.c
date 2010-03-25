@@ -14,8 +14,8 @@ __wt_filesize(ENV *env, WT_FH *fh, off_t *sizep)
 {
 	struct stat sb;
 
-	if (WT_VERB_ISSET(env, WT_VERB_FILEOPS))
-		__wt_msg(env, "fileops: %s: fstat", fh->name);
+	WT_VERBOSE(env,
+	    WT_VERB_FILEOPS, (env, "fileops: %s: fstat", fh->name));
 
 	if (fstat(fh->fd, &sb) == -1) {
 		__wt_api_env_err(env, errno, "%s: fstat", fh->name);
