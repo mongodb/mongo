@@ -26,8 +26,8 @@ __wt_workq_flist(ENV *env)
 	TAILQ_REMOVE(&ienv->flistq, fp, q);
 
 	for (cnt = 0; cnt < fp->cnt; ++cnt)
-		__wt_free(env, fp->ref[cnt], 0);
-	__wt_free(env, fp, 0);
+		__wt_free(env, fp->ref[cnt].p, fp->ref[cnt].len);
+	__wt_free(env, fp, sizeof(WT_FLIST));
 }
 
 /*
@@ -41,22 +41,22 @@ __wt_flist_insert(WT_TOC *toc, void *p, u_int32_t len)
 	WT_FLIST *fp;
 
 	env = toc->env;
-	fp = toc->flist;
 
 	/*
 	 * Allocate a new chunk; any existing chunk is handed off to the workQ
 	 * thread to be free'd later.
 	 */
-	if (fp != NULL) {
+	if (toc->flist != NULL) {
 		(void)__wt_flist_sched(toc);
-		toc->flist = fp = NULL;
+		toc->flist = NULL;
 	}
-	if (__wt_calloc(env, 1, sizeof(WT_FLIST), &fp) == 0) {
-		fp->ref[0].p = p;
-		fp->ref[0].len = len;
-		fp->cnt = 1;
-		toc->flist = fp;
-	}
+	if (__wt_calloc(env, 1, sizeof(WT_FLIST), &fp) != 0)
+		return;
+
+	fp->ref[0].p = p;
+	fp->ref[0].len = len;
+	fp->cnt = 1;
+	toc->flist = fp;
 }
 
 /*
