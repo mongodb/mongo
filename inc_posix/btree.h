@@ -75,7 +75,7 @@ struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
  * field on an 8-byte boundary.
  */
 struct __wt_page_desc {
-#define	WT_BTREE_MAGIC		0x120897
+#define	WT_BTREE_MAGIC		120897
 	u_int32_t magic;		/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
 	u_int16_t majorv;		/* 04-05: Major version */
