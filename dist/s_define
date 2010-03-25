@@ -7,7 +7,7 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 (
-sed '/^#/d' < s_define.list
+sed -e '/^$/d' -e '/^#/d' < s_define.list
 for i in \
     `cat ../inc_posix/*.h ../inc_posix/*.in |
      egrep '^#define' |
