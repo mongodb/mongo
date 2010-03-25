@@ -61,12 +61,10 @@ typedef struct __wt_mem {
  */
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_calloc(a, b, c, d)	__wt_calloc_func(a, b, c, d, __FILE__, __LINE__)
-#define	__wt_malloc(a, b, c)	__wt_calloc_func(a, 1, b, c, __FILE__, __LINE__)
 #define	__wt_realloc(a, b, c,d)	__wt_realloc_func(a, b, c,d, __FILE__, __LINE__)
 #define	__wt_strdup(a, b, c)	__wt_strdup_func(a, b, c, __FILE__, __LINE__)
 #else
 #define	__wt_calloc(a, b, c)	__wt_calloc_func(a, b, c, d)
-#define	__wt_malloc(a, b, c)	__wt_calloc_func(a, 1, b, c)
 #define	__wt_realloc(a,b,c,d)	__wt_realloc_func(a, b, c, d)
 #define	__wt_strdup(a, b, c)	__wt_strdup_func(a, b, c)
 #endif
