@@ -23,7 +23,6 @@ class Stat:
 ienv_stats = {}
 ienv_stats['DATABASE_OPEN'] = Stat([], 'database open')
 ienv_stats['HASH_BUCKETS'] = Stat([], 'hash buckets')
-ienv_stats['LONGEST_BUCKET'] = Stat([], 'longest hash bucket chain search')
 ienv_stats['MEMALLOC'] = Stat([], 'memory allocations')
 ienv_stats['MEMFREE'] = Stat([], 'memory frees')
 ienv_stats['MTX_LOCK'] = Stat([], 'mutex lock calls')
