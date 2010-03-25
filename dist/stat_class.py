@@ -21,17 +21,6 @@ class Stat:
 # IENV handle statistics
 ##########################################
 ienv_stats = {}
-ienv_stats['CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
-ienv_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes currently allocated in the cache')
-ienv_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
-ienv_stats['CACHE_EVICT'] = Stat([], 'clean pages evicted from the cache')
-ienv_stats['CACHE_HAZARD_EVICT'] = Stat([], 'pages not evicted because of a hazard reference')
-ienv_stats['CACHE_HIT'] = Stat([], 'reads found in the cache')
-ienv_stats['CACHE_LOCKOUT'] = Stat([], 'API cache lockout')
-ienv_stats['CACHE_MISS'] = Stat([], 'reads not found in the cache')
-ienv_stats['CACHE_PAGES'] = Stat(['perm'], 'number of pages currently in the cache')
-ienv_stats['CACHE_WRITE'] = Stat([], 'pages written from the cache')
-ienv_stats['CACHE_WRITE_EVICT'] = Stat([], 'dirty pages evicted from the cache')
 ienv_stats['DATABASE_OPEN'] = Stat([], 'database open')
 ienv_stats['HASH_BUCKETS'] = Stat([], 'hash buckets')
 ienv_stats['LONGEST_BUCKET'] = Stat([], 'longest hash bucket chain search')
@@ -43,6 +32,23 @@ ienv_stats['TOTAL_WRITE_IO'] = Stat([], 'total write I/Os')
 ienv_stats['WORKQ_PASSES'] = Stat([], 'workQ queue passes')
 ienv_stats['WORKQ_SLEEP'] = Stat([], 'workQ sleeps')
 ienv_stats['WORKQ_YIELD'] = Stat([], 'workQ yields')
+
+##########################################
+# Cache handle statistics
+##########################################
+cache_stats = {}
+cache_stats['CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
+cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
+cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
+cache_stats['CACHE_EVICT'] = Stat([], 'clean pages evicted from the cache')
+cache_stats['CACHE_HAZARD_EVICT'] = Stat([], 'pages not evicted because of a hazard reference')
+cache_stats['CACHE_HIT'] = Stat([], 'reads found in the cache')
+cache_stats['CACHE_MAX_BUCKET_ENTRIES'] = Stat([], 'maximum entries allocated to a hash bucket')
+cache_stats['CACHE_MISS'] = Stat([], 'reads not found in the cache')
+cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
+cache_stats['CACHE_READ_LOCKOUT'] = Stat([], 'API cache read lockout')
+cache_stats['CACHE_WRITE'] = Stat([], 'pages written from the cache')
+cache_stats['CACHE_WRITE_EVICT'] = Stat([], 'dirty pages evicted from the cache')
 
 ##########################################
 # IDB handle statistics

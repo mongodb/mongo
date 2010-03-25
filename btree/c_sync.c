@@ -19,13 +19,15 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	DB *db;
 	ENV *env;
 	WT_CACHE *cache;
+	WT_CACHE_ENTRY *e;
 	WT_PAGE *page;
 	u_int64_t fcnt;
-	u_int i;
+	u_int32_t i, j;
+	int ret;
 
 	db = toc->db;
 	env = toc->env;
-	cache = &env->ienv->cache;
+	cache = env->ienv->cache;
 
 	/*
 	 * Write any modified pages -- if the handle is set, write only pages
@@ -33,28 +35,29 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	 *
 	 * We only report progress on every 10 writes, to minimize callbacks.
 	 */
-	for (i = 0, fcnt = 0; i < cache->hash_size; ++i) {
-retry:		for (page = cache->hb[i]; page != NULL; page = page->next) {
-			if (page->db != db || !F_ISSET(page, WT_MODIFIED))
-				continue;
+	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
+		if (f != NULL && ++fcnt % 10 == 0)
+			f("Db.sync", fcnt);
 
-			/*
-			 * Get a hazard reference so the page can't be discarded
-			 * underfoot.
-			 */
-			__wt_hazard_set(toc, page);
-			if (page->drain) {
-				__wt_hazard_clear(toc, page);
-				__wt_sleep(0, 100000);
-				goto retry;
-			}
+		if (e->db != db || e->state != WT_OK)
+			continue;
 
-			WT_RET(__wt_cache_write(env, page));
-			__wt_hazard_clear(toc, page);
+		WT_VERBOSE(env, WT_VERB_CACHE,
+		    (env, "cache sync flushing page %lu", (u_long)e->addr));
 
-			if (f != NULL && ++fcnt % 10 == 0)
-				f("Db.sync", fcnt);
-		}
+		/*
+		 * Get a hazard reference so the page can't be discarded
+		 * underfoot.
+		 */
+		page = e->page;
+		__wt_hazard_set(toc, page);
+		ret = e->db != db ||
+		    e->state != WT_OK || !F_ISSET(page, WT_MODIFIED) ?
+			0 : __wt_cache_write(env, db, page);
+		__wt_hazard_clear(toc, page);
+		if (ret != 0)
+			return (ret);
 	}
+
 	return (0);
 }

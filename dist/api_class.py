@@ -257,7 +257,9 @@ methods['env.verbose_set'] = Api(
 	'method, setter, verify',
 	['verbose/u_int32_t @S'],
 	['VERB_ALL',
-	 'VERB_FILEOPS'],
+	 'VERB_CACHE',
+	 'VERB_FILEOPS',
+	 'VERB_SERVERS'],
 	['init'], [])
 
 ###################################################
@@ -544,9 +546,6 @@ flags['bt_search_key_row'] = [
 ###################################################
 # Structure flag declarations
 ###################################################
-flags['cache'] = [
-	'INITIALIZED',
-	'SERVER_SLEEPING' ]
 flags['env'] = [
 	'MEMORY_CHECK' ]
 flags['idb'] = [
@@ -554,12 +553,8 @@ flags['idb'] = [
 	'RDONLY',
 	'REPEAT_COMP' ]
 flags['ienv'] = [
-	'CACHE_LOCKOUT',
 	'SERVER_RUN',
 	'WORKQ_RUN' ]
 flags['wt_page'] = [
 	'MODIFIED',
-	'PINNED',
-	'UNFORMATTED' ]
-flags['wt_toc'] = [
-	'CACHE_DRAIN_WAIT' ]
+	'PINNED' ]

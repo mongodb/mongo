@@ -110,17 +110,12 @@ struct __wt_page_desc {
  * cache, not the actual page itself.
  */
 struct __wt_page {
-	WT_PAGE  *next;			/* Hash queue */
-	u_int32_t page_gen;		/* LRU generation number */
-
-	DB	 *db;			/* Page's backing database */
-	u_int32_t addr;			/* Page's allocation address */
-
 	/*
-	 * The page size is limited to 4GB by this type -- we could use off_t's
-	 * here if we need something bigger, but the page-size configuration
-	 * code limits page sizes to 128MB.
+	 * This limits a page size to 4GB -- we could use off_t's here if we
+	 * need something bigger, but the page-size configuration code limits
+	 * page sizes to 128MB.
 	 */
+	u_int32_t addr;			/* Page's allocation address */
 	u_int32_t bytes;		/* Page size */
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
@@ -154,14 +149,6 @@ struct __wt_page {
 	 */
 	WT_BIN_INDX *bin;		/* Binary tree root */
 
-	/*
-	 * The drain field is set when the page is being discarded from the
-	 * cache.   Threads acquiring pages must set a hazard pointer before
-	 * checking the drain field, the cache server must set the drain field
-	 * before checking the hazard pointers.
-	 */
-	u_int32_t drain;		/* Page is being drained */
-
 	u_int32_t flags;
 };
 /*
@@ -170,7 +157,7 @@ struct __wt_page {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_PAGE_SIZE		60
+#define	WT_PAGE_SIZE		44
 
 /*
  * WT_PAGE_HDR --
