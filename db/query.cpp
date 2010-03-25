@@ -517,12 +517,9 @@ namespace mongo {
                 if( !_c->getsetdup(cl) ) { 
                     // got a match.
                     
-                    BSONObj js = _pq.returnKey() ? _c->currKey() : _c->current();
-                    assert( js.objsize() >= 0 ); //defensive for segfaults
-
                     if ( _inMemSort ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                        _so->add(js);
+                        _so->add( _pq.returnKey() ? _c->currKey() : _c->current() );
                     }
                     else if ( _ntoskip > 0 ) {
                         _ntoskip--;
@@ -539,10 +536,12 @@ namespace mongo {
                         else {
                             if ( _pq.returnKey() ){
                                 BSONObjBuilder bb( _buf );
-                                bb.appendKeys( _c->indexKeyPattern() , js );
+                                bb.appendKeys( _c->indexKeyPattern() , _c->currKey() );
                                 bb.done();
                             }
                             else {
+                                BSONObj js = _c->currKey();
+                                assert( js.isValid() );
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js );
                             }
                             _n++;

@@ -107,6 +107,7 @@ namespace mongo {
         }
 
         void add(BSONObj o) {
+            assert( o.isValid() );
             BSONObj k = order.getKeyFromObject(o);
             if ( (int) best.size() < limit ) {
                 approxSize += k.objsize();
