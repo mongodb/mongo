@@ -21,9 +21,6 @@ def print_def(title, handle, list):
 	f.write('/*\n')
 	f.write(' * Statistics entries for ' + title + '.\n')
 	f.write(' */\n')
-	n = 'WT_STAT_' + handle  + '_TOTAL'
-	f.write('#define\t' + n +
-	    "\t" * max(1, 4 - len(n) / 8) + "%5d" % len(list) + '\n\n')
 	for l in sorted(list.iteritems()):
 		n = 'WT_STAT_' + l[0]
 		f.write('#define\t' + n +
@@ -61,9 +58,9 @@ def print_func(handle, list):
 	    handle.lower() + '_stats(ENV *env, WT_STATS **statsp)\n')
 	f.write('{\n')
 	f.write('\tWT_STATS *stats;\n\n')
-	f.write('\tWT_RET(__wt_calloc(env,\n')
-	f.write('\t    WT_STAT_' +
-	    handle + '_TOTAL + 1, sizeof(WT_STATS), &stats));\n\n')
+	f.write('\tWT_RET(__wt_calloc(env, ' +
+	    str(len(list) + 1) + ', sizeof(WT_STATS), &stats));\n\n')
+
 	for l in sorted(list.iteritems()):
 		o = '\tstats[WT_STAT_' + l[0] + '].desc = "' + l[1].str + '";\n'
 		if len(o) + 7  > 80:

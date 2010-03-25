@@ -7,8 +7,7 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_CACHE_TOTAL + 1, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
@@ -50,8 +49,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_DATABASE_TOTAL + 1, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 25, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_EXTSIZE].desc = "database extent size";
@@ -118,8 +116,7 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_DB_TOTAL + 1, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 15, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
 	    "bulk duplicate data pairs read";
@@ -173,8 +170,7 @@ __wt_stat_alloc_env_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_ENV_TOTAL + 1, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 12, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DATABASE_OPEN].desc = "database open";
 	stats[WT_STAT_HASH_BUCKETS].desc = "hash buckets";
@@ -214,8 +210,7 @@ __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env,
-	    WT_STAT_FH_TOTAL + 1, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 3, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_READ_IO].desc = "read I/Os";
 	stats[WT_STAT_WRITE_IO].desc = "write I/Os";

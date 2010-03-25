@@ -33,8 +33,6 @@ struct __wt_stats {
 /*
  * Statistics entries for CACHE handle.
  */
-#define	WT_STAT_CACHE_TOTAL		   12
-
 #define	WT_STAT_CACHE_ALLOC		    0
 #define	WT_STAT_CACHE_BYTES_INUSE	    1
 #define	WT_STAT_CACHE_BYTES_MAX		    2
@@ -51,8 +49,6 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB database.
  */
-#define	WT_STAT_DATABASE_TOTAL		   24
-
 #define	WT_STAT_BASE_RECNO		    0
 #define	WT_STAT_EXTSIZE			    1
 #define	WT_STAT_FIXED_LEN		    2
@@ -81,8 +77,6 @@ struct __wt_stats {
 /*
  * Statistics entries for DB/IDB handle.
  */
-#define	WT_STAT_DB_TOTAL		   14
-
 #define	WT_STAT_BULK_DUP_DATA_READ	    0
 #define	WT_STAT_BULK_HUFFMAN_DATA	    1
 #define	WT_STAT_BULK_HUFFMAN_KEY	    2
@@ -101,8 +95,6 @@ struct __wt_stats {
 /*
  * Statistics entries for ENV/IENV handle.
  */
-#define	WT_STAT_ENV_TOTAL		   11
-
 #define	WT_STAT_DATABASE_OPEN		    0
 #define	WT_STAT_HASH_BUCKETS		    1
 #define	WT_STAT_LONGEST_BUCKET		    2
@@ -118,8 +110,6 @@ struct __wt_stats {
 /*
  * Statistics entries for FH handle.
  */
-#define	WT_STAT_FH_TOTAL		    2
-
 #define	WT_STAT_READ_IO			    0
 #define	WT_STAT_WRITE_IO		    1
 
