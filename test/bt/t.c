@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 		config_single(*argv);
 
 	printf("%s: process %lu\n", g.progname, (u_long)getpid());
-	while (g.c_runs == 0 || ++g.run_cnt <= g.c_runs) {
+	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		config();
 
 		bdb_setup(0);
@@ -98,6 +98,9 @@ main(int argc, char *argv[])
 
 		bdb_teardown();
 		wts_teardown();
+
+		track("done", 0);
+		printf("\n");
 	}
 
 	return (EXIT_SUCCESS);
