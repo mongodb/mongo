@@ -37,14 +37,15 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_BYTES_INUSE	    1
 #define	WT_STAT_CACHE_BYTES_MAX		    2
 #define	WT_STAT_CACHE_EVICT		    3
-#define	WT_STAT_CACHE_HAZARD_EVICT	    4
-#define	WT_STAT_CACHE_HIT		    5
-#define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    6
-#define	WT_STAT_CACHE_MISS		    7
-#define	WT_STAT_CACHE_PAGES_INUSE	    8
-#define	WT_STAT_CACHE_READ_LOCKOUT	    9
-#define	WT_STAT_CACHE_WRITE		   10
-#define	WT_STAT_CACHE_WRITE_EVICT	   11
+#define	WT_STAT_CACHE_HASH_BUCKETS	    4
+#define	WT_STAT_CACHE_HAZARD_EVICT	    5
+#define	WT_STAT_CACHE_HIT		    6
+#define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    7
+#define	WT_STAT_CACHE_MISS		    8
+#define	WT_STAT_CACHE_PAGES_INUSE	    9
+#define	WT_STAT_CACHE_READ_LOCKOUT	   10
+#define	WT_STAT_CACHE_WRITE		   11
+#define	WT_STAT_CACHE_WRITE_EVICT	   12
 
 /*
  * Statistics entries for DB/IDB database.
@@ -96,16 +97,14 @@ struct __wt_stats {
  * Statistics entries for ENV/IENV handle.
  */
 #define	WT_STAT_DATABASE_OPEN		    0
-#define	WT_STAT_HASH_BUCKETS		    1
-#define	WT_STAT_LONGEST_BUCKET		    2
-#define	WT_STAT_MEMALLOC		    3
-#define	WT_STAT_MEMFREE			    4
-#define	WT_STAT_MTX_LOCK		    5
-#define	WT_STAT_TOTAL_READ_IO		    6
-#define	WT_STAT_TOTAL_WRITE_IO		    7
-#define	WT_STAT_WORKQ_PASSES		    8
-#define	WT_STAT_WORKQ_SLEEP		    9
-#define	WT_STAT_WORKQ_YIELD		   10
+#define	WT_STAT_MEMALLOC		    1
+#define	WT_STAT_MEMFREE			    2
+#define	WT_STAT_MTX_LOCK		    3
+#define	WT_STAT_TOTAL_READ_IO		    4
+#define	WT_STAT_TOTAL_WRITE_IO		    5
+#define	WT_STAT_WORKQ_PASSES		    6
+#define	WT_STAT_WORKQ_SLEEP		    7
+#define	WT_STAT_WORKQ_YIELD		    8
 
 /*
  * Statistics entries for FH handle.

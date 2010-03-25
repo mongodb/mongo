@@ -63,11 +63,11 @@ struct __wt_cache {
 	 */
 #define	WT_CACHE_PAGE_IN(c, bytes) do {					\
 	++(c)->stat_pages_in;						\
-	(c)->stat_frags_in += (bytes) / WT_FRAGMENT;			\
+	(c)->stat_bytes_in += bytes;					\
 } while (0);
 #define	WT_CACHE_PAGE_OUT(c, bytes) do {				\
 	++(c)->stat_pages_out;						\
-	(c)->stat_frags_out += (bytes) / WT_FRAGMENT;			\
+	(c)->stat_bytes_out += bytes;					\
 } while (0);
 
 #define	WT_CACHE_PAGES_INUSE(c)		/* Pages read/discarded */	\
@@ -78,11 +78,11 @@ struct __wt_cache {
 	u_int64_t stat_pages_out;
 
 #define	WT_CACHE_BYTES_INUSE(c)		/* Bytes read/discarded */	\
-	((c)->stat_frags_in > (c)->stat_frags_out ?			\
-	    (((c)->stat_frags_in - (c)->stat_frags_out)) * WT_FRAGMENT : 0)
+	((c)->stat_bytes_in > (c)->stat_bytes_out ?			\
+	    (c)->stat_bytes_in - (c)->stat_bytes_out : 0)
 
-	u_int64_t stat_frags_in;
-	u_int64_t stat_frags_out;
+	u_int64_t stat_bytes_in;
+	u_int64_t stat_bytes_out;
 
 	WT_STATS *stats;		/* Cache statistics */
 };
