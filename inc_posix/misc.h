@@ -29,7 +29,7 @@ extern "C" {
  * Convert a pointer to an unsigned long so we can print it without compiler
  * complaint.
  */
-#define	WT_ADDR_TO_ULONG(addr)	((u_long)(uintptr_t)(addr))
+#define	WT_PTR_TO_ULONG(p)	((u_long)(uintptr_t)(p))
 
 /* Flag check for API functions. */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
@@ -64,9 +64,11 @@ extern "C" {
 #define	FLD_ISSET(field, mask)	((field) & (mask))
 #define	FLD_SET(field, mask)	((field) |= (mask))
 
-/* Check for a verbose flag setting. */
-#define	WT_VERB_ISSET(env, f)						\
-	FLD_ISSET((env)->verbose, WT_VERB_ALL | (f))
+/* Output a verbose message. */
+#define	WT_VERBOSE(env, f, msg) do {					\
+	if (FLD_ISSET((env)->verbose, WT_VERB_ALL | (f)))		\
+		__wt_msg msg;						\
+} while (0)
 
 /* Clear a chunk of memory. */
 #define	WT_CLEAR(s)							\
