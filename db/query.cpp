@@ -281,6 +281,10 @@ namespace mongo {
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
+                        /* when a tailable cursor hits "EOF", ok() goes false, and current() is null.  however 
+                           advance() can still be retries as a reactivation attempt.  when there is new data, it will 
+                           return true.  that's what we are doing here.
+                           */
                         if ( c->advance() ) {
                             continue;
                         }
