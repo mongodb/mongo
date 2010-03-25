@@ -1099,7 +1099,7 @@ namespace mongo {
             auto_ptr<ClientCursor> cc;
             {
                 auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-                cc.reset( new ClientCursor(0, c, ns) );
+                cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
             CursorId id = cc->cursorid;
 

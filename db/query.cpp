@@ -137,7 +137,7 @@ namespace mongo {
 
         CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
 
-        auto_ptr<ClientCursor> cc( new ClientCursor(0, creal, ns) );
+        auto_ptr<ClientCursor> cc( new ClientCursor(QueryOption_NoCursorTimeout, creal, ns) );
         cc->setDoingDeletes( true );
 
         CursorId id = cc->cursorid;
@@ -544,7 +544,7 @@ namespace mongo {
                                 bb.done();
                             }
                             else {
-                                BSONObj js = _c->currKey();
+                                BSONObj js = _c->current();
                                 assert( js.isValid() );
                                 fillQueryResultFromObj( _buf , _pq.getFields() , js );
                             }
