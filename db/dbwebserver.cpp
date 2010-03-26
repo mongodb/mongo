@@ -241,6 +241,8 @@ namespace mongo {
             if ( from.localhost() )
                 return true;
             
+            Client::GodScope gs;
+
             if ( db.findOne( "admin.system.users" , BSONObj() , 0 , QueryOption_SlaveOk ).isEmpty() )
                 return true;
             
