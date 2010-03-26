@@ -491,7 +491,7 @@ namespace mongo {
         int pass = 0;
 
         QueryResult* msgdata;
-        while( 1 ) {
+        do {
             try {
                 mongolock lk(false);
                 Client::Context ctx(ns);
@@ -508,7 +508,7 @@ namespace mongo {
                 ok = false;
             }
             break;
-        }
+        } while ( ! inShutdown() );
 
         Message *resp = new Message();
         resp->setData(msgdata, true);
