@@ -11,5 +11,5 @@ stop on runlevel [06]
 script
   ENABLE_MONGODB="yes"
   if [ -f /etc/default/mongodb ]; then . /etc/default/mongodb; fi
-  if [ "x$ENABLE_MONGODB" = "xyes" ]; then start-stop-daemon --start --quiet --chuid mongodb --exec  /usr/bin/mongod -- --config /etc/mongodb.conf; fi
+  if [ "x$ENABLE_MONGODB" = "xyes" ]; then exec start-stop-daemon --start --quiet --chuid mongodb --exec  /usr/bin/mongod -- --config /etc/mongodb.conf; fi
 end script

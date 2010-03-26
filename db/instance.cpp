@@ -31,6 +31,7 @@
 #include "replset.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
+#include "../util/goodies.h"
 #include "cmdline.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
@@ -346,8 +347,12 @@ namespace mongo {
         log = log || (logLevel >= 2 && ++ctr % 512 == 0);
         DEV log = true;
         if ( log || ms > logThreshold ) {
-            ss << ' ' << ms << "ms";
-            mongo::log() << ss.str() << endl;
+            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && ms < 3000 && !log ) {
+                /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
+            } else {
+                ss << ' ' << ms << "ms";
+                mongo::log() << ss.str() << endl;
+            }
         }
         
         if ( currentOp.shouldDBProfile( ms ) ){
@@ -483,17 +488,28 @@ namespace mongo {
         
         ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
 
+        int pass = 0;
+
         QueryResult* msgdata;
-        try {
-            mongolock lk(false);
-            Client::Context ctx(ns);
-            msgdata = getMore(ns, ntoreturn, cursorid, curop);
+        while( 1 ) {
+            try {
+                mongolock lk(false);
+                Client::Context ctx(ns);
+                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass);
+            }
+            catch ( GetMoreWaitException& ) { 
+                pass++;
+                sleepmillis(2);
+                continue;
+            }
+            catch ( AssertionException& e ) {
+                ss << " exception " << e.toString();
+                msgdata = emptyMoreResult(cursorid);
+                ok = false;
+            }
+            break;
         }
-        catch ( AssertionException& e ) {
-            ss << " exception " << e.toString();
-            msgdata = emptyMoreResult(cursorid);
-            ok = false;
-        }
+
         Message *resp = new Message();
         resp->setData(msgdata, true);
         ss << " bytes:" << resp->data->dataLen();

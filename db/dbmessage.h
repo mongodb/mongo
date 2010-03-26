@@ -52,7 +52,7 @@ namespace mongo {
                the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep 
                a little between getMore's.
             */
-            //ResultFlag_AwaitCapable = 8
+            ResultFlag_AwaitCapable = 8
         };
 
         long long cursorId;
@@ -68,7 +68,7 @@ namespace mongo {
             return dataAsInt();
         }
         void setResultFlagsToOk() { 
-            _resultFlags() = 0; // ResultFlag_AwaitCapable
+            _resultFlags() = ResultFlag_AwaitCapable;
         }
     };
 #pragma pack()

@@ -74,7 +74,8 @@ namespace mongo {
     extern const int MaxBytesToReturnToClientAtOnce;
 
     // for an existing query (ie a ClientCursor), send back additional information.
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op);
+    struct GetMoreWaitException { };
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass);
 
     struct UpdateResult {
         bool existing;
