@@ -98,11 +98,13 @@ __wt_workq_srvr(void *arg)
  *	Swap in a new WT_PAGE replacement array.
  */
 int
-__wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new)
+__wt_workq_repl(WT_TOC *toc, WT_REPL **orig, WT_REPL *new)
 {
+	ENV *env;
 	WT_REPL *repl;
 	int ret;
 
+	env = toc->env;
 	repl = *orig;
 	ret = 0;
 
@@ -121,21 +123,17 @@ __wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new)
 
 	/*
 	 * Two threads might try to update the same item, and race while waiting
-	 * for the WorkQ thread.   Before updating the replacement structure, we
-	 * confirm the current WT_REPL reference is the same as when we decided
-	 * to do the update.
-	 *
-	 * Even if we raced, if there's an empty slot in the current WT_REPL
-	 * structure (another thread did an update, and there's room for our
-	 * caller's change), we return success, our caller can use that empty
-	 * slot, there's no need to upgrade the WT_REPL structure again.
+	 * for the WorkQ thread.  Even if we raced, if there's an empty slot in
+	 * the current WT_REPL structure (another thread updated the entry, and
+	 * there's room for our caller's change), we return success, our caller
+	 * can use that empty slot, there's no need to restart the operation.
 	 */
 	if (repl->data[repl->repl_next].data == NULL)
 		goto err;
 	if (new->next != repl) {
 		ret = WT_RESTART;
 
-err:		__wt_free(env, new->data, 0);
+err:		__wt_free(env, new->data, new->repl_size * sizeof(WT_SDBT));
 		__wt_free(env, new, sizeof(WT_REPL));
 		return (ret);
 	}

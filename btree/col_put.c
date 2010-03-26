@@ -78,7 +78,7 @@ __wt_bt_del_serial_func(WT_TOC *toc)
 
 	/* Update the replacement array as necessary. */
 	if (repl != NULL)
-		WT_RET(__wt_workq_repl(env, &ip->repl, repl));
+		WT_RET(__wt_workq_repl(toc, &ip->repl, repl));
 	repl = ip->repl;
 
 	/*

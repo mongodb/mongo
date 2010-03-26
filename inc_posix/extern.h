@@ -211,7 +211,7 @@ __wt_toc_dump(ENV *env);
 void *
 __wt_workq_srvr(void *arg);
 int
-__wt_workq_repl(ENV *env, WT_REPL **orig, WT_REPL *new);
+__wt_workq_repl(WT_TOC *toc, WT_REPL **orig, WT_REPL *new);
 void
 __wt_abort(ENV *env);
 int
