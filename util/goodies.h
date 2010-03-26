@@ -650,43 +650,54 @@ namespace mongo {
     
     // for convenience, '{' is greater than anything and stops number parsing
     inline int lexNumCmp( const char *s1, const char *s2 ) {
-        int nret = 0;
         while( *s1 && *s2 ) {
+
             bool p1 = ( *s1 == '{' );
             bool p2 = ( *s2 == '{' );
             if ( p1 && !p2 )
                 return 1;
             if ( p2 && !p1 )
                 return -1;
+        
             bool n1 = isNumber( *s1 );
             bool n2 = isNumber( *s2 );
+        
             if ( n1 && n2 ) {
-                if ( nret == 0 ) {
-                    nret = *s1 > *s2 ? 1 : ( *s1 == *s2 ? 0 : -1 );
-                }
-            } else if ( n1 ) {
-                return 1;
-            } else if ( n2 ) {
-                return -1;
-            } else {
-                if ( nret ) {
-                    return nret;
-                }
-                if ( *s1 > *s2 ) {
+                char * e1;
+                char * e2;
+                long l1 = strtol( s1 , &e1 , 10 );
+                long l2 = strtol( s2 , &e2 , 10 );
+            
+                if ( l1 > l2 )
                     return 1;
-                } else if ( *s2 > *s1 ) {
+                else if ( l1 < l2 )
                     return -1;
-                }
-                nret = 0;
-            }
-            ++s1; ++s2;
+            
+                s1 = e1;
+                s2 = e2;
+                continue;
+            } 
+        
+            if ( n1 ) 
+                return 1;
+        
+            if ( n2 ) 
+                return -1;
+        
+            if ( *s1 > *s2 )
+                return 1;
+        
+            if ( *s2 > *s1 )
+                return -1;
+        
+            s1++; s2++;
         }
-        if ( *s1 ) {
+    
+        if ( *s1 ) 
             return 1;
-        } else if ( *s2 ) {
+        if ( *s2 )
             return -1;
-        }
-        return nret;
+        return 0;
     }
     
 } // namespace mongo
