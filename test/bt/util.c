@@ -22,7 +22,7 @@ fname(const char *prefix, const char *name)
 }
 
 void
-key_gen(DBT *key, u_int64_t key_cnt)
+key_gen(DBT *key, u_int64_t keyno)
 {
 	static size_t blen;
 	static char *buf;
@@ -53,11 +53,11 @@ key_gen(DBT *key, u_int64_t key_cnt)
 		}
 	}
 
-	klen = g.key_rand_len[key_cnt %
+	klen = g.key_rand_len[keyno %
 	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 
 	/* The key always starts with a 10-digit string (the specified cnt). */
-	len = snprintf(buf, g.c_key_max, "%010llu", key_cnt);
+	len = snprintf(buf, g.c_key_max, "%010llu", keyno);
 	if (len < klen)
 		memset(buf + len, 'a', klen - len);
 	key->data = buf;
