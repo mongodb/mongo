@@ -491,13 +491,14 @@ namespace mongo {
         int pass = 0;
 
         QueryResult* msgdata;
-        do {
+        while( 1 ) {
             try {
                 mongolock lk(false);
                 Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass);
             }
             catch ( GetMoreWaitException& ) { 
+                massert(13073, "shutting down", !inShutdown() );
                 pass++;
                 sleepmillis(2);
                 continue;
@@ -508,7 +509,7 @@ namespace mongo {
                 ok = false;
             }
             break;
-        } while ( ! inShutdown() );
+        };
 
         Message *resp = new Message();
         resp->setData(msgdata, true);
