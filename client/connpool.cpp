@@ -63,6 +63,7 @@ namespace mongo {
             }
             else {
                 uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
+                c = 0; // prevents compiler warning
             }
             return c;
         }

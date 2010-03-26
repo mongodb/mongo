@@ -97,7 +97,7 @@ namespace mongo {
         bool resync(string db);
 
         /* pull some operations from the master's oplog, and apply them. */
-        bool sync_pullOpLog(int& nApplied);
+        int sync_pullOpLog(int& nApplied);
 
         void sync_pullOpLog_applyOperation(BSONObj& op, OpTime *localLogTail);
         
@@ -162,7 +162,10 @@ namespace mongo {
         typedef vector< shared_ptr< ReplSource > > SourceVector;
         static void loadAll(SourceVector&);
         explicit ReplSource(BSONObj);
-        bool sync(int& nApplied);
+
+        /* -1 = error */
+        int sync(int& nApplied);
+
         void save(); // write ourself to local.sources
         void resetConnection() {
             cursor = auto_ptr<DBClientCursor>(0);

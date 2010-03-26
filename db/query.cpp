@@ -250,8 +250,8 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* getMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop ) {
-        StringBuilder& ss = curop.debug().str;
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass) {
+
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
         
@@ -260,11 +260,12 @@ namespace mongo {
             bufSize += sizeof( QueryResult );
             bufSize += ( ntoreturn ? 4 : 1 ) * 1024 * 1024;
         }
+
         BufBuilder b( bufSize );
 
         b.skip(sizeof(QueryResult));
 
-        int resultFlags = 0; //QueryResult::ResultFlag_AwaitCapable;
+        int resultFlags = QueryResult::ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
 
@@ -274,7 +275,10 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
-            ss << " getMore: " << cc->query << " ";
+            if( pass == 0 ) {
+                StringBuilder& ss = curop.debug().str;
+                ss << " getMore: " << cc->query << " ";
+            }
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
@@ -285,9 +289,13 @@ namespace mongo {
                            advance() can still be retries as a reactivation attempt.  when there is new data, it will 
                            return true.  that's what we are doing here.
                            */
-                        if ( c->advance() ) {
+                        if ( c->advance() )
                             continue;
+
+                        if( n == 0 && (cc->_queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
+                            throw GetMoreWaitException();
                         }
+
                         break;
                     }
                     p.release();
