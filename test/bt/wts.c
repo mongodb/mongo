@@ -204,8 +204,8 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	 */
 	if (g.c_duplicates_pct == 0 ||
 	    (u_int32_t)rand() % 100 > g.c_duplicates_pct) {
-		if (++g.key_cnt > g.c_bulk_cnt) {
-			g.key_cnt = g.c_bulk_cnt;
+		if (++g.key_cnt > g.c_total) {
+			g.key_cnt = g.c_total;
 			return (1);
 		}
 

@@ -57,8 +57,7 @@ typedef struct {
 
 	int verbose;				/* Verbosity */
 
-	u_int32_t c_bulk_cnt;			/* Config values */
-	u_int32_t c_cache;
+	u_int32_t c_cache;			/* Config values */
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
 	u_int32_t c_database_type;
@@ -76,9 +75,10 @@ typedef struct {
 	u_int32_t c_repeat_comp;
 	u_int32_t c_repeat_comp_pct;
 	u_int32_t c_runs;
+	u_int32_t c_total;
 	u_int32_t c_write_ops;
 
-	u_int32_t key_cnt;			/* Current key count */
+	u_int32_t key_cnt;			/* Keys loaded so far */
 	u_int16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
