@@ -208,8 +208,14 @@ namespace BasicTests {
             for ( int i=0; i<(total/ms); i++ ){
                 sleepmillis( ms );
             }
-            ASSERT( t.millis() >= 1000 );
-            ASSERT( t.millis() <= 2500 );
+            {
+                int x = t.millis();
+                if ( x < 1000 || x > 2500 ){
+                    cout << "sleeptest x: " << x << endl;
+                    ASSERT( x >= 1000 );
+                    ASSERT( x <= 2500 );
+                }
+            }
             
         }
         
