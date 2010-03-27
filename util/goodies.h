@@ -217,8 +217,9 @@ namespace mongo {
     inline void sleepmicros(int s) {
         struct timespec t;
         t.tv_sec = (int)(s / 1000000);
-        t.tv_nsec = s % 1000000;
-        if ( nanosleep( &t , 0 ) ){
+        t.tv_nsec = 1000 * ( s % 1000000 );
+        struct timespec out;
+        if ( nanosleep( &t , &out ) ){
             cout << "nanosleep failed" << endl;
         }
     }

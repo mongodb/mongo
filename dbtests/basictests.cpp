@@ -186,6 +186,7 @@ namespace BasicTests {
 
     class sleeptest {
     public:
+
         void run(){
             Timer t;
             sleepsecs( 1 );
@@ -201,6 +202,15 @@ namespace BasicTests {
             ASSERT( t.millis() >= 1000 );
             ASSERT( t.millis() <= 2000 );
 
+            int total = 1727;
+            int ms = 2;
+            t.reset();
+            for ( int i=0; i<(total/ms); i++ ){
+                sleepmillis( ms );
+            }
+            ASSERT( t.millis() >= 1000 );
+            ASSERT( t.millis() <= 2000 );
+            
         }
         
     };
