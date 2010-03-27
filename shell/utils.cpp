@@ -76,20 +76,8 @@ namespace mongo {
             return BSON( "" << obj );
         }
 
-        void sleepms( int ms ) {
-            boost::xtime xt;
-            boost::xtime_get(&xt, boost::TIME_UTC);
-            xt.sec += ( ms / 1000 );
-            xt.nsec += ( ms % 1000 ) * 1000000;
-            if ( xt.nsec >= 1000000000 ) {
-                xt.nsec -= 1000000000;
-                xt.sec++;
-            }
-            boost::thread::sleep(xt);    
-        }
         
         // real methods
-
 
         
         mongo::BSONObj JSSleep(const mongo::BSONObj &args){
@@ -98,7 +86,7 @@ namespace mongo {
             int ms = int( args.firstElement().number() );
             {
                 auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
-                sleepms( ms );
+                sleepmillis( ms );
             }
             return undefined_;
         }

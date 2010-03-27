@@ -44,8 +44,16 @@ doTest = function( signal ) {
     checkWrite( rp.master(), rp.slave() );
 
     // allow slave to finish initial sync
-    assert.soon( function() { return 1 == rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} ).ok; } );
-
+    assert.soon( 
+        function() { 
+            var res = rp.slave().getDB( "admin" ).runCommand( {replacepeer:1} );
+            if ( res.ok == 1 )
+                return true;
+            printjson( res );
+            return false;
+        } 
+    );
+    
     // Should not be saved to slave.
     writeOne( rp.master() );
     // Make sure there would be enough time to save to l if we hadn't called replacepeer.
