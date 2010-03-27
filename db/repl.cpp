@@ -54,6 +54,7 @@ namespace mongo {
 
     /* if 1 sync() is running */
     volatile int syncing = 0;
+	static volatile int relinquishSyncingSome = 0;
 
     /* if true replace our peer in a replication pair -- don't worry about if his
        local.oplog.$main is empty.
@@ -161,7 +162,8 @@ namespace mongo {
                     break;
                 {
                     dbtemprelease t;
-					// sleepmillis(10);
+					relinquishSyncingSome = 1;
+					sleepmillis(1);
                 }
             }
             if ( syncing ) {
@@ -250,7 +252,8 @@ namespace mongo {
                     break;
                 {
                     dbtemprelease t;
-                    // sleepmillis(10);
+					relinquishSyncingSome = 1;
+                    sleepmillis(1);
                 }
             }
             if ( syncing ) {
@@ -1713,6 +1716,12 @@ namespace mongo {
                 assert( syncing == 1 );
                 syncing--;
             }
+
+			if( relinquishSyncingSome )  { 
+				relinquishSyncingSome = 0;
+				s = 1; // sleep before going back in to syncing=1
+			}
+
             if ( s ) {
                 stringstream ss;
                 ss << "repl: sleep " << s << "sec before next pass";
