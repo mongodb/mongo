@@ -537,7 +537,7 @@ namespace mongo {
                 }        
                 if(wait_for_pid(pid, false, &exitCode))
                     break;
-                sleepms( 1000 );
+                sleepmillis( 1000 );
             }
             if ( i == 65 ) {
                 char now[64];
@@ -555,7 +555,7 @@ namespace mongo {
                 shells.erase( pid );
             }
             if ( i > 4 || signal == SIGKILL ) {
-                sleepms( 4000 ); // allow operating system to reclaim resources
+                sleepmillis( 4000 ); // allow operating system to reclaim resources
             }
             
             return exitCode;
