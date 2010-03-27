@@ -89,3 +89,5 @@ doTest = function( signal ) {
 
 doTest( 15 ); // SIGTERM
 doTest( 9 );  // SIGKILL
+
+print("replace2Peer finishes");

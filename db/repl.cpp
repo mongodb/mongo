@@ -53,7 +53,7 @@ namespace mongo {
     void ensureHaveIdIndex(const char *ns);
 
     /* if 1 sync() is running */
-    int syncing = 0;
+    volatile int syncing = 0;
 
     /* if true replace our peer in a replication pair -- don't worry about if his
        local.oplog.$main is empty.
@@ -157,11 +157,11 @@ namespace mongo {
             }
             Timer t;
             while ( 1 ) {
-                if ( syncing == 0 || t.millis() > 20000 )
+                if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
                     dbtemprelease t;
-                    sleepmillis(10);
+					// sleepmillis(10);
                 }
             }
             if ( syncing ) {
@@ -246,11 +246,11 @@ namespace mongo {
             // reloaded with new saved state on next pass.
             Timer t;
             while ( 1 ) {
-                if ( syncing == 0 || t.millis() > 20000 )
+                if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
                     dbtemprelease t;
-                    sleepmillis(10);
+                    // sleepmillis(10);
                 }
             }
             if ( syncing ) {
