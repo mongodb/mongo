@@ -108,15 +108,19 @@ namespace mongo {
             Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
             _checkpoint = now;
         }
-        
-        void reset( const sockaddr_in & remote, int op ) { 
+
+        void reset(){
             _reset();
             _start = _checkpoint = 0;
             _active = true;
             _opNum = _nextOpNum++;
             _ns[0] = '?'; // just in case not set later
             _debug.reset();
-            resetQuery();
+            resetQuery();            
+        }
+        
+        void reset( const sockaddr_in & remote, int op ) { 
+            reset();
             _remote = remote;
             _op = op;
         }

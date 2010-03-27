@@ -938,6 +938,7 @@ namespace mongo {
         }
         
         Client::Context ctx( ns );
+        ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->isEmpty();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
