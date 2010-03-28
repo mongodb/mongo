@@ -1141,7 +1141,7 @@ namespace mongo {
                     break;
                 }
             }
-            progress.done();
+            progress.finished();
             return n;
         }
 
