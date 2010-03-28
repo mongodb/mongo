@@ -72,8 +72,14 @@ namespace mongo {
     
     LastError * LastErrorHolder::_get( bool create ){
         int id = _id.get();
-        if ( id == 0 )
-            return _tl.get();
+        if ( id == 0 ){
+            LastError * le = _tl.get();
+            if ( ! le && create ){
+                le = new LastError();
+                _tl.reset( le );
+            }
+            return le;
+        }
 
         scoped_lock lock(_idsmutex);        
         map<int,Status>::iterator i = _ids.find( id );
