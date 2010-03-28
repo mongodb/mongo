@@ -157,6 +157,7 @@ namespace mongo {
             if ( _params.count( "directoryperdb" ) ) {
                 directoryperdb = true;
             }
+            assert( lastError.get( true ) );
             Client::initThread("tools");
             _conn = new DBDirectClient();
             _host = "DIRECT";
