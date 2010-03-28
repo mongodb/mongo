@@ -246,17 +246,23 @@ namespace mongo {
         }
 
         ProgressMeter& setMessage( const char * msg , long long progressMeterTotal = 0 , int secondsBetween = 3 ){
-            _message = msg;
+
             if ( progressMeterTotal ){
-                assert( ! _progressMeter.isActive() );
+                if ( _progressMeter.isActive() ){
+                    cout << "about to assert, old _message: " << _message << endl;
+                    assert( ! _progressMeter.isActive() );
+                }
                 _progressMeter.reset( progressMeterTotal , secondsBetween );
             }
             else {
                 _progressMeter.finished();
             }
+            
+            _message = msg;
+            
             return _progressMeter;
         }
-
+        
         string getMessage() const { return _message; }
         ProgressMeter getProgressMeter() { return _progressMeter; }
 
