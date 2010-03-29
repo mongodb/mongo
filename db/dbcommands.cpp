@@ -1464,21 +1464,22 @@ namespace mongo {
             static DBDirectClient db;
 
             string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
-            string key = cmdObj["key"].valuestrsafe();
 
+            string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );
 
-            set<BSONObj,BSONObjCmp> map;
-
+            BSONObj query = getQuery( cmdObj );
+            
+            set<BSONElement,BSONElementCmpWithoutField> map;
             long long size = 0;
-
-            auto_ptr<DBClientCursor> cursor = db.query( ns , getQuery( cmdObj ) , 0 , 0 , &keyPattern );
+            
+            auto_ptr<DBClientCursor> cursor = db.query( ns , query , 0 , 0 , &keyPattern );
             while ( cursor->more() ){
                 BSONObj o = cursor->next();
-                BSONObj value = o.extractFields( keyPattern );
-                if ( value.isEmpty() )
+                BSONElement e = o.getFieldDotted( key.c_str() );
+                if ( ! e.type() )
                     continue;
-                if ( map.insert( value ).second ){
+                if ( map.insert( e ).second ){
                     size += o.objsize() + 20;
                     uassert( 10044 ,  "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
                 }
@@ -1487,8 +1488,8 @@ namespace mongo {
             assert( size <= 0x7fffffff );
             BSONObjBuilder b( (int) size );
             int n=0;
-            for ( set<BSONObj,BSONObjCmp>::iterator i = map.begin() ; i != map.end(); i++ ){
-                b.appendAs( i->firstElement() , b.numStr( n++ ).c_str() );
+            for ( set<BSONElement,BSONElementCmpWithoutField>::iterator i = map.begin() ; i != map.end(); i++ ){
+                b.appendAs( *i , b.numStr( n++ ).c_str() );
             }
 
             result.appendArray( "values" , b.obj() );
