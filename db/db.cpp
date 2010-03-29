@@ -191,22 +191,22 @@ namespace mongo {
         LastError *le = new LastError();
         lastError.reset(le);
 
-        MessagingPort& dbMsgPort = *connGrab;
+        auto_ptr<MessagingPort> dbMsgPort( connGrab );
         connGrab = 0;
         Client& c = cc();
 
         try {
 
-            c.getAuthenticationInfo()->isLocalHost = dbMsgPort.farEnd.isLocalHost();
+            c.getAuthenticationInfo()->isLocalHost = dbMsgPort->farEnd.isLocalHost();
 
             Message m;
             while ( 1 ) {
                 m.reset();
 
-                if ( !dbMsgPort.recv(m) ) {
+                if ( !dbMsgPort->recv(m) ) {
                     if( !cmdLine.quiet )
-                        log() << "end connection " << dbMsgPort.farEnd.toString() << endl;
-                    dbMsgPort.shutdown();
+                      log() << "end connection " << dbMsgPort->farEnd.toString() << endl;
+                    dbMsgPort->shutdown();
                     break;
                 }
 
@@ -218,11 +218,11 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse, dbMsgPort.farEnd.sa ) ) {
-                    out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort.farEnd.toString() << endl;
+                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd.sa ) ) {
+                    out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
                     /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
-                    if ( dbMsgPort.farEnd.isLocalHost() ) {
-                        dbMsgPort.shutdown();
+                    if ( dbMsgPort->farEnd.isLocalHost() ) {
+                        dbMsgPort->shutdown();
                         sleepmillis(50);
                         problem() << "exiting end msg" << endl;
                         dbexit(EXIT_CLEAN);
@@ -233,17 +233,17 @@ namespace mongo {
                 }
 
                 if ( dbresponse.response )
-                    dbMsgPort.reply(m, *dbresponse.response, dbresponse.responseTo);
+                    dbMsgPort->reply(m, *dbresponse.response, dbresponse.responseTo);
             }
 
         }
         catch ( AssertionException& ) {
             problem() << "AssertionException in connThread, closing client connection" << endl;
-            dbMsgPort.shutdown();
+            dbMsgPort->shutdown();
         }
         catch ( SocketException& ) {
             problem() << "SocketException in connThread, closing client connection" << endl;
-            dbMsgPort.shutdown();
+            dbMsgPort->shutdown();
         }
         catch ( const ClockSkewException & ) {
             exitCleanly( EXIT_CLOCK_SKEW );
