@@ -1299,7 +1299,7 @@ namespace mongo {
             return obj.extractFields( keyPattern , true );
         }
 
-        bool group( string realdbname , auto_ptr<DBClientCursor> cursor ,
+        bool group( string realdbname , const string& ns , const BSONObj& query , 
                     BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
                     BSONObj initial , string finalize ,
                     string& errmsg , BSONObjBuilder& result ){
@@ -1339,8 +1339,20 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            while ( cursor->more() ){
-                BSONObj obj = cursor->next();
+            auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            auto_ptr<CoveredIndexMatcher> matcher;
+            if ( ! query.isEmpty() )
+                matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
+
+            while ( cursor->ok() ){
+                if ( matcher.get() && ! matcher->matchesCurrent( cursor.get() ) ){
+                    cursor->advance();
+                    continue;
+                }
+
+                BSONObj obj = cursor->current();
+                cursor->advance();
+
                 BSONObj key = getKey( obj , keyPattern , keyFunction , keysize / keynum , s.get() );
                 keysize += key.objsize();
                 keynum++;
@@ -1383,7 +1395,6 @@ namespace mongo {
         }
 
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            static DBDirectClient db;
 
             /* db.$cmd.findOne( { group : <p> } ) */
             const BSONObj& p = jsobj.firstElement().embeddedObjectUserCheck();
@@ -1406,8 +1417,6 @@ namespace mongo {
             }
 
             ns += p["ns"].valuestr();
-
-            auto_ptr<DBClientCursor> cursor = db.query( ns , q );
 
             BSONObj key;
             string keyf;
@@ -1442,7 +1451,7 @@ namespace mongo {
             if (p["finalize"].type())
                 finalize = p["finalize"].ascode();
 
-            return group( realdbname , cursor ,
+            return group( realdbname , ns , q ,
                           key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );
