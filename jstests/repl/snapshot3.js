@@ -2,7 +2,7 @@
 
 ports = allocatePorts( 3 );
 
-var baseName = "repl_snapshot2";
+var baseName = "repl_snapshot3";
 var basePath = "/data/db/" + baseName;
 
 a = new MongodRunner( ports[ 0 ], basePath + "-arbiter" );
