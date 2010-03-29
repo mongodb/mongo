@@ -735,7 +735,7 @@ namespace mongo {
                 ( replPair && replSettings.fastsync ) ) {
                 DBDirectClient c;
                 if ( c.exists( "local.oplog.$main" ) ) {
-                    BSONObj op = c.findOne( "local.oplog.$main", Query().sort( BSON( "$natural" << -1 ) ) );
+                    BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
                     if ( !op.isEmpty() ) {
                         tmp.syncedTo = op[ "ts" ].date();
                         tmp._lastSavedLocalTs = op[ "ts" ].date();
