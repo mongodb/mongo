@@ -31,7 +31,7 @@ namespace mongo {
 
         void threadRun(){
             assert( grab );
-            MessagingPort * p = grab;
+            auto_ptr<MessagingPort> p( grab );
             grab = 0;
             
             Message m;
@@ -45,12 +45,11 @@ namespace mongo {
                         break;
                     }
                     
-                    handler->process( m , p );
+                    handler->process( m , p.get() );
                 }
             }
             catch ( ... ){
                 problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
-                delete p;
             }            
             
         }
