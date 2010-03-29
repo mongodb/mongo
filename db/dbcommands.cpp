@@ -1477,9 +1477,7 @@ namespace mongo {
 
             BSONObj query = getQuery( cmdObj );
             
-            set<BSONElement,BSONElementCmpWithoutField> map;
-            long long size = 0;
-
+            BSONElementSet values;
             auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
@@ -1494,24 +1492,17 @@ namespace mongo {
                 BSONObj o = cursor->current();
                 cursor->advance();
                 
-                BSONElement e = o.getFieldDotted( key.c_str() );
-                if ( ! e.type() )
-                    continue;
-
-                if ( map.insert( e ).second ){
-                    size += o.objsize() + 20;
-                    uassert( 10044 ,  "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
-                }
+                o.getFieldsDotted( key.c_str(), values );
             }
 
-            assert( size <= 0x7fffffff );
-            BSONObjBuilder b( (int) size );
-            int n=0;
-            for ( set<BSONElement,BSONElementCmpWithoutField>::iterator i = map.begin() ; i != map.end(); i++ ){
-                b.appendAs( *i , b.numStr( n++ ).c_str() );
+            BSONArrayBuilder b( result.subarrayStart( "values" ) );
+            for ( BSONElementSet::iterator i = values.begin() ; i != values.end(); i++ ){
+                b.append( *i );
             }
+            BSONObj arr = b.done();
 
-            result.appendArray( "values" , b.obj() );
+            uassert(10044,  "distinct too big, 4mb cap",
+                    (arr.objsize() + 1024) < (4 * 1024 * 1024));
 
             return true;
         }
