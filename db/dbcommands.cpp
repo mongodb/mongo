@@ -1505,14 +1505,13 @@ namespace mongo {
             }
 
             assert( size <= 0x7fffffff );
-            BSONObjBuilder b( (int) size );
-            int n=0;
+            
+            BSONArrayBuilder b( result.subarrayStart( "values" ) );
             for ( set<BSONElement,BSONElementCmpWithoutField>::iterator i = map.begin() ; i != map.end(); i++ ){
-                b.appendAs( *i , b.numStr( n++ ).c_str() );
+                b.append( *i );
             }
-
-            result.appendArray( "values" , b.obj() );
-
+            b.done();
+            
             return true;
         }
 

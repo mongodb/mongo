@@ -1662,7 +1662,7 @@ namespace mongo {
         }
 
         BSONArrayBuilder& append(const BSONElement& e){
-            _b.appendAs(e, num().c_str());
+            _b.appendAs(e, num());
             return *this;
         }
         
