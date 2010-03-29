@@ -141,8 +141,11 @@ namespace mongo {
         
         string _todb( const string& ns ) const {
             size_t i = ns.find( '.' );
-            if ( i == string::npos )
+            if ( i == string::npos ){
+                uassert( 13074 , "db name can't be empty" , ns.size() );
                 return ns;
+            }
+            uassert( 13075 , "db name can't be empty" , i > 0 );
             return ns.substr( 0 , i );
         }
         
