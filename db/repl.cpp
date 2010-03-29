@@ -1620,6 +1620,7 @@ namespace mongo {
             ReplInfo r("replMain load sources");
             dblock lk;
             ReplSource::loadAll(sources);
+            replSettings.fastsync = false; // only need this param for initial reset
         }
 
         if ( sources.empty() ) {
@@ -1882,6 +1883,9 @@ namespace mongo {
             createOplog();
             boost::thread t(replMasterThread);
         }
+        
+        while( replSettings.fastsync ) // don't allow writes until we've set up from log
+            sleepmillis( 50 );
     }
 
     /* called from main at server startup */
