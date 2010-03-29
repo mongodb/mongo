@@ -1470,8 +1470,6 @@ namespace mongo {
         }
 
         bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            static DBDirectClient db;
-
             string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
 
             string key = cmdObj["key"].valuestrsafe();
