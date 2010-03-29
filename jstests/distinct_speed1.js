@@ -20,3 +20,7 @@ for ( i=0; i<3; i++ ){
     print( "it: " + Date.timeFunc( fast ) );
     print( "di: " + Date.timeFunc( slow ) );
 }
+
+
+t.ensureIndex( { x : 1 } );
+t.distinct( "x" , { x : 5 } )

@@ -24,7 +24,8 @@
 #include <pcrecpp.h>
 
 namespace mongo {
-
+    
+    class Cursor;
     class CoveredIndexMatcher;
     class Matcher;
 
@@ -190,6 +191,7 @@ namespace mongo {
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
+        bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
 
         Matcher& docMatcher() { return _docMatcher; }

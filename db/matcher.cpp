@@ -153,6 +153,10 @@ namespace mongo {
                           );
 
     }
+
+    bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ){
+        return matches( cursor->currKey() , cursor->currLoc() , details );
+    }
     
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
         if ( details )

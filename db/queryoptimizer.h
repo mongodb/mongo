@@ -117,6 +117,10 @@ namespace mongo {
     // a QueryOp on these plans.
     class QueryPlanSet {
     public:
+
+        typedef boost::shared_ptr< QueryPlan > PlanPtr;
+        typedef vector< PlanPtr > PlanSet;
+
         QueryPlanSet( const char *ns,
                      const BSONObj &query,
                      const BSONObj &order,
@@ -133,10 +137,9 @@ namespace mongo {
         const FieldRangeSet &fbs() const { return fbs_; }
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
+        PlanPtr getBestGuess() const;
     private:
         void addOtherPlans( bool checkFirst );
-        typedef boost::shared_ptr< QueryPlan > PlanPtr;
-        typedef vector< PlanPtr > PlanSet;
         void addPlan( PlanPtr plan, bool checkFirst ) {
             if ( checkFirst && plan->indexKey().woCompare( plans_[ 0 ]->indexKey() ) == 0 )
                 return;

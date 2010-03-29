@@ -1472,13 +1472,25 @@ namespace mongo {
             
             set<BSONElement,BSONElementCmpWithoutField> map;
             long long size = 0;
-            
-            auto_ptr<DBClientCursor> cursor = db.query( ns , query , 0 , 0 , &keyPattern );
-            while ( cursor->more() ){
-                BSONObj o = cursor->next();
+
+            auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            auto_ptr<CoveredIndexMatcher> matcher;
+            if ( ! query.isEmpty() )
+                matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
+
+            while ( cursor->ok() ){
+                if ( matcher.get() && ! matcher->matchesCurrent( cursor.get() ) ){
+                    cursor->advance();
+                    continue;
+                }
+
+                BSONObj o = cursor->current();
+                cursor->advance();
+                
                 BSONElement e = o.getFieldDotted( key.c_str() );
                 if ( ! e.type() )
                     continue;
+
                 if ( map.insert( e ).second ){
                     size += o.objsize() + 20;
                     uassert( 10044 ,  "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );

@@ -451,6 +451,11 @@ namespace mongo {
         b.append( "allPlans", arr );
         return b.obj();
     }
+
+    QueryPlanSet::PlanPtr QueryPlanSet::getBestGuess() const {
+        assert( plans_.size() );
+        return plans_[0];
+    }
     
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
     op_( op ),
