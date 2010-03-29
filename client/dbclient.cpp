@@ -426,7 +426,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
-        massert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
+        uassert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
 
         if ( !c->more() )
             return BSONObj();
@@ -722,7 +722,7 @@ namespace mongo {
             if ( !port().call(toSend, response) ) {
                 failed = true;
                 if ( assertOk )
-                    massert( 10278 , "dbclient error communicating with server", false);
+                    uassert( 10278 , "dbclient error communicating with server", false);
                 return false;
             }
         }
