@@ -36,6 +36,7 @@
 #include "../util/goodies.h"
 #include "repl.h"
 #include "../util/message.h"
+#include "../util/background.h"
 #include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
@@ -126,6 +127,140 @@ namespace mongo {
         }
 
         negotiate( conn.get(), "arbiter" );
+    }
+
+    /* --------------------------------------------- */
+
+    class SlaveTracking : public BackgroundJob {
+    public:
+        
+        static const char * NS;
+
+        struct Ident {
+            
+            Ident(string h,string n) : host(h),ns(n){
+                obj = BSON( "host" << h << "ns" << ns );
+            }
+
+            bool operator<( const Ident& other ) const {
+                int x = strcmp( host.c_str() , other.host.c_str() );
+                if ( x < 0 )
+                    return 1;
+                if ( x > 0 )
+                    return 0;
+
+                return strcmp( ns.c_str() , other.ns.c_str() ) < 0;
+            }
+            
+            string host;
+            string ns;
+            BSONObj obj;
+        };
+
+        struct Info {
+            Info() : loc(0){}
+            ~Info(){
+                if ( loc && owned ){
+                    delete loc;
+                }
+            }
+            bool owned;
+            OpTime * loc;
+        };
+
+        SlaveTracking(){
+            _dirty = false;
+            _started = false;
+        }
+
+        void run(){
+            Client::initThread( "slaveTracking" );
+            DBDirectClient db;
+            while ( ! inShutdown() ){
+                sleepsecs( 1 );
+
+                if ( ! _dirty )
+                    continue;
+                
+                writelock lk(NS);
+
+                list< pair<BSONObj,BSONObj> > todo;
+                
+                {
+                    scoped_lock mylk(_mutex);
+                    
+                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ){
+                        BSONObjBuilder temp;
+                        temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
+                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() , 
+                                                               BSON( "$set" << temp.obj() ).getOwned() ) );
+                    }
+                    
+                    _slaves.clear();
+                }
+
+                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ){
+                    db.update( NS , i->first , i->second , true );
+                }
+
+                _dirty = false;
+            }
+        }
+
+        void reset(){
+            scoped_lock mylk(_mutex);
+            _slaves.clear();
+        }
+
+        void update( const string& host , const string& ns , OpTime last ){
+            scoped_lock mylk(_mutex);
+            
+            Ident ident(host,ns);
+            Info& i = _slaves[ ident ];
+            if ( i.loc ){
+                i.loc[0] = last;
+                return;
+            }
+            
+            dbMutex.assertAtLeastReadLocked();
+            BSONObj res;
+            if ( Helpers::findOne( NS , ident.obj , res ) ){
+                assert( res["syncedTo"].type() );
+                i.owned = false;
+                i.loc = (OpTime*)res["syncedTo"].value();
+                i.loc[0] = last;
+                return;
+            }
+            
+            i.owned = true;
+            i.loc = new OpTime[1];
+            i.loc[0] = last;
+            _dirty = true;
+            if ( ! _started )
+                go();
+        }
+        
+        // need to be careful not to deadlock with this
+        mongo::mutex _mutex;
+        map<Ident,Info> _slaves;
+        bool _dirty;
+        bool _started;
+
+    } slaveTracking;
+
+    const char * SlaveTracking::NS = "local.slaves";
+
+    void updateSlaveLocation( CurOp& curop, int flags , const char * ns , DiskLoc lastRead ){
+        if ( ! ( flags & QueryOption_OplogReplay ))
+            return;
+
+        if ( lastRead.isNull() )
+            return;
+        
+        assert( isMaster( ns ) );
+        assert( strstr( ns , "local.oplog.$" ) == ns );
+        
+        slaveTracking.update( curop.getRemoteString( false ) , ns , lastRead.obj()["ts"].optime() );
     }
 
     /* --------------------------------------------- */
@@ -1527,8 +1662,12 @@ namespace mongo {
          thus, the slave does not need to copy down all the data when it sees this.
     */
     static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
-        if ( strncmp(ns, "local.", 6) == 0 )
+        if ( strncmp(ns, "local.", 6) == 0 ){
+            if ( strncmp(ns, "local.slaves", 12) == 0 ){
+                slaveTracking.reset();
+            }
             return;
+        }
 
         DEV assertInWriteLock();
 
@@ -1944,5 +2083,9 @@ namespace mongo {
             return true;
         }
     } cmdlogcollection;
+
+    // -------------------------------------
+
+
     
 } // namespace mongo

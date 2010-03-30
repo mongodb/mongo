@@ -250,7 +250,7 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass) {
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, GetMoreStats& stats) {
 
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
@@ -264,7 +264,7 @@ namespace mongo {
         BufBuilder b( bufSize );
 
         b.skip(sizeof(QueryResult));
-
+        
         int resultFlags = QueryResult::ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
@@ -275,13 +275,18 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
+            int queryOptions = cc->_queryOptions;
+            stats.queryOptions = queryOptions;
+
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
                 ss << " getMore: " << cc->query << " ";
             }
+            
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
+            
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
@@ -292,7 +297,7 @@ namespace mongo {
                         if ( c->advance() )
                             continue;
 
-                        if( n == 0 && (cc->_queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
+                        if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
                             throw GetMoreWaitException();
                         }
 
@@ -313,7 +318,9 @@ namespace mongo {
                         //out() << "  but it's a dup \n";
                     }
                     else {
+                        stats.last = c->currLoc();
                         BSONObj js = c->current();
+
                         fillQueryResultFromObj(b, cc->fields.get(), js);
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
@@ -327,6 +334,7 @@ namespace mongo {
                 }
                 c->advance();
             }
+
             if ( cc ) {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
