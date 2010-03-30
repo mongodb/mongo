@@ -14,10 +14,15 @@ import shutil
 import subprocess
 import sys
 import urllib2
+sys.path[0:0] = [""]
 
+import simples3
 from suds.client import Client
 
-SOAP_URI = "http://mongodb.onconfluence.com/rpc/soap-axis/confluenceservice-v1?wsdl"
+import settings
+
+HTML_URI = "http://mongodb.onconfluence.com/rpc/soap-axis/confluenceservice-v1?wsdl"
+PDF_URI = "http://www.mongodb.org/rpc/soap-axis/pdfexport?wsdl"
 USERNAME = "soap"
 PASSWORD = "soap"
 AUTH_URI = "http://www.mongodb.org/login.action?os_authType=basic"
@@ -25,10 +30,16 @@ TMP_DIR = "confluence-tmp"
 TMP_FILE = "confluence-tmp.zip"
 
 
-def export_and_get_uri():
-    client = Client(SOAP_URI)
+def export_html_and_get_uri():
+    client = Client(HTML_URI)
     auth = client.service.login(USERNAME, PASSWORD)
     return client.service.exportSpace(auth, "DOCS", "TYPE_HTML")
+
+
+def export_pdf_and_get_uri():
+    client = Client(PDF_URI)
+    auth = client.service.login(USERNAME, PASSWORD)
+    return client.service.exportSpace(auth, "DOCS")
 
 
 def login_and_download(docs):
@@ -69,10 +80,20 @@ def overwrite(src, dest):
     os.symlink(os.path.abspath(target), os.path.abspath(current))
 
 
+def write_to_s3(pdf):
+    s3 = simples3.S3Bucket(settings.bucket, settings.id, settings.key)
+    name = "docs/mongodb-docs-%s.pdf" % datetime.date.today()
+    s3.put(name, pdf, acl="public-read")
+
+
 def main(dir):
+    # HTML
     rmdir(TMP_DIR)
-    extract_to_dir(login_and_download(export_and_get_uri()), TMP_DIR)
+    extract_to_dir(login_and_download(export_html_and_get_uri()), TMP_DIR)
     overwrite("%s/DOCS/" % TMP_DIR, dir)
+
+    # PDF
+    write_to_s3(login_and_download(export_pdf_and_get_uri()).read())
 
 
 if __name__ == "__main__":
