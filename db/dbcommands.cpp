@@ -1536,7 +1536,10 @@ namespace mongo {
             if (!sort.eoo())
                 q.sort(sort.embeddedObjectUserCheck());
 
-            BSONObj out = db.findOne(ns, q);
+            BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
+            const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
+
+            BSONObj out = db.findOne(ns, q, fields);
             if (out.firstElement().eoo()){
                 errmsg = "No matching object found";
                 return false;
@@ -1553,7 +1556,7 @@ namespace mongo {
                 db.update(ns, q, update.embeddedObjectUserCheck());
 
                 if (cmdObj["new"].trueValue())
-                    out = db.findOne(ns, q);
+                    out = db.findOne(ns, q, fields);
             }
 
             result.append("value", out);
