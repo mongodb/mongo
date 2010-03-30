@@ -108,7 +108,7 @@ namespace mongo {
             unsigned x = lockedForWriting;
             if( x ) {
                 b.append("fsyncLock", x);
-                b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
+                b.append("info", "use db.$cmd.sys.unlock.findOne() to terminate the fsync write/snapshot lock");
             }
         }
         
