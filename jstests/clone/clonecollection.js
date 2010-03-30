@@ -144,6 +144,7 @@ ret = finishstartclone();
 for( i = 200000; i < 250000; ++i ) {
     f.a.save( { i: i } );
 }
+assert.eq( 250000, f.a.count() );
 
 assert.commandFailed( dofinishclonecmd( ret ) );
 
