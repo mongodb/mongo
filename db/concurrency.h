@@ -225,11 +225,7 @@ namespace mongo {
     public:
         MongoMutex() { }
         void lock() { 
-#ifdef HAVE_READLOCK
-            m.lock();
-#else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
-#endif
             _minfo.entered();
         }
 
@@ -242,11 +238,7 @@ namespace mongo {
 
         void _unlock() {
             _minfo.leaving();
-#ifdef HAVE_READLOCK
-            m.unlock();
-#else
             boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
-#endif
         }
         void unlock() { 
             if( _releasedEarly.get() ) { 
