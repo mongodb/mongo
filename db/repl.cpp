@@ -104,7 +104,7 @@ namespace mongo {
             return;
         info = _comment;
         if ( n != state && !cmdLine.quiet )
-            log() << "pair: setting master=" << n << " was " << state << '\n';
+            log() << "pair: setting master=" << n << " was " << state << endl;
         state = n;
     }
 
