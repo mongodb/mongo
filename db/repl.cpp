@@ -236,8 +236,10 @@ namespace mongo {
             i.loc = new OpTime[1];
             i.loc[0] = last;
             _dirty = true;
-            if ( ! _started )
+            if ( ! _started ){
+                _started = true;
                 go();
+            }
         }
         
         // need to be careful not to deadlock with this
@@ -1719,8 +1721,10 @@ namespace mongo {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
+        
+        context.getClient()->setLastOp( ts );
     }
-
+    
     static void logKeepalive() { 
         BSONObj obj;
         _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());

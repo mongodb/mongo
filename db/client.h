@@ -162,6 +162,7 @@ namespace mongo {
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
+        OpTime _lastOp;
 
     public:
         
@@ -181,6 +182,15 @@ namespace mongo {
 
         void addTempCollection( const string& ns ){
             _tempCollections.push_back( ns );
+        }
+        
+        void setLastOp( const OpTime& op ){
+            _lastOp = op;
+        }
+
+        void appendLastOp( BSONObjBuilder& b ){
+            if ( ! _lastOp.isNull() )
+                b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
 
         /* each thread which does db operations has a Client object in TLS.  

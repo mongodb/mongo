@@ -140,6 +140,8 @@ namespace mongo {
             else
                 le->appendSelf( result );
             
+            cc().appendLastOp( result );
+
             if ( cmdObj["fsync"].trueValue() ){
                 log() << "fsync from getlasterror" << endl;
                 result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
