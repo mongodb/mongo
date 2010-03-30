@@ -191,6 +191,7 @@ namespace mongo {
             BSONObj o = fromjson("{\"initialsynccomplete\":1}");
             Helpers::putSingleton("local.pair.sync", o);
             initialsynccomplete = 1;
+            log() << "pair: initial sync complete" << endl;
         }
 
         void setInitialSyncCompletedLocking() {
