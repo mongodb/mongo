@@ -5,6 +5,12 @@ b = db.dbhashb;
 a.drop();
 b.drop();
 
+// debug SERVER-761
+db.getCollectionNames().forEach( function( x ) { 
+                                v = db[ x ].validate()
+                                assert( v.valid, x + " " + tojson( v ) );
+                                } );
+
 function gh( coll , mydb ){
     if ( ! mydb ) mydb = db;
     var x = mydb.runCommand( "dbhash" ).collections[coll.getName()];
