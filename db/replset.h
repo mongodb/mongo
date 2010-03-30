@@ -198,9 +198,7 @@ namespace mongo {
             if ( initialsynccomplete == 1 )
                 return;
             dblock lk;
-            BSONObj o = fromjson("{\"initialsynccomplete\":1}");
-            Helpers::putSingleton("local.pair.sync", o);
-            initialsynccomplete = 1;
+            setInitialSyncCompleted();
         }
     };
 
