@@ -476,6 +476,18 @@ namespace QueryTests {
         }
     };
 
+    class EmbeddedNumericTypes : public ClientBase {
+    public:
+        ~EmbeddedNumericTypes() {
+            client().dropCollection( "unittests.querytests.NumericEmbedded" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.NumericEmbedded";
+            client().insert( ns, BSON( "a" << BSON ( "b" << 1 ) ) );
+            ASSERT( ! client().findOne( ns, BSON( "a" << BSON ( "b" << 1.0 ) ) ).isEmpty() );
+        }
+    };
+
     class AutoResetIndexCache : public ClientBase {
     public:
         ~AutoResetIndexCache() {
@@ -1050,6 +1062,8 @@ namespace QueryTests {
             add< EmptyFieldSpec >();
             add< MultiNe >();
             add< EmbeddedNe >();
+            /* SERVER-853
+             * add< EmbeddedNumericTypes >(); */
             add< AutoResetIndexCache >();
             add< UniqueIndex >();
             add< UniqueIndexPreexistingData >();
