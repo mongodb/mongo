@@ -1458,7 +1458,9 @@ namespace mongo {
                     {
                         dbtemprelease t;
                         if ( c->more() ) {
-                            continue;
+                            if ( getInitialSyncCompleted() ) { // if initial sync hasn't completed, break out of loop so we can set to completed or clone more dbs
+                                continue;
+                            }
                         } else {
                             setLastSavedLocalTs( nextLastSaved );
                         }
