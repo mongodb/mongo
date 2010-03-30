@@ -35,11 +35,25 @@ namespace mongo {
 
         if (purePrefix) *purePrefix = false;
 
+        bool multilineOK;
+        if ( regex[0] == '\\' && regex[1] == 'A'){
+            multilineOK = true;
+            regex += 2;
+        } else if (regex[0] == '^') {
+            multilineOK = false;
+            regex += 1;
+        } else {
+            return r;
+        }
+
         bool extended = false;
         while (*flags){
             switch (*(flags++)){
                 case 'm': // multiline
-                    continue;
+                    if (multilineOK)
+                        continue;
+                    else
+                        return r;
                 case 'x': // extended
                     extended = true;
                     break;
@@ -47,9 +61,6 @@ namespace mongo {
                     return r; // cant use index
             }
         }
-
-        if ( *(regex++) != '^' )
-            return r;
 
         stringstream ss;
 
@@ -783,19 +794,31 @@ namespace mongo {
             }
             {
                 BSONObjBuilder b;
-                b.appendRegex("r", "^f", "m");
+                b.appendRegex("r", "\\Af", "");
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "f" );
             }
             {
                 BSONObjBuilder b;
-                b.appendRegex("r", "^f", "mi");
+                b.appendRegex("r", "^f", "m");
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "" );
             }
             {
                 BSONObjBuilder b;
-                b.appendRegex("r", "^f \t\vo\n\ro  \\ \\# #comment", "mx");
+                b.appendRegex("r", "\\Af", "m");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "f" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "\\Af", "mi");
+                BSONObj o = b.done();
+                assert( simpleRegex(o.firstElement()) == "" );
+            }
+            {
+                BSONObjBuilder b;
+                b.appendRegex("r", "\\Af \t\vo\n\ro  \\ \\# #comment", "mx");
                 BSONObj o = b.done();
                 assert( simpleRegex(o.firstElement()) == "foo #" );
             }
