@@ -143,6 +143,66 @@ namespace mongo {
          *         in fact, the whole database could be gone.
          */
         bool yield();
+
+        struct YieldLock {
+            YieldLock( ClientCursor * cc )
+                : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
+                cc->updateLocation();
+                _unlock = new dbtempreleasecond();
+            }
+            ~YieldLock(){
+                assert( ! _unlock );
+            }
+
+            bool stillOk(){
+                delete _unlock;
+                _unlock = 0;
+                
+                if ( ClientCursor::find( _id , false ) == 0 ){
+                    // i was deleted
+                    return false;
+                }
+                
+                _cc->_doingDeletes = _doingDeletes;
+                return true;
+            }
+            
+            ClientCursor * _cc;
+            CursorId _id;
+            bool _doingDeletes;
+
+            dbtempreleasecond * _unlock;
+
+        };
+
+        YieldLock yieldHold(){
+            return YieldLock( this );
+        }
+
+        // --- some pass through helpers for Cursor ---
+
+        BSONObj indexKeyPattern() {
+            return c->indexKeyPattern();
+        }
+
+        bool ok(){
+            return c->ok();
+        }
+
+        bool advance(){
+            return c->advance();
+        }
+
+        bool currentMatches(){
+            if ( ! matcher.get() )
+                return true;
+            return matcher->matchesCurrent( c.get() );
+        }
+
+        BSONObj current(){
+            return c->current();
+        }
+
     private:
         void setLastLoc_inlock(DiskLoc);
 
