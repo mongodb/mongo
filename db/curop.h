@@ -239,9 +239,11 @@ namespace mongo {
         
         BSONObj infoNoauth();
 
-        string getRemoteString(){
+        string getRemoteString( bool incPort = true ){
             stringstream ss;
-            ss << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
+            ss << inet_ntoa( _remote.sin_addr );
+            if ( incPort )
+                ss << ":" << ntohs( _remote.sin_port );
             return ss.str();
         }
 
