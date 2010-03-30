@@ -1027,6 +1027,10 @@ namespace mongo {
         abort();
     }
     
+    void ignoreSignal( int signal ){
+        cout << "ignoring signal: " << signal << endl;
+    }
+
     void setupSignals() {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
@@ -1034,6 +1038,7 @@ namespace mongo {
         assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
+        assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
 
         setupSIGTRAPforGDB();
 
