@@ -480,5 +480,7 @@ namespace mongo {
             _matcher.reset(new CoveredIndexMatcher(tsQuery, _qp.indexKey()));
         }
     };
+    
+    void updateSlaveLocation( CurOp& curop, int flags , const char * ns , DiskLoc lastRead );
 
 } // namespace mongo
