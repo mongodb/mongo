@@ -595,6 +595,10 @@ namespace mongo {
             }
         }
 
+        OpTime optime() const {
+            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+        }
+
         Date_t timestampTime() const{
             unsigned long long t = ((unsigned int*)(value() + 4 ))[0];
             return t * 1000;
