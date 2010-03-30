@@ -287,10 +287,10 @@ namespace mongo {
     // destroying them.
     class mutex : boost::noncopyable {
     public:
-        mutex() { new (_buf) boost::mutex(); }
+        mutex() { _m = new boost::mutex(); }
         ~mutex() {
             if( !__destroyingStatics ) {
-                boost().boost::mutex::~mutex();
+                delete _m;
             }
         }
         class scoped_lock : boost::noncopyable {
@@ -301,8 +301,8 @@ namespace mongo {
             boost::mutex::scoped_lock _l;
         };
     private:
-        boost::mutex &boost() { return *( boost::mutex * )( _buf ); }
-        char _buf[ sizeof( boost::mutex ) ];
+        boost::mutex &boost() { return *_m; }
+        boost::mutex *_m;
     };
     
     typedef mongo::mutex::scoped_lock scoped_lock;
