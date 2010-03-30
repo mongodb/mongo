@@ -23,7 +23,7 @@ namespace mongo {
     public:
 
         enum Options {
-            SEQUENTIAL = 1
+            SEQUENTIAL = 1 // hint - like FILE_FLAG_SEQUENTIAL_SCAN on windows
         };
 
         MemoryMappedFile();
@@ -48,13 +48,12 @@ namespace mongo {
             return len;
         }
         
-        static void updateLength( const char *filename, long &length );
-        
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
-        static int flushAll( bool sync );
+        static int flushAll( bool sync ); // returns n flushed
 
     private:
+        static void updateLength( const char *filename, long &length );
         void created();
         
         HANDLE fd;

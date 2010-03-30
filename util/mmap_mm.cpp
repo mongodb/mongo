@@ -1,4 +1,4 @@
-// mmap_mm.cpp
+// mmap_mm.cpp - in memory (no file) version
 
 /*    Copyright 2009 10gen Inc.
  *

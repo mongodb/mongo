@@ -36,8 +36,8 @@ namespace mongo {
     }
 
     /*static*/
-    int closingAllFiles = 0;
     void MemoryMappedFile::closeAllFiles( stringstream &message ) {
+        static int closingAllFiles = 0;
         if ( closingAllFiles ) {
             message << "warning closingAllFiles=" << closingAllFiles << endl;
             return;
@@ -52,7 +52,7 @@ namespace mongo {
         --closingAllFiles;
     }
 
-    long long MemoryMappedFile::totalMappedLength(){
+    /*static*/ long long MemoryMappedFile::totalMappedLength(){
         unsigned long long total = 0;
         
         scoped_lock lk( mmmutex );
@@ -62,7 +62,7 @@ namespace mongo {
         return total;
     }
 
-    int MemoryMappedFile::flushAll( bool sync ){
+    /*static*/ int MemoryMappedFile::flushAll( bool sync ){
         int num = 0;
 
         scoped_lock lk( mmmutex );
@@ -77,7 +77,7 @@ namespace mongo {
     }
 
 
-    void MemoryMappedFile::updateLength( const char *filename, long &length ) {
+    /*static*/ void MemoryMappedFile::updateLength( const char *filename, long &length ) {
         if ( !boost::filesystem::exists( filename ) )
             return;
         // make sure we map full length if preexisting file.
