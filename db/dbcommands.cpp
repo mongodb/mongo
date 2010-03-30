@@ -1643,6 +1643,19 @@ namespace mongo {
                 auto_ptr<Cursor> cursor;
 
                 NamespaceDetails * nsd = nsdetails( c.c_str() );
+                
+                // debug SERVER-761
+                NamespaceDetails::IndexIterator ii = nsd->ii();
+                while( ii.more() ) {
+                    const IndexDetails &idx = ii.next();
+                    if ( !idx.head.isValid() || !idx.info.isValid() ) {
+                        log() << "invalid index for ns: " << c << " " << idx.head << " " << idx.info;
+                        if ( idx.info.isValid() )
+                            log() << " " << idx.info.obj();
+                        log() << endl;
+                    }
+                }
+                
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ){
                     cursor.reset( new BtreeCursor( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
