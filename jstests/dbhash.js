@@ -7,8 +7,11 @@ b.drop();
 
 // debug SERVER-761
 db.getCollectionNames().forEach( function( x ) { 
-                                v = db[ x ].validate()
-                                assert( v.valid, x + " " + tojson( v ) );
+                                v = db[ x ].validate();
+                                if ( !v.valid ) {
+                                    print( x );
+                                    printjson( v );
+                                }
                                 } );
 
 function gh( coll , mydb ){
