@@ -100,10 +100,10 @@ namespace mongo {
 		int len = -1;
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
-		void *p;
+        MMF::Pointer p;
         if( boost::filesystem::exists(nsPath) ) { 
 			p = f.map(pathString.c_str());
-            if( p ) {
+            if( !p.isNull() ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ){
                     log() << "bad .ns file: " << pathString << endl;
@@ -117,17 +117,18 @@ namespace mongo {
             maybeMkdir();
 			long l = lenForNewNsFiles;
 			p = f.map(pathString.c_str(), l);
-            if( p ) { 
+            if( !p.isNull() ) {
                 len = (int) l;
                 assert( len == lenForNewNsFiles );
             }
 		}
 
-        if ( p == 0 ) {
+        if ( p.isNull() ) {
             problem() << "couldn't open file " << pathString << " terminating" << endl;
             dbexit( EXIT_FS );
         }
-        ht = new HashTable<Namespace,NamespaceDetails>(p, len, "namespace index");
+
+        ht = new HashTable<Namespace,NamespaceDetails,MMF::Pointer>(p, len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(callback);
     }

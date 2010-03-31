@@ -118,7 +118,7 @@ namespace mongo {
             bool valid = true;
             stringstream ss;
             ss << "\nvalidate\n";
-            ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
+            //ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
             if ( d->capped )
                 ss << "  capped:" << d->capped << " max:" << d->max << '\n';
             
