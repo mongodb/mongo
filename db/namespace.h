@@ -580,7 +580,6 @@ namespace mongo {
         friend class NamespaceCursor;
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
     public:
-        typedef MemoryMappedFile/*2*/ MMF;
 
         NamespaceIndex(const string &dir, const string &database) :
           ht( 0 ),

@@ -91,4 +91,6 @@ namespace mongo {
 
     void printMemInfo( const char * where );    
 
+    typedef MemoryMappedFile MMF;
+
 } // namespace mongo

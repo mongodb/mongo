@@ -83,7 +83,6 @@ namespace mongo {
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
 
-        typedef MemoryMappedFile MMF;
         MMF mmf;
         MMF::Pointer _p;
         DataFileHeader *header;
@@ -277,11 +276,11 @@ namespace mongo {
             return false;
         }
 
-        Record* getRecord(DiskLoc dl) {
+        /*Record* __getRecord(DiskLoc dl) {
             int ofs = dl.getOfs();
             assert( ofs >= HeaderSize );
             return (Record*) (((char *) this) + ofs);
-        }
+        }*/
 
         void init(int fileno, int filelength) {
             if ( uninitialized() ) {
@@ -306,7 +305,7 @@ namespace mongo {
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
-        Extent *e = (Extent *) (((char *)header) + loc.getOfs());
+        Extent *e = (Extent *) _p.at(loc.getOfs(), 16 * 1024);
         return e;
     }
 
@@ -323,7 +322,9 @@ namespace mongo {
 namespace mongo {
 
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
-        return header->getRecord(dl);
+        int ofs = dl.getOfs();
+        assert( ofs >= DataFileHeader::HeaderSize );
+        return (Record*) _p.at(ofs, 4096/*TODO*/);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
