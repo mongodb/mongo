@@ -616,6 +616,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("bind_ip", po::value<string>(&bind_ip),
          "local ip address to bind listener - all local ips bound by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+#if !defined(_WIN32) && !defined(__sunos__)
+        ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
+#endif
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
         ("cpu", "periodically show cpu and iowait utilization")
