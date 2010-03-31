@@ -36,7 +36,8 @@ namespace mongo {
 
     template <
     class Key,
-    class Type
+    class Type,
+    class PTR
     >
     class HashTable : boost::noncopyable {
     public:
@@ -51,9 +52,14 @@ namespace mongo {
             void setUnused() {
                 hash = 0;
             }
-        } *nodes;
+        };
+        PTR _buf;
         int n;
         int maxChain;
+
+        Node& nodes(int i) {
+            return *((Node*) _buf.at(i * sizeof(Node)));
+        }
 
         int _find(const Key& k, bool& found) {
             found = false;
@@ -63,12 +69,12 @@ namespace mongo {
             int chain = 0;
             int firstNonUsed = -1;
             while ( 1 ) {
-                if ( !nodes[i].inUse() ) {
+                if ( !nodes(i).inUse() ) {
                     if ( firstNonUsed < 0 )
                         firstNonUsed = i;
                 }
 
-                if ( nodes[i].hash == h && nodes[i].k == k ) {
+                if ( nodes(i).hash == h && nodes(i).k == k ) {
                     if ( chain >= 200 )
                         out() << "warning: hashtable " << name << " long chain " << endl;
                     found = true;
@@ -92,14 +98,15 @@ namespace mongo {
 
     public:
         /* buf must be all zeroes on initialization. */
-        HashTable(void *buf, int buflen, const char *_name) : name(_name) {
+        HashTable(PTR buf, int buflen, const char *_name) : name(_name) {
             int m = sizeof(Node);
             // out() << "hashtab init, buflen:" << buflen << " m:" << m << endl;
             n = buflen / m;
             if ( (n & 1) == 0 )
                 n--;
             maxChain = (int) (n * 0.05);
-            nodes = (Node *) buf;
+            _buf = buf;
+            //nodes = (Node *) buf;
 
             assert( sizeof(Node) == 628 );
             //out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
@@ -109,7 +116,7 @@ namespace mongo {
             bool found;
             int i = _find(k, found);
             if ( found )
-                return &nodes[i].value;
+                return &nodes(i).value;
             return 0;
         }
 
@@ -117,8 +124,9 @@ namespace mongo {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
-                nodes[i].k.kill();
-                nodes[i].setUnused();
+                Node& n = nodes(i);
+                n.k.kill();
+                n.setUnused();
             }
         }
 /*
@@ -136,14 +144,15 @@ namespace mongo {
             int i = _find(k, found);
             if ( i < 0 )
                 return false;
+            Node& n = nodes(i);
             if ( !found ) {
-                nodes[i].k = k;
-                nodes[i].hash = k.hash();
+                n.k = k;
+                n.hash = k.hash();
             }
             else {
-                assert( nodes[i].hash == k.hash() );
+                assert( n.hash == k.hash() );
             }
-            nodes[i].value = value;
+            n.value = value;
             return true;
         }
         
@@ -151,9 +160,9 @@ namespace mongo {
         
         void iterAll( IteratorCallback callback ){
             for ( int i=0; i<n; i++ ){
-                if ( ! nodes[i].inUse() )
+                if ( ! nodes(i).inUse() )
                     continue;
-                callback( nodes[i].k , nodes[i].value );
+                callback( nodes(i).k , nodes(i).value );
             }
         }
     

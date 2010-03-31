@@ -19,8 +19,30 @@
 
 namespace mongo {
 
+    class MemoryMappedFile2 {
+    public:
+        class Pointer {
+        public:
+            void* at(int offset);
+        };
+
+        // throws exception if file doesn't exist.
+        Pointer map( const char *filename );
+        Pointer map(const char *_filename, long &length, int options=0);
+
+        long length();
+    };
+
     class MemoryMappedFile {
     public:
+        class Pointer {
+            char *_base;
+        public:
+            Pointer() : _base(0) { }
+            Pointer(void *p) : _base((char*) p) { }
+            void* at(int offset) { return _base + offset; } 
+            bool isNull() const { return _base == 0; }
+        };
 
         enum Options {
             SEQUENTIAL = 1 // hint - like FILE_FLAG_SEQUENTIAL_SCAN on windows
@@ -30,8 +52,13 @@ namespace mongo {
         ~MemoryMappedFile(); /* closes the file if open */
         void close();
         
-        // Throws exception if file doesn't exist.
+        // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map( const char *filename );
+        /*Pointer pmap( const char *filename ) {
+            void *p = map(filename);
+            uassert(13077, "couldn't open/map file", p);
+            return Pointer(p);
+        }*/
 
         /* Creates with length if DNE, otherwise uses existing file length,
            passed length.
