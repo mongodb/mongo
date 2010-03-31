@@ -259,9 +259,6 @@ namespace mongo {
         if ( lastRead.isNull() )
             return;
         
-        if ( ! isMaster( ns ) )
-            return;
-
         assert( strstr( ns , "local.oplog.$" ) == ns );
         
         slaveTracking.update( curop.getRemoteString( false ) , ns , lastRead.obj()["ts"].optime() );
