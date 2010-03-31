@@ -138,8 +138,10 @@ namespace mongo {
         _markModified();
         
         _manager->_chunks.push_back( s );
+        _manager->_chunkMap[s->getMax()] = s;
         
         setMax(m.getOwned());
+        _manager->_chunkMap[_max] = this;
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << "\n" 
@@ -427,6 +429,7 @@ namespace mongo {
             Chunk * c = new Chunk( this );
             c->unserialize( d );
             _chunks.push_back( c );
+            _chunkMap[c->getMax()] = c;
             c->_id = d["_id"].wrap().getOwned();
         }
         conn.done();
@@ -440,6 +443,7 @@ namespace mongo {
             c->_markModified();
             
             _chunks.push_back( c );
+            _chunkMap[c->getMax()] = c;
             
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
         }
@@ -452,6 +456,7 @@ namespace mongo {
             delete( *i );
         }
         _chunks.clear();
+        _chunkMap.clear();
     }
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
@@ -459,14 +464,16 @@ namespace mongo {
     }
 
     Chunk& ChunkManager::findChunk( const BSONObj & obj ){
-        
-        for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++ ){
-            Chunk * c = *i;
+        BSONObj key = _key.extractKey(obj);
+        ChunkMap::iterator it = _chunkMap.upper_bound(key);
+        if (it != _chunkMap.end()){
+            Chunk* c = it->second;
             if ( c->contains( obj ) )
                 return *c;
         }
+
         stringstream ss;
-        ss << "couldn't find a chunk which should be impossible  extracted: " << _key.extractKey( obj );
+        ss << "couldn't find a chunk which should be impossible  extracted: " << key;
         throw UserException( 8070 , ss.str() );
     }
 
@@ -537,6 +544,7 @@ namespace mongo {
 
         // wipe my meta-data
         _chunks.clear();
+        _chunkMap.clear();
 
         
         // delete data from mongod
