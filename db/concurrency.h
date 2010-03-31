@@ -175,11 +175,7 @@ namespace mongo {
                 lock_shared();
                 return true;
             }
-            /*
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(2);
-            bool got = _m.timed_lock_shared( until );
-            */
+
             bool got = _m.lock_shared_try( millis );
             if ( got )
                 _state.set(-1);

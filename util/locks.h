@@ -60,7 +60,7 @@ namespace mongo {
 
         bool lock_shared_try( int millis ){
             boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(2);
+            until += boost::posix_time::milliseconds(millis);
             return _m.timed_lock_shared( until );
         }
     };
