@@ -32,6 +32,8 @@ namespace po = boost::program_options;
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     Tool::Tool( string name , bool localDBAllowed , string defaultDB , string defaultCollection ) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
     
