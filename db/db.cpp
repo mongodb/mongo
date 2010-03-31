@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */

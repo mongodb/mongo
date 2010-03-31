@@ -23,7 +23,6 @@
 namespace po = boost::program_options;
 
 namespace mongo {
-    CmdLine cmdLine;
 
     void setupSignals();
     BSONArray argvArray;

@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     const char * curNs = "in client mode";
 
     bool dbexitCalled = false;
