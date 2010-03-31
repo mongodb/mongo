@@ -741,7 +741,7 @@ namespace NamespaceTests {
         //        private:
         //            virtual string spec() const {
         //                // NOTE 256 added to size in _userCreateNS()
-        //                long long big = MongoDataFile::maxSize() - MDFHeader::headerSize();
+        //                long long big = MongoDataFile::maxSize() - DataFileHeader::headerSize();
         //                stringstream ss;
         //                ss << "{\"capped\":true,\"size\":" << big << "}";
         //                return ss.str();

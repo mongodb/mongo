@@ -137,8 +137,8 @@ namespace mongo {
                 int minSize = 0;
                 if ( n != 0 && files[ n - 1 ] )
                     minSize = files[ n - 1 ]->getHeader()->fileLength;
-                if ( sizeNeeded + MDFHeader::headerSize() > minSize )
-                    minSize = sizeNeeded + MDFHeader::headerSize();
+                if ( sizeNeeded + DataFileHeader::headerSize() > minSize )
+                    minSize = sizeNeeded + DataFileHeader::headerSize();
                 try {
                     p->open( fullNameString.c_str(), minSize, preallocateOnly );
                 }

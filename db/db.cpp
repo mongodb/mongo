@@ -316,7 +316,7 @@ namespace mongo {
     bool shouldRepairDatabases = 0;
     bool forceRepair = 0;
     
-    bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
+    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ){
         static DBDirectClient db;
         
         if ( h->version == 4 && h->versionMinor == 4 ){
@@ -361,7 +361,7 @@ namespace mongo {
             log(1) << "\t" << dbName << endl;
             Client::Context ctx( dbName );
             MongoDataFile *p = cc().database()->getFile( 0 );
-            MDFHeader *h = p->getHeader();
+            DataFileHeader *h = p->getHeader();
             if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;
                 log() << "****" << endl;

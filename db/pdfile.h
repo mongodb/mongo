@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    class MDFHeader;
+    class DataFileHeader;
     class Extent;
     class Record;
     class Cursor;
@@ -56,7 +56,6 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    class MDFHeader;
     class MongoDataFile {
         friend class DataFileMgr;
         friend class BasicCursor;
@@ -70,7 +69,7 @@ namespace mongo {
         */
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
-        MDFHeader *getHeader() {
+        DataFileHeader *getHeader() {
             return header;
         }
 
@@ -84,8 +83,10 @@ namespace mongo {
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
 
-        MemoryMappedFile mmf;
-        MDFHeader *header;
+        typedef MemoryMappedFile MMF;
+        MMF mmf;
+        MMF::Pointer _p;
+        DataFileHeader *header;
         int fileNo;
     };
 
@@ -254,8 +255,7 @@ namespace mongo {
           ----------------------
     */
 
-    /* data file header */
-    class MDFHeader {
+    class DataFileHeader {
     public:
         int version;
         int versionMinor;
@@ -267,7 +267,7 @@ namespace mongo {
         char data[4];
 
         static int headerSize() {
-            return sizeof(MDFHeader) - 4;
+            return sizeof(DataFileHeader) - 4;
         }
 
         bool currentVersion() const {
