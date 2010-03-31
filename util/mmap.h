@@ -23,7 +23,7 @@ namespace mongo {
     public:
         class Pointer {
         public:
-            void* at(int offset);
+            void* at(int offset, int maxLen);
         };
 
         // throws exception if file doesn't exist.
@@ -40,7 +40,7 @@ namespace mongo {
         public:
             Pointer() : _base(0) { }
             Pointer(void *p) : _base((char*) p) { }
-            void* at(int offset) { return _base + offset; } 
+            void* at(int offset, int maxLen) { return _base + offset; } 
             bool isNull() const { return _base == 0; }
         };
 

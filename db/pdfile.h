@@ -266,9 +266,7 @@ namespace mongo {
 
         char data[4];
 
-        static int headerSize() {
-            return sizeof(DataFileHeader) - 4;
-        }
+        enum { HeaderSize = 8192 };
 
         bool currentVersion() const {
             return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
@@ -281,26 +279,26 @@ namespace mongo {
 
         Record* getRecord(DiskLoc dl) {
             int ofs = dl.getOfs();
-            assert( ofs >= headerSize() );
+            assert( ofs >= HeaderSize );
             return (Record*) (((char *) this) + ofs);
         }
 
         void init(int fileno, int filelength) {
             if ( uninitialized() ) {
                 assert(filelength > 32768 );
-                assert( headerSize() == 8192 );
+                assert( HeaderSize == 8192 );
                 fileLength = filelength;
                 version = VERSION;
                 versionMinor = VERSION_MINOR;
-                unused.setOfs( fileno, headerSize() );
-                assert( (data-(char*)this) == headerSize() );
-                unusedLength = fileLength - headerSize() - 16;
+                unused.setOfs( fileno, HeaderSize );
+                assert( (data-(char*)this) == HeaderSize );
+                unusedLength = fileLength - HeaderSize - 16;
                 memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
         }
         
         bool isEmpty() const {
-            return uninitialized() || ( unusedLength == fileLength - headerSize() - 16 );
+            return uninitialized() || ( unusedLength == fileLength - HeaderSize - 16 );
         }
     };
 

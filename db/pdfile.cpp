@@ -199,7 +199,7 @@ namespace mongo {
             }
         } else {
             while ( size > 0 ) {
-                int max = MongoDataFile::maxSize() - DataFileHeader::headerSize();
+                int max = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
@@ -326,7 +326,7 @@ namespace mongo {
         }
         
         _p = mmf.map(filename, size);
-        header = (DataFileHeader *) _p.at(0);
+        header = (DataFileHeader *) _p.at(0, DataFileHeader::HeaderSize);
         if( sizeof(char *) == 4 ) 
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", header);
         else

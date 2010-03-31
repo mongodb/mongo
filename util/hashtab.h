@@ -58,7 +58,7 @@ namespace mongo {
         int maxChain;
 
         Node& nodes(int i) {
-            return *((Node*) _buf.at(i * sizeof(Node)));
+            return *((Node*) _buf.at(i * sizeof(Node), sizeof(Node)));
         }
 
         int _find(const Key& k, bool& found) {
