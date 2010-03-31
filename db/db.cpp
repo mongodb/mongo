@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */
@@ -1036,6 +1038,7 @@ namespace mongo {
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
         assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
+        assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
         assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
