@@ -317,6 +317,7 @@ namespace mongo {
                         responseMsg = "not allowed\n";
                         return;
                     }              
+                    headers.push_back( "Content-Type: application/json" );
                     generateServerStatus( url , responseMsg );
                     responseCode = 200;
                     return;
