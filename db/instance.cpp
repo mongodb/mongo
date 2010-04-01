@@ -212,7 +212,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
+    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
 
         // before we lock...
         int op = m.data->operation();

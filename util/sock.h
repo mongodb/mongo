@@ -121,10 +121,11 @@ namespace mongo {
 #endif
         }
 
-        string toString() const{
+        string toString(bool includePort=true) const{
             stringstream out;
-            out << inet_ntoa(sa.sin_addr) << ':'
-                << ntohs(sa.sin_port);
+            out << inet_ntoa(sa.sin_addr);
+            if (includePort)
+                out << ':' << ntohs(sa.sin_port);
             return out.str();
         }
 
