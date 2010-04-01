@@ -18,6 +18,8 @@
 
 //#include "../stdafx.h"
 
+#pragma once
+
 #if defined(_WIN32)
 
 #if BOOST_VERSION >= 103500
