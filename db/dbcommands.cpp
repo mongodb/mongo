@@ -1022,19 +1022,26 @@ namespace mongo {
 
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ){
-            DBDirectClient client;
-            auto_ptr<DBClientCursor> indexes =
-                client.query(db + ".system.indexes", QUERY( "ns" << ns));
+            dbMutex.assertAtLeastReadLocked();
 
-            long long totalSize = 0;
-            while (indexes->more()){
-                BSONObj index = indexes->nextSafe();
-                NamespaceDetails * nsd = nsdetails( (ns + ".$" + index["name"].valuestrsafe()).c_str() );
-                if (!nsd)
-                    continue; // nothing to do here
-                totalSize += nsd->datasize;
-                if (details)
-                    details->appendNumber(index["name"].valuestrsafe(), nsd->datasize / scale );
+            NamespaceDetails * nsd = nsdetails( ns.c_str() );
+            if ( ! nsd )
+                return 0;
+            
+            long long totalSize = 0;            
+
+            NamespaceDetails::IndexIterator ii = nsd->ii();
+            while ( ii.more() ){
+                IndexDetails& d = ii.next();
+                string collNS = d.indexNamespace();
+                NamespaceDetails * mine = nsdetails( collNS.c_str() );
+                if ( ! mine ){
+                    log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
+                    continue;
+                }
+                totalSize += mine->datasize;
+                if ( details )
+                    details->appendNumber( d.indexName() , mine->datasize / scale );
             }
             return totalSize;
         }
