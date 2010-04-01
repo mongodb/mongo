@@ -434,8 +434,12 @@ namespace mongo {
                 if ( fn[3] == 'a' && fn[4] == 'r' && fn[5] == 0 )
                     return BSONObj::opNEAR;
             }
-            else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
-                return BSONObj::opMOD;
+            else if ( fn[1] == 'm' ){
+                if ( fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
+                    return BSONObj::opMOD;
+                if ( fn[2] == 'a' && fn[3] == 'x' && fn[4] == 'D' && fn[5] == 'i' && fn[6] == 's' && fn[7] == 't' && fn[8] == 'a' && fn[9] == 'n' && fn[10] == 'c' && fn[11] == 'e' && fn[12] == 0 )
+                    return BSONObj::opMAX_DISTANCE;
+            }
             else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 )
                 return BSONObj::opTYPE;
             else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
