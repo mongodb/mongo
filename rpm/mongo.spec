@@ -68,9 +68,13 @@ scons -c
 rm -rf $RPM_BUILD_ROOT
 
 %pre server
-/usr/sbin/groupadd -r mongod
-/usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false \
-    -c mongod mongod > /dev/null 2>&1
+if ! /usr/bin/id -g mongod &>/dev/null; then
+    /usr/sbin/groupadd -r mongod
+fi
+if ! /usr/bin/id mongod &>/dev/null; then
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false \
+	-c mongod mongod > /dev/null 2>&1
+fi
 
 %post server
 if test $1 = 1
