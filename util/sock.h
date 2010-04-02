@@ -270,12 +270,22 @@ namespace mongo {
     }
 
     inline SockAddr::SockAddr(const char * iporhost , int port) {
-        string ip = hostbyname( iporhost );
-        memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
-        as<sockaddr_in>().sin_family = AF_INET;
-        as<sockaddr_in>().sin_port = htons(port);
-        as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
-        addressSize = sizeof(sockaddr_in);
+        if (strchr(iporhost, '/')){
+#ifdef _WIN32
+            uassert(13080, "no unix socket support on windows", false);
+#endif
+            uassert(13079, "path to unix socket too long", strlen(iporhost) < sizeof(as<sockaddr_un>().sun_path));
+            as<sockaddr_un>().sun_family = AF_UNIX;
+            strcpy(as<sockaddr_un>().sun_path, iporhost);
+            addressSize = sizeof(sockaddr_un);
+        } else {
+            string ip = hostbyname( iporhost );
+            memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
+            as<sockaddr_in>().sin_family = AF_INET;
+            as<sockaddr_in>().sin_port = htons(port);
+            as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
+            addressSize = sizeof(sockaddr_in);
+        }
     }
 
     inline string getHostName() {

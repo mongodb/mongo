@@ -446,7 +446,11 @@ namespace mongo {
             ip = hostbyname(ip.c_str());
         } else {
             port = CmdLine::DefaultDBPort;
-            ip = hostbyname( serverAddress.c_str() );
+            if (serverAddress.find( "/" ) == string::npos){
+                ip = hostbyname( serverAddress.c_str() );
+            } else {
+                ip = serverAddress;
+            }
         }
         if( ip.empty() ) {
             stringstream ss;

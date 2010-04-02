@@ -55,6 +55,9 @@ namespace mongo {
             log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
+        if (me.getType() == AF_UNIX){
+            unlink(me.getAddr().c_str());
+        }
         prebindOptions( sock );
         if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
             log() << "listen(): bind() failed " << OUTPUT_ERRNO << " for port: " << port << endl;
@@ -89,7 +92,8 @@ namespace mongo {
                 log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNOX(x) << endl;
                 continue;
             }
-            disableNagle(s);
+            if (from.getType() != AF_UNIX)
+                disableNagle(s);
             if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
             accepted( new MessagingPort(s, from) );
         }
@@ -233,7 +237,8 @@ namespace mongo {
             return false;
         }
 
-        disableNagle(sock);
+        if (farEnd.getType() != AF_UNIX)
+            disableNagle(sock);
 
 #ifdef SO_NOSIGPIPE
         // osx
