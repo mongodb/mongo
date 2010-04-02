@@ -18,10 +18,6 @@
 
 #pragma once
 
-#if defined(_WIN32)
-#  include <windows.h>
-#endif
-
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)

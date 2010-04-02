@@ -481,7 +481,7 @@ namespace mongo {
         }
     };
     
-    void updateSlaveLocation( CurOp& curop, int flags , const char * ns , DiskLoc lastRead );
+    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp );
     bool opReplicatedEnough( OpTime op , int w );
 
 } // namespace mongo

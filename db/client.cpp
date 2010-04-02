@@ -226,7 +226,7 @@ namespace mongo {
         }
         // b.append("inLock",  ??
         stringstream clientStr;
-        clientStr << inet_ntoa( _remote.sin_addr ) << ":" << ntohs( _remote.sin_port );
+        clientStr << _remote.toString();
         b.append("client", clientStr.str());
 
         if ( _client )
@@ -270,7 +270,6 @@ namespace mongo {
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();
             c.gotHandshake( cmdObj );
-            rotateLogs();
             return 1;
         }        
 

@@ -264,11 +264,8 @@ namespace mongo {
 
     const char * SlaveTracking::NS = "local.slaves";
 
-    void updateSlaveLocation( CurOp& curop, int flags , const char * ns , DiskLoc lastRead ){
-        if ( ! ( flags & QueryOption_OplogReplay ))
-            return;
-
-        if ( lastRead.isNull() )
+    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ){
+        if ( lastOp.isNull() )
             return;
         
         assert( strstr( ns , "local.oplog.$" ) == ns );
@@ -277,7 +274,7 @@ namespace mongo {
         if ( rid.isEmpty() )
             return;
 
-        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastRead.obj()["ts"].optime() );
+        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
     }
 
     bool opReplicatedEnough( OpTime op , int w ){

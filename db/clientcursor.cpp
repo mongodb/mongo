@@ -28,6 +28,7 @@
 #include <time.h>
 #include "db.h"
 #include "commands.h"
+#include "repl.h"
 
 namespace mongo {
 
@@ -257,6 +258,26 @@ namespace mongo {
         DEV out() << "  alloccursorid " << x << endl;
         return x;
     }
+
+    void ClientCursor::storeOpForSlave( DiskLoc last ){
+        if ( ! ( _queryOptions & QueryOption_OplogReplay ))
+            return;
+
+        if ( last.isNull() )
+            return;
+        
+        BSONElement e = last.obj()["ts"];
+        if ( e.type() == Date || e.type() == Timestamp )
+            _slaveReadTill = e.optime();
+    }
+    
+    void ClientCursor::updateSlaveLocation( CurOp& curop ){
+        if ( _slaveReadTill.isNull() )
+            return;
+        mongo::updateSlaveLocation( curop , ns.c_str() , _slaveReadTill );
+    }
+
+
 
     // QUESTION: Restrict to the namespace from which this command was issued?
     // Alternatively, make this command admin-only?

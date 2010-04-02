@@ -75,13 +75,8 @@ namespace mongo {
 
     // for an existing query (ie a ClientCursor), send back additional information.
     struct GetMoreWaitException { };
-    struct GetMoreStats {
-        GetMoreStats() : queryOptions(0){}
-        int queryOptions;
-        DiskLoc last;
-    };
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, GetMoreStats& stats);
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass );
 
     struct UpdateResult {
         bool existing;

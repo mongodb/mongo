@@ -220,7 +220,7 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd.sa ) ) {
+                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
                     /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort->farEnd.isLocalHost() ) {
@@ -439,7 +439,12 @@ namespace mongo {
                 }
 
                 sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
-
+                
+                if ( inShutdown() ){
+                    // occasional issue trying to flush during shutdown when sleep interrupted
+                    break;
+                }
+                
                 Date_t start = jsTime();
                 MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
