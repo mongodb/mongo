@@ -206,6 +206,10 @@ namespace mongo {
             memcpy(_queryBuf, query.objdata(), query.objsize());
         }
 
+        Client * getClient() const { 
+            return _client;
+        }
+
         CurOp( Client * client , CurOp * wrapped = 0 ) { 
             _client = client;
             _wrapped = wrapped;

@@ -140,11 +140,39 @@ namespace mongo {
             else
                 le->appendSelf( result );
             
-            cc().appendLastOp( result );
+            Client& c = cc();
+            c.appendLastOp( result );
 
             if ( cmdObj["fsync"].trueValue() ){
                 log() << "fsync from getlasterror" << endl;
                 result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
+            }
+            
+            BSONElement e = cmdObj["w"];
+            if ( e.isNumber() ){
+                int timeout = cmdObj["wtimeout"].numberInt();
+                Timer t;
+
+                int w = e.numberInt();
+
+                long long passes = 0;
+                char buf[32];
+                while ( 1 ){
+                    if ( opReplicatedEnough( c.getLastOp() , w ) )
+                        break;
+                    
+                    if ( timeout > 0 && t.millis() >= timeout ){
+                        result.append( "wtimeout" , true );
+                        errmsg = "timed out waiting for slaves";
+                        result.append( "waited" , t.millis() );
+                        return false;
+                    }
+
+                    assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
+                    c.curop()->setMessage( buf );
+                    sleepmillis(1);
+                }
+                result.appendNumber( "wtime" , t.millis() );
             }
             
             return true;
