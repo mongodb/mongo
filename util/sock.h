@@ -110,9 +110,6 @@ namespace mongo {
         SockAddr(int sourcePort); /* listener side */
         SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
-        struct sockaddr_storage sa;
-        socklen_t addressSize;
-
         template <typename T>
         T& as() { return *(T*)(&sa); }
         template <typename T>
@@ -156,6 +153,13 @@ namespace mongo {
                 return false;
             return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
         }
+
+        const sockaddr* raw() const {return (sockaddr*)&sa;}
+        sockaddr* raw() {return (sockaddr*)&sa;}
+
+        socklen_t addressSize;
+        private:
+        struct sockaddr_storage sa;
     };
 
     const int MaxMTU = 16384;
@@ -182,16 +186,15 @@ namespace mongo {
     };
 
     inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
-        return ::recvfrom(sock, buf, len, 0, (sockaddr *) &sender.sa, &sender.addressSize);
+        return ::recvfrom(sock, buf, len, 0, sender.raw(), &sender.addressSize);
     }
 
     inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
         if ( 0 && rand() < (RAND_MAX>>4) ) {
             out() << " NOTSENT ";
-            //		out() << curTimeMillis() << " .TEST: NOT SENDING PACKET" << endl;
             return 0;
         }
-        return ::sendto(sock, buf, len, 0, (sockaddr *) &EndPoint.sa, EndPoint.addressSize);
+        return ::sendto(sock, buf, len, 0, EndPoint.raw(), EndPoint.addressSize);
     }
 
     inline bool UDPConnection::init(const SockAddr& myAddr) {
@@ -200,8 +203,7 @@ namespace mongo {
             out() << "invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
-        //out() << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
-        if ( ::bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) {
+        if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
             out() << "udp init failed" << endl;
             closesocket(sock);
             sock = 0;

@@ -56,7 +56,7 @@ namespace mongo {
             return false;
         }
         prebindOptions( sock );
-        if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
+        if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
             log() << "listen(): bind() failed " << OUTPUT_ERRNO << " for port: " << port << endl;
             closesocket(sock);
             return false;
@@ -75,7 +75,7 @@ namespace mongo {
         static long connNumber = 0;
         SockAddr from;
         while ( ! inShutdown() ) {
-            int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
+            int s = accept(sock, from.raw(), &from.addressSize);
             if ( s < 0 ) {
                 if ( errno == ECONNABORTED || errno == EBADF ) {
                     log() << "Listener on port " << port << " aborted" << endl;
@@ -194,7 +194,7 @@ namespace mongo {
         int res;
         SockAddr farEnd;
         void run() {
-            res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
+            res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
         }
     };
 
@@ -208,28 +208,11 @@ namespace mongo {
             return false;
         }
 
-#if 0
-        long fl = fcntl(sock, F_GETFL, 0);
-        assert( fl >= 0 );
-        fl |= O_NONBLOCK;
-        fcntl(sock, F_SETFL, fl);
-
-        int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
-        if ( res ) {
-            if ( errno == EINPROGRESS )
-                closesocket(sock);
-            sock = -1;
-            return false;
-        }
-
-#endif
-
         ConnectBG bg;
         bg.sock = sock;
         bg.farEnd = farEnd;
         bg.go();
 
-        // int res = ::connect(sock, (sockaddr *) &farEnd.sa, farEnd.addressSize);
         if ( bg.wait(5000) ) {
             if ( bg.res ) {
                 closesocket(sock);

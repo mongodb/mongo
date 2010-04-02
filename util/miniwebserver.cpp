@@ -40,7 +40,7 @@ namespace mongo {
             return false;
         }
         prebindOptions( sock );
-        if ( ::bind(sock, (sockaddr *) &me.sa, me.addressSize) != 0 ) {
+        if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
             log() << "MiniWebServer: bind() failed port:" << port << " " << OUTPUT_ERRNO << endl;
             if ( errno == EADDRINUSE )
                 log() << "  addr already in use" << endl;
@@ -207,7 +207,7 @@ namespace mongo {
     void MiniWebServer::run() {
         SockAddr from;
         while ( ! inShutdown() ) {
-            int s = accept(sock, (sockaddr *) &from.sa, &from.addressSize);
+            int s = accept(sock, from.raw(), &from.addressSize);
             if ( s < 0 ) {
                 if ( errno == ECONNABORTED ) {
                     log() << "Listener on port " << port << " aborted." << endl;
