@@ -18,11 +18,6 @@
 
 #pragma once
 
-#if defined(_WIN32)
-#  include <winsock2.h> //this must be included before the first windows.h include
-#  include <windows.h>
-#endif
-
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
