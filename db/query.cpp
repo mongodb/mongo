@@ -327,7 +327,6 @@ namespace mongo {
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
                             c->advance();
                             cc->pos += n;
-                            //cc->updateLocation();
                             break;
                         }
                     }
