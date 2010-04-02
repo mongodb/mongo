@@ -439,7 +439,12 @@ namespace mongo {
                 }
 
                 sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
-
+                
+                if ( inShutdown() ){
+                    // occasional issue trying to flush during shutdown when sleep interrupted
+                    break;
+                }
+                
                 Date_t start = jsTime();
                 MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
