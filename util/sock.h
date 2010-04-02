@@ -30,6 +30,7 @@ namespace mongo {
 
 #if defined(_WIN32)
 
+    typedef short sa_family_t;
     typedef int socklen_t;
     inline int getLastError() {
         return WSAGetLastError();
