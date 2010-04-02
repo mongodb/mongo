@@ -163,6 +163,8 @@ namespace mongo {
         bool _god;
         AuthenticationInfo _ai;
         OpTime _lastOp;
+        BSONObj _handshake;
+        BSONObj _remoteId;
 
     public:
         
@@ -188,6 +190,10 @@ namespace mongo {
             _lastOp = op;
         }
 
+        OpTime getLastOp() const {
+            return _lastOp;
+        }
+
         void appendLastOp( BSONObjBuilder& b ){
             if ( ! _lastOp.isNull() )
                 b.appendTimestamp( "lastOp" , _lastOp.asDate() );
@@ -209,6 +215,11 @@ namespace mongo {
         friend class CurOp;
 
         string toString() const;
+
+        void gotHandshake( const BSONObj& o );
+
+        BSONObj getRemoteID() const { return _remoteId; }
+        BSONObj getHandshake() const { return _handshake; }
     };
     
     inline Client& cc() { 
