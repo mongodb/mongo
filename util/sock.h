@@ -23,10 +23,6 @@
 #include <sstream>
 #include "goodies.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#include <winsock.h>
-#endif
 
 namespace mongo {
 
