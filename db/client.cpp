@@ -270,7 +270,6 @@ namespace mongo {
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();
             c.gotHandshake( cmdObj );
-            rotateLogs();
             return 1;
         }        
 
