@@ -19,7 +19,26 @@
 
 namespace mongo {
 
-    class MemoryMappedFile2 {
+    /* the administrative-ish stuff here */
+    class MongoFile { 
+    protected:
+        virtual void close() = 0;
+        virtual long length() = 0;
+        virtual void flush(bool sync) = 0;
+        void created();
+    public:
+        enum Options {
+            SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
+        };
+
+        virtual ~MongoFile();
+
+        static int flushAll( bool sync ); // returns n flushed
+        static long long totalMappedLength();
+        static void closeAllFiles( stringstream &message );
+    };
+
+    class MemoryMappedFile2 : public MongoFile {
     public:
         class Pointer {
         public:
@@ -33,7 +52,7 @@ namespace mongo {
         long length();
     };
 
-    class MemoryMappedFile {
+    class MemoryMappedFile : public MongoFile {
     public:
         class Pointer {
             char *_base;
@@ -44,12 +63,8 @@ namespace mongo {
             bool isNull() const { return _base == 0; }
         };
 
-        enum Options {
-            SEQUENTIAL = 1 // hint - like FILE_FLAG_SEQUENTIAL_SCAN on windows
-        };
-
         MemoryMappedFile();
-        ~MemoryMappedFile(); /* closes the file if open */
+        ~MemoryMappedFile() { close(); }
         void close();
         
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
@@ -75,13 +90,8 @@ namespace mongo {
             return len;
         }
         
-        static long long totalMappedLength();
-        static void closeAllFiles( stringstream &message );
-        static int flushAll( bool sync ); // returns n flushed
-
     private:
         static void updateLength( const char *filename, long &length );
-        void created();
         
         HANDLE fd;
         HANDLE maphandle;
