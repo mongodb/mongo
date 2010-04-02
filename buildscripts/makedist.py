@@ -287,6 +287,7 @@ class SshConnectionConfigurator (BaseConfigurator):
                                  (("ubuntu", "9.4", "*"), "root"),
                                  (("ubuntu", "8.10", "*"), "root"),
                                  (("ubuntu", "8.4", "*"), "ubuntu"),
+                                 (("fedora", "8", "*"), "root"),
                                  (("centos", "*", "*"), "root"))),
                                ]
 
@@ -402,7 +403,7 @@ s/^Package:.*mongodb/Package: {pkg_name}{pkg_name_suffix}\\
 Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|$(CURDIR)/debian/mongodb/|$(CURDIR)/debian/{pkg_name}{pkg_name_suffix}/|g' debian/rules) || exit 1
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's|debian/mongodb.manpages|debian/{pkg_name}{pkg_name_suffix}.manpages|g' debian/rules) || exit 1
-( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/^Name:/s/.*/Name: {pkg_name}{pkg_name_suffix}/; /^Version:/s/.*/Version: {pkg_version}/;' rpm/mongo.spec )
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/^Name:/s/.*/Name: {pkg_name}{pkg_name_suffix}/; /^Version:/s/.*/Version: {pkg_version}/; /Requires.*mongo/s/mongo/{pkg_name}{pkg_name_suffix}/;' rpm/mongo.spec )
 # Debian systems require some ridiculous workarounds to get an init
 # script at /etc/init.d/mongodb when the packge name isn't the init
 # script name.  Note: dh_installinit --name won't work, because that
@@ -412,6 +413,20 @@ Conflicts: {pkg_name_conflicts}/' debian/control; ) || exit 1
 ln debian/init.d debian/{pkg_name}{pkg_name_suffix}.mongodb.init &&
 ln debian/mongodb.upstart debian/{pkg_name}{pkg_name_suffix}.mongodb.upstart &&
 sed -i 's/dh_installinit/dh_installinit --name=mongodb/' debian/rules) || exit 1
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && cat debian/rules)
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && cat rpm/mongo.spec)
+"""
+
+    # If we're just packaging up nightlies, do this:
+    nightly_build_mangle_files="""
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i '/scons[[:space:]]*$/d; s^scons.*install^mkdir -p debian/{pkg_name}{pkg_name_suffix} \&\& wget http://downloads.mongodb.org/linux/mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz \&\& tar xzvf mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz \&\& find `tar tzf mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz | sed "s|/.*||" | sort -u | head -n1` -mindepth 1 -maxdepth 1 -type d | xargs -n1 -IARG mv -v ARG debian/{pkg_name}{pkg_name_suffix}/usr \&\& (rm debian/{pkg_name}{pkg_name_suffix}/usr/bin/mongosniff || true)^' debian/rules)
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/^BuildRequires:.*//; s/scons.*\ -c//; s/scons.*\ all//; s^scons.*install^(mkdir -p $RPM_BUILD_ROOT/usr ; cd /tmp \&\& curl http://downloads.mongodb.org/linux/mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz > mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz \&\& tar xzvf mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz \&\& find `tar tzf mongodb-linux-{mongo_arch}-{mongo_pub_version}.tgz | sed "s|/.*||" | sort -u | head -n1` -mindepth 1 -maxdepth 1 -type d | xargs -n1 -IARG cp -pRv ARG $RPM_BUILD_ROOT/usr \&\& (rm $RPM_BUILD_ROOT/usr/bin/mongosniff || true))^' rpm/mongo.spec)
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && cat debian/rules)
+( cd  "{pkg_name}{pkg_name_suffix}-{pkg_version}" && cat rpm/mongo.spec)
+"""
+#$RPM_BUILD_ROOT/usr/lib/libmongoclient.a  $RPM_BUILD_ROOT/usr/lib64/libmongoclient.a
+    mangle_files_for_new_deb_xulrunner_commands = """
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/xulrunner-dev/xulrunner-1.9.1-dev/g' debian/control )
 """
 
     mangle_files_for_ancient_redhat_commands = """
@@ -446,9 +461,10 @@ yum -y install {pkg_prereq_str}
 """
     rpm_build_commands="""
 for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p /usr/src/redhat/$d; done
-cp -v "{pkg_name}{pkg_name_suffix}-{pkg_version}/rpm/mongo.spec" /usr/src/redhat/SPECS
+cp -v "{pkg_name}{pkg_name_suffix}-{pkg_version}/rpm/mongo.spec" /usr/src/redhat/SPECS/{pkg_name}{pkg_name_suffix}.spec
 tar -cpzf /usr/src/redhat/SOURCES/"{pkg_name}{pkg_name_suffix}-{pkg_version}".tar.gz "{pkg_name}{pkg_name_suffix}-{pkg_version}"
-rpmbuild -ba /usr/src/redhat/SPECS/mongo.spec
+rpmbuild -ba /usr/src/redhat/SPECS/{pkg_name}{pkg_name_suffix}.spec
+# FIXME: should install the rpms, check if mongod is running.
 """ 
     # FIXME: this is clean, but adds 40 minutes or so to the build process.
     old_rpm_precommands = """
@@ -489,11 +505,13 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.r
     common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
     centos_preqres = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
-    fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git" ]
+    fedora_prereqs = ["js-devel", "readline-devel", "pcre-devel", "gcc-c++", "scons", "rpm-build", "git", "curl" ]
 
     def __init__(self, **kwargs):
         super(ScriptFileConfigurator, self).__init__(**kwargs)
-        if kwargs["mongo_version"][0] == 'r':
+        # FIXME: this method is disabled until we get back around to
+        # actually building from source.
+        if None: # kwargs["mongo_version"][0] == 'r':
             self.get_mongo_commands = """
 wget -Otarball.tgz "http://github.com/mongodb/mongo/tarball/{mongo_version}";
 tar xzf tarball.tgz
@@ -538,33 +556,75 @@ git clone git://github.com/mongodb/mongo.git
                                   self.fedora_prereqs),
                                  (("centos", "5.4", "*"),
                                   self.centos_preqres))),
+                               # FIXME: this is deprecated
                                ("commands",
                                 ((("debian", "*", "*"),
-                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
-                                 (("ubuntu", "*", "*"),
+                                  self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
+                                 (("ubuntu", "10.4", "*"),
+                                  self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands  + self.mangle_files_for_new_deb_xulrunner_commands + self.deb_build_commands),
+                                  (("ubuntu", "*", "*"),
                                   self.preamble_commands + self.deb_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.deb_build_commands),
                                  (("centos", "*", "*"),
                                   self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands  + self.mangle_files_for_ancient_redhat_commands + self.rpm_build_commands),
                                  (("fedora", "*", "*"),
                                   self.preamble_commands + self.old_rpm_precommands + self.rpm_prereq_commands + self.get_mongo_commands + self.mangle_files_commands + self.rpm_build_commands))),
+                               ("preamble_commands",
+                                ((("*", "*", "*"), self.preamble_commands),
+                                 )),
+                               ("install_prereqs",
+                                ((("debian", "*", "*"), self.deb_prereq_commands),
+                                 (("ubuntu", "*", "*"), self.deb_prereq_commands),
+                                 (("centos", "*", "*"), self.rpm_prereq_commands),
+                                 (("fedora", "*", "*"), self.rpm_prereq_commands))),
+                               ("get_mongo",
+                                ((("*", "*", "*"), self.get_mongo_commands),
+                                 )),
+                               ("mangle_mongo",
+                                ((("debian", "*", "*"), self.mangle_files_commands),
+                                 (("ubuntu", "10.4", "*"),
+                                  self.mangle_files_commands  + self.mangle_files_for_new_deb_xulrunner_commands),
+                                 (("ubuntu", "*", "*"), self.mangle_files_commands),
+                                 (("centos", "*", "*"),
+                                  self.mangle_files_commands  + self.mangle_files_for_ancient_redhat_commands),
+                                 (("fedora", "*", "*"),
+                                  self.mangle_files_commands))),
+                               ("build_prerequisites",
+                                ((("fedora", "*", "*"), self.old_rpm_precommands),
+                                 (("centos", "*", "*"), self.old_rpm_precommands),
+                                 (("*", "*", "*"), ''))),
+                               ("install_for_packaging",
+                                ((("debian", "*", "*"),""),
+                                 (("ubuntu", "*", "*"),""),
+                                 (("fedora", "*", "*"), ""),
+                                 (("centos", "*", "*"),""))),
+                               ("build_package",
+                                ((("debian", "*", "*"),
+                                  self.deb_build_commands),
+                                 (("ubuntu", "*", "*"),
+                                  self.deb_build_commands),
+                                 (("fedora", "*", "*"),
+                                  self.rpm_build_commands),
+                                 (("centos", "*", "*"),
+                                  self.rpm_build_commands))),
                                ("pkg_name",
                                 ((("debian", "*", "*"), "mongodb"),
                                  (("ubuntu", "*", "*"), "mongodb"),
                                  (("centos", "*", "*"), "mongo"),
-
-                                 (("fedora", "*", "*"), "mongo")
-                                 )),
+                                 (("fedora", "*", "*"), "mongo"))),
+                               # FIXME: there should be a command-line argument for this.
                                ("pkg_name_conflicts",
-                                ((("*", "*", "*"),  ["", "-stable", "-unstable", "-snapshot"]),
-                                 ))
-                               ]
+                                ((("*", "*", "*"),  ["", "-stable", "-unstable", "-snapshot", "-oldstable"]),
+                                 )),
+                                ]
 
 
 
 
 class ScriptFile(object):
     def __init__(self, configurator, **kwargs):
-        self.mongo_version       = kwargs["mongo_version"]
+        self.mongo_version       = kwargs["mongo_version"] if kwargs['mongo_version'][0] != 'n' else 'HEAD'
+        self.mongo_pub_version       = kwargs["mongo_version"].lstrip('n') if kwargs['mongo_version'][0] in 'n' else 'latest'
+        self.mongo_arch       = kwargs["arch"] if kwargs["arch"] == "x86_64" else "i686"
         self.pkg_version        = kwargs["pkg_version"]
         self.pkg_name_suffix    = kwargs["pkg_name_suffix"] if "pkg_name_suffix" in kwargs else ""
         self.pkg_prereqs        = configurator.default("pkg_prereqs")
@@ -572,7 +632,8 @@ class ScriptFile(object):
         self.pkg_product_dir    = configurator.default("pkg_product_dir")
         self.pkg_name_conflicts = configurator.default("pkg_name_conflicts") if self.pkg_name_suffix else []
         self.pkg_name_conflicts.remove(self.pkg_name_suffix) if self.pkg_name_suffix and self.pkg_name_suffix in self.pkg_name_conflicts else []
-        self.formatter          = configurator.default("commands")
+        #self.formatter          = configurator.default("commands")
+        self.formatter          = configurator.default("preamble_commands") + configurator.default("install_prereqs") + configurator.default("get_mongo") + configurator.default("mangle_mongo") + (configurator.nightly_build_mangle_files if kwargs['mongo_version'][0] == 'n' else '') +(configurator.default("build_prerequisites") if kwargs['mongo_version'][0] != 'n' else '') + configurator.default("install_for_packaging") + configurator.default("build_package")
         self.distro_name        = configurator.default("distro_name")
         self.distro_version     = configurator.default("distro_version")
         self.distro_arch        = configurator.default("distro_arch")
@@ -592,8 +653,10 @@ class ScriptFile(object):
                                      # comma-separated conflicts,
                                      # but there's no reason to
                                      # suppose this works elsewhere
-                                     pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts])
-                                     )
+                                     pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts]),
+                                     mongo_arch=self.mongo_arch,
+                                     mongo_pub_version=self.mongo_pub_version
+)
 
     def __enter__(self):
         self.localscript=None
