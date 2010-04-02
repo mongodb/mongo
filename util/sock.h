@@ -22,7 +22,9 @@
 #include <stdio.h>
 #include <sstream>
 #include "goodies.h"
+#include "../db/jsobj.h"
 
+#define SOCK_FAMILY_UNKNOWN_ERROR 13078
 
 namespace mongo {
 
@@ -39,6 +41,12 @@ namespace mongo {
     }
     inline void prebindOptions( int sock ) {
     }
+
+    // This won't actually be used on windows
+    struct sockaddr_un {
+        short sun_family;
+        char sun_path[108]; // length from unix header
+    };
 #else
 
 } // namespace mongo
@@ -46,6 +54,7 @@ namespace mongo {
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -112,34 +121,78 @@ namespace mongo {
         const T& as() const { return *(const T*)(&sa); }
 
         string toString(bool includePort=true) const{
-            stringstream out;
-            out << inet_ntoa(as<sockaddr_in>().sin_addr);
-            if (includePort)
-                out << ':' << ntohs(as<sockaddr_in>().sin_port);
-            return out.str();
+            string out = getAddr();
+            if (includePort && getType() != AF_UNIX)
+                out += ':' + BSONObjBuilder::numStr(getPort());
+            return out;
         }
 
         operator string() const{
             return toString();
         }
 
-        unsigned getPort() {
-            return as<sockaddr_in>().sin_port;
+        // returns one of AF_INET, AF_INET6, or AF_UNIX
+        sa_family_t getType() const {
+            return sa.ss_family;
+        }
+
+        unsigned getPort() const {
+            switch (getType()){
+                case AF_INET:  return as<sockaddr_in>().sin_port;
+                case AF_INET6: return as<sockaddr_in6>().sin6_port;
+                case AF_UNIX: return 0;
+                default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return 0;
+            }
+        }
+
+        string getAddr() const {
+            const int buflen=128;
+            char buffer[buflen];
+
+            switch (getType()){
+                case AF_INET:  return inet_ntop(getType(), &as<sockaddr_in>().sin_addr, buffer, addressSize);
+                case AF_INET6: return inet_ntop(getType(), &as<sockaddr_in6>().sin6_addr, buffer, addressSize);
+                case AF_UNIX:  return as<sockaddr_un>().sun_path;
+                default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
+            }
         }
 
         bool isLocalHost() const { return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr; }
         
         bool operator==(const SockAddr& r) const {
-            return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr &&
-                   as<sockaddr_in>().sin_port == r.as<sockaddr_in>().sin_port;
+            if (getType() != r.getType())
+                return false;
+
+            if (getPort() != r.getPort())
+                return false;
+
+            switch (getType()){
+                case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr;
+                case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) == 0;
+                case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) == 0;
+                default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+            }
         }
         bool operator!=(const SockAddr& r) const {
             return !(*this == r);
         }
         bool operator<(const SockAddr& r) const {
-            if ( as<sockaddr_in>().sin_port >= r.as<sockaddr_in>().sin_port )
+            if (getType() < r.getType())
+                return true;
+            else if (getType() > r.getType())
                 return false;
-            return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
+
+            if (getPort() < r.getPort())
+                return true;
+            else if (getPort() > r.getPort())
+                return false;
+
+            switch (getType()){
+                case AF_INET:  return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
+                case AF_INET6: return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr, r.as<sockaddr_in6>().sin6_addr.s6_addr, sizeof(in6_addr)) < 0;
+                case AF_UNIX:  return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) < 0;
+                default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+            }
         }
 
         const sockaddr* raw() const {return (sockaddr*)&sa;}
