@@ -283,6 +283,7 @@ namespace mongo {
             }
             case BSONObj::opNEAR:
             case BSONObj::opWITHIN:
+            case BSONObj::opMAX_DISTANCE:
                 break;
             default:
                 uassert( 10069 ,  (string)"BUG - can't operator for: " + fn , 0 );

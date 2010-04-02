@@ -986,6 +986,7 @@ namespace mongo {
             opELEM_MATCH = 0x12,
             opNEAR = 0x13,
             opWITHIN = 0x14,
+            opMAX_DISTANCE=0x15
         };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );

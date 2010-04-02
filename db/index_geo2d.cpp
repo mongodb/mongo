@@ -1478,13 +1478,19 @@ namespace mongo {
             
             switch ( e.embeddedObject().firstElement().getGtLtOp() ){
             case BSONObj::opNEAR: {
-                e = e.embeddedObject().firstElement();
+                BSONObj n = e.embeddedObject();
+                e = n.firstElement();
                 double maxDistance = numeric_limits<double>::max();
                 if ( e.isABSONObj() && e.embeddedObject().nFields() > 2 ){
                     BSONObjIterator i(e.embeddedObject());
                     i.next();
                     i.next();
                     BSONElement e = i.next();
+                    if ( e.isNumber() )
+                        maxDistance = e.numberDouble();
+                }
+                {
+                    BSONElement e = n["$maxDistance"];
                     if ( e.isNumber() )
                         maxDistance = e.numberDouble();
                 }
