@@ -106,6 +106,7 @@ namespace mongo {
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
         int _queryOptions;
+        OpTime _slaveReadTill;
 
         ClientCursor(int queryOptions, auto_ptr<Cursor>& _c, const char *_ns) :
             _idleAgeMillis(0), _pinValue(0), 
@@ -259,6 +260,9 @@ namespace mongo {
             _idleAgeMillis += millis;
             return _idleAgeMillis > 600000 && _pinValue == 0;
         }
+
+        void storeOpForSlave( DiskLoc last );
+        void updateSlaveLocation( CurOp& curop );
         
         unsigned idleTime(){
             return _idleAgeMillis;

@@ -489,16 +489,13 @@ namespace mongo {
         ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
 
         int pass = 0;
-        GetMoreStats stats;
         
         QueryResult* msgdata;
         while( 1 ) {
             try {
                 mongolock lk(false);
                 Client::Context ctx(ns);
-                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, stats);
-
-                updateSlaveLocation( curop , stats.queryOptions , ns , stats.last );
+                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass );
             }
             catch ( GetMoreWaitException& ) { 
                 massert(13073, "shutting down", !inShutdown() );

@@ -250,7 +250,7 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, GetMoreStats& stats) {
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass ) {
 
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
@@ -275,8 +275,10 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
+            if ( pass == 0 )
+                cc->updateSlaveLocation( curop );
+
             int queryOptions = cc->_queryOptions;
-            stats.queryOptions = queryOptions;
 
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
@@ -286,7 +288,8 @@ namespace mongo {
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
-            
+            DiskLoc last;
+
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
@@ -318,7 +321,7 @@ namespace mongo {
                         //out() << "  but it's a dup \n";
                     }
                     else {
-                        stats.last = c->currLoc();
+                        last = c->currLoc();
                         BSONObj js = c->current();
 
                         fillQueryResultFromObj(b, cc->fields.get(), js);
@@ -333,10 +336,11 @@ namespace mongo {
                 }
                 c->advance();
             }
-
+            
             if ( cc ) {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
+                cc->storeOpForSlave( last );
             }
         }
 
