@@ -77,11 +77,16 @@ namespace mongo {
         while ( ! inShutdown() ) {
             int s = accept(sock, from.raw(), &from.addressSize);
             if ( s < 0 ) {
-                if ( errno == ECONNABORTED || errno == EBADF ) {
+                int x = errno; // so no global issues
+                if ( x == ECONNABORTED || x == EBADF ) {
                     log() << "Listener on port " << port << " aborted" << endl;
                     return;
                 }
-                log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNO << endl;
+                if ( x == 0 && inShutdown() ){
+                    // socket closed
+                    return;
+                }
+                log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNOX(x) << endl;
                 continue;
             }
             disableNagle(s);
