@@ -382,8 +382,14 @@ namespace mongo {
         }
 
         bool isSimpleStatement( const string& code ){
-            if ( code.find( "return" ) != string::npos )
-                return false;
+            {
+                size_t x = code.find( "return" );
+                if ( x != string::npos ){
+                    if ( ( x == 0 || ! isalpha( code[x-1] ) ) &&
+                         ! isalpha( code[x+6] ) )
+                        return false;
+                }
+            }
 
             if ( code.find( ";" ) != string::npos &&
                  code.find( ";" ) != code.rfind( ";" ) )
