@@ -50,7 +50,7 @@ namespace mongo {
             me = SockAddr( port );
         else
             me = SockAddr( ip.c_str(), port );
-        sock = ::socket(AF_INET, SOCK_STREAM, 0);
+        sock = ::socket(me.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
@@ -207,7 +207,7 @@ namespace mongo {
     {
         farEnd = _far;
 
-        sock = socket(AF_INET, SOCK_STREAM, 0);
+        sock = socket(farEnd.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: connect(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;

@@ -34,7 +34,7 @@ namespace mongo {
             me = SockAddr( port );
         else
             me = SockAddr( ip.c_str(), port );
-        sock = ::socket(AF_INET, SOCK_STREAM, 0);
+        sock = ::socket(me.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: MiniWebServer listen(): invalid socket? " << OUTPUT_ERRNO << endl;
             return false;

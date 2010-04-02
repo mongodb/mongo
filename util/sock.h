@@ -239,7 +239,7 @@ namespace mongo {
     }
 
     inline bool UDPConnection::init(const SockAddr& myAddr) {
-        sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        sock = socket(myAddr.getType(), SOCK_DGRAM, IPPROTO_UDP);
         if ( sock == INVALID_SOCKET ) {
             out() << "invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
