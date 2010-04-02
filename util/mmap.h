@@ -25,7 +25,7 @@ namespace mongo {
         virtual void close() = 0;
         virtual long length() = 0;
         virtual void flush(bool sync) = 0;
-        void created();
+        void created(); /* subclass must call after create */
     public:
         enum Options {
             SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
@@ -38,18 +38,19 @@ namespace mongo {
         static void closeAllFiles( stringstream &message );
     };
 
-    class MemoryMappedFile2 : public MongoFile {
+    class MFTemplate : public MongoFile {
+    protected:
+        virtual void close();
+        virtual long length();
+        virtual void flush(bool sync);
     public:
         class Pointer {
         public:
             void* at(int offset, int maxLen);
         };
 
-        // throws exception if file doesn't exist.
         Pointer map( const char *filename );
         Pointer map(const char *_filename, long &length, int options=0);
-
-        long length();
     };
 
     class MemoryMappedFile : public MongoFile {
@@ -82,9 +83,9 @@ namespace mongo {
 
         void flush(bool sync);
 
-        void* viewOfs() {
+        /*void* viewOfs() {
             return view;
-        }
+        }*/
 
         long length() {
             return len;
