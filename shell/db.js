@@ -471,8 +471,14 @@ DB.prototype.forceError = function(){
     return this.runCommand( { forceerror : 1 } );
 }
 
-DB.prototype.getLastError = function(){
-    var res = this.runCommand( { getlasterror : 1 } );
+DB.prototype.getLastError = function( w , wtimeout ){
+    var cmd = { getlasterror : 1 };
+    if ( w ){
+        cmd.w = w;
+        if ( wtimeout )
+            cmd.wtimeout = wtimeout;
+    }
+    var res = this.runCommand( cmd );
     if ( ! res.ok )
         throw "getlasterror failed: " + tojson( res );
     return res.err;
