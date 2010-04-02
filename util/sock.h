@@ -115,14 +115,6 @@ namespace mongo {
         template <typename T>
         const T& as() const { return *(const T*)(&sa); }
 
-        bool isLocalHost() const {
-#if defined(_WIN32)
-            return as<sockaddr_in>().sin_addr.S_un.S_addr == 0x100007f;
-#else
-            return as<sockaddr_in>().sin_addr.s_addr == 0x100007f;
-#endif
-        }
-
         string toString(bool includePort=true) const{
             stringstream out;
             out << inet_ntoa(as<sockaddr_in>().sin_addr);
@@ -139,7 +131,7 @@ namespace mongo {
             return as<sockaddr_in>().sin_port;
         }
 
-        bool localhost() const { return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr; }
+        bool isLocalHost() const { return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr; }
         
         bool operator==(const SockAddr& r) const {
             return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr &&
