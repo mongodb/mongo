@@ -26,6 +26,7 @@
 #include "curop.h"
 #include "json.h"
 #include "security.h"
+#include "commands.h"
 
 namespace mongo {
 
@@ -244,5 +245,35 @@ namespace mongo {
 
         return b.obj();
     }
+
+    void Client::gotHandshake( const BSONObj& o ){
+        BSONObjIterator i(o);
+
+        {
+            BSONElement id = i.next();
+            assert( id.type() );
+            _remoteId = id.wrap( "_id" );
+        }
+        
+        BSONObjBuilder b;
+        while ( i.more() )
+            b.append( i.next() );
+        _handshake = b.obj();
+    }
+
+    class HandshakeCmd : public Command {
+    public:
+        HandshakeCmd() : Command( "handshake" ){}
+        virtual LockType locktype(){ return NONE; } 
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return false; }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            Client& c = cc();
+            c.gotHandshake( cmdObj );
+            rotateLogs();
+            return 1;
+        }        
+
+    } handshakeCmd;
 
 }

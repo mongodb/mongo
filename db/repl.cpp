@@ -138,22 +138,18 @@ namespace mongo {
 
         struct Ident {
             
-            Ident(string h,string n) : host(h),ns(n){
-                obj = BSON( "host" << h << "ns" << ns );
+            Ident(BSONObj r,string h,string n){
+                BSONObjBuilder b;
+                b.appendElements( r );
+                b.append( "host" , h );
+                b.append( "ns" , n );
+                obj = b.obj();
             }
 
             bool operator<( const Ident& other ) const {
-                int x = strcmp( host.c_str() , other.host.c_str() );
-                if ( x < 0 )
-                    return 1;
-                if ( x > 0 )
-                    return 0;
-
-                return strcmp( ns.c_str() , other.ns.c_str() ) < 0;
+                return obj.woCompare( other.obj ) < 0;
             }
             
-            string host;
-            string ns;
             BSONObj obj;
         };
 
@@ -212,10 +208,10 @@ namespace mongo {
             _slaves.clear();
         }
 
-        void update( const string& host , const string& ns , OpTime last ){
+        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
             scoped_lock mylk(_mutex);
             
-            Ident ident(host,ns);
+            Ident ident(rid,host,ns);
             Info& i = _slaves[ ident ];
             if ( i.loc ){
                 i.loc[0] = last;
@@ -241,6 +237,22 @@ namespace mongo {
                 go();
             }
         }
+
+        bool opReplicatedEnough( OpTime op , int w ){
+            if ( w <= 1 )
+                return true;
+            w--; // now this is the # of slaves i need
+            scoped_lock mylk(_mutex);
+            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
+                OpTime s = *(i->second.loc);
+                if ( s < op ){
+                    continue;
+                }
+                if ( --w == 0 )
+                    return true;
+            }
+            return w <= 0;
+        }
         
         // need to be careful not to deadlock with this
         mongo::mutex _mutex;
@@ -261,7 +273,15 @@ namespace mongo {
         
         assert( strstr( ns , "local.oplog.$" ) == ns );
         
-        slaveTracking.update( curop.getRemoteString( false ) , ns , lastRead.obj()["ts"].optime() );
+        BSONObj rid = curop.getClient()->getRemoteID();
+        if ( rid.isEmpty() )
+            return;
+
+        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastRead.obj()["ts"].optime() );
+    }
+
+    bool opReplicatedEnough( OpTime op , int w ){
+        return slaveTracking.opReplicatedEnough( op , w );
     }
 
     /* --------------------------------------------- */
@@ -1528,7 +1548,7 @@ namespace mongo {
     }
 
 	BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
-
+    
 	bool replAuthenticate(DBClientConnection *conn) {
 		if( ! cc().isAdmin() ){
 			log() << "replauthenticate: requires admin permissions, failing\n";
@@ -1549,6 +1569,7 @@ namespace mongo {
 					return false;
 				}
 			}
+            
 		}
 
 		string u = user.getStringField("user");
@@ -1563,12 +1584,37 @@ namespace mongo {
 		return true;
 	}
 
+    bool replHandshake(DBClientConnection *conn) {
+        
+        BSONObj me;
+        {
+            dblock l;
+            if ( ! Helpers::getSingleton( "local.me" , me ) ){
+                BSONObjBuilder b;
+                b.appendOID( "_id" , 0 , true );
+                me = b.obj();
+                Helpers::putSingleton( "local.me" , me );
+            }
+        }
+        
+        BSONObjBuilder cmd;
+        cmd.appendAs( me["_id"] , "handshake" );
+
+        BSONObj res;
+        bool ok = conn->runCommand( "admin" , cmd.obj() , res );
+        // ignoring for now on purpose for older versions
+        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
+        return true;
+    }
+
     bool ReplSource::connect() {
         if ( conn.get() == 0 ) {
             conn = auto_ptr<DBClientConnection>(new DBClientConnection());
             string errmsg;
             ReplInfo r("trying to connect to sync source");
-            if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
+            if ( !conn->connect(hostName.c_str(), errmsg) || 
+                 !replAuthenticate(conn.get()) ||
+                 !replHandshake(conn.get()) ) {
                 resetConnection();
                 log() << "repl:  " << errmsg << endl;
                 return false;

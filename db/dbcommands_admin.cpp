@@ -389,5 +389,6 @@ namespace mongo {
         }        
         
     } logRotateCmd;
+
 }
 
