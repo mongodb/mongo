@@ -238,7 +238,7 @@ namespace mongo {
         
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
             
-            if ( from.localhost() )
+            if ( from.isLocalHost() )
                 return true;
             
             Client::GodScope gs;

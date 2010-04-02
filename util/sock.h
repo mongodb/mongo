@@ -110,21 +110,16 @@ namespace mongo {
         SockAddr(int sourcePort); /* listener side */
         SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
-        struct sockaddr_in sa;
-        socklen_t addressSize;
+        template <typename T>
+        T& as() { return *(T*)(&sa); }
+        template <typename T>
+        const T& as() const { return *(const T*)(&sa); }
 
-        bool isLocalHost() const {
-#if defined(_WIN32)
-            return sa.sin_addr.S_un.S_addr == 0x100007f;
-#else
-            return sa.sin_addr.s_addr == 0x100007f;
-#endif
-        }
-
-        string toString() const{
+        string toString(bool includePort=true) const{
             stringstream out;
-            out << inet_ntoa(sa.sin_addr) << ':'
-                << ntohs(sa.sin_port);
+            out << inet_ntoa(as<sockaddr_in>().sin_addr);
+            if (includePort)
+                out << ':' << ntohs(as<sockaddr_in>().sin_port);
             return out.str();
         }
 
@@ -133,23 +128,30 @@ namespace mongo {
         }
 
         unsigned getPort() {
-            return sa.sin_port;
+            return as<sockaddr_in>().sin_port;
         }
 
-        bool localhost() const { return inet_addr( "127.0.0.1" ) == sa.sin_addr.s_addr; }
+        bool isLocalHost() const { return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr; }
         
         bool operator==(const SockAddr& r) const {
-            return sa.sin_addr.s_addr == r.sa.sin_addr.s_addr &&
-                   sa.sin_port == r.sa.sin_port;
+            return as<sockaddr_in>().sin_addr.s_addr == r.as<sockaddr_in>().sin_addr.s_addr &&
+                   as<sockaddr_in>().sin_port == r.as<sockaddr_in>().sin_port;
         }
         bool operator!=(const SockAddr& r) const {
             return !(*this == r);
         }
         bool operator<(const SockAddr& r) const {
-            if ( sa.sin_port >= r.sa.sin_port )
+            if ( as<sockaddr_in>().sin_port >= r.as<sockaddr_in>().sin_port )
                 return false;
-            return sa.sin_addr.s_addr < r.sa.sin_addr.s_addr;
+            return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
         }
+
+        const sockaddr* raw() const {return (sockaddr*)&sa;}
+        sockaddr* raw() {return (sockaddr*)&sa;}
+
+        socklen_t addressSize;
+        private:
+        struct sockaddr_storage sa;
     };
 
     const int MaxMTU = 16384;
@@ -176,16 +178,15 @@ namespace mongo {
     };
 
     inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
-        return ::recvfrom(sock, buf, len, 0, (sockaddr *) &sender.sa, &sender.addressSize);
+        return ::recvfrom(sock, buf, len, 0, sender.raw(), &sender.addressSize);
     }
 
     inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
         if ( 0 && rand() < (RAND_MAX>>4) ) {
             out() << " NOTSENT ";
-            //		out() << curTimeMillis() << " .TEST: NOT SENDING PACKET" << endl;
             return 0;
         }
-        return ::sendto(sock, buf, len, 0, (sockaddr *) &EndPoint.sa, EndPoint.addressSize);
+        return ::sendto(sock, buf, len, 0, EndPoint.raw(), EndPoint.addressSize);
     }
 
     inline bool UDPConnection::init(const SockAddr& myAddr) {
@@ -194,8 +195,7 @@ namespace mongo {
             out() << "invalid socket? " << OUTPUT_ERRNO << endl;
             return false;
         }
-        //out() << sizeof(sockaddr_in) << ' ' << myAddr.addressSize << endl;
-        if ( ::bind(sock, (sockaddr *) &myAddr.sa, myAddr.addressSize) != 0 ) {
+        if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
             out() << "udp init failed" << endl;
             closesocket(sock);
             sock = 0;
@@ -213,20 +213,20 @@ namespace mongo {
     }
 
     inline SockAddr::SockAddr(int sourcePort) {
-        memset(sa.sin_zero, 0, sizeof(sa.sin_zero));
-        sa.sin_family = AF_INET;
-        sa.sin_port = htons(sourcePort);
-        sa.sin_addr.s_addr = htonl(INADDR_ANY);
-        addressSize = sizeof(sa);
+        memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
+        as<sockaddr_in>().sin_family = AF_INET;
+        as<sockaddr_in>().sin_port = htons(sourcePort);
+        as<sockaddr_in>().sin_addr.s_addr = htonl(INADDR_ANY);
+        addressSize = sizeof(sockaddr_in);
     }
 
     inline SockAddr::SockAddr(const char * iporhost , int port) {
         string ip = hostbyname( iporhost );
-        memset(sa.sin_zero, 0, sizeof(sa.sin_zero));
-        sa.sin_family = AF_INET;
-        sa.sin_port = htons(port);
-        sa.sin_addr.s_addr = inet_addr(ip.c_str());
-        addressSize = sizeof(sa);
+        memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
+        as<sockaddr_in>().sin_family = AF_INET;
+        as<sockaddr_in>().sin_port = htons(port);
+        as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
+        addressSize = sizeof(sockaddr_in);
     }
 
     inline string getHostName() {
