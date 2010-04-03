@@ -76,8 +76,8 @@ namespace mongo {
 
     void Listener::listen() {
         static long connNumber = 0;
-        SockAddr from;
         while ( ! inShutdown() ) {
+            SockAddr from;
             int s = accept(sock, from.raw(), &from.addressSize);
             if ( s < 0 ) {
                 int x = errno; // so no global issues
