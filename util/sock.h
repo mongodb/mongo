@@ -50,7 +50,7 @@ namespace mongo {
     };
 
     // Windows doesn't const-qualify src for some reason
-    const char* inet_ntop(int af, const void* src, char* dst, socklen_t size){
+    inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size){
         return ::inet_ntop(af, const_cast<void*>(src),dst,size);
     }
 #else
