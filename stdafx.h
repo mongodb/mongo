@@ -23,6 +23,7 @@
 #if defined(_WIN32)
 #  define NOMINMAX
 #  include <winsock2.h> //this must be included before the first windows.h include
+#  include <ws2tcpip.h>
 #  include <windows.h>
 #endif
 

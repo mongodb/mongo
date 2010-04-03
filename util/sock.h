@@ -48,6 +48,11 @@ namespace mongo {
         short sun_family;
         char sun_path[108]; // length from unix header
     };
+
+    // Windows doesn't const-qualify src for some reason
+    const char* inet_ntop(int af, const void* src, char* dst, socklen_t size){
+        return ::inet_ntop(af, const_cast<void*>(src),dst,size);
+    }
 #else
 
 } // namespace mongo
