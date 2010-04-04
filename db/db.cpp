@@ -463,6 +463,17 @@ namespace mongo {
         cout << "\nwarning: built with boost version <= 1.34, limited concurrency" << endl;
 #endif
 
+        {
+            const char * foo = strstr( versionString , "." ) + 1;
+            int bar = atoi( foo );
+            if ( ( 2 * ( bar / 2 ) ) != bar ){
+                cout << "****\n" 
+                     << "WARNING: This is development version of MongoDB.  Not recommended for production.\n" 
+                     << "****" << endl;
+            }
+                
+        }
+
         if ( sizeof(int*) != 4 )
             return;
         cout << endl;
