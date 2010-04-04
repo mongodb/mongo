@@ -31,7 +31,10 @@ namespace mongo {
         // register ourself.
         if ( _commands == 0 )
             _commands = new map<string,Command*>;
-        (*_commands)[name] = this;
+        Command*& c = (*_commands)[name];
+        if ( c )
+            log() << "warning: 2 commands with name: " << _name << endl;
+        c = this;
     }
 
     void Command::help( stringstream& help ) const {
