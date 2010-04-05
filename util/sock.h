@@ -141,8 +141,8 @@ namespace mongo {
 
         unsigned getPort() const {
             switch (getType()){
-                case AF_INET:  return as<sockaddr_in>().sin_port;
-                case AF_INET6: return as<sockaddr_in6>().sin6_port;
+                case AF_INET:  return ntohs(as<sockaddr_in>().sin_port);
+                case AF_INET6: return ntohs(as<sockaddr_in6>().sin6_port);
                 case AF_UNIX: return 0;
                 case AF_UNSPEC: return 0;
                 default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return 0;
