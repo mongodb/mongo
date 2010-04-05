@@ -36,7 +36,11 @@ namespace mongo {
         void listen(); // never returns (start a thread)
 
         /* spawn a thread, etc., then return */
-        virtual void accepted(MessagingPort *mp) = 0;
+        virtual void accepted(int sock, const SockAddr& from);
+        virtual void accepted(MessagingPort *mp){
+            assert(!"You must overwrite one of the accepted methods");
+        }
+
     private:
         string ip;
         int port;
@@ -54,7 +58,7 @@ namespace mongo {
 
     class MessagingPort : public AbstractMessagingPort {
     public:
-        MessagingPort(int sock, SockAddr& farEnd);
+        MessagingPort(int sock, const SockAddr& farEnd);
         MessagingPort();
         virtual ~MessagingPort();
 

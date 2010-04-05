@@ -60,7 +60,10 @@ namespace mongo {
         }
         prebindOptions( sock );
         if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
-            log() << "listen(): bind() failed " << OUTPUT_ERRNO << " for port: " << port << endl;
+            int x = errno;
+            log() << "listen(): bind() failed " << OUTPUT_ERRNOX(x) << " for port: " << port << endl;
+            if ( x == EADDRINUSE )
+                log() << "  addr already in use" << endl;
             closesocket(sock);
             return false;
         }
@@ -95,8 +98,12 @@ namespace mongo {
             if (from.getType() != AF_UNIX)
                 disableNagle(s);
             if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
-            accepted( new MessagingPort(s, from) );
+            accepted(s, from);
         }
+    }
+
+    void Listener::accepted(int sock, const SockAddr& from){
+        accepted( new MessagingPort(sock, from) );
     }
 
     /* messagingport -------------------------------------------------------------- */
@@ -173,7 +180,7 @@ namespace mongo {
         ports.closeAll();
     }
 
-    MessagingPort::MessagingPort(int _sock, SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
+    MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far) {
         ports.insert(this);
     }
 

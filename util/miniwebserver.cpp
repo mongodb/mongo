@@ -23,39 +23,9 @@
 
 namespace mongo {
 
-    MiniWebServer::MiniWebServer() {
-        sock = 0;
-    }
-
-    bool MiniWebServer::init(const string &ip, int _port) {
-        port = _port;
-        SockAddr me;
-        if ( ip.empty() )
-            me = SockAddr( port );
-        else
-            me = SockAddr( ip.c_str(), port );
-        sock = ::socket(me.getType(), SOCK_STREAM, 0);
-        if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: MiniWebServer listen(): invalid socket? " << OUTPUT_ERRNO << endl;
-            return false;
-        }
-        prebindOptions( sock );
-        if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
-            log() << "MiniWebServer: bind() failed port:" << port << " " << OUTPUT_ERRNO << endl;
-            if ( errno == EADDRINUSE )
-                log() << "  addr already in use" << endl;
-            closesocket(sock);
-            return false;
-        }
-
-        if ( ::listen(sock, 16) != 0 ) {
-            log() << "MiniWebServer: listen() failed " << OUTPUT_ERRNO << endl;
-            closesocket(sock);
-            return false;
-        }
-
-        return true;
-    }
+    MiniWebServer::MiniWebServer(const string &ip, int port)
+        : Listener(ip, port)
+    {}
 
     string MiniWebServer::parseURL( const char * buf ) {
         const char * urlStart = strstr( buf , " " );
@@ -186,6 +156,7 @@ namespace mongo {
         string response = ss.str();
 
         ::send(s, response.c_str(), response.size(), 0);
+        closesocket(s);
     }
     
     string MiniWebServer::getHeader( const char * req , string wanted ){
@@ -202,26 +173,6 @@ namespace mongo {
                 return val;
         }
         return "";
-    }
-    
-    void MiniWebServer::run() {
-        SockAddr from;
-        while ( ! inShutdown() ) {
-            int s = accept(sock, from.raw(), &from.addressSize);
-            if ( s < 0 ) {
-                if ( errno == ECONNABORTED ) {
-                    log() << "Listener on port " << port << " aborted." << endl;
-                    return;
-                }
-                log() << "MiniWebServer: accept() returns " << s << " " << OUTPUT_ERRNO << endl;
-                sleepmillis(200);
-                continue;
-            }
-            disableNagle(s);
-            RARELY log() << "MiniWebServer: connection accepted from " << from.toString() << endl;
-            accepted( s, from );
-            closesocket(s);
-        }
     }
 
     string MiniWebServer::urlDecode(const char* s){
