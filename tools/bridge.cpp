@@ -74,7 +74,7 @@ auto_ptr< MyListener > listener;
 
 #if !defined(_WIN32) 
 void cleanup( int sig ) {
-    close( listener->socket() );
+    ListeningSockets::get()->closeAll();
     for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
         (*i)->shutdown();
     ::exit( 0 );

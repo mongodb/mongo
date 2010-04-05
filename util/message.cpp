@@ -73,7 +73,8 @@ namespace mongo {
             closesocket(sock);
             return false;
         }
-        
+
+        ListeningSockets::get()->add( sock );
         return true;
     }
 

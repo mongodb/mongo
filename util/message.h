@@ -32,7 +32,6 @@ namespace mongo {
         Listener(const string &_ip, int p) : ip(_ip), port(p) { }
         virtual ~Listener() {}
         bool init(); // set up socket
-        int socket() const { return sock; }
         void listen(); // never returns (start a thread)
 
         /* spawn a thread, etc., then return */

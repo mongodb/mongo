@@ -592,7 +592,6 @@ namespace mongo {
         const int p = cmdLine.port + 1000;
         DbWebServer mini(bind_ip, p);
         if ( mini.init() ) {
-            ListeningSockets::get()->add( mini.socket() );
             log() << "web admin interface listening on port " << p << endl;
             mini.listen();
         }
