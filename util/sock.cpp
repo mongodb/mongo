@@ -39,6 +39,11 @@ namespace mongo {
             as<sockaddr_un>().sun_family = AF_UNIX;
             strcpy(as<sockaddr_un>().sun_path, iporhost);
             addressSize = sizeof(sockaddr_un);
+        }else if (strchr(iporhost, ':')){
+            as<sockaddr_in6>().sin6_family = AF_INET6;
+            as<sockaddr_in6>().sin6_port = htons(port);
+            inet_pton(AF_INET6, iporhost, &as<sockaddr_in6>().sin6_addr);
+            addressSize = sizeof(sockaddr_in6);
         } else {
             string ip = hostbyname( iporhost );
             memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
@@ -50,7 +55,11 @@ namespace mongo {
     }
 
     bool SockAddr::isLocalHost() const {
-        return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr;
+        switch (getType()){
+            case AF_INET: return getAddr() == "127.0.0.1";
+            case AF_INET6: return getAddr() == "::1";
+            case AF_UNIX: return true;
+        }
     }
 
     string hostbyname(const char *hostname) {
