@@ -102,8 +102,8 @@ namespace mongo {
             }else if (me.getType() == AF_INET6){
                 // IPv6 can also accept IPv4 connections as mapped addresses (::ffff:127.0.0.1)
                 // That causes a conflict if we don't do set it to IPV6_ONLY
-                int on = 1;
-                setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on));
+                const int one = 1;
+                setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (const char*) &one, sizeof(one));
             }
 
             prebindOptions( sock );
