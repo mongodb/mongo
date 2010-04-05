@@ -57,7 +57,7 @@ namespace mongo {
             addressSize = sizeof(sockaddr_in);
         }
     }
-
+ 
     bool SockAddr::isLocalHost() const {
         switch (getType()){
             case AF_INET: return getAddr() == "127.0.0.1";

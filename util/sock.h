@@ -151,7 +151,9 @@ namespace mongo {
 
         string getAddr() const {
             const int buflen=128;
+#if !defined(_WIN32)
             char buffer[buflen];
+#endif
 
             switch (getType()){
 #ifdef _WIN32
