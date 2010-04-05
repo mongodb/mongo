@@ -166,7 +166,7 @@ namespace mongo {
             }
         }
 
-        bool isLocalHost() const { return inet_addr( "127.0.0.1" ) == as<sockaddr_in>().sin_addr.s_addr; }
+        bool isLocalHost() const;
         
         bool operator==(const SockAddr& r) const {
             if (getType() != r.getType())
@@ -215,89 +215,6 @@ namespace mongo {
     };
 
     const int MaxMTU = 16384;
-
-    class UDPConnection {
-    public:
-        UDPConnection() {
-            sock = 0;
-        }
-        ~UDPConnection() {
-            if ( sock ) {
-                closesocket(sock);
-                sock = 0;
-            }
-        }
-        bool init(const SockAddr& myAddr);
-        int recvfrom(char *buf, int len, SockAddr& sender);
-        int sendto(char *buf, int len, const SockAddr& EndPoint);
-        int mtu(const SockAddr& sa) {
-            return sa.isLocalHost() ? 16384 : 1480;
-        }
-
-        SOCKET sock;
-    };
-
-    inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
-        return ::recvfrom(sock, buf, len, 0, sender.raw(), &sender.addressSize);
-    }
-
-    inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
-        if ( 0 && rand() < (RAND_MAX>>4) ) {
-            out() << " NOTSENT ";
-            return 0;
-        }
-        return ::sendto(sock, buf, len, 0, EndPoint.raw(), EndPoint.addressSize);
-    }
-
-    inline bool UDPConnection::init(const SockAddr& myAddr) {
-        sock = socket(myAddr.getType(), SOCK_DGRAM, IPPROTO_UDP);
-        if ( sock == INVALID_SOCKET ) {
-            out() << "invalid socket? " << OUTPUT_ERRNO << endl;
-            return false;
-        }
-        if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
-            out() << "udp init failed" << endl;
-            closesocket(sock);
-            sock = 0;
-            return false;
-        }
-        socklen_t optLen;
-        int rcvbuf;
-        if (getsockopt(sock,
-                       SOL_SOCKET,
-                       SO_RCVBUF,
-                       (char*)&rcvbuf,
-                       &optLen) != -1)
-            out() << "SO_RCVBUF:" << rcvbuf << endl;
-        return true;
-    }
-
-    inline SockAddr::SockAddr(int sourcePort) {
-        memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
-        as<sockaddr_in>().sin_family = AF_INET;
-        as<sockaddr_in>().sin_port = htons(sourcePort);
-        as<sockaddr_in>().sin_addr.s_addr = htonl(INADDR_ANY);
-        addressSize = sizeof(sockaddr_in);
-    }
-
-    inline SockAddr::SockAddr(const char * iporhost , int port) {
-        if (strchr(iporhost, '/')){
-#ifdef _WIN32
-            uassert(13080, "no unix socket support on windows", false);
-#endif
-            uassert(13079, "path to unix socket too long", strlen(iporhost) < sizeof(as<sockaddr_un>().sun_path));
-            as<sockaddr_un>().sun_family = AF_UNIX;
-            strcpy(as<sockaddr_un>().sun_path, iporhost);
-            addressSize = sizeof(sockaddr_un);
-        } else {
-            string ip = hostbyname( iporhost );
-            memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
-            as<sockaddr_in>().sin_family = AF_INET;
-            as<sockaddr_in>().sin_port = htons(port);
-            as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
-            addressSize = sizeof(sockaddr_in);
-        }
-    }
 
     inline string getHostName() {
         char buf[256];
