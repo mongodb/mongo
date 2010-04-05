@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    extern bool noUnixSocket;
+
     class Message;
     class MessagingPort;
     class PiggyBackData;

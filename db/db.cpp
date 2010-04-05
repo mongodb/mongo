@@ -627,7 +627,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("bind_ip", po::value<string>(&bind_ip),
-         "local ip address to bind listener - all local ips bound by default")
+         "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
 #if !defined(_WIN32) && !defined(__sunos__)
         ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
@@ -662,6 +662,8 @@ int main(int argc, char* argv[], char *envp[] )
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
+#else
+        ("nounixsocket", "disable listening on unix sockets")
 #endif
         ;
 
@@ -905,6 +907,9 @@ int main(int argc, char* argv[], char *envp[] )
             uassert( 12507 , "maxConns has to be at least 5" , newSize >= 5 );
             uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
             connTicketHolder.resize( newSize );
+        }
+        if (params.count("nounixsocket")){
+            noUnixSocket = true;
         }
         
         Module::configAll( params );

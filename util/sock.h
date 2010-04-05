@@ -94,6 +94,10 @@ namespace mongo {
 
 #endif
 
+    inline string makeUnixSockPath(int port){
+        return "/tmp/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
+    }
+
     inline void setSockReceiveTimeout(int sock, int secs) {
 // todo - finish - works?
         struct timeval tv;
