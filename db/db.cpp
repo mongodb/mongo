@@ -156,9 +156,7 @@ namespace mongo {
         startReplication();
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);
-        if ( l.init() ) {
-            l.listen();
-        }
+        l.initAndListen();
     }
 
 } // namespace mongo

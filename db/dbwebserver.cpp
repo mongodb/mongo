@@ -591,13 +591,8 @@ namespace mongo {
         Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
         DbWebServer mini(bind_ip, p);
-        if ( mini.init() ) {
-            log() << "web admin interface listening on port " << p << endl;
-            mini.listen();
-        }
-        else { 
-            log() << "warning: web admin interface failed to initialize on port " << p << endl;
-        }
+        log() << "web admin interface listening on port " << p << endl;
+        mini.initAndListen();
         cc().shutdown();
     }
 

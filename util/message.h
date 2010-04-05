@@ -31,8 +31,7 @@ namespace mongo {
     public:
         Listener(const string &_ip, int p) : ip(_ip), port(p) { }
         virtual ~Listener() {}
-        bool init(); // set up socket
-        void listen(); // never returns (start a thread)
+        void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
         virtual void accepted(int sock, const SockAddr& from);
@@ -43,7 +42,6 @@ namespace mongo {
     private:
         string ip;
         int port;
-        int sock;
     };
 
     class AbstractMessagingPort {

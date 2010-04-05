@@ -44,16 +44,16 @@ namespace mongo {
 
     /* listener ------------------------------------------------------------------- */
 
-    bool Listener::init() {
+    void Listener::initAndListen() {
         SockAddr me;
         if ( ip.empty() )
             me = SockAddr( port );
         else
             me = SockAddr( ip.c_str(), port );
-        sock = ::socket(me.getType(), SOCK_STREAM, 0);
+        int sock = ::socket(me.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
             log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
-            return false;
+            return;
         }
         if (me.getType() == AF_UNIX){
             unlink(me.getAddr().c_str());
@@ -65,20 +65,17 @@ namespace mongo {
             if ( x == EADDRINUSE )
                 log() << "  addr already in use" << endl;
             closesocket(sock);
-            return false;
+            return;
         }
 
         if ( ::listen(sock, 128) != 0 ) {
             log() << "listen(): listen() failed " << OUTPUT_ERRNO << endl;
             closesocket(sock);
-            return false;
+            return;
         }
 
         ListeningSockets::get()->add( sock );
-        return true;
-    }
 
-    void Listener::listen() {
         static long connNumber = 0;
         while ( ! inShutdown() ) {
             SockAddr from;

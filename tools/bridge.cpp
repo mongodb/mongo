@@ -125,8 +125,7 @@ int main( int argc, char **argv ) {
     check( port != 0 && !destUri.empty() );
 
     listener.reset( new MyListener( port ) );
-    listener->init();
-    listener->listen();
+    listener->initAndListen();
 
     return 0;
 }
