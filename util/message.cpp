@@ -56,7 +56,7 @@ namespace mongo {
             return;
         }
         if (me.getType() == AF_UNIX){
-            unlink(me.getAddr().c_str());
+            _unlink(me.getAddr().c_str());
         }
         prebindOptions( sock );
         if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {

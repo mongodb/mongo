@@ -561,7 +561,7 @@ namespace mongo {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf();
                 p /= ( dbName + ".ns" );
-                if ( boost::filesystem::exists( p ) )
+                if ( MMF::exists( p ) )
                     names.push_back( dbName );
             } else {
                 string fileName = boost::filesystem::path(*i).leaf();

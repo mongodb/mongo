@@ -64,6 +64,8 @@ namespace mongo {
             case AF_INET6: return getAddr() == "::1";
             case AF_UNIX: return true;
         }
+        assert(false);
+        return false;
     }
 
     string hostbyname(const char *hostname) {
