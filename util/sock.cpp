@@ -63,6 +63,7 @@ namespace mongo {
             case AF_INET: return getAddr() == "127.0.0.1";
             case AF_INET6: return getAddr() == "::1";
             case AF_UNIX: return true;
+            default: return false;
         }
         assert(false);
         return false;
