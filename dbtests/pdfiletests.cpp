@@ -73,7 +73,7 @@ namespace PdfileTests {
                 Extent *e = ext.ext();
                 int ofs;
                 if ( e->lastRecord.isNull() )
-                    ofs = ext.getOfs() + ( e->extentData - (char *)e );
+                    ofs = ext.getOfs() + ( e->_extentData - (char *)e );
                 else
                     ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders;
                 DiskLoc dl( ext.a(), ofs );
