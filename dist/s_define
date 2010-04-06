@@ -18,7 +18,7 @@ for i in \
      egrep '^#define' |
      sed 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' |
      sort -u`; do
-	if `egrep "$i" $l > /dev/null`; then
+	if `egrep -w "$i" $l > /dev/null`; then
 		continue
 	fi
 	echo $i
@@ -36,7 +36,7 @@ for i in \
      sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
          -e 's/WT_STAT_//' |
      sort -u`; do
-	if `egrep "$i" $l > /dev/null`; then
+	if `egrep -w "$i" $l > /dev/null`; then
 		continue
 	fi
 	echo "WT_STAT_$i"
