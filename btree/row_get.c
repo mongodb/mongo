@@ -19,7 +19,6 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW_INDX *ip;
-	WT_SRCH srch;
 	u_int32_t type;
 	int ret;
 
@@ -30,16 +29,12 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 
 	WT_STAT_INCR(idb->stats, DB_READ_BY_KEY);
 
-	/*
-	 * Initialize the thread-of-control structure.
-	 * We're will to re-start if the cache is too full.
-	 */
 	WT_TOC_DB_INIT(toc, db, "Db.get");
 
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_key_row(toc, key, &srch, 0));
-	page = srch.page;
-	ip = srch.indx;
+	WT_ERR(__wt_bt_search_key_row(toc, key, 0));
+	page = toc->srch_page;
+	ip = toc->srch_ip;
 
 	/*
 	 * The Db.get method can only return single key/data pairs.
@@ -63,8 +58,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	}
 	ret = __wt_bt_dbt_return(toc, key, data, page, ip, 0);
 
-	/* Discard the page. */
-err:	if (page != NULL && page != idb->root_page)
+err:	if (page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 	WT_TOC_DB_CLEAR(toc);
