@@ -4,10 +4,8 @@
 # $Id$
 
 btree/bt_bulk.c
-btree/bt_cget.c
 btree/bt_close.c
 btree/bt_cmp.c
-btree/bt_csrch.c
 btree/bt_debug.c
 btree/bt_desc.c
 btree/bt_dump.c
@@ -15,14 +13,16 @@ btree/bt_misc.c
 btree/bt_open.c
 btree/bt_ovfl.c
 btree/bt_page.c
-btree/bt_rdel.c
 btree/bt_ret.c
-btree/bt_rget.c
-btree/bt_rput.c
-btree/bt_rsrch.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
+btree/col_get.c
+btree/col_srch.c
+btree/row_del.c
+btree/row_get.c
+btree/row_put.c
+btree/row_srch.c
 cache/c_drain.c
 cache/c_init.c
 cache/c_io.c

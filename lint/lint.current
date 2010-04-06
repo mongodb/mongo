@@ -44,23 +44,9 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 ../btree/bt_bulk.c  1275  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
---- Module:   ../btree/bt_cget.c (C)
-
 --- Module:   ../btree/bt_close.c (C)
 
 --- Module:   ../btree/bt_cmp.c (C)
-
---- Module:   ../btree/bt_csrch.c (C)
-                                                              _
-#...                    WT_RECORDS((WT_OFF *)((ip)->page_data))
-			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
-../btree/bt_csrch.c  48  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                                                           _
-#...                 WT_RECORDS((WT_OFF *)((ip)->page_data))
-			record_cnt += WT_COL_OFF_RECORDS(ip);
-../btree/bt_csrch.c  50  Info 740: Unusual pointer cast (incompatible indirect
-    types)
 
 --- Module:   ../btree/bt_debug.c (C)
                                                        _
@@ -107,8 +93,6 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 ../btree/bt_page.c  409  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
---- Module:   ../btree/bt_rdel.c (C)
-
 --- Module:   ../btree/bt_ret.c (C)
                                              _
 		if (toc->data.data_len < size)
@@ -126,72 +110,6 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 ../btree/bt_ret.c  195  Warning 644: Variable 'ovfl_page' (line 27) may not
     have been initialized
 ../btree/bt_ret.c  27  Info 830: Location cited in prior message
-
---- Module:   ../btree/bt_rget.c (C)
-
---- Module:   ../btree/bt_rput.c (C)
-_
-}
-../btree/bt_rput.c  108  Info 715: Symbol 'db' (line 19) not referenced
-../btree/bt_rput.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  108  Info 715: Symbol 'toc' (line 19) not referenced
-../btree/bt_rput.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  108  Info 715: Symbol 'key' (line 19) not referenced
-../btree/bt_rput.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  108  Info 715: Symbol 'data' (line 19) not referenced
-../btree/bt_rput.c  19  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  142  Warning 529: Symbol 'repl' (line 117) not subsequently
-    referenced
-../btree/bt_rput.c  117  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  142  Info 715: Symbol 'toc' (line 115) not referenced
-../btree/bt_rput.c  115  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  142  Warning 529: Symbol 'ip' (line 118) not subsequently
-    referenced
-../btree/bt_rput.c  118  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  142  Warning 529: Symbol 'data' (line 119) not subsequently
-    referenced
-../btree/bt_rput.c  119  Info 830: Location cited in prior message
-_
-}
-../btree/bt_rput.c  142  Warning 529: Symbol 'size' (line 120) not subsequently
-    referenced
-../btree/bt_rput.c  120  Info 830: Location cited in prior message
-
-    --- Wrap-up for Module: ../btree/bt_rput.c
-
-Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 115,
-    file ../btree/bt_rput.c) not referenced
-../btree/bt_rput.c  115  Info 830: Location cited in prior message
-
---- Module:   ../btree/bt_rsrch.c (C)
-                                                                          _
-				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_rsrch.c  63  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                            _
-		if (cmp != 0)
-../btree/bt_rsrch.c  86  Warning 644: Variable 'cmp' (line 24) may not have
-    been initialized
-../btree/bt_rsrch.c  24  Info 830: Location cited in prior message
-                                                 _
-				toc->srch_ip = ip;
-../btree/bt_rsrch.c  100  Info 771: Symbol 'ip' (line 22) conceivably not
-    initialized
-../btree/bt_rsrch.c  22  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_stat.c (C)
 
@@ -285,15 +203,97 @@ Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 115,
 			bit_set(vs->fragbits, ffc);
 ../btree/bt_vrfy.c  1195  Info 702: Shift right of signed quantity (int)
 
+--- Module:   ../btree/col_get.c (C)
+
+--- Module:   ../btree/col_srch.c (C)
+                                                              _
+#...                    WT_RECORDS((WT_OFF *)((ip)->page_data))
+			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
+../btree/col_srch.c  48  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                                                           _
+#...                 WT_RECORDS((WT_OFF *)((ip)->page_data))
+			record_cnt += WT_COL_OFF_RECORDS(ip);
+../btree/col_srch.c  50  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+
+--- Module:   ../btree/row_del.c (C)
+
+--- Module:   ../btree/row_get.c (C)
+
+--- Module:   ../btree/row_put.c (C)
+_
+}
+../btree/row_put.c  108  Info 715: Symbol 'db' (line 19) not referenced
+../btree/row_put.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  108  Info 715: Symbol 'toc' (line 19) not referenced
+../btree/row_put.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  108  Info 715: Symbol 'key' (line 19) not referenced
+../btree/row_put.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  108  Info 715: Symbol 'data' (line 19) not referenced
+../btree/row_put.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  142  Warning 529: Symbol 'repl' (line 117) not subsequently
+    referenced
+../btree/row_put.c  117  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  142  Info 715: Symbol 'toc' (line 115) not referenced
+../btree/row_put.c  115  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  142  Warning 529: Symbol 'ip' (line 118) not subsequently
+    referenced
+../btree/row_put.c  118  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  142  Warning 529: Symbol 'data' (line 119) not subsequently
+    referenced
+../btree/row_put.c  119  Info 830: Location cited in prior message
+_
+}
+../btree/row_put.c  142  Warning 529: Symbol 'size' (line 120) not subsequently
+    referenced
+../btree/row_put.c  120  Info 830: Location cited in prior message
+
+    --- Wrap-up for Module: ../btree/row_put.c
+
+Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 115,
+    file ../btree/row_put.c) not referenced
+../btree/row_put.c  115  Info 830: Location cited in prior message
+
+--- Module:   ../btree/row_srch.c (C)
+                                                                          _
+				cmp = db->btree_compare(db, key, (DBT *)ip);
+../btree/row_srch.c  63  Info 740: Unusual pointer cast (incompatible indirect
+    types)
+                            _
+		if (cmp != 0)
+../btree/row_srch.c  86  Warning 644: Variable 'cmp' (line 24) may not have
+    been initialized
+../btree/row_srch.c  24  Info 830: Location cited in prior message
+                                                 _
+				toc->srch_ip = ip;
+../btree/row_srch.c  100  Info 771: Symbol 'ip' (line 22) conceivably not
+    initialized
+../btree/row_srch.c  22  Info 830: Location cited in prior message
+
 --- Module:   ../db/db_err.c (C)
                                 _
 #... all((void *)((db)->errcall), (void *)(db), (db)->errpfx, (db)->idb == NULL
 	WT_DB_ERR(db, error, fmt);
-../db/db_err.c  45  Warning 611: Suspicious cast
+../db/db_err.c  46  Warning 611: Suspicious cast
                             _
 #... (void *)((db)->errcall), (void *)(db), (db)->errpfx, (db)->idb == NULL ? N
 	WT_DB_ERR(db, 0, fmt);
-../db/db_err.c  55  Warning 611: Suspicious cast
+../db/db_err.c  57  Warning 611: Suspicious cast
 
 --- Module:   ../db/db_getset.c (C)
 
@@ -315,11 +315,29 @@ _
                                   _
 #... call((void *)((env)->errcall), (void *)(env), env->errpfx, NULL, error, fm
 	WT_ENV_ERR(env, error, fmt);
-../env/env_err.c  64  Warning 611: Suspicious cast
+../env/env_err.c  65  Warning 611: Suspicious cast
                               _
 #... ((void *)((env)->errcall), (void *)(env), env->errpfx, NULL, 0, fmt, __ap)
 	WT_ENV_ERR(env, 0, fmt);
-../env/env_err.c  74  Warning 611: Suspicious cast
+../env/env_err.c  76  Warning 611: Suspicious cast
+
+During Specific Walk:
+  File ../btree/bt_misc.c line 45: __wt_api_env_errx(0, !=0, ... )
+../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
+    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 42]
+../btree/bt_misc.c  42  Info 831: Reference cited in prior message
+
+During Specific Walk:
+  File ../btree/bt_misc.c line 55: __wt_api_env_errx(0, !=0, ... )
+../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
+    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 53]
+../btree/bt_misc.c  53  Info 831: Reference cited in prior message
+
+During Specific Walk:
+  File ../btree/bt_misc.c line 68: __wt_api_env_errx(0, !=0, ... )
+../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
+    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 66]
+../btree/bt_misc.c  66  Info 831: Reference cited in prior message
 
 --- Module:   ../env/env_getset.c (C)
 
