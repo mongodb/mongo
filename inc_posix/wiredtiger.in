@@ -126,6 +126,9 @@ struct __wt_toc {
 
 	WT_PAGE	**hazard;		/* Hazard reference array */
 
+	WT_PAGE *srch_page;		/* Search page */
+	void	*srch_ip;		/* Search WT_{COL,ROW}_INDX */
+
 	/*
 	 * DO NOT EDIT: automatically built by dist/api.py.
 	 * WT_TOC methods: BEGIN
@@ -265,7 +268,7 @@ struct __db {
 	    DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t );
 
 	int (*get_recno)(
-	    DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t );
+	    DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t );
 
 	int (*huffman_set)(
 	    DB *, u_int8_t const *, u_int , u_int32_t );
