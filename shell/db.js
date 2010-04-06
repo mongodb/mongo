@@ -274,6 +274,7 @@ DB.prototype.help = function() {
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this onew");
     print("\tdb.killOp(opid) kills the current operation in the db" );
+    print("\tdb.listCommands() lists all the db commands" );
     print("\tdb.printCollectionStats()" );
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
@@ -471,8 +472,14 @@ DB.prototype.forceError = function(){
     return this.runCommand( { forceerror : 1 } );
 }
 
-DB.prototype.getLastError = function(){
-    var res = this.runCommand( { getlasterror : 1 } );
+DB.prototype.getLastError = function( w , wtimeout ){
+    var cmd = { getlasterror : 1 };
+    if ( w ){
+        cmd.w = w;
+        if ( wtimeout )
+            cmd.wtimeout = wtimeout;
+    }
+    var res = this.runCommand( cmd );
     if ( ! res.ok )
         throw "getlasterror failed: " + tojson( res );
     return res.err;
@@ -641,6 +648,28 @@ DB.prototype.serverStatus = function(){
 
 DB.prototype.version = function(){
     return this.serverBuildInfo().version;
+}
+
+DB.prototype.listCommands = function(){
+    var x = this.runCommand( "listCommands" );
+    for ( var name in x.commands ){
+        var c = x.commands[name];
+
+        var s = name + " lock: ";
+        
+        switch ( c.lockType ){
+        case -1: s += "read"; break;
+        case 0: s += "node"; break;
+        case 1: s += "write"; break;
+        default: s += c.lockType;
+        }
+        
+        s += " adminOnly: " + c.adminOnly;
+        s += " slaveOk: " + c.slaveOk;
+        s += " " + c.help;
+        
+        print( s )
+    }
 }
 
 DB.prototype.printShardingStatus = function(){

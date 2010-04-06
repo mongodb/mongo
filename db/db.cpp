@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+    CmdLine cmdLine;
+
     bool useJNI = true;
 
     /* only off if --nocursors which is for debugging. */
@@ -61,6 +63,10 @@ namespace mongo {
     extern int lockFile;
     
     extern string repairpath;
+
+#if defined(_WIN32)
+    std::wstring windowsServiceName = L"MongoDB";
+#endif
 
     void setupSignals();
     void closeAllSockets();
@@ -154,10 +160,7 @@ namespace mongo {
         startReplication();
         if ( !noHttpInterface )
             boost::thread thr(webServerThread);
-        if ( l.init() ) {
-            ListeningSockets::get()->add( l.socket() );
-            l.listen();
-        }
+        l.initAndListen();
     }
 
 } // namespace mongo
@@ -218,7 +221,7 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd.sa ) ) {
+                if ( !assembleResponse( m, dbresponse, dbMsgPort->farEnd ) ) {
                     out() << curTimeMillis() % 10000 << "   end msg " << dbMsgPort->farEnd.toString() << endl;
                     /* todo: we may not wish to allow this, even on localhost: very low priv accounts could stop us. */
                     if ( dbMsgPort->farEnd.isLocalHost() ) {
@@ -314,7 +317,7 @@ namespace mongo {
     bool shouldRepairDatabases = 0;
     bool forceRepair = 0;
     
-    bool doDBUpgrade( const string& dbName , string errmsg , MDFHeader * h ){
+    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ){
         static DBDirectClient db;
         
         if ( h->version == 4 && h->versionMinor == 4 ){
@@ -359,7 +362,7 @@ namespace mongo {
             log(1) << "\t" << dbName << endl;
             Client::Context ctx( dbName );
             MongoDataFile *p = cc().database()->getFile( 0 );
-            MDFHeader *h = p->getHeader();
+            DataFileHeader *h = p->getHeader();
             if ( !h->currentVersion() || forceRepair ) {
                 log() << "****" << endl;
                 log() << "****" << endl;
@@ -437,7 +440,12 @@ namespace mongo {
                 }
 
                 sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
-
+                
+                if ( inShutdown() ){
+                    // occasional issue trying to flush during shutdown when sleep interrupted
+                    break;
+                }
+                
                 Date_t start = jsTime();
                 MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
@@ -455,6 +463,17 @@ namespace mongo {
 #if BOOST_VERSION < 103500
         cout << "\nwarning: built with boost version <= 1.34, limited concurrency" << endl;
 #endif
+
+        {
+            const char * foo = strstr( versionString , "." ) + 1;
+            int bar = atoi( foo );
+            if ( ( 2 * ( bar / 2 ) ) != bar ){
+                cout << "****\n" 
+                     << "WARNING: This is development version of MongoDB.  Not recommended for production.\n" 
+                     << "****" << endl;
+            }
+                
+        }
 
         if ( sizeof(int*) != 4 )
             return;
@@ -612,8 +631,11 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("bind_ip", po::value<string>(&bind_ip),
-         "local ip address to bind listener - all local ips bound by default")
+         "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
+#if !defined(_WIN32) && !defined(__sunos__)
+        ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
+#endif
         ("directoryperdb", "each database will be stored in a separate directory")
         ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
         ("cpu", "periodically show cpu and iowait utilization")
@@ -644,6 +666,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
+        ("serviceName", po::value<std::wstring>(&windowsServiceName), "windows service name")
+#else
+        ("nounixsocket", "disable listening on unix sockets")
 #endif
         ;
 
@@ -888,6 +913,9 @@ int main(int argc, char* argv[], char *envp[] )
             uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
             connTicketHolder.resize( newSize );
         }
+        if (params.count("nounixsocket")){
+            noUnixSocket = true;
+        }
         
         Module::configAll( params );
         dataFileSync.go();
@@ -932,17 +960,17 @@ int main(int argc, char* argv[], char *envp[] )
 
 #if defined(_WIN32)
         if ( installService ) {
-            if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( removeService ) {
-            if ( !ServiceController::removeService( L"MongoDB" ) )
+            if ( !ServiceController::removeService( windowsServiceName ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( startService ) {
-            if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
+            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
@@ -1027,13 +1055,19 @@ namespace mongo {
         abort();
     }
     
+    void ignoreSignal( int signal ){
+        cout << "ignoring signal: " << signal << endl;
+    }
+
     void setupSignals() {
         assert( signal(SIGSEGV, abruptQuit) != SIG_ERR );
         assert( signal(SIGFPE, abruptQuit) != SIG_ERR );
         assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
         assert( signal(SIGBUS, abruptQuit) != SIG_ERR );
+        assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
         assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
         assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
+        assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
 
         setupSIGTRAPforGDB();
 

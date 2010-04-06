@@ -108,7 +108,7 @@ namespace mongo {
             unsigned x = lockedForWriting;
             if( x ) {
                 b.append("fsyncLock", x);
-                b.append("info", "use command {unlock:0} to terminate the fsync write/snapshot lock");
+                b.append("info", "use db.$cmd.sys.unlock.findOne() to terminate the fsync write/snapshot lock");
             }
         }
         
@@ -212,7 +212,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client ) {
+    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
 
         // before we lock...
         int op = m.data->operation();
@@ -489,13 +489,13 @@ namespace mongo {
         ss << ns << " cid:" << cursorid << " ntoreturn:" << ntoreturn;;
 
         int pass = 0;
-
+        
         QueryResult* msgdata;
         while( 1 ) {
             try {
                 mongolock lk(false);
                 Client::Context ctx(ns);
-                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass);
+                msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass );
             }
             catch ( GetMoreWaitException& ) { 
                 massert(13073, "shutting down", !inShutdown() );
@@ -561,7 +561,7 @@ namespace mongo {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf();
                 p /= ( dbName + ".ns" );
-                if ( boost::filesystem::exists( p ) )
+                if ( MMF::exists( p ) )
                     names.push_back( dbName );
             } else {
                 string fileName = boost::filesystem::path(*i).leaf();
@@ -703,7 +703,7 @@ namespace mongo {
 
     void acquirePathLock() {
 #if !defined(_WIN32) && !defined(__sunos__)
-        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+      string name = ( boost::filesystem::path( lockfilepath.empty() ? dbpath : lockfilepath ) / "mongod.lock" ).native_file_string();
 
         bool oldFile = false;
 
@@ -712,8 +712,8 @@ namespace mongo {
         }
         
         lockFile = open( name.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO );
-        uassert( 10309 ,  "Unable to create / open lock file for dbpath: " + name, lockFile > 0 );
-        uassert( 10310 ,  "Unable to acquire lock for dbpath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
+        uassert( 10309 ,  "Unable to create / open lock file for lockfilepath: " + name, lockFile > 0 );
+        uassert( 10310 ,  "Unable to acquire lock for lockfilepath: " + name, flock( lockFile, LOCK_EX | LOCK_NB ) == 0 );
 
         if ( oldFile ){
             // we check this here because we want to see if we can get the lock

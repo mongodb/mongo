@@ -57,12 +57,13 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; } 
+        virtual LockType locktype(){ return NONE; } 
         virtual void help( stringstream& help ) const {
             help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            dblock l;
             cc().shutdown();
             log() << "terminating, shutdown command received" << endl;
             dbexit( EXIT_CLEAN ); // this never returns
@@ -140,9 +141,39 @@ namespace mongo {
             else
                 le->appendSelf( result );
             
+            Client& c = cc();
+            c.appendLastOp( result );
+
             if ( cmdObj["fsync"].trueValue() ){
                 log() << "fsync from getlasterror" << endl;
                 result.append( "fsyncFiles" , MemoryMappedFile::flushAll( true ) );
+            }
+            
+            BSONElement e = cmdObj["w"];
+            if ( e.isNumber() ){
+                int timeout = cmdObj["wtimeout"].numberInt();
+                Timer t;
+
+                int w = e.numberInt();
+
+                long long passes = 0;
+                char buf[32];
+                while ( 1 ){
+                    if ( opReplicatedEnough( c.getLastOp() , w ) )
+                        break;
+                    
+                    if ( timeout > 0 && t.millis() >= timeout ){
+                        result.append( "wtimeout" , true );
+                        errmsg = "timed out waiting for slaves";
+                        result.append( "waited" , t.millis() );
+                        return false;
+                    }
+
+                    assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
+                    c.curop()->setMessage( buf );
+                    sleepmillis(1);
+                }
+                result.appendNumber( "wtime" , t.millis() );
             }
             
             return true;
@@ -1020,19 +1051,26 @@ namespace mongo {
 
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ){
-            DBDirectClient client;
-            auto_ptr<DBClientCursor> indexes =
-                client.query(db + ".system.indexes", QUERY( "ns" << ns));
+            dbMutex.assertAtLeastReadLocked();
 
-            long long totalSize = 0;
-            while (indexes->more()){
-                BSONObj index = indexes->nextSafe();
-                NamespaceDetails * nsd = nsdetails( (ns + ".$" + index["name"].valuestrsafe()).c_str() );
-                if (!nsd)
-                    continue; // nothing to do here
-                totalSize += nsd->datasize;
-                if (details)
-                    details->appendNumber(index["name"].valuestrsafe(), nsd->datasize / scale );
+            NamespaceDetails * nsd = nsdetails( ns.c_str() );
+            if ( ! nsd )
+                return 0;
+            
+            long long totalSize = 0;            
+
+            NamespaceDetails::IndexIterator ii = nsd->ii();
+            while ( ii.more() ){
+                IndexDetails& d = ii.next();
+                string collNS = d.indexNamespace();
+                NamespaceDetails * mine = nsdetails( collNS.c_str() );
+                if ( ! mine ){
+                    log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
+                    continue;
+                }
+                totalSize += mine->datasize;
+                if ( details )
+                    details->appendNumber( d.indexName() , mine->datasize / scale );
             }
             return totalSize;
         }
@@ -1477,9 +1515,7 @@ namespace mongo {
 
             BSONObj query = getQuery( cmdObj );
             
-            set<BSONElement,BSONElementCmpWithoutField> map;
-            long long size = 0;
-
+            BSONElementSet values;
             auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
@@ -1494,24 +1530,18 @@ namespace mongo {
                 BSONObj o = cursor->current();
                 cursor->advance();
                 
-                BSONElement e = o.getFieldDotted( key.c_str() );
-                if ( ! e.type() )
-                    continue;
-
-                if ( map.insert( e ).second ){
-                    size += o.objsize() + 20;
-                    uassert( 10044 ,  "distinct too big, 4mb cap" , size < 4 * 1024 * 1024 );
-                }
+                o.getFieldsDotted( key.c_str(), values );
             }
 
-            assert( size <= 0x7fffffff );
-            
             BSONArrayBuilder b( result.subarrayStart( "values" ) );
-            for ( set<BSONElement,BSONElementCmpWithoutField>::iterator i = map.begin() ; i != map.end(); i++ ){
+            for ( BSONElementSet::iterator i = values.begin() ; i != values.end(); i++ ){
                 b.append( *i );
             }
-            b.done();
-            
+            BSONObj arr = b.done();
+
+            uassert(10044,  "distinct too big, 4mb cap",
+                    (arr.objsize() + 1024) < (4 * 1024 * 1024));
+
             return true;
         }
 
@@ -1544,7 +1574,10 @@ namespace mongo {
             if (!sort.eoo())
                 q.sort(sort.embeddedObjectUserCheck());
 
-            BSONObj out = db.findOne(ns, q);
+            BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
+            const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
+
+            BSONObj out = db.findOne(ns, q, fields);
             if (out.firstElement().eoo()){
                 errmsg = "No matching object found";
                 return false;
@@ -1561,7 +1594,7 @@ namespace mongo {
                 db.update(ns, q, update.embeddedObjectUserCheck());
 
                 if (cmdObj["new"].trueValue())
-                    out = db.findOne(ns, q);
+                    out = db.findOne(ns, q, fields);
             }
 
             result.append("value", out);
@@ -1646,6 +1679,19 @@ namespace mongo {
                 auto_ptr<Cursor> cursor;
 
                 NamespaceDetails * nsd = nsdetails( c.c_str() );
+                
+                // debug SERVER-761
+                NamespaceDetails::IndexIterator ii = nsd->ii();
+                while( ii.more() ) {
+                    const IndexDetails &idx = ii.next();
+                    if ( !idx.head.isValid() || !idx.info.isValid() ) {
+                        log() << "invalid index for ns: " << c << " " << idx.head << " " << idx.info;
+                        if ( idx.info.isValid() )
+                            log() << " " << idx.info.obj();
+                        log() << endl;
+                    }
+                }
+                
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ){
                     cursor.reset( new BtreeCursor( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );

@@ -480,5 +480,8 @@ namespace mongo {
             _matcher.reset(new CoveredIndexMatcher(tsQuery, _qp.indexKey()));
         }
     };
+    
+    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp );
+    bool opReplicatedEnough( OpTime op , int w );
 
 } // namespace mongo

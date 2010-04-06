@@ -76,6 +76,10 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
+        DbWebServer(const string& ip, int port)
+            :MiniWebServer(ip, port)
+        {}
+
         // caller locks
         void doLockedStuff(stringstream& ss) {
             ss << "# databases: " << dbHolder.size() << '\n';
@@ -238,7 +242,7 @@ namespace mongo {
         
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
             
-            if ( from.localhost() )
+            if ( from.isLocalHost() )
                 return true;
             
             Client::GodScope gs;
@@ -317,6 +321,7 @@ namespace mongo {
                         responseMsg = "not allowed\n";
                         return;
                     }              
+                    headers.push_back( "Content-Type: application/json" );
                     generateServerStatus( url , responseMsg );
                     responseCode = 200;
                     return;
@@ -584,16 +589,10 @@ namespace mongo {
 
     void webServerThread() {
         Client::initThread("websvr");
-        DbWebServer mini;
-        int p = cmdLine.port + 1000;
-        if ( mini.init(bind_ip, p) ) {
-            ListeningSockets::get()->add( mini.socket() );
-            log() << "web admin interface listening on port " << p << endl;
-            mini.run();
-        }
-        else { 
-            log() << "warning: web admin interface failed to initialize on port " << p << endl;
-        }
+        const int p = cmdLine.port + 1000;
+        DbWebServer mini(bind_ip, p);
+        log() << "web admin interface listening on port " << p << endl;
+        mini.initAndListen();
         cc().shutdown();
     }
 

@@ -446,7 +446,11 @@ namespace mongo {
             ip = hostbyname(ip.c_str());
         } else {
             port = CmdLine::DefaultDBPort;
-            ip = hostbyname( serverAddress.c_str() );
+            if (serverAddress.find( "/" ) == string::npos){
+                ip = hostbyname( serverAddress.c_str() );
+            } else {
+                ip = serverAddress;
+            }
         }
         if( ip.empty() ) {
             stringstream ss;
@@ -460,6 +464,16 @@ namespace mongo {
         // requires that?
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
         p = auto_ptr<MessagingPort>(new MessagingPort());
+
+#ifndef _WIN32
+        if (server->getAddr() == "127.0.0.1"){
+            SockAddr _server (makeUnixSockPath(port).c_str(), port);
+            if (p->connect(_server)){
+                *server = _server;
+                return true;
+            }
+        }
+#endif
 
         if ( !p->connect(*server) ) {
             stringstream ss;

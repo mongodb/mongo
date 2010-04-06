@@ -580,6 +580,7 @@ namespace mongo {
         friend class NamespaceCursor;
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
     public:
+
         NamespaceIndex(const string &dir, const string &database) :
           ht( 0 ),
           dir_( dir ),
@@ -602,11 +603,11 @@ namespace mongo {
 		}
 
         /* just for diagnostics */
-        size_t detailsOffset(NamespaceDetails *d) {
+        /*size_t detailsOffset(NamespaceDetails *d) {
             if ( !ht )
                 return -1;
             return ((char *) d) -  (char *) ht->nodes;
-        }
+        }*/
 
         /* extra space for indexes when more than 10 */
         NamespaceDetails::Extra* allocExtra(const char *ns) { 
@@ -665,14 +666,15 @@ namespace mongo {
         boost::filesystem::path path() const;
         void maybeMkdir() const;
         
-        MemoryMappedFile f;
-        HashTable<Namespace,NamespaceDetails> *ht;
+        MMF f;
+        HashTable<Namespace,NamespaceDetails,MMF::Pointer> *ht;
         string dir_;
         string database_;
     };
 
     extern string dbpath; // --dbpath parm
     extern bool directoryperdb;
+    extern string lockfilepath; // --lockfilepath param
 
     // Rename a namespace within current 'client' db.
     // (Arguments should include db name)

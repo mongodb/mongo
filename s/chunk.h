@@ -212,6 +212,9 @@ namespace mongo {
         vector<Chunk*> _chunks;
         map<string,unsigned long long> _maxMarkers;
 
+        typedef map<BSONObj,Chunk*,BSONObjCmp> ChunkMap;
+        ChunkMap _chunkMap;
+
         unsigned long long _sequenceNumber;
         
         friend class Chunk;

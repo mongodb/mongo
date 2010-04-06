@@ -29,23 +29,12 @@
 
 #pragma once
 
-#if BOOST_VERSION >= 103500
-#include <boost/thread/shared_mutex.hpp>
-#undef assert
-#define assert xassert
-#define HAVE_READLOCK
-#else
-#warning built with boost version 1.34 or older - limited concurrency
-#endif
+#include "../util/locks.h"
 
 namespace mongo {
 
     inline bool readLockSupported(){
-#ifdef HAVE_READLOCK
         return true;
-#else
-        return false;
-#endif
     }
 
     string sayClientState();
@@ -87,11 +76,9 @@ namespace mongo {
         }
     };
 
-#ifdef HAVE_READLOCK
-//#if 0
     class MongoMutex {
         MutexInfo _minfo;
-        boost::shared_mutex _m;
+        RWLock _m;
         ThreadLocalValue<int> _state;
 
         /* we use a separate TLS value for releasedEarly - that is ok as 
@@ -188,10 +175,8 @@ namespace mongo {
                 lock_shared();
                 return true;
             }
-            
-            boost::system_time until = get_system_time();
-            until += boost::posix_time::milliseconds(2);
-            bool got = _m.timed_lock_shared( until );
+
+            bool got = _m.lock_shared_try( millis );
             if ( got )
                 _state.set(-1);
             return got;
@@ -216,71 +201,6 @@ namespace mongo {
         
         MutexInfo& info() { return _minfo; }
     };
-#else
-    /* this will be for old versions of boost */
-    class MongoMutex { 
-        MutexInfo _minfo;
-        boost::recursive_mutex m;
-        ThreadLocalValue<bool> _releasedEarly;
-    public:
-        MongoMutex() { }
-        void lock() { 
-#ifdef HAVE_READLOCK
-            m.lock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::lock(m);
-#endif
-            _minfo.entered();
-        }
-
-        void releaseEarly() {
-            assertWriteLocked(); // aso must not be recursive, although we don't verify that in the old boost version
-            assert( !_releasedEarly.get() );
-            _releasedEarly.set(true);
-            _unlock();
-        }
-
-        void _unlock() {
-            _minfo.leaving();
-#ifdef HAVE_READLOCK
-            m.unlock();
-#else
-            boost::detail::thread::lock_ops<boost::recursive_mutex>::unlock(m);
-#endif
-        }
-        void unlock() { 
-            if( _releasedEarly.get() ) { 
-                _releasedEarly.set(false);
-                return;
-            }
-            _unlock();
-        }
-
-        void lock_shared() { lock(); }
-        bool lock_shared_try( int millis ) {
-            while ( millis-- ){
-                if ( getState() ){
-                    sleepmillis(1);
-                    continue;
-                }
-                lock_shared();
-                return true;
-            }
-            return false;
-        }
-                    
-        void unlock_shared() { unlock(); }
-        MutexInfo& info() { return _minfo; }
-        void assertWriteLocked() { 
-            assert( info().isLocked() );
-        }
-        void assertAtLeastReadLocked() { 
-            assert( info().isLocked() );
-        }
-        bool atLeastReadLocked() { return info().isLocked(); }
-        int getState(){ return info().isLocked() ? 1 : 0; }
-    };
-#endif
 
     extern MongoMutex &dbMutex;
 

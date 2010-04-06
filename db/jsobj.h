@@ -529,26 +529,12 @@ namespace mongo {
            just the value.
         */
         bool valuesEqual(const BSONElement& r) const {
-            switch( type() ) {
-                case NumberLong:
-                    return _numberLong() == r.numberLong() && r.isNumber();
-                case NumberDouble:
-                    return _numberDouble() == r.number() && r.isNumber();
-                case NumberInt:
-                    return _numberInt() == r.numberInt() && r.isNumber();
-                default:
-                    ;
-            }
-            bool match= valuesize() == r.valuesize() &&
-                        memcmp(value(),r.value(),valuesize()) == 0;
-            return match && canonicalType() == r.canonicalType();
+            return woCompare( r , false ) == 0;
         }
 
         /** Returns true if elements are equal. */
         bool operator==(const BSONElement& r) const {
-            if ( strcmp(fieldName(), r.fieldName()) != 0 )
-                return false;
-            return valuesEqual(r);
+            return woCompare( r , true ) == 0;
         }
 
 
@@ -593,6 +579,10 @@ namespace mongo {
             default:
                 return false;
             }
+        }
+
+        OpTime optime() const {
+            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
         }
 
         Date_t timestampTime() const{
@@ -996,6 +986,7 @@ namespace mongo {
             opELEM_MATCH = 0x12,
             opNEAR = 0x13,
             opWITHIN = 0x14,
+            opMAX_DISTANCE=0x15
         };        
     };
     ostream& operator<<( ostream &s, const BSONObj &o );

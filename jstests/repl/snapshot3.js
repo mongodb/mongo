@@ -2,7 +2,7 @@
 
 ports = allocatePorts( 3 );
 
-var baseName = "repl_snapshot2";
+var baseName = "repl_snapshot3";
 var basePath = "/data/db/" + baseName;
 
 a = new MongodRunner( ports[ 0 ], basePath + "-arbiter" );
@@ -13,12 +13,13 @@ rp = new ReplPair( l, r, a );
 rp.start();
 rp.waitForSteadyState();
 
-big = new Array( 2000 ).toString();
+big = new Array( 2000 ).toString(); // overflow oplog, so test can't pass supriously
 rp.slave().setSlaveOk();
-for( i = 0; i < 1000; ++i ) {
+for( i = 0; i < 500; ++i ) {
     rp.master().getDB( baseName )[ baseName ].save( { _id: new ObjectId(), i: i, b: big } );
     if ( i % 250 == 249 ) {
         assert.soon( function() { return i+1 == rp.slave().getDB( baseName )[ baseName ].count(); } );    
+        sleep( 10 ); // give master a chance to grab a sync point - have such small oplogs the master log might overflow otherwise
     }
 }
 
@@ -40,11 +41,11 @@ rp.left_.extraArgs_ = [ "--fastsync" ];
 
 rp.start( true );
 rp.waitForSteadyState();
-assert.eq( 1000, rp.master().getDB( baseName )[ baseName ].count() );
+assert.eq( 500, rp.master().getDB( baseName )[ baseName ].count() );
 rp.slave().setSlaveOk();
-assert.eq( 1000, rp.slave().getDB( baseName )[ baseName ].count() );
-rp.master().getDB( baseName )[ baseName ].save( {i:1000} );
-assert.soon( function() { return 1001 == rp.slave().getDB( baseName )[ baseName ].count(); } );
+assert.eq( 500, rp.slave().getDB( baseName )[ baseName ].count() );
+rp.master().getDB( baseName )[ baseName ].save( {i:500} );
+assert.soon( function() { return 501 == rp.slave().getDB( baseName )[ baseName ].count(); } );
 
 assert( !rawMongoProgramOutput().match( /resync/ ) );
 assert( !rawMongoProgramOutput().match( /SyncException/ ) );

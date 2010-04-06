@@ -162,6 +162,9 @@ namespace mongo {
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
+        OpTime _lastOp;
+        BSONObj _handshake;
+        BSONObj _remoteId;
 
     public:
         
@@ -182,6 +185,19 @@ namespace mongo {
         void addTempCollection( const string& ns ){
             _tempCollections.push_back( ns );
         }
+        
+        void setLastOp( const OpTime& op ){
+            _lastOp = op;
+        }
+
+        OpTime getLastOp() const {
+            return _lastOp;
+        }
+
+        void appendLastOp( BSONObjBuilder& b ){
+            if ( ! _lastOp.isNull() )
+                b.appendTimestamp( "lastOp" , _lastOp.asDate() );
+        }
 
         /* each thread which does db operations has a Client object in TLS.  
            call this when your thread starts. 
@@ -199,6 +215,11 @@ namespace mongo {
         friend class CurOp;
 
         string toString() const;
+
+        void gotHandshake( const BSONObj& o );
+
+        BSONObj getRemoteID() const { return _remoteId; }
+        BSONObj getHandshake() const { return _handshake; }
     };
     
     inline Client& cc() { 

@@ -20,13 +20,18 @@
 
 #pragma once
 
+#if defined(_WIN32)
+#  define NOMINMAX
+#  include <winsock2.h> //this must be included before the first windows.h include
+#  include <ws2tcpip.h>
+#  include <windows.h>
+#endif
+
 #include <string>
 
 namespace mongo {
 
     using namespace std;
-
-#define NOMINMAX
 
 #if defined(_WIN32)
     const bool debug=true;

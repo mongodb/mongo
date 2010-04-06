@@ -34,6 +34,8 @@ namespace po = boost::program_options;
 
 namespace mongo {
     
+    CmdLine cmdLine;
+
     namespace regression {
 
         map<string,Suite*> * mongo::regression::Suite::_suites = 0;

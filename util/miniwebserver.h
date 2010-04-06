@@ -23,13 +23,10 @@
 
 namespace mongo {
 
-    class MiniWebServer {
+    class MiniWebServer : public Listener {
     public:
-        MiniWebServer();
+        MiniWebServer(const string &ip, int _port);
         virtual ~MiniWebServer() {}
-
-        bool init(const string &ip, int _port);
-        void run();
 
         virtual void doRequest(
             const char *rq, // the full request
@@ -40,8 +37,6 @@ namespace mongo {
             vector<string>& headers, // if completely empty, content-type: text/html will be added
             const SockAddr &from
         ) = 0;
-
-        int socket() const { return sock; }
         
     protected:
         string parseURL( const char * buf );
@@ -56,9 +51,6 @@ namespace mongo {
     private:
         void accepted(int s, const SockAddr &from);
         static bool fullReceive( const char *buf );
-
-        int port;
-        int sock;
     };
 
 } // namespace mongo

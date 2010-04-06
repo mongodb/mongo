@@ -28,7 +28,8 @@
 #include "chunk.h"
 
 namespace mongo {
-    
+
+    CmdLine cmdLine;    
     Database *database = 0;
     string mongosCommand;
     string ourHostname;

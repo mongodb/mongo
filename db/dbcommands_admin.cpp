@@ -118,7 +118,7 @@ namespace mongo {
             bool valid = true;
             stringstream ss;
             ss << "\nvalidate\n";
-            ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
+            //ss << "  details: " << hex << d << " ofs:" << nsindex(ns)->detailsOffset(d) << dec << endl;
             if ( d->capped )
                 ss << "  capped:" << d->capped << " max:" << d->max << '\n';
             
@@ -376,7 +376,7 @@ namespace mongo {
         }
         
     } fsyncCmd;
-
+    
     class LogRotateCmd : public Command {
     public:
         LogRotateCmd() : Command( "logRotate" ){}
@@ -389,5 +389,35 @@ namespace mongo {
         }        
         
     } logRotateCmd;
+    
+    class ListCommandsCmd : public Command {
+    public:
+        ListCommandsCmd() : Command( "listCommands" ){}
+        virtual LockType locktype(){ return NONE; } 
+        virtual bool slaveOk(){ return true; }
+        virtual bool adminOnly(){ return false; }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            BSONObjBuilder b( result.subobjStart( "commands" ) );
+            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ){
+                Command * c = i->second;
+                BSONObjBuilder temp( b.subobjStart( c->name.c_str() ) );
+
+                {
+                    stringstream help;
+                    c->help( help );
+                    temp.append( "help" , help.str() );
+                }
+                temp.append( "lockType" , c->locktype() );
+                temp.append( "slaveOk" , c->slaveOk() );
+                temp.append( "adminOnly" , c->adminOnly() );
+                temp.done();
+            }
+            b.done();
+
+            return 1;
+        }        
+
+    } listCommandsCmd;
+
 }
 

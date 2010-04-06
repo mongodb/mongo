@@ -23,6 +23,9 @@
 #include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "../client/parallel.h"
+#include "queryoptimizer.h"
+#include "matcher.h"
+#include "clientcursor.h"
 
 namespace mongo {
 
@@ -327,6 +330,7 @@ namespace mongo {
                     if ( all.size() == 1 ){
                         // this key has low cardinality, so just write to db
                         writelock l(_state.setup.incLong);
+                        Client::Context ctx(_state.setup.incLong.c_str());
                         write( *(all.begin()) );
                     }
                     else if ( all.size() > 1 ){
@@ -409,14 +413,14 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "see http://www.mongodb.org/display/DOCS/MapReduce";
             }
-            virtual LockType locktype(){ return WRITE; } // TODO, READ?
+            virtual LockType locktype(){ return NONE; } 
             bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
                 Client& client = cc();
                 CurOp * op = client.curop();
 
-                MRSetup mr( client.database()->name , cmd );
+                MRSetup mr( nsToDatabase( dbname ) , cmd );
 
                 log(1) << "mr ns: " << mr.ns << endl;
                 
@@ -441,35 +445,60 @@ namespace mongo {
                     _tlmr.reset( mrtl );
 
                     ProgressMeter & pm = op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) );
-                    auto_ptr<DBClientCursor> cursor = db.query( mr.ns , mr.q );
                     long long mapTime = 0;
-                    Timer mt;
-                    while ( cursor->more() ){
-                        BSONObj o = cursor->next(); 
-                    
-                        if ( mr.verbose ) mt.reset();
+                    {
+                        readlock lock( mr.ns );
+                        Client::Context ctx( mr.ns );
                         
-                        state.scope->setThis( &o );
-                        if ( state.scope->invoke( state.map , state.setup.mapparams , 0 , true ) )
-                            throw UserException( 9014, (string)"map invoke failed: " + state.scope->getError() );
-                        
-                        if ( mr.verbose ) mapTime += mt.micros();
-                        
-                        num++;
-                        if ( num % 100 == 0 ){
-                            Timer t;
-                            mrtl->checkSize();
-                            inReduce += t.micros();
-                            killCurrentOp.checkForInterrupt();
-                            dbtemprelease temprlease;
-                        }
-                        pm.hit();
+                        auto_ptr<Cursor> temp = QueryPlanSet(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
+                        auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.ns.c_str() ) );
 
-                        if ( mr.limit && num >= mr.limit )
-                            break;
+                        if ( ! mr.filter.isEmpty() )
+                            cursor->matcher.reset( new CoveredIndexMatcher( mr.filter , cursor->indexKeyPattern() ) );
+                        
+                        Timer mt;
+                        while ( cursor->ok() ){
+                            
+                            if ( ! cursor->currentMatches() ){
+                                cursor->advance();
+                                continue;
+                            }
+                            
+                            BSONObj o = cursor->current(); 
+                            cursor->advance();
+                            
+                            if ( mr.verbose ) mt.reset();
+                            
+                            state.scope->setThis( &o );
+                            if ( state.scope->invoke( state.map , state.setup.mapparams , 0 , true ) )
+                                throw UserException( 9014, (string)"map invoke failed: " + state.scope->getError() );
+                            
+                            if ( mr.verbose ) mapTime += mt.micros();
+                            
+                            num++;
+                            if ( num % 100 == 0 ){
+                                ClientCursor::YieldLock yield = cursor->yieldHold();
+                                Timer t;
+                                mrtl->checkSize();
+                                inReduce += t.micros();
+                                
+                                if ( ! yield.stillOk() ){
+                                    cursor.release();
+                                    break;
+                                }
+
+                                killCurrentOp.checkForInterrupt();
+                            }
+                            pm.hit();
+                            
+                            if ( mr.limit && num >= mr.limit )
+                                break;
+                        }
                     }
                     pm.finished();
                     
+                    killCurrentOp.checkForInterrupt();
+
                     countsBuilder.appendNumber( "input" , num );
                     countsBuilder.appendNumber( "emit" , mrtl->numEmits );
                     if ( mrtl->numEmits )
@@ -486,36 +515,67 @@ namespace mongo {
                     BSONObj sortKey = BSON( "0" << 1 );
                     db.ensureIndex( mr.incLong , sortKey );
                     
-                    BSONObj prev;
-                    BSONList all;
-                    
-                    assert( userCreateNS( mr.tempLong.c_str() , BSONObj() , errmsg , mr.replicate ) );
-
-                    pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
-                    cursor = db.query( mr.incLong, Query().sort( sortKey ) );
-
-                    while ( cursor->more() ){
-                        BSONObj o = cursor->next().getOwned();
-                        pm.hit();
-
-                        if ( o.woSortOrder( prev , sortKey ) == 0 ){
-                            all.push_back( o );
-                            if ( pm.hits() % 1000 == 0 ){
-                                dbtemprelease tl;
-                            }
-                            continue;
-                        }
-                        
-                        state.finalReduce( all );
-                        
-                        all.clear();
-                        prev = o;
-                        all.push_back( o );
-                        killCurrentOp.checkForInterrupt();
-                        dbtemprelease tl;
+                    {
+                        writelock lock( mr.tempLong.c_str() );
+                        Client::Context ctx( mr.tempLong.c_str() );
+                        assert( userCreateNS( mr.tempLong.c_str() , BSONObj() , errmsg , mr.replicate ) );
                     }
-                    state.finalReduce( all );
-                    pm.finished();
+
+
+                    {
+                        readlock rl(mr.incLong.c_str());
+                        Client::Context ctx( mr.incLong );
+                        
+                        BSONObj prev;
+                        BSONList all;
+                        
+                        pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
+
+                        auto_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
+                        auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.incLong.c_str() ) );
+                        
+                        while ( cursor->ok() ){
+                            BSONObj o = cursor->current().getOwned();
+                            cursor->advance();
+                            
+                            pm.hit();
+                            
+                            if ( o.woSortOrder( prev , sortKey ) == 0 ){
+                                all.push_back( o );
+                                if ( pm.hits() % 1000 == 0 ){
+                                    if ( ! cursor->yield() ){
+                                        cursor.release();
+                                        break;
+                                    } 
+                                    killCurrentOp.checkForInterrupt();
+                                }
+                                continue;
+                            }
+                        
+                            ClientCursor::YieldLock yield = cursor->yieldHold();
+                                
+                            state.finalReduce( all );
+                            
+                            all.clear();
+                            prev = o;
+                            all.push_back( o );
+
+                            if ( ! yield.stillOk() ){
+                                cursor.release();
+                                break;
+                            }
+                            
+                            killCurrentOp.checkForInterrupt();
+                        }
+
+                        {
+                            dbtemprelease tl;
+                            state.finalReduce( all );
+                        }
+
+                        pm.finished();
+                    }
+
                     _tlmr.reset( 0 );
                 }
                 catch ( ... ){
@@ -525,9 +585,13 @@ namespace mongo {
                     throw;
                 }
                 
-                db.dropCollection( mr.incLong );
+                long long finalCount = 0;
+                {
+                    dblock lock;
+                    db.dropCollection( mr.incLong );
                 
-                long long finalCount = mr.renameIfNeeded( db );
+                    finalCount = mr.renameIfNeeded( db );
+                }
 
                 timingBuilder.append( "total" , t.millis() );
                 

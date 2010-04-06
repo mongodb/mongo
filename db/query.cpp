@@ -250,7 +250,7 @@ namespace mongo {
         return qr;
     }
 
-    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass) {
+    QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass ) {
 
         ClientCursor::Pointer p(cursorid);
         ClientCursor *cc = p._c;
@@ -264,7 +264,7 @@ namespace mongo {
         BufBuilder b( bufSize );
 
         b.skip(sizeof(QueryResult));
-
+        
         int resultFlags = QueryResult::ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
@@ -275,13 +275,21 @@ namespace mongo {
             resultFlags = QueryResult::ResultFlag_CursorNotFound;
         }
         else {
+            if ( pass == 0 )
+                cc->updateSlaveLocation( curop );
+
+            int queryOptions = cc->_queryOptions;
+
             if( pass == 0 ) {
                 StringBuilder& ss = curop.debug().str;
                 ss << " getMore: " << cc->query << " ";
             }
+            
             start = cc->pos;
             Cursor *c = cc->c.get();
             c->checkLocation();
+            DiskLoc last;
+
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
@@ -292,7 +300,7 @@ namespace mongo {
                         if ( c->advance() )
                             continue;
 
-                        if( n == 0 && (cc->_queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
+                        if( n == 0 && (queryOptions & QueryOption_AwaitData) && pass < 1000 ) {
                             throw GetMoreWaitException();
                         }
 
@@ -313,23 +321,26 @@ namespace mongo {
                         //out() << "  but it's a dup \n";
                     }
                     else {
+                        last = c->currLoc();
                         BSONObj js = c->current();
+
                         fillQueryResultFromObj(b, cc->fields.get(), js);
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
                             c->advance();
                             cc->pos += n;
-                            //cc->updateLocation();
                             break;
                         }
                     }
                 }
                 c->advance();
             }
+            
             if ( cc ) {
                 cc->updateLocation();
                 cc->mayUpgradeStorage();
+                cc->storeOpForSlave( last );
             }
         }
 
@@ -668,7 +679,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
-                ss << " command ";
+                ss << " command: " << jsobj;
                 curop.markCommand();
                 n = 1;
                 qr.reset( (QueryResult *) bb.buf() );

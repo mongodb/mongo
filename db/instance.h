@@ -108,7 +108,7 @@ namespace mongo {
 
     static SockAddr unknownAddress( "0.0.0.0", 0 );
     
-    bool assembleResponse( Message &m, DbResponse &dbresponse, const sockaddr_in &client = unknownAddress.sa );
+    bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
 
     void getDatabaseNames( vector< string > &names );
 

@@ -36,6 +36,7 @@
 #include "../util/goodies.h"
 #include "repl.h"
 #include "../util/message.h"
+#include "../util/background.h"
 #include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
@@ -103,7 +104,7 @@ namespace mongo {
             return;
         info = _comment;
         if ( n != state && !cmdLine.quiet )
-            log() << "pair: setting master=" << n << " was " << state << '\n';
+            log() << "pair: setting master=" << n << " was " << state << endl;
         state = n;
     }
 
@@ -126,6 +127,158 @@ namespace mongo {
         }
 
         negotiate( conn.get(), "arbiter" );
+    }
+
+    /* --------------------------------------------- */
+
+    class SlaveTracking : public BackgroundJob {
+    public:
+        
+        static const char * NS;
+
+        struct Ident {
+            
+            Ident(BSONObj r,string h,string n){
+                BSONObjBuilder b;
+                b.appendElements( r );
+                b.append( "host" , h );
+                b.append( "ns" , n );
+                obj = b.obj();
+            }
+
+            bool operator<( const Ident& other ) const {
+                return obj.woCompare( other.obj ) < 0;
+            }
+            
+            BSONObj obj;
+        };
+
+        struct Info {
+            Info() : loc(0){}
+            ~Info(){
+                if ( loc && owned ){
+                    delete loc;
+                }
+            }
+            bool owned;
+            OpTime * loc;
+        };
+
+        SlaveTracking(){
+            _dirty = false;
+            _started = false;
+        }
+
+        void run(){
+            Client::initThread( "slaveTracking" );
+            DBDirectClient db;
+            while ( ! inShutdown() ){
+                sleepsecs( 1 );
+
+                if ( ! _dirty )
+                    continue;
+                
+                writelock lk(NS);
+
+                list< pair<BSONObj,BSONObj> > todo;
+                
+                {
+                    scoped_lock mylk(_mutex);
+                    
+                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ){
+                        BSONObjBuilder temp;
+                        temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
+                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() , 
+                                                               BSON( "$set" << temp.obj() ).getOwned() ) );
+                    }
+                    
+                    _slaves.clear();
+                }
+
+                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ){
+                    db.update( NS , i->first , i->second , true );
+                }
+
+                _dirty = false;
+            }
+        }
+
+        void reset(){
+            scoped_lock mylk(_mutex);
+            _slaves.clear();
+        }
+
+        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
+            scoped_lock mylk(_mutex);
+            
+            Ident ident(rid,host,ns);
+            Info& i = _slaves[ ident ];
+            if ( i.loc ){
+                i.loc[0] = last;
+                return;
+            }
+            
+            dbMutex.assertAtLeastReadLocked();
+            BSONObj res;
+            if ( Helpers::findOne( NS , ident.obj , res ) ){
+                assert( res["syncedTo"].type() );
+                i.owned = false;
+                i.loc = (OpTime*)res["syncedTo"].value();
+                i.loc[0] = last;
+                return;
+            }
+            
+            i.owned = true;
+            i.loc = new OpTime[1];
+            i.loc[0] = last;
+            _dirty = true;
+            if ( ! _started ){
+                _started = true;
+                go();
+            }
+        }
+
+        bool opReplicatedEnough( OpTime op , int w ){
+            if ( w <= 1 )
+                return true;
+            w--; // now this is the # of slaves i need
+            scoped_lock mylk(_mutex);
+            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
+                OpTime s = *(i->second.loc);
+                if ( s < op ){
+                    continue;
+                }
+                if ( --w == 0 )
+                    return true;
+            }
+            return w <= 0;
+        }
+        
+        // need to be careful not to deadlock with this
+        mongo::mutex _mutex;
+        map<Ident,Info> _slaves;
+        bool _dirty;
+        bool _started;
+
+    } slaveTracking;
+
+    const char * SlaveTracking::NS = "local.slaves";
+
+    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ){
+        if ( lastOp.isNull() )
+            return;
+        
+        assert( strstr( ns , "local.oplog.$" ) == ns );
+        
+        BSONObj rid = curop.getClient()->getRemoteID();
+        if ( rid.isEmpty() )
+            return;
+
+        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
+    }
+
+    bool opReplicatedEnough( OpTime op , int w ){
+        return slaveTracking.opReplicatedEnough( op , w );
     }
 
     /* --------------------------------------------- */
@@ -735,7 +888,7 @@ namespace mongo {
                 ( replPair && replSettings.fastsync ) ) {
                 DBDirectClient c;
                 if ( c.exists( "local.oplog.$main" ) ) {
-                    BSONObj op = c.findOne( "local.oplog.$main", Query().sort( BSON( "$natural" << -1 ) ) );
+                    BSONObj op = c.findOne( "local.oplog.$main", QUERY( "op" << NE << "n" ).sort( BSON( "$natural" << -1 ) ) );
                     if ( !op.isEmpty() ) {
                         tmp.syncedTo = op[ "ts" ].date();
                         tmp._lastSavedLocalTs = op[ "ts" ].date();
@@ -1321,7 +1474,9 @@ namespace mongo {
                     {
                         dbtemprelease t;
                         if ( c->more() ) {
-                            continue;
+                            if ( getInitialSyncCompleted() ) { // if initial sync hasn't completed, break out of loop so we can set to completed or clone more dbs
+                                continue;
+                            }
                         } else {
                             setLastSavedLocalTs( nextLastSaved );
                         }
@@ -1390,7 +1545,7 @@ namespace mongo {
     }
 
 	BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
-
+    
 	bool replAuthenticate(DBClientConnection *conn) {
 		if( ! cc().isAdmin() ){
 			log() << "replauthenticate: requires admin permissions, failing\n";
@@ -1411,6 +1566,7 @@ namespace mongo {
 					return false;
 				}
 			}
+            
 		}
 
 		string u = user.getStringField("user");
@@ -1425,12 +1581,37 @@ namespace mongo {
 		return true;
 	}
 
+    bool replHandshake(DBClientConnection *conn) {
+        
+        BSONObj me;
+        {
+            dblock l;
+            if ( ! Helpers::getSingleton( "local.me" , me ) ){
+                BSONObjBuilder b;
+                b.appendOID( "_id" , 0 , true );
+                me = b.obj();
+                Helpers::putSingleton( "local.me" , me );
+            }
+        }
+        
+        BSONObjBuilder cmd;
+        cmd.appendAs( me["_id"] , "handshake" );
+
+        BSONObj res;
+        bool ok = conn->runCommand( "admin" , cmd.obj() , res );
+        // ignoring for now on purpose for older versions
+        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
+        return true;
+    }
+
     bool ReplSource::connect() {
         if ( conn.get() == 0 ) {
             conn = auto_ptr<DBClientConnection>(new DBClientConnection());
             string errmsg;
             ReplInfo r("trying to connect to sync source");
-            if ( !conn->connect(hostName.c_str(), errmsg) || !replAuthenticate(conn.get()) ) {
+            if ( !conn->connect(hostName.c_str(), errmsg) || 
+                 !replAuthenticate(conn.get()) ||
+                 !replHandshake(conn.get()) ) {
                 resetConnection();
                 log() << "repl:  " << errmsg << endl;
                 return false;
@@ -1527,8 +1708,12 @@ namespace mongo {
          thus, the slave does not need to copy down all the data when it sees this.
     */
     static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
-        if ( strncmp(ns, "local.", 6) == 0 )
+        if ( strncmp(ns, "local.", 6) == 0 ){
+            if ( strncmp(ns, "local.slaves", 12) == 0 ){
+                slaveTracking.reset();
+            }
             return;
+        }
 
         DEV assertInWriteLock();
 
@@ -1580,8 +1765,10 @@ namespace mongo {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
+        
+        context.getClient()->setLastOp( ts );
     }
-
+    
     static void logKeepalive() { 
         BSONObj obj;
         _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());
@@ -1620,6 +1807,7 @@ namespace mongo {
             ReplInfo r("replMain load sources");
             dblock lk;
             ReplSource::loadAll(sources);
+            replSettings.fastsync = false; // only need this param for initial reset
         }
 
         if ( sources.empty() ) {
@@ -1882,6 +2070,9 @@ namespace mongo {
             createOplog();
             boost::thread t(replMasterThread);
         }
+        
+        while( replSettings.fastsync ) // don't allow writes until we've set up from log
+            sleepmillis( 50 );
     }
 
     /* called from main at server startup */
@@ -1940,5 +2131,9 @@ namespace mongo {
             return true;
         }
     } cmdlogcollection;
+
+    // -------------------------------------
+
+
     
 } // namespace mongo

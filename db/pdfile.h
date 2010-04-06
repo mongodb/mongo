@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    class MDFHeader;
+    class DataFileHeader;
     class Extent;
     class Record;
     class Cursor;
@@ -56,7 +56,6 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    class MDFHeader;
     class MongoDataFile {
         friend class DataFileMgr;
         friend class BasicCursor;
@@ -70,7 +69,7 @@ namespace mongo {
         */
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
-        MDFHeader *getHeader() {
+        DataFileHeader *getHeader() {
             return header;
         }
 
@@ -83,9 +82,11 @@ namespace mongo {
         Extent* getExtent(DiskLoc loc);
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
+        Record* makeRecord(DiskLoc dl, int size);
 
-        MemoryMappedFile mmf;
-        MDFHeader *header;
+        MMF mmf;
+        MMF::Pointer _p;
+        DataFileHeader *header;
         int fileNo;
     };
 
@@ -119,6 +120,7 @@ namespace mongo {
 
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
+        static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
@@ -197,7 +199,9 @@ namespace mongo {
 
         int length;   /* size of the extent, including these fields */
         DiskLoc firstRecord, lastRecord;
-        char extentData[4];
+        char _extentData[4];
+
+        static int HeaderSize() { return sizeof(Extent)-4; }
 
         bool validates() {
             return !(firstRecord.isNull() ^ lastRecord.isNull()) &&
@@ -254,8 +258,7 @@ namespace mongo {
           ----------------------
     */
 
-    /* data file header */
-    class MDFHeader {
+    class DataFileHeader {
     public:
         int version;
         int versionMinor;
@@ -266,9 +269,7 @@ namespace mongo {
 
         char data[4];
 
-        static int headerSize() {
-            return sizeof(MDFHeader) - 4;
-        }
+        enum { HeaderSize = 8192 };
 
         bool currentVersion() const {
             return ( version == VERSION ) && ( versionMinor == VERSION_MINOR );
@@ -279,28 +280,28 @@ namespace mongo {
             return false;
         }
 
-        Record* getRecord(DiskLoc dl) {
+        /*Record* __getRecord(DiskLoc dl) {
             int ofs = dl.getOfs();
-            assert( ofs >= headerSize() );
+            assert( ofs >= HeaderSize );
             return (Record*) (((char *) this) + ofs);
-        }
+        }*/
 
         void init(int fileno, int filelength) {
             if ( uninitialized() ) {
                 assert(filelength > 32768 );
-                assert( headerSize() == 8192 );
+                assert( HeaderSize == 8192 );
                 fileLength = filelength;
                 version = VERSION;
                 versionMinor = VERSION_MINOR;
-                unused.setOfs( fileno, headerSize() );
-                assert( (data-(char*)this) == headerSize() );
-                unusedLength = fileLength - headerSize() - 16;
-                memcpy(data+unusedLength, "      \nthe end\n", 16);
+                unused.setOfs( fileno, HeaderSize );
+                assert( (data-(char*)this) == HeaderSize );
+                unusedLength = fileLength - HeaderSize - 16;
+                //memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
         }
         
         bool isEmpty() const {
-            return uninitialized() || ( unusedLength == fileLength - headerSize() - 16 );
+            return uninitialized() || ( unusedLength == fileLength - HeaderSize - 16 );
         }
     };
 
@@ -308,7 +309,7 @@ namespace mongo {
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
-        Extent *e = (Extent *) (((char *)header) + loc.getOfs());
+        Extent *e = (Extent *) _p.at(loc.getOfs(), Extent::HeaderSize());
         return e;
     }
 
@@ -325,7 +326,15 @@ namespace mongo {
 namespace mongo {
 
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
-        return header->getRecord(dl);
+        int ofs = dl.getOfs();
+        assert( ofs >= DataFileHeader::HeaderSize );
+        return (Record*) _p.at(ofs, -1);
+    }
+
+    inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
+        int ofs = dl.getOfs();
+        assert( ofs >= DataFileHeader::HeaderSize );
+        return (Record*) _p.at(ofs, size);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
@@ -445,6 +454,11 @@ namespace mongo {
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
         assert( dl.a() != -1 );
         return cc().database()->getFile(dl.a())->recordAt(dl);
+    }
+
+    inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) { 
+        assert( dl.a() != -1 );
+        return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, len);
     }
     
     void ensureHaveIdIndex(const char *ns);

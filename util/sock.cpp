@@ -22,6 +22,53 @@ namespace mongo {
 
     static mongo::mutex sock_mutex;
 
+    SockAddr::SockAddr(int sourcePort) {
+        memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
+        as<sockaddr_in>().sin_family = AF_INET;
+        as<sockaddr_in>().sin_port = htons(sourcePort);
+        as<sockaddr_in>().sin_addr.s_addr = htonl(INADDR_ANY);
+        addressSize = sizeof(sockaddr_in);
+    }
+
+    SockAddr::SockAddr(const char * iporhost , int port) {
+        if (strchr(iporhost, '/')){
+#ifdef _WIN32
+            uassert(13080, "no unix socket support on windows", false);
+#endif
+            uassert(13079, "path to unix socket too long", strlen(iporhost) < sizeof(as<sockaddr_un>().sun_path));
+            as<sockaddr_un>().sun_family = AF_UNIX;
+            strcpy(as<sockaddr_un>().sun_path, iporhost);
+            addressSize = sizeof(sockaddr_un);
+        }else if (strchr(iporhost, ':')){
+            as<sockaddr_in6>().sin6_family = AF_INET6;
+            as<sockaddr_in6>().sin6_port = htons(port);
+#ifdef _WIN32
+            uassert(13081, "No IPv6 support on windows", false);
+#else
+            inet_pton(AF_INET6, iporhost, &as<sockaddr_in6>().sin6_addr);
+#endif
+            addressSize = sizeof(sockaddr_in6);
+        } else {
+            string ip = hostbyname( iporhost );
+            memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
+            as<sockaddr_in>().sin_family = AF_INET;
+            as<sockaddr_in>().sin_port = htons(port);
+            as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
+            addressSize = sizeof(sockaddr_in);
+        }
+    }
+ 
+    bool SockAddr::isLocalHost() const {
+        switch (getType()){
+            case AF_INET: return getAddr() == "127.0.0.1";
+            case AF_INET6: return getAddr() == "::1";
+            case AF_UNIX: return true;
+            default: return false;
+        }
+        assert(false);
+        return false;
+    }
+
     string hostbyname(const char *hostname) {
         static string unknown = "0.0.0.0";
         if ( unknown == hostname )
@@ -40,6 +87,62 @@ namespace mongo {
         h = gethostbyname(hostname);
         if ( h == 0 ) return "";
         return inet_ntoa( *((struct in_addr *)(h->h_addr)) );
+    }
+
+    class UDPConnection {
+    public:
+        UDPConnection() {
+            sock = 0;
+        }
+        ~UDPConnection() {
+            if ( sock ) {
+                closesocket(sock);
+                sock = 0;
+            }
+        }
+        bool init(const SockAddr& myAddr);
+        int recvfrom(char *buf, int len, SockAddr& sender);
+        int sendto(char *buf, int len, const SockAddr& EndPoint);
+        int mtu(const SockAddr& sa) {
+            return sa.isLocalHost() ? 16384 : 1480;
+        }
+
+        SOCKET sock;
+    };
+
+    inline int UDPConnection::recvfrom(char *buf, int len, SockAddr& sender) {
+        return ::recvfrom(sock, buf, len, 0, sender.raw(), &sender.addressSize);
+    }
+
+    inline int UDPConnection::sendto(char *buf, int len, const SockAddr& EndPoint) {
+        if ( 0 && rand() < (RAND_MAX>>4) ) {
+            out() << " NOTSENT ";
+            return 0;
+        }
+        return ::sendto(sock, buf, len, 0, EndPoint.raw(), EndPoint.addressSize);
+    }
+
+    inline bool UDPConnection::init(const SockAddr& myAddr) {
+        sock = socket(myAddr.getType(), SOCK_DGRAM, IPPROTO_UDP);
+        if ( sock == INVALID_SOCKET ) {
+            out() << "invalid socket? " << OUTPUT_ERRNO << endl;
+            return false;
+        }
+        if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
+            out() << "udp init failed" << endl;
+            closesocket(sock);
+            sock = 0;
+            return false;
+        }
+        socklen_t optLen;
+        int rcvbuf;
+        if (getsockopt(sock,
+                       SOL_SOCKET,
+                       SO_RCVBUF,
+                       (char*)&rcvbuf,
+                       &optLen) != -1)
+            out() << "SO_RCVBUF:" << rcvbuf << endl;
+        return true;
     }
 
     void sendtest() {
@@ -79,131 +182,13 @@ namespace mongo {
                 dbexit( EXIT_NTSERVICE_ERROR );
             }
 #endif
-            //out() << "ntohl:" << ntohl(256) << endl;
-            //sendtest();
-            //listentest();
         }
     } sstests;
-
-#if 0
-    void smain() {
-
-        WSADATA wsaData;
-        SOCKET RecvSocket;
-        sockaddr_in RecvAddr;
-        int Port = 27015;
-        char RecvBuf[1024];
-        int  BufLen = 1024;
-        sockaddr_in SenderAddr;
-        int SenderAddrSize = sizeof(SenderAddr);
-
-        //-----------------------------------------------
-        // Initialize Winsock
-        WSAStartup(MAKEWORD(2,2), &wsaData);
-
-        //-----------------------------------------------
-        // Create a receiver socket to receive datagrams
-        RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        prebindOptions( RecvSocket );
-
-        //-----------------------------------------------
-        // Bind the socket to any address and the specified port.
-        RecvAddr.sin_family = AF_INET;
-        RecvAddr.sin_port = htons(Port);
-        RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-        ::bind(RecvSocket, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr));
-
-        //-----------------------------------------------
-        // Call the recvfrom function to receive datagrams
-        // on the bound socket.
-        printf("Receiving datagrams...\n");
-        recvfrom(RecvSocket,
-                 RecvBuf,
-                 BufLen,
-                 0,
-                 (SOCKADDR *)&SenderAddr,
-                 &SenderAddrSize);
-
-        //-----------------------------------------------
-        // Close the socket when finished receiving datagrams
-        printf("Finished receiving. Closing socket.\n");
-        closesocket(RecvSocket);
-
-        //-----------------------------------------------
-        // Clean up and exit.
-        printf("Exiting.\n");
-        WSACleanup();
-        return;
-    }
-
-
-
-
-    void xmain() {
-
-        WSADATA wsaData;
-        SOCKET RecvSocket;
-        sockaddr_in RecvAddr;
-        int Port = 27015;
-        char RecvBuf[1024];
-        int  BufLen = 1024;
-        sockaddr_in SenderAddr;
-        int SenderAddrSize = sizeof(SenderAddr);
-
-        //-----------------------------------------------
-        // Initialize Winsock
-        WSAStartup(MAKEWORD(2,2), &wsaData);
-
-        //-----------------------------------------------
-        // Create a receiver socket to receive datagrams
-
-        RecvSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        prebindOptions( RecvSocket );
-
-        //-----------------------------------------------
-        // Bind the socket to any address and the specified port.
-        RecvAddr.sin_family = AF_INET;
-        RecvAddr.sin_port = htons(Port);
-        RecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-        SockAddr a(Port);
-        ::bind(RecvSocket, (SOCKADDR *) &a.sa, a.addressSize);
-//  bind(RecvSocket, (SOCKADDR *) &RecvAddr, sizeof(RecvAddr));
-
-        SockAddr b;
-
-        //-----------------------------------------------
-        // Call the recvfrom function to receive datagrams
-        // on the bound socket.
-        printf("Receiving datagrams...\n");
-        recvfrom(RecvSocket,
-                 RecvBuf,
-                 BufLen,
-                 0,
-                 (SOCKADDR *) &b.sa, &b.addressSize);
-//    (SOCKADDR *)&SenderAddr,
-//    &SenderAddrSize);
-
-        //-----------------------------------------------
-        // Close the socket when finished receiving datagrams
-        printf("Finished receiving. Closing socket.\n");
-        closesocket(RecvSocket);
-
-        //-----------------------------------------------
-        // Clean up and exit.
-        printf("Exiting.\n");
-        WSACleanup();
-        return;
-    }
-
-#endif
 
     ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
     
     ListeningSockets* ListeningSockets::get(){
         return _instance;
     }
-
 
 } // namespace mongo

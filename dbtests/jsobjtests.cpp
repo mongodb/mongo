@@ -1420,6 +1420,16 @@ namespace JsobjTests {
         }
     };
 
+    class EmbeddedNumbers {
+    public:
+        void run(){
+            BSONObj x = BSON( "a" << BSON( "b" << 1 ) );
+            BSONObj y = BSON( "a" << BSON( "b" << 1.0 ) );
+            ASSERT_EQUALS( x , y );
+            ASSERT_EQUALS( 0 , x.woCompare( y ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1510,6 +1520,7 @@ namespace JsobjTests {
             add< checkForStorageTests >();
             add< InvalidIDFind >();
             add< ElementSetTest >();
+            add< EmbeddedNumbers >();
         }
     } myall;
     

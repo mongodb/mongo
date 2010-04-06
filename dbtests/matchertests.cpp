@@ -96,6 +96,14 @@ namespace MatcherTests {
         }
     };
 
+    class MixedNumericEmbedded {
+    public:
+        void run(){
+            Matcher m( BSON( "a" << BSON( "x" << 1 ) ) );
+            ASSERT( m.matches( BSON( "a" << BSON( "x" << 1 ) ) ) );
+            ASSERT( m.matches( BSON( "a" << BSON( "x" << 1.0 ) ) ) );
+        }
+    };
     
     class Size {
     public:
@@ -121,6 +129,7 @@ namespace MatcherTests {
             add< MixedNumericGt >();
             add< MixedNumericIN >();
             add< Size >();
+            add< MixedNumericEmbedded >();
         }
     } dball;
     

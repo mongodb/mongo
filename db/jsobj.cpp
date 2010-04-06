@@ -434,8 +434,12 @@ namespace mongo {
                 if ( fn[3] == 'a' && fn[4] == 'r' && fn[5] == 0 )
                     return BSONObj::opNEAR;
             }
-            else if ( fn[1] == 'm' && fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
-                return BSONObj::opMOD;
+            else if ( fn[1] == 'm' ){
+                if ( fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )
+                    return BSONObj::opMOD;
+                if ( fn[2] == 'a' && fn[3] == 'x' && fn[4] == 'D' && fn[5] == 'i' && fn[6] == 's' && fn[7] == 't' && fn[8] == 'a' && fn[9] == 'n' && fn[10] == 'c' && fn[11] == 'e' && fn[12] == 0 )
+                    return BSONObj::opMAX_DISTANCE;
+            }
             else if ( fn[1] == 't' && fn[2] == 'y' && fn[3] == 'p' && fn[4] == 'e' && fn[5] == 0 )
                 return BSONObj::opTYPE;
             else if ( fn[1] == 'i' && fn[2] == 'n' && fn[3] == 0 )
@@ -845,59 +849,45 @@ namespace mongo {
     }
 
     void BSONObj::getFieldsDotted(const char *name, BSONElementSet &ret ) const {
-        BSONObjIterator i(*this);
-        while ( i.more() ){
-            BSONElement e = i.next();
-            FieldCompareResult cmp = compareDottedFieldNames( name , e.fieldName() );
-            switch ( cmp ){
+        BSONElement e = getField( name );
+        if ( e.eoo() ) {
+            const char *p = strchr(name, '.');
+            if ( p ) {
+                string left(name, p-name);
+                const char* next = p+1;
+                BSONElement e = getField( left.c_str() );
 
-            case LEFT_BEFORE: 
-            case RIGHT_BEFORE:
-                break;
-
-            case RIGHT_SUBFIELD: 
-                assert(0); 
-                break;
-
-            case LEFT_SUBFIELD: {
-                const char * next = name + strlen( e.fieldName() ) + 1;
-                bool allDigits = false;
-                if ( isdigit( *next ) ){
-                    const char * temp = next + 1;
-                    while ( isdigit( *temp ) )
-                        temp++;
-                    allDigits = *temp == '.';
-                }
-
-                if ( e.type() == Object || allDigits ){
-                    e.embeddedObject().getFieldsDotted( next , ret );
-                }
-                else if ( e.type() == Array ){
-                    BSONObjIterator j( e.embeddedObject() );
-                    while ( j.more() ){
-                        BSONElement f = j.next();
-                        if ( f.type() == Object )
-                            f.embeddedObject().getFieldsDotted( next , ret );
+                if (e.type() == Object){
+                    e.embeddedObject().getFieldsDotted(next, ret);
+                } else if (e.type() == Array) {
+                    bool allDigits = false;
+                    if ( isdigit( *next ) ){
+                        const char * temp = next + 1;
+                        while ( isdigit( *temp ) )
+                            temp++;
+                        allDigits = *temp == '.';
                     }
+                    if (allDigits) {
+                        e.embeddedObject().getFieldsDotted(next, ret);
+                    } else {
+                        BSONObjIterator i(e.embeddedObject());
+                        while ( i.more() ){
+                            BSONElement e2 = i.next();
+                            if (e2.type() == Object || e2.type() == Array)
+                                e2.embeddedObject().getFieldsDotted(next, ret);
+                        }
+                    }
+                } else {
+                    // do nothing: no match
                 }
-                else {
-                    // intentially left blank, this means no match
-                }
-                return;
             }
-
-            case SAME: {
-                if ( e.type() == Array ){
-                    BSONObjIterator j( e.embeddedObject() );
-                    while ( j.more() )
-                        ret.insert( j.next() );
-                }
-                else {
-                    ret.insert( e );
-                }
-                return;
-            }
-
+        } else {
+            if (e.type() == Array){
+                BSONObjIterator i(e.embeddedObject());
+                while ( i.more() )
+                    ret.insert(i.next());
+            } else {
+                ret.insert(e);
             }
         }
     }

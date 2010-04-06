@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    extern bool noUnixSocket;
+
     class Message;
     class MessagingPort;
     class PiggyBackData;
@@ -31,16 +33,17 @@ namespace mongo {
     public:
         Listener(const string &_ip, int p) : ip(_ip), port(p) { }
         virtual ~Listener() {}
-        bool init(); // set up socket
-        int socket() const { return sock; }
-        void listen(); // never returns (start a thread)
+        void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
-        virtual void accepted(MessagingPort *mp) = 0;
+        virtual void accepted(int sock, const SockAddr& from);
+        virtual void accepted(MessagingPort *mp){
+            assert(!"You must overwrite one of the accepted methods");
+        }
+
     private:
         string ip;
         int port;
-        int sock;
     };
 
     class AbstractMessagingPort {
@@ -54,7 +57,7 @@ namespace mongo {
 
     class MessagingPort : public AbstractMessagingPort {
     public:
-        MessagingPort(int sock, SockAddr& farEnd);
+        MessagingPort(int sock, const SockAddr& farEnd);
         MessagingPort();
         virtual ~MessagingPort();
 
