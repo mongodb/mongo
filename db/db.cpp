@@ -666,7 +666,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
-        ("serviceName", po::value<std::wstring>(&windowsServiceName), "windows service name")
+        ("serviceName", po::value<string>(), "windows service name")
 #else
         ("nounixsocket", "disable listening on unix sockets")
 #endif
@@ -917,6 +917,16 @@ int main(int argc, char* argv[], char *envp[] )
             noUnixSocket = true;
         }
         
+#if defined(_WIN32)
+        if (params.count("serviceName")){
+            string x = params["serviceName"].as<string>();
+            windowsServiceName = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++)
+                windowsServiceName[i] = x[i];
+        }
+        #endif
+
+
         Module::configAll( params );
         dataFileSync.go();
 

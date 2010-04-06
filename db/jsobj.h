@@ -747,7 +747,7 @@ namespace mongo {
         /** Readable representation of a BSON object in an extended JSON-style notation. 
             This is an abbreviated representation which might be used for logging.
         */
-        string toString() const;
+        string toString( bool isArray = false ) const;
         operator string() const { return toString(); }
         
         /** Properly formatted JSON string. */

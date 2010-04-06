@@ -167,7 +167,7 @@ namespace mongo {
                 case AF_INET:  return inet_ntop(getType(), &as<sockaddr_in>().sin_addr, buffer, addressSize);
                 case AF_INET6: return inet_ntop(getType(), &as<sockaddr_in6>().sin6_addr, buffer, addressSize);
 #endif
-                case AF_UNIX:  return as<sockaddr_un>().sun_path;
+                case AF_UNIX:  return (addressSize > 2 ?as<sockaddr_un>().sun_path : "anonymous unix socket");
                 case AF_UNSPEC: return "(NONE)";
                 default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
             }
