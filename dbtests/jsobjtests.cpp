@@ -377,6 +377,14 @@ namespace JsobjTests {
 
             }
         };
+        
+        class ToStringArray {
+        public:
+            void run() {
+                string spec = "{ a: [ \"a\", \"b\" ] }";
+                ASSERT_EQUALS( spec, fromjson( spec ).toString() );
+            }
+        };
 
         namespace Validation {
 
@@ -1452,6 +1460,7 @@ namespace JsobjTests {
             add< BSONObjTests::AsTempObj >();
             add< BSONObjTests::AppendIntOrLL >();
             add< BSONObjTests::AppendNumber >();
+            add< BSONObjTests::ToStringArray >();
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
             add< BSONObjTests::Validation::Undefined >();
