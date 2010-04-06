@@ -9,8 +9,6 @@
 
 #include "wt_internal.h"
 
-static WT_BIN_INDX *
-	    __wt_bt_bin_init(WT_BIN_INDX *, u_int32_t);
 static int  __wt_bt_page_inmem_col_fix(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_col_int(WT_PAGE *);
 static int  __wt_bt_page_inmem_col_leaf(WT_PAGE *);
@@ -104,6 +102,10 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 	u_int32_t i;
 	void *bp, *ep;
 
+#ifdef HAVE_DIAGNOSTIC
+	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
+		(void)__wt_api_args(env, "Page.recycle");
+#endif
 	WT_ASSERT(env, F_ISSET(page, WT_MODIFIED) == 0);
 
 	switch (page->hdr->type) {
@@ -144,11 +146,6 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 		__wt_free(env, page->u.indx, 0);
 
 	__wt_free(env, page->hdr, page->bytes);
-
-#ifdef DIAGNOSTIC
-	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
-		(void)__wt_api_args(env, "Page.recycle");
-#endif
 	__wt_free(env, page, sizeof(WT_PAGE));
 }
 
@@ -159,23 +156,14 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page)
 static void
 __wt_bt_page_recycle_repl(ENV *env, WT_REPL *repl)
 {
-	WT_REPL *next;
 	u_int16_t i;
 
-	/*
-	 * We only free the data pointers in the top-level WT_REPL structure,
-	 * all data pointers in previous WT_REPL structures were copied into
-	 * the top-level structure as it was upgraded.
-	 */
+	/* Free the data pointers and then the WT_REPL structure itself. */
 	for (i = 0; i < repl->repl_next; ++i)
 		if (repl->data[i].data != WT_DATA_DELETED)
 			__wt_free(env, repl->data[i].data, repl->data[i].size);
-
-	/* Walk the WT_REPL list, freeing the replacement structures. */
-	do {
-		next = repl->next;
-		__wt_free(env, repl, sizeof(WT_REPL));
-	} while ((repl = next) != NULL);
+	__wt_free(env, repl->data, repl->repl_size * sizeof(WT_SDBT));
+	__wt_free(env, repl, sizeof(WT_REPL));
 }
 
 /*
@@ -545,88 +533,6 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 
 	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)p);
 	return (0);
-}
-
-/*
- * __wt_bt_bin_create --
- *	Create the in-memory binary tree for a page.
- */
-int
-__wt_bt_bin_create(WT_TOC *toc, WT_PAGE *page)
-{
-	DB *db;
-	ENV *env;
-	WT_BIN_INDX *bp;
-	WT_COL_INDX *cip;
-	WT_ROW_INDX *rip;
-	u_int32_t i;
-
-	db = toc->db;
-	env = toc->env;
-
-	/* Allocate the initial binary tree in one chunk of memory. */
-	WT_RET(__wt_calloc(
-	    env, page->indx_count, sizeof(WT_BIN_INDX), &page->bin));
-
-	/*
-	 * First, fill in the references to the underlying index array.   We
-	 * could do this at the same time we build the binary tree, but it's
-	 * a lot simpler to do in two passes than to complicate the recursive
-	 * function that builds the tree.
-	 */
-	bp = page->bin;
-	switch (page->hdr->type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		WT_INDX_FOREACH(page, rip, i) {
-			bp->indx = rip;
-			++bp;
-		}
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		WT_INDX_FOREACH(page, cip, i) {
-			bp->indx = cip;
-			++bp;
-		}
-		break;
-	WT_ILLEGAL_FORMAT(db);
-	}
-
-	/* Second, build the balanced binary tree. */
-	page->bin = __wt_bt_bin_init(page->bin, page->indx_count);
-
-	return (0);
-}
-
-/*
- * __wt_bt_bin_init --
- *	Routine to fill in the initial binary tree.
- */
-static WT_BIN_INDX *
-__wt_bt_bin_init(WT_BIN_INDX *base, u_int32_t n)
-{
-	WT_BIN_INDX *p;
-	u_int32_t c, l, r;
-
-	if (n == 1)
-		return (base);
-
-	c = (n + 1) / 2;			/* Center element */
-	p = &base[c - 1];			/* Middle pointer */
-
-	r = n - c;				/* Right count */
-	if (r != 0)
-		p->right = __wt_bt_bin_init(base + c, r);
-
-	l = (n - 1) - r;			/* Left count */
-	if (l != 0)
-		p->left = __wt_bt_bin_init(base, l);
-
-	return (p);
 }
 
 /*
