@@ -12,7 +12,6 @@
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_bt_debug_col_indx(WT_TOC *, WT_COL_INDX *, FILE *);
 static void __wt_bt_debug_desc(WT_PAGE *, FILE *);
-static int  __wt_bt_debug_inmem_tree(WT_TOC *, WT_BIN_INDX *, int, FILE *);
 static int  __wt_bt_debug_item(WT_TOC *, WT_ITEM *, FILE *);
 static int  __wt_bt_debug_item_data(WT_TOC *, WT_ITEM *, FILE *fp);
 static void __wt_bt_debug_page_col_fix(DB *, WT_PAGE *, FILE *);
@@ -207,20 +206,14 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		if (page->bin == NULL) {
-			WT_INDX_FOREACH(page, rip, i)
-				WT_RET(__wt_bt_debug_row_indx(toc, rip, fp));
-		} else
-			WT_RET(__wt_bt_debug_inmem_tree(toc, page->bin, 1, fp));
+		WT_INDX_FOREACH(page, rip, i)
+			WT_RET(__wt_bt_debug_row_indx(toc, rip, fp));
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-		if (page->bin == NULL) {
-			WT_INDX_FOREACH(page, cip, i)
-				__wt_bt_debug_col_indx(toc, cip, fp);
-		} else
-			WT_RET(__wt_bt_debug_inmem_tree(toc, page->bin, 0, fp));
+		WT_INDX_FOREACH(page, cip, i)
+			__wt_bt_debug_col_indx(toc, cip, fp);
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -231,25 +224,6 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	if (do_close)
 		(void)fclose(fp);
-
-	return (0);
-}
-
-/*
- * __wt_bt_debug_inmem_tree --
- *	Dump the WT_COL_INDX structures from the binary tree.
- */
-static int
-__wt_bt_debug_inmem_tree(WT_TOC *toc, WT_BIN_INDX *bin, int isrow, FILE *fp)
-{
-	if (bin->left != NULL)
-		WT_RET(__wt_bt_debug_inmem_tree(toc, bin->left, isrow, fp));
-	if (isrow)
-		WT_RET(__wt_bt_debug_row_indx(toc, bin->indx, fp));
-	else
-		__wt_bt_debug_col_indx(toc, bin->indx, fp);
-	if (bin->right != NULL)
-		WT_RET(__wt_bt_debug_inmem_tree(toc, bin->right, isrow, fp));
 
 	return (0);
 }
