@@ -14,9 +14,22 @@ from dist import source_paths_list
 # Read the source files and build a dictionary of handles and stat counters.
 import stat_class
 
+class Stat:
+	def __init__(self, config, str):
+		self.config = config
+		self.str = str
+
+# method_stats --
+#	Read the API class, and create statistics entries for each method.
+method_stats = {}
+import api_class
+api = api_class.methods
+for i in sorted(api.iteritems()):
+	method_stats[i[0].replace('.', '_').upper()] = Stat([], i[0])
+
 # print_def --
 #	Print the #defines for the stat.h file.
-def print_def(title, handle, list):
+def print_def(title, list):
 	def_cnt = 0
 	f.write('/*\n')
 	f.write(' * Statistics entries for ' + title + '.\n')
@@ -24,7 +37,7 @@ def print_def(title, handle, list):
 	for l in sorted(list.iteritems()):
 		n = 'WT_STAT_' + l[0]
 		f.write('#define\t' + n +
-		    "\t" * max(1, 4 - len(n) / 8) + "%5d" % def_cnt + '\n')
+		    "\t" * max(1, 5 - len(n) / 8) + "%5d" % def_cnt + '\n')
 		def_cnt += 1
 	f.write('\n')
 
@@ -41,11 +54,12 @@ for line in open('../inc_posix/stat.h', 'r'):
 	elif line.count('Statistics section: BEGIN'):
 		f.write('\n')
 		skip = 1
-		print_def('CACHE handle', 'CACHE', stat_class.cache_stats)
-		print_def('DB/IDB database', 'DATABASE', stat_class.idb_dstats)
-		print_def('DB/IDB handle', 'DB', stat_class.idb_stats)
-		print_def('ENV/IENV handle', 'ENV', stat_class.ienv_stats)
-		print_def('FH handle', 'FH', stat_class.fh_stats)
+		print_def('CACHE handle', stat_class.cache_stats)
+		print_def('DB/IDB database', stat_class.idb_dstats)
+		print_def('DB/IDB handle', stat_class.idb_stats)
+		print_def('ENV/IENV handle', stat_class.ienv_stats)
+		print_def('FH handle', stat_class.fh_stats)
+		print_def('Methods', method_stats)
 f.close()
 compare_srcfile(tmp_file, '../inc_posix/stat.h')
 
@@ -87,10 +101,14 @@ def print_func(handle, list):
 f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
+
 print_func('CACHE', stat_class.cache_stats)
 print_func('DATABASE', stat_class.idb_dstats)
 print_func('DB', stat_class.idb_stats)
 print_func('ENV', stat_class.ienv_stats)
 print_func('FH', stat_class.fh_stats)
+print_func('METHOD', method_stats)
+
 f.close()
+
 compare_srcfile(tmp_file, '../support/stat.c')

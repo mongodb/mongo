@@ -126,8 +126,8 @@ struct __wt_flist {
 	if (__fp == NULL || __fp->cnt == WT_FLIST_MAX)			\
 		__wt_flist_insert(toc, __p, __l);			\
 	else {								\
-		__fp->ref[__fp->cnt].p = __p;				\
-		__fp->ref[__fp->cnt].len = __l;				\
+		__fp->ref[__fp->cnt].p = (__p);				\
+		__fp->ref[__fp->cnt].len = (__l);			\
 		++__fp->cnt;						\
 	}								\
 	__p = NULL;							\
@@ -223,6 +223,7 @@ struct __ienv {
 	u_int32_t  page_gen;		/* Page cache LRU generation number */
 
 	WT_STATS *stats;		/* Environment handle statistics */
+	WT_STATS *method_stats;		/* Environment method statistics */
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_MTRACK *mtrack;		/* Memory tracking information */

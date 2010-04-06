@@ -27,6 +27,8 @@ __wt_env_stat_print(ENV *env, FILE *stream)
 	fprintf(stream, "Environment cache statistics:\n");
 	__wt_cache_stats(env);
 	__wt_stat_print(env, ienv->cache->stats, stream);
+	fprintf(stream, "Environment method statistics:\n");
+	__wt_stat_print(env, ienv->method_stats, stream);
 
 	TAILQ_FOREACH(idb, &ienv->dbqh, q)
 		WT_RET(__wt_db_stat_print(idb->db, stream));
@@ -50,8 +52,9 @@ __wt_env_stat_clear(ENV *env)
 	TAILQ_FOREACH(idb, &ienv->dbqh, q)
 		WT_TRET(__wt_db_stat_clear(idb->db));
 
-	__wt_stat_clear_cache_stats(ienv->cache->stats);
 	__wt_stat_clear_env_stats(ienv->stats);
+	__wt_stat_clear_cache_stats(ienv->cache->stats);
+	__wt_stat_clear_method_stats(ienv->method_stats);
 
 	return (ret);
 }

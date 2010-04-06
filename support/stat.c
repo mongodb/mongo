@@ -222,3 +222,154 @@ __wt_stat_clear_fh_stats(WT_STATS *stats)
 	stats[WT_STAT_READ_IO].v = 0;
 	stats[WT_STAT_WRITE_IO].v = 0;
 }
+
+int
+__wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
+{
+	WT_STATS *stats;
+
+	WT_RET(__wt_calloc(env, 64, sizeof(WT_STATS), &stats));
+
+	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
+	    "db.btree_compare_dup_get";
+	stats[WT_STAT_DB_BTREE_COMPARE_DUP_SET].desc =
+	    "db.btree_compare_dup_set";
+	stats[WT_STAT_DB_BTREE_COMPARE_GET].desc = "db.btree_compare_get";
+	stats[WT_STAT_DB_BTREE_COMPARE_INT_GET].desc =
+	    "db.btree_compare_int_get";
+	stats[WT_STAT_DB_BTREE_COMPARE_INT_SET].desc =
+	    "db.btree_compare_int_set";
+	stats[WT_STAT_DB_BTREE_COMPARE_SET].desc = "db.btree_compare_set";
+	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_GET].desc =
+	    "db.btree_dup_offpage_get";
+	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_SET].desc =
+	    "db.btree_dup_offpage_set";
+	stats[WT_STAT_DB_BTREE_ITEMSIZE_GET].desc = "db.btree_itemsize_get";
+	stats[WT_STAT_DB_BTREE_ITEMSIZE_SET].desc = "db.btree_itemsize_set";
+	stats[WT_STAT_DB_BTREE_PAGESIZE_GET].desc = "db.btree_pagesize_get";
+	stats[WT_STAT_DB_BTREE_PAGESIZE_SET].desc = "db.btree_pagesize_set";
+	stats[WT_STAT_DB_BULK_LOAD].desc = "db.bulk_load";
+	stats[WT_STAT_DB_CLOSE].desc = "db.close";
+	stats[WT_STAT_DB_COLUMN_SET].desc = "db.column_set";
+	stats[WT_STAT_DB_DEL].desc = "db.del";
+	stats[WT_STAT_DB_DUMP].desc = "db.dump";
+	stats[WT_STAT_DB_ERR].desc = "db.err";
+	stats[WT_STAT_DB_ERRCALL_GET].desc = "db.errcall_get";
+	stats[WT_STAT_DB_ERRCALL_SET].desc = "db.errcall_set";
+	stats[WT_STAT_DB_ERRFILE_GET].desc = "db.errfile_get";
+	stats[WT_STAT_DB_ERRFILE_SET].desc = "db.errfile_set";
+	stats[WT_STAT_DB_ERRPFX_GET].desc = "db.errpfx_get";
+	stats[WT_STAT_DB_ERRPFX_SET].desc = "db.errpfx_set";
+	stats[WT_STAT_DB_ERRX].desc = "db.errx";
+	stats[WT_STAT_DB_GET].desc = "db.get";
+	stats[WT_STAT_DB_GET_RECNO].desc = "db.get_recno";
+	stats[WT_STAT_DB_HUFFMAN_SET].desc = "db.huffman_set";
+	stats[WT_STAT_DB_OPEN].desc = "db.open";
+	stats[WT_STAT_DB_PUT].desc = "db.put";
+	stats[WT_STAT_DB_STAT_CLEAR].desc = "db.stat_clear";
+	stats[WT_STAT_DB_STAT_PRINT].desc = "db.stat_print";
+	stats[WT_STAT_DB_SYNC].desc = "db.sync";
+	stats[WT_STAT_DB_VERIFY].desc = "db.verify";
+	stats[WT_STAT_ENV_CACHE_HASH_SIZE_GET].desc =
+	    "env.cache_hash_size_get";
+	stats[WT_STAT_ENV_CACHE_HASH_SIZE_SET].desc =
+	    "env.cache_hash_size_set";
+	stats[WT_STAT_ENV_CACHE_SIZE_GET].desc = "env.cache_size_get";
+	stats[WT_STAT_ENV_CACHE_SIZE_SET].desc = "env.cache_size_set";
+	stats[WT_STAT_ENV_CLOSE].desc = "env.close";
+	stats[WT_STAT_ENV_DB].desc = "env.db";
+	stats[WT_STAT_ENV_ERR].desc = "env.err";
+	stats[WT_STAT_ENV_ERRCALL_GET].desc = "env.errcall_get";
+	stats[WT_STAT_ENV_ERRCALL_SET].desc = "env.errcall_set";
+	stats[WT_STAT_ENV_ERRFILE_GET].desc = "env.errfile_get";
+	stats[WT_STAT_ENV_ERRFILE_SET].desc = "env.errfile_set";
+	stats[WT_STAT_ENV_ERRPFX_GET].desc = "env.errpfx_get";
+	stats[WT_STAT_ENV_ERRPFX_SET].desc = "env.errpfx_set";
+	stats[WT_STAT_ENV_ERRX].desc = "env.errx";
+	stats[WT_STAT_ENV_HAZARD_SIZE_GET].desc = "env.hazard_size_get";
+	stats[WT_STAT_ENV_HAZARD_SIZE_SET].desc = "env.hazard_size_set";
+	stats[WT_STAT_ENV_MSGCALL_GET].desc = "env.msgcall_get";
+	stats[WT_STAT_ENV_MSGCALL_SET].desc = "env.msgcall_set";
+	stats[WT_STAT_ENV_MSGFILE_GET].desc = "env.msgfile_get";
+	stats[WT_STAT_ENV_MSGFILE_SET].desc = "env.msgfile_set";
+	stats[WT_STAT_ENV_OPEN].desc = "env.open";
+	stats[WT_STAT_ENV_STAT_CLEAR].desc = "env.stat_clear";
+	stats[WT_STAT_ENV_STAT_PRINT].desc = "env.stat_print";
+	stats[WT_STAT_ENV_TOC].desc = "env.toc";
+	stats[WT_STAT_ENV_TOC_SIZE_GET].desc = "env.toc_size_get";
+	stats[WT_STAT_ENV_TOC_SIZE_SET].desc = "env.toc_size_set";
+	stats[WT_STAT_ENV_VERBOSE_GET].desc = "env.verbose_get";
+	stats[WT_STAT_ENV_VERBOSE_SET].desc = "env.verbose_set";
+	stats[WT_STAT_WT_TOC_CLOSE].desc = "wt_toc.close";
+
+	*statsp = stats;
+	return (0);
+}
+
+void
+__wt_stat_clear_method_stats(WT_STATS *stats)
+{
+	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_COMPARE_DUP_SET].v = 0;
+	stats[WT_STAT_DB_BTREE_COMPARE_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_COMPARE_INT_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_COMPARE_INT_SET].v = 0;
+	stats[WT_STAT_DB_BTREE_COMPARE_SET].v = 0;
+	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_DUP_OFFPAGE_SET].v = 0;
+	stats[WT_STAT_DB_BTREE_ITEMSIZE_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_ITEMSIZE_SET].v = 0;
+	stats[WT_STAT_DB_BTREE_PAGESIZE_GET].v = 0;
+	stats[WT_STAT_DB_BTREE_PAGESIZE_SET].v = 0;
+	stats[WT_STAT_DB_BULK_LOAD].v = 0;
+	stats[WT_STAT_DB_CLOSE].v = 0;
+	stats[WT_STAT_DB_COLUMN_SET].v = 0;
+	stats[WT_STAT_DB_DEL].v = 0;
+	stats[WT_STAT_DB_DUMP].v = 0;
+	stats[WT_STAT_DB_ERR].v = 0;
+	stats[WT_STAT_DB_ERRCALL_GET].v = 0;
+	stats[WT_STAT_DB_ERRCALL_SET].v = 0;
+	stats[WT_STAT_DB_ERRFILE_GET].v = 0;
+	stats[WT_STAT_DB_ERRFILE_SET].v = 0;
+	stats[WT_STAT_DB_ERRPFX_GET].v = 0;
+	stats[WT_STAT_DB_ERRPFX_SET].v = 0;
+	stats[WT_STAT_DB_ERRX].v = 0;
+	stats[WT_STAT_DB_GET].v = 0;
+	stats[WT_STAT_DB_GET_RECNO].v = 0;
+	stats[WT_STAT_DB_HUFFMAN_SET].v = 0;
+	stats[WT_STAT_DB_OPEN].v = 0;
+	stats[WT_STAT_DB_PUT].v = 0;
+	stats[WT_STAT_DB_STAT_CLEAR].v = 0;
+	stats[WT_STAT_DB_STAT_PRINT].v = 0;
+	stats[WT_STAT_DB_SYNC].v = 0;
+	stats[WT_STAT_DB_VERIFY].v = 0;
+	stats[WT_STAT_ENV_CACHE_HASH_SIZE_GET].v = 0;
+	stats[WT_STAT_ENV_CACHE_HASH_SIZE_SET].v = 0;
+	stats[WT_STAT_ENV_CACHE_SIZE_GET].v = 0;
+	stats[WT_STAT_ENV_CACHE_SIZE_SET].v = 0;
+	stats[WT_STAT_ENV_CLOSE].v = 0;
+	stats[WT_STAT_ENV_DB].v = 0;
+	stats[WT_STAT_ENV_ERR].v = 0;
+	stats[WT_STAT_ENV_ERRCALL_GET].v = 0;
+	stats[WT_STAT_ENV_ERRCALL_SET].v = 0;
+	stats[WT_STAT_ENV_ERRFILE_GET].v = 0;
+	stats[WT_STAT_ENV_ERRFILE_SET].v = 0;
+	stats[WT_STAT_ENV_ERRPFX_GET].v = 0;
+	stats[WT_STAT_ENV_ERRPFX_SET].v = 0;
+	stats[WT_STAT_ENV_ERRX].v = 0;
+	stats[WT_STAT_ENV_HAZARD_SIZE_GET].v = 0;
+	stats[WT_STAT_ENV_HAZARD_SIZE_SET].v = 0;
+	stats[WT_STAT_ENV_MSGCALL_GET].v = 0;
+	stats[WT_STAT_ENV_MSGCALL_SET].v = 0;
+	stats[WT_STAT_ENV_MSGFILE_GET].v = 0;
+	stats[WT_STAT_ENV_MSGFILE_SET].v = 0;
+	stats[WT_STAT_ENV_OPEN].v = 0;
+	stats[WT_STAT_ENV_STAT_CLEAR].v = 0;
+	stats[WT_STAT_ENV_STAT_PRINT].v = 0;
+	stats[WT_STAT_ENV_TOC].v = 0;
+	stats[WT_STAT_ENV_TOC_SIZE_GET].v = 0;
+	stats[WT_STAT_ENV_TOC_SIZE_SET].v = 0;
+	stats[WT_STAT_ENV_VERBOSE_GET].v = 0;
+	stats[WT_STAT_ENV_VERBOSE_SET].v = 0;
+	stats[WT_STAT_WT_TOC_CLOSE].v = 0;
+}

@@ -101,6 +101,7 @@ __wt_ienv_config_default(ENV *env)
 
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_env_stats(env, &ienv->stats));
+	WT_RET(__wt_stat_alloc_method_stats(env, &ienv->method_stats));
 
 	/* Diagnostic output separator. */
 	ienv->sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=";
@@ -135,6 +136,7 @@ __wt_ienv_destroy(ENV *env, int refresh)
 	__wt_free(env, ienv->toc_array, 0);
 	__wt_free(env, ienv->hazard, 0);
 	__wt_free(env, ienv->stats, 0);
+	__wt_free(env, ienv->method_stats, 0);
 
 #ifdef HAVE_DIAGNOSTIC
 	/* If we're tracking memory, check to see if everything was free'd. */

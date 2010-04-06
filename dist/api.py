@@ -171,12 +171,13 @@ def func_method_getset(a, f):
 	# return value.
 	if handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
+	f.write('\tIENV *ienv = env->ienv;\n')
 	if handcode:
 		f.write('\tint ret;\n')
 	if handle != 'env' or handcode:
 		f.write('\n')
 
-	# If we have a "flags" argument to a setter fucntion, check it
+	# If we have a "flags" argument to a setter function, check it
 	# before we continue.
 	if config.count('setter'):
 		for l in args:
@@ -198,10 +199,15 @@ def func_method_getset(a, f):
 		for l in args:
 			s += ', ' + l.split('/')[0]
 		s += ')'
-		f.write(s + '));\n\n')
+		f.write(s + '));\n')
 
 	# getter/setter implies ienvlock: lock the data structure.
-	f.write('\t__wt_lock(env, env->ienv->mtx);\n')
+	f.write('\t__wt_lock(env, ienv->mtx);\n')
+
+	# Count the call.
+	s = a.handle + '_' + a.method
+	f.write(
+	    '\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
 
 	# If the function is hand-coded, just call it.
 	if handcode:
@@ -224,7 +230,7 @@ def func_method_getset(a, f):
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 
 	# getter/setter implies ienvlock: unlock the data structure.
-	f.write('\t__wt_unlock(env->ienv->mtx);\n')
+	f.write('\t__wt_unlock(ienv->mtx);\n')
 	f.write('\treturn (')
 	if handcode:
 		f.write('ret')
@@ -262,22 +268,27 @@ def func_method(a, f):
 		    handle.upper() + '.' + method + '";\n')
 	if (flagchk or locking) and handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
+	f.write('\tIENV *ienv = env->ienv;\n')
 	f.write('\tint ret;\n\n')
 
 	if flagchk:
 		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
-		    handle.upper() + '_' + method.upper() + ');\n\n')
+		    handle.upper() + '_' + method.upper() + ');\n')
 
 	# If the method is illegal for read-only databases, check that.
 	if rdonly:
-		f.write('\tWT_DB_RDONLY(db, method_name);\n\n')
+		f.write('\tWT_DB_RDONLY(db, method_name);\n')
 
 	# If entering the API with a WT_TOC handle, set the generation number.
 	if toc_handle:
 		f.write('\tWT_TOC_SET_GEN(toc);\n')
 
 	if locking:
-		f.write('\t__wt_lock(env, env->ienv->mtx);\n')
+		f.write('\t__wt_lock(env, ienv->mtx);\n')
+
+	# Count the call.
+	s = a.handle + '_' + a.method
+	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
 
 	f.write('\t')
 	if restart:
@@ -292,7 +303,7 @@ def func_method(a, f):
 	else:
 		f.write(');\n')
 	if locking:
-		f.write('\t__wt_unlock(env->ienv->mtx);\n')
+		f.write('\t__wt_unlock(ienv->mtx);\n')
 	# If entering the API with a WT_TOC handle, clear the generation number.
 	if toc_handle:
 		f.write('\tWT_TOC_CLR_GEN(toc);\n')

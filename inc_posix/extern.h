@@ -365,3 +365,7 @@ int
 __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp);
 void
 __wt_stat_clear_fh_stats(WT_STATS *stats);
+int
+__wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp);
+void
+__wt_stat_clear_method_stats(WT_STATS *stats);
