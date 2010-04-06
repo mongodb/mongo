@@ -98,52 +98,57 @@ __wt_workq_srvr(void *arg)
  *	Swap in a new WT_PAGE replacement array.
  */
 int
-__wt_workq_repl(WT_TOC *toc, WT_REPL **orig, WT_REPL *new)
+__wt_workq_repl(WT_TOC *toc, WT_REPL *orig, WT_REPL *new, WT_REPL **rp)
 {
-	ENV *env;
 	WT_REPL *repl;
-	int ret;
 
-	env = toc->env;
-	repl = *orig;
-	ret = 0;
+	repl = *rp;
 
 	/*
-	 * The WorkQ thread updates the WT_REPL replacement structure so writes
-	 * to an existing key/data item are serialized.   Callers have already
-	 * allocated memory for the update and copied the previous replacement
-	 * structure's contents into that memory.
+	 * The WorkQ thread updates WT_REPL replacement structures, serializing
+	 * changes to existing key/data items.   Callers have already allocated
+	 * memory for the update and copied the previous structure's contents
+	 * into that memory.
 	 *
-	 * It's easy the first time -- just fill stuff in.
+	 * If there's no existing replacement structure, ours is good, use it.
 	 */
-	if (repl == NULL) {
-		*orig = new;
-		return (0);
+	if (repl != NULL) {
+		/*
+		 * If we don't reference the current replacement structure, it
+		 * was replaced while we waited.   Our replacement is useless,
+		 * discard it.
+		 */
+		if (orig != repl) {
+			WT_FLIST_INSERT(
+			    toc, new->data, new->repl_size * sizeof(WT_SDBT));
+			WT_FLIST_INSERT(toc, new, sizeof(WT_REPL));
+
+			/*
+			 * Two threads might try to update the same item, and
+			 * race while waiting for the WorkQ thread.  Even if
+			 * we raced, if there's a free slot in the current
+			 * WT_REPL structure (another thread updated the entry,
+			 * and there's room for our caller's change), return
+			 * success, our caller can use the empty slot.
+			 */
+			if (repl->data[repl->repl_next].data == NULL)
+				return (0);
+
+			return (WT_RESTART);
+		}
 	}
 
-	/*
-	 * Two threads might try to update the same item, and race while waiting
-	 * for the WorkQ thread.  Even if we raced, if there's an empty slot in
-	 * the current WT_REPL structure (another thread updated the entry, and
-	 * there's room for our caller's change), we return success, our caller
-	 * can use that empty slot, there's no need to restart the operation.
-	 */
-	if (repl->data[repl->repl_next].data == NULL)
-		goto err;
-	if (new->next != repl) {
-		ret = WT_RESTART;
-
-err:		__wt_free(env, new->data, new->repl_size * sizeof(WT_SDBT));
-		__wt_free(env, new, sizeof(WT_REPL));
-		return (ret);
+	if (repl != NULL) {
+		WT_FLIST_INSERT(toc,
+		    repl->data, repl->repl_size * sizeof(WT_SDBT));
+		WT_FLIST_INSERT(toc, repl, sizeof(WT_REPL));
 	}
-
 
 	/*
 	 * Update the WT_REPL structure and flush the change to the rest of the
 	 * system.
 	 */
-	*orig = new;
+	*rp = new;
 	WT_MEMORY_FLUSH;
 
 	return (0);
