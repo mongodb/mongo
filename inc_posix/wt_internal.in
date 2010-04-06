@@ -65,6 +65,11 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 /*******************************************
  * Default values -- grouped together so it's obvious what to re-configure.
  *******************************************/
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_CACHE_ENTRY_DEFAULT	(5)	/* Default cache allocation unit */
+#else
+#define	WT_CACHE_ENTRY_DEFAULT	(40)	/* Default cache allocation unit */
+#endif
 #define	WT_CACHE_SIZE_DEFAULT	(20)	/* Default cache size in MB */
 #define	WT_HAZARD_SIZE_DEFAULT	(15)	/* Default number of hazard refs */
 #define	WT_TOC_SIZE_DEFAULT	(50)	/* Default number of TOCs */
@@ -85,6 +90,15 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 	(toc)->db = NULL;						\
 	(toc)->name = NULL;						\
 } while (0)
+
+/*
+ * Set/clear the WT_TOC's generation number; done in the API level, as well as
+ * periodically by long-running operations.
+ */
+#define	WT_TOC_CLR_GEN(toc)						\
+	(toc)->gen = UINT32_MAX
+#define	WT_TOC_SET_GEN(toc)						\
+	(toc)->gen = (toc)->env->ienv->api_gen
 
 /*******************************************
  * Memory reference tracking information.

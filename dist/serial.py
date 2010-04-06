@@ -12,13 +12,7 @@ from dist import compare_srcfile
 
 serial = {}
 serial['bt_del'] = [
-	'WT_ROW_INDX */indx',
-	'WT_REPL */repl']
-
-serial['bt_insert'] = [
-	'WT_BIN_INDX */bp',
-	'WT_BIN_INDX */new',
-	'int/isleft']
+	'WT_REPL */new']
 
 serial['bt_repl'] = [
 	'WT_ROW_INDX */indx',
