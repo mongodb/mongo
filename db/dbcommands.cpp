@@ -57,12 +57,13 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; } 
+        virtual LockType locktype(){ return NONE; } 
         virtual void help( stringstream& help ) const {
             help << "shutdown the database.  must be ran against admin db and either (1) ran from localhost or (2) authenticated.\n";
         }
         CmdShutdown() : Command("shutdown") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            dblock l;
             cc().shutdown();
             log() << "terminating, shutdown command received" << endl;
             dbexit( EXIT_CLEAN ); // this never returns
