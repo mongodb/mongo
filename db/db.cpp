@@ -65,7 +65,7 @@ namespace mongo {
     extern string repairpath;
 
 #if defined(_WIN32)
-    string windowsServiceName = "MongoDB";
+    std::wstring windowsServiceName = "MongoDB";
 #endif
 
     void setupSignals();
@@ -666,7 +666,7 @@ int main(int argc, char* argv[], char *envp[] )
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
-        ("serviceName", po::value<string>(&windowsServiceName), "windows service name")
+        ("serviceName", po::value<std::wstring>(&windowsServiceName), "windows service name")
 #else
         ("nounixsocket", "disable listening on unix sockets")
 #endif
@@ -960,17 +960,17 @@ int main(int argc, char* argv[], char *envp[] )
 
 #if defined(_WIN32)
         if ( installService ) {
-            if ( !ServiceController::installService( windowsServiceName.c_str() , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( removeService ) {
-            if ( !ServiceController::removeService( windowsServiceName.c_str() ) )
+            if ( !ServiceController::removeService( windowsServiceName ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( startService ) {
-            if ( !ServiceController::startService( windowsServiceName.c_str() , mongo::initService ) )
+            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
