@@ -310,6 +310,7 @@ again:
         int z = (len+1023)&0xfffffc00;
         assert(z>=len);
         MsgData *md = (MsgData *) malloc(z);
+        assert(md);
         md->len = len;
 
         if ( len <= 0 ) {
