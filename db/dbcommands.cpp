@@ -1740,6 +1740,18 @@ namespace mongo {
         DBDirectClient _db;
     } dbhashCmd;
     
+    class PingCommand : public Command {
+    public:
+        PingCommand() : Command( "ping" ){}
+        virtual bool slaveOk() { return true; }
+        virtual LockType locktype() { return NONE; }
+        virtual bool requiresAuth() { return false; }
+        virtual bool run(const char * badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            // IMPORTANT: Don't put anything in here that might lock db - including authentication
+            return true;
+        }
+    } pingCmd;
+    
     /** 
      * this handles
      - auth
