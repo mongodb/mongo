@@ -109,6 +109,12 @@ __wt_bt_bulk_fix(DB *db,
 		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
 
 		/*
+		 * Bulk load is a long-running operation, update the generation
+		 * number so we don't tie memory down.
+		 */
+		WT_TOC_SET_GEN(toc);
+
+		/*
 		 * If doing repeat compression, check to see if this record
 		 * matches the last data inserted.   If there's a match try
 		 * and increment that item's repeat count instead of entering
@@ -281,6 +287,12 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 		if (f != NULL && ++insert_cnt % 100 == 0)
 			f("Db.bulk_load", insert_cnt);
 		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
+
+		/*
+		 * Bulk load is a long-running operation, update the generation
+		 * number so we don't tie memory down.
+		 */
+		WT_TOC_SET_GEN(toc);
 
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
