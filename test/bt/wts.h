@@ -46,6 +46,7 @@ typedef struct {
 	void *bdb_db;				/* BDB DB handle */
 
 	void *wts_db;				/* WT DB handle */
+	void *wts_toc;				/* WT WT_TOC handle */
 	FILE *logfp;				/* WT log file stream */
 
 	enum                                    /* Dumps */
@@ -70,27 +71,28 @@ typedef struct {
 	u_int32_t c_key_max;
 	u_int32_t c_key_min;
 	u_int32_t c_leaf_node;
+	u_int32_t c_ops;
 	u_int32_t c_rand_seed;
-	u_int32_t c_read_ops;
+	u_int32_t c_read_pct;
 	u_int32_t c_repeat_comp;
 	u_int32_t c_repeat_comp_pct;
 	u_int32_t c_runs;
 	u_int32_t c_total;
-	u_int32_t c_write_ops;
 
 	u_int32_t key_cnt;			/* Keys loaded so far */
 	u_int16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
+int	 bdb_del(void *, u_int32_t, int *);
 void	 bdb_insert(void *, u_int32_t, void *, u_int32_t);
-int	 bdb_read_key(void *, u_int32_t, void *, u_int32_t *);
-int	 bdb_read_recno(u_int64_t, void *, u_int32_t *, void *, u_int32_t *);
+int	 bdb_read_key(void *, u_int32_t, void *, u_int32_t *, int *);
+int	 bdb_read_recno(u_int64_t, void *, u_int32_t *);
 void	 bdb_setup(int);
 void	 bdb_teardown(void);
+void	 config(void);
 void	 config_dump(int);
 void	 config_file(char *);
-void	 config(void);
 void	 config_names(void);
 void	 config_single(char *);
 void	 data_gen(DBT *);
@@ -98,8 +100,13 @@ char	*fname(const char *, const char *);
 void	 key_gen(DBT *, u_int64_t);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);
-int	 wts_read_key(void);
-int	 wts_read_recno(void);
+int	 wts_del(u_int64_t);
+int	 wts_ops(void);
+int	 wts_read_row(u_int64_t);
+int	 wts_read_row_scan(void);
+int	 wts_read_col(u_int64_t);
+int	 wts_read_col_scan(void);
 int	 wts_setup(int, int);
 int	 wts_stats(void);
 void	 wts_teardown(void);
+int	 wts_verify(void);

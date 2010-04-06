@@ -23,7 +23,7 @@ bdb_setup(int reopen)
 	assert(dbenv->set_cachesize(dbenv, 0, 50 * 1024 * 1024, 1) == 0);
 	assert(dbenv->open(dbenv, NULL,
 	    DB_CREATE |
-	    (g.c_write_ops != 0 ? DB_INIT_LOCK : 0) |
+	    (g.c_read_pct == 100 ? 0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 	if (g.c_duplicates)
@@ -57,13 +57,11 @@ void
 bdb_insert(
     void *key_data, u_int32_t key_size, void *data_data, u_int32_t data_size)
 {
-	DBT key, data;
+	static DBT key, data;
 	DB *db;
 
-	memset(&key, 0, sizeof(DBT));
 	key.data = key_data;
 	key.size = key_size;
-	memset(&data, 0, sizeof(DBT));
 	data.data = data_data;
 	data.size = data_size;
 
@@ -73,20 +71,24 @@ bdb_insert(
 }
 
 int
-bdb_read_key(void *key_data, u_int32_t key_size, void *datap, u_int32_t *sizep)
+bdb_read_key(void *key_data,
+    u_int32_t key_size, void *datap, u_int32_t *sizep, int *notfoundp)
 {
-	DBT key, data;
+	static DBT key, data;
 	DB *db;
 	int ret;
 
-	memset(&key, 0, sizeof(DBT));
+	*notfoundp = 0;
 	key.data = key_data;
 	key.size = key_size;
-	memset(&data, 0, sizeof(DBT));
 
 	db = g.bdb_db;
 
 	if ((ret = db->get(db, NULL, &key, &data, 0)) != 0) {
+		if (ret == DB_NOTFOUND) {
+			*notfoundp = 1;
+			return (0);
+		}
 		db->err(db, ret,
 		    "bdb_read_key: {%.*s}", (int)key_size, (char *)key_data);
 		return (1);
@@ -97,19 +99,16 @@ bdb_read_key(void *key_data, u_int32_t key_size, void *datap, u_int32_t *sizep)
 }
 
 int
-bdb_read_recno(u_int64_t arg_recno,
-    void *keyp, u_int32_t *key_sizep, void *datap, u_int32_t *data_sizep)
+bdb_read_recno(u_int64_t arg_recno, void *datap, u_int32_t *data_sizep)
 {
-	DBT key, data;
+	static DBT key, data;
 	DB *db;
 	u_int32_t recno;
 	int ret;
 
-	memset(&key, 0, sizeof(DBT));
 	recno = (u_int32_t)arg_recno;
 	key.data = &recno;
 	key.size = sizeof(recno);
-	memset(&data, 0, sizeof(DBT));
 
 	db = g.bdb_db;
 
@@ -117,9 +116,33 @@ bdb_read_recno(u_int64_t arg_recno,
 		db->err(db, ret, "bdb_read_recno: %llu", arg_recno);
 		return (1);
 	}
-	*(void **)keyp = key.data;
-	*key_sizep = key.size;
 	*(void **)datap = data.data;
 	*data_sizep = data.size;
+	return (0);
+}
+
+int
+bdb_del(void *key_data, u_int32_t key_size, int *notfoundp)
+{
+	static DBT key;
+	DB *db;
+	int ret;
+
+	*notfoundp = 0;
+
+	key.data = key_data;
+	key.size = key_size;
+
+	db = g.bdb_db;
+
+	if ((ret = db->del(db, NULL, &key, 0)) != 0) {
+		if (ret == DB_NOTFOUND) {
+			*notfoundp = 1;
+			return (0);
+		}
+		db->err(db, ret,
+		    "bdb_read_key: {%.*s}", (int)key_size, (char *)key_data);
+		return (1);
+	}
 	return (0);
 }

@@ -67,11 +67,6 @@ config(void)
 	for (cp = c; cp->name != NULL; ++cp)
 		if (!(cp->flags & (C_FIXED | C_IGNORE)))
 			*cp->v = CONF_RAND(cp);
-
-	/* Specials. */
-	cp = config_find("write_ops");
-	if (!(cp->flags & (C_FIXED | C_IGNORE)))
-		g.c_write_ops = 100 - g.c_read_ops;
 }
 
 /*

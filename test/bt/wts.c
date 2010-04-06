@@ -18,6 +18,7 @@ wts_setup(int reopen, int logfile)
 {
 	ENV *env;
 	DB *db;
+	WT_TOC *toc;
 	u_int32_t intl_size, leaf_size;
 	int ret;
 	char *p;
@@ -41,7 +42,7 @@ wts_setup(int reopen, int logfile)
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
-		env->verbose_set(env, WT_VERB_ALL);
+		env->verbose_set(env, WT_VERB_CACHE | WT_VERB_SERVERS);
 		env->msgfile_set(env, g.logfp);
 	}
 
@@ -96,13 +97,24 @@ wts_setup(int reopen, int logfile)
 		return (1);
 	}
 
+	if ((ret = db->env->toc(db->env, 0, &toc)) != 0) {
+		db->err(db, ret, "Env.toc");
+		return (1);
+	}
+
 	g.wts_db = db;
+	g.wts_toc = toc;
 	return (0);
 }
 
 void
 wts_teardown()
 {
+	WT_TOC *toc;
+
+	toc = g.wts_toc;
+
+	assert(toc->close(toc, 0) == 0);
 	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
 
 	if (g.logfp != NULL)
@@ -147,6 +159,17 @@ wts_bulk_load()
 		}
 		(void)fclose(fp);
 	}
+
+	return (0);
+}
+
+int
+wts_verify()
+{
+	DB *db;
+	int ret;
+
+	db = g.wts_db;
 
 	if ((ret = db->verify(db, track, 0)) != 0) {
 		db->err(db, ret, "Db.verify");
@@ -232,151 +255,227 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 }
 
 /*
- * wts_read_key --
- *	Read random database entries by key.
+ * wts_ops --
+ *	Perform a number of operations.
  */
 int
-wts_read_key()
+wts_ops()
 {
-	DB *db;
-	DBT key, data, bdb_data;
-	ENV *env;
-	WT_TOC *toc;
-	u_int64_t cnt, last_cnt;
-	int ret;
+	u_int64_t keyno;
+	u_int cnt;
 
-	db = g.wts_db;
-	env = db->env;
+	for (cnt = 0; cnt < g.c_ops; ++cnt) {
+		/*
+		 * Perform some number of read/write operations.  Deletes are
+		 * not separately configured, they're a fixed percent of write
+		 * operations.
+		 */
+		keyno = MMRAND(1, g.c_total);
+		if ((u_int32_t)rand() % 100 <= g.c_read_pct) {
+			switch (g.c_database_type) {
+			case ROW:
+				if (wts_read_row(keyno))
+					return (1);
+				break;
+			case FIX:
+			case VAR:
+				if (wts_read_col(keyno))
+					return (1);
+				break;
+			}
+		} else if (rand() % 100 <= 5) {
+			if (wts_del(keyno))
+				return (1);
+		}
 
-	memset(&key, 0, sizeof(key));
-	memset(&data, 0, sizeof(data));
-
-	if ((ret = env->toc(env, 0, &toc)) != 0) {
-		env->err(env, ret, "Env.toc");
-		return (1);
+		if (cnt % 1000 == 0)
+			track("read/write ops", cnt);
 	}
+	return (0);
+}
+
+/*
+ * wts_read_key_scan --
+ *	Read some number of row database entries by record key.
+ */
+int
+wts_read_row_scan()
+{
+	u_int64_t cnt, last_cnt;
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
 		cnt += rand() % 17 + 1;
-		if (cnt > g.key_cnt)
-			cnt = g.key_cnt;
+		if (cnt > g.c_total)
+			cnt = g.c_total;
 		if (cnt - last_cnt > 1000) {
-			track("read key", cnt);
+			track("read row scan", cnt);
 			last_cnt = cnt;
 		}
 
-		/* Retrieve the key/data pair by key. */
-		key_gen(&key, cnt);
-		if ((ret = db->get(db, toc, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret,
-			    "wts_read_key: read row %llu by key", cnt);
+		if (wts_read_row(cnt))
 			return (1);
-		}
+	}
+	return (0);
+}
 
-		/* Retrieve the BDB data item. */
-		if (bdb_read_key(
-		    key.data, key.size, &bdb_data.data, &bdb_data.size))
-			return (1);
+/*
+ * wts_read_row --
+ *	Read and verify a single row database record by key.
+ */
+int
+wts_read_row(u_int64_t keyno)
+{
+	static DBT key, data, bdb_data;
+	DB *db;
+	ENV *env;
+	WT_TOC *toc;
+	int ret, notfound;
 
-		/* Compare the two. */
-		if (data.size != bdb_data.size ||
-		    memcmp(data.data, bdb_data.data, data.size) != 0) {
-			fprintf(stderr,
-			    "wts_read_key: read row %llu by key:\n", cnt);
-			__wt_bt_debug_dbt("\tbdb", &bdb_data, stderr);
-			__wt_bt_debug_dbt("\twt", &data, stderr);
-			return (1);
-		}
+	db = g.wts_db;
+	toc = g.wts_toc;
+	env = db->env;
+
+	key_gen(&key, keyno);
+
+	/* Retrieve the BDB data item. */
+	if (bdb_read_key(
+	    key.data, key.size, &bdb_data.data, &bdb_data.size, &notfound))
+		return (1);
+
+	/* Retrieve the key/data pair by key. */
+	if ((ret = db->get(
+	    db, toc, &key, NULL, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+		env->err(env, ret,
+		    "wts_read_key: read row %llu by key", keyno);
+		return (1);
 	}
 
-	if ((ret = toc->close(toc, 0)) != 0) {
-		env->err(env, ret, "Toc.close");
+	/* Check for not found status. */
+	if (notfound) {
+		if (ret == WT_NOTFOUND)
+			return (0);
+		env->errx(env, "WT returned deleted row %llu", keyno);
+		return (1);
+	}
+	if (ret != 0) {
+		env->errx(env,
+		    "WT returned existing row %llu as deleted", keyno);
+		return (1);
+	} 
+
+	/* Compare the two. */
+	if (data.size != bdb_data.size ||
+	    memcmp(data.data, bdb_data.data, data.size) != 0) {
+		fprintf(stderr,
+		    "wts_read_key: read row %llu by key:\n", keyno);
+		__wt_bt_debug_dbt("\tbdb", &bdb_data, stderr);
+		__wt_bt_debug_dbt("\twt", &data, stderr);
 		return (1);
 	}
 	return (0);
 }
 
 /*
- * wts_read_recno --
- *	Read random database entries by record number.
+ * wts_read_col_scan --
+ *	Read some number of column database entries by record number.
  */
 int
-wts_read_recno()
+wts_read_col_scan()
 {
-	DB *db;
-	ENV *env;
-	DBT key, data, bdb_data, bdb_key;
-	WT_TOC *toc;
 	u_int64_t cnt, last_cnt;
-	int ret;
-	char num[20];
-
-	db = g.wts_db;
-	env = db->env;
-
-	memset(&key, 0, sizeof(key));
-	memset(&data, 0, sizeof(data));
-
-	if ((ret = env->toc(env, 0, &toc)) != 0) {
-		env->err(env, ret, "Env.toc");
-		return (1);
-	}
 
 	/* Check a random subset of the records using the record number. */
-	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
+	for (last_cnt = cnt = 0; cnt < g.c_total;) {
 		cnt += rand() % 17 + 1;
-		if (cnt > g.key_cnt)
-			cnt = g.key_cnt;
+		if (cnt > g.c_total)
+			cnt = g.c_total;
 		if (cnt - last_cnt > 1000) {
-			track("read recno", cnt);
+			track("read column scan", cnt);
 			last_cnt = cnt;
 		}
 
-		/* Retrieve the key/data pair by record number. */
-		key_gen(&key, (u_int)cnt);
-		if ((ret = db->get_recno(
-		    db, toc, cnt, &key, NULL, &data, 0)) != 0) {
-			env->err(env, ret,
-			    "wts_read_recno: read row %llu by recno", cnt);
+		if (wts_read_col(cnt))
 			return (1);
-		}
+	}
+	return (0);
+}
 
-		/* Confirm the key number is correct. */
-		snprintf(num, sizeof(num), "%010llu", cnt);
-		if (key.size < 10 || memcmp(num, key.data, 10)) {
-			fprintf(stderr,
-			    "wts_read_recno: read row %llu by recno:\n", cnt);
-			__wt_bt_debug_dbt("\t wt key", &key, stderr);
-			return (1);
-		}
+/*
+ * wts_read_col --
+ *	Read and verify a single record by record number.
+ */
+int
+wts_read_col(u_int64_t keyno)
+{
+	static DBT data, bdb_data;
+	DB *db;
+	ENV *env;
+	WT_TOC *toc;
+	int ret;
 
-		/* BDB doesn't support record counts with duplicates. */
-		if (g.c_duplicates)
-			continue;
+	db = g.wts_db;
+	toc = g.wts_toc;
+	env = db->env;
 
-		/* Retrieve the BDB data item. */
-		if (bdb_read_recno(cnt, &bdb_key.data,
-		    &bdb_key.size, &bdb_data.data, &bdb_data.size))
-			return (1);
-
-		/* Compare the two. */
-		if (key.size != bdb_key.size ||
-		    memcmp(key.data, bdb_key.data, key.size) != 0 ||
-		    data.size != bdb_data.size ||
-		    memcmp(data.data, bdb_data.data, data.size) != 0) {
-			fprintf(stderr,
-			    "wts_read_recno: read row %llu by recno:\n", cnt);
-			__wt_bt_debug_dbt("\tbdb key", &bdb_key, stderr);
-			__wt_bt_debug_dbt("\t wt key", &key, stderr);
-			__wt_bt_debug_dbt("\tbdb data", &bdb_data, stderr);
-			__wt_bt_debug_dbt("\t wt data", &data, stderr);
-			return (1);
-		}
+	/* Retrieve the key/data pair by record number. */
+	if ((ret = db->get_recno(db, toc, keyno, &data, 0)) != 0) {
+		env->err(env, ret,
+		    "wts_read_recno: read column %llu by recno", keyno);
+		return (1);
 	}
 
-	if ((ret = toc->close(toc, 0)) != 0) {
-		env->err(env, ret, "Toc.close");
+	/* Retrieve the BDB data item. */
+	if (bdb_read_recno(keyno, &bdb_data.data, &bdb_data.size))
+		return (1);
+
+	/* Compare the two. */
+	if (data.size != bdb_data.size ||
+	    memcmp(data.data, bdb_data.data, data.size) != 0) {
+		fprintf(stderr,
+		    "wts_read_recno: read column %llu by recno:\n", keyno);
+		__wt_bt_debug_dbt("\tbdb data", &bdb_data, stderr);
+		__wt_bt_debug_dbt("\t wt data", &data, stderr);
+		return (1);
+	}
+
+	return (0);
+}
+
+/*
+ * wts_del --
+ *	Delete a record by key.
+ */
+int
+wts_del(u_int64_t keyno)
+{
+	static DBT key;
+	DB *db;
+	ENV *env;
+	WT_TOC *toc;
+	int notfound, ret;
+
+	db = g.wts_db;
+	toc = g.wts_toc;
+	env = db->env;
+
+	/*
+	 * Delete the key/data pair by key -- if the item has already been
+	 * deleted, then we'll get back WT_NOTFOUND.
+	 */
+	key_gen(&key, keyno);
+	if ((ret = db->del(db, toc, &key, 0)) != 0 && ret != WT_NOTFOUND) {
+		env->err(env, ret, "wts_del: delete row %llu by key", keyno);
+		return (1);
+	}
+	if (bdb_del(key.data, key.size, &notfound))
+		return (1);
+	if (ret == WT_NOTFOUND) {
+		if (notfound)
+			return (0);
+		env->errx(env,
+		    "wts_del: delete row %llu by key returned WT_NOTFOUND for "
+		    "existing key", keyno);
 		return (1);
 	}
 	return (0);
