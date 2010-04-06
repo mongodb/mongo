@@ -20,7 +20,7 @@
 class RamStoreFile : public MongoFile {
     char name[256];
     struct Node { 
-        void *p;
+        char *p;
         int len;
         Node() : len(0) { }
     };
@@ -32,12 +32,13 @@ class RamStoreFile : public MongoFile {
         Node& n = _m[offset];
         if( n.len == 0 ) { 
             // create
-            cout << "CREATE ofs:" << offset << " len:" << maxLen << endl;
+            cout << "CREATE " << name << " ofs:" << offset << " len:" << maxLen << endl;
             assert( maxLen >= 0 );
-            n.p = calloc(maxLen+1, 1);
+            n.p = (char *) calloc(maxLen+1, 1);
             n.len = maxLen;
         }
         assert( n.len >= maxLen );
+        assert( n.p[n.len] == 0 );
         return n.p;
     }
 
