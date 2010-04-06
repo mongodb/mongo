@@ -96,6 +96,8 @@ struct __wt_toc {
 	 */
 	ENV	*env;			/* Operation environment */
 
+	void	*app_private;		/* Application-private information */
+
 	DB	*db;			/* Current database */
 	DBT	 key, data;		/* Returned key/data pairs */
 	DBT	 scratch;		/* Temporary use by anybody */
