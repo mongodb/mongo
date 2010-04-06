@@ -143,12 +143,6 @@ struct __wt_page {
 	} u;
 	u_int32_t indx_count;		/* Entry count */
 
-	/*
-	 * When new item is inserted into a page (not just a replacement or a
-	 * delete of an item), the indx is replaced by a balanced binary tree.
-	 */
-	WT_BIN_INDX *bin;		/* Binary tree root */
-
 	u_int32_t flags;
 };
 /*
@@ -157,7 +151,7 @@ struct __wt_page {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_PAGE_SIZE		44
+#define	WT_PAGE_SIZE		40
 
 /*
  * WT_PAGE_HDR --
@@ -358,8 +352,6 @@ struct __wt_repl {
 
 	u_int16_t repl_size;		/* Data array size */
 	u_int16_t repl_next;		/* Next available slot */
-
-	WT_REPL *next;			/* Previous replace structures */
 };
 
 /*
@@ -578,18 +570,6 @@ struct __wt_ovfl {
  */
 #define	WT_FIX_REPEAT_DATA(p)						\
 	((u_int8_t *)p + sizeof(u_int16_t))
-
-/*
- * There's a structure returned from the search routine which includes (at
- * the moment), a page reference, a WT_{ROW,COL}_INDX reference, and in some
- * cases information as to which leg of the binary tree is the insert leg.
- */
-typedef struct __wt_srch {
-	WT_PAGE		*page;		/* Returned page */
-	WT_BIN_INDX	*bp;		/* Returned binary tree node */
-	void		*indx;		/* Returned WT_{ROW,COL}_INDX */
-	int		 isleft;	/* Left leg vs. right leg of tree */
-} WT_SRCH;
 
 #if defined(__cplusplus)
 }
