@@ -1,43 +1,17 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
-	WT_ROW_INDX * indx;
-	WT_REPL * repl;
+	WT_REPL * new;
 } __wt_bt_del_args;
-#define	 __wt_bt_del_serial(toc, _indx, _repl, ret) do {\
+#define	 __wt_bt_del_serial(toc, _new, ret) do {\
 	__wt_bt_del_args _args;\
-	_args.indx = _indx;\
-	_args.repl = _repl;\
+	_args.new = _new;\
 	(ret) = __wt_toc_serialize_func(\
 	    toc, __wt_bt_del_serial_func, &_args);\
 } while (0)
-#define	__wt_bt_del_unpack(toc, _indx, _repl) do {\
-	_indx =\
-	    ((__wt_bt_del_args *)(toc)->wq_args)->indx;\
-	_repl =\
-	    ((__wt_bt_del_args *)(toc)->wq_args)->repl;\
-} while (0)
-
-typedef struct {
-	WT_BIN_INDX * bp;
-	WT_BIN_INDX * new;
-	int isleft;
-} __wt_bt_insert_args;
-#define	 __wt_bt_insert_serial(toc, _bp, _new, _isleft, ret) do {\
-	__wt_bt_insert_args _args;\
-	_args.bp = _bp;\
-	_args.new = _new;\
-	_args.isleft = _isleft;\
-	(ret) = __wt_toc_serialize_func(\
-	    toc, __wt_bt_insert_serial_func, &_args);\
-} while (0)
-#define	__wt_bt_insert_unpack(toc, _bp, _new, _isleft) do {\
-	_bp =\
-	    ((__wt_bt_insert_args *)(toc)->wq_args)->bp;\
+#define	__wt_bt_del_unpack(toc, _new) do {\
 	_new =\
-	    ((__wt_bt_insert_args *)(toc)->wq_args)->new;\
-	_isleft =\
-	    ((__wt_bt_insert_args *)(toc)->wq_args)->isleft;\
+	    ((__wt_bt_del_args *)(toc)->wq_args)->new;\
 } while (0)
 
 typedef struct {

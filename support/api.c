@@ -295,10 +295,10 @@ static int __wt_api_db_del(
 
 	WT_DB_RDONLY(db, method_name);
 
-	toc->gen = env->ienv->api_gen;
+	WT_TOC_SET_GEN(toc);
 	while ((ret = __wt_db_del(db, toc, key)) == WT_RESTART)
 		;
-	toc->gen = UINT32_MAX;
+	WT_TOC_CLR_GEN(toc);
 	return (ret);
 }
 
@@ -434,9 +434,9 @@ static int __wt_api_db_get(
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET);
 
-	toc->gen = env->ienv->api_gen;
+	WT_TOC_SET_GEN(toc);
 	ret = __wt_db_get(db, toc, key, pkey, data);
-	toc->gen = UINT32_MAX;
+	WT_TOC_CLR_GEN(toc);
 	return (ret);
 }
 
@@ -444,16 +444,12 @@ static int __wt_api_db_get_recno(
 	DB *db,
 	WT_TOC *toc,
 	u_int64_t recno,
-	DBT *key,
-	DBT *pkey,
 	DBT *data,
 	u_int32_t flags);
 static int __wt_api_db_get_recno(
 	DB *db,
 	WT_TOC *toc,
 	u_int64_t recno,
-	DBT *key,
-	DBT *pkey,
 	DBT *data,
 	u_int32_t flags)
 {
@@ -463,9 +459,9 @@ static int __wt_api_db_get_recno(
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET_RECNO);
 
-	toc->gen = env->ienv->api_gen;
-	ret = __wt_db_get_recno(db, toc, recno, key, pkey, data);
-	toc->gen = UINT32_MAX;
+	WT_TOC_SET_GEN(toc);
+	ret = __wt_db_get_recno(db, toc, recno, data);
+	WT_TOC_CLR_GEN(toc);
 	return (ret);
 }
 
@@ -535,10 +531,10 @@ static int __wt_api_db_put(
 
 	WT_DB_RDONLY(db, method_name);
 
-	toc->gen = env->ienv->api_gen;
+	WT_TOC_SET_GEN(toc);
 	while ((ret = __wt_db_put(db, toc, key, data)) == WT_RESTART)
 		;
-	toc->gen = UINT32_MAX;
+	WT_TOC_CLR_GEN(toc);
 	return (ret);
 }
 
@@ -1094,7 +1090,7 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->get_recno = (int (*)
-	    (DB *, WT_TOC *, u_int64_t , DBT *, DBT *, DBT *, u_int32_t ))
+	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->huffman_set = (int (*)
 	    (DB *, u_int8_t const *, u_int , u_int32_t ))

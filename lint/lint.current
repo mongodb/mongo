@@ -3,45 +3,45 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_bulk.c (C)
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  119  Warning 530: Symbol 'last_repeat' (line 64) not
+../btree/bt_bulk.c  125  Warning 530: Symbol 'last_repeat' (line 64) not
     initialized
 ../btree/bt_bulk.c  64  Info 830: Location cited in prior message
                                                                           _
 			    memcmp(last_data, data->data, data->size) == 0) {
-../btree/bt_bulk.c  119  Warning 530: Symbol 'last_data' (line 65) not
+../btree/bt_bulk.c  125  Warning 530: Symbol 'last_data' (line 65) not
     initialized
 ../btree/bt_bulk.c  65  Info 830: Location cited in prior message
                                                                   _
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-../btree/bt_bulk.c  352  Warning 530: Symbol 'dup_data' (line 216) not
+../btree/bt_bulk.c  364  Warning 530: Symbol 'dup_data' (line 222) not
     initialized
-../btree/bt_bulk.c  216  Info 830: Location cited in prior message
+../btree/bt_bulk.c  222  Info 830: Location cited in prior message
                                                                             _
 				    (page->first_free - (u_int8_t *)dup_key);
-../btree/bt_bulk.c  440  Warning 530: Symbol 'dup_key' (line 216) not
+../btree/bt_bulk.c  452  Warning 530: Symbol 'dup_key' (line 222) not
     initialized
-../btree/bt_bulk.c  216  Info 830: Location cited in prior message
+../btree/bt_bulk.c  222  Info 830: Location cited in prior message
                                 _
 	WT_RECORDS(&offpage_item) = dup_count,
-../btree/bt_bulk.c  786  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  798  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1027  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1039  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                _
 		WT_RECORDS(&off) = page->records;
-../btree/bt_bulk.c  1069  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1081  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... _OFF *)((ip)->page_data))
 	WT_COL_OFF_RECORDS(ip) += increment;
-../btree/bt_bulk.c  1246  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1258  Info 740: Unusual pointer cast (incompatible indirect
     types)
                              _
 #... EM_BYTE((ip)->page_data))
 	WT_ROW_OFF_RECORDS(ip) += increment;
-../btree/bt_bulk.c  1263  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_bulk.c  1275  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_cget.c (C)
@@ -54,22 +54,22 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
                                                               _
 #...                    WT_RECORDS((WT_OFF *)((ip)->page_data))
 			if (record_cnt + WT_COL_OFF_RECORDS(ip) >= recno)
-../btree/bt_csrch.c  45  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_csrch.c  48  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                            _
 #...                 WT_RECORDS((WT_OFF *)((ip)->page_data))
 			record_cnt += WT_COL_OFF_RECORDS(ip);
-../btree/bt_csrch.c  47  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_csrch.c  50  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_debug.c (C)
                                                        _
 		    (u_long)offp->addr, WT_RECORDS(offp));
-../btree/bt_debug.c  361  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  335  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                                     _
 		    ref, (u_long)offp->addr, (u_quad)WT_RECORDS(offp));
-../btree/bt_debug.c  386  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  360  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)
@@ -95,16 +95,16 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_page.c (C)
                                                   _
 			records += WT_RECORDS(offp);
-../btree/bt_page.c  308  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  296  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...  WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  385  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  373  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		records += WT_RECORDS(offp);
-../btree/bt_page.c  421  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  409  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_rdel.c (C)
@@ -130,36 +130,68 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_rget.c (C)
 
 --- Module:   ../btree/bt_rput.c (C)
+_
+}
+../btree/bt_rput.c  108  Info 715: Symbol 'db' (line 19) not referenced
+../btree/bt_rput.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  108  Info 715: Symbol 'toc' (line 19) not referenced
+../btree/bt_rput.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  108  Info 715: Symbol 'key' (line 19) not referenced
+../btree/bt_rput.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  108  Info 715: Symbol 'data' (line 19) not referenced
+../btree/bt_rput.c  19  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  142  Warning 529: Symbol 'repl' (line 117) not subsequently
+    referenced
+../btree/bt_rput.c  117  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  142  Info 715: Symbol 'toc' (line 115) not referenced
+../btree/bt_rput.c  115  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  142  Warning 529: Symbol 'ip' (line 118) not subsequently
+    referenced
+../btree/bt_rput.c  118  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  142  Warning 529: Symbol 'data' (line 119) not subsequently
+    referenced
+../btree/bt_rput.c  119  Info 830: Location cited in prior message
+_
+}
+../btree/bt_rput.c  142  Warning 529: Symbol 'size' (line 120) not subsequently
+    referenced
+../btree/bt_rput.c  120  Info 830: Location cited in prior message
+
+    --- Wrap-up for Module: ../btree/bt_rput.c
+
+Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 115,
+    file ../btree/bt_rput.c) not referenced
+../btree/bt_rput.c  115  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_rsrch.c (C)
-                                                              _
-					    db, key, (DBT *)ip);
-../btree/bt_rsrch.c  78  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                                    _
-			if (cmp != 0)
-../btree/bt_rsrch.c  102  Warning 644: Variable 'cmp' (line 26) may not have
-    been initialized
-../btree/bt_rsrch.c  26  Info 830: Location cited in prior message
                                                                           _
 				cmp = db->btree_compare(db, key, (DBT *)ip);
-../btree/bt_rsrch.c  116  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_rsrch.c  63  Info 740: Unusual pointer cast (incompatible indirect
     types)
-                                               _
-				retp->indx = ip;
-../btree/bt_rsrch.c  147  Info 771: Symbol 'ip' (line 24) conceivably not
-    initialized
+                            _
+		if (cmp != 0)
+../btree/bt_rsrch.c  86  Warning 644: Variable 'cmp' (line 24) may not have
+    been initialized
 ../btree/bt_rsrch.c  24  Info 830: Location cited in prior message
-                                                              _
-#...        WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
-			if (record_cnt + WT_ROW_OFF_RECORDS(ip) >= recno)
-../btree/bt_rsrch.c  206  Info 740: Unusual pointer cast (incompatible indirect
-    types)
-                                                           _
-#...     WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
-			record_cnt += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_rsrch.c  208  Info 740: Unusual pointer cast (incompatible indirect
-    types)
+                                                 _
+				toc->srch_ip = ip;
+../btree/bt_rsrch.c  100  Info 771: Symbol 'ip' (line 22) conceivably not
+    initialized
+../btree/bt_rsrch.c  22  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_stat.c (C)
 
@@ -266,10 +298,6 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../db/db_getset.c (C)
 
 --- Module:   ../db/db_handle.c (C)
-_
-}
-../db/db_handle.c  49  Warning 550: Symbol 'ienv' (line 24) not accessed
-../db/db_handle.c  24  Info 830: Location cited in prior message
 
 --- Module:   ../db/db_huffman.c (C)
 _
