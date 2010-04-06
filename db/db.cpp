@@ -65,7 +65,7 @@ namespace mongo {
     extern string repairpath;
 
 #if defined(_WIN32)
-    std::wstring windowsServiceName = "MongoDB";
+    std::wstring windowsServiceName = L"MongoDB";
 #endif
 
     void setupSignals();
