@@ -195,6 +195,8 @@ namespace mongo {
         boost::thread::sleep(xt);
     }
     inline void sleepmicros(int s) {
+        if ( s <= 0 )
+            return;
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
         xt.sec += ( s / 1000000 );
@@ -215,6 +217,8 @@ namespace mongo {
         }
     }
     inline void sleepmicros(int s) {
+        if ( s <= 0 )
+            return;
         struct timespec t;
         t.tv_sec = (int)(s / 1000000);
         t.tv_nsec = s % 1000000;
