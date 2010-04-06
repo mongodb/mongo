@@ -21,12 +21,10 @@ __wt_env_db(ENV *env, DB **dbp)
 {
 	DB *db;
 	IDB *idb;
-	IENV *ienv;
 	int ret;
 
 	db = NULL;
 	idb = NULL;
-	ienv = env->ienv;
 
 	/* Create the DB and IDB structures. */
 	WT_ERR(__wt_calloc(env, 1, sizeof(DB), &db));
