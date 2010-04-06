@@ -58,6 +58,11 @@ __wt_env_close(ENV *env)
 	WT_FH *fh;
 	int ret, secondary_err;
 
+#ifdef HAVE_DIAGNOSTIC
+	if (F_ISSET(env, ~WT_APIMASK_ENV))
+		(void)__wt_api_args(env, "Env.close");
+#endif
+
 	ienv = env->ienv;
 	ret = secondary_err = 0;
 

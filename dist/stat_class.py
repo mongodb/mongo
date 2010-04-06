@@ -38,16 +38,15 @@ cache_stats = {}
 cache_stats['CACHE_ALLOC'] = Stat([], 'pages allocated in the cache')
 cache_stats['CACHE_BYTES_INUSE'] = Stat(['perm'], 'bytes in the cache')
 cache_stats['CACHE_BYTES_MAX'] = Stat(['perm'], 'maximum bytes configured for the cache')
-cache_stats['CACHE_EVICT'] = Stat([], 'clean pages evicted from the cache')
+cache_stats['CACHE_EVICT'] = Stat([], 'unmodified pages evicted from the cache')
+cache_stats['CACHE_EVICT_HAZARD'] = Stat([], 'pages not evicted because of a hazard reference')
+cache_stats['CACHE_EVICT_MODIFIED'] = Stat([], 'modified pages evicted from the cache')
 cache_stats['CACHE_HASH_BUCKETS'] = Stat([], 'hash buckets')
-cache_stats['CACHE_HAZARD_EVICT'] = Stat([], 'pages not evicted because of a hazard reference')
 cache_stats['CACHE_HIT'] = Stat([], 'reads found in the cache')
 cache_stats['CACHE_MAX_BUCKET_ENTRIES'] = Stat([], 'maximum entries allocated to a hash bucket')
 cache_stats['CACHE_MISS'] = Stat([], 'reads not found in the cache')
 cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
 cache_stats['CACHE_READ_LOCKOUT'] = Stat([], 'API cache read lockout')
-cache_stats['CACHE_WRITE'] = Stat([], 'pages written from the cache')
-cache_stats['CACHE_WRITE_EVICT'] = Stat([], 'dirty pages evicted from the cache')
 
 ##########################################
 # IDB handle statistics

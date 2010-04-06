@@ -42,6 +42,7 @@
 void
 __wt_api_db_err(DB *db, int error, const char *fmt, ...)
 {
+	WT_STAT_INCR(db->env->ienv->method_stats, DB_ERR);
 	WT_DB_ERR(db, error, fmt);
 }
 
@@ -52,5 +53,6 @@ __wt_api_db_err(DB *db, int error, const char *fmt, ...)
 void
 __wt_api_db_errx(DB *db, const char *fmt, ...)
 {
+	WT_STAT_INCR(db->env->ienv->method_stats, DB_ERRX);
 	WT_DB_ERR(db, 0, fmt);
 }

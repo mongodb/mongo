@@ -24,16 +24,24 @@ for i in \
 	echo $i
 done
 
-# The stat #defines are a bit harder for two reasons: first, we don't care
-# about "usage" in support/stat.c because it's auto-generated, we care if
-# the #define is set somewhere else; second, we don't use the "WT_STAT_"
-# prefix when we call a stat macro, the stat macro handles that for us.
-l=`echo $l | sed -e 's/\.\.\/support\/stat.c//'`
+# The stat #defines are harder for two reasons: first, we don't care about uses
+# of the #define in support/stat.c because it's initialization code, using all
+# of the #defines by definition -- we care if the #define is used somewhere else
+# Second, we don't use the "WT_STAT_" prefix when we call a stat macro, the stat
+# macro handles that for us, so we have to remove that prefix before searching.
+#
+# The 4 special cases listed below are because the INCR, INCRV, and SET #defines
+# are in stat.h, but shouldn't have the leading WT_STAT prefix stripped.  They
+# are heavily used, so just delete them from the search.
 
+l=`echo $l | sed -e 's/\.\.\/support\/stat.c//'`
 for i in \
     `cat ../inc_posix/stat.h |
      egrep '^#define' |
      sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
+	 -e '/^WT_STAT_INCR$/d' \
+	 -e '/^WT_STAT_INCRV$/d' \
+	 -e '/^WT_STAT_SET$/d' \
          -e 's/WT_STAT_//' |
      sort -u`; do
 	if `egrep -w "$i" $l > /dev/null`; then

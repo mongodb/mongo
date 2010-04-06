@@ -320,7 +320,7 @@ __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
 			    "cache drain server skipping hazard referenced "
 			    "element/page %#lx/%lu",
 			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
-			WT_STAT_INCR(stats, CACHE_HAZARD_EVICT);
+			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 
 			(*drainp)->state = WT_OK;
 			*drainp = NULL;
@@ -353,7 +353,7 @@ __wt_cache_wmod(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server writing element/page %#lx/%lu",
 			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
-			WT_STAT_INCR(stats, CACHE_WRITE_EVICT);
+			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
 
 			if ((tret =
 			    __wt_cache_write(env, (*drainp)->db, page)) != 0) {

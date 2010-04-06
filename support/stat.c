@@ -7,25 +7,25 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 14, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
 	stats[WT_STAT_CACHE_BYTES_MAX].desc =
 	    "maximum bytes configured for the cache";
-	stats[WT_STAT_CACHE_EVICT].desc = "clean pages evicted from the cache";
-	stats[WT_STAT_CACHE_HASH_BUCKETS].desc = "hash buckets";
-	stats[WT_STAT_CACHE_HAZARD_EVICT].desc =
+	stats[WT_STAT_CACHE_EVICT].desc =
+	    "unmodified pages evicted from the cache";
+	stats[WT_STAT_CACHE_EVICT_HAZARD].desc =
 	    "pages not evicted because of a hazard reference";
+	stats[WT_STAT_CACHE_EVICT_MODIFIED].desc =
+	    "modified pages evicted from the cache";
+	stats[WT_STAT_CACHE_HASH_BUCKETS].desc = "hash buckets";
 	stats[WT_STAT_CACHE_HIT].desc = "reads found in the cache";
 	stats[WT_STAT_CACHE_MAX_BUCKET_ENTRIES].desc =
 	    "maximum entries allocated to a hash bucket";
 	stats[WT_STAT_CACHE_MISS].desc = "reads not found in the cache";
 	stats[WT_STAT_CACHE_PAGES_INUSE].desc = "pages in the cache";
 	stats[WT_STAT_CACHE_READ_LOCKOUT].desc = "API cache read lockout";
-	stats[WT_STAT_CACHE_WRITE].desc = "pages written from the cache";
-	stats[WT_STAT_CACHE_WRITE_EVICT].desc =
-	    "dirty pages evicted from the cache";
 
 	*statsp = stats;
 	return (0);
@@ -36,14 +36,13 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_CACHE_EVICT].v = 0;
+	stats[WT_STAT_CACHE_EVICT_HAZARD].v = 0;
+	stats[WT_STAT_CACHE_EVICT_MODIFIED].v = 0;
 	stats[WT_STAT_CACHE_HASH_BUCKETS].v = 0;
-	stats[WT_STAT_CACHE_HAZARD_EVICT].v = 0;
 	stats[WT_STAT_CACHE_HIT].v = 0;
 	stats[WT_STAT_CACHE_MAX_BUCKET_ENTRIES].v = 0;
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_READ_LOCKOUT].v = 0;
-	stats[WT_STAT_CACHE_WRITE].v = 0;
-	stats[WT_STAT_CACHE_WRITE_EVICT].v = 0;
 }
 
 int
