@@ -274,7 +274,7 @@ def func_method(a, f):
 
 	# If entering the API with a WT_TOC handle, set the generation number.
 	if toc_handle:
-		f.write('\ttoc->gen = env->ienv->api_gen;\n')
+		f.write('\tWT_TOC_SET_GEN(toc);\n')
 
 	if locking:
 		f.write('\t__wt_lock(env, env->ienv->mtx);\n')
@@ -295,7 +295,7 @@ def func_method(a, f):
 		f.write('\t__wt_unlock(env->ienv->mtx);\n')
 	# If entering the API with a WT_TOC handle, clear the generation number.
 	if toc_handle:
-		f.write('\ttoc->gen = UINT32_MAX;\n')
+		f.write('\tWT_TOC_CLR_GEN(toc);\n')
 	f.write('\treturn (ret);\n}\n\n')
 
 #####################################################################
