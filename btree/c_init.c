@@ -31,6 +31,7 @@ __wt_cache_create(ENV *env)
 
 	WT_ERR(__wt_mtx_alloc(env, 1, &cache->mtx_drain));
 	WT_ERR(__wt_mtx_alloc(env, 1, &cache->mtx_io));
+	WT_ERR(__wt_mtx_alloc(env, 0, &cache->mtx_hb));
 
 	/*
 	 * Initialize the cache hash buckets.
@@ -51,10 +52,10 @@ __wt_cache_create(ENV *env)
 	/* Create an array of WT_CACHE_ENTRY structures in each bucket. */
 	for (i = 0; i < cache->hb_size; ++i) {
 		hb = &cache->hb[i];
-		WT_ERR(__wt_calloc(env,
-		    WT_CACHE_ENTRY_ALLOC, sizeof(WT_CACHE_ENTRY), &hb->entry));
-		hb->entry_size = WT_CACHE_ENTRY_ALLOC;
-		for (e = hb->entry, j = 0; j < WT_CACHE_ENTRY_ALLOC; ++e, ++j)
+		WT_ERR(__wt_calloc(env, WT_CACHE_ENTRY_DEFAULT,
+		    sizeof(WT_CACHE_ENTRY), &hb->entry));
+		hb->entry_size = WT_CACHE_ENTRY_DEFAULT;
+		for (e = hb->entry, j = 0; j < WT_CACHE_ENTRY_DEFAULT; ++e, ++j)
 			e->state = WT_EMPTY;
 	}
 
@@ -120,9 +121,8 @@ __wt_cache_destroy(ENV *env)
 	/* Discard all hash bucket entries. */
 	for (i = 0; i < cache->hb_size; ++i) {
 		hb = &cache->hb[i];
-		if (hb->entry != NULL)
-			__wt_free(env, hb->entry,
-			    hb->entry_size * sizeof(WT_CACHE_ENTRY));
+		__wt_free(env,
+		    hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
 	}
 
 	/* Discard and destroy mutexes. */
@@ -130,6 +130,8 @@ __wt_cache_destroy(ENV *env)
 		(void)__wt_mtx_destroy(env, cache->mtx_drain);
 	if (cache->mtx_io != NULL)
 		__wt_mtx_destroy(env, cache->mtx_io);
+	if (cache->mtx_hb != NULL)
+		__wt_mtx_destroy(env, cache->mtx_hb);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->stats, 0);
@@ -164,7 +166,7 @@ __wt_cache_dump(ENV *env)
 			__wt_msg(env, "\tempty");
 			break;
 		case WT_OK:
-		case WT_CACHE_DRAIN:
+		case WT_DRAIN:
 			__wt_msg(env,
 			    "\t%#lx {addr: %lu, bytes: %lu, state: %s}",
 			    WT_PTR_TO_ULONG(e->page), (u_long)e->addr,
