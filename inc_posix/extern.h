@@ -3,8 +3,7 @@ int
 __wt_db_bulk_load(DB *db, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **));
 int
-__wt_db_get_recno(
-    DB *db, WT_TOC *toc, u_int64_t recno, DBT *key, DBT *pkey, DBT *data);
+__wt_db_get_recno(DB *db, WT_TOC *toc, u_int64_t recno, DBT *data);
 int
 __wt_bt_close(DB *db);
 int
@@ -12,8 +11,7 @@ __wt_bt_lex_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
-__wt_bt_search_recno_col(
-    WT_TOC *toc, u_int64_t recno, WT_PAGE **pagep, void *ipp);
+__wt_bt_search_recno_col(WT_TOC *toc, u_int64_t recno);
 int
 __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
@@ -73,8 +71,6 @@ __wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
-__wt_bt_bin_create(WT_TOC *toc, WT_PAGE *page);
-int
 __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt);
 int
 __wt_db_del(DB *db, WT_TOC *toc, DBT *key);
@@ -86,11 +82,9 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data);
 int
 __wt_db_put(DB *db, WT_TOC *toc, DBT *key, DBT *data);
 int
-__wt_bt_repl_alloc(ENV *env, WT_REPL **orig, int insert);
+__wt_bt_repl_alloc(ENV *env, WT_REPL *repl, WT_REPL **newp);
 int
-__wt_bt_search_key_row(WT_TOC *toc, DBT *key, WT_SRCH *retp, u_int32_t flags);
-int
-__wt_bt_search_recno_row(WT_TOC *toc, u_int64_t recno, WT_SRCH *retp);
+__wt_bt_search_key_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 int
 __wt_bt_stat(DB *db);
 int
@@ -106,6 +100,8 @@ void *
 __wt_cache_drain(void *arg);
 int
 __wt_cache_write(ENV *env, DB *db, WT_PAGE *page);
+void
+__wt_cache_chk(ENV *env);
 int
 __wt_cache_create(ENV *env);
 void
@@ -211,7 +207,7 @@ __wt_toc_dump(ENV *env);
 void *
 __wt_workq_srvr(void *arg);
 int
-__wt_workq_repl(WT_TOC *toc, WT_REPL **orig, WT_REPL *new);
+__wt_workq_repl(WT_TOC *toc, WT_REPL *orig, WT_REPL *new, WT_REPL **rp);
 void
 __wt_abort(ENV *env);
 int
