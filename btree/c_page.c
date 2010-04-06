@@ -70,15 +70,15 @@ retry:	/* Search the cache for the page. */
 
 	/*
 	 * The memory location making this page "real" is the WT_CACHE_ENTRY's
-	 * state field, which can be reset from WT_OK to WT_CACHE_DRAIN at any
-	 * time by the cache server.
+	 * state field, which can be reset from WT_OK to WT_DRAIN at any time
+	 * by the cache server.
 	 *
 	 * Add the page to the WT_TOC's hazard list (which flushes the write),
 	 * then see if the state field is still WT_OK.  If it's still WT_OK,
 	 * we know we can use the page because the cache drain server will see
 	 * our hazard reference before it discards the buffer (the drain server
-	 * sets the WT_CACHE_DRAIN state, flushes memory, and then checks the
-	 * the hazard references).
+	 * sets the WT_DRAIN state, flushes memory, and then checks the hazard
+	 * references).
 	 *
 	 * If for any reason, we can't get the page we want, ask the I/O server
 	 * to get it for us and go to sleep.  The I/O server is expensive, but
