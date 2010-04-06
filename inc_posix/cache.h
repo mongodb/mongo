@@ -39,6 +39,16 @@ struct __wt_cache {
 	u_int	io_sleeping;		/* Cache drain server is sleeping */
 
 	/*
+	 * The I/O thread and the cache drain thread have a serialization
+	 * problem: the I/O thread may need to grow the entries in a hash
+	 * bucket, and the cache drain thread may be discarding pages from
+	 * that bucket.  The mtx_hb mutex is used to serialize their access.
+	 * Growing the hash bucket entries is a rare action, so we use a
+	 * global mutex.
+	 */
+	WT_MTX *mtx_hb;
+
+	/*
 	 * The workQ thread sets/clears the read_lockout flag when the cache is
 	 * sufficiently full that no I/O should be done and the cache requires
 	 * draining.   The read_lockout flag is declared volatile so the cache
@@ -98,7 +108,6 @@ struct __wt_cache {
  * Entries are only removed by the cache drain thread.
  */
 struct __wt_cache_hb {
-#define	WT_CACHE_ENTRY_ALLOC	40	/* Entry allocation unit */
 	WT_CACHE_ENTRY	*entry;		/* Array of cache pages */
 	u_int32_t	 entry_size;	/* Number of cache pages */
 };
@@ -124,9 +133,9 @@ struct __wt_cache_hb {
  * the validity of the page.  If the page is still valid, they continue.
  *
  * When the cache drain server wants to remove a page from the cache, it sets
- * the state field to WT_CACHE_DRAIN, flushes memory, and checks for a hazard
- * reference.   If the cache drain server finds a hazard reference, it resets
- * the state field, restoring the page to readers.  If the cache drain server
+ * the state field to WT_DRAIN, flushes memory, then checks hazard references.
+ * If the cache drain server finds a hazard reference, it resets the state
+ * field to WT_OK, restoring the page to readers.  If the cache drain server
  * doesn't find a hazard reference, it knows the page is safe to discard.
  *
  * There is an additional synchronization between the cache drain server and
@@ -148,7 +157,7 @@ struct __wt_cache_entry {
 	 */
 #define	WT_EMPTY	0		/* Nothing here, available for re-use */
 #define	WT_OK		1		/* In-use, valid data */
-#define	WT_CACHE_DRAIN	2		/* Requested by cache drain server */
+#define	WT_DRAIN	2		/* Requested by cache drain server */
 	u_int32_t volatile state;	/* State */
 };
 

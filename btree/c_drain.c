@@ -118,6 +118,13 @@ __wt_cache_drain(void *arg)
 			continue;
 		}
 
+		/*
+		 * Lock the hash buckets, we can't grow them while the cache
+		 * drain server has them pinned (that is, has references to
+		 * pages in the bucket).
+		 */
+		__wt_lock(env, cache->mtx_hb);
+
 		WT_VERBOSE(env,
 		    WT_VERB_CACHE | WT_VERB_SERVERS, (env,
 		        "cache drain server running: bytes inuse > max "
@@ -130,7 +137,7 @@ __wt_cache_drain(void *arg)
 		 * pages and not more than 100 pages.  (Not sure this is an OK
 		 * configuration; the only hard rule is we can't review more
 		 * pages than there are in the cache, because that would result
-		 * in duplicate entries in the drain array, and that will fail.
+		 * in duplicate entries in the drain array, and that will fail.)
 		 */
 		cache_pages = WT_CACHE_PAGES_INUSE(cache);
 		if (cache_pages <= 20)
@@ -182,7 +189,7 @@ __wt_cache_drain(void *arg)
 		/* No pages to drain: confused but done. */
 		drain_elem = (u_int32_t)(drainp - drain);
 		if (drain_elem == 0)
-			continue;
+			goto done;
 
 		/* Sort the drain pages by ascending generation number. */
 		qsort(drain, (size_t)drain_elem,
@@ -224,10 +231,11 @@ __wt_cache_drain(void *arg)
 				continue;
 			}
 
-			(*drainp)->state = WT_CACHE_DRAIN;
+			(*drainp)->state = WT_DRAIN;
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache drain server attempting to drain page %lu",
-			    (u_long)(*drainp)->addr));
+			    "cache drain server draining element/page "
+			    "%#lx/%#lu",
+			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
 		}
 
 		/* Copy and sort the hazard references. */
@@ -248,6 +256,12 @@ __wt_cache_drain(void *arg)
 
 		/* Recycle the  memory. */
 		WT_ERR(__wt_cache_recycle(env, drain, drain_elem));
+
+done:		__wt_unlock(cache->mtx_hb);
+
+#ifdef HAVE_DIAGNOSTIC
+		__wt_cache_chk(env);
+#endif
 	}
 
 err:	if (drain != NULL) {
@@ -304,7 +318,8 @@ __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
 		if (*hazard == page) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server skipping hazard referenced "
-			    "page %lu", (u_long)(*drainp)->addr));
+			    "element/page %#lx/%lu",
+			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
 			WT_STAT_INCR(stats, CACHE_HAZARD_EVICT);
 
 			(*drainp)->state = WT_OK;
@@ -323,8 +338,10 @@ __wt_cache_wmod(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 {
 	WT_PAGE *page;
 	WT_STATS *stats;
+	int tret, ret;
 
 	stats = env->ienv->stats;
+	ret = 0;
 
 	for (; drain_elem > 0; ++drainp, --drain_elem) {
 		if (*drainp == NULL)
@@ -334,15 +351,21 @@ __wt_cache_wmod(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 		/* Write the page if it's been modified. */
 		if (F_ISSET(page, WT_MODIFIED)) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache drain server writing page %lu",
-			    (u_long)(*drainp)->addr));
+			    "cache drain server writing element/page %#lx/%lu",
+			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
 			WT_STAT_INCR(stats, CACHE_WRITE_EVICT);
 
-			WT_RET(__wt_cache_write(env, (*drainp)->db, page));
+			if ((tret =
+			    __wt_cache_write(env, (*drainp)->db, page)) != 0) {
+				if (ret == 0)
+					ret = tret;
+				(*drainp)->state = WT_OK;
+				*drainp = NULL;
+			}
 		} else
 			WT_STAT_INCR(stats, CACHE_EVICT);
 	}
-	return (0);
+	return (ret);
 }
 
 /*
@@ -364,8 +387,8 @@ __wt_cache_recycle(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 		__wt_cache_hazard_check(env, *(drainp));
 #endif
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache drain server recycling page %lu",
-		    (u_long)(*drainp)->addr));
+		    "cache drain server recycling element/page %#lx/%lu",
+		    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
 
 		/* Copy the page ref, and give the slot to the I/O server. */
 		page = (*drainp)->page;
@@ -428,11 +451,40 @@ __wt_cache_hazard_check(ENV *env, WT_CACHE_ENTRY *e)
 		for (hp = toc->hazard;
 		    hp < toc->hazard + toc->env->hazard_size; ++hp)
 			if (*hp == e->page) {
-				WT_VERBOSE(env, WT_VERB_CACHE, (env,
+				__wt_api_env_errx(env,
 				    "hazard check for drained page %#lx/%lu "
 				    "failed",
-				    (u_long)e->page, (u_long)e->addr));
-				WT_ASSERT(env, *hp != e->page);
+				    (u_long)e->page, (u_long)e->addr);
+				__wt_abort(env);
 			}
+}
+
+/*
+ * __wt_cache_chk --
+ *	Check the cache for consistency.
+ */
+void
+__wt_cache_chk(ENV *env)
+{
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY *e;
+	uint32_t i, j;
+
+	cache = env->ienv->cache;
+	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
+		switch (e->state) {
+		case WT_DRAIN:
+			__wt_api_env_errx(env,
+			    "e->state == WT_DRAIN (e: %#lx, addr: %lu)",
+			    (u_long)e, (u_long)e->addr);
+			__wt_abort(env);
+			break;
+		case WT_OK:
+			if (e->addr != e->page->addr) {
+				__wt_api_env_errx(env, "e->addr != page->addr");
+				__wt_abort(env);
+			}
+			break;
+		}
 }
 #endif

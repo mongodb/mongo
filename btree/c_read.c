@@ -153,7 +153,7 @@ __wt_cache_read(WT_TOC *toc)
 	WT_PAGE_HDR *hdr;
 	off_t offset;
 	u_int32_t addr, bytes, checksum, i;
-	int ret;
+	int newpage, ret;
 
 	db = toc->db;
 	env = toc->env;
@@ -164,6 +164,7 @@ __wt_cache_read(WT_TOC *toc)
 
 	addr = toc->wq_addr;
 	bytes = toc->wq_bytes;
+	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
 
 	/*
 	 * Read a page from the file -- allocations end up here too, because
@@ -181,7 +182,7 @@ __wt_cache_read(WT_TOC *toc)
 	 * we find, we may need one.
 	 */
 	empty = NULL;
-	if (addr != WT_ADDR_INVALID) {
+	if (!newpage) {
 		hb = &cache->hb[WT_HASH(cache, addr)];
 		WT_CACHE_FOREACH_PAGE(cache, hb, e, i) {
 			if (e->state == WT_EMPTY) {
@@ -208,7 +209,7 @@ __wt_cache_read(WT_TOC *toc)
 	WT_ERR(__wt_calloc(env, (size_t)bytes, sizeof(u_int8_t), &page->hdr));
 
 	/* If it's an allocation, extend the file; otherwise read the page. */
-	if (addr == WT_ADDR_INVALID) {
+	if (newpage) {
 		/* Extend the file. */
 		addr = WT_OFF_TO_ADDR(db, fh->file_size);
 		fh->file_size += bytes;
@@ -219,14 +220,7 @@ __wt_cache_read(WT_TOC *toc)
 
 		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
 		WT_STAT_INCR(env->ienv->stats, CACHE_ALLOC);
-		WT_VERBOSE(env,
-		    WT_VERB_CACHE, (env,
-		        "cache I/O server allocated page %lu", (u_long)addr));
 	} else {
-		WT_VERBOSE(env,
-		    WT_VERB_CACHE, (env,
-		        "cache I/O server read page %lu", (u_long)addr));
-
 		offset = WT_ADDR_TO_OFF(db, addr);
 		WT_ERR(__wt_read(env, fh, offset, bytes, page->hdr));
 
@@ -244,7 +238,7 @@ __wt_cache_read(WT_TOC *toc)
 		}
 	}
 
-	/* Initialize the page structure. */
+	/* Fill in the page structure. */
 	page->addr = addr;
 	page->bytes = bytes;
 
@@ -260,9 +254,9 @@ __wt_cache_read(WT_TOC *toc)
 				empty = e;
 				break;
 			}
+		if (empty == NULL)
+			WT_ERR(__wt_cache_hb_entry_grow(toc, hb, &empty));
 	}
-	if (empty == NULL)
-		WT_ERR(__wt_cache_hb_entry_grow(toc, hb, &empty));
 
 	/*
 	 * Fill in everything but the state, flush, then fill in the state.  No
@@ -279,12 +273,18 @@ __wt_cache_read(WT_TOC *toc)
 
 	WT_CACHE_PAGE_IN(cache, bytes);
 
+	WT_VERBOSE(env, WT_VERB_CACHE,
+	    (env, "cache I/O server %s element/page %#lx/%lu",
+	    newpage ? "allocated" : "read",
+	    WT_PTR_TO_ULONG(empty), (u_long)addr));
+
 	return (0);
 
-err:	if (page->hdr != NULL)
-		__wt_free(env, page->hdr, bytes);
-	if (page != NULL)
+err:	if (page != NULL) {
+		if (page->hdr != NULL)
+			__wt_free(env, page->hdr, bytes);
 		__wt_free(env, page, sizeof(WT_PAGE));
+	}
 	return (ret);
 }
 
@@ -303,11 +303,18 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 	env = toc->env;
 	cache = env->ienv->cache;
 
-	entries = hb->entry_size + WT_CACHE_ENTRY_ALLOC;
+	entries = hb->entry_size + WT_CACHE_ENTRY_DEFAULT;
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "I/O server: hash bucket %lu grows to %lu entries",
 	    (u_long)(hb - cache->hb), entries));
+
+	/*
+	 * Lock the hash buckets, we can't copy them while the cache drain
+	 * server has them pinned (that is, has references to pages in the
+	 * bucket).
+	 */
+	__wt_lock(env, cache->mtx_hb);
 
 	/* Allocate the new WT_ENTRY array. */
 	WT_RET(__wt_calloc(env, (size_t)entries, sizeof(WT_CACHE_ENTRY), &new));
@@ -315,31 +322,30 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 		WT_STAT_SET(cache->stats, CACHE_MAX_BUCKET_ENTRIES, entries);
 
 	/* Copy any previous values from the old array to the new array. */
-	if (hb->entry != NULL)
-		memcpy(new, hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
+	memcpy(new, hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
 
-	/* Optionally copy out the first empty slot. */
+	/* Set and return the first empty slot. */
 	e = new + hb->entry_size;
-	if (emptyp != NULL)
-		*emptyp = e;
+	*emptyp = e;
 
-	/* Initialize allocated slots' state. */
-	for (i = 0; i < WT_CACHE_ENTRY_ALLOC; ++e, ++i)
+	/* Initialize newly allocated slots' state. */
+	for (i = 0; i < WT_CACHE_ENTRY_DEFAULT; ++e, ++i)
 		e->state = WT_EMPTY;
 
-	/* Free any previous array. */
-	if (hb->entry != NULL)
-		WT_FLIST_INSERT(
-		    toc, hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
+	/* Schedule the previous array to be freed. */
+	WT_FLIST_INSERT(
+	    toc, hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
 
 	/*
-	 * Update the arry in place -- it's OK because the old and new memory
-	 * chunks are identical up to the old length, it doesn't matter which
-	 * memory write goes out first.
+	 * Update the array in place -- because the old and new memory chunks
+	 * are identical up to the old length, it doesn't matter which write
+	 * goes out first.
 	 */
 	hb->entry = new;
 	hb->entry_size = entries;
 	WT_MEMORY_FLUSH;
+
+	__wt_unlock(cache->mtx_hb);
 
 	return (0);
 }
