@@ -499,7 +499,7 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.r
 
     unversioned_deb_xulrunner_prereqs = ["xulrunner-dev"]
 
-    old_versioned_deb_xulrunner_prereqs = ["xulrunner1.9-dev"]
+    old_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9-dev"]
     new_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9.1-dev"]
 
     common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
@@ -696,7 +696,7 @@ def main():
             for key in ["EC2_HOME", "JAVA_HOME"]:
                 if key in settings.makedist:
                     os.environ[key] = settings.makedist[key]
-            for key in ["ec2_pkey", "ec2_cert", "ec2_sshkey", "ssh_keyfile" ]:
+            for key in ["ec2_pkey", "ec2_cert", "ec2_sshkey", "ssh_keyfile", "gpg_homedir" ]:
                 if key not in kwargs and key in settings.makedist:
                     kwargs[key] = settings.makedist[key]
     except Exception, err:
@@ -745,7 +745,7 @@ def main():
             kwargs["pkg_name_suffix"] = ""
 
 
-    kwargs['local_gpg_dir'] = kwargs["local_gpg_dir"] if "local_gpg_dir" in kwargs else os.path.expanduser("~/.gnupg") 
+    kwargs['gpg_homedir'] = kwargs["gpg_homedir"] if "gpg_homedir" in kwargs else os.path.expanduser("~/.gnupg") 
     configurator = Configurator(**kwargs)
     LocalHost.runLocally(["mkdir", "-p", kwargs["localdir"]])
     with ScriptFile(configurator, **kwargs) as script:
@@ -761,7 +761,7 @@ def main():
                 ssh.runRemotely(["mkdir", "pkg"])
                 if "local_mongo_dir" in kwargs:
                     ssh.sendFiles([(kwargs["local_mongo_dir"]+'/'+d, "pkg") for d in ["rpm", "debian"]])
-                ssh.sendFiles([(kwargs['local_gpg_dir'], ".gnupg")])
+                ssh.sendFiles([(kwargs['gpg_homedir'], ".gnupg")])
                 ssh.sendFiles([(script.localscript, "makedist.sh")])
                 ssh.runRemotely((["sudo"] if ssh.ssh_login != "root" else [])+ ["sh", "makedist.sh"])
                 ssh.recvFiles([(script.pkg_product_dir, kwargs['localdir'])])
@@ -773,7 +773,7 @@ def processArguments():
                  ("N", "no-terminate", False, "Leave the EC2 instance running at the end of the job", None),
                  ("S", "subdirs", False, "Create subdirectories of the output directory based on distro name, version, and architecture", None),
                  ("I", "use-internal-name", False, "Use the EC2 internal hostname for sshing", None),
-                 (None, "local-gpg-dir", True, "Local directory of gpg junk", "STRING"),
+                 (None, "gpg-homedir", True, "Local directory of gpg junk", "STRING"),
                  (None, "local-mongo-dir", True, "Copy packaging files from local mongo checkout", "DIRECTORY"),
                  ]
     shortopts = "".join([t[0] + (":" if t[2] else "") for t in flagspec if t[0] is not None])
@@ -860,4 +860,4 @@ if __name__ == "__main__":
 
 # Examples:
 
-# ./makedist.py --local-gpg-dir=$HOME/10gen/dst/dist-gnupg /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot
+# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot
