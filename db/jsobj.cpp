@@ -94,8 +94,10 @@ namespace mongo {
             s << ( boolean() ? "true" : "false" );
             break;
         case Object:
-        case Array:
             s << embeddedObject().toString();
+            break;
+        case Array:
+            s << embeddedObject().toString( true );
             break;
         case Undefined:
             s << "undefined";
@@ -682,11 +684,11 @@ namespace mongo {
 
     BSONObj::EmptyObject BSONObj::emptyObject;
 
-    string BSONObj::toString() const {
+    string BSONObj::toString( bool isArray ) const {
         if ( isEmpty() ) return "{}";
 
         stringstream s;
-        s << "{ ";
+        s << ( isArray ? "[ " : "{ " );
         BSONObjIterator i(*this);
         bool first = true;
         while ( 1 ) {
@@ -707,9 +709,9 @@ namespace mongo {
                 first = false;
             else
                 s << ", ";
-            s << e.toString();
+            s << e.toString( !isArray );
         }
-        s << " }";
+        s << ( isArray ? " ]" : " }" );
         return s.str();
     }
 

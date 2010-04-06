@@ -42,7 +42,11 @@ namespace mongo {
         }else if (strchr(iporhost, ':')){
             as<sockaddr_in6>().sin6_family = AF_INET6;
             as<sockaddr_in6>().sin6_port = htons(port);
+#ifdef _WIN32
+            uassert(13081, "No IPv6 support on windows", false);
+#else
             inet_pton(AF_INET6, iporhost, &as<sockaddr_in6>().sin6_addr);
+#endif
             addressSize = sizeof(sockaddr_in6);
         } else {
             string ip = hostbyname( iporhost );
@@ -53,13 +57,16 @@ namespace mongo {
             addressSize = sizeof(sockaddr_in);
         }
     }
-
+ 
     bool SockAddr::isLocalHost() const {
         switch (getType()){
             case AF_INET: return getAddr() == "127.0.0.1";
             case AF_INET6: return getAddr() == "::1";
             case AF_UNIX: return true;
+            default: return false;
         }
+        assert(false);
+        return false;
     }
 
     string hostbyname(const char *hostname) {

@@ -49,10 +49,6 @@ namespace mongo {
         char sun_path[108]; // length from unix header
     };
 
-    // Windows doesn't const-qualify src for some reason
-    inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size){
-        return ::inet_ntop(af, const_cast<void*>(src),dst,size);
-    }
 #else
 
 } // namespace mongo
@@ -97,6 +93,10 @@ namespace mongo {
 
 
 #endif
+
+    inline string makeUnixSockPath(int port){
+        return "/tmp/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
+    }
 
     inline void setSockReceiveTimeout(int sock, int secs) {
 // todo - finish - works?
@@ -145,8 +145,8 @@ namespace mongo {
 
         unsigned getPort() const {
             switch (getType()){
-                case AF_INET:  return as<sockaddr_in>().sin_port;
-                case AF_INET6: return as<sockaddr_in6>().sin6_port;
+                case AF_INET:  return ntohs(as<sockaddr_in>().sin_port);
+                case AF_INET6: return ntohs(as<sockaddr_in6>().sin6_port);
                 case AF_UNIX: return 0;
                 case AF_UNSPEC: return 0;
                 default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return 0;
@@ -155,12 +155,19 @@ namespace mongo {
 
         string getAddr() const {
             const int buflen=128;
+#if !defined(_WIN32)
             char buffer[buflen];
+#endif
 
             switch (getType()){
+#ifdef _WIN32
+                case AF_INET: return inet_ntoa(as<sockaddr_in>().sin_addr);
+                case AF_INET6: return "No IPv6 support on windows";
+#else
                 case AF_INET:  return inet_ntop(getType(), &as<sockaddr_in>().sin_addr, buffer, addressSize);
                 case AF_INET6: return inet_ntop(getType(), &as<sockaddr_in6>().sin6_addr, buffer, addressSize);
-                case AF_UNIX:  return as<sockaddr_un>().sun_path;
+#endif
+                case AF_UNIX:  return (addressSize > 2 ?as<sockaddr_un>().sun_path : "anonymous unix socket");
                 case AF_UNSPEC: return "(NONE)";
                 default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
             }

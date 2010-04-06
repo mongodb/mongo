@@ -43,7 +43,7 @@ namespace mongo {
     };
 
     bool NamespaceIndex::exists() const {
-        return !boost::filesystem::exists(path());
+        return !MMF::exists(path());
     }
     
     boost::filesystem::path NamespaceIndex::path() const {
@@ -101,7 +101,7 @@ namespace mongo {
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         MMF::Pointer p;
-        if( boost::filesystem::exists(nsPath) ) { 
+        if( MMF::exists(nsPath) ) { 
 			p = f.map(pathString.c_str());
             if( !p.isNull() ) {
                 len = f.length();
@@ -195,7 +195,8 @@ namespace mongo {
         r->lengthWithHeaders = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        DeletedRecord *newDel = newDelLoc.drec();
+        /* TODOMMF split */
+        DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
         newDel->extentOfs = r->extentOfs;
         newDel->lengthWithHeaders = left;
         newDel->nextDeleted.Null();

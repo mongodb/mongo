@@ -290,7 +290,7 @@ namespace mongo {
                very simple temporary implementation - we will in future look up
                the quota from the grid database
             */
-            if ( cmdLine.quota && fileNo > cmdLine.quotaFiles && !boost::filesystem::exists(filename) ) {
+            if ( cmdLine.quota && fileNo > cmdLine.quotaFiles && !MMF::exists(filename) ) {
                 /* todo: if we were adding / changing keys in an index did we do some
                    work previously that needs cleaning up?  Possible.  We should
                    check code like that and have it catch the exception and do
@@ -461,12 +461,12 @@ namespace mongo {
         lastRecord.Null();
 
         DiskLoc emptyLoc = myLoc;
-        emptyLoc.inc( (extentData-(char*)this) );
+        emptyLoc.inc( (_extentData-(char*)this) );
 
-        int delRecLength = length - (extentData - (char *) this);
-        DeletedRecord *empty1 = (DeletedRecord *) extentData;
+        int delRecLength = length - (_extentData - (char *) this);
+        //DeletedRecord *empty1 = (DeletedRecord *) extentData;
         DeletedRecord *empty = (DeletedRecord *) getRecord(emptyLoc);
-        assert( empty == empty1 );
+        //assert( empty == empty1 );
         memset(empty, delRecLength, 1);
 
         empty->lengthWithHeaders = delRecLength;
@@ -488,19 +488,20 @@ namespace mongo {
         lastRecord.Null();
 
         DiskLoc emptyLoc = myLoc;
-        emptyLoc.inc( (extentData-(char*)this) );
+        emptyLoc.inc( (_extentData-(char*)this) );
 
-        DeletedRecord *empty1 = (DeletedRecord *) extentData;
-        DeletedRecord *empty = (DeletedRecord *) getRecord(emptyLoc);
-        assert( empty == empty1 );
-        empty->lengthWithHeaders = _length - (extentData - (char *) this);
+        int l = _length - (_extentData - (char *) this);
+        //DeletedRecord *empty1 = (DeletedRecord *) extentData;
+        DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, l);
+        //assert( empty == empty1 );
+        empty->lengthWithHeaders = l;
         empty->extentOfs = myLoc.getOfs();
         return emptyLoc;
     }
 
     /*
       Record* Extent::newRecord(int len) {
-      if( firstEmptyRegion.isNull() )
+      if( firstEmptyRegion.isNull() )8
       return 0;
 
       assert(len > 0);

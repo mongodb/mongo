@@ -82,6 +82,7 @@ namespace mongo {
         Extent* getExtent(DiskLoc loc);
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
+        Record* makeRecord(DiskLoc dl, int size);
 
         MMF mmf;
         MMF::Pointer _p;
@@ -119,6 +120,7 @@ namespace mongo {
 
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
+        static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
@@ -197,7 +199,9 @@ namespace mongo {
 
         int length;   /* size of the extent, including these fields */
         DiskLoc firstRecord, lastRecord;
-        char extentData[4];
+        char _extentData[4];
+
+        static int HeaderSize() { return sizeof(Extent)-4; }
 
         bool validates() {
             return !(firstRecord.isNull() ^ lastRecord.isNull()) &&
@@ -292,7 +296,7 @@ namespace mongo {
                 unused.setOfs( fileno, HeaderSize );
                 assert( (data-(char*)this) == HeaderSize );
                 unusedLength = fileLength - HeaderSize - 16;
-                memcpy(data+unusedLength, "      \nthe end\n", 16);
+                //memcpy(data+unusedLength, "      \nthe end\n", 16);
             }
         }
         
@@ -305,7 +309,7 @@ namespace mongo {
 
     inline Extent* MongoDataFile::_getExtent(DiskLoc loc) {
         loc.assertOk();
-        Extent *e = (Extent *) _p.at(loc.getOfs(), 16 * 1024);
+        Extent *e = (Extent *) _p.at(loc.getOfs(), Extent::HeaderSize());
         return e;
     }
 
@@ -324,7 +328,13 @@ namespace mongo {
     inline Record* MongoDataFile::recordAt(DiskLoc dl) {
         int ofs = dl.getOfs();
         assert( ofs >= DataFileHeader::HeaderSize );
-        return (Record*) _p.at(ofs, 4096/*TODO*/);
+        return (Record*) _p.at(ofs, -1);
+    }
+
+    inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
+        int ofs = dl.getOfs();
+        assert( ofs >= DataFileHeader::HeaderSize );
+        return (Record*) _p.at(ofs, size);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
@@ -444,6 +454,11 @@ namespace mongo {
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
         assert( dl.a() != -1 );
         return cc().database()->getFile(dl.a())->recordAt(dl);
+    }
+
+    inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) { 
+        assert( dl.a() != -1 );
+        return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, len);
     }
     
     void ensureHaveIdIndex(const char *ns);

@@ -23,10 +23,11 @@ namespace mongo {
     class MongoFile { 
     protected:
         virtual void close() = 0;
-        virtual long length() = 0;
         virtual void flush(bool sync) = 0;
         void created(); /* subclass must call after create */
     public:
+        virtual long length() = 0;
+
         enum Options {
             SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
         };
@@ -36,17 +37,24 @@ namespace mongo {
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
+
+        /* can be "overriden" if necessary */
+        static bool exists(boost::filesystem::path p) {
+            return boost::filesystem::exists(p);
+        }
     };
 
     class MFTemplate : public MongoFile {
     protected:
         virtual void close();
-        virtual long length();
         virtual void flush(bool sync);
     public:
+        virtual long length();
+
         class Pointer {
         public:
             void* at(int offset, int maxLen);
+            bool isNull() const;
         };
 
         Pointer map( const char *filename );
@@ -102,6 +110,9 @@ namespace mongo {
 
     void printMemInfo( const char * where );    
 
+//#include "ramstore.h"
+//    typedef RamStoreFile MMF;
     typedef MemoryMappedFile MMF;
+
 
 } // namespace mongo

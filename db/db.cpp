@@ -64,6 +64,10 @@ namespace mongo {
     
     extern string repairpath;
 
+#if defined(_WIN32)
+    std::wstring windowsServiceName = L"MongoDB";
+#endif
+
     void setupSignals();
     void closeAllSockets();
     void startReplication();
@@ -627,7 +631,7 @@ int main(int argc, char* argv[], char *envp[] )
 
     general_options.add_options()
         ("bind_ip", po::value<string>(&bind_ip),
-         "local ip address to bind listener - all local ips bound by default")
+         "comma separated list of ip addresses to listen on - all local ips by default")
         ("dbpath", po::value<string>()->default_value("/data/db/"), "directory for datafiles")
 #if !defined(_WIN32) && !defined(__sunos__)
         ("lockfilepath", po::value<string>(&lockfilepath), "directory for lockfile (if not set, dbpath is used)")
@@ -662,6 +666,9 @@ int main(int argc, char* argv[], char *envp[] )
         ("install", "install mongodb service")
         ("remove", "remove mongodb service")
         ("service", "start mongodb service")
+        ("serviceName", po::value<string>(), "windows service name")
+#else
+        ("nounixsocket", "disable listening on unix sockets")
 #endif
         ;
 
@@ -906,7 +913,20 @@ int main(int argc, char* argv[], char *envp[] )
             uassert( 12508 , "maxConns can't be greater than 10000000" , newSize < 10000000 );
             connTicketHolder.resize( newSize );
         }
+        if (params.count("nounixsocket")){
+            noUnixSocket = true;
+        }
         
+#if defined(_WIN32)
+        if (params.count("serviceName")){
+            string x = params["serviceName"].as<string>();
+            windowsServiceName = wstring(x.size(),L' ');
+            for ( size_t i=0; i<x.size(); i++)
+                windowsServiceName[i] = x[i];
+        }
+        #endif
+
+
         Module::configAll( params );
         dataFileSync.go();
 
@@ -950,17 +970,17 @@ int main(int argc, char* argv[], char *envp[] )
 
 #if defined(_WIN32)
         if ( installService ) {
-            if ( !ServiceController::installService( L"MongoDB", L"Mongo DB", L"Mongo DB Server", argc, argv ) )
+            if ( !ServiceController::installService( windowsServiceName , L"Mongo DB", L"Mongo DB Server", argc, argv ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( removeService ) {
-            if ( !ServiceController::removeService( L"MongoDB" ) )
+            if ( !ServiceController::removeService( windowsServiceName ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }
         else if ( startService ) {
-            if ( !ServiceController::startService( L"MongoDB", mongo::initService ) )
+            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) )
                 dbexit( EXIT_NTSERVICE_ERROR );
             dbexit( EXIT_CLEAN );
         }

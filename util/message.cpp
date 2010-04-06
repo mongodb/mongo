@@ -29,6 +29,8 @@
 
 namespace mongo {
 
+    bool noUnixSocket = false;
+
     bool objcheck = false;
     
 // if you want trace output:
@@ -42,61 +44,131 @@ namespace mongo {
     const int portRecvFlags = 0;
 #endif
 
+    vector<SockAddr> ipToAddrs(const char* ips, int port){
+        vector<SockAddr> out;
+        if (*ips == '\0'){
+            out.push_back(SockAddr("0.0.0.0", port)); // IPv4 all
+#ifndef _WIN32
+            out.push_back(SockAddr("::", port)); // IPv6 all
+            if (!noUnixSocket)
+                out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port)); // Unix socket
+#endif
+            return out;
+        }
+
+        while(*ips){
+            string ip;
+            const char * comma = strchr(ips, ',');
+            if (comma){
+                ip = string(ips, comma - ips);
+                ips = comma + 1;
+            }else{
+                ip = string(ips);
+                ips = "";
+            }
+
+            SockAddr sa(ip.c_str(), port);
+            out.push_back(sa);
+
+#ifndef _WIN32
+            if (!noUnixSocket && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
+                out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
+#endif
+        }
+        return out;
+
+    }
+
     /* listener ------------------------------------------------------------------- */
 
     void Listener::initAndListen() {
-        SockAddr me;
-        if ( ip.empty() )
-            me = SockAddr( port );
-        else
-            me = SockAddr( ip.c_str(), port );
-        int sock = ::socket(me.getType(), SOCK_STREAM, 0);
-        if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
-            return;
-        }
-        if (me.getType() == AF_UNIX){
-            unlink(me.getAddr().c_str());
-        }
-        prebindOptions( sock );
-        if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
-            int x = errno;
-            log() << "listen(): bind() failed " << OUTPUT_ERRNOX(x) << " for port: " << port << endl;
-            if ( x == EADDRINUSE )
-                log() << "  addr already in use" << endl;
-            closesocket(sock);
-            return;
-        }
+        vector<SockAddr> mine = ipToAddrs(ip.c_str(), port);
+        vector<int> socks;
+        int maxfd = 0; // needed for select()
 
-        if ( ::listen(sock, 128) != 0 ) {
-            log() << "listen(): listen() failed " << OUTPUT_ERRNO << endl;
-            closesocket(sock);
-            return;
-        }
+        for (vector<SockAddr>::iterator it=mine.begin(), end=mine.end(); it != end; ++it){
+            SockAddr& me = *it;
 
-        ListeningSockets::get()->add( sock );
+            int sock = ::socket(me.getType(), SOCK_STREAM, 0);
+            if ( sock == INVALID_SOCKET ) {
+                log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
+                return;
+            }
+
+            if (me.getType() == AF_UNIX){
+#if !defined(_WIN32)
+                unlink(me.getAddr().c_str());
+#endif
+            }else if (me.getType() == AF_INET6){
+                // IPv6 can also accept IPv4 connections as mapped addresses (::ffff:127.0.0.1)
+                // That causes a conflict if we don't do set it to IPV6_ONLY
+                const int one = 1;
+                setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (const char*) &one, sizeof(one));
+            }
+
+            prebindOptions( sock );
+            if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
+                int x = errno;
+                log() << "listen(): bind() failed " << OUTPUT_ERRNOX(x) << " for socket: " << me.toString() << endl;
+                if ( x == EADDRINUSE )
+                    log() << "  addr already in use" << endl;
+                closesocket(sock);
+                return;
+            }
+
+            if ( ::listen(sock, 128) != 0 ) {
+                log() << "listen(): listen() failed " << OUTPUT_ERRNO << endl;
+                closesocket(sock);
+                return;
+            }
+
+            ListeningSockets::get()->add( sock );
+
+            socks.push_back(sock);
+            if (sock > maxfd)
+                maxfd = sock;
+        }
 
         static long connNumber = 0;
         while ( ! inShutdown() ) {
-            SockAddr from;
-            int s = accept(sock, from.raw(), &from.addressSize);
-            if ( s < 0 ) {
-                int x = errno; // so no global issues
-                if ( x == ECONNABORTED || x == EBADF ) {
-                    log() << "Listener on port " << port << " aborted" << endl;
-                    return;
-                }
-                if ( x == 0 && inShutdown() ){
-                    // socket closed
-                    return;
-                }
-                log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNOX(x) << endl;
-                continue;
+            fd_set fds[1];
+            FD_ZERO(fds);
+
+            for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it){
+                FD_SET(*it, fds);
             }
-            if (from.getType() != AF_UNIX)
-                disableNagle(s);
-            if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
-            accepted(s, from);
+
+            const int ret = select(maxfd+1, fds, NULL, NULL, NULL);
+            if (ret == 0){
+                log() << "select() returned 0" << endl;
+                continue;
+            }else if (ret < 0){
+                log() << "select() failure: ret=" << ret << " " << OUTPUT_ERRNO << endl;
+                return;
+            }
+
+            for (vector<int>::iterator it=socks.begin(), end=socks.end(); it != end; ++it){
+                if (! (FD_ISSET(*it, fds)))
+                    continue;
+
+                SockAddr from;
+                int s = accept(*it, from.raw(), &from.addressSize);
+                if ( s < 0 ) {
+                    int x = errno; // so no global issues
+                    if ( x == ECONNABORTED || x == EBADF ) {
+                        log() << "Listener on port " << port << " aborted" << endl;
+                        return;
+                    } if ( x == 0 && inShutdown() ){
+                        return;   // socket closed
+                    }
+                    log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNOX(x) << endl;
+                    continue;
+                }
+                if (from.getType() != AF_UNIX)
+                    disableNagle(s);
+                if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+                accepted(s, from);
+            }
         }
     }
 
