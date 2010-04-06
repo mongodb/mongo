@@ -11,7 +11,7 @@
 
 /*
  * __wt_env_toc --
- *	WT_TOC constructor.
+ *	ENV.toc method.
  */
 int
 __wt_env_toc(ENV *env, WT_TOC **tocp)
@@ -42,6 +42,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	memset(toc, 0, sizeof(WT_TOC));
 
 	toc->env = env;
+	toc->gen = UINT32_MAX;
 	toc->hazard = ienv->hazard + slot * env->hazard_size;
 
 	WT_RET(__wt_mtx_alloc(env, 1, &toc->mtx));
@@ -59,7 +60,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 
 /*
  * __wt_wt_toc_close --
- *	toc.close method (WT_TOC close + destructor).
+ *	WT_TOC.close method.
  */
 int
 __wt_wt_toc_close(WT_TOC *toc)
@@ -111,6 +112,8 @@ __wt_wt_toc_close(WT_TOC *toc)
 }
 
 #ifdef HAVE_DIAGNOSTIC
+static const char *__wt_toc_print_state(WT_TOC *);
+
 int
 __wt_toc_dump(ENV *env)
 {
@@ -125,7 +128,8 @@ __wt_toc_dump(ENV *env)
 	__wt_mb_add(&mb, "%s\n", ienv->sep);
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 		__wt_mb_add(&mb,
-		    "toc: %#lx {\n\tworkq func: ", WT_PTR_TO_ULONG(toc));
+		    "toc: %#lx (gen: %lu) {\n\tworkq func: ",
+		    WT_PTR_TO_ULONG(toc), (u_long)toc->gen);
 		if (toc->wq_func == NULL)
 			__wt_mb_add(&mb, "none");
 		else
@@ -134,6 +138,7 @@ __wt_toc_dump(ENV *env)
 
 		__wt_mb_add(&mb, "\n\twq_addr: %lu, ", toc->wq_addr);
 		__wt_mb_add(&mb, "wq_bytes: %lu, ", toc->wq_bytes);
+		__wt_mb_add(&mb, "state: %s", __wt_toc_print_state(toc));
 
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = toc->hazard;
@@ -148,5 +153,26 @@ __wt_toc_dump(ENV *env)
 
 	__wt_mb_discard(&mb);
 	return (0);
+}
+
+/*
+ * __wt_toc_print_state --
+ *	Return the WT_TOC state as a string.
+ */
+static const char *
+__wt_toc_print_state(WT_TOC *toc)
+{
+	switch (toc->wq_state) {
+	case WT_WORKQ_FUNCTION:
+		return ("function");
+	case WT_WORKQ_READ:
+		return ("read");
+	case WT_WORKQ_READ_SCHED:
+		return ("read-sched");
+	case WT_WORKQ_NONE:
+		return ("none");
+	}
+	return ("unknown");
+	/* NOTREACHED */
 }
 #endif
