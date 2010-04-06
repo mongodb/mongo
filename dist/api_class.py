@@ -465,8 +465,6 @@ methods['db.get_recno'] = Api(
 	'method, cache',
 	['toc/WT_TOC *@S',
 	 'recno/u_int64_t @S',
-	 'key/DBT *@S',
-	 'pkey/DBT *@S',
 	 'data/DBT *@S',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
