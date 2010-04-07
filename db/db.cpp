@@ -351,7 +351,7 @@ namespace mongo {
         Client::GodScope gs;
         log(1) << "enter repairDatabases" << endl;
         
-        assert(checkNsFilesOnLoad);
+//        assert(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 
         dblock lk;
