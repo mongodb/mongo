@@ -23,6 +23,19 @@ extern bool checkNsFilesOnLoad;
 
 static set<RamStoreFile*> files;
 
+void RamStoreFile::grow(int offset, int len) {
+	cout << "GROW ofs:" << offset << " len:" << len;
+	assert( len > 0 );
+	Node& n = _m[offset];
+	cout << " oldlen:" << n.len << endl;
+	assert( n.len > 0 );
+	if( len > n.len ) { 
+		n.p = (char *) realloc(n.p, len);
+		memset(((char *)n.p) + n.len, 0, len - n.len);
+		n.len = len;
+	}
+}
+
 /* maxLen can be -1 for existing data */
 void* RamStoreFile::at(int offset, int maxLen) {
     if( offset != _last ) {

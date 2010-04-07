@@ -35,6 +35,8 @@ class RamStoreFile : public MongoFile {
 
     int _last;
 
+	void grow(int offset, int len);
+
     /* maxLen can be -1 for existing data */
     void* at(int offset, int maxLen);
 
@@ -57,10 +59,14 @@ public:
         RamStoreFile* _f;
         friend class RamStoreFile;
     public:
-        void* at(int offset, int maxLen) { 
-            assert( maxLen <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
-            return _f->at(offset,maxLen);
+        void* at(int offset, int len) { 
+            assert( len <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
+            return _f->at(offset,len);
         }
+		void grow(int offset, int len) {
+            assert( len <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
+            _f->grow(offset,len);
+		}
         bool isNull() const { return _f == 0; }
     };
 

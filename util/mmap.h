@@ -53,7 +53,8 @@ namespace mongo {
 
         class Pointer {
         public:
-            void* at(int offset, int maxLen);
+            void* at(int offset, int len);
+			void grow(int offset, int len);
             bool isNull() const;
         };
 
@@ -69,6 +70,7 @@ namespace mongo {
             Pointer() : _base(0) { }
             Pointer(void *p) : _base((char*) p) { }
             void* at(int offset, int maxLen) { return _base + offset; } 
+			void grow(int offset, int len) { /* no action required with mem mapped file */ }
             bool isNull() const { return _base == 0; }
         };
 

@@ -83,6 +83,7 @@ namespace mongo {
         Extent* _getExtent(DiskLoc loc);
         Record* recordAt(DiskLoc dl);
         Record* makeRecord(DiskLoc dl, int size);
+		void grow(DiskLoc dl, int size);
 
         MMF mmf;
         MMF::Pointer _p;
@@ -121,6 +122,7 @@ namespace mongo {
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
         static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
+		static void grow(const DiskLoc& dl, int len);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
@@ -331,6 +333,11 @@ namespace mongo {
         return (Record*) _p.at(ofs, -1);
     }
 
+	inline void MongoDataFile::grow(DiskLoc dl, int size) { 
+        int ofs = dl.getOfs();
+        _p.grow(ofs, size);
+	}
+
     inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) { 
         int ofs = dl.getOfs();
         assert( ofs >= DataFileHeader::HeaderSize );
@@ -456,9 +463,16 @@ namespace mongo {
         return cc().database()->getFile(dl.a())->recordAt(dl);
     }
 
+	BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
+
+	inline void DataFileMgr::grow(const DiskLoc& dl, int len) { 
+        assert( dl.a() != -1 );
+        cc().database()->getFile(dl.a())->grow(dl, len);
+	}
+
     inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) { 
         assert( dl.a() != -1 );
-        return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, len);
+        return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, sizeof(DeletedRecord));
     }
     
     void ensureHaveIdIndex(const char *ns);

@@ -452,6 +452,7 @@ namespace mongo {
     /*---------------------------------------------------------------------*/
 
     DiskLoc Extent::reuse(const char *nsname) { 
+		/*TODOMMF - work to do when extent is freed. */
         log(3) << "reset extent was:" << nsDiagnostic.buf << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         xnext.Null();
@@ -465,9 +466,10 @@ namespace mongo {
 
         int delRecLength = length - (_extentData - (char *) this);
         //DeletedRecord *empty1 = (DeletedRecord *) extentData;
-        DeletedRecord *empty = (DeletedRecord *) getRecord(emptyLoc);
+        DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);//(DeletedRecord *) getRecord(emptyLoc);
         //assert( empty == empty1 );
-        memset(empty, delRecLength, 1);
+
+        // do we want to zero the record? memset(empty, ...)
 
         empty->lengthWithHeaders = delRecLength;
         empty->extentOfs = myLoc.getOfs();

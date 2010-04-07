@@ -187,15 +187,16 @@ namespace mongo {
         if ( capped == 0 ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
+				DataFileMgr::grow(loc, regionlen);
                 return loc;
             }
         }
 
         /* split off some for further use. */
         r->lengthWithHeaders = lenToAlloc;
+		DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        /* TODOMMF split */
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
         newDel->extentOfs = r->extentOfs;
         newDel->lengthWithHeaders = left;
