@@ -1,3 +1,9 @@
+mongodb (1.2.5) unsable; urgency=low
+
+  * replication clock skew fix
+
+ -- Richard Kreuter <richard@10gen.com>  Fri, 05 Feb 2010 16:56:28 -0500
+
 mongodb (1.2.4) unsable; urgency=low
 
   * shell fix
