@@ -551,7 +551,7 @@ namespace mongo {
             a << "abc.foo" << fromjson( "{ 'key' : { 'a' : 1 } , 'unique' : false }" );
             a << "abc.bar" << fromjson( "{ 'key' : { 'kb' : -1 } , 'unique' : true }" );
             
-            b.appendArray( "sharded" , a.obj() );
+            b.append( "sharded" , a.obj() );
 
             DBConfig c;
             testInOut( c , b.obj() );
