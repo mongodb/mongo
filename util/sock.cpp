@@ -74,6 +74,9 @@ namespace mongo {
         if ( unknown == hostname )
             return unknown;
 
+        if (strchr(hostname, ':'))
+            return hostname;
+
         scoped_lock lk(sock_mutex);
 #if defined(_WIN32)
         if( inet_addr(hostname) != INADDR_NONE )

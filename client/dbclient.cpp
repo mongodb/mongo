@@ -439,7 +439,7 @@ namespace mongo {
 
         string ip;
         int port;
-        size_t idx = serverAddress.find( ":" );
+        size_t idx = serverAddress.rfind( ":" );
         if ( idx != string::npos ) {
             port = strtol( serverAddress.substr( idx + 1 ).c_str(), 0, 10 );
             ip = serverAddress.substr( 0 , idx );
@@ -467,7 +467,7 @@ namespace mongo {
 
         if ( !p->connect(*server) ) {
             stringstream ss;
-            ss << "couldn't connect to server " << serverAddress << " " << ip << ":" << port;
+            ss << "couldn't connect to server " << serverAddress << " {ip: \"" << ip <<  "\", port: " << port << '}';
             errmsg = ss.str();
             failed = true;
             return false;
