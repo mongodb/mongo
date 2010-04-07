@@ -82,7 +82,7 @@ namespace mongo {
     /* listener ------------------------------------------------------------------- */
 
     void Listener::initAndListen() {
-        vector<SockAddr> mine = ipToAddrs(ip.c_str(), port);
+        vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port);
         vector<int> socks;
         int maxfd = 0; // needed for select()
 
@@ -156,7 +156,7 @@ namespace mongo {
                 if ( s < 0 ) {
                     int x = errno; // so no global issues
                     if ( x == ECONNABORTED || x == EBADF ) {
-                        log() << "Listener on port " << port << " aborted" << endl;
+                        log() << "Listener on port " << _port << " aborted" << endl;
                         return;
                     } if ( x == 0 && inShutdown() ){
                         return;   // socket closed
@@ -166,7 +166,8 @@ namespace mongo {
                 }
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
-                if ( ! cmdLine.quiet ) log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
+                if ( _logConnect && ! cmdLine.quiet ) 
+                    log() << "connection accepted from " << from.toString() << " #" << ++connNumber << endl;
                 accepted(s, from);
             }
         }
