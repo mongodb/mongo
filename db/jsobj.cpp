@@ -754,7 +754,9 @@ namespace mongo {
                 if (! it.moreWithEOO() )
                     return false;
 
+                // both throw exception on failure
                 BSONElement e = it.next(true);
+                e.validate();
 
                 if (e.eoo()){
                     if (it.moreWithEOO())
@@ -762,6 +764,8 @@ namespace mongo {
                     its.pop_back();
                 }else if (e.isABSONObj()){
                     its.push_back(e.embeddedObject());
+                }else if (e.type() == CodeWScope){
+                    its.push_back(e.codeWScopeObject());
                 }
             }
         } catch (...) {
