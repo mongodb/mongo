@@ -1178,6 +1178,11 @@ testEnv.Alias( "startMongod", [add_exe("mongod")], [startMongodForTests] );
 testEnv.AlwaysBuild( "startMongod" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
+testEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [startMongodForTests] );
+testEnv.AlwaysBuild( "startMongodSmallOplog" );
+testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
+
+
 def addMongodReqTargets( env, target, source ):
     mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
     for target in mongodReqTargets:
