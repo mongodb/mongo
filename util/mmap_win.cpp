@@ -100,7 +100,7 @@ namespace mongo {
     }
 
     void MemoryMappedFile::flush(bool sync) {
-        uassert(13056, "Async flushing not supported on windows", sync);
+        uassert("Async flushing not supported on windows", sync);
 
         if (!view) return;
 
