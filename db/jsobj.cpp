@@ -748,10 +748,7 @@ namespace mongo {
     bool BSONObj::valid() const {
         try{
             BSONObjIterator it(*this);
-            while( true ){
-                if (! it.moreWithEOO() )
-                    return false;
-
+            while( it.moreWithEOO() ){
                 // both throw exception on failure
                 BSONElement e = it.next(true);
                 e.validate();
@@ -769,9 +766,8 @@ namespace mongo {
                 }
             }
         } catch (...) {
-            return false;
         }
-        return true;
+        return false;
     }
 
     /* well ordered compare */
