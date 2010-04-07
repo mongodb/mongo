@@ -746,10 +746,25 @@ namespace mongo {
 
 // todo: can be a little faster if we don't use toString() here.
     bool BSONObj::valid() const {
-        try {
-            toString();
-        }
-        catch (...) {
+        try{
+            vector<BSONObjIterator> its;
+            its.push_back(*this);
+            while( !its.empty() ){
+                BSONObjIterator& it = its.back();
+                if (! it.moreWithEOO() )
+                    return false;
+
+                BSONElement e = it.next(true);
+
+                if (e.eoo()){
+                    if (it.moreWithEOO())
+                        return false;
+                    its.pop_back();
+                }else if (e.isABSONObj()){
+                    its.push_back(e.embeddedObject());
+                }
+            }
+        } catch (...) {
             return false;
         }
         return true;
