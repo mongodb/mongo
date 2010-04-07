@@ -1587,6 +1587,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\ramstore.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\repl.cpp"
 					>
 				</File>

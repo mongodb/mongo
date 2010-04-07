@@ -31,7 +31,7 @@ namespace mongo {
 
     class Listener {
     public:
-        Listener(const string &_ip, int p) : ip(_ip), port(p) { }
+        Listener(const string &ip, int p, bool logConnect=true ) : _ip(ip), _port(p), _logConnect(logConnect) { }
         virtual ~Listener() {}
         void initAndListen(); // never returns unless error (start a thread)
 
@@ -42,8 +42,9 @@ namespace mongo {
         }
 
     private:
-        string ip;
-        int port;
+        string _ip;
+        int _port;
+        bool _logConnect;
     };
 
     class AbstractMessagingPort {

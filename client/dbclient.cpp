@@ -465,21 +465,6 @@ namespace mongo {
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
         p = auto_ptr<MessagingPort>(new MessagingPort());
 
-#if 0
-        //Right now some code depends on ports to identify a connection.
-        //Using unix sockets breaks this code
-        
-#ifndef _WIN32
-        if (server->getAddr() == "127.0.0.1"){
-            SockAddr _server (makeUnixSockPath(port).c_str(), port);
-            if (p->connect(_server)){
-                *server = _server;
-                return true;
-            }
-        }
-#endif
-#endif
-
         if ( !p->connect(*server) ) {
             stringstream ss;
             ss << "couldn't connect to server " << serverAddress << " " << ip << ":" << port;

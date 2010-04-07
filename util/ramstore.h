@@ -17,29 +17,26 @@
  *    limitations under the License.
  */
 
+extern bool checkNsFilesOnLoad;
+
 class RamStoreFile : public MongoFile {
     char name[256];
     struct Node { 
-        void *p;
+        char *p;
         int len;
         Node() : len(0) { }
+        void check();
     };
     map<int,Node> _m;
     long _len;
 
+    static void validate();
+    void check();
+
+    int _last;
+
     /* maxLen can be -1 for existing data */
-    void* at(int offset, int maxLen) {
-        Node& n = _m[offset];
-        if( n.len == 0 ) { 
-            // create
-            cout << "CREATE ofs:" << offset << " len:" << maxLen << endl;
-            assert( maxLen >= 0 );
-            n.p = calloc(maxLen+1, 1);
-            n.len = maxLen;
-        }
-        assert( n.len >= maxLen );
-        return n.p;
-    }
+    void* at(int offset, int maxLen);
 
 protected:
     virtual void close() { 
@@ -51,7 +48,8 @@ protected:
     virtual void flush(bool sync) { }
 
 public:
-    RamStoreFile() : _len(0) { }
+    ~RamStoreFile();
+    RamStoreFile();
 
     virtual long length() { return _len; }
 
