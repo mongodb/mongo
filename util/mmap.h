@@ -110,9 +110,10 @@ namespace mongo {
 
     void printMemInfo( const char * where );    
 
+#include "ramstore.h"
+
 //#define _RAMSTORE
 #if defined(_RAMSTORE)
-#include "ramstore.h"
     typedef RamStoreFile MMF;
 #else
     typedef MemoryMappedFile MMF;
