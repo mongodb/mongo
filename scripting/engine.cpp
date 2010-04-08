@@ -421,5 +421,15 @@ namespace mongo {
     void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
     
     ScriptEngine * globalScriptEngine;
+
+    bool hasJSReturn( const string& code ){
+        size_t x = code.find( "return" );
+        if ( x == string::npos )
+            return false;
+
+        return 
+            ( x == 0 || ! isalpha( code[x-1] ) ) &&
+            ! isalpha( code[x+6] );
+    }
 }
     

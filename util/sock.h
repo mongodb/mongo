@@ -115,6 +115,9 @@ namespace mongo {
     // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname);
 
+    void enableIPv6(bool state=true);
+    bool IPv6Enabled();
+
     struct SockAddr {
         SockAddr() {
             addressSize = sizeof(sa);

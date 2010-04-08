@@ -670,6 +670,7 @@ int main(int argc, char* argv[], char *envp[] )
 #else
         ("nounixsocket", "disable listening on unix sockets")
 #endif
+        ("ipv6", "enable IPv6 support (disabled by default)")
         ;
 
     replication_options.add_options()
@@ -916,6 +917,9 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("nounixsocket")){
             noUnixSocket = true;
         }
+        if (params.count("ipv6")){
+            enableIPv6();
+        }
         
 #if defined(_WIN32)
         if (params.count("serviceName")){
@@ -1123,11 +1127,18 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
     }
 }
 
+    void myPurecallHandler() {
+        rawOut( "pure virtual method called, printing stack:\n" );
+        printStackTrace();
+        abort();        
+    }
+    
     void setupSignals() {
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;
         else
             massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
+        _set_purecall_handler( myPurecallHandler );
     }
 #endif
 

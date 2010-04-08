@@ -98,6 +98,10 @@ namespace mongo {
             MongoFile * mmf = *i;
             if ( ! mmf )
                 continue;
+
+            PRINT(mmf);
+            PRINT(typeid(mmf).name());
+
             mmf->flush( sync );
         }
         return num;

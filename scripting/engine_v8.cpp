@@ -232,7 +232,7 @@ namespace mongo {
         string code = raw;
         if ( code.find( "function" ) == string::npos ){
             if ( code.find( "\n" ) == string::npos && 
-                 code.find( "return" ) == string::npos &&
+                 ! hasJSReturn( code ) && 
                  ( code.find( ";" ) == string::npos || code.find( ";" ) == code.size() - 1 ) ){
                 code = "return " + code;
             }
