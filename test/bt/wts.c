@@ -12,6 +12,11 @@
 extern void __wt_bt_debug_dbt(const char *, DBT *, FILE *);
 
 static int cb_bulk(DB *, DBT **, DBT **);
+static int wts_del_col(u_int64_t);
+static int wts_del_row(u_int64_t);
+static int wts_notfound_chk(ENV *, const char *, int, int, u_int64_t);
+static int wts_read_col(u_int64_t);
+static int wts_read_row(u_int64_t);
 
 int
 wts_setup(int reopen, int logfile)
@@ -42,7 +47,7 @@ wts_setup(int reopen, int logfile)
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
-		env->verbose_set(env, WT_VERB_CACHE | WT_VERB_SERVERS);
+		env->verbose_set(env, WT_VERB_ALL);
 		env->msgfile_set(env, g.logfp);
 	}
 
@@ -263,6 +268,7 @@ wts_ops()
 {
 	u_int64_t keyno;
 	u_int cnt;
+	int op;
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		/*
@@ -270,8 +276,21 @@ wts_ops()
 		 * not separately configured, they're a fixed percent of write
 		 * operations.
 		 */
+		op = rand() % 100;
 		keyno = MMRAND(1, g.c_total);
-		if ((u_int32_t)rand() % 100 <= g.c_read_pct) {
+		if ((u_int32_t)op > g.c_read_pct) {
+			switch (g.c_database_type) {
+			case ROW:
+				if (wts_del_row(keyno))
+					return (1);
+				break;
+			case FIX:
+			case VAR:
+				if (wts_del_col(keyno))
+					return (1);
+				break;
+			}
+		} else {
 			switch (g.c_database_type) {
 			case ROW:
 				if (wts_read_row(keyno))
@@ -283,9 +302,6 @@ wts_ops()
 					return (1);
 				break;
 			}
-		} else if (rand() % 100 <= 5) {
-			if (wts_del(keyno))
-				return (1);
 		}
 
 		if (cnt % 1000 == 0)
@@ -296,7 +312,7 @@ wts_ops()
 
 /*
  * wts_read_key_scan --
- *	Read some number of row database entries by record key.
+ *	Read and verify elements in a row database.
  */
 int
 wts_read_row_scan()
@@ -321,48 +337,37 @@ wts_read_row_scan()
 
 /*
  * wts_read_row --
- *	Read and verify a single row database record by key.
+ *	Read and verify a single element in a row database.
  */
-int
+static int
 wts_read_row(u_int64_t keyno)
 {
 	static DBT key, data, bdb_data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
-	int ret, notfound;
+	int notfound, ret;
 
 	db = g.wts_db;
 	toc = g.wts_toc;
 	env = db->env;
 
-	key_gen(&key, keyno);
-
 	/* Retrieve the BDB data item. */
-	if (bdb_read_key(
-	    key.data, key.size, &bdb_data.data, &bdb_data.size, &notfound))
+	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
 		return (1);
 
 	/* Retrieve the key/data pair by key. */
-	if ((ret = db->get(
-	    db, toc, &key, NULL, &data, 0)) != 0 && ret != WT_NOTFOUND) {
+	key_gen(&key, keyno);
+	if ((ret = db->row_get(
+	    db, toc, &key, &data, 0)) != 0 && ret != WT_NOTFOUND) {
 		env->err(env, ret,
 		    "wts_read_key: read row %llu by key", keyno);
 		return (1);
 	}
 
-	/* Check for not found status. */
-	if (notfound) {
-		if (ret == WT_NOTFOUND)
-			return (0);
-		env->errx(env, "WT returned deleted row %llu", keyno);
+	/* Check for not-found status. */
+	if (wts_notfound_chk(env, "wts_read_row", ret, notfound, keyno))
 		return (1);
-	}
-	if (ret != 0) {
-		env->errx(env,
-		    "WT returned existing row %llu as deleted", keyno);
-		return (1);
-	} 
 
 	/* Compare the two. */
 	if (data.size != bdb_data.size ||
@@ -378,7 +383,7 @@ wts_read_row(u_int64_t keyno)
 
 /*
  * wts_read_col_scan --
- *	Read some number of column database entries by record number.
+ *	Read and verify elements in a column database.
  */
 int
 wts_read_col_scan()
@@ -403,30 +408,35 @@ wts_read_col_scan()
 
 /*
  * wts_read_col --
- *	Read and verify a single record by record number.
+ *	Read and verify a single element in a column database.
  */
-int
+static int
 wts_read_col(u_int64_t keyno)
 {
 	static DBT data, bdb_data;
 	DB *db;
 	ENV *env;
 	WT_TOC *toc;
-	int ret;
+	int notfound, ret;
 
 	db = g.wts_db;
 	toc = g.wts_toc;
 	env = db->env;
 
+	/* Retrieve the BDB data item. */
+	if (bdb_read(keyno, &bdb_data.data, &bdb_data.size, &notfound))
+		return (1);
+
 	/* Retrieve the key/data pair by record number. */
-	if ((ret = db->get_recno(db, toc, keyno, &data, 0)) != 0) {
+	if ((ret = db->col_get(
+	    db, toc, keyno, &data, 0)) != 0 && ret != WT_NOTFOUND) {
 		env->err(env, ret,
 		    "wts_read_recno: read column %llu by recno", keyno);
 		return (1);
 	}
 
-	/* Retrieve the BDB data item. */
-	if (bdb_read_recno(keyno, &bdb_data.data, &bdb_data.size))
+	/* Check for not-found status. */
+	if (wts_notfound_chk(env, "wts_read_col", ret, notfound, keyno))
 		return (1);
 
 	/* Compare the two. */
@@ -443,11 +453,11 @@ wts_read_col(u_int64_t keyno)
 }
 
 /*
- * wts_del --
- *	Delete a record by key.
+ * wts_del_row --
+ *	Delete an element from a row database.
  */
-int
-wts_del(u_int64_t keyno)
+static int
+wts_del_row(u_int64_t keyno)
 {
 	static DBT key;
 	DB *db;
@@ -459,23 +469,70 @@ wts_del(u_int64_t keyno)
 	toc = g.wts_toc;
 	env = db->env;
 
-	/*
-	 * Delete the key/data pair by key -- if the item has already been
-	 * deleted, then we'll get back WT_NOTFOUND.
-	 */
+	if (bdb_del(keyno, &notfound))
+		return (1);
+
 	key_gen(&key, keyno);
-	if ((ret = db->del(db, toc, &key, 0)) != 0 && ret != WT_NOTFOUND) {
-		env->err(env, ret, "wts_del: delete row %llu by key", keyno);
+	if ((ret = db->row_del(db, toc, &key, 0)) != 0 && ret != WT_NOTFOUND) {
+		env->err(
+		    env, ret, "wts_del_row: delete row %llu by key", keyno);
 		return (1);
 	}
-	if (bdb_del(key.data, key.size, &notfound))
+	return (wts_notfound_chk(env, "wts_del_row", ret, notfound, keyno));
+}
+
+/*
+ * wts_del_col --
+ *	Delete an element from a column database.
+ */
+static int
+wts_del_col(u_int64_t keyno)
+{
+	static DBT key;
+	DB *db;
+	ENV *env;
+	WT_TOC *toc;
+	int notfound, ret;
+
+	db = g.wts_db;
+	toc = g.wts_toc;
+	env = db->env;
+
+	if (bdb_del(keyno, &notfound))
 		return (1);
-	if (ret == WT_NOTFOUND) {
-		if (notfound)
+
+	key_gen(&key, keyno);
+	if ((ret = db->col_del(db, toc, keyno, 0)) != 0 && ret != WT_NOTFOUND) {
+		env->err(
+		    env, ret, "wts_del_col: delete row %llu by key", keyno);
+		return (1);
+	}
+
+	return (wts_notfound_chk(env, "wts_del_col", ret, notfound, keyno));
+}
+
+/*
+ * wts_notfound_chk --
+ *	Compare notfound returns for consistency.
+ */
+static int
+wts_notfound_chk(
+    ENV *env, const char *f, int wt_ret, int bdb_notfound, u_int64_t keyno)
+{
+	/* Check for not found status. */
+	if (bdb_notfound) {
+		if (wt_ret == WT_NOTFOUND)
 			return (0);
+
 		env->errx(env,
-		    "wts_del: delete row %llu by key returned WT_NOTFOUND for "
-		    "existing key", keyno);
+		    "%s: row %llu: deleted in Berkeley DB, found in WiredTiger",
+		    f, keyno);
+		return (1);
+	}
+	if (wt_ret == WT_NOTFOUND) {
+		env->errx(env,
+		    "%s: row %llu: found in Berkeley DB, deleted in WiredTiger",
+		    f, keyno);
 		return (1);
 	}
 	return (0);

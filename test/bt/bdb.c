@@ -28,8 +28,6 @@ bdb_setup(int reopen)
 	assert(db_create(&db, dbenv, 0) == 0);
 	if (g.c_duplicates)
 		assert(db->set_flags(db, DB_DUP) == 0);
-	else
-		assert(db->set_flags(db, DB_RECNUM) == 0);
 
 	p = fname(BDB_PREFIX, "db");
 	if (!reopen)
@@ -71,16 +69,14 @@ bdb_insert(
 }
 
 int
-bdb_read_key(void *key_data,
-    u_int32_t key_size, void *datap, u_int32_t *sizep, int *notfoundp)
+bdb_read(u_int64_t keyno, void *datap, u_int32_t *sizep, int *notfoundp)
 {
 	static DBT key, data;
 	DB *db;
 	int ret;
 
 	*notfoundp = 0;
-	key.data = key_data;
-	key.size = key_size;
+	key_gen(&key, keyno);
 
 	db = g.bdb_db;
 
@@ -90,7 +86,7 @@ bdb_read_key(void *key_data,
 			return (0);
 		}
 		db->err(db, ret,
-		    "bdb_read_key: {%.*s}", (int)key_size, (char *)key_data);
+		    "bdb_read_key: {%.*s}", (int)key.size, (char *)key.data);
 		return (1);
 	}
 	*(void **)datap = data.data;
@@ -99,39 +95,14 @@ bdb_read_key(void *key_data,
 }
 
 int
-bdb_read_recno(u_int64_t arg_recno, void *datap, u_int32_t *data_sizep)
-{
-	static DBT key, data;
-	DB *db;
-	u_int32_t recno;
-	int ret;
-
-	recno = (u_int32_t)arg_recno;
-	key.data = &recno;
-	key.size = sizeof(recno);
-
-	db = g.bdb_db;
-
-	if ((ret = db->get(db, NULL, &key, &data, DB_SET_RECNO)) != 0) {
-		db->err(db, ret, "bdb_read_recno: %llu", arg_recno);
-		return (1);
-	}
-	*(void **)datap = data.data;
-	*data_sizep = data.size;
-	return (0);
-}
-
-int
-bdb_del(void *key_data, u_int32_t key_size, int *notfoundp)
+bdb_del(u_int64_t keyno, int *notfoundp)
 {
 	static DBT key;
 	DB *db;
 	int ret;
 
 	*notfoundp = 0;
-
-	key.data = key_data;
-	key.size = key_size;
+	key_gen(&key, keyno);
 
 	db = g.bdb_db;
 
@@ -141,7 +112,7 @@ bdb_del(void *key_data, u_int32_t key_size, int *notfoundp)
 			return (0);
 		}
 		db->err(db, ret,
-		    "bdb_read_key: {%.*s}", (int)key_size, (char *)key_data);
+		    "bdb_del: {%.*s}", (int)key.size, (char *)key.data);
 		return (1);
 	}
 	return (0);
