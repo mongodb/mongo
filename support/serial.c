@@ -31,7 +31,7 @@
 
 /*
  * __wt_toc_serialize_func --
- *	Configure a serialization request, and spin until it completes.
+ *	Schedule a serialization request, and spin until it completes.
  */
 int
 __wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
@@ -66,7 +66,7 @@ __wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
 
 /*
  * __wt_toc_serialize_io --
- *	Configure an io request, and block until it completes.
+ *	Schedule an io request, and block until it completes.
  */
 int
 __wt_toc_serialize_io(WT_TOC *toc, u_int32_t addr, u_int32_t bytes)
