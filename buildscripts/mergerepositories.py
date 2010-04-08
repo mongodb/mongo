@@ -155,7 +155,7 @@ Description: 10gen packages"""
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "sh", "-c",  "\"ls -lR ./" + dirtail + "\""])
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "cd ./"+dirtail + " && " + makeaptrepo])
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "cd ./"+dirtail + " && " + makeaptrelease])
-        run_for_effect(["scp", "-i", keyfile, "-r", "ubuntu@"+ubuntu.node.public_ip[0]+":./"+dirtail +'/*', outdir])
+        run_for_effect(["scp", "-o", "StrictHostKeyChecking no", "-i", keyfile, "-r", "ubuntu@"+ubuntu.node.public_ip[0]+":./"+dirtail +'/*', outdir])
 
     # TODO: yum repositories
 
