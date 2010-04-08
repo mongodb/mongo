@@ -310,9 +310,10 @@ DB.prototype.printCollectionStats = function(){
  *  <p>Levels :</p>
  *   <ul>
  *    <li>0=off</li>
- *    <li>1=log very slow (>100ms) operations</li>
+ *    <li>1=log very slow operations; optional argument slowms specifies slowness threshold</li>
  *    <li>2=log all</li>
  *  @param {String} level Desired level of profiling
+ *  @param {String} slowms For slow logging, query duration that counts as slow (default 100ms)
  *  @return SOMETHING_FIXME or null on error
  */
 DB.prototype.setProfilingLevel = function(level,slowms) {

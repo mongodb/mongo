@@ -167,18 +167,23 @@ namespace mongo {
     }
 
     void xmain();
-    struct SockStartupTests {
-        SockStartupTests() {
+
 #if defined(_WIN32)
-            WSADATA d;
-            if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                out() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
-                problem() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
-                dbexit( EXIT_NTSERVICE_ERROR );
+    namespace {
+        struct WinsockInit {
+            WinsockInit() {
+                WSADATA d;
+                if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
+                    out() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
+                    problem() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
+                    dbexit( EXIT_NTSERVICE_ERROR );
+                }
             }
+        } winsock_init;
+    }
 #endif
-        }
-    } sstests;
+
+    SockAddr unknownAddress( "0.0.0.0", 0 );
 
     ListeningSockets* ListeningSockets::_instance = new ListeningSockets();
     

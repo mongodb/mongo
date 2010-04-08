@@ -105,8 +105,6 @@ namespace mongo {
             delete response;
         }
     };
-
-    static SockAddr unknownAddress( "0.0.0.0", 0 );
     
     bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client = unknownAddress );
 

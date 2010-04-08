@@ -1,3 +1,10 @@
+mongodb (1.5.0) unstable; urgency=low
+
+  * replication w & real-time
+
+ -- Richard Kreuter <richard@10gen.com>  Wed, 22 Mar 2010 16:56:28 -0500
+
+
 mongodb (1.3.5) unstable; urgency=low
 
   * bug fixes

@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import with_statement
 import subprocess
 import sys
 import os
@@ -35,10 +36,6 @@ def pushrepo(repodir):
     # FIXME: delete the old
     [bucket.delete(olddeb) for olddeb in olddebs]
     
-    shutil.rmtree(outputroot)
-    shutil.rmtree(mergedir)
-    shutil.rmtree(repodir)
-
 def cat (inh, outh):
     inh.seek(0)
     for line in inh:
@@ -69,7 +66,8 @@ def fileify(string):
 def makedirs(f):
     try:
         os.makedirs(f)
-    except OSError as exc: # Python >2.5
+    except OSError: # as exc: # Python >2.5
+        exc=sys.exc_value
         if exc.errno == errno.EEXIST:
             pass
         else: 
@@ -241,6 +239,9 @@ def __main__():
         raise Exception("mergerepositories.py exited %d" % r)
     print repodir
     pushrepo(repodir)
+    shutil.rmtree(outputroot)
+    shutil.rmtree(mergedir)
+    shutil.rmtree(repodir)
 
     return 0
 

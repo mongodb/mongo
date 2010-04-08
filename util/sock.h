@@ -220,6 +220,8 @@ namespace mongo {
         struct sockaddr_storage sa;
     };
 
+    extern SockAddr unknownAddress; // ( "0.0.0.0", 0 )
+
     const int MaxMTU = 16384;
 
     inline string getHostName() {

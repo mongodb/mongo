@@ -120,7 +120,7 @@ namespace mongo {
     }
 
     void printShardingVersionInfo(){
-        log() << mongosCommand << " v0.3 (alpha 3) starting (--help for usage)" << endl;
+        log() << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
         printGitVersion();
         printSysInfo();
     }
