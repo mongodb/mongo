@@ -27,7 +27,7 @@ namespace SockTests {
     class HostByName {
     public:
         void run() {
-            ASSERT( hostbyname( "localhost" ) == "127.0.0.0" || hostbyname( "localhost" ) == "::1" );
+            ASSERT( hostbyname( "localhost" ) == "127.0.0.1" || hostbyname( "localhost" ) == "::1" );
             ASSERT_EQUALS( "127.0.0.1", hostbyname( "127.0.0.1" ) );
             ASSERT_EQUALS( "::1", hostbyname( "::1" ) );
         }
