@@ -58,7 +58,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 {
 	DB *db;
 	DBT *key, *data;
-	ENV *env;
 	IDB *idb;
 	WT_PAGE *page, *next;
 	u_int len;
@@ -68,7 +67,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	int ret;
 
 	db = toc->db;
-	env = toc->env;
 	idb = db->idb;
 	insert_cnt = 0;
 

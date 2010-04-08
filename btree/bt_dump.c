@@ -25,17 +25,13 @@ __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags)
 {
 	DB *db;
-	ENV *env;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int64_t fcnt;
 	u_int32_t addr;
-	int ret;
 
-	env = toc->env;
 	db = toc->db;
 	fcnt = 0;
-	ret = 0;
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC

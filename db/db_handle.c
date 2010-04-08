@@ -54,12 +54,6 @@ err:	(void)__wt_db_destroy(db);
 static int
 __wt_db_config_default(DB *db)
 {
-	ENV *env;
-	IDB *idb;
-
-	env = db->env;
-	idb = db->idb;
-
 	__wt_methods_db_lockout(db);
 	__wt_methods_db_init_transition(db);
 

@@ -20,12 +20,10 @@ int
 __wt_bt_stat(WT_TOC *toc)
 {
 	DB *db;
-	ENV *env;
 	IDB *idb;
 	WT_PAGE *page;
 
 	db = toc->db;
-	env = toc->env;
 	idb = db->idb;
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
