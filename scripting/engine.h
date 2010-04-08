@@ -162,5 +162,7 @@ namespace mongo {
         static void ( *_connectCallback )( DBClientWithCommands & );
     };
 
+    bool hasJSReturn( const string& s );
+
     extern ScriptEngine * globalScriptEngine;
 }
