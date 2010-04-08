@@ -443,21 +443,9 @@ namespace mongo {
         if ( idx != string::npos ) {
             port = strtol( serverAddress.substr( idx + 1 ).c_str(), 0, 10 );
             ip = serverAddress.substr( 0 , idx );
-            ip = hostbyname(ip.c_str());
         } else {
             port = CmdLine::DefaultDBPort;
-            if (serverAddress.find( "/" ) == string::npos){
-                ip = hostbyname( serverAddress.c_str() );
-            } else {
-                ip = serverAddress;
-            }
-        }
-        if( ip.empty() ) {
-            stringstream ss;
-            ss << "client connect: couldn't parse/resolve hostname: " << _serverAddress;
-            errmsg = ss.str();
-            failed = true;
-            return false;
+            ip = serverAddress;
         }
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
@@ -465,9 +453,14 @@ namespace mongo {
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
         p = auto_ptr<MessagingPort>(new MessagingPort());
 
+        if (server->getAddr() == "0.0.0.0"){
+            failed = true;
+            return false;
+        }
+
         if ( !p->connect(*server) ) {
             stringstream ss;
-            ss << "couldn't connect to server " << serverAddress << " {ip: \"" << ip <<  "\", port: " << port << '}';
+            ss << "couldn't connect to server {ip: \"" << ip <<  "\", port: " << port << '}';
             errmsg = ss.str();
             failed = true;
             return false;

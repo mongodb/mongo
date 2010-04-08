@@ -39,22 +39,26 @@ namespace mongo {
             as<sockaddr_un>().sun_family = AF_UNIX;
             strcpy(as<sockaddr_un>().sun_path, iporhost);
             addressSize = sizeof(sockaddr_un);
-        }else if (strchr(iporhost, ':')){
-            as<sockaddr_in6>().sin6_family = AF_INET6;
-            as<sockaddr_in6>().sin6_port = htons(port);
-#ifdef _WIN32
-            uassert(13081, "No IPv6 support on windows", false);
-#else
-            inet_pton(AF_INET6, iporhost, &as<sockaddr_in6>().sin6_addr);
-#endif
-            addressSize = sizeof(sockaddr_in6);
-        } else {
-            string ip = hostbyname( iporhost );
-            memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
-            as<sockaddr_in>().sin_family = AF_INET;
-            as<sockaddr_in>().sin_port = htons(port);
-            as<sockaddr_in>().sin_addr.s_addr = inet_addr(ip.c_str());
-            addressSize = sizeof(sockaddr_in);
+        }else{
+            addrinfo* addrs = NULL;
+            addrinfo hints;
+            memset(&hints, 0, sizeof(addrinfo));
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_flags = AI_ADDRCONFIG; 
+
+            stringstream ss;
+            ss << port;
+            int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+            if (ret){
+                log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
+                *this = SockAddr(port); 
+            }else{
+                //TODO: handle other addresses in linked list;
+                assert(addrs->ai_addrlen <= sizeof(sa));
+                memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
+                addressSize = addrs->ai_addrlen;
+                freeaddrinfo(addrs);
+            }
         }
     }
  
@@ -70,26 +74,11 @@ namespace mongo {
     }
 
     string hostbyname(const char *hostname) {
-        static string unknown = "0.0.0.0";
-        if ( unknown == hostname )
-            return unknown;
-
-        if (strchr(hostname, ':'))
-            return hostname;
-
-        scoped_lock lk(sock_mutex);
-#if defined(_WIN32)
-        if( inet_addr(hostname) != INADDR_NONE )
-            return hostname;
-#else
-        struct in_addr temp;
-        if ( inet_aton( hostname, &temp ) )
-            return hostname;
-#endif
-        struct hostent *h;
-        h = gethostbyname(hostname);
-        if ( h == 0 ) return "";
-        return inet_ntoa( *((struct in_addr *)(h->h_addr)) );
+        string addr =  SockAddr(hostname, 0).getAddr();
+        if (addr == "0.0.0.0")
+            return "";
+        else
+            return addr;
     }
 
     class UDPConnection {

@@ -154,20 +154,17 @@ namespace mongo {
         }
 
         string getAddr() const {
-            const int buflen=128;
-#if !defined(_WIN32)
-            char buffer[buflen];
-#endif
-
             switch (getType()){
-#ifdef _WIN32
-                case AF_INET: return inet_ntoa(as<sockaddr_in>().sin_addr);
-                case AF_INET6: return "No IPv6 support on windows";
-#else
-                case AF_INET:  return inet_ntop(getType(), &as<sockaddr_in>().sin_addr, buffer, addressSize);
-                case AF_INET6: return inet_ntop(getType(), &as<sockaddr_in6>().sin6_addr, buffer, addressSize);
-#endif
-                case AF_UNIX:  return (addressSize > 2 ?as<sockaddr_un>().sun_path : "anonymous unix socket");
+                case AF_INET:
+                case AF_INET6: {
+                    const int buflen=128;
+                    char buffer[buflen];
+                    int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
+                    massert(13082, gai_strerror(ret), ret == 0);
+                    return buffer;
+                }
+
+                case AF_UNIX:  return (addressSize > 2 ? as<sockaddr_un>().sun_path : "anonymous unix socket");
                 case AF_UNSPEC: return "(NONE)";
                 default: massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false); return "";
             }
