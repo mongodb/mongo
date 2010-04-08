@@ -31,6 +31,9 @@ namespace mongo {
     }
 
     SockAddr::SockAddr(const char * iporhost , int port) {
+        if (!strcmp(iporhost, "localhost"))
+            iporhost = "127.0.0.1";
+
         if (strchr(iporhost, '/')){
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
