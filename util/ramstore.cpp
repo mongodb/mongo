@@ -19,7 +19,7 @@
 
 namespace mongo {
 
-extern bool checkNsFilesOnLoad;
+	//extern bool checkNsFilesOnLoad;
 
 static set<RamStoreFile*> files;
 
@@ -85,7 +85,7 @@ RamStoreFile::~RamStoreFile() {
 }
 
 RamStoreFile::RamStoreFile() : _len(0) { 
-    checkNsFilesOnLoad = false;
+	//    checkNsFilesOnLoad = false;
     files.insert(this);
 }
 
