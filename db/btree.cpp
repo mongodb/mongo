@@ -665,13 +665,18 @@ found:
         if ( split_debug )
             out() << "    " << thisLoc.toString() << ".split" << endl;
 
-        int mid = n / 2;
+        int split = n / 2;
+        if ( keypos == n ) { // see SERVER-983
+            split = 0.9 * n;
+            if ( split > n - 2 )
+                split = n - 2;
+        }
 
         DiskLoc rLoc = addBucket(idx);
         BtreeBucket *r = rLoc.btreemod();
         if ( split_debug )
-            out() << "     mid:" << mid << ' ' << keyNode(mid).key.toString() << " n:" << n << endl;
-        for ( int i = mid+1; i < n; i++ ) {
+            out() << "     split:" << split << ' ' << keyNode(split).key.toString() << " n:" << n << endl;
+        for ( int i = split+1; i < n; i++ ) {
             KeyNode kn = keyNode(i);
             r->pushBack(kn.recordLoc, kn.key, order, kn.prevChildBucket);
         }
@@ -684,18 +689,18 @@ found:
         rLoc.btree()->fixParentPtrs(rLoc);
 
         {
-            KeyNode middle = keyNode(mid);
-            nextChild = middle.prevChildBucket; // middle key gets promoted, its children will be thisLoc (l) and rLoc (r)
+            KeyNode splitkey = keyNode(split);
+            nextChild = splitkey.prevChildBucket; // splitkey key gets promoted, its children will be thisLoc (l) and rLoc (r)
             if ( split_debug ) {
-                out() << "    middle key:" << middle.key.toString() << endl;
+                out() << "    splitkey key:" << splitkey.key.toString() << endl;
             }
 
-            // promote middle to a parent node
+            // promote splitkey to a parent node
             if ( parent.isNull() ) {
                 // make a new parent if we were the root
                 DiskLoc L = addBucket(idx);
                 BtreeBucket *p = L.btreemod();
-                p->pushBack(middle.recordLoc, middle.key, order, thisLoc);
+                p->pushBack(splitkey.recordLoc, splitkey.key, order, thisLoc);
                 p->nextChild = rLoc;
                 p->assertValid( order );
                 parent = idx.head = L;
@@ -708,22 +713,22 @@ found:
                 */
                 rLoc.btreemod()->parent = parent;
                 if ( split_debug )
-                    out() << "    promoting middle key " << middle.key.toString() << endl;
-                parent.btree()->_insert(parent, middle.recordLoc, middle.key, order, /*dupsallowed*/true, thisLoc, rLoc, idx);
+                    out() << "    promoting splitkey key " << splitkey.key.toString() << endl;
+                parent.btree()->_insert(parent, splitkey.recordLoc, splitkey.key, order, /*dupsallowed*/true, thisLoc, rLoc, idx);
             }
         }
 
-        truncateTo(mid, order);  // note this may trash middle.key.  thus we had to promote it before finishing up here.
+        truncateTo(split, order);  // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
 
         // add our new key, there is room now
         {
 
-            if ( keypos <= mid ) {
+            if ( keypos <= split ) {
                 if ( split_debug )
-                    out() << "  keypos<mid, insertHere() the new key" << endl;
+                    out() << "  keypos<split, insertHere() the new key" << endl;
                 insertHere(thisLoc, keypos, recordLoc, key, order, lchild, rchild, idx);
             } else {
-                int kp = keypos-mid-1;
+                int kp = keypos-split-1;
                 assert(kp>=0);
                 rLoc.btree()->insertHere(rLoc, kp, recordLoc, key, order, lchild, rchild, idx);
             }

@@ -72,6 +72,9 @@ namespace BtreeTests {
             bt()->assertValid( order(), true );
             ASSERT_EQUALS( nKeys, bt()->fullValidate( dl(), order() ) );
         }
+        void dump() {
+            bt()->dumpTree( dl(), order() );
+        }
         void insert( BSONObj &key ) {
             bt()->bt_insert( dl(), recordLoc(), key, order(), true, id(), true );
         }
@@ -206,10 +209,12 @@ namespace BtreeTests {
     class MissingLocateMultiBucket : public Base {
     public:
         void run() {
-            for ( int i = 0; i < 10; ++i ) {
-                BSONObj k = key( 'b' + 2 * i );
-                insert( k );
+            for ( int i = 0; i < 8; ++i ) {
+                insert( i );
             }
+            insert( 9 );
+            insert( 8 );
+//            dump();
             BSONObj straddle = key( 'i' );
             locate( straddle, 0, false, dl(), 1 );
             straddle = key( 'k' );
@@ -219,8 +224,34 @@ namespace BtreeTests {
         BSONObj key( char c ) {
             return simpleKey( c, 800 );
         }
+        void insert( int i ) {
+            BSONObj k = key( 'b' + 2 * i );
+            Base::insert( k );            
+        }
     };
 
+    class SERVER983 : public Base {
+    public:
+        void run() {
+            for ( int i = 0; i < 10; ++i ) {
+                insert( i );
+            }
+//            dump();
+            BSONObj straddle = key( 'o' );
+            locate( straddle, 0, false, dl(), 1 );
+            straddle = key( 'q' );
+            locate( straddle, 0, false, dl(), -1 );
+        }
+    private:
+        BSONObj key( char c ) {
+            return simpleKey( c, 800 );
+        }
+        void insert( int i ) {
+            BSONObj k = key( 'b' + 2 * i );
+            Base::insert( k );            
+        }        
+    };
+    
     class All : public Suite {
     public:
         All() : Suite( "btree" ){
@@ -233,6 +264,7 @@ namespace BtreeTests {
             add< SplitLeftHeavyBucket >();
             add< MissingLocate >();
             add< MissingLocateMultiBucket >();
+            add< SERVER983 >();
         }
     } myall;
 }
