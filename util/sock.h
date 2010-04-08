@@ -35,8 +35,8 @@ namespace mongo {
     inline int getLastError() {
         return WSAGetLastError();
     }
-    inline char* gai_strerror(int code) {
-        return gai_strerrorA(code);
+    inline const char* gai_strerror(int code) {
+        return ::gai_strerrorA(code);
     }
     inline void disableNagle(int sock) {
         int x = 1;
