@@ -35,10 +35,6 @@ def pushrepo(repodir):
     # FIXME: delete the old
     [bucket.delete(olddeb) for olddeb in olddebs]
     
-    shutil.rmtree(outputroot)
-    shutil.rmtree(mergedir)
-    shutil.rmtree(repodir)
-
 def cat (inh, outh):
     inh.seek(0)
     for line in inh:
@@ -241,6 +237,9 @@ def __main__():
         raise Exception("mergerepositories.py exited %d" % r)
     print repodir
     pushrepo(repodir)
+    shutil.rmtree(outputroot)
+    shutil.rmtree(mergedir)
+    shutil.rmtree(repodir)
 
     return 0
 
