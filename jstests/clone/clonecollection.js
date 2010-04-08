@@ -123,10 +123,10 @@ ret = finishstartclone();
 finishclone( ret );
 
 assert.eq( 100000, t.a.find().count() );
-assert.eq( 1, t.a.find( { i: 200000 } ).count() );
+assert.eq( 1, t.a.find( { i: 200000 } ).count(), "CA" );
 assert.eq( 0, t.a.find( { i: -1 } ).count() );
 assert.eq( 0, t.a.find( { i: 0 } ).count() );
-assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() );
+assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count(), "CB" );
 
 
 // Now test oplog running out of space -- specify small size clone oplog for test.
