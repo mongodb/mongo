@@ -24,7 +24,9 @@ namespace mongo {
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;
+
         void created(); /* subclass must call after create */
+        void destroyed(); /* subclass must call in destructor */
     public:
         virtual long length() = 0;
 
@@ -32,7 +34,7 @@ namespace mongo {
             SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
         };
 
-        virtual ~MongoFile();
+        virtual ~MongoFile() {}
 
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
@@ -75,7 +77,10 @@ namespace mongo {
         };
 
         MemoryMappedFile();
-        ~MemoryMappedFile() { close(); }
+        ~MemoryMappedFile() {
+            destroyed();
+            close();
+        }
         void close();
         
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)

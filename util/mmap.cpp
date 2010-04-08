@@ -57,7 +57,7 @@ namespace mongo {
     static set<MongoFile*> mmfiles;
     static mongo::mutex mmmutex;
 
-    MongoFile::~MongoFile() {
+    void MongoFile::destroyed() {
         scoped_lock lk( mmmutex );
         mmfiles.erase(this);
     }
@@ -70,6 +70,9 @@ namespace mongo {
             return;
         }
         ++closingAllFiles;
+
+        scoped_lock lk( mmmutex );
+
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             (*i)->close();
@@ -98,9 +101,6 @@ namespace mongo {
             MongoFile * mmf = *i;
             if ( ! mmf )
                 continue;
-
-            PRINT(mmf);
-            PRINT(typeid(mmf).name());
 
             mmf->flush( sync );
         }
