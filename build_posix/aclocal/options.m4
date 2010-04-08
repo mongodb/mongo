@@ -9,10 +9,10 @@ AC_DEFUN([AM_OPTIONS], [
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
 	[AC_HELP_STRING([--enable-debug],
-	    [Configure for debug symbols.])], r=set, r=notset)
+	    [Configure for debug symbols.])], r=$enableval, r=no)
 case "$r" in
-set)	db_cv_enable_debug=yes;;
-notset)	db_cv_enable_debug=no;;
+no)	db_cv_enable_debug=no;;
+*)	db_cv_enable_debug=yes;;
 esac
 AC_MSG_RESULT($db_cv_enable_debug)
 
@@ -20,36 +20,24 @@ AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,
 	[AC_HELP_STRING([--enable-diagnostic],
-	    [Configure for diagnostic tests.])], r=set, r=notset)
+	    [Configure for diagnostic tests.])], r=$enableval, r=no)
 case "$r" in
-set)	AC_DEFINE(HAVE_DIAGNOSTIC)
+no)	db_cv_enable_diagnostic=no;;
+*)	AC_DEFINE(HAVE_DIAGNOSTIC)
 	db_cv_enable_diagnostic=yes;;
-notset)	db_cv_enable_diagnostic=no;;
 esac
 AC_MSG_RESULT($db_cv_enable_diagnostic)
 
-AH_TEMPLATE(HAVE_DIAGNOSTIC_MEMORY, [Define to 1 for memory tracking output.])
-AC_MSG_CHECKING(if --enable-diagnostic_memory option specified)
-AC_ARG_ENABLE(diagnostic_memory,
-	[AC_HELP_STRING([--enable-diagnostic_memory],
-	    [Configure for memory tracking output.])], r=set, r=notset)
+AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
+AC_MSG_CHECKING(if --enable-verbose option specified)
+AC_ARG_ENABLE(verbose,
+	[AC_HELP_STRING([--enable-verbose],
+	    [Configure for Env.verbose_set method.])], r=$enableval, r=yes)
 case "$r" in
-set)	AC_DEFINE(HAVE_DIAGNOSTIC_MEMORY)
-	db_cv_enable_diagnostic_memory=yes;;
-notset)	db_cv_enable_diagnostic_memory=no;;
+no)	db_cv_enable_verbose=no;;
+*)	AC_DEFINE(HAVE_VERBOSE)
+	db_cv_enable_verbose=yes;;
 esac
-AC_MSG_RESULT($db_cv_enable_diagnostic_memory)
-
-AH_TEMPLATE(HAVE_SMALLBUILD, [Define to 1 for a small build.])
-AC_MSG_CHECKING(if --enable-smallbuild option specified)
-AC_ARG_ENABLE(smallbuild,
-	[AC_HELP_STRING([--enable-smallbuild],
-	    [Configure for a small build.])], r=set, r=notset)
-case "$r" in
-set)	AC_DEFINE(HAVE_SMALLBUILD)
-	db_cv_enable_smallbuild=yes;;
-notset)	db_cv_enable_smallbuild=no;;
-esac
-AC_MSG_RESULT($db_cv_enable_smallbuild)
+AC_MSG_RESULT($db_cv_enable_verbose)
 
 ])
