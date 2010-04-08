@@ -1127,11 +1127,18 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
     }
 }
 
+    void myPurecallHandler() {
+        rawOut( "pure virtual method called, printing stack:\n" );
+        printStackTrace();
+        abort();        
+    }
+    
     void setupSignals() {
         if( SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE ) )
             ;
         else
             massert( 10297 , "Couldn't register Windows Ctrl-C handler", false);
+        _set_purecall_handler( myPurecallHandler );
     }
 #endif
 
