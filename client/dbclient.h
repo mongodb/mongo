@@ -754,14 +754,16 @@ namespace mongo {
         void _checkConnection();
         void checkConnection() { if( failed ) _checkConnection(); }
 		map< string, pair<string,string> > authCache;
+        int _timeout;
     public:
 
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientPaired.  You do not need to specify this parameter
+           @param timeout tcp timeout in seconds - this is for read/write, not connect
          */
-        DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0) :
-                clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0) { }
+        DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0,int timeout=0) :
+                clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
 
         /** Connect to a Mongo database server.
 
@@ -924,6 +926,9 @@ namespace mongo {
         }
     };
     
+    /** pings server to check if it's up
+     */
+    bool serverAlive( const string &uri );
 
     DBClientBase * createDirectClient();
     

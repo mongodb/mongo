@@ -451,7 +451,7 @@ namespace mongo {
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
-        p = auto_ptr<MessagingPort>(new MessagingPort());
+        p = auto_ptr<MessagingPort>(new MessagingPort( _timeout ));
 
         if (server->getAddr() == "0.0.0.0"){
             failed = true;
@@ -1006,4 +1006,14 @@ namespace mongo {
 		}
 	}
 
+    bool serverAlive( const string &uri ) {
+        DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
+        string err;
+        if ( !c.connect( uri, err ) )
+            return false;
+        if ( !c.simpleCommand( "admin", 0, "ping" ) )
+            return false;
+        return true;
+    }
+    
 } // namespace mongo

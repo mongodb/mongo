@@ -1606,7 +1606,7 @@ namespace mongo {
 
     bool ReplSource::connect() {
         if ( conn.get() == 0 ) {
-            conn = auto_ptr<DBClientConnection>(new DBClientConnection());
+            conn = auto_ptr<DBClientConnection>(new DBClientConnection( false, 0, replPair ? 20 : 0 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !conn->connect(hostName.c_str(), errmsg) || 

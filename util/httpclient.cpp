@@ -94,15 +94,11 @@ namespace mongo {
         { 
             const char * out = req.c_str();
             int toSend = req.size();
-            while ( toSend ){
-                int did = p.send( out , toSend );
-                toSend -= did;
-                out += did;
-            }
+            p.send( out , toSend, "_go" );
         }
         
         char buf[4096];
-        int got = p.recv( buf , 4096 );
+        int got = p.unsafe_recv( buf , 4096 );
         buf[got] = 0;
 
         int rc;
@@ -114,7 +110,7 @@ namespace mongo {
         if ( result )
             sb << buf;
         
-        while ( ( got = p.recv( buf , 4096 ) ) > 0){
+        while ( ( got = p.unsafe_recv( buf , 4096 ) ) > 0){
             if ( result )
                 sb << buf;
         }

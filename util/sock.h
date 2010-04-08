@@ -101,15 +101,14 @@ namespace mongo {
         return "/tmp/mongodb-" + BSONObjBuilder::numStr(port) + ".sock";
     }
 
-    inline void setSockReceiveTimeout(int sock, int secs) {
-// todo - finish - works?
+    inline void setSockTimeouts(int sock, int secs) {
         struct timeval tv;
-        tv.tv_sec = 0;//secs;
-        tv.tv_usec = 1000;
-        int rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv));
-        if ( rc ) {
-            out() << "ERROR: setsockopt RCVTIMEO failed rc:" << rc << " " << OUTPUT_ERRNO << " secs:" << secs << " sock:" << sock << endl;
-        }
+        tv.tv_sec = secs;
+        tv.tv_usec = 0;
+        massert( 13083, "unable to set SO_RCVTIMEO",
+                setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *) &tv, sizeof(tv) ) == 0 );
+        massert( 13084, "unable to set SO_SNDTIMEO",
+                setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (void *) &tv, sizeof(tv) ) == 0 );
     }
 
     // If an ip address is passed in, just return that.  If a hostname is passed

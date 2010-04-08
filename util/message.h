@@ -59,7 +59,12 @@ namespace mongo {
     class MessagingPort : public AbstractMessagingPort {
     public:
         MessagingPort(int sock, const SockAddr& farEnd);
-        MessagingPort();
+
+        // in some cases the timeout will actually be 2x this value - eg we do a partial send,
+        // then the timeout fires, then we try to send again, then the timeout fires again with
+        // no data sent, then we detect that the other side is down
+        MessagingPort(int timeout = 0);
+
         virtual ~MessagingPort();
 
         void shutdown();
@@ -79,13 +84,18 @@ namespace mongo {
 
         virtual unsigned remotePort();
 
-        int send( const char * data , const int len );
-        int recv( char * data , int max );
+        // send len or throw SocketException
+        void send( const char * data , int len, const char *context );
+        // recv len or throw SocketException
+        void recv( char * data , int len );
+        
+        int unsafe_recv( char *buf, int max );
     private:
         int sock;
         PiggyBackData * piggyBackData;
     public:
         SockAddr farEnd;
+        int _timeout;
 
         friend class PiggyBackData;
     };
