@@ -172,12 +172,13 @@ struct __wt_stats {
 #define	WT_STAT_ENV_OPEN			   56
 #define	WT_STAT_ENV_STAT_CLEAR			   57
 #define	WT_STAT_ENV_STAT_PRINT			   58
-#define	WT_STAT_ENV_TOC				   59
-#define	WT_STAT_ENV_TOC_SIZE_GET		   60
-#define	WT_STAT_ENV_TOC_SIZE_SET		   61
-#define	WT_STAT_ENV_VERBOSE_GET			   62
-#define	WT_STAT_ENV_VERBOSE_SET			   63
-#define	WT_STAT_WT_TOC_CLOSE			   64
+#define	WT_STAT_ENV_SYNC			   59
+#define	WT_STAT_ENV_TOC				   60
+#define	WT_STAT_ENV_TOC_SIZE_GET		   61
+#define	WT_STAT_ENV_TOC_SIZE_SET		   62
+#define	WT_STAT_ENV_VERBOSE_GET			   63
+#define	WT_STAT_ENV_VERBOSE_SET			   64
+#define	WT_STAT_WT_TOC_CLOSE			   65
 
 /* Statistics section: END */
 

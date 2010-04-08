@@ -228,6 +228,14 @@ methods['env.stat_print'] = Api(
 	['__NONE__'],
 	['init'], [])
 
+methods['env.sync'] = Api(
+	'env.sync',
+	'method',
+	['progress/void (*@S)(const char *, u_int64_t)',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
 methods['env.toc'] = Api(
 	'env.toc',
 	'method, ienvlock',

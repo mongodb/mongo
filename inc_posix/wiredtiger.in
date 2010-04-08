@@ -422,6 +422,9 @@ struct __env {
 	int (*stat_print)(
 	    ENV *, FILE *, u_int32_t );
 
+	int (*sync)(
+	    ENV *, void (*)(const char *, u_int64_t), u_int32_t );
+
 	int (*toc)(
 	    ENV *, u_int32_t , WT_TOC **);
 
@@ -506,6 +509,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_ENV_OPEN				0x00000000
 #define	WT_APIMASK_ENV_STAT_CLEAR			0x00000000
 #define	WT_APIMASK_ENV_STAT_PRINT			0x00000000
+#define	WT_APIMASK_ENV_SYNC				0x00000000
 #define	WT_APIMASK_ENV_TOC				0x00000000
 #define	WT_APIMASK_ENV_VERBOSE_SET			0x0000001f
 #define	WT_APIMASK_IDB					0x00000007

@@ -1074,6 +1074,25 @@ static int __wt_api_env_stat_print(
 	return (ret);
 }
 
+static int __wt_api_env_sync(
+	ENV *env,
+	void (*progress)(const char *, u_int64_t),
+	u_int32_t flags);
+static int __wt_api_env_sync(
+	ENV *env,
+	void (*progress)(const char *, u_int64_t),
+	u_int32_t flags)
+{
+	const char *method_name = "ENV.sync";
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_ENV_SYNC);
+	WT_STAT_INCR(ienv->method_stats, ENV_SYNC);
+	ret = __wt_env_sync(env, progress);
+	return (ret);
+}
+
 static int __wt_api_env_toc(
 	ENV *env,
 	u_int32_t flags,
@@ -1426,6 +1445,9 @@ __wt_methods_env_lockout(ENV *env)
 	env->stat_print = (int (*)
 	    (ENV *, FILE *, u_int32_t ))
 	    __wt_env_lockout;
+	env->sync = (int (*)
+	    (ENV *, void (*)(const char *, u_int64_t), u_int32_t ))
+	    __wt_env_lockout;
 	env->toc = (int (*)
 	    (ENV *, u_int32_t , WT_TOC **))
 	    __wt_env_lockout;
@@ -1490,6 +1512,7 @@ __wt_methods_env_open_transition(ENV *env)
 	    (ENV *, u_int32_t ))
 	    __wt_env_lockout;
 	env->db = __wt_api_env_db;
+	env->sync = __wt_api_env_sync;
 	env->toc = __wt_api_env_toc;
 }
 

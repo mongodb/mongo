@@ -207,6 +207,8 @@ __wt_env_stat_clear(ENV *env);
 void
 __wt_stat_print(ENV *env, WT_STATS *s, FILE *stream);
 int
+__wt_env_sync(ENV *env, void (*f)(const char *, u_int64_t));
+int
 __wt_env_toc(ENV *env, WT_TOC **tocp);
 int
 __wt_wt_toc_close(WT_TOC *toc);

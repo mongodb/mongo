@@ -217,7 +217,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 66, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 67, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -286,6 +286,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ENV_OPEN].desc = "env.open";
 	stats[WT_STAT_ENV_STAT_CLEAR].desc = "env.stat_clear";
 	stats[WT_STAT_ENV_STAT_PRINT].desc = "env.stat_print";
+	stats[WT_STAT_ENV_SYNC].desc = "env.sync";
 	stats[WT_STAT_ENV_TOC].desc = "env.toc";
 	stats[WT_STAT_ENV_TOC_SIZE_GET].desc = "env.toc_size_get";
 	stats[WT_STAT_ENV_TOC_SIZE_SET].desc = "env.toc_size_set";
@@ -359,6 +360,7 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_ENV_OPEN].v = 0;
 	stats[WT_STAT_ENV_STAT_CLEAR].v = 0;
 	stats[WT_STAT_ENV_STAT_PRINT].v = 0;
+	stats[WT_STAT_ENV_SYNC].v = 0;
 	stats[WT_STAT_ENV_TOC].v = 0;
 	stats[WT_STAT_ENV_TOC_SIZE_GET].v = 0;
 	stats[WT_STAT_ENV_TOC_SIZE_SET].v = 0;

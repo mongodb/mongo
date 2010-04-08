@@ -46,6 +46,7 @@ env/env_init.c
 env/env_msg.c
 env/env_open.c
 env/env_stat.c
+env/env_sync.c
 env/env_toc.c
 env/env_workq.c
 os_posix/os_abort.c
