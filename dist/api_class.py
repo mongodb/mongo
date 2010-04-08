@@ -376,7 +376,7 @@ methods['db.close'] = Api(
 	'db.close',
 	'method, toc',
 	['flags/u_int32_t @S'],
-	['__NONE__'],
+	['NOFLUSH'],
 	['init'], [])
 
 methods['db.col_del'] = Api(

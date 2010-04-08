@@ -157,7 +157,7 @@ __wt_db_huffman_set(DB *db,
 int
 __wt_db_open(WT_TOC *toc, const char *dbname, mode_t mode, u_int32_t flags);
 int
-__wt_db_close(WT_TOC *toc);
+__wt_db_close(WT_TOC *toc, u_int32_t flags);
 int
 __wt_db_stat_print(WT_TOC *toc, FILE *stream);
 int

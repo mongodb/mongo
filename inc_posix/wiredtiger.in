@@ -473,6 +473,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_INSERT					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
 #define	WT_MODIFIED					0x00000002
+#define	WT_NOFLUSH					0x00000001
 #define	WT_PINNED					0x00000001
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
@@ -488,7 +489,7 @@ char	*wiredtiger_version(int *, int *, int *);
 
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
-#define	WT_APIMASK_DB_CLOSE				0x00000000
+#define	WT_APIMASK_DB_CLOSE				0x00000001
 #define	WT_APIMASK_DB_COL_DEL				0x00000000
 #define	WT_APIMASK_DB_COL_GET				0x00000000
 #define	WT_APIMASK_DB_COL_PUT				0x00000000

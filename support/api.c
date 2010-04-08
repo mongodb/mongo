@@ -274,7 +274,7 @@ static int __wt_api_db_close(
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_CLOSE);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_CLOSE);
-	ret = __wt_db_close(toc);
+	ret = __wt_db_close(toc, flags);
 	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }

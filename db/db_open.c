@@ -72,7 +72,7 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
  *	Db.close method (DB close & handle destructor).
  */
 int
-__wt_db_close(WT_TOC *toc)
+__wt_db_close(WT_TOC *toc, u_int32_t flags)
 {
 	DB *db;
 	int ret;
@@ -80,7 +80,8 @@ __wt_db_close(WT_TOC *toc)
 	db = toc->db;
 
 	/* Flush the underlying Btree. */
-	WT_TRET(__wt_bt_sync(toc, NULL));
+	if (!LF_ISSET(WT_NOFLUSH))
+		WT_TRET(__wt_bt_sync(toc, NULL));
 
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(toc);
