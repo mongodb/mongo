@@ -116,7 +116,7 @@ def func_struct_variable_all(handle, f):
 	for i in sorted(filter(lambda _i:
 	    _i[1].handle.count(handle) and
 	    _i[1].config.count('setter') and not
-	    _i[1].config.count('handcode'), api.iteritems())):
+	    _i[1].config.count('extfunc'), api.iteritems())):
 		func_struct_variable(i[1].args, f)
 
 # func_struct_variable
@@ -163,7 +163,7 @@ def func_method_getset(a, f):
 	config = a.config
 	args = a.args
 
-	handcode = config.count('handcode')
+	extfunc = config.count('extfunc')
 
 	# Declarations:
 	# If we don't have an environment handle, acquire one.
@@ -172,9 +172,9 @@ def func_method_getset(a, f):
 	if handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
 	f.write('\tIENV *ienv = env->ienv;\n')
-	if handcode:
+	if extfunc:
 		f.write('\tint ret;\n')
-	if handle != 'env' or handcode:
+	if handle != 'env' or extfunc:
 		f.write('\n')
 
 	# If we have a "flags" argument to a setter function, check it
@@ -210,7 +210,7 @@ def func_method_getset(a, f):
 	    '\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
 
 	# If the function is hand-coded, just call it.
-	if handcode:
+	if extfunc:
 		f.write('\tret = __wt_' +
 		    handle + '_' + method + '(\n\t    ' + handle)
 		for l in args:
@@ -232,7 +232,7 @@ def func_method_getset(a, f):
 	# getter/setter implies ienvlock: unlock the data structure.
 	f.write('\t__wt_unlock(ienv->mtx);\n')
 	f.write('\treturn (')
-	if handcode:
+	if extfunc:
 		f.write('ret')
 	else:
 		f.write('0')
@@ -249,11 +249,13 @@ def func_method(a, f):
 	config = a.config
 	args = a.args
 
-	locking = config.count('ienvlock')	# We're doing locking
-	rdonly = config.count('rdonly')		# We're checking read-only
-	restart = config.count('restart')	# We're handling WT_RESTART
+	colonly = config.count('colonly')	# Check row-only databases
+	locking = config.count('ienvlock')	# Lock
+	rdonly = config.count('rdonly')		# Check read-only databases
+	restart = config.count('restart')	# Handle WT_RESTART
+	rowonly = config.count('rowonly')	# Check row-only databases
 
-	toc = config.count('toc')		# We're handling a WT_TOC
+	toc = config.count('toc')		# Handle a WT_TOC
 	toc_alloc = toc and not args[0].count('toc/')
 
 	flagchk = 0				# We're checking flags
@@ -262,7 +264,7 @@ def func_method(a, f):
 			flagchk = 1
 
 	# We may need a method name.
-	if flagchk or rdonly or toc:
+	if colonly or flagchk or rdonly or rowonly or toc:
 		f.write('\tconst char *method_name = "' +
 		    handle.upper() + '.' + method + '";\n')
 
@@ -276,14 +278,20 @@ def func_method(a, f):
 		f.write('\tWT_TOC *toc = NULL;\n')
 	f.write('\tint ret;\n\n')
 
-	# Check the flags.
-	if flagchk:
-		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
-		    handle.upper() + '_' + method.upper() + ');\n')
+	# Check if the method is illegal for the database type.
+	if colonly:
+		f.write('\tWT_DB_COL_ONLY(db, method_name);\n')
+	if rowonly:
+		f.write('\tWT_DB_ROW_ONLY(db, method_name);\n')
 
 	# Check if the method is illegal for read-only databases.
 	if rdonly:
 		f.write('\tWT_DB_RDONLY(db, method_name);\n')
+
+	# Check flags.
+	if flagchk:
+		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
+		    handle.upper() + '_' + method.upper() + ');\n')
 
 	# If entering the API with a WT_TOC handle, allocate/initialize it.
 	if toc:

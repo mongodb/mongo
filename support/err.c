@@ -139,6 +139,20 @@ __wt_api_arg_max(ENV *env,
 }
 
 /*
+ * __wt_database_method_type --
+ *	Print a standard error message on attempts to call methods inappropriate
+ *	for a database type.
+ */
+int
+__wt_database_method_type(DB *db, const char *name, int column_err)
+{
+	__wt_api_db_errx(db,
+	    "%s: this method is not supported for a %s database type",
+	    name, column_err ? "column" : "err");
+	return (WT_READONLY);
+}
+
+/*
  * __wt_database_readonly --
  *	Print a standard error message on attempts to modify  a read-only
  *	database.

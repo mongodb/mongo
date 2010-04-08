@@ -249,8 +249,8 @@ static int __wt_api_db_bulk_load(
 	WT_TOC *toc = NULL;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_BULK_LOAD);
 	ret = __wt_db_bulk_load(toc, flags, progress, cb);
@@ -295,8 +295,9 @@ static int __wt_api_db_col_del(
 	IENV *ienv = env->ienv;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_DEL);
+	WT_DB_COL_ONLY(db, method_name);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_DEL);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_DEL);
 	while ((ret = __wt_db_col_del(toc, recno)) == WT_RESTART)
@@ -323,6 +324,7 @@ static int __wt_api_db_col_get(
 	IENV *ienv = env->ienv;
 	int ret;
 
+	WT_DB_COL_ONLY(db, method_name);
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_GET);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_GET);
@@ -349,8 +351,9 @@ static int __wt_api_db_col_put(
 	IENV *ienv = env->ienv;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_PUT);
+	WT_DB_COL_ONLY(db, method_name);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_PUT);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_COL_PUT);
 	while ((ret = __wt_db_col_put(toc, recno, data)) == WT_RESTART)
@@ -580,8 +583,9 @@ static int __wt_api_db_row_del(
 	IENV *ienv = env->ienv;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_DEL);
+	WT_DB_ROW_ONLY(db, method_name);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_DEL);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_DEL);
 	while ((ret = __wt_db_row_del(toc, key)) == WT_RESTART)
@@ -608,6 +612,7 @@ static int __wt_api_db_row_get(
 	IENV *ienv = env->ienv;
 	int ret;
 
+	WT_DB_ROW_ONLY(db, method_name);
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_GET);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_GET);
@@ -634,8 +639,9 @@ static int __wt_api_db_row_put(
 	IENV *ienv = env->ienv;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_PUT);
+	WT_DB_ROW_ONLY(db, method_name);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_PUT);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_ROW_PUT);
 	while ((ret = __wt_db_row_put(toc, key, data)) == WT_RESTART)
@@ -700,8 +706,8 @@ static int __wt_api_db_sync(
 	WT_TOC *toc = NULL;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_SYNC);
 	WT_DB_RDONLY(db, method_name);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_SYNC);
 	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_SYNC);
 	ret = __wt_db_sync(toc, progress);

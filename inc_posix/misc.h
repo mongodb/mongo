@@ -46,6 +46,14 @@ extern "C" {
 	if (F_ISSET((db)->idb, WT_RDONLY))				\
 		return (__wt_database_readonly(db, name));
 
+/* Column- and row-only database check. */
+#define	WT_DB_ROW_ONLY(db, name)					\
+	if (F_ISSET((db)->idb, WT_COLUMN))				\
+		return (__wt_database_method_type(db, name, 1));
+#define	WT_DB_COL_ONLY(db, name)					\
+	if (!F_ISSET((db)->idb, WT_COLUMN))				\
+		return (__wt_database_method_type(db, name, 0));
+
 /*
  * Flag set, clear and test.  They come in 3 flavors: F_XXX (handles a
  * field named "flags" in the structure referenced by its argument),

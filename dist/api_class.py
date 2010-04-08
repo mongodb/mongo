@@ -19,16 +19,17 @@
 #	1: the method name
 #		 'handle' + '.' + 'method'
 #	2: a string of comma-separated configuration key words
-#		cache	 -- method reads/writes the cache
-#		getter	 -- auto-generated getter method
-#		handcode -- hand-coded getter/setter method
-#		ienvlock -- lock the IENV structure (implied by getter/setter)
+#		colonly	 -- column databases only
+#		extfunc  -- call an external function to do the work
+#		getter	 -- getter method
+#		ienvlock -- locks the IENV mutex (implied by getter/setter)
 #		method	 -- method returns an int
 #		methodV  -- method returns void
-#		noauto	 -- don't create a stub
+#		noauto	 -- don't auto-generate a stub at all
 #		rdonly	 -- not allowed if the database is read-only
 #		restart	 -- handle WT_RESTART in the API call
-#		setter	 -- auto-generated setter method
+#		rowonly	 -- row databases only
+#		setter	 -- setter method
 #		toc	 -- function takes a WT_TOC/DB argument pair
 #		verify	 -- setter methods call validation function
 #	3: a list of argument and name/declaration pairs
@@ -372,7 +373,7 @@ methods['db.close'] = Api(
 
 methods['db.col_del'] = Api(
 	'db.col_del',
-	'method, cache, rdonly, restart, toc',
+	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
 	 'recno/u_int64_t @S',
 	 'flags/u_int32_t @S'],
@@ -381,7 +382,7 @@ methods['db.col_del'] = Api(
 
 methods['db.col_get'] = Api(
 	'db.col_get',
-	'method, cache, toc',
+	'method, colonly, toc',
 	['toc/WT_TOC *@S',
 	 'recno/u_int64_t @S',
 	 'data/DBT *@S',
@@ -391,7 +392,7 @@ methods['db.col_get'] = Api(
 
 methods['db.col_put'] = Api(
 	'db.col_put',
-	'method, cache, rdonly, restart, toc',
+	'method, colonly, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
 	 'recno/u_int64_t *@S',
 	 'data/DBT *@S',
@@ -474,7 +475,7 @@ methods['db.errx'] = Api(
 
 methods['db.huffman_set'] = Api(
 	'db.huffman_set',
-	'method, setter, handcode',
+	'method, extfunc, setter',
 	['huffman_table/u_int8_t const *@S',
 	 'huffman_table_size/u_int @S',
 	 'huffman_flags/u_int32_t @S'],
@@ -492,7 +493,7 @@ methods['db.open'] = Api(
 
 methods['db.row_del'] = Api(
 	'db.row_del',
-	'method, cache, rdonly, restart, toc',
+	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'flags/u_int32_t @S'],
@@ -501,7 +502,7 @@ methods['db.row_del'] = Api(
 
 methods['db.row_get'] = Api(
 	'db.row_get',
-	'method, cache, toc',
+	'method, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
@@ -511,7 +512,7 @@ methods['db.row_get'] = Api(
 
 methods['db.row_put'] = Api(
 	'db.row_put',
-	'method, cache, rdonly, restart, toc',
+	'method, rdonly, restart, rowonly, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
