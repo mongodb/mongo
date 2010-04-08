@@ -17,6 +17,7 @@ static int wts_del_row(u_int64_t);
 static int wts_notfound_chk(ENV *, const char *, int, int, u_int64_t);
 static int wts_read_col(u_int64_t);
 static int wts_read_row(u_int64_t);
+static int wts_sync(void);
 
 int
 wts_setup(int reopen, int logfile)
@@ -119,6 +120,7 @@ wts_teardown()
 
 	toc = g.wts_toc;
 
+	assert(wts_sync() == 0);
 	assert(toc->close(toc, 0) == 0);
 	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
 
@@ -165,6 +167,21 @@ wts_bulk_load()
 		(void)fclose(fp);
 	}
 
+	return (0);
+}
+
+static int
+wts_sync()
+{
+	DB *db;
+	int ret;
+
+	db = g.wts_db;
+
+	if ((ret = db->sync(db, track, 0)) != 0) {
+		db->err(db, ret, "Db.sync");
+		return (1);
+	}
 	return (0);
 }
 
