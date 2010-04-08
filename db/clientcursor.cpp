@@ -233,6 +233,7 @@ namespace mongo {
             
         {
             dbtempreleasecond unlock;
+            sleepmicros( Client::recommendedYieldMicros() );
         }
 
         if ( ClientCursor::find( id , false ) == 0 ){

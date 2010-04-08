@@ -17,29 +17,28 @@
  *    limitations under the License.
  */
 
+extern bool checkNsFilesOnLoad;
+
 class RamStoreFile : public MongoFile {
     char name[256];
     struct Node { 
-        void *p;
+        char *p;
         int len;
         Node() : len(0) { }
+        void check();
     };
-    map<int,Node> _m;
+    std::map<int,Node> _m;
     long _len;
 
+    static void validate();
+    void check();
+
+    int _last;
+
+	void grow(int offset, int len);
+
     /* maxLen can be -1 for existing data */
-    void* at(int offset, int maxLen) {
-        Node& n = _m[offset];
-        if( n.len == 0 ) { 
-            // create
-            cout << "CREATE ofs:" << offset << " len:" << maxLen << endl;
-            assert( maxLen >= 0 );
-            n.p = calloc(maxLen+1, 1);
-            n.len = maxLen;
-        }
-        assert( n.len >= maxLen );
-        return n.p;
-    }
+    void* at(int offset, int maxLen);
 
 protected:
     virtual void close() { 
@@ -51,7 +50,8 @@ protected:
     virtual void flush(bool sync) { }
 
 public:
-    RamStoreFile() : _len(0) { }
+    ~RamStoreFile();
+    RamStoreFile();
 
     virtual long length() { return _len; }
 
@@ -59,10 +59,14 @@ public:
         RamStoreFile* _f;
         friend class RamStoreFile;
     public:
-        void* at(int offset, int maxLen) { 
-            assert( maxLen <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
-            return _f->at(offset,maxLen);
+        void* at(int offset, int len) { 
+            assert( len <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
+            return _f->at(offset,len);
         }
+		void grow(int offset, int len) {
+            assert( len <= /*MaxBSONObjectSize*/4*1024*1024 + 128 );
+            _f->grow(offset,len);
+		}
         bool isNull() const { return _f == 0; }
     };
 

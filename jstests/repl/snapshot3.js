@@ -49,3 +49,5 @@ assert.soon( function() { return 501 == rp.slave().getDB( baseName )[ baseName ]
 
 assert( !rawMongoProgramOutput().match( /resync/ ) );
 assert( !rawMongoProgramOutput().match( /SyncException/ ) );
+
+print("snapshot3.js finishes");

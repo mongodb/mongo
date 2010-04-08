@@ -275,4 +275,21 @@ namespace mongo {
 
     } handshakeCmd;
 
+
+    int Client::recommendedYieldMicros(){
+        int num = 0;
+        {
+            scoped_lock bl(clientsMutex);
+            num = clients.size();
+        }
+        
+        if ( --num <= 0 ) // -- is for myself
+            return 0;
+        
+        if ( num > 50 )
+            num = 50;
+
+        num *= 100;
+        return num;
+    }
 }

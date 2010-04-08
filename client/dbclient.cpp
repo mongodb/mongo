@@ -426,7 +426,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
-        massert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
+        uassert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
 
         if ( !c->more() )
             return BSONObj();
@@ -439,25 +439,13 @@ namespace mongo {
 
         string ip;
         int port;
-        size_t idx = serverAddress.find( ":" );
+        size_t idx = serverAddress.rfind( ":" );
         if ( idx != string::npos ) {
             port = strtol( serverAddress.substr( idx + 1 ).c_str(), 0, 10 );
             ip = serverAddress.substr( 0 , idx );
-            ip = hostbyname(ip.c_str());
         } else {
             port = CmdLine::DefaultDBPort;
-            if (serverAddress.find( "/" ) == string::npos){
-                ip = hostbyname( serverAddress.c_str() );
-            } else {
-                ip = serverAddress;
-            }
-        }
-        if( ip.empty() ) {
-            stringstream ss;
-            ss << "client connect: couldn't parse/resolve hostname: " << _serverAddress;
-            errmsg = ss.str();
-            failed = true;
-            return false;
+            ip = serverAddress;
         }
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
@@ -465,24 +453,14 @@ namespace mongo {
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
         p = auto_ptr<MessagingPort>(new MessagingPort());
 
-#if 0
-        //Right now some code depends on ports to identify a connection.
-        //Using unix sockets breaks this code
-        
-#ifndef _WIN32
-        if (server->getAddr() == "127.0.0.1"){
-            SockAddr _server (makeUnixSockPath(port).c_str(), port);
-            if (p->connect(_server)){
-                *server = _server;
-                return true;
-            }
+        if (server->getAddr() == "0.0.0.0"){
+            failed = true;
+            return false;
         }
-#endif
-#endif
 
         if ( !p->connect(*server) ) {
             stringstream ss;
-            ss << "couldn't connect to server " << serverAddress << " " << ip << ":" << port;
+            ss << "couldn't connect to server {ip: \"" << ip <<  "\", port: " << port << '}';
             errmsg = ss.str();
             failed = true;
             return false;
@@ -741,7 +719,7 @@ namespace mongo {
             if ( !port().call(toSend, response) ) {
                 failed = true;
                 if ( assertOk )
-                    massert( 10278 , "dbclient error communicating with server", false);
+                    uassert( 10278 , "dbclient error communicating with server", false);
                 return false;
             }
         }

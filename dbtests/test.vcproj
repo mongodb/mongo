@@ -1563,6 +1563,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\ramstore.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\repl.cpp"
 					>
 				</File>

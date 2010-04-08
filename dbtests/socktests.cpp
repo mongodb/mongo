@@ -29,6 +29,7 @@ namespace SockTests {
         void run() {
             ASSERT_EQUALS( "127.0.0.1", hostbyname( "localhost" ) );
             ASSERT_EQUALS( "127.0.0.1", hostbyname( "127.0.0.1" ) );
+            ASSERT_EQUALS( "::1", hostbyname( "::1" ) );
         }
     };
     

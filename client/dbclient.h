@@ -769,6 +769,7 @@ namespace mongo {
            false was returned -- it will try to connect again.
 
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
+                                 If you use IPv6 you must add a port number ( ::1:27017 )
            @param errmsg any relevant error message will appended to the string
            @return false if fails to connect.
         */

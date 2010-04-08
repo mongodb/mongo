@@ -173,8 +173,8 @@ string fixHost( string url , string host , string port ){
             if ( url.find( "." ) != string::npos )
                 return url + "/test";
 
-            if ( url.find( ":" ) != string::npos &&
-                 isdigit( url[url.find(":")+1] ) )
+            if ( url.rfind( ":" ) != string::npos &&
+                 isdigit( url[url.rfind(":")+1] ) )
                 return url + "/test";
         }
         return url;
@@ -191,6 +191,10 @@ string fixHost( string url , string host , string port ){
     string newurl = host;
     if ( port.size() > 0 )
         newurl += ":" + port;
+    else if (host.find(':') != string::npos){
+        // need to add port with IPv6 addresses
+        newurl += ":27017";
+    }
 
     newurl += "/" + url;
 
