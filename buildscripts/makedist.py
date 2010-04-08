@@ -54,6 +54,7 @@ import socket
 import time
 import os.path
 import tempfile
+import string
 
 # For the moment, we don't handle any of the errors we raise, so it
 # suffices to have a simple subclass of Exception that just
@@ -638,25 +639,63 @@ class ScriptFile(object):
         self.distro_version     = configurator.default("distro_version")
         self.distro_arch        = configurator.default("distro_arch")
 
+    def bogoformat(self, fmt, **kwargs):
+        r = ''
+        i = 0
+        while True:
+            c = fmt[i]
+            if c in '{}':
+                i+=1
+                c2=fmt[i]
+                if c2 == c:
+                    r+=c
+                else:
+                    j=i
+                    while True:
+                        p=fmt[j:].find('}')
+                        if p == -1:
+                            raise Exception("malformed format string starting at %d: no closing brace" % i)
+                        else:
+                            j+=p
+                            if len(fmt) > (j+1) and fmt[j+1]=='}':
+                                j+=2
+                            else:
+                                break
+                    key = fmt[i:j]
+                    r+=kwargs[key]
+                    i=j
+            else:
+                r+=c
+            i+=1
+            if i==len(fmt):
+                return r
+    
+    def fmt(self, formatter, **kwargs):
+        try:
+            return string.Formatter.format(formatter, kwargs)
+        finally:
+            return self.bogoformat(formatter, **kwargs)
+
     def genscript(self):
-        return self.formatter.format(mongo_version=self.mongo_version,
-                                     distro_name=self.distro_name,
-                                     distro_version=self.distro_version,
-                                     distro_arch=self.distro_arch,
-                                     pkg_prereq_str=" ".join(self.pkg_prereqs),
-                                     pkg_name=self.pkg_name,
-                                     pkg_name_suffix=self.pkg_name_suffix,
-                                     pkg_version=self.pkg_version,
-                                     pkg_product_dir=self.pkg_product_dir,
-                                     # KLUDGE: rpm specs and deb
-                                     # control files use
-                                     # comma-separated conflicts,
-                                     # but there's no reason to
-                                     # suppose this works elsewhere
-                                     pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts]),
-                                     mongo_arch=self.mongo_arch,
-                                     mongo_pub_version=self.mongo_pub_version
-)
+        return self.fmt(self.formatter,
+                   mongo_version=self.mongo_version,
+                   distro_name=self.distro_name,
+                   distro_version=self.distro_version,
+                   distro_arch=self.distro_arch,
+                   pkg_prereq_str=" ".join(self.pkg_prereqs),
+                   pkg_name=self.pkg_name,
+                   pkg_name_suffix=self.pkg_name_suffix,
+                   pkg_version=self.pkg_version,
+                   pkg_product_dir=self.pkg_product_dir,
+                   # KLUDGE: rpm specs and deb
+                   # control files use
+                   # comma-separated conflicts,
+                   # but there's no reason to
+                   # suppose this works elsewhere
+                   pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts]),
+                   mongo_arch=self.mongo_arch,
+                   mongo_pub_version=self.mongo_pub_version
+                   )
 
     def __enter__(self):
         self.localscript=None
