@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import with_statement
 from libcloud.types import Provider
 from libcloud.providers import get_driver
 from libcloud.drivers.ec2 import EC2NodeDriver, NodeImage
