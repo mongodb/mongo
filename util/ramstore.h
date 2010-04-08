@@ -27,7 +27,7 @@ class RamStoreFile : public MongoFile {
         Node() : len(0) { }
         void check();
     };
-    map<int,Node> _m;
+    std::map<int,Node> _m;
     long _len;
 
     static void validate();
