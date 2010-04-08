@@ -26,6 +26,7 @@ __wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	db = toc->db;
 	env = toc->env;
 	cache = env->ienv->cache;
+	fcnt = 0;
 
 	/*
 	 * Write any modified pages -- if the handle is set, write only pages
