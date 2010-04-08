@@ -103,7 +103,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
-			f("Db.bulk_load", insert_cnt);
+			f(toc->name, insert_cnt);
 		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
 
 		/*
@@ -192,7 +192,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f("Db.bulk_load", insert_cnt);
+		f(toc->name, insert_cnt);
 
 	if (0) {
 err:		if (page != NULL)
@@ -279,7 +279,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 
 		/* Report on progress every 100 inserts. */
 		if (f != NULL && ++insert_cnt % 100 == 0)
-			f("Db.bulk_load", insert_cnt);
+			f(toc->name, insert_cnt);
 		WT_STAT_INCR(idb->stats, BULK_PAIRS_READ);
 
 		/*
@@ -599,7 +599,7 @@ skip_read:	/*
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f("Db.bulk_load", insert_cnt);
+		f(toc->name, insert_cnt);
 
 	if (0) {
 err:		if (page != NULL)

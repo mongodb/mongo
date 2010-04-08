@@ -18,12 +18,15 @@ struct __wt_stats {
 
 #define	WT_STAT(stats, def)						\
 	(stats)[WT_STAT_ ## def].v
-#define	WT_STAT_INCR(stats, def)					\
-	++(stats)[WT_STAT_ ## def].v
-#define	WT_STAT_INCRV(stats, def, value)				\
-	(stats)[WT_STAT_ ## def].v += (value)
-#define	WT_STAT_SET(stats, def, value)					\
-	(stats)[WT_STAT_ ## def].v = (value)
+#define	WT_STAT_INCR(stats, def) do {					\
+	++(stats)[WT_STAT_ ## def].v;					\
+} while (0)
+#define	WT_STAT_INCRV(stats, def, value) do {				\
+	(stats)[WT_STAT_ ## def].v += (value);				\
+} while (0)
+#define	WT_STAT_SET(stats, def, value) do {				\
+	(stats)[WT_STAT_ ## def].v = (value);				\
+} while (0)
 
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.

@@ -9,13 +9,12 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_compare_gen(const void *a, const void *b);
-static int __wt_cache_compare_page(const void *a, const void *b);
-static int __wt_cache_hazard_compare(const void *a, const void *b);
-static int __wt_cache_hazchk(
+static int  __wt_cache_compare_gen(const void *a, const void *b);
+static int  __wt_cache_compare_page(const void *a, const void *b);
+static void __wt_cache_evict(ENV *, WT_CACHE_ENTRY **, u_int32_t);
+static int  __wt_cache_hazard_compare(const void *a, const void *b);
+static void  __wt_cache_hazchk(
 	       ENV *, WT_CACHE_ENTRY **, u_int32_t, WT_PAGE **, u_int32_t);
-static int __wt_cache_recycle(ENV *, WT_CACHE_ENTRY **, u_int32_t);
-static int __wt_cache_wmod(ENV *, WT_CACHE_ENTRY **, u_int32_t);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_cache_hazard_check(ENV *, WT_CACHE_ENTRY *);
@@ -106,7 +105,7 @@ __wt_cache_drain(void *arg)
 		 * bytes.
 		 */
 		bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
-		bytes_max = WT_STAT(ienv->stats, CACHE_BYTES_MAX);
+		bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
 		if (cache->read_lockout == 0 && bytes_inuse <= bytes_max) {
 			/*
 			 * No memory flush needed, the drain_sleeping field is
@@ -238,24 +237,17 @@ __wt_cache_drain(void *arg)
 			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
 		}
 
-		/* Copy and sort the hazard references. */
+		/*
+		 * Compare the list of hazard references to the list of pages
+		 * to be discarded; any matching pages are left in the cache.
+		 */
 		memcpy(hazard, ienv->hazard, hazard_elem * sizeof(WT_PAGE *));
 		qsort(hazard, (size_t)hazard_elem,
 		    sizeof(WT_PAGE *), __wt_cache_hazard_compare);
+		__wt_cache_hazchk(env, drain, drain_elem, hazard, hazard_elem);
 
-		/*
-		 * Compare the list of hazard references to the list of pages
-		 * to be discarded.   Any matches will set the WT_CACHE_ENTRY
-		 * reference to NULL.
-		 */
-		WT_ERR(__wt_cache_hazchk(
-		    env, drain, drain_elem, hazard, hazard_elem));
-
-		/* Flush any modified pages. */
-		WT_ERR(__wt_cache_wmod(env, drain, drain_elem));
-
-		/* Recycle the  memory. */
-		WT_ERR(__wt_cache_recycle(env, drain, drain_elem));
+		/* Evict pages that weren't in use. */
+		__wt_cache_evict(env, drain, drain_elem);
 
 done:		__wt_unlock(cache->mtx_hb);
 
@@ -282,14 +274,15 @@ err:	if (drain != NULL) {
  *	Compare the list of hazard references to the list of pages to be
  *	discarded.
  */
-static int
+static void
 __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
     u_int32_t drain_elem, WT_PAGE **hazard, u_int32_t hazard_elem)
 {
+	WT_CACHE_ENTRY *e;
 	WT_PAGE **end_hazard, *page;
 	WT_STATS *stats;
 
-	stats = env->ienv->stats;
+	stats = env->ienv->cache->stats;
 	end_hazard = hazard + hazard_elem;
 
 	/*
@@ -298,14 +291,14 @@ __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
 	 * the lists in parallel and compare them.
 	 */
 	for (; drain_elem > 0; ++drainp, --drain_elem) {
-		if (*drainp == NULL)
+		if ((e = *drainp) == NULL)
 			continue;
 
 		/*
 		 * Look for the page in the hazard list until we reach the end
 		 * of the list or find a hazard pointer larger than the page.
 		 */
-		for (page = (*drainp)->page;
+		for (page = e->page;
 		    hazard < end_hazard && *hazard < page; ++hazard)
 			;
 		if (hazard == end_hazard)
@@ -316,89 +309,63 @@ __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
 		 * remove it from the drain list.
 		 */
 		if (*hazard == page) {
+			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server skipping hazard referenced "
 			    "element/page %#lx/%lu",
-			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
-			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
+			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
 
-			(*drainp)->state = WT_OK;
+			e->state = WT_OK;
 			*drainp = NULL;
 		}
 	}
-	return (0);
 }
 
 /*
- * __wt_cache_wmod --
- *	Flush modified pages.
- */
-static int
-__wt_cache_wmod(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
-{
-	WT_PAGE *page;
-	WT_STATS *stats;
-	int tret, ret;
-
-	stats = env->ienv->stats;
-	ret = 0;
-
-	for (; drain_elem > 0; ++drainp, --drain_elem) {
-		if (*drainp == NULL)
-			continue;
-		page = (*drainp)->page;
-
-		/* Write the page if it's been modified. */
-		if (F_ISSET(page, WT_MODIFIED)) {
-			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache drain server writing element/page %#lx/%lu",
-			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
-			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
-
-			if ((tret =
-			    __wt_cache_write(env, (*drainp)->db, page)) != 0) {
-				if (ret == 0)
-					ret = tret;
-				(*drainp)->state = WT_OK;
-				*drainp = NULL;
-			}
-		} else
-			WT_STAT_INCR(stats, CACHE_EVICT);
-	}
-	return (ret);
-}
-
-/*
- * __wt_cache_recycle --
+ * __wt_cache_evict --
  *	Recycle cache pages.
  */
-static int
-__wt_cache_recycle(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
+static void
+__wt_cache_evict(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 {
-	WT_PAGE *page;
+	WT_CACHE_ENTRY *e;
 	WT_CACHE *cache;
+	WT_STATS *stats;
 
 	cache = env->ienv->cache;
+	stats = cache->stats;
 
 	for (; drain_elem > 0; ++drainp, --drain_elem) {
-		if (*drainp == NULL)
+		if ((e = *drainp) == NULL)
 			continue;
-#ifdef HAVE_DIAGNOSTIC
-		__wt_cache_hazard_check(env, *(drainp));
-#endif
+
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache drain server recycling element/page %#lx/%lu",
-		    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
+		    "cache drain server evicting %selement/page %#lx/%lu",
+		    F_ISSET(e->page, WT_MODIFIED) ? "modified " : "",
+		    WT_PTR_TO_ULONG(e), (u_long)e->addr));
 
-		/* Copy the page ref, and give the slot to the I/O server. */
-		page = (*drainp)->page;
-		(*drainp)->state = WT_EMPTY;
+		if (F_ISSET(e->page, WT_MODIFIED))
+			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
+		else
+			WT_STAT_INCR(stats, CACHE_EVICT);
 
-		WT_CACHE_PAGE_OUT(cache, page->bytes);
+#ifdef HAVE_DIAGNOSTIC
+		__wt_cache_hazard_check(env, e);
+#endif
+		/*
+		 * Reconcile and discard the page -- this includes writing the
+		 * page if it's modified.   If the write fails for any reason,
+		 * the page remains in the cache.
+		 */
+		if (__wt_bt_page_reconcile(e->db, e->page))
+			e->state = WT_OK;
+		else {
+			WT_CACHE_PAGE_OUT(cache, e->page->bytes);
 
-		__wt_bt_page_recycle(env, page);
+			/* Give the slot to the I/O server. */
+			e->state = WT_EMPTY;
+		}
 	}
-	return (0);
 }
 
 /*
@@ -406,14 +373,14 @@ __wt_cache_recycle(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
  *	Write a page to the backing database file.
  */
 int
-__wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
+__wt_cache_write(DB *db, WT_PAGE *page)
 {
-	WT_CACHE *cache;
+	ENV *env;
 	WT_FH *fh;
 	WT_PAGE_HDR *hdr;
 	int ret;
 
-	cache = env->ienv->cache;
+	env = db->env;
 	fh = db->idb->fh;
 
 	/* Update the checksum. */
@@ -427,8 +394,6 @@ __wt_cache_write(ENV *env, DB *db, WT_PAGE *page)
 		__wt_api_env_err(env, ret, "cache unable to write page");
 		return (ret);
 	}
-
-	F_CLR(page, WT_MODIFIED);
 
 	return (0);
 }

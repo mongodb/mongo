@@ -15,7 +15,6 @@ static int  __wt_bt_page_inmem_col_leaf(WT_PAGE *);
 static int  __wt_bt_page_inmem_dup_leaf(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_item_int(DB *, WT_PAGE *);
 static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
-static void __wt_bt_page_recycle_repl(ENV *, WT_REPL *);
 
 /*
  * __wt_bt_page_alloc --
@@ -88,82 +87,6 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
 	return (__wt_cache_out(toc, page, flags));
-}
-
-/*
- * __wt_bt_page_recycle --
- *	Discard any in-memory allocated memory and reset the counters.
- */
-void
-__wt_bt_page_recycle(ENV *env, WT_PAGE *page)
-{
-	WT_COL_INDX *cip;
-	WT_ROW_INDX *rip;
-	u_int32_t i;
-	void *bp, *ep;
-
-#ifdef HAVE_DIAGNOSTIC
-	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
-		(void)__wt_api_args(env, "Page.recycle");
-#endif
-	WT_ASSERT(env, F_ISSET(page, WT_MODIFIED) == 0);
-
-	switch (page->hdr->type) {
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_DUP_LEAF:
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		bp = (u_int8_t *)page->hdr;
-		ep = (u_int8_t *)bp + page->bytes;
-		WT_INDX_FOREACH(page, rip, i) {
-			/*
-			 * For each entry, see if the data was an allocation,
-			 * that is, if it points somewhere other than the
-			 * original page.  If it's an allocation, free it.
-			 *
-			 * For each entry, see if replacements were made -- if
-			 * so, free them.
-			 */
-			if (rip->data < bp || rip->data >= ep)
-				__wt_free(env, rip->data, rip->size);
-			if (rip->repl != NULL)
-				__wt_bt_page_recycle_repl(env, rip->repl);
-		}
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		WT_INDX_FOREACH(page, cip, i)
-			if (cip->repl != NULL)
-				__wt_bt_page_recycle_repl(env, cip->repl);
-		break;
-	case WT_PAGE_OVFL:
-	default:
-		break;
-	}
-
-	if (page->u.indx != NULL)
-		__wt_free(env, page->u.indx, 0);
-
-	__wt_free(env, page->hdr, page->bytes);
-	__wt_free(env, page, sizeof(WT_PAGE));
-}
-
-/*
- * __wt_bt_page_recycle_repl --
- *	Recycle the replacement array.
- */
-static void
-__wt_bt_page_recycle_repl(ENV *env, WT_REPL *repl)
-{
-	u_int16_t i;
-
-	/* Free the data pointers and then the WT_REPL structure itself. */
-	for (i = 0; i < repl->repl_next; ++i)
-		if (repl->data[i].data != WT_DATA_DELETED)
-			__wt_free(env, repl->data[i].data, repl->data[i].size);
-	__wt_free(env, repl->data, repl->repl_size * sizeof(WT_SDBT));
-	__wt_free(env, repl, sizeof(WT_REPL));
 }
 
 /*

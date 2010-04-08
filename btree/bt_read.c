@@ -27,7 +27,7 @@ __wt_workq_cache_server(ENV *env)
 	cache = ienv->cache;
 
 	bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
-	bytes_max = WT_STAT(ienv->stats, CACHE_BYTES_MAX);
+	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
 
 	/*
 	 * If we're 10% over the maximum cache, shut out page allocations until
@@ -39,7 +39,7 @@ __wt_workq_cache_server(ENV *env)
 	} else {
 		if (bytes_inuse > bytes_max + (bytes_max / 10)) {
 			cache->read_lockout = 1;
-			WT_STAT_INCR(ienv->stats, CACHE_READ_LOCKOUT);
+			WT_STAT_INCR(cache->stats, CACHE_READ_LOCKOUT);
 		}
 	}
 
@@ -192,8 +192,8 @@ __wt_cache_read(WT_TOC *toc)
 			if (e->db == db && e->addr == addr)
 				return (0);
 		}
+		WT_STAT_INCR(cache->stats, CACHE_MISS);
 		WT_STAT_INCR(idb->stats, DB_CACHE_MISS);
-		WT_STAT_INCR(env->ienv->stats, CACHE_MISS);
 	}
 
 	/*
@@ -218,8 +218,8 @@ __wt_cache_read(WT_TOC *toc)
 		toc->wq_addr = addr;
 		toc->wq_bytes = bytes;
 
+		WT_STAT_INCR(cache->stats, CACHE_ALLOC);
 		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
-		WT_STAT_INCR(env->ienv->stats, CACHE_ALLOC);
 	} else {
 		offset = WT_ADDR_TO_OFF(db, addr);
 		WT_ERR(__wt_read(env, fh, offset, bytes, page->hdr));

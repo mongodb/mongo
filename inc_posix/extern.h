@@ -62,12 +62,14 @@ __wt_bt_page_in(
     WT_TOC *toc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
 int
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
-void
-__wt_bt_page_recycle(ENV *env, WT_PAGE *page);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt);
+int
+__wt_bt_page_reconcile(DB *db, WT_PAGE *page);
+void
+__wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
@@ -105,7 +107,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
 void *
 __wt_cache_drain(void *arg);
 int
-__wt_cache_write(ENV *env, DB *db, WT_PAGE *page);
+__wt_cache_write(DB *db, WT_PAGE *page);
 void
 __wt_cache_chk(ENV *env);
 int

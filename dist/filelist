@@ -13,6 +13,7 @@ btree/bt_misc.c
 btree/bt_open.c
 btree/bt_ovfl.c
 btree/bt_page.c
+btree/bt_reconcile.c
 btree/bt_ret.c
 btree/bt_stat.c
 btree/bt_sync.c

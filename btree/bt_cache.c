@@ -39,8 +39,6 @@ __wt_cache_create(ENV *env)
 	 * By default, size for a cache filled with 8KB pages, and 4 pages per
 	 * bucket (or, 32 buckets per MB).
 	 */
-	WT_STAT_SET(
-	    ienv->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
 	cache->hb_size = env->cache_hash_size == 0 ?
 	    __wt_prime(env->cache_size * 32) : env->cache_hash_size;
 	WT_ERR(
@@ -60,6 +58,9 @@ __wt_cache_create(ENV *env)
 	}
 
 	WT_ERR(__wt_stat_alloc_cache_stats(env, &cache->stats));
+
+	WT_STAT_SET(
+	    cache->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
 
 	return (0);
 
@@ -116,7 +117,7 @@ __wt_cache_destroy(ENV *env)
 	 */
 	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
 		if (e->state != WT_EMPTY)
-			__wt_bt_page_recycle(env, e->page);
+			__wt_bt_page_discard(env, e->page);
 
 	/* Discard all hash bucket entries. */
 	for (i = 0; i < cache->hb_size; ++i) {

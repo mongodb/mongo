@@ -95,8 +95,8 @@ retry:	/* Search the cache for the page. */
 			F_CLR(e->page, WT_DISCARD);
 			*pagep = e->page;
 
-			WT_STAT_INCR(ienv->stats, CACHE_HIT);
 			WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
+			WT_STAT_INCR(cache->stats, CACHE_HIT);
 			return (0);
 		}
 		__wt_hazard_clear(toc, e->page);

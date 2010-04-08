@@ -76,12 +76,12 @@ __wt_db_dump(WT_TOC *toc,
 
 		/* Report progress every 100 pages. */
 		if (f != NULL && ++fcnt % 100 == 0)
-			f("Db.dump", fcnt);
+			f(toc->name, fcnt);
 	}
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f("Db.dump", fcnt);
+		f(toc->name, fcnt);
 
 	return (0);
 }
