@@ -241,6 +241,7 @@ def func_method_getset(a, f):
 # func_method --
 #	Generate all non-getter/setter API entry functions.
 def func_method(a, f):
+	# Write the declaration for this function.
 	func_method_decl(a, f)
 
 	handle = a.handle
@@ -251,62 +252,87 @@ def func_method(a, f):
 	locking = config.count('ienvlock')	# We're doing locking
 	rdonly = config.count('rdonly')		# We're checking read-only
 	restart = config.count('restart')	# We're handling WT_RESTART
-	toc_handle = 0				# We're thread aware
-	for l in args:
-		if l.count('toc/'):
-			toc_handle = 1
+
+	toc = config.count('toc')		# We're handling a WT_TOC
+	toc_alloc = toc and not args[0].count('toc/')
+
 	flagchk = 0				# We're checking flags
 	for l in args:
 		if l.count('flags/'):
 			flagchk = 1
 
-	# We need an ENV handle, find one.
-	# If we're doing flag or read-only checks, we need a method name.
-	# If we're doing locking or handling restart we need a 'ret' variable.
-	if flagchk or rdonly:
+	# We may need a method name.
+	if flagchk or rdonly or toc:
 		f.write('\tconst char *method_name = "' +
 		    handle.upper() + '.' + method + '";\n')
+
+	# We need an ENV/IENV handle pair, find them.
 	if (flagchk or locking) and handle != 'env':
 		f.write('\tENV *env = ' + handle + '->env;\n')
 	f.write('\tIENV *ienv = env->ienv;\n')
+
+	# If we're allocating a WT_TOC, we'll need a pointer on the stack.
+	if toc_alloc:
+		f.write('\tWT_TOC *toc = NULL;\n')
 	f.write('\tint ret;\n\n')
 
+	# Check the flags.
 	if flagchk:
 		f.write('\tWT_ENV_FCHK(env, method_name, flags, WT_APIMASK_' +
 		    handle.upper() + '_' + method.upper() + ');\n')
 
-	# If the method is illegal for read-only databases, check that.
+	# Check if the method is illegal for read-only databases.
 	if rdonly:
 		f.write('\tWT_DB_RDONLY(db, method_name);\n')
 
-	# If entering the API with a WT_TOC handle, set the generation number.
-	if toc_handle:
-		f.write('\tWT_TOC_SET_GEN(toc);\n')
+	# If entering the API with a WT_TOC handle, allocate/initialize it.
+	if toc:
+		f.write('\tWT_RET(' +
+		    '__wt_toc_api_set(env, method_name, db, &toc));\n')
 
+	# Acquire the lock.
 	if locking:
 		f.write('\t__wt_lock(env, ienv->mtx);\n')
 
-	# Count the call.
+	# Method call statistics -- we put the update inside the lock just to
+	# make the stat value a little more precise.
 	s = a.handle + '_' + a.method
 	f.write('\tWT_STAT_INCR(ienv->method_stats, ' + s.upper() + ');\n')
 
+	# Call the underlying method function, handling restart as necessary.
 	f.write('\t')
 	if restart:
 		f.write('while ((')
-	f.write('ret = __wt_' + handle + '_' + method + '(' + handle)
+	f.write('ret = __wt_' + handle + '_' + method + '(')
+
+	# Some functions take DB handles but pass WT_TOC handles; some functions	# take DB and WT_TOC handles, and pass WT_TOC handles.
+	if toc:
+		handle = 'toc'
+	f.write(handle)
 	for l in args:
 		if l.count('flags/') and flags[a.key][0] == '__NONE__':
 			continue
-		f.write(', ' + l.split('/')[0])
+		if not toc or not l.count('toc/'):
+			f.write(', ' + l.split('/')[0])
 	if restart:
 		f.write(')) == WT_RESTART)\n\t\t;\n')
 	else:
 		f.write(');\n')
+
+	# Unlock.
 	if locking:
 		f.write('\t__wt_unlock(ienv->mtx);\n')
-	# If entering the API with a WT_TOC handle, clear the generation number.
-	if toc_handle:
-		f.write('\tWT_TOC_CLR_GEN(toc);\n')
+
+	# If entering the API with a WT_TOC handle, free/clear it.
+	if toc:
+		f.write('\tWT_TRET(__wt_toc_api_clr(toc, ')
+		if toc_alloc:
+			f.write('1')
+		else:
+			f.write('0')
+		f.write('));\n')
+
+	# And return.
 	f.write('\treturn (ret);\n}\n\n')
 
 #####################################################################

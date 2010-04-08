@@ -246,12 +246,15 @@ static int __wt_api_db_bulk_load(
 	const char *method_name = "DB.bulk_load";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_BULK_LOAD);
 	WT_DB_RDONLY(db, method_name);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_BULK_LOAD);
-	ret = __wt_db_bulk_load(db, flags, progress, cb);
+	ret = __wt_db_bulk_load(toc, flags, progress, cb);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
@@ -265,11 +268,94 @@ static int __wt_api_db_close(
 	const char *method_name = "DB.close";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_CLOSE);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_CLOSE);
-	ret = __wt_db_close(db);
+	ret = __wt_db_close(toc);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
+	return (ret);
+}
+
+static int __wt_api_db_col_del(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	u_int32_t flags);
+static int __wt_api_db_col_del(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	u_int32_t flags)
+{
+	const char *method_name = "DB.col_del";
+	ENV *env = db->env;
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_DEL);
+	WT_DB_RDONLY(db, method_name);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_COL_DEL);
+	while ((ret = __wt_db_col_del(toc, recno)) == WT_RESTART)
+		;
+	WT_TRET(__wt_toc_api_clr(toc, 0));
+	return (ret);
+}
+
+static int __wt_api_db_col_get(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	DBT *data,
+	u_int32_t flags);
+static int __wt_api_db_col_get(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t recno,
+	DBT *data,
+	u_int32_t flags)
+{
+	const char *method_name = "DB.col_get";
+	ENV *env = db->env;
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_GET);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_COL_GET);
+	ret = __wt_db_col_get(toc, recno, data);
+	WT_TRET(__wt_toc_api_clr(toc, 0));
+	return (ret);
+}
+
+static int __wt_api_db_col_put(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t *recno,
+	DBT *data,
+	u_int32_t flags);
+static int __wt_api_db_col_put(
+	DB *db,
+	WT_TOC *toc,
+	u_int64_t *recno,
+	DBT *data,
+	u_int32_t flags)
+{
+	const char *method_name = "DB.col_put";
+	ENV *env = db->env;
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_COL_PUT);
+	WT_DB_RDONLY(db, method_name);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_COL_PUT);
+	while ((ret = __wt_db_col_put(toc, recno, data)) == WT_RESTART)
+		;
+	WT_TRET(__wt_toc_api_clr(toc, 0));
 	return (ret);
 }
 
@@ -300,32 +386,6 @@ static int __wt_api_db_column_set(
 	return (0);
 }
 
-static int __wt_api_db_del(
-	DB *db,
-	WT_TOC *toc,
-	DBT *key,
-	u_int32_t flags);
-static int __wt_api_db_del(
-	DB *db,
-	WT_TOC *toc,
-	DBT *key,
-	u_int32_t flags)
-{
-	const char *method_name = "DB.del";
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-	int ret;
-
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_DEL);
-	WT_DB_RDONLY(db, method_name);
-	WT_TOC_SET_GEN(toc);
-	WT_STAT_INCR(ienv->method_stats, DB_DEL);
-	while ((ret = __wt_db_del(db, toc, key)) == WT_RESTART)
-		;
-	WT_TOC_CLR_GEN(toc);
-	return (ret);
-}
-
 static int __wt_api_db_dump(
 	DB *db,
 	FILE *stream,
@@ -340,11 +400,14 @@ static int __wt_api_db_dump(
 	const char *method_name = "DB.dump";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_DUMP);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_DUMP);
-	ret = __wt_db_dump(db, stream, progress, flags);
+	ret = __wt_db_dump(toc, stream, progress, flags);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
@@ -450,60 +513,6 @@ static int __wt_api_db_errpfx_set(
 	return (0);
 }
 
-static int __wt_api_db_get(
-	DB *db,
-	WT_TOC *toc,
-	DBT *key,
-	DBT *pkey,
-	DBT *data,
-	u_int32_t flags);
-static int __wt_api_db_get(
-	DB *db,
-	WT_TOC *toc,
-	DBT *key,
-	DBT *pkey,
-	DBT *data,
-	u_int32_t flags)
-{
-	const char *method_name = "DB.get";
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-	int ret;
-
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET);
-	WT_TOC_SET_GEN(toc);
-	WT_STAT_INCR(ienv->method_stats, DB_GET);
-	ret = __wt_db_get(db, toc, key, pkey, data);
-	WT_TOC_CLR_GEN(toc);
-	return (ret);
-}
-
-static int __wt_api_db_get_recno(
-	DB *db,
-	WT_TOC *toc,
-	u_int64_t recno,
-	DBT *data,
-	u_int32_t flags);
-static int __wt_api_db_get_recno(
-	DB *db,
-	WT_TOC *toc,
-	u_int64_t recno,
-	DBT *data,
-	u_int32_t flags)
-{
-	const char *method_name = "DB.get_recno";
-	ENV *env = db->env;
-	IENV *ienv = env->ienv;
-	int ret;
-
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_GET_RECNO);
-	WT_TOC_SET_GEN(toc);
-	WT_STAT_INCR(ienv->method_stats, DB_GET_RECNO);
-	ret = __wt_db_get_recno(db, toc, recno, data);
-	WT_TOC_CLR_GEN(toc);
-	return (ret);
-}
-
 static int __wt_api_db_huffman_set(
 	DB *db,
 	u_int8_t const *huffman_table,
@@ -544,39 +553,94 @@ static int __wt_api_db_open(
 	const char *method_name = "DB.open";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_OPEN);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_OPEN);
-	ret = __wt_db_open(db, dbname, mode, flags);
+	ret = __wt_db_open(toc, dbname, mode, flags);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
-static int __wt_api_db_put(
+static int __wt_api_db_row_del(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	u_int32_t flags);
+static int __wt_api_db_row_del(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	u_int32_t flags)
+{
+	const char *method_name = "DB.row_del";
+	ENV *env = db->env;
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_DEL);
+	WT_DB_RDONLY(db, method_name);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_ROW_DEL);
+	while ((ret = __wt_db_row_del(toc, key)) == WT_RESTART)
+		;
+	WT_TRET(__wt_toc_api_clr(toc, 0));
+	return (ret);
+}
+
+static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
 	u_int32_t flags);
-static int __wt_api_db_put(
+static int __wt_api_db_row_get(
 	DB *db,
 	WT_TOC *toc,
 	DBT *key,
 	DBT *data,
 	u_int32_t flags)
 {
-	const char *method_name = "DB.put";
+	const char *method_name = "DB.row_get";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
 	int ret;
 
-	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_PUT);
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_GET);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_ROW_GET);
+	ret = __wt_db_row_get(toc, key, data);
+	WT_TRET(__wt_toc_api_clr(toc, 0));
+	return (ret);
+}
+
+static int __wt_api_db_row_put(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	DBT *data,
+	u_int32_t flags);
+static int __wt_api_db_row_put(
+	DB *db,
+	WT_TOC *toc,
+	DBT *key,
+	DBT *data,
+	u_int32_t flags)
+{
+	const char *method_name = "DB.row_put";
+	ENV *env = db->env;
+	IENV *ienv = env->ienv;
+	int ret;
+
+	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_ROW_PUT);
 	WT_DB_RDONLY(db, method_name);
-	WT_TOC_SET_GEN(toc);
-	WT_STAT_INCR(ienv->method_stats, DB_PUT);
-	while ((ret = __wt_db_put(db, toc, key, data)) == WT_RESTART)
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
+	WT_STAT_INCR(ienv->method_stats, DB_ROW_PUT);
+	while ((ret = __wt_db_row_put(toc, key, data)) == WT_RESTART)
 		;
-	WT_TOC_CLR_GEN(toc);
+	WT_TRET(__wt_toc_api_clr(toc, 0));
 	return (ret);
 }
 
@@ -610,11 +674,14 @@ static int __wt_api_db_stat_print(
 	const char *method_name = "DB.stat_print";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_STAT_PRINT);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_STAT_PRINT);
-	ret = __wt_db_stat_print(db, stream);
+	ret = __wt_db_stat_print(toc, stream);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
@@ -630,12 +697,15 @@ static int __wt_api_db_sync(
 	const char *method_name = "DB.sync";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_SYNC);
 	WT_DB_RDONLY(db, method_name);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_SYNC);
-	ret = __wt_db_sync(db, progress);
+	ret = __wt_db_sync(toc, progress);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
@@ -651,11 +721,14 @@ static int __wt_api_db_verify(
 	const char *method_name = "DB.verify";
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
+	WT_TOC *toc = NULL;
 	int ret;
 
 	WT_ENV_FCHK(env, method_name, flags, WT_APIMASK_DB_VERIFY);
+	WT_RET(__wt_toc_api_set(env, method_name, db, &toc));
 	WT_STAT_INCR(ienv->method_stats, DB_VERIFY);
-	ret = __wt_db_verify(db, progress);
+	ret = __wt_db_verify(toc, progress);
+	WT_TRET(__wt_toc_api_clr(toc, 1));
 	return (ret);
 }
 
@@ -1140,11 +1213,17 @@ __wt_methods_db_lockout(DB *db)
 	db->bulk_load = (int (*)
 	    (DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **)))
 	    __wt_db_lockout;
+	db->col_del = (int (*)
+	    (DB *, WT_TOC *, u_int64_t , u_int32_t ))
+	    __wt_db_lockout;
+	db->col_get = (int (*)
+	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
+	    __wt_db_lockout;
+	db->col_put = (int (*)
+	    (DB *, WT_TOC *, u_int64_t *, DBT *, u_int32_t ))
+	    __wt_db_lockout;
 	db->column_set = (int (*)
 	    (DB *, u_int32_t , const char *, u_int32_t ))
-	    __wt_db_lockout;
-	db->del = (int (*)
-	    (DB *, WT_TOC *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->dump = (int (*)
 	    (DB *, FILE *, void (*)(const char *, u_int64_t), u_int32_t ))
@@ -1173,19 +1252,19 @@ __wt_methods_db_lockout(DB *db)
 	db->errx = (void (*)
 	    (DB *, const char *, ...))
 	    __wt_db_lockout;
-	db->get = (int (*)
-	    (DB *, WT_TOC *, DBT *, DBT *, DBT *, u_int32_t ))
-	    __wt_db_lockout;
-	db->get_recno = (int (*)
-	    (DB *, WT_TOC *, u_int64_t , DBT *, u_int32_t ))
-	    __wt_db_lockout;
 	db->huffman_set = (int (*)
 	    (DB *, u_int8_t const *, u_int , u_int32_t ))
 	    __wt_db_lockout;
 	db->open = (int (*)
 	    (DB *, const char *, mode_t , u_int32_t ))
 	    __wt_db_lockout;
-	db->put = (int (*)
+	db->row_del = (int (*)
+	    (DB *, WT_TOC *, DBT *, u_int32_t ))
+	    __wt_db_lockout;
+	db->row_get = (int (*)
+	    (DB *, WT_TOC *, DBT *, DBT *, u_int32_t ))
+	    __wt_db_lockout;
+	db->row_put = (int (*)
 	    (DB *, WT_TOC *, DBT *, DBT *, u_int32_t ))
 	    __wt_db_lockout;
 	db->stat_clear = (int (*)
@@ -1259,11 +1338,13 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, u_int8_t const *, u_int , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = __wt_api_db_bulk_load;
-	db->del = __wt_api_db_del;
+	db->col_del = __wt_api_db_col_del;
+	db->col_get = __wt_api_db_col_get;
+	db->col_put = __wt_api_db_col_put;
 	db->dump = __wt_api_db_dump;
-	db->get = __wt_api_db_get;
-	db->get_recno = __wt_api_db_get_recno;
-	db->put = __wt_api_db_put;
+	db->row_del = __wt_api_db_row_del;
+	db->row_get = __wt_api_db_row_get;
+	db->row_put = __wt_api_db_row_put;
 	db->stat_clear = __wt_api_db_stat_clear;
 	db->stat_print = __wt_api_db_stat_print;
 	db->sync = __wt_api_db_sync;

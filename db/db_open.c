@@ -16,11 +16,13 @@ static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
  *	Open a DB handle.
  */
 int
-__wt_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
+__wt_db_open(WT_TOC *toc, const char *dbname, mode_t mode, u_int32_t flags)
 {
+	DB *db;
 	ENV *env;
 
-	env = db->env;
+	env = toc->env;
+	db = toc->db;
 
 	WT_STAT_INCR(env->ienv->stats, DATABASE_OPEN);
 
@@ -28,7 +30,7 @@ __wt_db_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	WT_RET(__wt_db_idb_open(db, dbname, mode, flags));
 
 	/* Open the underlying Btree. */
-	WT_RET(__wt_bt_open(db, LF_ISSET(WT_CREATE) ? 1 : 0));
+	WT_RET(__wt_bt_open(toc, LF_ISSET(WT_CREATE) ? 1 : 0));
 
 	/* Turn on the methods that require open. */
 	__wt_methods_db_open_transition(db);
@@ -63,4 +65,24 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 		F_SET(idb, WT_RDONLY);
 
 	return (0);
+}
+
+/*
+ * __wt_db_close --
+ *	Db.close method (DB close & handle destructor).
+ */
+int
+__wt_db_close(WT_TOC *toc)
+{
+	DB *db;
+	int ret;
+
+	db = toc->db;
+
+	/* Close the underlying Btree. */
+	ret = __wt_bt_close(toc);
+
+	WT_TRET(__wt_db_destroy(db));
+
+	return (ret);
 }

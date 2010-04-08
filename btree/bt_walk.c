@@ -17,35 +17,27 @@ static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
  *	Return Btree statistics.
  */
 int
-__wt_bt_stat(DB *db)
+__wt_bt_stat(WT_TOC *toc)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_TOC *toc;
 	WT_PAGE *page;
-	int ret;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
-	ret = 0;
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.stat");
 
 	/* If no root page has been set, there's nothing to stat. */
 	if ((page = idb->root_page) == NULL)
 		return (0);
 
 	/* Check for one-page databases. */
-	ret = page->hdr->type == WT_PAGE_ROW_LEAF ?
+	return (page->hdr->type == WT_PAGE_ROW_LEAF ?
 	    __wt_bt_stat_page(toc, page) :
-	    __wt_bt_stat_level(toc, page->addr, 0);
-
-	WT_TRET(toc->close(toc, 0));
-
-	return (ret);
+	    __wt_bt_stat_level(toc, page->addr, 0));
 }
 
 /*

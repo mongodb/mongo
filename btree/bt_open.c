@@ -17,16 +17,15 @@ static int __wt_bt_open_verify_sizes(DB *);
  *	Open a Btree.
  */
 int
-__wt_bt_open(DB *db, int ok_create)
+__wt_bt_open(WT_TOC *toc, int ok_create)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_TOC *toc;
-	int ret;
 
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
-	env = db->env;
-	ret = 0;
 
 	/* Check page size configuration. */
 	WT_RET(__wt_bt_open_verify(db));
@@ -34,15 +33,10 @@ __wt_bt_open(DB *db, int ok_create)
 	/* Open the fle. */
 	WT_RET(__wt_open(env, idb->dbname, idb->mode, ok_create, &idb->fh));
 
-	WT_ERR(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.open");
-
 	/* Get a permanent root page reference. */
-	WT_ERR(__wt_bt_root_page(toc));
+	WT_RET(__wt_bt_root_page(toc));
 
-err:	WT_TRET(toc->close(toc, 0));
-
-	return (ret);
+	return (0);
 }
 
 /*

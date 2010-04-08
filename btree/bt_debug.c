@@ -62,7 +62,7 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 	 * dumping in debugging mode, we want to confirm the page is OK before
 	 * walking it.
 	 */
-	ret = __wt_bt_verify_int(toc, NULL, NULL, fp);
+	ret = __wt_bt_verify_int(toc, NULL, fp);
 
 	if (do_close)
 		(void)fclose(fp);

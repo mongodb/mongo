@@ -10,18 +10,22 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_search_key_row --
+ * __wt_bt_search_row --
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_bt_search_key_row(WT_TOC *toc, DBT *key, u_int32_t flags)
+__wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 {
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW_INDX *ip;
+	WT_SDBT *rdbt;
 	u_int32_t addr, base, indx, limit;
 	int cmp, isleaf, ret;
+
+	toc->srch_page = NULL;			/* Return values. */
+	toc->srch_ip = NULL;
 
 	db = toc->db;
 	idb = db->idb;
@@ -86,23 +90,9 @@ __wt_bt_search_key_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 		if (cmp != 0)
 			ip = page->u.r_indx + (base == 0 ? 0 : base - 1);
 
-		/*
-		 * If we've reached the leaf page:
-		 *	If we found a match, set the page/index and return OK.
-		 *	If we didn't find a match, but we're inserting, set
-		 *	    the page/index and return WT_NOTFOUND.
-		 *	If we didn't find a match and it's not an insert, lose
-		 *	    the page and return WT_NOTFOUND.
-		 */
-		if (isleaf) {
-			if (cmp == 0 || LF_ISSET(WT_INSERT)) {
-				toc->srch_page = page;
-				toc->srch_ip = ip;
-				if (cmp == 0)
-					return (0);
-			}
-			return (WT_NOTFOUND);
-		}
+		/* If we've reached the leaf page, we're done. */
+		if (isleaf)
+			break;
 
 		/* Get the address for the child page. */
 		addr = WT_ROW_OFF_ADDR(ip);
@@ -116,6 +106,28 @@ __wt_bt_search_key_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 		/* Get the next page. */
 		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
 	}
+
+	/*
+	 * If we're inserting, we're returning a position in the tree rather
+	 * than an item, so it's always useful.
+	 */
+	if (!LF_ISSET(WT_INSERT)) {
+		/* Lookups only return exact matches. */
+		if (cmp != 0) {
+			ret = WT_NOTFOUND;
+			goto err;
+		}
+
+		/* Return the match unless it's been deleted. */
+		if ((rdbt = WT_REPL_CURRENT(ip)) != NULL &&
+		     rdbt->data == WT_DATA_DELETED) {
+			ret = WT_NOTFOUND;
+			goto err;
+		}
+	}
+	toc->srch_page = page;
+	toc->srch_ip = ip;
+	return (0);
 
 err:	if (page != idb->root_page)
 		WT_RET(__wt_bt_page_out(toc, page, 0));

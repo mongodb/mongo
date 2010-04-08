@@ -14,12 +14,14 @@
  *	Print DB handle statistics to a stream.
  */
 int
-__wt_db_stat_print(DB *db, FILE *stream)
+__wt_db_stat_print(WT_TOC *toc, FILE *stream)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
 
 	fprintf(stream, "Database handle statistics: %s\n", idb->dbname);
@@ -27,7 +29,7 @@ __wt_db_stat_print(DB *db, FILE *stream)
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_database_stats(idb->dstats);
-	WT_RET(__wt_bt_stat(db));
+	WT_RET(__wt_bt_stat(toc));
 
 	fprintf(stream, "Database statistics: %s\n", idb->dbname);
 	__wt_stat_print(env, idb->dstats, stream);

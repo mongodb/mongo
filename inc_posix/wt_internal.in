@@ -75,29 +75,15 @@ struct __wt_stats;		typedef struct __wt_stats WT_STATS;
 #define	WT_TOC_SIZE_DEFAULT	(50)	/* Default number of TOCs */
 
 /*******************************************
- * WT_TOC support (the structures are public, so declared in wiredtiger.h).
+ * WT_TOC support.
  *******************************************/
-/*
- * We pass around WT_TOCs internally in the Btree, (rather than a DB), because
- * the DB's are free-threaded, and the WT_TOCs are per-thread.  WT_TOCs always
- * reference a DB handle, though.
- */
-#define	WT_TOC_DB_INIT(toc, _db, _name) do {				\
-	(toc)->db = (_db);						\
-	(toc)->name = (_name);						\
-} while (0)
-#define	WT_TOC_DB_CLEAR(toc) do {					\
-	(toc)->db = NULL;						\
-	(toc)->name = NULL;						\
-} while (0)
-
 /*
  * Set/clear the WT_TOC's generation number; done in the API level, as well as
  * periodically by long-running operations.
  */
-#define	WT_TOC_CLR_GEN(toc)						\
+#define	WT_TOC_GEN_CLR(toc)						\
 	(toc)->gen = UINT32_MAX
-#define	WT_TOC_SET_GEN(toc)						\
+#define	WT_TOC_GEN_SET(toc)						\
 	(toc)->gen = (toc)->env->ienv->api_gen
 
 /*******************************************

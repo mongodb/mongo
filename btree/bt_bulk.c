@@ -8,9 +8,9 @@
 
 #include "wt_internal.h"
 
-static int  __wt_bt_bulk_fix(DB *,
+static int  __wt_bt_bulk_fix(WT_TOC *,
     void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
-static int  __wt_bt_bulk_var(DB *, u_int32_t,
+static int  __wt_bt_bulk_var(WT_TOC *, u_int32_t,
     void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));
 static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
@@ -26,11 +26,13 @@ static void __wt_bt_promote_row_rec(WT_PAGE *, u_int64_t);
  *	Db.bulk_load method.
  */
 int
-__wt_db_bulk_load(DB *db, u_int32_t flags,
+__wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
+	DB *db;
 	IDB *idb;
 
+	db = toc->db;
 	idb = db->idb;
 
 	if (F_ISSET(idb, WT_COLUMN))
@@ -41,9 +43,9 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
 	 * fixed-length pages.
 	 */
 	if (F_ISSET(idb, WT_COLUMN) && db->fixed_len != 0)
-		return (__wt_bt_bulk_fix(db, f, cb));
+		return (__wt_bt_bulk_fix(toc, f, cb));
 
-	return (__wt_bt_bulk_var(db, flags, f, cb));
+	return (__wt_bt_bulk_var(toc, flags, f, cb));
 }
 
 /*
@@ -51,30 +53,28 @@ __wt_db_bulk_load(DB *db, u_int32_t flags,
  *	Db.bulk_load method for column-store, fixed-length database pages.
  */
 static int
-__wt_bt_bulk_fix(DB *db,
+__wt_bt_bulk_fix(WT_TOC *toc,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
+	DB *db;
 	DBT *key, *data;
 	ENV *env;
 	IDB *idb;
 	WT_PAGE *page, *next;
-	WT_TOC *toc;
 	u_int len;
 	u_int64_t insert_cnt;
 	u_int16_t *last_repeat;
 	u_int8_t *last_data;
 	int ret;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
 	insert_cnt = 0;
 
 	/* Figure out how large is the chunk we're storing on the page. */
 	len = db->fixed_len +
 	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.bulk_load");
 
 	/*
 	 * Allocate our first page -- we do this before we look at any keys
@@ -112,7 +112,7 @@ __wt_bt_bulk_fix(DB *db,
 		 * Bulk load is a long-running operation, update the generation
 		 * number so we don't tie memory down.
 		 */
-		WT_TOC_SET_GEN(toc);
+		WT_TOC_GEN_SET(toc);
 
 		/*
 		 * If doing repeat compression, check to see if this record
@@ -201,8 +201,6 @@ err:		if (page != NULL)
 			(void)__wt_bt_page_out(toc, page, 0);
 	}
 
-	WT_TRET(toc->close(toc, 0));
-
 	return (ret == 1 ? 0 : ret);
 }
 
@@ -212,9 +210,10 @@ err:		if (page != NULL)
  *	pages.
  */
 static int
-__wt_bt_bulk_var(DB *db, u_int32_t flags,
+__wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
     void (*f)(const char *, u_int64_t), int (*cb)(DB *, DBT **, DBT **))
 {
+	DB *db;
 	DBT *key, *data, key_copy, data_copy, key_comp, data_comp;
 	DBT *lastkey, lastkey_std, lastkey_ovfl;
 	ENV *env;
@@ -222,12 +221,12 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 	WT_ITEM key_item, data_item, *dup_key, *dup_data;
 	WT_OVFL key_ovfl, data_ovfl;
 	WT_PAGE *page, *next;
-	WT_TOC *toc;
 	u_int64_t insert_cnt;
 	u_int32_t dup_count, dup_space, len;
 	int ret;
 
-	env = db->env;
+	db = toc->db;
+	env = toc->env;
 	idb = db->idb;
 	ret = 0;
 
@@ -243,9 +242,6 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 	WT_CLEAR(key_item);
 	WT_CLEAR(lastkey_ovfl);
 	WT_CLEAR(lastkey_std);
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.bulk_load");
 
 	/*
 	 * Allocate our first page -- we do this before we look at any keys
@@ -292,7 +288,7 @@ __wt_bt_bulk_var(DB *db, u_int32_t flags,
 		 * Bulk load is a long-running operation, update the generation
 		 * number so we don't tie memory down.
 		 */
-		WT_TOC_SET_GEN(toc);
+		WT_TOC_GEN_SET(toc);
 
 		/*
 		 * Copy the caller's DBTs, we don't want to modify them.  But,
@@ -615,8 +611,6 @@ err:		if (page != NULL)
 	__wt_free(env, data_comp.data, data_comp.data_len);
 	__wt_free(env, key_comp.data, key_comp.data_len);
 	__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.data_len);
-
-	WT_TRET(toc->close(toc, 0));
 
 	return (ret == 1 ? 0 : ret);
 }

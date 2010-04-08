@@ -10,29 +10,25 @@
 #include "wt_internal.h"
 
 /*
- * __wt_db_get --
- *	Db.get method.
+ * __wt_db_row_get --
+ *	Db.row_get method.
  */
 int
-__wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
+__wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 {
+	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_ROW_INDX *ip;
 	u_int32_t type;
 	int ret;
 
-	WT_ASSERT(toc->env, pkey == NULL);		/* NOT YET */
-
+	db = toc->db;
 	idb = db->idb;
 	page = NULL;
 
-	WT_STAT_INCR(idb->stats, DB_READ_BY_KEY);
-
-	WT_TOC_DB_INIT(toc, db, "Db.get");
-
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_key_row(toc, key, 0));
+	WT_ERR(__wt_bt_search_row(toc, key, 0));
 	page = toc->srch_page;
 	ip = toc->srch_ip;
 
@@ -58,10 +54,7 @@ __wt_db_get(DB *db, WT_TOC *toc, DBT *key, DBT *pkey, DBT *data)
 	}
 	ret = __wt_bt_dbt_return(toc, key, data, page, ip, 0);
 
-err:	if (page != idb->root_page)
+err:	if (page != NULL && page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
-
-	WT_TOC_DB_CLEAR(toc);
-
 	return (ret);
 }

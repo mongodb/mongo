@@ -31,7 +31,7 @@ __wt_env_stat_print(ENV *env, FILE *stream)
 	__wt_stat_print(env, ienv->method_stats, stream);
 
 	TAILQ_FOREACH(idb, &ienv->dbqh, q)
-		WT_RET(__wt_db_stat_print(idb->db, stream));
+		WT_RET(idb->db->stat_print(idb->db, stream, 0));
 	return (0);
 }
 

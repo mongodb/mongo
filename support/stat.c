@@ -117,7 +117,7 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 15, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 11, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BULK_DUP_DATA_READ].desc =
 	    "bulk duplicate data pairs read";
@@ -136,12 +136,6 @@ __wt_stat_alloc_db_stats(ENV *env, WT_STATS **statsp)
 	    "cache hit: reads found in the cache";
 	stats[WT_STAT_DB_CACHE_MISS].desc =
 	    "cache miss: reads not found in the cache";
-	stats[WT_STAT_DB_DELETE_BY_KEY].desc =
-	    "database delete-by-key operations";
-	stats[WT_STAT_DB_READ_BY_KEY].desc = "database read-by-key operations";
-	stats[WT_STAT_DB_READ_BY_RECNO].desc =
-	    "database read-by-recno operations";
-	stats[WT_STAT_DB_WRITE_BY_KEY].desc = "database put-by-key operations";
 
 	*statsp = stats;
 	return (0);
@@ -160,10 +154,6 @@ __wt_stat_clear_db_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_CACHE_ALLOC].v = 0;
 	stats[WT_STAT_DB_CACHE_HIT].v = 0;
 	stats[WT_STAT_DB_CACHE_MISS].v = 0;
-	stats[WT_STAT_DB_DELETE_BY_KEY].v = 0;
-	stats[WT_STAT_DB_READ_BY_KEY].v = 0;
-	stats[WT_STAT_DB_READ_BY_RECNO].v = 0;
-	stats[WT_STAT_DB_WRITE_BY_KEY].v = 0;
 }
 
 int
@@ -227,7 +217,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 64, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 66, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -250,7 +240,9 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_BULK_LOAD].desc = "db.bulk_load";
 	stats[WT_STAT_DB_CLOSE].desc = "db.close";
 	stats[WT_STAT_DB_COLUMN_SET].desc = "db.column_set";
-	stats[WT_STAT_DB_DEL].desc = "db.del";
+	stats[WT_STAT_DB_COL_DEL].desc = "db.col_del";
+	stats[WT_STAT_DB_COL_GET].desc = "db.col_get";
+	stats[WT_STAT_DB_COL_PUT].desc = "db.col_put";
 	stats[WT_STAT_DB_DUMP].desc = "db.dump";
 	stats[WT_STAT_DB_ERR].desc = "db.err";
 	stats[WT_STAT_DB_ERRCALL_GET].desc = "db.errcall_get";
@@ -260,11 +252,11 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_ERRPFX_GET].desc = "db.errpfx_get";
 	stats[WT_STAT_DB_ERRPFX_SET].desc = "db.errpfx_set";
 	stats[WT_STAT_DB_ERRX].desc = "db.errx";
-	stats[WT_STAT_DB_GET].desc = "db.get";
-	stats[WT_STAT_DB_GET_RECNO].desc = "db.get_recno";
 	stats[WT_STAT_DB_HUFFMAN_SET].desc = "db.huffman_set";
 	stats[WT_STAT_DB_OPEN].desc = "db.open";
-	stats[WT_STAT_DB_PUT].desc = "db.put";
+	stats[WT_STAT_DB_ROW_DEL].desc = "db.row_del";
+	stats[WT_STAT_DB_ROW_GET].desc = "db.row_get";
+	stats[WT_STAT_DB_ROW_PUT].desc = "db.row_put";
 	stats[WT_STAT_DB_STAT_CLEAR].desc = "db.stat_clear";
 	stats[WT_STAT_DB_STAT_PRINT].desc = "db.stat_print";
 	stats[WT_STAT_DB_SYNC].desc = "db.sync";
@@ -323,7 +315,9 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_BULK_LOAD].v = 0;
 	stats[WT_STAT_DB_CLOSE].v = 0;
 	stats[WT_STAT_DB_COLUMN_SET].v = 0;
-	stats[WT_STAT_DB_DEL].v = 0;
+	stats[WT_STAT_DB_COL_DEL].v = 0;
+	stats[WT_STAT_DB_COL_GET].v = 0;
+	stats[WT_STAT_DB_COL_PUT].v = 0;
 	stats[WT_STAT_DB_DUMP].v = 0;
 	stats[WT_STAT_DB_ERR].v = 0;
 	stats[WT_STAT_DB_ERRCALL_GET].v = 0;
@@ -333,11 +327,11 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_ERRPFX_GET].v = 0;
 	stats[WT_STAT_DB_ERRPFX_SET].v = 0;
 	stats[WT_STAT_DB_ERRX].v = 0;
-	stats[WT_STAT_DB_GET].v = 0;
-	stats[WT_STAT_DB_GET_RECNO].v = 0;
 	stats[WT_STAT_DB_HUFFMAN_SET].v = 0;
 	stats[WT_STAT_DB_OPEN].v = 0;
-	stats[WT_STAT_DB_PUT].v = 0;
+	stats[WT_STAT_DB_ROW_DEL].v = 0;
+	stats[WT_STAT_DB_ROW_GET].v = 0;
+	stats[WT_STAT_DB_ROW_PUT].v = 0;
 	stats[WT_STAT_DB_STAT_CLEAR].v = 0;
 	stats[WT_STAT_DB_STAT_PRINT].v = 0;
 	stats[WT_STAT_DB_SYNC].v = 0;

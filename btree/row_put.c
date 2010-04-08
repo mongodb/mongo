@@ -9,14 +9,12 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_del_serial_func(WT_TOC *);
-
 /*
- * __wt_db_del --
- *	Db.del method.
+ * __wt_db_row_del --
+ *	Db.row_del method.
  */
 int
-__wt_db_del(DB *db, WT_TOC *toc, DBT *key)
+__wt_db_row_del(WT_TOC *toc, DBT *key)
 {
 	ENV *env;
 	IDB *idb;
@@ -25,17 +23,13 @@ __wt_db_del(DB *db, WT_TOC *toc, DBT *key)
 	WT_ROW_INDX *ip;
 	int ret;
 
-	env = db->env;
-	idb = db->idb;
+	env = toc->env;
+	idb = toc->db->idb;
 	page = NULL;
 	ret = 0;
 
-	WT_STAT_INCR(idb->stats, DB_DELETE_BY_KEY);
-
-	WT_TOC_DB_INIT(toc, db, "Db.del");
-
 	/* Search the btree for the key. */
-	WT_ERR(__wt_bt_search_key_row(toc, key, 0));
+	WT_ERR(__wt_bt_search_row(toc, key, 0));
 	page = toc->srch_page;
 	ip = toc->srch_ip;
 
@@ -49,10 +43,8 @@ __wt_db_del(DB *db, WT_TOC *toc, DBT *key)
 	/* Delete the item. */
 	__wt_bt_del_serial(toc, new, ret);
 
-err:	if (page != idb->root_page)
+err:	if (page != NULL && page != idb->root_page)
 		WT_TRET(__wt_bt_page_out(toc, page, 0));
-
-	WT_TOC_DB_CLEAR(toc);
 
 	return (ret);
 }
@@ -61,7 +53,7 @@ err:	if (page != idb->root_page)
  * __wt_bt_del_serial_func --
  *	Server function to discard an entry.
  */
-static int
+int
 __wt_bt_del_serial_func(WT_TOC *toc)
 {
 	WT_REPL *new, *repl;
@@ -80,14 +72,14 @@ __wt_bt_del_serial_func(WT_TOC *toc)
 		WT_RET(__wt_workq_repl(toc, ip->repl, new, &ip->repl));
 
 	/*
-	 * Update the entry.  The data field makes this entry visible to the
-	 * rest of the system; flush memory before setting the data field so
-	 * it is never valid without supporting information.
+	 * Update the entry.  Incrementing the repl_next field makes this entry
+	 * visible to the rest of the system; flush memory before incrementing
+	 * it so it's never valid without supporting information.
 	 */
 	repl = ip->repl;
 	repl->data[repl->repl_next].size = 0;
-	WT_MEMORY_FLUSH;
 	repl->data[repl->repl_next].data = WT_DATA_DELETED;
+	WT_MEMORY_FLUSH;
 	++repl->repl_next;
 	WT_MEMORY_FLUSH;
 	return (0);

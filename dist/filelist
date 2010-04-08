@@ -17,7 +17,9 @@ btree/bt_ret.c
 btree/bt_stat.c
 btree/bt_sync.c
 btree/bt_vrfy.c
+btree/col_del.c
 btree/col_get.c
+btree/col_put.c
 btree/col_srch.c
 btree/row_del.c
 btree/row_get.c

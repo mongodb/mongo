@@ -60,7 +60,11 @@ __wt_env_toc_size_set_verify(ENV *env, u_int32_t toc_size)
 int
 __wt_env_verbose_set_verify(ENV *env, u_int32_t verbose)
 {
+#ifdef HAVE_VERBOSE
 	WT_ENV_FCHK(env,
 	    "Env.verbose_set", verbose, WT_APIMASK_ENV_VERBOSE_SET);
 	return (0);
+#else
+	return (__wt_api_config(env, "Env.verbose_set", "--enable-verbose"));
+#endif
 }

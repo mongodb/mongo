@@ -29,6 +29,7 @@
 #		rdonly	 -- not allowed if the database is read-only
 #		restart	 -- handle WT_RESTART in the API call
 #		setter	 -- auto-generated setter method
+#		toc	 -- function takes a WT_TOC/DB argument pair
 #		verify	 -- setter methods call validation function
 #	3: a list of argument and name/declaration pairs
 #		An argument to the method.  In an argument declaration, "@S"
@@ -104,7 +105,8 @@ methods['env.close'] = Api(
 methods['env.db'] = Api(
 	'env.db',
 	'method',
-	['flags/u_int32_t @S', 'dbp/DB **@S'],
+	['flags/u_int32_t @S',
+	 'dbp/DB **@S'],
 	['__NONE__'],
 	['open'], [])
 
@@ -258,6 +260,7 @@ methods['env.verbose_set'] = Api(
 	['verbose/u_int32_t @S'],
 	['VERB_ALL',
 	 'VERB_CACHE',
+	 'VERB_HAZARD',
 	 'VERB_FILEOPS',
 	 'VERB_SERVERS'],
 	['init'], [])
@@ -353,7 +356,7 @@ methods['db.btree_pagesize_set'] = Api(
 
 methods['db.bulk_load'] = Api(
 	'db.bulk_load',
-	'method, rdonly',
+	'method, rdonly, toc',
 	['flags/u_int32_t @S',
 	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'cb/int (*@S)(DB *, DBT **, DBT **)'],
@@ -362,10 +365,39 @@ methods['db.bulk_load'] = Api(
 
 methods['db.close'] = Api(
 	'db.close',
-	'method',
+	'method, toc',
 	['flags/u_int32_t @S'],
 	['__NONE__'],
 	['init'], [])
+
+methods['db.col_del'] = Api(
+	'db.col_del',
+	'method, cache, rdonly, restart, toc',
+	['toc/WT_TOC *@S',
+	 'recno/u_int64_t @S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['db.col_get'] = Api(
+	'db.col_get',
+	'method, cache, toc',
+	['toc/WT_TOC *@S',
+	 'recno/u_int64_t @S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['db.col_put'] = Api(
+	'db.col_put',
+	'method, cache, rdonly, restart, toc',
+	['toc/WT_TOC *@S',
+	 'recno/u_int64_t *@S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
 
 methods['db.column_set'] = Api(
 	'db.column_set',
@@ -376,18 +408,9 @@ methods['db.column_set'] = Api(
 	[ 'REPEAT_COMP' ],
 	['init'], ['open'])
 
-methods['db.del'] = Api(
-	'db.del',
-	'method, cache, rdonly, restart',
-	['toc/WT_TOC *@S',
-	 'key/DBT *@S',
-	 'flags/u_int32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
 methods['db.dump'] = Api(
 	'db.dump',
-	'method',
+	'method, toc',
 	['stream/FILE *@S',
 	 'progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
@@ -449,27 +472,6 @@ methods['db.errx'] = Api(
 	[],
 	['init'], [])
 
-methods['db.get'] = Api(
-	'db.get',
-	'method, cache',
-	['toc/WT_TOC *@S',
-	 'key/DBT *@S',
-	 'pkey/DBT *@S',
-	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
-methods['db.get_recno'] = Api(
-	'db.get_recno',
-	'method, cache',
-	['toc/WT_TOC *@S',
-	 'recno/u_int64_t @S',
-	 'data/DBT *@S',
-	 'flags/u_int32_t @S'],
-	['__NONE__'],
-	['open'], [])
-
 methods['db.huffman_set'] = Api(
 	'db.huffman_set',
 	'method, setter, handcode',
@@ -481,16 +483,35 @@ methods['db.huffman_set'] = Api(
 
 methods['db.open'] = Api(
 	'db.open',
-	'method',
+	'method, toc',
 	['dbname/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/u_int32_t @S'],
 	[ 'CREATE', 'RDONLY' ],
 	['init'], [])
 
-methods['db.put'] = Api(
-	'db.put',
-	'method, cache, rdonly, restart',
+methods['db.row_del'] = Api(
+	'db.row_del',
+	'method, cache, rdonly, restart, toc',
+	['toc/WT_TOC *@S',
+	 'key/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['db.row_get'] = Api(
+	'db.row_get',
+	'method, cache, toc',
+	['toc/WT_TOC *@S',
+	 'key/DBT *@S',
+	 'data/DBT *@S',
+	 'flags/u_int32_t @S'],
+	['__NONE__'],
+	['open'], [])
+
+methods['db.row_put'] = Api(
+	'db.row_put',
+	'method, cache, rdonly, restart, toc',
 	['toc/WT_TOC *@S',
 	 'key/DBT *@S',
 	 'data/DBT *@S',
@@ -507,7 +528,7 @@ methods['db.stat_clear'] = Api(
 
 methods['db.stat_print'] = Api(
 	'db.stat_print',
-	'method',
+	'method, toc',
 	['stream/FILE *@S',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
@@ -515,7 +536,7 @@ methods['db.stat_print'] = Api(
 
 methods['db.sync'] = Api(
 	'db.sync',
-	'method, rdonly',
+	'method, rdonly, toc',
 	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],
@@ -523,7 +544,7 @@ methods['db.sync'] = Api(
 
 methods['db.verify'] = Api(
 	'db.verify',
-	'method',
+	'method, toc',
 	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
 	['__NONE__'],

@@ -10,18 +10,22 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bt_search_recno_col --
+ * __wt_bt_search_col --
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_bt_search_recno_col(WT_TOC *toc, u_int64_t recno)
+__wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 {
 	IDB *idb;
 	WT_COL_INDX *ip;
 	WT_PAGE *page;
+	WT_SDBT *rdbt;
 	u_int64_t record_cnt;
 	u_int32_t addr, i;
-	int isleaf;
+	int isleaf, ret;
+
+	toc->srch_page = NULL;			/* Return values. */
+	toc->srch_ip = NULL;
 
 	idb = toc->db->idb;
 
@@ -37,9 +41,7 @@ __wt_bt_search_recno_col(WT_TOC *toc, u_int64_t recno)
 	for (record_cnt = 0;;) {
 		/* If it's a leaf page, return the page and index. */
 		if (isleaf) {
-			toc->srch_page = page;
-			toc->srch_ip =
-			    page->u.c_indx + ((recno - record_cnt) - 1);
+			ip = page->u.c_indx + ((recno - record_cnt) - 1);
 			break;
 		}
 
@@ -61,5 +63,18 @@ __wt_bt_search_recno_col(WT_TOC *toc, u_int64_t recno)
 		/* Get the next page. */
 		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
 	}
+
+	/* Check for deleted items. */
+	if ((rdbt =
+	    WT_REPL_CURRENT(ip)) != NULL && rdbt->data == WT_DATA_DELETED) {
+		ret = WT_NOTFOUND;
+		goto err;
+	}
+
+	toc->srch_page = page;
+	toc->srch_ip = ip;
 	return (0);
+
+err:	if (page != idb->root_page)
+		WT_RET(__wt_bt_page_out(toc, page, 0));
 }

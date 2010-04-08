@@ -65,10 +65,14 @@ extern "C" {
 #define	FLD_SET(field, mask)	((field) |= (mask))
 
 /* Output a verbose message. */
+#ifdef HAVE_VERBOSE
 #define	WT_VERBOSE(env, f, msg) do {					\
 	if (FLD_ISSET((env)->verbose, WT_VERB_ALL | (f)))		\
 		__wt_msg msg;						\
 } while (0)
+#else
+#define	WT_VERBOSE(env, f, msg)
+#endif
 
 /* Clear a chunk of memory. */
 #define	WT_CLEAR(s)							\

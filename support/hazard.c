@@ -21,6 +21,10 @@ __wt_hazard_set(WT_TOC *toc, WT_PAGE *page)
 
 	env = toc->env;
 
+	WT_VERBOSE(env, WT_VERB_HAZARD,
+	    (env, "toc %#lx hazard %#lx: set",
+	    WT_PTR_TO_ULONG(toc), WT_PTR_TO_ULONG(page)));
+
 	/* Set the caller's hazard pointer. */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp == NULL) {
@@ -32,6 +36,7 @@ __wt_hazard_set(WT_TOC *toc, WT_PAGE *page)
 			WT_MEMORY_FLUSH;
 			return;
 		}
+	__wt_api_env_errx(env, "WT_TOC has no more hazard reference slots");
 	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
 }
 
@@ -47,6 +52,10 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 
 	env = toc->env;
 
+	WT_VERBOSE(env, WT_VERB_HAZARD,
+	    (env, "toc %#lx hazard %#lx: clr",
+	    WT_PTR_TO_ULONG(toc), WT_PTR_TO_ULONG(page)));
+
 	/* Clear the caller's hazard pointer. */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp == page) {
@@ -59,6 +68,7 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 			WT_MEMORY_FLUSH;
 			return;
 		}
+	__wt_api_env_errx(env, "WT_TOC hazard reference not found");
 	WT_ASSERT(env, hp < toc->hazard + env->hazard_size);
 }
 
@@ -86,7 +96,7 @@ __wt_hazard_empty(WT_TOC *toc)
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
 		if (*hp != NULL) {
 			__wt_api_env_errx(env,
-			    "WT_TOC closed with a hazard reference set");
+			    "WT_TOC left library with a hazard reference set");
 			*hp = NULL;
 			WT_MEMORY_FLUSH;
 		}

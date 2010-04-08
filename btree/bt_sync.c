@@ -14,21 +14,7 @@
  *	Sync a Btree.
  */
 int
-__wt_bt_sync(DB *db, void (*f)(const char *, u_int64_t))
+__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
-	ENV *env;
-	WT_TOC *toc;
-	int ret;
-
-	env = db->env;
-	ret = 0;
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.sync");
-
-	ret = __wt_cache_sync(toc, f);
-
-	WT_TRET(toc->close(toc, 0));
-
-	return (ret);
+	return (__wt_cache_sync(toc, f));
 }

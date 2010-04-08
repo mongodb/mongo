@@ -83,9 +83,6 @@ __wt_wt_toc_close(WT_TOC *toc)
 	if (toc->flist != NULL)
 		WT_TRET(__wt_flist_sched(toc));
 
-	/* Clear any remaining hazard references (there shouldn't be any). */
-	__wt_hazard_empty(toc);
-
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {
 		__wt_unlock(toc->mtx);
@@ -109,6 +106,56 @@ __wt_wt_toc_close(WT_TOC *toc)
 	WT_MEMORY_FLUSH;
 
 	return (ret);
+}
+
+/*
+ * __wt_toc_api_set --
+ *	Pair WT_TOC and DB handle, allocating the WT_TOC as necessary.
+ */
+int
+__wt_toc_api_set(ENV *env, const char *name, DB *db, WT_TOC **tocp)
+{
+	WT_TOC *toc;
+
+	/*
+	 * We pass around WT_TOCs internally in the Btree, (rather than a DB),
+	 * because the DB's are free-threaded, and the WT_TOCs are per-thread.
+	 * Lots of the API calls don't require the application to allocate and
+	 * manage the WT_TOC, which means we have to do it for them.
+	 *
+	 * WT_TOCs always reference a DB handle, and we do that here, as well.
+	 */
+	if ((toc = *tocp) == NULL) {
+		WT_RET(env->toc(env, 0, tocp));
+		toc = *tocp;
+	}
+	toc->db = db;
+	toc->name = name;
+	WT_TOC_GEN_SET(toc);
+	return (0);
+}
+
+/*
+ * __wt_toc_api_clr --
+ *	Clear the WT_TOC, freeing it if it was allocated by the library.
+ */
+int
+__wt_toc_api_clr(WT_TOC *toc, int islocal)
+{
+	/*
+	 * The WT_TOC should hold no more hazard references; this is a
+	 * diagnostic check, but it's cheap so we do it all the time.
+	 */
+	__wt_hazard_empty(toc);
+
+	if (islocal)
+		return (toc->close(toc, 0));
+
+	WT_TOC_GEN_CLR(toc);
+
+	toc->db = NULL;
+	toc->name = NULL;
+	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC

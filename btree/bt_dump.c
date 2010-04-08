@@ -21,23 +21,21 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  *	Db.dump method.
  */
 int
-__wt_db_dump(
-    DB *db, FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags)
+__wt_db_dump(WT_TOC *toc,
+    FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags)
 {
+	DB *db;
 	ENV *env;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_TOC *toc;
 	u_int64_t fcnt;
 	u_int32_t addr;
 	int ret;
 
-	env = db->env;
+	env = toc->env;
+	db = toc->db;
 	fcnt = 0;
 	ret = 0;
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.dump");
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
@@ -46,13 +44,11 @@ __wt_db_dump(
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before walking it.
 		 */
-		ret = __wt_bt_verify_int(toc, f, "Db.dump", stream);
+		return (__wt_bt_verify_int(toc, f, stream));
 #else
 		__wt_api_db_errx(db, "library not built for debugging");
-		ret = WT_ERROR;
+		return (WT_ERROR);
 #endif
-		WT_TRET(toc->close(toc, 0));
-		return (ret);
 	}
 
 	/*
@@ -60,25 +56,25 @@ __wt_db_dump(
 	 * leaf page in the database; walk the linked list of leaf pages.
 	 */
 	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		WT_ERR(__wt_bt_page_in(toc, addr, 1, 0, &page));
+		WT_RET(__wt_bt_page_in(toc, addr, 1, 0, &page));
 		hdr = page->hdr;
 		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
-			WT_ERR(
+			WT_RET(
 			    __wt_bt_dump_page_fixed(toc, page, stream, flags));
 			break;
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_DUP_INT:
 		case WT_PAGE_DUP_LEAF:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(
+			WT_RET(
 			    __wt_bt_dump_page_item(toc, page, stream, flags));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
 
 		addr = hdr->nextaddr;
-		WT_ERR(__wt_bt_page_out(toc, page, 0));
+		WT_RET(__wt_bt_page_out(toc, page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
 
@@ -87,13 +83,11 @@ __wt_db_dump(
 			f("Db.dump", fcnt);
 	}
 
-err:	WT_TRET(toc->close(toc, 0));
-
 	/* Wrap up reporting. */
 	if (f != NULL)
 		f("Db.dump", fcnt);
 
-	return (ret);
+	return (0);
 }
 
 /* Check if the next page entry is part of a duplicate data set. */

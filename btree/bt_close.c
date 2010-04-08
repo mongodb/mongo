@@ -14,20 +14,18 @@
  *	Close a Btree.
  */
 int
-__wt_bt_close(DB *db)
+__wt_bt_close(WT_TOC *toc)
 {
+	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_TOC *toc;
 	WT_PAGE *page;
 	int isleaf, ret;
 
-	env = db->env;
+	env = toc->env;
+	db = toc->db;
 	idb = db->idb;
 	ret = 0;
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.close");
 
 	/*
 	 * Discard any pinned root page.  We have a direct reference but we
@@ -44,13 +42,11 @@ __wt_bt_close(DB *db)
 	}
 
 	/* Flush any modified pages, and discard the tree. */
-	WT_TRET(__wt_bt_sync(db, NULL));
+	WT_TRET(__wt_bt_sync(toc, NULL));
 
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(env, idb->fh));
 	idb->fh = NULL;
-
-	WT_TRET(toc->close(toc, 0));
 
 	return (ret);
 }

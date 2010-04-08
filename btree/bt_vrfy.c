@@ -20,7 +20,6 @@ typedef struct {
 	FILE	*stream;			/* Dump file stream */
 
 	void (*f)(const char *s, u_int64_t);	/* Progress callback */
-	const char *ptag;			/* Progress tag */
 	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
@@ -37,22 +36,9 @@ static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
  *	Verify a Btree.
  */
 int
-__wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
+__wt_db_verify(WT_TOC *toc, void (*f)(const char *s, u_int64_t))
 {
-	ENV *env;
-	WT_TOC *toc;
-	int ret;
-
-	env = db->env;
-
-	WT_RET(env->toc(env, 0, &toc));
-	WT_TOC_DB_INIT(toc, db, "Db.verify");
-
-	ret = __wt_bt_verify_int(toc, f, "Db.verify", NULL);
-
-	WT_TRET(toc->close(toc, 0));
-
-	return (ret);
+	return (__wt_bt_verify_int(toc, f, NULL));
 }
 
 /*
@@ -60,8 +46,8 @@ __wt_db_verify(DB *db, void (*f)(const char *s, u_int64_t))
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_bt_verify_int(WT_TOC *toc,
-    void (*f)(const char *s, u_int64_t), const char *ptag, FILE *stream)
+__wt_bt_verify_int(
+    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream)
 {
 	DB *db;
 	ENV *env;
@@ -78,7 +64,6 @@ __wt_bt_verify_int(WT_TOC *toc,
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.stream = stream;
 	vstuff.f = f;
-	vstuff.ptag = ptag;
 
 	/*
 	 * If we don't have a root page yet, read the database description
@@ -137,7 +122,7 @@ err:	if (vstuff.fragbits != NULL)
 
 	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
-		vstuff.f(vstuff.ptag, vstuff.fcnt);
+		vstuff.f(toc->name, vstuff.fcnt);
 
 	return (ret);
 }
@@ -653,7 +638,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 
 	/* Report progress every 100 pages. */
 	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 100 == 0)
-		vs->f(vs->ptag, vs->fcnt);
+		vs->f(toc->name, vs->fcnt);
 
 	/*
 	 * If we're verifying the whole tree, complain if there's a page

@@ -355,6 +355,17 @@ struct __wt_repl {
 };
 
 /*
+ * WT_REPL_CURRENT --
+ *	Return the last replacement entry referenced by either a WT_ROW_INDX
+ *	or WT_COL_INDX structure; the repl_next field makes entries visible,
+ *	so we have to test for both a non-zero repl_next field as well as a
+ *	NULL repl field.
+ */
+#define	WT_REPL_CURRENT(i)						\
+	((i)->repl == NULL || (i)->repl->repl_next == 0 ?		\
+	    NULL : &((i)->repl->data[(i)->repl->repl_next - 1]))
+
+/*
  * WT_ITEM --
  *	Trailing data length (in bytes) plus item type.
  *

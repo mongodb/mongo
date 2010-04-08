@@ -9,8 +9,9 @@
 
 #include "wt_internal.h"
 
-static int  __wt_db_config_default(DB *);
-static int  __wt_idb_config_default(DB *);
+static int __wt_db_config_default(DB *);
+static int __wt_idb_config_default(DB *);
+static int __wt_idb_destroy(DB *, int);
 
 /*
  * __wt_env_db --
@@ -42,7 +43,7 @@ __wt_env_db(ENV *env, DB **dbp)
 	*dbp = db;
 	return (0);
 
-err:	(void)__wt_db_close(db);
+err:	(void)__wt_db_destroy(db);
 	return (ret);
 }
 
@@ -63,9 +64,6 @@ __wt_db_config_default(DB *db)
 	__wt_methods_db_init_transition(db);
 
 	db->btree_compare = db->btree_compare_dup = __wt_bt_lex_compare;
-
-	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
-	WT_RET(__wt_stat_alloc_database_stats(env, &idb->dstats));
 
 	return (0);
 }
@@ -91,27 +89,26 @@ __wt_idb_config_default(DB *db)
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
 	__wt_unlock(ienv->mtx);
 
+	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
+	WT_RET(__wt_stat_alloc_database_stats(env, &idb->dstats));
+
 	return (0);
 }
 
 /*
- * __wt_db_close --
- *	Db.close method (DB close & handle destructor).
+ * __wt_db_destroy --
+ *	DB handle destructor.
  */
 int
-__wt_db_close(DB *db)
+__wt_db_destroy(DB *db)
 {
 	ENV *env;
 	int ret;
 
 	env = db->env;
-	ret = 0;
-
-	/* Close the underlying Btree. */
-	WT_TRET(__wt_bt_close(db));
 
 	/* Discard the underlying IDB object. */
-	WT_TRET(__wt_idb_close(db, 0));
+	ret = __wt_idb_destroy(db, 0);
 
 	/* Discard the DB object. */
 	__wt_free(env, db, sizeof(DB));
@@ -120,11 +117,11 @@ __wt_db_close(DB *db)
 }
 
 /*
- * __wt_idb_close --
- *	Db.close method (IDB close & handle destructor).
+ * __wt_idb_destroy --
+ *	IDB handle destructor.
  */
-int
-__wt_idb_close(DB *db, int refresh)
+static int
+__wt_idb_destroy(DB *db, int refresh)
 {
 	ENV *env;
 	IDB *idb;
