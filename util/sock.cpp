@@ -22,6 +22,10 @@ namespace mongo {
 
     static mongo::mutex sock_mutex;
 
+    static bool ipv6 = false;
+    void enableIPv6(bool state) { ipv6 = state; }
+    bool IPv6Enabled() { return ipv6; }
+
     SockAddr::SockAddr(int sourcePort) {
         memset(as<sockaddr_in>().sin_zero, 0, sizeof(as<sockaddr_in>().sin_zero));
         as<sockaddr_in>().sin_family = AF_INET;
@@ -47,7 +51,8 @@ namespace mongo {
             addrinfo hints;
             memset(&hints, 0, sizeof(addrinfo));
             hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags = AI_ADDRCONFIG; 
+            hints.ai_flags = AI_ADDRCONFIG;
+            hints.ai_family = (IPv6Enabled() ? AF_UNSPEC : AF_INET);
 
             stringstream ss;
             ss << port;

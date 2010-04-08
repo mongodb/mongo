@@ -321,6 +321,7 @@ int _main(int argc, char* argv[]) {
         ("password,p", po::value<string>(&password), "password for authentication")
         ("help,h", "show this usage information")
         ("version", "show version information")
+        ("ipv6", "enable IPv6 support (disabled by default)")
         ;
 
     hidden_options.add_options()
@@ -398,6 +399,9 @@ int _main(int argc, char* argv[]) {
                 files.insert(files.begin(), dbaddress);
             }
         }
+    }
+    if (params.count("ipv6")){
+        mongo::enableIPv6();
     }
     
     if ( ! mongo::cmdLine.quiet ) 

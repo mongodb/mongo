@@ -48,8 +48,10 @@ namespace mongo {
         vector<SockAddr> out;
         if (*ips == '\0'){
             out.push_back(SockAddr("0.0.0.0", port)); // IPv4 all
+
+            if (IPv6Enabled())
+                out.push_back(SockAddr("::", port)); // IPv6 all
 #ifndef _WIN32
-            out.push_back(SockAddr("::", port)); // IPv6 all
             if (!noUnixSocket)
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port)); // Unix socket
 #endif

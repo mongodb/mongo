@@ -46,6 +46,7 @@ namespace mongo {
             ("collection,c",po::value<string>(), "collection to use (some commands)" )
             ("username,u",po::value<string>(), "username" )
             ("password,p",po::value<string>(), "password" )
+            ("ipv6", "enable IPv6 support (disabled by default)")
             ;
         if ( localDBAllowed )
             _options->add_options()
@@ -190,6 +191,9 @@ namespace mongo {
 
         if ( _params.count( "password" ) )
             _password = _params["password"].as<string>();
+
+        if (_params.count("ipv6"))
+            enableIPv6();
 
         int ret = -1;
         try {

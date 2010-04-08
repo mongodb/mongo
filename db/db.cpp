@@ -670,6 +670,7 @@ int main(int argc, char* argv[], char *envp[] )
 #else
         ("nounixsocket", "disable listening on unix sockets")
 #endif
+        ("ipv6", "enable IPv6 support (disabled by default)")
         ;
 
     replication_options.add_options()
@@ -915,6 +916,9 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("nounixsocket")){
             noUnixSocket = true;
+        }
+        if (params.count("ipv6")){
+            enableIPv6();
         }
         
 #if defined(_WIN32)
