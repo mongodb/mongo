@@ -106,9 +106,9 @@ namespace mongo {
         tv.tv_sec = secs;
         tv.tv_usec = 0;
         massert( 13083, "unable to set SO_RCVTIMEO",
-                setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *) &tv, sizeof(tv) ) == 0 );
+                setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0 );
         massert( 13084, "unable to set SO_SNDTIMEO",
-                setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (void *) &tv, sizeof(tv) ) == 0 );
+                setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0 );
     }
 
     // If an ip address is passed in, just return that.  If a hostname is passed
