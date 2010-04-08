@@ -66,7 +66,8 @@ def fileify(string):
 def makedirs(f):
     try:
         os.makedirs(f)
-    except OSError as exc: # Python >2.5
+    except OSError: # as exc: # Python >2.5
+        exc=sys.exc_value
         if exc.errno == errno.EEXIST:
             pass
         else: 
