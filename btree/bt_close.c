@@ -41,9 +41,6 @@ __wt_bt_close(WT_TOC *toc)
 		idb->root_page = NULL;
 	}
 
-	/* Flush any modified pages, and discard the tree. */
-	WT_TRET(__wt_bt_sync(toc, NULL));
-
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(env, idb->fh));
 	idb->fh = NULL;

@@ -79,6 +79,9 @@ __wt_db_close(WT_TOC *toc)
 
 	db = toc->db;
 
+	/* Flush the underlying Btree. */
+	WT_TRET(__wt_bt_sync(toc, NULL));
+
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(toc);
 
