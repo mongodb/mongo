@@ -146,8 +146,10 @@ namespace mongo {
             if (ret == 0){
                 log() << "select() returned 0" << endl;
                 continue;
-            }else if (ret < 0){
-                log() << "select() failure: ret=" << ret << " " << OUTPUT_ERRNO << endl;
+            }
+            else if (ret < 0){
+                if ( ! inShutdown() )
+                    log() << "select() failure: ret=" << ret << " " << OUTPUT_ERRNO << endl;
                 return;
             }
 
