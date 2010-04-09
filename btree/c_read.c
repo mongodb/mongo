@@ -205,7 +205,7 @@ __wt_cache_read(WT_TOC *toc, WT_IO_REQ *rr)
 				continue;
 			}
 			if (e->db == db && e->addr == addr)
-				return (0);
+				return (WT_RESTART);
 		}
 		WT_STAT_INCR(cache->stats, CACHE_MISS);
 		WT_STAT_INCR(idb->stats, DB_CACHE_MISS);

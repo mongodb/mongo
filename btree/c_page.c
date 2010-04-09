@@ -55,7 +55,7 @@ __wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
-	/* Search the cache for the page. */
+retry:	/* Search the cache for the page. */
 	found = 0;
 	hb = &cache->hb[WT_HASH(cache, addr)];
 	WT_CACHE_FOREACH_PAGE(cache, hb, e, i)
@@ -109,6 +109,8 @@ __wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 		return (0);
 
 	__wt_cache_in_serial(toc, addr, bytes, pagep, ret);
+	if (ret == WT_RESTART)
+		goto retry;
 	return (ret);
 }
 
