@@ -133,10 +133,7 @@ __wt_cache_drain(void *arg)
 
 		/*
 		 * Review 2% of the pages in the cache, but not less than 20
-		 * pages and not more than 100 pages.  (Not sure this is an OK
-		 * configuration; the only hard rule is we can't review more
-		 * pages than there are in the cache, because that would result
-		 * in duplicate entries in the drain array, and that will fail.)
+		 * pages and not more than 100 pages.
 		 */
 		cache_pages = WT_CACHE_PAGES_INUSE(cache);
 		if (cache_pages <= 20)
