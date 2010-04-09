@@ -37,6 +37,8 @@ int
 __wt_toc_serialize_func(
     WT_TOC *toc, wq_state_t op, int (*func)(WT_TOC *), void *args)
 {
+	int done;
+
 	/*
 	 * Threads serializing access to data using a function:
 	 *	set a function/argument pair in the WT_TOC handle,
@@ -64,8 +66,19 @@ __wt_toc_serialize_func(
 	 */
 	switch (op) {
 	case WT_WORKQ_SPIN:
-		while (toc->wq_state == WT_WORKQ_SPIN)
-			__wt_yield();
+		/*
+		 * !!!
+		 * Don't do arithmetic comparisons (even equality) on enum's,
+		 * it makes some compilers/lint tools crazy.
+		 */
+		for (done = 0; !done; __wt_yield())
+			switch (toc->wq_state) {
+			case WT_WORKQ_SPIN:
+				break;
+			default:
+				done = 1;
+				break;
+			}
 		break;
 	case WT_WORKQ_READ:
 	case WT_WORKQ_SYNC:

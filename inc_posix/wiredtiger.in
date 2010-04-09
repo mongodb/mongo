@@ -84,12 +84,12 @@ struct __dbt {
  * Application thread-of-control information
  *******************************************/
 typedef	enum {
-	WT_WORKQ_NONE,			/* No request */
-	WT_WORKQ_READ,			/* Schedule read */
-	WT_WORKQ_READ_SCHED,		/* Read scheduled */
-	WT_WORKQ_SPIN,			/* Spin on simple function */
-	WT_WORKQ_SYNC_SCHED,		/* Sync scheduled */
-	WT_WORKQ_SYNC			/* Schedule sync */
+	WT_WORKQ_NONE=0,		/* No request */
+	WT_WORKQ_READ=1,		/* Schedule read */
+	WT_WORKQ_READ_SCHED=2,		/* Read scheduled */
+	WT_WORKQ_SPIN=3,		/* Spin on simple function */
+	WT_WORKQ_SYNC_SCHED=4,		/* Sync scheduled */
+	WT_WORKQ_SYNC=5			/* Schedule sync */
 } wq_state_t;
 
 struct __wt_toc {

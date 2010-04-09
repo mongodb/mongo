@@ -78,6 +78,7 @@ __wt_db_close(WT_TOC *toc, u_int32_t flags)
 	int ret;
 
 	db = toc->db;
+	ret = 0;
 
 	/* Flush the underlying Btree. */
 	if (!LF_ISSET(WT_NOFLUSH))
