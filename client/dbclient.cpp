@@ -769,6 +769,8 @@ namespace mongo {
         }
         if ( !connector->call( toSend, *m, false ) )
             return false;
+        if ( ! m->data )
+            return false;
         dataReceived();
         return true;
     }

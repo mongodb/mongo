@@ -522,7 +522,7 @@ namespace mongo {
             BSONObj query = queryBuilder.obj();
 
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
-
+            uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
             if ( one ) {
                 if ( cursor->more() ) {
                     BSONObj obj = cursor->next();
