@@ -121,7 +121,7 @@ __wt_cache_dump(ENV *env);
 void
 __wt_workq_cache_server(ENV *env);
 int
-__wt_workq_schedule_read(WT_TOC *toc);
+__wt_cache_in_serial_func(WT_TOC *toc);
 void *
 __wt_cache_io(void *arg);
 int
@@ -358,9 +358,8 @@ __wt_prime(u_int32_t n);
 void
 __wt_progress(const char *s, u_int64_t v);
 int
-__wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args);
-int
-__wt_toc_serialize_io(WT_TOC *toc, u_int32_t addr, u_int32_t bytes);
+__wt_toc_serialize_func(
+    WT_TOC *toc, wq_state_t op, int (*func)(WT_TOC *), void *args);
 int
 __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp);
 void

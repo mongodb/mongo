@@ -83,6 +83,15 @@ struct __dbt {
 /*******************************************
  * Application thread-of-control information
  *******************************************/
+typedef	enum {
+	WT_WORKQ_NONE,			/* No request */
+	WT_WORKQ_READ,			/* Schedule read */
+	WT_WORKQ_READ_SCHED,		/* Read scheduled */
+	WT_WORKQ_SPIN,			/* Spin on simple function */
+	WT_WORKQ_SYNC_SCHED,		/* Sync scheduled */
+	WT_WORKQ_SYNC			/* Schedule sync */
+} wq_state_t;
+
 struct __wt_toc {
 	WT_MTX	 *mtx;			/* Blocking mutex */
 
@@ -111,18 +120,10 @@ struct __wt_toc {
 	u_int32_t volatile gen;		/* API generation */
 
 					/* WT_TOC workQ request */
+	wq_state_t volatile wq_state;	/* Request state */
 	int     (*wq_func)(WT_TOC *);	/* Function */
 	void	 *wq_args;		/* Function argument */
-	u_int32_t wq_addr;		/* I/O request: file address */
-	u_int32_t wq_bytes;		/* I/O request: bytes to read */
-	int	  wq_ret;		/* Returned error */
-
-	enum {
-		WT_WORKQ_NONE,		/* No request */
-		WT_WORKQ_FUNCTION,	/* Function request */
-		WT_WORKQ_READ,		/* Read I/O request */
-		WT_WORKQ_READ_SCHED	/* Read I/O has been scheduled */
-	} volatile wq_state;
+	int	  wq_ret;		/* Return value */
 
 	WT_FLIST *flist;		/* Memory free list */
 

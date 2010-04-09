@@ -12,7 +12,18 @@ extern "C" {
 
 struct __wt_cache_entry;	typedef struct __wt_cache_entry WT_CACHE_ENTRY;
 struct __wt_cache_hb;		typedef struct __wt_cache_hb WT_CACHE_HB;
+struct __wt_io_req;		typedef struct __wt_io_req WT_IO_REQ;
 struct __wt_io_write;		typedef struct __wt_io_write WT_IO_WRITE;
+
+/*
+ * WT_IO_REQ --
+ */
+struct __wt_io_req {
+	WT_TOC	  *toc;			/* Requesting thread */
+	u_int32_t  addr;		/* Address */
+	u_int32_t  bytes;		/* Bytes */
+	WT_PAGE  **pagep;		/* Returned page */
+};
 
 /*
  * WiredTiger cache structure.
@@ -62,8 +73,8 @@ struct __wt_cache {
 	WT_CACHE_HB *hb;		/* Array of hash buckets */
 	u_int32_t    hb_size;		/* Number of hash buckets */
 
-	WT_TOC *read_request[20];	/* Cache read requests */
-
+	WT_IO_REQ read_request[20];	/* Cache read requests:
+					   slot available if toc is NULL. */
 	/*
 	 * Different threads read (write) pages to (from) the cache, so we can
 	 * never know exactly how much memory is in-use at any partcular time.

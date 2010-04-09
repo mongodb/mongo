@@ -17,19 +17,15 @@ int
 __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 {
 	ENV *env;
+	int ret;
 
 	*pagep = NULL;
 	env = toc->env;
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
-	/* Schedule the allocation and sleep until it's completed. */
-	WT_RET(__wt_toc_serialize_io(toc, WT_ADDR_INVALID, bytes));
-
-	/* Then go get the page. */
-	WT_RET(__wt_cache_in(toc, toc->wq_addr, toc->wq_bytes, pagep));
-
-	return (0);
+	__wt_cache_in_serial(toc, WT_ADDR_INVALID, bytes, pagep, ret);
+	return (ret);
 }
 
 /*
@@ -47,7 +43,7 @@ __wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 	WT_CACHE_ENTRY *e;
 	WT_CACHE_HB *hb;
 	u_int32_t i;
-	int found;
+	int found, ret;
 
 	*pagep = NULL;
 
@@ -59,7 +55,7 @@ __wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 
 	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
 
-retry:	/* Search the cache for the page. */
+	/* Search the cache for the page. */
 	found = 0;
 	hb = &cache->hb[WT_HASH(cache, addr)];
 	WT_CACHE_FOREACH_PAGE(cache, hb, e, i)
@@ -112,8 +108,8 @@ retry:	/* Search the cache for the page. */
 	if (bytes == 0)
 		return (0);
 
-	WT_RET(__wt_toc_serialize_io(toc, addr, bytes));
-	goto retry;
+	__wt_cache_in_serial(toc, addr, bytes, pagep, ret);
+	return (ret);
 }
 
 /*

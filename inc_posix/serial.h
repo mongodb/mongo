@@ -7,7 +7,7 @@ typedef struct {
 	__wt_bt_del_args _args;\
 	_args.new = _new;\
 	(ret) = __wt_toc_serialize_func(\
-	    toc, __wt_bt_del_serial_func, &_args);\
+	    toc, WT_WORKQ_SPIN, __wt_bt_del_serial_func, &_args);\
 } while (0)
 #define	__wt_bt_del_unpack(toc, _new) do {\
 	_new =\
@@ -27,7 +27,7 @@ typedef struct {
 	_args.data = _data;\
 	_args.size = _size;\
 	(ret) = __wt_toc_serialize_func(\
-	    toc, __wt_bt_repl_serial_func, &_args);\
+	    toc, WT_WORKQ_SPIN, __wt_bt_repl_serial_func, &_args);\
 } while (0)
 #define	__wt_bt_repl_unpack(toc, _indx, _repl, _data, _size) do {\
 	_indx =\
@@ -41,13 +41,35 @@ typedef struct {
 } while (0)
 
 typedef struct {
+	u_int32_t addr;
+	u_int32_t bytes;
+	WT_PAGE ** pagep;
+} __wt_cache_in_args;
+#define	 __wt_cache_in_serial(toc, _addr, _bytes, _pagep, ret) do {\
+	__wt_cache_in_args _args;\
+	_args.addr = _addr;\
+	_args.bytes = _bytes;\
+	_args.pagep = _pagep;\
+	(ret) = __wt_toc_serialize_func(\
+	    toc, WT_WORKQ_READ, __wt_cache_in_serial_func, &_args);\
+} while (0)
+#define	__wt_cache_in_unpack(toc, _addr, _bytes, _pagep) do {\
+	_addr =\
+	    ((__wt_cache_in_args *)(toc)->wq_args)->addr;\
+	_bytes =\
+	    ((__wt_cache_in_args *)(toc)->wq_args)->bytes;\
+	_pagep =\
+	    ((__wt_cache_in_args *)(toc)->wq_args)->pagep;\
+} while (0)
+
+typedef struct {
 	WT_FLIST * fp;
 } __wt_flist_free_args;
 #define	 __wt_flist_free_serial(toc, _fp, ret) do {\
 	__wt_flist_free_args _args;\
 	_args.fp = _fp;\
 	(ret) = __wt_toc_serialize_func(\
-	    toc, __wt_flist_free_serial_func, &_args);\
+	    toc, WT_WORKQ_SPIN, __wt_flist_free_serial_func, &_args);\
 } while (0)
 #define	__wt_flist_free_unpack(toc, _fp) do {\
 	_fp =\

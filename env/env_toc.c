@@ -183,8 +183,6 @@ __wt_toc_dump(ENV *env)
 			__wt_mb_add(&mb,
 			    "%#lx", WT_PTR_TO_ULONG(toc->wq_func));
 
-		__wt_mb_add(&mb, "\n\twq_addr: %lu, ", toc->wq_addr);
-		__wt_mb_add(&mb, "wq_bytes: %lu, ", toc->wq_bytes);
 		__wt_mb_add(&mb, "state: %s", __wt_toc_print_state(toc));
 
 		__wt_mb_add(&mb, "\n\thazard: ");
@@ -210,12 +208,16 @@ static const char *
 __wt_toc_print_state(WT_TOC *toc)
 {
 	switch (toc->wq_state) {
-	case WT_WORKQ_FUNCTION:
-		return ("function");
 	case WT_WORKQ_READ:
 		return ("read");
 	case WT_WORKQ_READ_SCHED:
-		return ("read-sched");
+		return ("read scheduled");
+	case WT_WORKQ_SPIN:
+		return ("spin");
+	case WT_WORKQ_SYNC:
+		return ("sync");
+	case WT_WORKQ_SYNC_SCHED:
+		return ("sync scheduled");
 	case WT_WORKQ_NONE:
 		return ("none");
 	}

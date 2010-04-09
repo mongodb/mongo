@@ -31,22 +31,21 @@
 
 /*
  * __wt_toc_serialize_func --
- *	Schedule a serialization request, and spin until it completes.
+ *	Schedule a serialization request, and block or spin until it completes.
  */
 int
-__wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
+__wt_toc_serialize_func(
+    WT_TOC *toc, wq_state_t op, int (*func)(WT_TOC *), void *args)
 {
 	/*
 	 * Threads serializing access to data using a function:
 	 *	set a function/argument pair in the WT_TOC handle,
 	 *	flush memory,
-	 *	update the WT_TOC workq state,
-	 *	flush memory, and
-	 *	spins.
+	 *	update the WT_TOC workq state, and
+	 *	spins or blocks.
 	 *
 	 * The workQ thread notices the state change and calls the serialization
-	 * function.  When the function returns, the workQ resets WT_TOC workq
-	 * state, allowing the original thread to proceed.
+	 * function.
 	 *
 	 * The first memory flush ensures all supporting information is written
 	 * before the wq_state field (which makes the entry visible to the workQ
@@ -56,27 +55,28 @@ __wt_toc_serialize_func(WT_TOC *toc, int (*func)(WT_TOC *), void *args)
 	toc->wq_args = args;
 	toc->wq_func = func;
 	WT_MEMORY_FLUSH;
-	toc->wq_state = WT_WORKQ_FUNCTION;
+	toc->wq_state = op;
 
-	/* Spin on the WT_TOC->wq_state field. */
-	while (toc->wq_state == WT_WORKQ_FUNCTION)
-		__wt_yield();
-	return (toc->wq_ret);
-}
+	/*
+	 * Callers can spin on the WT_TOC state (implying the call is quickly
+	 * satisfied), or block until its mutex is unlocked by another thread
+	 * when the operation has completed.
+	 */
+	switch (op) {
+	case WT_WORKQ_SPIN:
+		while (toc->wq_state == WT_WORKQ_SPIN)
+			__wt_yield();
+		break;
+	case WT_WORKQ_READ:
+	case WT_WORKQ_SYNC:
+		__wt_lock(toc->env, toc->mtx);
 
-/*
- * __wt_toc_serialize_io --
- *	Schedule an io request, and block until it completes.
- */
-int
-__wt_toc_serialize_io(WT_TOC *toc, u_int32_t addr, u_int32_t bytes)
-{
-	toc->wq_addr = addr;
-	toc->wq_bytes = bytes;
-	WT_MEMORY_FLUSH;
-	toc->wq_state = WT_WORKQ_READ;
-
-	/* Block until we're awakened. */
-	__wt_lock(toc->env, toc->mtx);
+		/* The workQ thread can quit worrying about us. */
+		toc->wq_state = WT_WORKQ_NONE;
+		break;
+	default:
+	case WT_WORKQ_NONE:
+		return (WT_ERROR);
+	}
 	return (toc->wq_ret);
 }

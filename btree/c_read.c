@@ -10,7 +10,7 @@
 #include "wt_internal.h"
 
 static int __wt_cache_hb_entry_grow(WT_TOC *, WT_CACHE_HB *, WT_CACHE_ENTRY **);
-static int __wt_cache_read(WT_TOC *);
+static int __wt_cache_read(WT_TOC *, WT_IO_REQ *);
 
 /*
  * __wt_workq_cache_server --
@@ -54,16 +54,20 @@ __wt_workq_cache_server(ENV *env)
 }
 
 /*
- * __wt_workq_schedule_read --
+ * __wt_cache_in_serial_func --
  *	Ask the I/O thread to read a page into the cache.
  */
 int
-__wt_workq_schedule_read(WT_TOC *toc)
+__wt_cache_in_serial_func(WT_TOC *toc)
 {
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_TOC **rr, **rr_end;
+	WT_IO_REQ *rr, *rr_end;
+	WT_PAGE **pagep;
+	u_int32_t addr, bytes;
+
+	__wt_cache_in_unpack(toc, addr, bytes, pagep);
 
 	env = toc->env;
 	ienv = env->ienv;
@@ -74,12 +78,21 @@ __wt_workq_schedule_read(WT_TOC *toc)
 	rr_end =
 	    rr + sizeof(cache->read_request) / sizeof(cache->read_request[0]);
 	for (; rr < rr_end; ++rr)
-		if (rr[0] == NULL) {
-			rr[0] = toc;
+		if (rr->toc == NULL) {
+			/*
+			 * Fill in the arguments, flush memory, then the WT_TOC
+			 * field that turns the slot on.
+			 */
+			rr->addr = addr;
+			rr->bytes = bytes;
+			rr->pagep = pagep;
+			WT_MEMORY_FLUSH;
+			rr->toc = toc;
 			WT_MEMORY_FLUSH;
 			return (0);
 		}
-	return (1);
+	__wt_api_env_errx(env, "cache server read request table full");
+	return (WT_RESTART);
 }
 
 /*
@@ -92,7 +105,8 @@ __wt_cache_io(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_TOC **rr, **rr_end, *toc;
+	WT_IO_REQ *rr, *rr_end;
+	WT_TOC *toc;
 	int didwork;
 
 	env = arg;
@@ -114,17 +128,18 @@ __wt_cache_io(void *arg)
 
 		/*
 		 * Look for work (unless reads are locked out for now).  If we
-		 * find a requested read, perform it, flush the result, and
-		 * wake up the requesting thread.   If we don't find any work,
-		 * go back to sleep.
+		 * find a requested read, perform it, flush the result, clear
+		 * the request slot, and wake up the requesting thread.   If we
+		 * don't find any work, go back to sleep.  Strictly speaking,
+		 * the request slot clear doesn't need to be flushed, but we
+		 * have to flush, might as well include it.
 		 */
 		do {
 			didwork = 0;
 			for (rr = cache->read_request; rr < rr_end; ++rr)
-				if ((toc = rr[0]) != NULL) {
-					toc->wq_ret = __wt_cache_read(toc);
-					toc->wq_state = 0;
-					rr[0] = NULL;
+				if ((toc = rr->toc) != NULL) {
+					toc->wq_ret = __wt_cache_read(toc, rr);
+					rr->toc = NULL;
 					WT_MEMORY_FLUSH;
 					__wt_unlock(toc->mtx);
 					didwork = 1;
@@ -139,7 +154,7 @@ __wt_cache_io(void *arg)
  *	Read or allocate a new page for the cache.
  */
 static int
-__wt_cache_read(WT_TOC *toc)
+__wt_cache_read(WT_TOC *toc, WT_IO_REQ *rr)
 {
 	DB *db;
 	ENV *env;
@@ -162,8 +177,8 @@ __wt_cache_read(WT_TOC *toc)
 	cache = ienv->cache;
 	fh = idb->fh;
 
-	addr = toc->wq_addr;
-	bytes = toc->wq_bytes;
+	addr = rr->addr;
+	bytes = rr->bytes;
 	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
 
 	/*
@@ -214,10 +229,6 @@ __wt_cache_read(WT_TOC *toc)
 		addr = WT_OFF_TO_ADDR(db, fh->file_size);
 		fh->file_size += bytes;
 
-		/* Return the address & bytes to the caller. */
-		toc->wq_addr = addr;
-		toc->wq_bytes = bytes;
-
 		WT_STAT_INCR(cache->stats, CACHE_ALLOC);
 		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
 	} else {
@@ -259,6 +270,13 @@ __wt_cache_read(WT_TOC *toc)
 	}
 
 	/*
+	 * Get a hazard reference before we mark the entry OK, the cache drain
+	 * server shouldn't pick our new page, but there's no reason to risk
+	 * it.
+	 */
+	__wt_hazard_set(toc, page);
+
+	/*
 	 * Fill in everything but the state, flush, then fill in the state.  No
 	 * additional flush is necessary, the state field is declared volatile.
 	 * The state turns on the entry for both the cache drain server thread
@@ -277,6 +295,9 @@ __wt_cache_read(WT_TOC *toc)
 	    (env, "cache I/O server %s element/page %#lx/%lu",
 	    newpage ? "allocated" : "read",
 	    WT_PTR_TO_ULONG(empty), (u_long)addr));
+
+	/* Return the page to the caller. */
+	*rr->pagep = page;
 
 	return (0);
 
