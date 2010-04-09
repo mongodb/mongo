@@ -7,7 +7,7 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 13, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 14, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_CACHE_ALLOC].desc = "pages allocated in the cache";
 	stats[WT_STAT_CACHE_BYTES_INUSE].desc = "bytes in the cache";
@@ -26,6 +26,7 @@ __wt_stat_alloc_cache_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_CACHE_MISS].desc = "reads not found in the cache";
 	stats[WT_STAT_CACHE_PAGES_INUSE].desc = "pages in the cache";
 	stats[WT_STAT_CACHE_READ_LOCKOUT].desc = "API cache read lockout";
+	stats[WT_STAT_CACHE_READ_RESTARTS].desc = "cache read restarts";
 
 	*statsp = stats;
 	return (0);
@@ -43,6 +44,7 @@ __wt_stat_clear_cache_stats(WT_STATS *stats)
 	stats[WT_STAT_CACHE_MAX_BUCKET_ENTRIES].v = 0;
 	stats[WT_STAT_CACHE_MISS].v = 0;
 	stats[WT_STAT_CACHE_READ_LOCKOUT].v = 0;
+	stats[WT_STAT_CACHE_READ_RESTARTS].v = 0;
 }
 
 int

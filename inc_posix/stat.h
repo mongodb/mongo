@@ -48,6 +48,7 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_MISS			    9
 #define	WT_STAT_CACHE_PAGES_INUSE		   10
 #define	WT_STAT_CACHE_READ_LOCKOUT		   11
+#define	WT_STAT_CACHE_READ_RESTARTS		   12
 
 /*
  * Statistics entries for DB/IDB database.

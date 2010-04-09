@@ -47,6 +47,7 @@ cache_stats['CACHE_MAX_BUCKET_ENTRIES'] = Stat([], 'maximum entries allocated to
 cache_stats['CACHE_MISS'] = Stat([], 'reads not found in the cache')
 cache_stats['CACHE_PAGES_INUSE'] = Stat(['perm'], 'pages in the cache')
 cache_stats['CACHE_READ_LOCKOUT'] = Stat([], 'API cache read lockout')
+cache_stats['CACHE_READ_RESTARTS'] = Stat([], 'cache read restarts')
 
 ##########################################
 # IDB handle statistics

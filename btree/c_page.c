@@ -109,8 +109,10 @@ retry:	/* Search the cache for the page. */
 		return (0);
 
 	__wt_cache_in_serial(toc, addr, bytes, pagep, ret);
-	if (ret == WT_RESTART)
+	if (ret == WT_RESTART) {
+		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
 		goto retry;
+	}
 	return (ret);
 }
 
