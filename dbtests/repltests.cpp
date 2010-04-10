@@ -1053,7 +1053,8 @@ namespace ReplTests {
             check();
             ASSERT( !s_.inMem() );            
             
-            s_.reset();
+            s_.reset( 4 * sizeof( BSONObj ) - 1 );
+            s_.mayUpgradeStorage();
             ASSERT( s_.inMem() );                        
         }
     private:
