@@ -667,7 +667,7 @@ found:
 
         int split = n / 2;
         if ( keypos == n ) { // see SERVER-983
-            split = 0.9 * n;
+            split = (int) (0.9 * n);
             if ( split > n - 2 )
                 split = n - 2;
         }

@@ -35,7 +35,7 @@ void writerThread();
 #if defined(_RECSTORE)
 RecStoreInterface *btreeStore = new CachedBasicRecStore();
 #else
-RecStoreInterface *btreeStore = new MongoMemMapped_RecStore();
+MongoMemMapped_RecStore *btreeStore = new MongoMemMapped_RecStore();
 #endif
 
 void BasicRecStore::init(const char *fn, unsigned recsize)

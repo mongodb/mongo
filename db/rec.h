@@ -41,28 +41,28 @@ NamespaceDetails* nsdetails_notinline(const char *ns);
 
 class MongoMemMapped_RecStore : public RecStoreInterface { 
 public:
-    virtual char* get(DiskLoc d, unsigned len) { return d.rec()->data; }
+    VIRT char* get(DiskLoc d, unsigned len) { return d.rec()->data; }
 
-    virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
+    VIRT DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theDataFileMgr.insert(ns, obuf, len, god);
     }
 
-    virtual void deleteRecord(const char *ns, DiskLoc d) { 
+    VIRT void deleteRecord(const char *ns, DiskLoc d) { 
         theDataFileMgr._deleteRecord(nsdetails_notinline(ns), ns, d.rec(), d);
     }
 
-    virtual void modified(DiskLoc d) { }
+    VIRT void modified(DiskLoc d) { }
 
-    virtual void drop(const char *ns) { 
+    VIRT void drop(const char *ns) { 
         dropNS(ns);
     }
 
-    virtual void rename(const char *fromNs, const char *toNs) {
+    VIRT void rename(const char *fromNs, const char *toNs) {
       renameNamespace( fromNs, toNs );
     }
 
     /* close datafiles associated with the db specified. */
-    virtual void closeFiles(string dbname, string path) {
+    VIRT void closeFiles(string dbname, string path) {
         /* as this is only used for indexes so far, and we are in the same 
            PDFiles as the nonindex data, we just rely on them having been closed 
            at the same time.  one day this may need to change.
@@ -116,7 +116,9 @@ public:
 
 /* Glue btree to RecStoreInterface: ---------------------------- */
 
-extern RecStoreInterface *btreeStore;
+typedef MongoMemMapped_RecStore StoreToUse;
+
+extern StoreToUse *btreeStore;
 
 const int BucketSize = 8192;
 
