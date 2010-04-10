@@ -208,7 +208,10 @@ namespace mongo {
     public:
         MemIds() : size_() {}
         friend class IdTracker;
-        void reset() { imp_.clear(); }
+        void reset() {
+            imp_.clear();
+            size_ = 0;
+        }
         bool get( const char *ns, const BSONObj &id ) { return imp_[ ns ].count( id ); }
         void set( const char *ns, const BSONObj &id, bool val ) {
             if ( val ) {
