@@ -212,29 +212,29 @@ extern RecCache theRecCache;
 
 class CachedBasicRecStore : public RecStoreInterface { 
 public:
-    virtual char* get(DiskLoc d, unsigned len) { 
+    VIRT char* get(DiskLoc d, unsigned len) { 
         return theRecCache.get(d, len);
     }
 
-    virtual DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
+    VIRT DiskLoc insert(const char *ns, const void *obuf, int len, bool god) { 
         return theRecCache.insert(ns, obuf, len, god);
     }
 
-    virtual void modified(DiskLoc d) { 
+    VIRT void modified(DiskLoc d) { 
         theRecCache.dirty(d);
     }
 
     /* drop collection */
-    virtual void drop(const char *ns) { 
+    VIRT void drop(const char *ns) { 
         theRecCache.drop(ns);
     }
 
-    virtual void rename(const char *fromNs, const char *toNs) {
+    VIRT void rename(const char *fromNs, const char *toNs) {
       massert( 10378 ,  "rename not yet implemented for CachedBasicRecStore", false );
     }
 
     /* close datafiles associated with the db specified. */
-    virtual void closeFiles(string dbname, string path) {
+    VIRT void closeFiles(string dbname, string path) {
         theRecCache.closeFiles(dbname, dbpath);
     }
 };
