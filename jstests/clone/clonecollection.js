@@ -119,6 +119,7 @@ f.a.save( { i: 200000 } );
 f.a.save( { i: -1 } );
 f.a.remove( { i: 0 } );
 f.a.update( { i: 99998 }, { i: 99998, x: "y" } );
+assert.eq( 100001, f.a.count() );
 ret = finishstartclone();
 finishclone( ret );
 
@@ -181,6 +182,7 @@ startstartclone();
 
 sleep( 200 );
 f.a.save( { i: -1 } );
+assert.eq( 100001, f.a.count() );
 
 ret = finishstartclone();
 assert.eq( 100001, t.a.find().count() );
