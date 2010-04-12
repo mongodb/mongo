@@ -23,6 +23,7 @@ def pushrepo(repodir):
     files=subprocess.Popen(['find', repodir, '-name', 'Packages*', '-o', '-name', '*.deb', '-o', '-name', 'Release*'], stdout=subprocess.PIPE).communicate()[0][:-1].split('\n')
     bucket=s3bucket()
     olddebs=[t[0] for t in bucket.listdir(prefix='distros/') if t[0].endswith('.deb')]
+    newdebs=[]
     for fn in files:
         tail = fn[len(repodir):]
         # Note: be very careful not to produce s3names containing
@@ -33,8 +34,9 @@ def pushrepo(repodir):
         s3cp(bucket, fn, s3name)
         s3name='distros'+tail
         s3cp(bucket, fn, s3name)        
-    # FIXME: delete the old
-    [bucket.delete(olddeb) for olddeb in olddebs]
+        if s3name.endswith('.deb'):
+            newdebs.append(s3name)
+    [bucket.delete(deb) for deb in set(olddebs).difference(set(newdebs))]
     
 def cat (inh, outh):
     inh.seek(0)
