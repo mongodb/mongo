@@ -680,13 +680,13 @@ namespace UpdateTests {
             
         class inc3 : public SingleTest {
             virtual BSONObj initial(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+                return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
             virtual BSONObj mod(){
                 return BSON( "$inc" << BSON( "x" << 2 ) );
             }
             virtual BSONObj after(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+                return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
                 return "unittests.inc2";
@@ -696,13 +696,13 @@ namespace UpdateTests {
 
         class inc4 : public SingleTest {
             virtual BSONObj initial(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+                return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
             virtual BSONObj mod(){
-                return BSON( "$inc" << BSON( "x" << (long long)2 ) );
+                return BSON( "$inc" << BSON( "x" << 2LL ) );
             }
             virtual BSONObj after(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+                return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
                 return "unittests.inc2";
