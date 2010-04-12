@@ -58,7 +58,11 @@ namespace mongo {
                 doQuery( r , r.singleServerName() );
             }
             catch ( AssertionException& e ) {
-                assert( !lateAssert );
+                if ( lateAssert ){
+                    log() << "lateAssert: " << e.msg << endl;
+                    assert( !lateAssert );
+                }
+
                 BSONObjBuilder err;
                 err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
                 BSONObj errObj = err.done();
