@@ -40,9 +40,11 @@ namespace mongo {
         void setNumber(double d) {
             if ( _element.type() == NumberDouble ) *reinterpret_cast< double * >( value() )  = d;
             else if ( _element.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
+            else assert(0);
         }
         void setLong(long long n) { 
-            if( _element.type() == NumberLong ) *reinterpret_cast< long long * >( value() ) = n;
+            assert( _element.type() == NumberLong );
+            *reinterpret_cast< long long * >( value() ) = n;
         }
         void setInt(int n) { 
             assert( _element.type() == NumberInt );

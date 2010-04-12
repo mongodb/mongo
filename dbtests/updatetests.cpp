@@ -678,6 +678,55 @@ namespace UpdateTests {
 
         };
             
+        class inc3 : public SingleTest {
+            virtual BSONObj initial(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+            }
+            virtual BSONObj mod(){
+                return BSON( "$inc" << BSON( "x" << 2 ) );
+            }
+            virtual BSONObj after(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+            }
+            virtual const char * ns(){
+                return "unittests.inc2";
+            }
+
+        };
+
+        class inc4 : public SingleTest {
+            virtual BSONObj initial(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+            }
+            virtual BSONObj mod(){
+                return BSON( "$inc" << BSON( "x" << (long long)2 ) );
+            }
+            virtual BSONObj after(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+            }
+            virtual const char * ns(){
+                return "unittests.inc2";
+            }
+
+        };
+
+        class inc5 : public SingleTest {
+            virtual BSONObj initial(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+            }
+            virtual BSONObj mod(){
+                return BSON( "$inc" << BSON( "x" << (double)2.0 ) );
+            }
+            virtual BSONObj after(){
+                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+            }
+            virtual const char * ns(){
+                return "unittests.inc2";
+            }
+
+        };
+
+
         class bit1 : public Base {
             const char * ns(){
                 return "unittests.bit1";
@@ -775,6 +824,9 @@ namespace UpdateTests {
             
             add< basic::inc1 >();
             add< basic::inc2 >();
+            add< basic::inc3 >();
+            add< basic::inc4 >();
+            add< basic::inc5 >();
             add< basic::bit1 >();
             add< basic::unset >();
             add< basic::setswitchint >();
