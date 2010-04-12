@@ -712,13 +712,13 @@ namespace UpdateTests {
 
         class inc5 : public SingleTest {
             virtual BSONObj initial(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123123 );
+                return BSON( "_id" << 1 << "x" << 537142123123LL );
             }
             virtual BSONObj mod(){
-                return BSON( "$inc" << BSON( "x" << (double)2.0 ) );
+                return BSON( "$inc" << BSON( "x" << 2.0 ) );
             }
             virtual BSONObj after(){
-                return BSON( "_id" << 1 << "x" << (long long)537142123125 );
+                return BSON( "_id" << 1 << "x" << 537142123125LL );
             }
             virtual const char * ns(){
                 return "unittests.inc2";
