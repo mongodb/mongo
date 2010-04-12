@@ -493,7 +493,7 @@ namespace mongo {
     }
 
     string ConfigServer::getHost( string name , bool withPort ){
-        if ( name.find( ":" ) ){
+        if ( name.find( ":" ) != string::npos ){
             if ( withPort )
                 return name;
             return name.substr( 0 , name.find( ":" ) );
