@@ -22,7 +22,7 @@ static void __wt_bt_print_nl(u_int8_t *, u_int32_t, FILE *);
  */
 int
 __wt_db_dump(WT_TOC *toc,
-    FILE *stream, void (*f)(const char *s, u_int64_t), u_int32_t flags)
+    FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags)
 {
 	DB *db;
 	WT_PAGE *page;
@@ -74,8 +74,8 @@ __wt_db_dump(WT_TOC *toc,
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		/* Report progress every 100 pages. */
-		if (f != NULL && ++fcnt % 100 == 0)
+		/* Report progress every 10 pages. */
+		if (f != NULL && ++fcnt % 10 == 0)
 			f(toc->name, fcnt);
 	}
 
