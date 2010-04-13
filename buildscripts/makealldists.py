@@ -143,7 +143,8 @@ def lose(name, logfh, losefh):
 def wait(procs, winfh, losefh, winners, losers):
     # emit a blank line, so that the buildbot doesn't kill us off
     # while waiting for output.
-    print ""
+    sys.stdout.write('.')
+    sys.stdout.flush()
     try:
         (pid, stat) = os.wait()
     except OSError, err:

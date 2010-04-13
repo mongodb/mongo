@@ -48,7 +48,9 @@ namespace mongo {
             set<ServerAndQuery> servers;
             map<string,int> serverCounts;
             for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                servers.insert( ServerAndQuery( (*i)->getShard() , (*i)->getFilter() ) );
+                Chunk* c = *i;
+                //servers.insert( ServerAndQuery( c->getShard() , BSONObj() ) );
+                servers.insert( ServerAndQuery( c->getShard() , c->getFilter() ) );
                 int& num = serverCounts[(*i)->getShard()];
                 num++;
             }

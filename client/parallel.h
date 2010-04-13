@@ -22,6 +22,7 @@
 #include "../stdafx.h"
 #include "dbclient.h"
 #include "../db/dbmessage.h"
+#include "../db/matcher.h"
 
 namespace mongo {
 
@@ -91,6 +92,25 @@ namespace mongo {
         BSONObj _orderObject;
     };
 
+    class FilteringClientCursor {
+    public:
+        FilteringClientCursor( const BSONObj filter = BSONObj() );
+        FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
+        ~FilteringClientCursor();
+        
+        void reset( auto_ptr<DBClientCursor> cursor );
+        
+        bool more();
+        BSONObj next();
+
+    private:
+        void _advance();
+        
+        Matcher _matcher;
+        auto_ptr<DBClientCursor> _cursor;
+        
+        BSONObj _next;
+    };
 
     /**
      * runs a query in serial across any number of servers
@@ -106,7 +126,7 @@ namespace mongo {
         vector<ServerAndQuery> _servers;
         unsigned _serverIndex;
         
-        auto_ptr<DBClientCursor> _current;
+        FilteringClientCursor _current;
     };
 
 
@@ -131,8 +151,8 @@ namespace mongo {
         int _numServers;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;
-
-        auto_ptr<DBClientCursor> * _cursors;
+        
+        FilteringClientCursor * _cursors;
         BSONObj * _nexts;
     };
 
