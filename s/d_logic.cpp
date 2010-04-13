@@ -61,7 +61,7 @@ namespace mongo {
             return e._numberLong();
 
         
-        errmsg = "version is not a numberic type";
+        errmsg = "version is not a numeric type";
         return 0;
     }
 
