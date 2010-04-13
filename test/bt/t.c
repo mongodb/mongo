@@ -89,6 +89,7 @@ main(int argc, char *argv[])
 		if (wts_verify())	/* Verify the database */
 			goto err;
 
+		track("flushing & re-opening WT", 0);
 		wts_teardown();		/* Re-open the WT database */
 		wts_setup(1, log);
 					/* Scan through some records */
@@ -111,9 +112,10 @@ main(int argc, char *argv[])
 		if (g.stats && wts_stats())
 			goto err;
 
-		track("shutting down", 0);
-
-		bdb_teardown();		/* Close the databases */
+					/* Close the databases */
+		track("shutting down BDB", 0);
+		bdb_teardown();	
+		track("shutting down WT", 0);
 		wts_teardown();
 
 		track("done", 0);
