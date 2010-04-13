@@ -19,7 +19,7 @@ typedef struct {
 
 	FILE	*stream;			/* Dump file stream */
 
-	void (*f)(const char *s, u_int64_t);	/* Progress callback */
+	void (*f)(const char *, u_int64_t);	/* Progress callback */
 	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
@@ -36,7 +36,7 @@ static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
  *	Verify a Btree.
  */
 int
-__wt_db_verify(WT_TOC *toc, void (*f)(const char *s, u_int64_t))
+__wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
 	return (__wt_bt_verify_int(toc, f, NULL));
 }
@@ -47,7 +47,7 @@ __wt_db_verify(WT_TOC *toc, void (*f)(const char *s, u_int64_t))
  */
 int
 __wt_bt_verify_int(
-    WT_TOC *toc, void (*f)(const char *s, u_int64_t), FILE *stream)
+    WT_TOC *toc, void (*f)(const char *, u_int64_t), FILE *stream)
 {
 	DB *db;
 	ENV *env;
@@ -636,8 +636,8 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	hdr = page->hdr;
 	addr = page->addr;
 
-	/* Report progress every 100 pages. */
-	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 100 == 0)
+	/* Report progress every 10 pages. */
+	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 10 == 0)
 		vs->f(toc->name, vs->fcnt);
 
 	/*
