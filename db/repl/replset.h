@@ -23,10 +23,16 @@ namespace mongo {
     class ReplSet;
     extern ReplSet *theReplSet;
 
+    /* information about the entire repl set, such as the various servers in the set, and their state */
     class ReplSet {
-        string _name;
-        vector<string> _members;
     public:
+        class Member { 
+            string host;
+            int port;
+        };
+    private:
+        string _name;
+        vector<Member> _members;
     };
 
 }
