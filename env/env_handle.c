@@ -85,7 +85,7 @@ __wt_ienv_config_default(ENV *env)
 		WT_RET(__wt_mtrack_alloc(env));
 #endif
 						/* Global mutex */
-	WT_RET(__wt_mtx_alloc(env, 0, &ienv->mtx));
+	WT_RET(__wt_mtx_alloc(env, "IENV", 0, &ienv->mtx));
 
 	TAILQ_INIT(&ienv->dbqh);		/* DB list */
 	TAILQ_INIT(&ienv->fhqh);		/* File list */

@@ -230,7 +230,7 @@ def func_method_getset(a, f):
 			    l.split('/')[0] + ' = ' + l.split('/')[0] + ';\n')
 
 	# getter/setter implies ienvlock: unlock the data structure.
-	f.write('\t__wt_unlock(ienv->mtx);\n')
+	f.write('\t__wt_unlock(env, ienv->mtx);\n')
 	f.write('\treturn (')
 	if extfunc:
 		f.write('ret')
@@ -329,7 +329,7 @@ def func_method(a, f):
 
 	# Unlock.
 	if locking:
-		f.write('\t__wt_unlock(ienv->mtx);\n')
+		f.write('\t__wt_unlock(env, ienv->mtx);\n')
 
 	# If entering the API with a WT_TOC handle, free/clear it.
 	if toc:

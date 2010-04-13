@@ -45,7 +45,7 @@ __wt_env_toc(ENV *env, WT_TOC **tocp)
 	toc->gen = UINT32_MAX;
 	toc->hazard = ienv->hazard + slot * env->hazard_size;
 
-	WT_RET(__wt_mtx_alloc(env, 1, &toc->mtx));
+	WT_RET(__wt_mtx_alloc(env, "toc", 1, &toc->mtx));
 
 	__wt_methods_wt_toc_lockout(toc);
 	__wt_methods_wt_toc_init_transition(toc);
@@ -85,7 +85,7 @@ __wt_wt_toc_close(WT_TOC *toc)
 
 	/* Unlock and destroy the thread's mutex. */
 	if (toc->mtx != NULL) {
-		__wt_unlock(toc->mtx);
+		__wt_unlock(env, toc->mtx);
 		(void)__wt_mtx_destroy(env, toc->mtx);
 	}
 

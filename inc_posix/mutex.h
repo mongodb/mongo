@@ -55,6 +55,8 @@ extern void *__wt_addr;
  * performance requirements.
  */
 struct __wt_mtx {
+	const char *name;		/* Mutex name for debugging */
+
 	pthread_mutex_t mtx;		/* Mutex */
 	pthread_cond_t  cond;		/* Condition variable */
 

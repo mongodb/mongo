@@ -14,7 +14,7 @@
  *	Allocate and initialize a pthread mutex.
  */
 int
-__wt_mtx_alloc(ENV *env, int is_locked, WT_MTX **mtxp)
+__wt_mtx_alloc(ENV *env, const char *name, int is_locked, WT_MTX **mtxp)
 {
 	WT_MTX *mtx;
 	pthread_condattr_t condattr;
@@ -52,6 +52,8 @@ __wt_mtx_alloc(ENV *env, int is_locked, WT_MTX **mtxp)
 		goto err;
 	(void)pthread_condattr_destroy(&condattr);
 
+	mtx->name = name;
+
 	/* If the normal state of the mutex is locked, lock it immediately. */
 	if (is_locked)
 		__wt_lock(env, mtx);
@@ -71,6 +73,9 @@ void
 __wt_lock(ENV *env, WT_MTX *mtx)
 {
 	int ret;
+
+	WT_VERBOSE(env, WT_VERB_MUTEX,
+	    (env, "lock %s mutex (%#lx)",  mtx->name, WT_PTR_TO_ULONG(mtx)));
 
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
 
@@ -106,9 +111,12 @@ err:	__wt_api_env_err(env, ret, "mutex lock failed");
  *	Release a mutex.
  */
 void
-__wt_unlock(WT_MTX *mtx)
+__wt_unlock(ENV *env, WT_MTX *mtx)
 {
 	int ret;
+
+	WT_VERBOSE(env, WT_VERB_MUTEX,
+	    (env, "unlock %s mutex (%#lx)",  mtx->name, WT_PTR_TO_ULONG(mtx)));
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
@@ -118,7 +126,7 @@ __wt_unlock(WT_MTX *mtx)
 	WT_ERR(pthread_mutex_unlock(&mtx->mtx));
 	return;
 
-err:	__wt_api_env_err(NULL, ret, "mutex unlock failed");
+err:	__wt_api_env_err(env, ret, "mutex unlock failed");
 	__wt_abort(NULL);
 }
 
