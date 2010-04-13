@@ -34,6 +34,7 @@ assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}, { b: {$in:[0,1]}} }  ] } ).toA
 
 doTest();
 
+// not part of SERVER-1003, but good check for subseq. implementations
 t.drop();
 t.ensureIndex( {a:1} );
 doTest();
