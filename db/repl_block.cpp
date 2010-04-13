@@ -16,6 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "stdafx.h"
 #include "repl_block.h"
 #include "instance.h"
 #include "dbhelpers.h"

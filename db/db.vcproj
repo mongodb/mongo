@@ -1309,146 +1309,6 @@
 		<Filter
 			Name="db"
 			>
-			<File
-				RelativePath=".\background.h"
-				>
-			</File>
-			<File
-				RelativePath=".\client.h"
-				>
-			</File>
-			<File
-				RelativePath=".\clientcursor.h"
-				>
-			</File>
-			<File
-				RelativePath=".\cmdline.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\cmdline.h"
-				>
-			</File>
-			<File
-				RelativePath=".\commands.h"
-				>
-			</File>
-			<File
-				RelativePath=".\concurrency.h"
-				>
-			</File>
-			<File
-				RelativePath=".\curop.h"
-				>
-			</File>
-			<File
-				RelativePath=".\cursor.h"
-				>
-			</File>
-			<File
-				RelativePath=".\database.h"
-				>
-			</File>
-			<File
-				RelativePath=".\db.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbhelpers.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbinfo.h"
-				>
-			</File>
-			<File
-				RelativePath=".\dbmessage.h"
-				>
-			</File>
-			<File
-				RelativePath=".\diskloc.h"
-				>
-			</File>
-			<File
-				RelativePath=".\index.h"
-				>
-			</File>
-			<File
-				RelativePath=".\introspect.h"
-				>
-			</File>
-			<File
-				RelativePath=".\jsobj.h"
-				>
-			</File>
-			<File
-				RelativePath=".\json.h"
-				>
-			</File>
-			<File
-				RelativePath=".\matcher.h"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\message.h"
-				>
-			</File>
-			<File
-				RelativePath=".\minilex.h"
-				>
-			</File>
-			<File
-				RelativePath=".\namespace.h"
-				>
-			</File>
-			<File
-				RelativePath=".\pdfile.h"
-				>
-			</File>
-			<File
-				RelativePath="..\grid\protocol.h"
-				>
-			</File>
-			<File
-				RelativePath=".\query.h"
-				>
-			</File>
-			<File
-				RelativePath=".\queryoptimizer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\queryutil.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\repl.h"
-				>
-			</File>
-			<File
-				RelativePath=".\replset.h"
-				>
-			</File>
-			<File
-				RelativePath=".\resource.h"
-				>
-			</File>
-			<File
-				RelativePath=".\scanandorder.h"
-				>
-			</File>
-			<File
-				RelativePath=".\security.h"
-				>
-			</File>
-			<File
-				RelativePath="..\stdafx.h"
-				>
-			</File>
-			<File
-				RelativePath=".\update.h"
-				>
-			</File>
 			<Filter
 				Name="cpp"
 				Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
@@ -1523,6 +1383,10 @@
 					>
 				</File>
 				<File
+					RelativePath=".\indexkey.cpp"
+					>
+				</File>
+				<File
 					RelativePath=".\instance.cpp"
 					>
 				</File>
@@ -1544,6 +1408,10 @@
 				</File>
 				<File
 					RelativePath=".\matcher.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\matcher_covered.cpp"
 					>
 				</File>
 				<File
@@ -1588,10 +1456,6 @@
 				</File>
 				<File
 					RelativePath="..\util\ramstore.cpp"
-					>
-				</File>
-				<File
-					RelativePath=".\repl.cpp"
 					>
 				</File>
 				<File
@@ -1647,66 +1511,146 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="h"
+				>
+				<File
+					RelativePath=".\background.h"
+					>
+				</File>
+				<File
+					RelativePath=".\client.h"
+					>
+				</File>
+				<File
+					RelativePath=".\clientcursor.h"
+					>
+				</File>
+				<File
+					RelativePath=".\cmdline.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\cmdline.h"
+					>
+				</File>
+				<File
+					RelativePath=".\commands.h"
+					>
+				</File>
+				<File
+					RelativePath=".\concurrency.h"
+					>
+				</File>
+				<File
+					RelativePath=".\curop.h"
+					>
+				</File>
+				<File
+					RelativePath=".\cursor.h"
+					>
+				</File>
+				<File
+					RelativePath=".\database.h"
+					>
+				</File>
+				<File
+					RelativePath=".\db.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbhelpers.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbinfo.h"
+					>
+				</File>
+				<File
+					RelativePath=".\dbmessage.h"
+					>
+				</File>
+				<File
+					RelativePath=".\diskloc.h"
+					>
+				</File>
+				<File
+					RelativePath=".\index.h"
+					>
+				</File>
+				<File
+					RelativePath=".\introspect.h"
+					>
+				</File>
+				<File
+					RelativePath=".\jsobj.h"
+					>
+				</File>
+				<File
+					RelativePath=".\json.h"
+					>
+				</File>
+				<File
+					RelativePath=".\matcher.h"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\message.h"
+					>
+				</File>
+				<File
+					RelativePath=".\minilex.h"
+					>
+				</File>
+				<File
+					RelativePath=".\namespace.h"
+					>
+				</File>
+				<File
+					RelativePath=".\pdfile.h"
+					>
+				</File>
+				<File
+					RelativePath="..\grid\protocol.h"
+					>
+				</File>
+				<File
+					RelativePath=".\query.h"
+					>
+				</File>
+				<File
+					RelativePath=".\queryoptimizer.h"
+					>
+				</File>
+				<File
+					RelativePath=".\queryutil.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\resource.h"
+					>
+				</File>
+				<File
+					RelativePath=".\scanandorder.h"
+					>
+				</File>
+				<File
+					RelativePath=".\security.h"
+					>
+				</File>
+				<File
+					RelativePath="..\stdafx.h"
+					>
+				</File>
+				<File
+					RelativePath=".\update.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="util"
 			>
-			<File
-				RelativePath="..\util\assert_util.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\builder.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\file.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\goodies.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\hashtab.h"
-				>
-			</File>
-			<File
-				RelativePath=".\lasterror.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\log.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\lruishmap.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\md5.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\md5.hpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\miniwebserver.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\mmap.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\sock.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\unittest.h"
-				>
-			</File>
 			<Filter
 				Name="cpp"
 				>
@@ -1804,6 +1748,66 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="h"
+				>
+				<File
+					RelativePath="..\util\assert_util.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\builder.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\file.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\goodies.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\hashtab.h"
+					>
+				</File>
+				<File
+					RelativePath=".\lasterror.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\log.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\lruishmap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\md5.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\md5.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\miniwebserver.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\mmap.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\sock.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\unittest.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="shard"
@@ -1874,7 +1878,7 @@
 			</File>
 		</Filter>
 		<Filter
-			Name="btree related"
+			Name="btree"
 			>
 			<File
 				RelativePath=".\btree.cpp"
@@ -1894,6 +1898,30 @@
 			>
 			<File
 				RelativePath=".\repl\replset.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="old_repl"
+			>
+			<File
+				RelativePath=".\oplog.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl.h"
+				>
+			</File>
+			<File
+				RelativePath=".\repl_block.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\replset.h"
 				>
 			</File>
 		</Filter>

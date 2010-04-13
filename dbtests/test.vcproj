@@ -1398,6 +1398,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\matcher_covered.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\grid\message.h"
 				>
 			</File>
@@ -1407,6 +1411,10 @@
 			</File>
 			<File
 				RelativePath="..\db\namespace.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\oplog.cpp"
 				>
 			</File>
 			<File
@@ -1431,6 +1439,10 @@
 			</File>
 			<File
 				RelativePath="..\db\repl.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\repl_block.cpp"
 				>
 			</File>
 			<File
@@ -1512,6 +1524,10 @@
 				</File>
 				<File
 					RelativePath="..\db\index_geo2d.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\indexkey.cpp"
 					>
 				</File>
 				<File
