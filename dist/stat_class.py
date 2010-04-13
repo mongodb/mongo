@@ -97,5 +97,6 @@ idb_dstats['TREE_LEVEL'] = Stat([], 'number of levels in the Btree')
 # FH handle statistics
 ##########################################
 fh_stats = {}
+fh_stats['FSYNC'] = Stat([], 'fsyncs')
 fh_stats['READ_IO'] = Stat([], 'read I/Os')
 fh_stats['WRITE_IO'] = Stat([], 'write I/Os')
