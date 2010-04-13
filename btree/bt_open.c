@@ -31,7 +31,7 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 	WT_RET(__wt_bt_open_verify(db));
 
 	/* Open the fle. */
-	WT_RET(__wt_open(env, idb->dbname, idb->mode, ok_create, &idb->fh));
+	WT_RET(__wt_open(env, idb->name, idb->mode, ok_create, &idb->fh));
 
 	/* Get a permanent root page reference. */
 	WT_RET(__wt_bt_root_page(toc));

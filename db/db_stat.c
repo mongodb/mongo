@@ -24,20 +24,20 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	env = toc->env;
 	idb = db->idb;
 
-	fprintf(stream, "Database handle statistics: %s\n", idb->dbname);
+	fprintf(stream, "Database handle statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->stats, stream);
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
 	__wt_stat_clear_database_stats(idb->dstats);
 	WT_RET(__wt_bt_stat(toc));
 
-	fprintf(stream, "Database statistics: %s\n", idb->dbname);
+	fprintf(stream, "Database statistics: %s\n", idb->name);
 	__wt_stat_print(env, idb->dstats, stream);
 
 	/* Underlying file handle statistics. */
 	if (idb->fh != NULL) {
 		fprintf(stream,
-		    "Underlying file I/O statistics: %s\n", idb->dbname);
+		    "Underlying file I/O statistics: %s\n", idb->name);
 		__wt_stat_print(env, idb->fh->stats, stream);
 	}
 
