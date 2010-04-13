@@ -17,7 +17,7 @@ static int  __wt_bt_page_write(DB *, WT_PAGE *);
  *	Move a page from its in-memory state out to disk.
  */
 int
-__wt_bt_page_reconcile(DB *db, WT_PAGE *page)
+__wt_bt_page_reconcile(DB *db, WT_PAGE *page, int reclaim)
 {
 	ENV *env;
 
@@ -30,7 +30,8 @@ __wt_bt_page_reconcile(DB *db, WT_PAGE *page)
 	if (F_ISSET(page, WT_MODIFIED))
 		WT_RET(__wt_bt_page_write(db, page));
 
-	__wt_bt_page_discard(env, page);
+	if (reclaim)
+		__wt_bt_page_discard(env, page);
 
 	return (0);
 }
