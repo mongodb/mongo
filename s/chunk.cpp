@@ -495,7 +495,7 @@ namespace mongo {
         BSONElement field = fields.next();
         FieldRange range = ranges.range(field.fieldName());
         
-        uassert(13085, "no support for special queries yet", range.getSpecial().empty());
+        uassert(13088, "no support for special queries yet", range.getSpecial().empty());
 
         if (range.empty()) {
             return 0;
