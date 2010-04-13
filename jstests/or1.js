@@ -28,7 +28,7 @@ t.drop();
 t.save( {a:[0,1],b:[0,1]} );
 assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}  ] } ).toArray().length );
 assert.eq( 1, t.find( { $or: [ { b: {$in:[0,1]}}  ] } ).toArray().length );
-assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}, { b: {$in:[0,1]}} }  ] } ).toArray().length );
+assert.eq( 1, t.find( { $or: [ { a: {$in:[0,1]}}, { b: {$in:[0,1]}}  ] } ).toArray().length );
 
 }
 
