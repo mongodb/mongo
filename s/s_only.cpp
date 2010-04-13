@@ -32,9 +32,6 @@ namespace mongo {
         return i;
     }
 
-    // need this stub to reduce mongos link dependencies
-    inline Matcher::~Matcher() { assert(!"this shouldn't be called"); }
-
     boost::thread_specific_ptr<Client> currentClient;
     Client::~Client(){ assert(!"this shouldn't be called"); }
 
