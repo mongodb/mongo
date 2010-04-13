@@ -293,7 +293,7 @@ namespace mongo {
     
     /* _jsobj          - the query pattern
     */
-    Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey) :
+    Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey, bool subMatcher) :
         where(0), jsobj(_jsobj), haveSize(), all(), hasArray(0), haveNeg(), _atomic(false), nRegex(0) {
 
         BSONObjIterator i(jsobj);
@@ -302,12 +302,14 @@ namespace mongo {
             
             const char *ef = e.fieldName();
             if ( ef[1] == 'o' && ef[2] == 'r' && ef[3] == 0 ) {
+                uassert( 13088, "recursive $or not allowed", !subMatcher );
                 uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
                     BSONElement f = j.next();
                     uassert( 13087, "$or match element must be an object", f.type() == Object );
-                    _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), constrainIndexKey ) ) );
+                    // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
+                    _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), BSONObj(), true ) ) );
                 }
                 break;
             }            
@@ -716,21 +718,6 @@ namespace mongo {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
-        // for now $or must be the only top level field if present
-        if ( _orMatchers.size() > 0 ) {
-            for( vector< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
-                i != _orMatchers.end(); ++i ) {
-                if( details ) {
-                    // just to be safe - may not be strictly necessary.
-                    details->reset();
-                }
-                if ( (*i)->matches( jsobj, details ) ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        
         // check normal non-regex cases:
         for ( unsigned i = 0; i < basics.size(); i++ ) {
             ElementMatcher& bm = basics[i];
@@ -773,6 +760,23 @@ namespace mongo {
                 return false;
         }
         
+        if ( _orMatchers.size() > 0 ) {
+            bool match = false;
+            for( vector< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+                i != _orMatchers.end(); ++i ) {
+                // SERVER-205 don't submit details - we don't want to track field
+                // matched within $or, and at this point we've already loaded the
+                // whole document
+                if ( (*i)->matches( jsobj ) ) {
+                    match = true;
+                    break;
+                }
+            }
+            if ( !match ) {
+                return false;
+            }
+        }
+                
         if ( where ) {
             if ( where->func == 0 ) {
                 uassert( 10070 , "$where compile error", false);
@@ -801,7 +805,7 @@ namespace mongo {
             return where->scope->getBoolean( "return" ) != 0;
 
         }
-
+        
         return true;
     }
 

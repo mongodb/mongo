@@ -136,13 +136,14 @@ namespace mongo {
 
         // Only specify constrainIndexKey if matches() will be called with
         // index keys having empty string field names.
-        Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj());
+        Matcher(const BSONObj &pattern, const BSONObj &constrainIndexKey = BSONObj(), bool subMatcher = false);
 
         ~Matcher();
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 );
         
-        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg; }
+        // until SERVER-109 $or is opaque to indexes
+        bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg && _orMatchers.size() == 0; }
 
         bool atomic() const { return _atomic; }
 
