@@ -21,6 +21,7 @@
 #include "config.h"
 #include "../util/unittest.h"
 #include "../client/connpool.h"
+#include "../db/queryutil.h"
 #include "cursors.h"
 #include "strategy.h"
 
@@ -489,16 +490,50 @@ namespace mongo {
     }
 
     int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
-        int added = 0;
+        FieldRangeSet ranges(_ns.c_str(), query, false);
+        BSONObjIterator fields(_key.key());
+        BSONElement field = fields.next();
+        FieldRange range = ranges.range(field.fieldName());
         
-        for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
-            Chunk * c = *i;
-            if ( _key.relevantForQuery( query , c ) ){
-                chunks.push_back( c );
-                added++;
+        uassert(13085, "no support for special queries yet", range.getSpecial().empty());
+
+        if (range.empty()) {
+            return 0;
+
+        } else if (range.equality()) {
+            chunks.push_back(&findChunk(BSON(field.fieldName() << range.min())));
+            return 1;
+        } else if (!range.nontrivial()) {
+            chunks = _chunks;
+            return chunks.size();
+        } else {
+            set<Chunk*, ChunkCmp> chunkSet;
+
+            for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
+                 it != end;
+                 ++it)
+            {
+                const FieldInterval& fi = *it;
+                assert(fi.valid());
+                BSONObj minObj = BSON(field.fieldName() << fi.lower_.bound_);
+                BSONObj maxObj = BSON(field.fieldName() << fi.upper_.bound_);
+                ChunkMap::iterator min = (fi.lower_.inclusive_ ? _chunkMap.upper_bound(minObj) : _chunkMap.lower_bound(minObj));
+                ChunkMap::iterator max = (fi.upper_.inclusive_ ? _chunkMap.upper_bound(maxObj) : _chunkMap.lower_bound(maxObj));
+
+                assert(min != _chunkMap.end());
+
+                // make max non-inclusive like end iterators
+                if(max != _chunkMap.end())
+                    ++max;
+
+                for (ChunkMap::iterator it=min; it != max; ++it){
+                    chunkSet.insert(it->second);
+                }
             }
+
+            chunks.assign(chunkSet.begin(), chunkSet.end());
+            return chunks.size();
         }
-        return added;
     }
 
     void ChunkManager::getAllServers( set<string>& allServers ){
