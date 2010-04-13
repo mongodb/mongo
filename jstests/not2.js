@@ -27,6 +27,7 @@ t.save( {i:"a"} );
 t.save( {i:"b"} );
 
 fail( {i:{$not:"a"}} );
+fail( {i:{$not:{$not:"a"}}} );
 fail( {i:{$not:{$not:{$gt:"a"}}}} );
 fail( {i:{$not:{$ref:"foo"}}} );
 fail( {i:{$not:{}}} );

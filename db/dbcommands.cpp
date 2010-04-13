@@ -28,6 +28,7 @@
 #include "../util/processinfo.h"
 #include "json.h"
 #include "repl.h"
+#include "repl_block.h"
 #include "replset.h"
 #include "commands.h"
 #include "db.h"

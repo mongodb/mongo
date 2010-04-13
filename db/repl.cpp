@@ -45,6 +45,7 @@
 #include "commands.h"
 #include "security.h"
 #include "cmdline.h"
+#include "repl_block.h"
 
 namespace mongo {
     
@@ -127,158 +128,6 @@ namespace mongo {
         }
 
         negotiate( conn.get(), "arbiter" );
-    }
-
-    /* --------------------------------------------- */
-
-    class SlaveTracking : public BackgroundJob {
-    public:
-        
-        static const char * NS;
-
-        struct Ident {
-            
-            Ident(BSONObj r,string h,string n){
-                BSONObjBuilder b;
-                b.appendElements( r );
-                b.append( "host" , h );
-                b.append( "ns" , n );
-                obj = b.obj();
-            }
-
-            bool operator<( const Ident& other ) const {
-                return obj.woCompare( other.obj ) < 0;
-            }
-            
-            BSONObj obj;
-        };
-
-        struct Info {
-            Info() : loc(0){}
-            ~Info(){
-                if ( loc && owned ){
-                    delete loc;
-                }
-            }
-            bool owned;
-            OpTime * loc;
-        };
-
-        SlaveTracking(){
-            _dirty = false;
-            _started = false;
-        }
-
-        void run(){
-            Client::initThread( "slaveTracking" );
-            DBDirectClient db;
-            while ( ! inShutdown() ){
-                sleepsecs( 1 );
-
-                if ( ! _dirty )
-                    continue;
-                
-                writelock lk(NS);
-
-                list< pair<BSONObj,BSONObj> > todo;
-                
-                {
-                    scoped_lock mylk(_mutex);
-                    
-                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ){
-                        BSONObjBuilder temp;
-                        temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
-                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() , 
-                                                               BSON( "$set" << temp.obj() ).getOwned() ) );
-                    }
-                    
-                    _slaves.clear();
-                }
-
-                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ){
-                    db.update( NS , i->first , i->second , true );
-                }
-
-                _dirty = false;
-            }
-        }
-
-        void reset(){
-            scoped_lock mylk(_mutex);
-            _slaves.clear();
-        }
-
-        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
-            scoped_lock mylk(_mutex);
-            
-            Ident ident(rid,host,ns);
-            Info& i = _slaves[ ident ];
-            if ( i.loc ){
-                i.loc[0] = last;
-                return;
-            }
-            
-            dbMutex.assertAtLeastReadLocked();
-            BSONObj res;
-            if ( Helpers::findOne( NS , ident.obj , res ) ){
-                assert( res["syncedTo"].type() );
-                i.owned = false;
-                i.loc = (OpTime*)res["syncedTo"].value();
-                i.loc[0] = last;
-                return;
-            }
-            
-            i.owned = true;
-            i.loc = new OpTime[1];
-            i.loc[0] = last;
-            _dirty = true;
-            if ( ! _started ){
-                _started = true;
-                go();
-            }
-        }
-
-        bool opReplicatedEnough( OpTime op , int w ){
-            if ( w <= 1 )
-                return true;
-            w--; // now this is the # of slaves i need
-            scoped_lock mylk(_mutex);
-            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
-                OpTime s = *(i->second.loc);
-                if ( s < op ){
-                    continue;
-                }
-                if ( --w == 0 )
-                    return true;
-            }
-            return w <= 0;
-        }
-        
-        // need to be careful not to deadlock with this
-        mongo::mutex _mutex;
-        map<Ident,Info> _slaves;
-        bool _dirty;
-        bool _started;
-
-    } slaveTracking;
-
-    const char * SlaveTracking::NS = "local.slaves";
-
-    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ){
-        if ( lastOp.isNull() )
-            return;
-        
-        assert( strstr( ns , "local.oplog.$" ) == ns );
-        
-        BSONObj rid = curop.getClient()->getRemoteID();
-        if ( rid.isEmpty() )
-            return;
-
-        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
-    }
-
-    bool opReplicatedEnough( OpTime op , int w ){
-        return slaveTracking.opReplicatedEnough( op , w );
     }
 
     /* --------------------------------------------- */
@@ -1710,7 +1559,7 @@ namespace mongo {
     static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
         if ( strncmp(ns, "local.", 6) == 0 ){
             if ( strncmp(ns, "local.slaves", 12) == 0 ){
-                slaveTracking.reset();
+                resetSlaveCache();
             }
             return;
         }

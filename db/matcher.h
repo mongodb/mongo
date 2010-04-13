@@ -181,6 +181,7 @@ namespace mongo {
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;
+        vector< shared_ptr< Matcher > > _orMatchers;
 
         friend class CoveredIndexMatcher;
     };

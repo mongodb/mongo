@@ -81,77 +81,6 @@ namespace mongo {
         return true;
     }
 
-    /** @return true if shard s is relevant for query q.
-
-    Example:
-     q:     { x : 3 }
-     *this: { x : 1 }
-     s:     x:2..x:7
-       -> true
-    */
-
-    bool ShardKeyPattern::relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R) { 
-        BSONObj q = extractKey( query );
-        if( q.isEmpty() )
-            return true;
-
-        BSONElement e = q.firstElement();
-        assert( !e.eoo() ) ;
-
-        if( e.type() == RegEx ) {
-            /* todo: if starts with ^, we could be smarter here */
-            return true;
-        }
-
-        if( e.type() == Object ) { 
-            BSONObjIterator j(e.embeddedObject());
-            BSONElement LE = L.firstElement(); // todo compound keys
-            BSONElement RE = R.firstElement(); // todo compound keys
-            while( 1 ) { 
-                BSONElement f = j.next();
-                if( f.eoo() ) 
-                    break;
-                int op = f.getGtLtOp();
-                switch( op ) { 
-                    case BSONObj::LT:
-                        if( f.woCompare(LE, false) <= 0 )
-                            return false;
-                        break;
-                    case BSONObj::LTE:
-                        if( f.woCompare(LE, false) < 0 )
-                            return false;
-                        break;
-                    case BSONObj::GT:
-                    case BSONObj::GTE:
-                        if( f.woCompare(RE, false) >= 0 )
-                            return false;
-                        break;
-                    case BSONObj::opIN:
-                    case BSONObj::NE:
-                    case BSONObj::opSIZE:
-                        massert( 10423 , "not implemented yet relevant()", false);
-                    case BSONObj::Equality:
-                        goto normal;
-                    default:
-                        massert( 10424 , "bad operator in relevant()?", false);
-                }
-            }
-            return true;
-        }
-normal:
-        return L.woCompare(q) <= 0 && R.woCompare(q) > 0;
-    }
-
-    bool ShardKeyPattern::relevantForQuery( const BSONObj& query , Chunk * chunk ){
-        massert( 10425 , "not done for compound patterns", patternfields.size() == 1);
-
-        bool rel = relevant(query, chunk->getMin(), chunk->getMax());
-        if( ! hasShardKey( query ) )
-            assert(rel);
-
-        return rel;
-    }
-
     /**
       returns a query that filters results only for the range desired, i.e. returns 
         { $gte : keyval(min), $lt : keyval(max) }
@@ -223,7 +152,6 @@ normal:
     /* things to test for compound : 
        x hasshardkey 
        _ getFilter (hard?)
-       _ relevantForQuery
        x canOrder
        \ middle (deprecating?)
     */
@@ -243,19 +171,6 @@ normal:
                 assert( !k.hasShardKey( fromjson("{k:99}") ) );
             }
 
-        }
-        void rfq() {
-            ShardKeyPattern k( BSON( "key" << 1 ) );
-            BSONObj q = BSON( "key" << 3 );
-            Chunk c(0);
-            BSONObj z = fromjson("{ ns : \"alleyinsider.fs.chunks\" , min : {key:2} , max : {key:20} , server : \"localhost:30001\" }");
-            c.unserialize(z);
-            assert( k.relevantForQuery(q, &c) );
-            assert( k.relevantForQuery(fromjson("{foo:9,key:4}"), &c) );
-            assert( !k.relevantForQuery(fromjson("{foo:9,key:43}"), &c) );
-            assert( k.relevantForQuery(fromjson("{foo:9,key:{$gt:10}}"), &c) );
-            assert( !k.relevantForQuery(fromjson("{foo:9,key:{$gt:22}}"), &c) );
-            assert( k.relevantForQuery(fromjson("{foo:9}"), &c) );
         }
         void getfilt() { 
             ShardKeyPattern k( BSON( "key" << 1 ) );
@@ -312,7 +227,6 @@ normal:
             
             testCanOrder();
             getfilt();
-            rfq();
             // add middle multitype tests
         }
     } shardKeyTest;

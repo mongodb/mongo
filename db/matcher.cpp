@@ -299,6 +299,18 @@ namespace mongo {
         BSONObjIterator i(jsobj);
         while ( i.more() ) {
             BSONElement e = i.next();
+            
+            const char *ef = e.fieldName();
+            if ( ef[1] == 'o' && ef[2] == 'r' && ef[3] == 0 ) {
+                uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                BSONObjIterator j( e.embeddedObject() );
+                while( j.more() ) {
+                    BSONElement f = j.next();
+                    uassert( 13087, "$or match element must be an object", f.type() == Object );
+                    _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), constrainIndexKey ) ) );
+                }
+                break;
+            }            
 
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
@@ -704,6 +716,21 @@ namespace mongo {
         /* assuming there is usually only one thing to match.  if more this
         could be slow sometimes. */
 
+        // for now $or must be the only top level field if present
+        if ( _orMatchers.size() > 0 ) {
+            for( vector< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+                i != _orMatchers.end(); ++i ) {
+                if( details ) {
+                    // just to be safe - may not be strictly necessary.
+                    details->reset();
+                }
+                if ( (*i)->matches( jsobj, details ) ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
         // check normal non-regex cases:
         for ( unsigned i = 0; i < basics.size(); i++ ) {
             ElementMatcher& bm = basics[i];

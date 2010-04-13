@@ -48,7 +48,9 @@ namespace mongo {
                     handler->process( m , p.get() );
                 }
             }
-            catch ( ... ){
+            catch ( const std::exception& e ){
+                problem() << "uncaught exception (" << e.what() << ") in PortMessageServer::threadRun, closing connection" << endl;
+            }catch ( ... ){
                 problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
             }            
             
