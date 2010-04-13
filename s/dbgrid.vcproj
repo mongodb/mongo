@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;C:\Program Files\boost\boost_1_35_0&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
+				AdditionalIncludeDirectories="..\..\js\src;&quot;..\pcre-7.4&quot;;&quot;C:\Program Files\boost\boost_1_35_0&quot;"
+				PreprocessorDefinitions="XP_WIN;OLDJS;STATIC_JS_API;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -362,6 +362,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\s_only.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\server.cpp"
 				>
 			</File>
@@ -445,6 +449,18 @@
 					>
 				</File>
 				<File
+					RelativePath="..\scripting\engine.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\scripting\engine_spidermonkey.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\indexkey.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\db\jsobj.cpp"
 					>
 				</File>
@@ -454,6 +470,10 @@
 				</File>
 				<File
 					RelativePath="..\db\lasterror.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\matcher.cpp"
 					>
 				</File>
 				<File
@@ -600,6 +620,22 @@
 			<File
 				RelativePath="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp"
 				>
+			</File>
+			<File
+				RelativePath="..\..\js\src\js.lib"
+				>
+			</File>
+			<File
+				RelativePath="..\pcre-7.4\pcrecpp.cc"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\..\boostw\boost_1_34_1\boost\version.hpp"
