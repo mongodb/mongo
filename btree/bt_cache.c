@@ -29,9 +29,9 @@ __wt_cache_create(ENV *env)
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_CACHE), &ienv->cache));
 	cache = ienv->cache;
 
-	WT_ERR(__wt_mtx_alloc(env, 1, &cache->mtx_drain));
-	WT_ERR(__wt_mtx_alloc(env, 1, &cache->mtx_io));
-	WT_ERR(__wt_mtx_alloc(env, 0, &cache->mtx_hb));
+	WT_ERR(__wt_mtx_alloc(env, "cache drain", 1, &cache->mtx_drain));
+	WT_ERR(__wt_mtx_alloc(env, "cache I/O", 1, &cache->mtx_io));
+	WT_ERR(__wt_mtx_alloc(env, "cache hash bucket", 0, &cache->mtx_hb));
 
 	/*
 	 * Initialize the cache hash buckets.
