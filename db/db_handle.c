@@ -81,7 +81,7 @@ __wt_idb_config_default(DB *db)
 
 	__wt_lock(env, ienv->mtx);		/* Add to the ENV's list */
 	TAILQ_INSERT_TAIL(&ienv->dbqh, idb, q);
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 
 	WT_RET(__wt_stat_alloc_db_stats(env, &idb->stats));
 	WT_RET(__wt_stat_alloc_database_stats(env, &idb->dstats));
@@ -147,7 +147,7 @@ __wt_idb_destroy(DB *db, int refresh)
 	}
 
 	/* Free any allocated memory. */
-	__wt_free(env, idb->dbname, 0);
+	__wt_free(env, idb->name, 0);
 	__wt_free(env, idb->stats, 0);
 	__wt_free(env, idb->dstats, 0);
 
@@ -167,7 +167,7 @@ __wt_idb_destroy(DB *db, int refresh)
 
 	__wt_lock(env, ienv->mtx);		/* Delete from the ENV's list */
 	TAILQ_REMOVE(&ienv->dbqh, idb, q);
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 
 	__wt_free(env, idb, sizeof(IDB));
 
