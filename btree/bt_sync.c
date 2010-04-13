@@ -14,7 +14,7 @@
  *	Sync a Btree.
  */
 int
-__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
+__wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags)
 {
-	return (__wt_cache_sync(toc, f));
+	return (__wt_cache_sync(toc, f, flags));
 }
