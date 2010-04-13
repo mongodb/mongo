@@ -28,7 +28,7 @@
 #include <time.h>
 #include "db.h"
 #include "commands.h"
-#include "repl.h"
+#include "repl_block.h"
 
 namespace mongo {
 

@@ -384,7 +384,7 @@ else:
 coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp db/cmdline.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/client.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp db/cmdline.cpp" )
 serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/index_*.cpp" )
 
 serverOnlyFiles += Glob( "db/dbcommands*.cpp" )
