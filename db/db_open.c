@@ -16,7 +16,7 @@ static int __wt_db_idb_open(DB *, const char *, mode_t, u_int32_t);
  *	Open a DB handle.
  */
 int
-__wt_db_open(WT_TOC *toc, const char *dbname, mode_t mode, u_int32_t flags)
+__wt_db_open(WT_TOC *toc, const char *name, mode_t mode, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -27,7 +27,7 @@ __wt_db_open(WT_TOC *toc, const char *dbname, mode_t mode, u_int32_t flags)
 	WT_STAT_INCR(env->ienv->stats, DATABASE_OPEN);
 
 	/* Initialize the IDB structure. */
-	WT_RET(__wt_db_idb_open(db, dbname, mode, flags));
+	WT_RET(__wt_db_idb_open(db, name, mode, flags));
 
 	/* Open the underlying Btree. */
 	WT_RET(__wt_bt_open(toc, LF_ISSET(WT_CREATE) ? 1 : 0));
@@ -43,7 +43,7 @@ __wt_db_open(WT_TOC *toc, const char *dbname, mode_t mode, u_int32_t flags)
  *	Routine to intialize any IDB values based on a DB value during open.
  */
 static int
-__wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
+__wt_db_idb_open(DB *db, const char *name, mode_t mode, u_int32_t flags)
 {
 	ENV *env;
 	IENV *ienv;
@@ -54,12 +54,12 @@ __wt_db_idb_open(DB *db, const char *dbname, mode_t mode, u_int32_t flags)
 	ienv = env->ienv;
 	idb = db->idb;
 
-	WT_RET(__wt_strdup(env, dbname, &idb->dbname));
+	WT_RET(__wt_strdup(env, name, &idb->name));
 	idb->mode = mode;
 
 	__wt_lock(env, ienv->mtx);
 	idb->file_id = ++ienv->next_file_id;
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 
 	if (LF_ISSET(WT_RDONLY))
 		F_SET(idb, WT_RDONLY);
@@ -81,8 +81,8 @@ __wt_db_close(WT_TOC *toc, u_int32_t flags)
 	ret = 0;
 
 	/* Flush the underlying Btree. */
-	if (!LF_ISSET(WT_NOFLUSH))
-		WT_TRET(__wt_bt_sync(toc, NULL));
+	if (!LF_ISSET(WT_NOWRITE))
+		WT_TRET(__wt_bt_sync(toc, NULL, flags));
 
 	/* Close the underlying Btree. */
 	ret = __wt_bt_close(toc);

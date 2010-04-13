@@ -270,6 +270,7 @@ methods['env.verbose_set'] = Api(
 	['VERB_ALL',
 	 'VERB_CACHE',
 	 'VERB_HAZARD',
+	 'VERB_MUTEX',
 	 'VERB_FILEOPS',
 	 'VERB_SERVERS'],
 	['init'], [])
@@ -376,7 +377,8 @@ methods['db.close'] = Api(
 	'db.close',
 	'method, toc',
 	['flags/u_int32_t @S'],
-	['NOFLUSH'],
+	['NOWRITE',
+	 'OSWRITE'],
 	['init'], [])
 
 methods['db.col_del'] = Api(
@@ -493,7 +495,7 @@ methods['db.huffman_set'] = Api(
 methods['db.open'] = Api(
 	'db.open',
 	'method, toc',
-	['dbname/const char *@S',
+	['name/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/u_int32_t @S'],
 	[ 'CREATE', 'RDONLY' ],
@@ -548,7 +550,7 @@ methods['db.sync'] = Api(
 	'method, rdonly, toc',
 	['progress/void (*@S)(const char *, u_int64_t)',
 	 'flags/u_int32_t @S'],
-	['__NONE__'],
+	['OSWRITE'],
 	['open'], [])
 
 methods['db.verify'] = Api(
