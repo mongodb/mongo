@@ -1900,6 +1900,10 @@
 				RelativePath=".\repl\replset.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\repl\replset.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="old_repl"
