@@ -265,7 +265,7 @@ namespace mongo {
             
             const char *ef = e.fieldName();
             if ( ef[1] == 'o' && ef[2] == 'r' && ef[3] == 0 ) {
-                uassert( 13088, "recursive $or not allowed", !subMatcher );
+                uassert( 13090, "recursive $or not allowed", !subMatcher );
                 uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
