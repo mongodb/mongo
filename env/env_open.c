@@ -71,7 +71,7 @@ __wt_env_close(ENV *env)
 		TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 			__wt_api_env_errx(env,
 			    "Env handle has open Db handles: %s",
-			    idb->dbname);
+			    idb->name);
 			WT_TRET(idb->db->close(idb->db, 0));
 		}
 		secondary_err = WT_ERROR;
@@ -91,9 +91,9 @@ __wt_env_close(ENV *env)
 	/* Close down and wait for server threads. */
 	F_CLR(ienv, WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
-	__wt_unlock(ienv->cache->mtx_drain);
+	__wt_unlock(env, ienv->cache->mtx_drain);
 	__wt_thread_join(ienv->cache_drain_tid);
-	__wt_unlock(ienv->cache->mtx_io);
+	__wt_unlock(env, ienv->cache->mtx_io);
 	__wt_thread_join(ienv->cache_io_tid);
 
 	/*

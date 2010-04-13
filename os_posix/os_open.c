@@ -31,13 +31,13 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 	TAILQ_FOREACH(idb, &ienv->dbqh, q) {
 		if ((fh = idb->fh) == NULL)
 			continue;
-		if (strcmp(name, idb->dbname) == 0) {
+		if (strcmp(name, idb->name) == 0) {
 			++fh->refcnt;
 			*fhp = fh;
 			break;
 		}
 	}
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 	if (fh != NULL)
 		return (0);
 
@@ -82,7 +82,7 @@ __wt_open(ENV *env, const char *name, mode_t mode, int ok_create, WT_FH **fhp)
 	/* Link onto the environment's list of files. */
 	__wt_lock(env, ienv->mtx);
 	TAILQ_INSERT_TAIL(&ienv->fhqh, fh, q);
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 
 	return (0);
 
@@ -114,7 +114,7 @@ __wt_close(ENV *env, WT_FH *fh)
 	/* Remove from the list and discard the memory. */
 	__wt_lock(env, ienv->mtx);
 	TAILQ_REMOVE(&ienv->fhqh, fh, q);
-	__wt_unlock(ienv->mtx);
+	__wt_unlock(env, ienv->mtx);
 
 	if (close(fh->fd) != 0) {
 		__wt_api_env_err(env, errno, "%s", fh->name);
