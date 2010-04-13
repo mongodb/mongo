@@ -61,7 +61,10 @@ wiredtiger_err_stream(FILE *stream)
 void
 __wt_api_env_err(ENV *env, int error, const char *fmt, ...)
 {
-	WT_STAT_INCR(env->ienv->method_stats, ENV_ERR);
+	/*
+	 * This function may be called at before/after the statistics memory
+	 * has been allocated/freed; don't increment method statistics here.
+	 */
 	WT_ENV_ERR(env, error, fmt);
 }
 
@@ -72,6 +75,9 @@ __wt_api_env_err(ENV *env, int error, const char *fmt, ...)
 void
 __wt_api_env_errx(ENV *env, const char *fmt, ...)
 {
-	WT_STAT_INCR(env->ienv->method_stats, ENV_ERRX);
+	/*
+	 * This function may be called at before/after the statistics memory
+	 * has been allocated/freed; don't increment method statistics here.
+	 */
 	WT_ENV_ERR(env, 0, fmt);
 }
