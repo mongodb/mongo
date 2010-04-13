@@ -9,23 +9,96 @@
 
 #include "wt_internal.h"
 
-static int  __wt_cache_compare_gen(const void *a, const void *b);
-static int  __wt_cache_compare_page(const void *a, const void *b);
-static void __wt_cache_evict(ENV *, WT_CACHE_ENTRY **, u_int32_t);
-static int  __wt_cache_hazard_compare(const void *a, const void *b);
-static void  __wt_cache_hazchk(
-	       ENV *, WT_CACHE_ENTRY **, u_int32_t, WT_PAGE **, u_int32_t);
+static void __wt_drain(
+		ENV *, int, void (*)(const char *, u_int64_t), const char *);
+static int  __wt_drain_compare_gen(const void *a, const void *b);
+static int  __wt_drain_compare_level(const void *a, const void *b);
+static int  __wt_drain_compare_page(const void *a, const void *b);
+static void __wt_drain_evict(
+		ENV *, int, void (*)(const char *, u_int64_t), const char *);
+static int  __wt_drain_hazard_compare(const void *a, const void *b);
+static void __wt_drain_hazchk(ENV *);
+static int  __wt_drain_sync(ENV *, int *);
+static int  __wt_drain_trickle(ENV *, int *);
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_cache_hazard_check(ENV *, WT_CACHE_ENTRY *);
+static void __wt_drain_hazard_check(ENV *, WT_CACHE_ENTRY *);
 #endif
 
 /*
- * __wt_cache_compare_gen --
+ * __wt_drain_compare_level --
+ *	Qsort function: sort WT_CACHE_ENTRY list based on the page's level.
+ */
+static int
+__wt_drain_compare_level(const void *a, const void *b)
+{
+	WT_CACHE_ENTRY *a_entry, *b_entry;
+	WT_PAGE_HDR *a_hdr, *b_hdr;
+	int a_level, b_level;
+
+	/*
+	 * The array may contain entries set to NULL for various reasons (for
+	 * example, a matching hazard reference), and so can't be discarded.
+	 * Ignore them.
+	 */
+	a_entry = *(WT_CACHE_ENTRY **)a;
+	b_entry = *(WT_CACHE_ENTRY **)b;
+	if (a_entry == NULL || b_entry == NULL)
+		return (a_entry == NULL &&
+		    b_entry == NULL ? 0 : a_entry == NULL ? -1 : 1);
+
+	a_hdr = a_entry->page->hdr;
+	b_hdr = b_entry->page->hdr;
+
+	/*
+	 * The idea is to minimize the I/O in reconciliation, we'd like to find
+	 * the pages we need in the cache.
+	 */
+	switch (a_hdr->type) {
+	case WT_PAGE_DUP_LEAF:
+		a_level = 1;
+		break;
+	case WT_PAGE_DUP_INT:
+		a_level = 2;
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
+		a_level = 3;
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		a_level = 4;
+		break;
+	}
+
+	switch (b_hdr->type) {
+	case WT_PAGE_DUP_LEAF:
+		b_level = 1;
+		break;
+	case WT_PAGE_DUP_INT:
+		b_level = 2;
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_ROW_LEAF:
+		b_level = 3;
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		b_level = 4;
+		break;
+	}
+
+	return (a_level > b_level ? 1 : (a_level < b_level ? -1 : 0));
+}
+
+/*
+ * __wt_drain_compare_gen --
  *	Qsort function: sort WT_CACHE_ENTRY list based on the page's generation.
  */
 static int
-__wt_cache_compare_gen(const void *a, const void *b)
+__wt_drain_compare_gen(const void *a, const void *b)
 {
 	u_int32_t a_gen, b_gen;
 
@@ -36,11 +109,11 @@ __wt_cache_compare_gen(const void *a, const void *b)
 }
 
 /*
- * __wt_cache_compare_page --
+ * __wt_drain_compare_page --
  *	Qsort function: sort WT_CACHE_ENTRY list based on the page's address.
  */
 static int
-__wt_cache_compare_page(const void *a, const void *b)
+__wt_drain_compare_page(const void *a, const void *b)
 {
 	WT_PAGE *a_page, *b_page;
 
@@ -51,11 +124,11 @@ __wt_cache_compare_page(const void *a, const void *b)
 }
 
 /*
- * __wt_cache_hazard_compare --
+ * __wt_drain_hazard_compare --
  *	Qsort function: sort hazard list based on the page's address.
  */
 static int
-__wt_cache_hazard_compare(const void *a, const void *b)
+__wt_drain_hazard_compare(const void *a, const void *b)
 {
 	WT_PAGE *a_page, *b_page;
 
@@ -63,6 +136,28 @@ __wt_cache_hazard_compare(const void *a, const void *b)
 	b_page = *(WT_PAGE **)b;
 
 	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
+}
+
+/*
+ * __wt_workq_cache_sync_server --
+ *	Called to check on the cache drain server thread when a sync
+ *	is scheduled.
+ */
+void
+__wt_workq_cache_sync_server(ENV *env)
+{
+	WT_CACHE *cache;
+
+	cache = env->ienv->cache;
+
+	/* Wake the cache drain thread if it's sleeping and it needs to run. */
+	if (cache->drain_sleeping) {
+		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		    (env, "workQ waking cache drain server"));
+
+		__wt_unlock(env, cache->mtx_drain);
+		cache->drain_sleeping = 0;
+	}
 }
 
 /*
@@ -75,48 +170,23 @@ __wt_cache_drain(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e, **drain, **drainp;
-	WT_PAGE **hazard;
-	u_int64_t bytes_inuse, bytes_max, cache_pages;
-	u_int32_t bucket_cnt, drain_len, drain_cnt, drain_elem;
-	u_int32_t hazard_elem, i, review_cnt;
-	int ret;
+	int didwork, ret;
 
 	env = arg;
 	ienv = env->ienv;
 	cache = ienv->cache;
+	ret = 0;
 
-	/* Allocate memory for a copy of the hazard references. */
-	hazard_elem = env->toc_size * env->hazard_size;
-	WT_ERR(__wt_calloc(env, hazard_elem, sizeof(WT_PAGE *), &hazard));
-
-	/* Initialize the drain array (which is reallocated on demand). */
-	drain = NULL;
-	drain_len = 0;
-
-	/* Initialize the bucket count, it cycles through the hash buckets. */
-	bucket_cnt = 0;
+	/*
+	 * Allocate memory for a copy of the hazard references -- it's a fixed
+	 * size so doesn't need run-time adjustments.
+	 */
+	cache->hazard_elem = env->toc_size * env->hazard_size;
+	WT_ERR(__wt_calloc(
+	    env, cache->hazard_elem, sizeof(WT_PAGE *), &cache->hazard));
+	cache->hazard_len = cache->hazard_elem * sizeof(WT_PAGE *);
 
 	while (F_ISSET(ienv, WT_SERVER_RUN)) {
-		/*
-		 * If there's no work to do, go to sleep.  We check the cache
-		 * lockout flag because it implies being more aggressive about
-		 * cleaning than only comparing the in-use bytes vs. the max
-		 * bytes.
-		 */
-		bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
-		bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
-		if (cache->read_lockout == 0 && bytes_inuse <= bytes_max) {
-			/*
-			 * No memory flush needed, the drain_sleeping field is
-			 * declared volatile.
-			 */
-			cache->drain_sleeping = 1;
-			__wt_lock(env, cache->mtx_drain);
-			cache->drain_sleeping = 0;
-			continue;
-		}
-
 		/*
 		 * Lock the hash buckets, we can't grow them while the cache
 		 * drain server has them pinned (that is, has references to
@@ -124,171 +194,323 @@ __wt_cache_drain(void *arg)
 		 */
 		__wt_lock(env, cache->mtx_hb);
 
-		WT_VERBOSE(env,
-		    WT_VERB_CACHE | WT_VERB_SERVERS, (env,
-		        "cache drain server running: bytes inuse > max "
-			"(%llu > %llu), read lockout %sset",
-			bytes_inuse, bytes_max,
-			cache->read_lockout ? "" : "not "));
+		/* Check for a sync, then running out of resources. */
+		didwork = 0;
+		WT_ERR(__wt_drain_sync(env, &didwork));
+		WT_ERR(__wt_drain_trickle(env, &didwork));
 
-		/*
-		 * Review 2% of the pages in the cache, but not less than 20
-		 * pages and not more than 100 pages.
-		 */
-		cache_pages = WT_CACHE_PAGES_INUSE(cache);
-		if (cache_pages <= 20)
-			review_cnt = cache_pages;
-		else {
-			review_cnt = cache_pages / 20;
-			if (review_cnt < 20)
-				review_cnt = 20;
-			else if (review_cnt > 100)
-				review_cnt = 100;
-		}
-		if (review_cnt * sizeof(WT_CACHE_ENTRY *) > drain_len)
-			WT_ERR(__wt_realloc(env, &drain_len,
-			    (review_cnt + 20) * sizeof(WT_CACHE_ENTRY *),
-			    &drain));
-
-		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache drain server reviewing %lu entries of total "
-		    "%lu cache pages",
-		    (u_long)review_cnt, (u_long)cache_pages));
-
-		/*
-		 * Get the next review_cnt pages available to be discarded.
-		 * There's no defense against a cache filled with pinned pages,
-		 * but that's not an issue, only the root page of each database
-		 * is pinned.
-		 */
-		for (drainp = drain; review_cnt > 0; ++bucket_cnt) {
-			if (bucket_cnt == cache->hb_size)
-				bucket_cnt = 0;
-			WT_CACHE_FOREACH_PAGE(
-			    cache, &cache->hb[bucket_cnt], e, i) {
-				/* Skip pages that aren't ours to take. */
-				if (e->state != WT_OK ||
-				    F_ISSET(e->page, WT_PINNED))
-					continue;
-				/*
-				 * If the page is marked as useless, clear its
-				 * generation number so we'll take it.
-				 */
-				if (F_ISSET(e->page, WT_DISCARD))
-					e->gen = 0;
-				*drainp++ = e;
-				if (--review_cnt == 0)
-					break;
-			}
-		}
-
-		/* No pages to drain: confused but done. */
-		drain_elem = (u_int32_t)(drainp - drain);
-		if (drain_elem == 0)
-			goto done;
-
-		/* Sort the drain pages by ascending generation number. */
-		qsort(drain, (size_t)drain_elem,
-		    sizeof(WT_CACHE_ENTRY *), __wt_cache_compare_gen);
-
-		/*
-		 * Try and drain 10 pages, knowing we may not be able to drain
-		 * them all.  (I have no evidence 10 is the right choice, I'm
-		 * just amortizing the cost of building and sorting the drain
-		 * and hazard arrays.)
-		 */
-#define	WT_DRAIN_CNT	10
-		if (drain_elem > WT_DRAIN_CNT)
-			drain_elem = WT_DRAIN_CNT;
-
-		/* Re-sort the drain pages by their WT_PAGE addresses. */
-		qsort(drain, (size_t)drain_elem,
-		    sizeof(WT_CACHE_ENTRY *), __wt_cache_compare_page);
-
-		/*
-		 * Set the entry state so readers don't try and use the pages.
-		 * Now, any thread searching for a page will either see our
-		 * state value, or will have already set a hazard reference to
-		 * the page.  We don't drain a page with a hazard reference
-		 * set, so we won't race.
-		 *
-		 * No memory flush needed, the state field is declared volatile.
-		 */
-		for (drainp = drain, drain_cnt = 0;
-		    drain_cnt < drain_elem; ++drainp, ++drain_cnt) {
-			/*
-			 * If we're reviewing a small cache, it's possible that
-			 * we entered a page onto the list twice -- we catch it
-			 * here, by discarding any reference to a page that's
-			 * not in an "OK" state.
-			 */
-			if ((*drainp)->state != WT_OK) {
-				*drainp = NULL;
-				continue;
-			}
-
-			(*drainp)->state = WT_DRAIN;
-			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache drain server draining element/page "
-			    "%#lx/%#lu",
-			    WT_PTR_TO_ULONG(*drainp), (u_long)(*drainp)->addr));
-		}
-
-		/*
-		 * Compare the list of hazard references to the list of pages
-		 * to be discarded; any matching pages are left in the cache.
-		 */
-		memcpy(hazard, ienv->hazard, hazard_elem * sizeof(WT_PAGE *));
-		qsort(hazard, (size_t)hazard_elem,
-		    sizeof(WT_PAGE *), __wt_cache_hazard_compare);
-		__wt_cache_hazchk(env, drain, drain_elem, hazard, hazard_elem);
-
-		/* Evict pages that weren't in use. */
-		__wt_cache_evict(env, drain, drain_elem);
-
-done:		__wt_unlock(cache->mtx_hb);
+		__wt_unlock(env, cache->mtx_hb);
 
 #ifdef HAVE_DIAGNOSTIC
-		__wt_cache_chk(env);
+		__wt_drain_chk(env);
 #endif
+		/*
+		 * No memory flush needed, the drain_sleeping field is declared
+		 * volatile.
+		 */
+		if (!didwork) {
+			WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+			    (env, "cache drain server sleeping"));
+			cache->drain_sleeping = 1;
+			__wt_lock(env, cache->mtx_drain);
+		}
 	}
 
-err:	if (drain != NULL) {
-		__wt_free(env, drain, drain_len);
-		drain = NULL;
-	}
-	if (hazard != NULL) {
-		__wt_free(env, hazard, hazard_elem * sizeof(WT_PAGE *));
-		hazard = NULL;
-	}
+err:	if (cache->drain != NULL)
+		__wt_free(env, cache->drain, cache->drain_len);
+	if (cache->hazard != NULL)
+		__wt_free(env, cache->hazard, cache->hazard_len);
 	if (ret != 0)
 		__wt_api_env_err(env, ret, "cache server failure");
+
 	return (NULL);
 }
 
 /*
- * __wt_cache_hazchk --
+ * __wt_drain_trickle --
+ *	Select a group of pages to trickle out.
+ */
+static int
+__wt_drain_trickle(ENV *env, int *didworkp)
+{
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY *e, **drain;
+	u_int64_t bytes_inuse, bytes_max, cache_pages;
+	u_int32_t i, review_cnt;
+
+	cache = env->ienv->cache;
+
+	/*
+	 * Check if we need to run.  We check the cache lockout flag because it
+	 * implies being more aggressive about cleaning than only comparing the
+	 * in-use bytes vs. the max bytes.
+	 */
+	bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
+	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
+	if (cache->read_lockout == 0 && bytes_inuse <= bytes_max)
+		return (0);
+
+	WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS, (env,
+	    "cache drain server running: read lockout %sset, "
+	    "bytes inuse > max (%llu > %llu), ",
+	    cache->read_lockout ? "" : "not ",
+	    (u_quad)bytes_inuse, (u_quad)bytes_max));
+
+	/*
+	 * Review 2% of the pages in the cache, but not less than 20 pages and
+	 * not more than 100 pages.
+	 */
+	cache_pages = WT_CACHE_PAGES_INUSE(cache);
+	if (cache_pages <= 20)
+		review_cnt = cache_pages;
+	else {
+		review_cnt = cache_pages / 20;
+		if (review_cnt < 20)
+			review_cnt = 20;
+		else if (review_cnt > 100)
+			review_cnt = 100;
+	}
+	WT_VERBOSE(env, WT_VERB_CACHE, (env,
+	    "cache drain server reviewing %lu entries of %llu total cache "
+	    "pages",
+	    (u_long)review_cnt, (u_quad)cache_pages));
+
+	/* Allocate more space in the drain list as necessary. */
+	if (review_cnt > cache->drain_len / sizeof(WT_CACHE_ENTRY *))
+		WT_RET(__wt_realloc(env, &cache->drain_len,
+		    (review_cnt + 20) * sizeof(WT_CACHE_ENTRY *),
+		    &cache->drain));
+
+	/*
+	 * Get the next review_cnt pages available to be discarded.  There's
+	 * no defense against a cache filled with pinned pages, but that's
+	 * not an issue, only the root page of each database is pinned.
+	 */
+	for (drain = cache->drain; review_cnt > 0; ++cache->bucket_cnt) {
+		if (cache->bucket_cnt == cache->hb_size)
+			cache->bucket_cnt = 0;
+		WT_CACHE_FOREACH_PAGE(
+		    cache, &cache->hb[cache->bucket_cnt], e, i) {
+			/*
+			 * Skip pages that aren't ours to take -- we're really
+			 * going to discard these pages from memory, so ignore
+			 * pinned pages.
+			 */
+			if (e->state != WT_OK || F_ISSET(e->page, WT_PINNED))
+				continue;
+
+			/*
+			 * If a page is marked as useless, clear its generation
+			 * number so we'll choose it.  We're rather do this in
+			 * when returning a page to the cache, but we don't have
+			 * a reference to the WT_CACHE_ENTRY at that point.
+			 */
+			if (F_ISSET(e->page, WT_DISCARD))
+				e->gen = 0;
+
+			*drain++ = e;
+			if (--review_cnt == 0)
+				break;
+		}
+	}
+	cache->drain_elem = drain - cache->drain;
+
+	/*
+	 * Sort the pages by ascending generation number, then discard the
+	 * WT_CACHE_DRAIN_CNT pages with the lowest generation numbers.  (I
+	 * have no evidence WT_CACHE_DRAIN_CNT is the right choice, but I'm
+	 * trying to amortize the cost of building and sorting the drain and
+	 * hazard arrays.)
+	 */
+	if (cache->drain_elem > WT_CACHE_DRAIN_CNT) {
+		qsort(cache->drain, (size_t)cache->drain_elem,
+		    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_gen);
+		cache->drain_elem = WT_CACHE_DRAIN_CNT;
+	}
+
+	__wt_drain(env, 1, NULL, NULL);
+	*didworkp = 1;
+
+	return (0);
+}
+
+/*
+ * __wt_drain_sync --
+ *	Flush all of the pages for any specified sync calls.
+ */
+static int
+__wt_drain_sync(ENV *env, int *didworkp)
+{
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY *e, **drain;
+	WT_SYNC_REQ *sr, *sr_end;
+	WT_TOC *toc;
+	DB *db;
+	u_int32_t drain_elem, i, j;
+	void (*f)(const char *, u_int64_t);
+
+	cache = env->ienv->cache;
+
+	/* Check if we need to run. */
+	sr = cache->sync_request;
+	sr_end =
+	    sr + sizeof(cache->sync_request) / sizeof(cache->sync_request[0]);
+	for (toc = NULL; sr < sr_end; ++sr)
+		if (sr->toc != NULL) {
+			/*
+			 * We only do a single sync per call; that's OK, if by
+			 * some chance there is more than one sync request, we
+			 * will find it on our next loop.
+			 */
+			toc = sr->toc;
+			f = sr->f;
+
+			/* We've got it -- clear the slot. */
+			sr->toc = NULL;
+			WT_MEMORY_FLUSH;
+			break;
+		}
+	if (toc == NULL)
+		return (0);
+	db = toc->db;
+
+	drain = cache->drain;
+	drain_elem = 0;
+	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
+		/*
+		 * Skip pages that aren't ours to take -- pinned pages are OK,
+		 * we're not discarding the pages from memory.
+		 */
+		if (e->state != WT_OK)
+			continue;
+
+		/* We only want modified pages from the specified database. */
+		if (e->db != db || !F_ISSET(e->page, WT_MODIFIED))
+			continue;
+
+		/*
+		 * If a page is marked as useless, clear its generation
+		 * number so we'll choose it.  We're rather do this in
+		 * when returning a page to the cache, but we don't have
+		 * a reference to the WT_CACHE_ENTRY at that point.
+		 */
+		if (F_ISSET(e->page, WT_DISCARD))
+			e->gen = 0;
+
+		/* Allocate more space as necessary. */
+		if (drain_elem * sizeof(WT_CACHE_ENTRY *) >= cache->drain_len) {
+			WT_RET(__wt_realloc(env, &cache->drain_len,
+			    (drain_elem + 100) * sizeof(WT_CACHE_ENTRY *),
+			    &cache->drain));
+			drain = cache->drain + drain_elem;
+		}
+
+		*drain++ = e;
+		++drain_elem;
+	}
+	cache->drain_elem = drain_elem;
+
+	WT_VERBOSE(env, WT_VERB_CACHE, (env,
+	    "cache drain server flushing file %s, %lu of %llu total cache "
+	    "pages",
+	    db->idb->name, (u_long)drain_elem,
+	    (u_quad)WT_CACHE_PAGES_INUSE(cache)));
+
+	if (drain_elem != 0)
+		__wt_drain(env, 0, f, toc->name);
+
+	/* Wake the caller. */
+	__wt_unlock(env, toc->mtx);
+
+	*didworkp = 1;
+	return (0);
+}
+
+/*
+ * __wt_drain --
+ *	Discard a set of pages from the cache.
+ */
+static void
+__wt_drain(ENV *env,
+    int reclaim, void (*f)(const char *, u_int64_t), const char *name)
+{
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY **drain;
+	u_int32_t drain_elem;
+
+	cache = env->ienv->cache;
+
+	/*
+	 * Set the entry state so readers don't try and use the pages.   Once
+	 * that's done, any thread searching for a page will either see our
+	 * state value, or will have already set a hazard reference to the page.
+	 * We don't drain a page with a hazard reference set, so we can't race.
+	 *
+	 * No memory flush needed, the state field is declared volatile.
+	 */
+	for (drain_elem = 0, drain = cache->drain;
+	    drain_elem < cache->drain_elem; ++drain, ++drain_elem) {
+		/*
+		 * If we're reviewing a small cache, it's possible we entered
+		 * a page onto the list twice -- catch it here, by discarding
+		 * our reference to any page that's not in an "OK" state.
+		 */
+		if ((*drain)->state != WT_OK) {
+			*drain = NULL;
+			continue;
+		}
+
+		(*drain)->state = WT_DRAIN;
+
+		WT_VERBOSE(env, WT_VERB_CACHE, (env,
+		    "cache drain server draining element/page %#lx/%#lu",
+		    WT_PTR_TO_ULONG(*drain), (u_long)(*drain)->addr));
+	}
+
+	/*
+	 * Compare the list of hazard references to the list of pages to be
+	 * discarded; any matching pages are left in the cache.
+	 */
+	__wt_drain_hazchk(env);
+
+	/* Evict pages that weren't in use. */
+	__wt_drain_evict(env, reclaim, f, name);
+}
+
+/*
+ * __wt_drain_hazchk --
  *	Compare the list of hazard references to the list of pages to be
  *	discarded.
  */
 static void
-__wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
-    u_int32_t drain_elem, WT_PAGE **hazard, u_int32_t hazard_elem)
+__wt_drain_hazchk(ENV *env)
 {
-	WT_CACHE_ENTRY *e;
-	WT_PAGE **end_hazard, *page;
+	IENV *ienv;
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY **drain, *e;
+	WT_PAGE **hazard, **end_hazard, *page;
 	WT_STATS *stats;
+	u_int32_t drain_elem;
 
-	stats = env->ienv->cache->stats;
-	end_hazard = hazard + hazard_elem;
+	ienv = env->ienv;
+	cache = ienv->cache;
+	stats = cache->stats;
 
-	/*
-	 * Both the drain and hazard lists are sorted by the page address in
-	 * ascending order, so we don't have to search anything, just walk
-	 * the lists in parallel and compare them.
-	 */
-	for (; drain_elem > 0; ++drainp, --drain_elem) {
-		if ((e = *drainp) == NULL)
+	/* Sort the drain pages by WT_PAGE address. */
+	qsort(cache->drain, (size_t)cache->drain_elem,
+	    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_page);
+
+	/* Copy the hazard reference array and sort it by WT_PAGE address. */
+	hazard = cache->hazard;
+	end_hazard = hazard + cache->hazard_elem;
+	memcpy(hazard, ienv->hazard, cache->hazard_elem * sizeof(WT_PAGE *));
+	qsort(hazard, (size_t)cache->hazard_elem,
+	    sizeof(WT_PAGE *), __wt_drain_hazard_compare);
+
+	/* Walk the lists in parallel and look for matches. */
+	for (drain = cache->drain, drain_elem = 0;
+	    drain_elem < cache->drain_elem; ++drain, ++drain_elem) {
+		if ((e = *drain) == NULL)
 			continue;
 
 		/*
@@ -313,27 +535,41 @@ __wt_cache_hazchk(ENV *env, WT_CACHE_ENTRY **drainp,
 			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
 
 			e->state = WT_OK;
-			*drainp = NULL;
+			*drain = NULL;
 		}
 	}
 }
 
 /*
- * __wt_cache_evict --
+ * __wt_drain_evict --
  *	Recycle cache pages.
  */
 static void
-__wt_cache_evict(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
+__wt_drain_evict(ENV *env,
+    int reclaim, void (*f)(const char *, u_int64_t), const char *name)
 {
-	WT_CACHE_ENTRY *e;
+	WT_CACHE_ENTRY **drain, *e;
 	WT_CACHE *cache;
 	WT_STATS *stats;
+	u_int64_t fcnt;
+	u_int32_t bytes, drain_elem;
 
 	cache = env->ienv->cache;
 	stats = cache->stats;
+	fcnt = 0;
 
-	for (; drain_elem > 0; ++drainp, --drain_elem) {
-		if ((e = *drainp) == NULL)
+	/*
+	 * Sort the pages for writing; we'd like to write leaf pages first so
+	 * we minimize the I/O we do during reconcilation.  This is almost
+	 * certainly not enough, we'll want to do much, much better planning
+	 * than this, at some point.
+	 */
+	qsort(cache->drain, (size_t)cache->drain_elem,
+	    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_level);
+
+	for (drain = cache->drain, drain_elem = 0;
+	    drain_elem < cache->drain_elem; ++drain, ++drain_elem) {
+		if ((e = *drain) == NULL)
 			continue;
 
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
@@ -347,22 +583,32 @@ __wt_cache_evict(ENV *env, WT_CACHE_ENTRY **drainp, u_int32_t drain_elem)
 			WT_STAT_INCR(stats, CACHE_EVICT);
 
 #ifdef HAVE_DIAGNOSTIC
-		__wt_cache_hazard_check(env, e);
+		__wt_drain_hazard_check(env, e);
 #endif
 		/*
 		 * Reconcile and discard the page -- this includes writing the
 		 * page if it's modified.   If the write fails for any reason,
 		 * the page remains in the cache.
 		 */
-		if (__wt_bt_page_reconcile(e->db, e->page))
+		bytes = e->page->bytes;
+		if (__wt_bt_page_reconcile(e->db, e->page, reclaim) || !reclaim)
 			e->state = WT_OK;
 		else {
-			WT_CACHE_PAGE_OUT(cache, e->page->bytes);
+			WT_CACHE_PAGE_OUT(cache, bytes);
 
 			/* Give the slot to the I/O server. */
 			e->state = WT_EMPTY;
 		}
+
+		/* Report progress every 10 pages. */
+		if (f != NULL && ++fcnt % 10 == 0)
+			f(name, fcnt);
 	}
+	cache->drain_elem = 0;
+
+	/* Wrap up reporting. */
+	if (f != NULL)
+		f(name, fcnt);
 }
 
 /*
@@ -397,11 +643,11 @@ __wt_cache_write(DB *db, WT_PAGE *page)
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_cache_hazard_check --
+ * __wt_drain_hazard_check --
  *	Return if a page is or isn't on the hazard list.
  */
 static void
-__wt_cache_hazard_check(ENV *env, WT_CACHE_ENTRY *e)
+__wt_drain_hazard_check(ENV *env, WT_CACHE_ENTRY *e)
 {
 	IENV *ienv;
 	WT_PAGE **hp;
@@ -422,11 +668,11 @@ __wt_cache_hazard_check(ENV *env, WT_CACHE_ENTRY *e)
 }
 
 /*
- * __wt_cache_chk --
+ * __wt_drain_chk --
  *	Check the cache for consistency.
  */
 void
-__wt_cache_chk(ENV *env)
+__wt_drain_chk(ENV *env)
 {
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e;

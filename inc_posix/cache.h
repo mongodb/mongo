@@ -12,17 +12,28 @@ extern "C" {
 
 struct __wt_cache_entry;	typedef struct __wt_cache_entry WT_CACHE_ENTRY;
 struct __wt_cache_hb;		typedef struct __wt_cache_hb WT_CACHE_HB;
-struct __wt_io_req;		typedef struct __wt_io_req WT_IO_REQ;
-struct __wt_io_write;		typedef struct __wt_io_write WT_IO_WRITE;
+struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
+struct __wt_sync_req;		typedef struct __wt_sync_req WT_SYNC_REQ;
 
 /*
- * WT_IO_REQ --
+ * WT_READ_REQ --
+ *	Encapsulation of a read request.
  */
-struct __wt_io_req {
+struct __wt_read_req {
 	WT_TOC	  *toc;			/* Requesting thread */
 	u_int32_t  addr;		/* Address */
 	u_int32_t  bytes;		/* Bytes */
 	WT_PAGE  **pagep;		/* Returned page */
+};
+
+/*
+ * WT_SYNC_REQ --
+ *	Encapsulation of a sync request.
+ */
+struct __wt_sync_req {
+	WT_TOC	  *toc;			/* Requesting thread */
+					/* Progress callback */
+	void (*f)(const char *, u_int64_t);
 };
 
 /*
@@ -73,7 +84,10 @@ struct __wt_cache {
 	WT_CACHE_HB *hb;		/* Array of hash buckets */
 	u_int32_t    hb_size;		/* Number of hash buckets */
 
-	WT_IO_REQ read_request[20];	/* Cache read requests:
+	WT_READ_REQ read_request[20];	/* Cache read requests:
+					   slot available if toc is NULL. */
+
+	WT_SYNC_REQ sync_request[20];	/* Cache read requests:
 					   slot available if toc is NULL. */
 	/*
 	 * Different threads read (write) pages to (from) the cache, so we can
@@ -104,6 +118,21 @@ struct __wt_cache {
 
 	u_int64_t stat_bytes_in;
 	u_int64_t stat_bytes_out;
+
+	/*
+	 * The cache drain server has two memory chunks it uses: the first is
+	 * a list of pages to drain, the second is a copy of the hazard refs
+	 * compared against pages being drained.
+	 */
+	WT_CACHE_ENTRY **drain;		/* List of entries being drained */
+	u_int32_t drain_elem;		/* Number of entries in the list */
+	u_int32_t drain_len;		/* Bytes in the list */
+
+	WT_PAGE **hazard;		/* Copy of the hazard references */
+	u_int32_t hazard_elem;		/* Number of entries in the list */
+	u_int32_t hazard_len;		/* Bytes in the list */
+
+	u_int32_t bucket_cnt;		/* Drain review: last hash bucket */
 
 	WT_STATS *stats;		/* Cache statistics */
 };

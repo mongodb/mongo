@@ -20,27 +20,32 @@ class Serial:
 serial['bt_del'] = Serial(
 	'bt_del',
 	'WT_WORKQ_SPIN',
-	['WT_REPL */new'])
+	['WT_REPL *new/new'])
 
 serial['bt_repl'] = Serial(
 	'bt_repl',
 	'WT_WORKQ_SPIN',
-	['WT_ROW_INDX */indx',
-	 'WT_REPL */repl',
-	 'void */data',
-	 'u_int32_t/size'])
+	['WT_ROW_INDX *indx/indx',
+	 'WT_REPL *repl/repl',
+	 'void *data/data',
+	 'u_int32_t size/size'])
 
 serial['cache_in'] = Serial(
 	'cache_in',
 	'WT_WORKQ_READ',
-	['u_int32_t/addr',
-	 'u_int32_t/bytes',
-	 'WT_PAGE **/pagep'])
+	['u_int32_t addr/addr',
+	 'u_int32_t bytes/bytes',
+	 'WT_PAGE **pagep/pagep'])
 
 serial['flist_free'] = Serial(
 	'flist_free',
 	'WT_WORKQ_SPIN',
-	['WT_FLIST */fp'])
+	['WT_FLIST *flistp/flistp'])
+
+serial['sync'] = Serial(
+	'sync',
+	'WT_WORKQ_SYNC',
+	 ['void (*f)(const char *, u_int64_t)/f'])
 
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule
@@ -51,7 +56,7 @@ def func_serial(f):
 		f.write('\n')
 		f.write('typedef struct {\n')
 		for l in entry[1].args:
-			f.write('\t' + l.replace('/', ' ') + ';\n')
+			f.write('\t' + l.split('/')[0] + ';\n')
 		f.write('} __wt_' + entry[0] + '_args;\n')
 
 		# pack function
@@ -74,8 +79,8 @@ def func_serial(f):
 			f.write(', _' + l.split('/')[1])
 		f.write(') do {\\\n')
 		for l in entry[1].args:
-			f.write('\t_' + l.split('/')[1] + ' =\\\n')
-			f.write('\t    ((__wt_' + entry[0] +
+			f.write('\t_' + l.split('/')[1] +
+			    ' = ((__wt_' + entry[0] +
 			    '_args *)(toc)->wq_args)->' +
 			    l.split('/')[1] + ';\\\n')
 		f.write('} while (0)\n')

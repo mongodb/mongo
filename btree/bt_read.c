@@ -10,14 +10,15 @@
 #include "wt_internal.h"
 
 static int __wt_cache_hb_entry_grow(WT_TOC *, WT_CACHE_HB *, WT_CACHE_ENTRY **);
-static int __wt_cache_read(WT_TOC *, WT_IO_REQ *);
+static int __wt_cache_read(WT_TOC *, WT_READ_REQ *);
 
 /*
- * __wt_workq_cache_server --
- *	Called to check on the cache server threads.
+ * __wt_workq_cache_read_server --
+ *	Called to check on the cache read/drain server threads when a read
+ *	is scheduled.
  */
 void
-__wt_workq_cache_server(ENV *env)
+__wt_workq_cache_read_server(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
@@ -45,12 +46,25 @@ __wt_workq_cache_server(ENV *env)
 
 	/* Wake the cache drain thread if it's sleeping and it needs to run. */
 	if (cache->drain_sleeping &&
-	    (bytes_inuse > bytes_max || cache->read_lockout))
-		__wt_unlock(cache->mtx_drain);
+	    (bytes_inuse > bytes_max || cache->read_lockout)) {
+		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		    (env, "workQ waking cache drain server: read lockout "
+		    "%sset, bytes-inuse %llu of bytes-max %llu",
+		    cache->read_lockout ? "" : "not ",
+		    (u_quad)bytes_inuse, (u_quad)bytes_max));
+
+		__wt_unlock(env, cache->mtx_drain);
+		cache->drain_sleeping = 0;
+	}
 
 	/* A read is scheduled -- wake the I/O thread if it's sleeping. */
-	if (!cache->read_lockout && cache->io_sleeping)
-		__wt_unlock(cache->mtx_io);
+	if (!cache->read_lockout && cache->io_sleeping) {
+		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		    (env, "workQ waking cache I/O server"));
+
+		__wt_unlock(env, cache->mtx_io);
+		cache->io_sleeping = 0;
+	}
 }
 
 /*
@@ -63,8 +77,8 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_IO_REQ *rr, *rr_end;
 	WT_PAGE **pagep;
+	WT_READ_REQ *rr, *rr_end;
 	u_int32_t addr, bytes;
 
 	__wt_cache_in_unpack(toc, addr, bytes, pagep);
@@ -105,7 +119,7 @@ __wt_cache_io(void *arg)
 	ENV *env;
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_IO_REQ *rr, *rr_end;
+	WT_READ_REQ *rr, *rr_end;
 	WT_TOC *toc;
 	int didwork;
 
@@ -122,9 +136,10 @@ __wt_cache_io(void *arg)
 		 * No need for an explicit memory flush, the io_sleeping flag
 		 * is declared volatile.
 		 */
+		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		    (env, "cache I/O server sleeping"));
 		cache->io_sleeping = 1;
 		__wt_lock(env, cache->mtx_io);
-		cache->io_sleeping = 0;
 
 		/*
 		 * Look for work (unless reads are locked out for now).  If we
@@ -141,7 +156,7 @@ __wt_cache_io(void *arg)
 					toc->wq_ret = __wt_cache_read(toc, rr);
 					rr->toc = NULL;
 					WT_MEMORY_FLUSH;
-					__wt_unlock(toc->mtx);
+					__wt_unlock(env, toc->mtx);
 					didwork = 1;
 				}
 		} while (cache->read_lockout == 0 && didwork == 1);
@@ -154,7 +169,7 @@ __wt_cache_io(void *arg)
  *	Read or allocate a new page for the cache.
  */
 static int
-__wt_cache_read(WT_TOC *toc, WT_IO_REQ *rr)
+__wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 {
 	DB *db;
 	ENV *env;
@@ -366,7 +381,7 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 	hb->entry_size = entries;
 	WT_MEMORY_FLUSH;
 
-	__wt_unlock(cache->mtx_hb);
+	__wt_unlock(env, cache->mtx_hb);
 
 	return (0);
 }

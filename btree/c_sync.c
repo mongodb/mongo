@@ -14,45 +14,64 @@
  *	Flush a database's underlying cache to disk.
  */
 int
-__wt_cache_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t))
+__wt_cache_sync(
+    WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags)
 {
-	DB *db;
 	ENV *env;
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e;
-	u_int64_t fcnt;
-	u_int32_t i, j;
+	IDB *idb;
+	int ret;
 
-	db = toc->db;
 	env = toc->env;
-	cache = env->ienv->cache;
-	fcnt = 0;
+	idb = toc->db->idb;
 
 	/*
-	 * Write any modified pages -- if the handle is set, write only pages
-	 * belonging to the specified file.
-	 *
-	 * We only report progress on every 10 writes, to minimize callbacks.
+	 * The cache drain server is the only thread of control that's
+	 * allowed to write pages from the cache.  Schedule the sync.
 	 */
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
-		if (e->db != db ||
-		    e->state != WT_OK || !F_ISSET(e->page, WT_MODIFIED))
-			continue;
+	__wt_sync_serial(toc, f, ret);
 
-		if (f != NULL && ++fcnt % 10 == 0)
-			f(toc->name, fcnt);
+	/* Optionally flush the file to the backing disk. */
+	if (!LF_ISSET(WT_OSWRITE))
+		(void)__wt_fsync(env, idb->fh);
 
-		WT_VERBOSE(env, WT_VERB_CACHE,
-		    (env, "cache sync flushing element/page %#lx/%lu",
-		     WT_PTR_TO_ULONG(e), (u_long)e->addr));
+	return (ret);
+}
 
-		WT_RET(__wt_bt_page_reconcile(db, e->page));
-		e->state = WT_EMPTY;
-	}
+/*
+ * __wt_sync_serial_func --
+ *	Ask the I/O thread to read a page into the cache.
+ */
+int
+__wt_sync_serial_func(WT_TOC *toc)
+{
+	ENV *env;
+	IENV *ienv;
+	WT_CACHE *cache;
+	WT_SYNC_REQ *sr, *sr_end;
+	void (*f)(const char *, u_int64_t);
 
-	/* Wrap up reporting. */
-	if (f != NULL)
-		f(toc->name, fcnt);
+	__wt_sync_unpack(toc, f);
 
-	return (0);
+	env = toc->env;
+	ienv = env->ienv;
+	cache = ienv->cache;
+
+	/* Find an empty slot and enter the sync request. */
+	sr = cache->sync_request;
+	sr_end =
+	    sr + sizeof(cache->sync_request) / sizeof(cache->sync_request[0]);
+	for (; sr < sr_end; ++sr)
+		if (sr->toc == NULL) {
+			/*
+			 * Fill in the arguments, flush memory, then the WT_TOC
+			 * field that turns the slot on.
+			 */
+			sr->f = f;
+			WT_MEMORY_FLUSH;
+			sr->toc = toc;
+			WT_MEMORY_FLUSH;
+			return (0);
+		}
+	__wt_api_env_errx(env, "cache server sync request table full");
+	return (WT_RESTART);
 }

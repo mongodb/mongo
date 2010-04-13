@@ -21,7 +21,7 @@ __wt_workq_srvr(void *arg)
 	WT_FLIST *fp;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
-	int chk_io, nowork;
+	int chk_read, chk_sync, nowork;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
@@ -32,7 +32,7 @@ __wt_workq_srvr(void *arg)
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
 		low_gen = UINT32_MAX;
-		chk_io = 0;
+		chk_read = chk_sync = 0;
 		nowork = 1;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 			if (toc->gen < low_gen)
@@ -48,8 +48,11 @@ __wt_workq_srvr(void *arg)
 				toc->wq_ret = toc->wq_func(toc);
 				WT_MEMORY_FLUSH;
 				toc->wq_state = WT_WORKQ_NONE;
+
+				nowork = 0;
 				break;
 			case WT_WORKQ_READ:
+			case WT_WORKQ_SYNC:
 				/*
 				 * Call the function, flush out the results.
 				 * If the call failed, wake the waiting thread,
@@ -60,16 +63,29 @@ __wt_workq_srvr(void *arg)
 				WT_MEMORY_FLUSH;
 				if (toc->wq_ret != 0) {
 					toc->wq_state = WT_WORKQ_NONE;
-					__wt_unlock(toc->mtx);
+					__wt_unlock(env, toc->mtx);
 					break;
 				}
-				toc->wq_state = WT_WORKQ_READ_SCHED;
-				/* FALLTHROUGH */
+				switch (toc->wq_state) {
+				case WT_WORKQ_READ:
+					toc->wq_state = WT_WORKQ_READ_SCHED;
+					break;
+				case WT_WORKQ_SYNC:
+					toc->wq_state = WT_WORKQ_SYNC_SCHED;
+					break;
+				default:		/* Not possible. */
+					break;
+				}
+
+				nowork = 0;
+				break;
 			case WT_WORKQ_READ_SCHED:
-				chk_io = 1;
+				chk_read = 1;
+				break;
+			case WT_WORKQ_SYNC_SCHED:
+				chk_sync = 1;
 				break;
 			}
-			nowork = 0;
 		}
 
 		/* Check if we can free some memory. */
@@ -78,8 +94,12 @@ __wt_workq_srvr(void *arg)
 			__wt_workq_flist(env);
 
 		/* If a read was scheduled, check on the cache servers. */
-		if (chk_io)
-			__wt_workq_cache_server(env);
+		if (chk_read)
+			__wt_workq_cache_read_server(env);
+
+		/* If a sync is scheduled, check on the cache servers. */
+		if (chk_sync)
+			__wt_workq_cache_sync_server(env);
 
 		/*
 		 * If we didn't find work, yield the processor.  If we
