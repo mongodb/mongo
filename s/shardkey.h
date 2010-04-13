@@ -74,16 +74,6 @@ namespace mongo {
         */
         void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
         
-        /** @return true if shard s is relevant for query q.
-
-            Example:
-              q:     { x : 3 }
-              *this: { x : 1 }
-              s:     x:2..x:7
-               -> true
-         */
-        bool relevantForQuery( const BSONObj& q , Chunk * s );
-        
         /**
            Returns if the given sort pattern can be ordered by the shard key pattern.
            Example
@@ -116,9 +106,8 @@ namespace mongo {
         BSONObj gMin;
         BSONObj gMax;
 
-        /* question: better to have patternfields precomputed or not?  depends on if we use copy contructor often. */
+        /* question: better to have patternfields precomputed or not?  depends on if we use copy constructor often. */
         set<string> patternfields;
-        bool relevant(const BSONObj& query, const BSONObj& L, const BSONObj& R);
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const { 
