@@ -1889,6 +1889,14 @@
 				>
 			</File>
 		</Filter>
+		<Filter
+			Name="replsets"
+			>
+			<File
+				RelativePath=".\repl\replset.cpp"
+				>
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>

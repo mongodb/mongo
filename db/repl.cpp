@@ -2038,13 +2038,17 @@ namespace mongo {
         logOp( "n", "dummy", BSONObj() );
     }
     
+    bool startReplSets();
     void startReplication() {
+        if( startReplSets() ) 
+            return;
+
         /* this was just to see if anything locks for longer than it should -- we need to be careful
            not to be locked when trying to connect() or query() the other side.
            */
         //boost::thread tempt(tempThread);
 
-        if ( !replSettings.slave && !replSettings.master && !replPair )
+        if( !replSettings.slave && !replSettings.master && !replPair )
             return;
 
         {
@@ -2055,11 +2059,11 @@ namespace mongo {
 
         if ( replSettings.slave || replPair ) {
             if ( replSettings.slave ) {
-				assert( replSettings.slave == SimpleSlave );
+                assert( replSettings.slave == SimpleSlave );
                 log(1) << "slave=true" << endl;
-			}
-			else
-				replSettings.slave = ReplPairSlave;
+            }
+            else
+                replSettings.slave = ReplPairSlave;
             boost::thread repl_thread(replSlaveThread);
         }
 
