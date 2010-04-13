@@ -48,7 +48,13 @@ wts_setup(int reopen, int logfile)
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
-		env->verbose_set(env, WT_VERB_ALL);
+		env->verbose_set(env,
+		    WT_VERB_CACHE |
+		    // WT_VERB_HAZARD |
+		    // WT_VERB_MUTEX |
+		    WT_VERB_SERVERS |
+		    // WT_VERB_FILEOPS |
+		    0);
 		env->msgfile_set(env, g.logfp);
 	}
 
@@ -178,7 +184,7 @@ wts_sync()
 
 	db = g.wts_db;
 
-	if ((ret = db->sync(db, track, 0)) != 0) {
+	if ((ret = db->sync(db, track, WT_OSWRITE)) != 0) {
 		db->err(db, ret, "Db.sync");
 		return (1);
 	}
