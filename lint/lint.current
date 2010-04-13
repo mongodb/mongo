@@ -81,17 +81,19 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_page.c (C)
                                                   _
 			records += WT_RECORDS(offp);
-../btree/bt_page.c  296  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  219  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                         _
 #...  WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
 			records += WT_ROW_OFF_RECORDS(ip);
-../btree/bt_page.c  373  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  296  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                           _
 		records += WT_RECORDS(offp);
-../btree/bt_page.c  409  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_page.c  332  Info 740: Unusual pointer cast (incompatible indirect
     types)
+
+--- Module:   ../btree/bt_reconcile.c (C)
 
 --- Module:   ../btree/bt_ret.c (C)
                                              _
@@ -301,11 +303,11 @@ Warning 528: Symbol '__wt_bt_repl_serial_func(struct __wt_toc *)' (line 109,
                                 _
 #... all((void *)((db)->errcall), (void *)(db), (db)->errpfx, (db)->idb == NULL
 	WT_DB_ERR(db, error, fmt);
-../db/db_err.c  46  Warning 611: Suspicious cast
+../db/db_err.c  49  Warning 611: Suspicious cast
                             _
 #... (void *)((db)->errcall), (void *)(db), (db)->errpfx, (db)->idb == NULL ? N
 	WT_DB_ERR(db, 0, fmt);
-../db/db_err.c  57  Warning 611: Suspicious cast
+../db/db_err.c  63  Warning 611: Suspicious cast
 
 --- Module:   ../db/db_getset.c (C)
 
@@ -327,29 +329,11 @@ _
                                   _
 #... call((void *)((env)->errcall), (void *)(env), env->errpfx, NULL, error, fm
 	WT_ENV_ERR(env, error, fmt);
-../env/env_err.c  65  Warning 611: Suspicious cast
+../env/env_err.c  68  Warning 611: Suspicious cast
                               _
 #... ((void *)((env)->errcall), (void *)(env), env->errpfx, NULL, 0, fmt, __ap)
 	WT_ENV_ERR(env, 0, fmt);
-../env/env_err.c  76  Warning 611: Suspicious cast
-
-During Specific Walk:
-  File ../btree/bt_misc.c line 45: __wt_api_env_errx(0, !=0, ... )
-../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
-    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 42]
-../btree/bt_misc.c  42  Info 831: Reference cited in prior message
-
-During Specific Walk:
-  File ../btree/bt_misc.c line 55: __wt_api_env_errx(0, !=0, ... )
-../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
-    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 53]
-../btree/bt_misc.c  53  Info 831: Reference cited in prior message
-
-During Specific Walk:
-  File ../btree/bt_misc.c line 68: __wt_api_env_errx(0, !=0, ... )
-../env/env_err.c  75  Warning 413: Likely use of null pointer 'env' in left
-    argument to operator '->' [Reference: file ../btree/bt_misc.c: line 66]
-../btree/bt_misc.c  66  Info 831: Reference cited in prior message
+../env/env_err.c  82  Warning 611: Suspicious cast
 
 --- Module:   ../env/env_getset.c (C)
 
@@ -369,6 +353,8 @@ During Specific Walk:
 
 --- Module:   ../env/env_stat.c (C)
 
+--- Module:   ../env/env_sync.c (C)
+
 --- Module:   ../env/env_toc.c (C)
 
 --- Module:   ../env/env_workq.c (C)
@@ -378,6 +364,8 @@ During Specific Walk:
 --- Module:   ../os_posix/os_alloc.c (C)
 
 --- Module:   ../os_posix/os_filesize.c (C)
+
+--- Module:   ../os_posix/os_fsync.c (C)
 
 --- Module:   ../os_posix/os_mtx.c (C)
 
@@ -427,10 +415,6 @@ During Specific Walk:
 --- Module:   ../support/progress.c (C)
 
 --- Module:   ../support/serial.c (C)
-                                                 _
-	while (toc->wq_state == WT_WORKQ_FUNCTION)
-../support/serial.c  62  Warning 641: Converting enum 'volatile {...}' to int
-../support/serial.c  62  Warning 641: Converting enum '{...}' to int
 
 --- Module:   ../support/stat.c (C)
 

@@ -198,8 +198,9 @@ __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 3, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 4, sizeof(WT_STATS), &stats));
 
+	stats[WT_STAT_FSYNC].desc = "fsyncs";
 	stats[WT_STAT_READ_IO].desc = "read I/Os";
 	stats[WT_STAT_WRITE_IO].desc = "write I/Os";
 
@@ -210,6 +211,7 @@ __wt_stat_alloc_fh_stats(ENV *env, WT_STATS **statsp)
 void
 __wt_stat_clear_fh_stats(WT_STATS *stats)
 {
+	stats[WT_STAT_FSYNC].v = 0;
 	stats[WT_STAT_READ_IO].v = 0;
 	stats[WT_STAT_WRITE_IO].v = 0;
 }

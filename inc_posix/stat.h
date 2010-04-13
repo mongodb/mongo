@@ -108,8 +108,9 @@ struct __wt_stats {
 /*
  * Statistics entries for FH handle.
  */
-#define	WT_STAT_READ_IO				    0
-#define	WT_STAT_WRITE_IO			    1
+#define	WT_STAT_FSYNC				    0
+#define	WT_STAT_READ_IO				    1
+#define	WT_STAT_WRITE_IO			    2
 
 /*
  * Statistics entries for Methods.
