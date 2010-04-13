@@ -15,11 +15,15 @@
  *    limitations under the License.
  */
 
-#include "../stdafx.h"
+#include "stdafx.h"
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"
 
+/*
+  most a pile of hacks to make linking nicer
+
+ */
 namespace mongo {
 
     auto_ptr<CursorIterator> Helpers::find( const char *ns , BSONObj query , bool requireIndex ){
@@ -28,6 +32,7 @@ namespace mongo {
         return i;
     }
 
-    // need this stub to reduce mongos link dependencies
-    inline Matcher::~Matcher() { assert(!"this shouldn't be called"); }
+    boost::thread_specific_ptr<Client> currentClient;
+    Client::~Client(){ assert(!"this shouldn't be called"); }
+
 }

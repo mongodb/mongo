@@ -35,7 +35,7 @@ namespace mongo {
     string ourHostname;
     OID serverID;
     bool dbexitCalled = false;
-    
+
     bool inShutdown(){
         return dbexitCalled;
     }

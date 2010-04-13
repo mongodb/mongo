@@ -141,43 +141,6 @@ namespace mongo {
         
     }
     
-    CoveredIndexMatcher::CoveredIndexMatcher(const BSONObj &jsobj, const BSONObj &indexKeyPattern) :
-        _keyMatcher(jsobj.filterFieldsUndotted(indexKeyPattern, true), 
-        indexKeyPattern),
-        _docMatcher(jsobj) 
-    {
-        _needRecord = ! ( 
-                         _docMatcher.keyMatch() && 
-                         _keyMatcher.jsobj.nFields() == _docMatcher.jsobj.nFields() &&
-                         ! _keyMatcher.hasType( BSONObj::opEXISTS )
-                          );
-
-    }
-
-    bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ){
-        return matches( cursor->currKey() , cursor->currLoc() , details );
-    }
-    
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details ) {
-        if ( details )
-            details->reset();
-        
-        if ( _keyMatcher.keyMatch() ) {
-            if ( !_keyMatcher.matches(key, details ) ){
-                return false;
-            }
-        }
-        
-        if ( ! _needRecord ){
-            return true;
-        }
-
-        if ( details )
-            details->loadedObject = true;
-
-        return _docMatcher.matches(recLoc.rec() , details );
-    }
-    
     
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot){
 
@@ -316,8 +279,9 @@ namespace mongo {
 
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
-                uassert( 10066 ,  "$where occurs twice?", where == 0 );
-                uassert( 10067 ,  "$where query, but no script engine", globalScriptEngine );
+                uassert( 10066 , "$where occurs twice?", where == 0 );
+                uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
+                massert( 13089 , "no current client needed for $where" , haveClient() ); 
                 where = new Where();
                 where->scope = globalScriptEngine->getPooledScope( cc().ns() );
                 where->scope->localConnect( cc().database()->name.c_str() );

@@ -400,7 +400,7 @@ namespace mongo {
         Database *database = ctx->db();
         assert( database->name == db );
         
-        replCheckCloseDatabase( database );
+        oplogCheckCloseDatabase( database );
 
         if( BackgroundOperation::inProgForDb(db) ) { 
             log() << "warning: bg op in prog during close db? " << db << endl;

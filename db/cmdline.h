@@ -27,6 +27,7 @@ namespace mongo {
         int port;              // --port
         bool rest;             // --rest
 
+        string replSet;        // --replSet <seedlist>
         string source;         // --source
         string only;           // --only
         

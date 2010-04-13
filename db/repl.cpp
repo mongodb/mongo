@@ -45,6 +45,7 @@
 #include "commands.h"
 #include "security.h"
 #include "cmdline.h"
+#include "repl_block.h"
 
 namespace mongo {
     
@@ -71,8 +72,6 @@ namespace mongo {
     
     IdTracker &idTracker = *( new IdTracker() );
     
-    int __findingStartInitialTimeout = 5; // configurable for testing    
-
 } // namespace mongo
 
 #include "replset.h"
@@ -127,158 +126,6 @@ namespace mongo {
         }
 
         negotiate( conn.get(), "arbiter" );
-    }
-
-    /* --------------------------------------------- */
-
-    class SlaveTracking : public BackgroundJob {
-    public:
-        
-        static const char * NS;
-
-        struct Ident {
-            
-            Ident(BSONObj r,string h,string n){
-                BSONObjBuilder b;
-                b.appendElements( r );
-                b.append( "host" , h );
-                b.append( "ns" , n );
-                obj = b.obj();
-            }
-
-            bool operator<( const Ident& other ) const {
-                return obj.woCompare( other.obj ) < 0;
-            }
-            
-            BSONObj obj;
-        };
-
-        struct Info {
-            Info() : loc(0){}
-            ~Info(){
-                if ( loc && owned ){
-                    delete loc;
-                }
-            }
-            bool owned;
-            OpTime * loc;
-        };
-
-        SlaveTracking(){
-            _dirty = false;
-            _started = false;
-        }
-
-        void run(){
-            Client::initThread( "slaveTracking" );
-            DBDirectClient db;
-            while ( ! inShutdown() ){
-                sleepsecs( 1 );
-
-                if ( ! _dirty )
-                    continue;
-                
-                writelock lk(NS);
-
-                list< pair<BSONObj,BSONObj> > todo;
-                
-                {
-                    scoped_lock mylk(_mutex);
-                    
-                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ){
-                        BSONObjBuilder temp;
-                        temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
-                        todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() , 
-                                                               BSON( "$set" << temp.obj() ).getOwned() ) );
-                    }
-                    
-                    _slaves.clear();
-                }
-
-                for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ){
-                    db.update( NS , i->first , i->second , true );
-                }
-
-                _dirty = false;
-            }
-        }
-
-        void reset(){
-            scoped_lock mylk(_mutex);
-            _slaves.clear();
-        }
-
-        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ){
-            scoped_lock mylk(_mutex);
-            
-            Ident ident(rid,host,ns);
-            Info& i = _slaves[ ident ];
-            if ( i.loc ){
-                i.loc[0] = last;
-                return;
-            }
-            
-            dbMutex.assertAtLeastReadLocked();
-            BSONObj res;
-            if ( Helpers::findOne( NS , ident.obj , res ) ){
-                assert( res["syncedTo"].type() );
-                i.owned = false;
-                i.loc = (OpTime*)res["syncedTo"].value();
-                i.loc[0] = last;
-                return;
-            }
-            
-            i.owned = true;
-            i.loc = new OpTime[1];
-            i.loc[0] = last;
-            _dirty = true;
-            if ( ! _started ){
-                _started = true;
-                go();
-            }
-        }
-
-        bool opReplicatedEnough( OpTime op , int w ){
-            if ( w <= 1 )
-                return true;
-            w--; // now this is the # of slaves i need
-            scoped_lock mylk(_mutex);
-            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++){
-                OpTime s = *(i->second.loc);
-                if ( s < op ){
-                    continue;
-                }
-                if ( --w == 0 )
-                    return true;
-            }
-            return w <= 0;
-        }
-        
-        // need to be careful not to deadlock with this
-        mongo::mutex _mutex;
-        map<Ident,Info> _slaves;
-        bool _dirty;
-        bool _started;
-
-    } slaveTracking;
-
-    const char * SlaveTracking::NS = "local.slaves";
-
-    void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ){
-        if ( lastOp.isNull() )
-            return;
-        
-        assert( strstr( ns , "local.oplog.$" ) == ns );
-        
-        BSONObj rid = curop.getClient()->getRemoteID();
-        if ( rid.isEmpty() )
-            return;
-
-        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
-    }
-
-    bool opReplicatedEnough( OpTime op , int w ){
-        return slaveTracking.opReplicatedEnough( op , w );
     }
 
     /* --------------------------------------------- */
@@ -650,20 +497,6 @@ namespace mongo {
         }
         return remote;
     }
-
-    struct TestOpTime {
-        TestOpTime() {
-            OpTime t;
-            for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::now();
-                assert( s != t );
-                t = s;
-            }
-            OpTime q = t;
-            assert( q == t );
-            assert( !(q != t) );
-        }
-    } testoptime;
 
     /* --------------------------------------------------------------*/
 
@@ -1678,118 +1511,6 @@ namespace mongo {
         return sync_pullOpLog(nApplied);
     }
 
-    /* -- Logging of operations -------------------------------------*/
-
-// cached copies of these...so don't rename them
-    NamespaceDetails *localOplogMainDetails = 0;
-    Database *localOplogDB = 0;
-
-    void replCheckCloseDatabase( Database * db ){
-        localOplogDB = 0;
-        localOplogMainDetails = 0;
-    }
-
-    /* we write to local.opload.$main:
-         { ts : ..., op: ..., ns: ..., o: ... }
-       ts: an OpTime timestamp
-       op:
-        "i" insert
-        "u" update
-        "d" delete
-        "c" db cmd
-        "db" declares presence of a database (ns is set to the db name + '.')
-        "n" no op
-       logNS - e.g. "local.oplog.$main"
-       bb:
-         if not null, specifies a boolean to pass along to the other side as b: param.
-         used for "justOne" or "upsert" flags on 'd', 'u'
-       first: true
-         when set, indicates this is the first thing we have logged for this database.
-         thus, the slave does not need to copy down all the data when it sees this.
-    */
-    static void _logOp(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, const OpTime &ts ) {
-        if ( strncmp(ns, "local.", 6) == 0 ){
-            if ( strncmp(ns, "local.slaves", 12) == 0 ){
-                slaveTracking.reset();
-            }
-            return;
-        }
-
-        DEV assertInWriteLock();
-
-        Client::Context context;
-
-        /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
-           instead we do a single copy to the destination position in the memory mapped file.
-        */
-
-        BSONObjBuilder b;
-        b.appendTimestamp("ts", ts.asDate());
-        b.append("op", opstr);
-        b.append("ns", ns);
-        if ( bb )
-            b.appendBool("b", *bb);
-        if ( o2 )
-            b.append("o2", *o2);
-        BSONObj partial = b.done();
-        int posz = partial.objsize();
-        int len = posz + obj.objsize() + 1 + 2 /*o:*/;
-
-        Record *r;
-        if ( strncmp( logNS, "local.", 6 ) == 0 ) { // For now, assume this is olog main
-            if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx("local.", dbpath, 0, false);
-                localOplogDB = ctx.db();
-                localOplogMainDetails = nsdetails(logNS);
-            }
-            Client::Context ctx( "" , localOplogDB, false );
-            r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
-        } else {
-            Client::Context ctx( logNS, dbpath, 0, false );
-            assert( nsdetails( logNS ) );
-            r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
-        }
-
-        char *p = r->data;
-        memcpy(p, partial.objdata(), posz);
-        *((unsigned *)p) += obj.objsize() + 1 + 2;
-        p += posz - 1;
-        *p++ = (char) Object;
-        *p++ = 'o';
-        *p++ = 0;
-        memcpy(p, obj.objdata(), obj.objsize());
-        p += obj.objsize();
-        *p = EOO;
-        
-        if ( logLevel >= 6 ) {
-            BSONObj temp(r);
-            log( 6 ) << "logging op:" << temp << endl;
-        }
-        
-        context.getClient()->setLastOp( ts );
-    }
-    
-    static void logKeepalive() { 
-        BSONObj obj;
-        _logOp("n", "", "local.oplog.$main", obj, 0, 0, OpTime::now());
-    }
-
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
-        if ( replSettings.master ) {
-            _logOp(opstr, ns, "local.oplog.$main", obj, patt, b, OpTime::now());
-            char cl[ 256 ];
-            nsToDatabase( ns, cl );
-        }
-        NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( ns );
-        if ( t.cllEnabled() ) {
-            try {
-                _logOp(opstr, ns, t.cllNS().c_str(), obj, patt, b, OpTime::now());
-            } catch ( const DBException & ) {
-                t.cllInvalidate();
-            }
-        }
-    }    
-    
     /* --------------------------------------------------------------*/
 
     /*
@@ -1987,64 +1708,17 @@ namespace mongo {
         }
     }
 
-    void createOplog() {
-        dblock lk;
-
-        const char * ns = "local.oplog.$main";
-        Client::Context ctx(ns);
-        
-        if ( nsdetails( ns ) ) {
-            DBDirectClient c;
-            BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
-            if ( !lastOp.isEmpty() ) {
-                OpTime::setLast( lastOp[ "ts" ].date() );
-            }
-            return;
-        }
-        
-        /* create an oplog collection, if it doesn't yet exist. */
-        BSONObjBuilder b;
-        double sz;
-        if ( cmdLine.oplogSize != 0 )
-            sz = (double)cmdLine.oplogSize;
-        else {
-			/* not specified. pick a default size */
-            sz = 50.0 * 1000 * 1000;
-            if ( sizeof(int *) >= 8 ) {
-#if defined(__APPLE__)
-				// typically these are desktops (dev machines), so keep it smallish
-				sz = (256-64) * 1000 * 1000;
-#else
-                sz = 990.0 * 1000 * 1000;
-                boost::intmax_t free = freeSpace(); //-1 if call not supported.
-                double fivePct = free * 0.05;
-                if ( fivePct > sz )
-                    sz = fivePct;
-#endif
-            }
-        }
-
-        log() << "******\n";
-        log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB (use --oplogSize to change)\n";
-        log() << "******" << endl;
-
-        b.append("size", sz);
-        b.appendBool("capped", 1);
-        b.appendBool("autoIndexId", false);
-
-        string err;
-        BSONObj o = b.done();
-        userCreateNS(ns, o, err, false);
-        logOp( "n", "dummy", BSONObj() );
-    }
-    
+    bool startReplSets();
     void startReplication() {
+        if( startReplSets() ) 
+            return;
+
         /* this was just to see if anything locks for longer than it should -- we need to be careful
            not to be locked when trying to connect() or query() the other side.
            */
         //boost::thread tempt(tempThread);
 
-        if ( !replSettings.slave && !replSettings.master && !replPair )
+        if( !replSettings.slave && !replSettings.master && !replPair )
             return;
 
         {
@@ -2055,11 +1729,11 @@ namespace mongo {
 
         if ( replSettings.slave || replPair ) {
             if ( replSettings.slave ) {
-				assert( replSettings.slave == SimpleSlave );
+                assert( replSettings.slave == SimpleSlave );
                 log(1) << "slave=true" << endl;
-			}
-			else
-				replSettings.slave = ReplPairSlave;
+            }
+            else
+                replSettings.slave = ReplPairSlave;
             boost::thread repl_thread(replSlaveThread);
         }
 
@@ -2079,61 +1753,6 @@ namespace mongo {
     void pairWith(const char *remoteEnd, const char *arb) {
         replPair = new ReplPair(remoteEnd, arb);
     }
-
-    class CmdLogCollection : public Command {
-    public:
-        virtual bool slaveOk() {
-            return false;
-        }
-        virtual LockType locktype(){ return WRITE; }
-        CmdLogCollection() : Command( "logCollection" ) {}
-        virtual void help( stringstream &help ) const {
-            help << "examples: { logCollection: <collection ns>, start: 1 }, "
-                 << "{ logCollection: <collection ns>, validateComplete: 1 }";
-        }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string logCollection = cmdObj.getStringField( "logCollection" );
-            if ( logCollection.empty() ) {
-                errmsg = "missing logCollection spec";
-                return false;
-            }
-            bool start = !cmdObj.getField( "start" ).eoo();
-            bool validateComplete = !cmdObj.getField( "validateComplete" ).eoo();
-            if ( start ? validateComplete : !validateComplete ) {
-                errmsg = "Must specify exactly one of start:1 or validateComplete:1";
-                return false;
-            }
-            int logSizeMb = cmdObj.getIntField( "logSizeMb" );
-            NamespaceDetailsTransient &t = NamespaceDetailsTransient::get_w( logCollection.c_str() );
-            if ( start ) {
-                if ( t.cllNS().empty() ) {
-                    if ( logSizeMb == INT_MIN ) {
-                        t.cllStart();
-                    } else {
-                        t.cllStart( logSizeMb );
-                    }
-                } else {
-                    errmsg = "Log already started for ns: " + logCollection;
-                    return false;
-                }
-            } else {
-                if ( t.cllNS().empty() ) {
-                    errmsg = "No log to validateComplete for ns: " + logCollection;
-                    return false;
-                } else {
-                    if ( !t.cllValidateComplete() ) {
-                        errmsg = "Oplog failure, insufficient space allocated";
-                        return false;
-                    }
-                }
-            }
-            log() << "started logCollection with cmd obj: " << cmdObj << endl;
-            return true;
-        }
-    } cmdlogcollection;
-
-    // -------------------------------------
-
 
     
 } // namespace mongo

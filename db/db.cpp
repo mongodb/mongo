@@ -693,6 +693,7 @@ int main(int argc, char* argv[], char *envp[] )
 		;
 
     hidden_options.add_options()
+        ("replSet", po::value<string>(), "specify repl set seed hostnames")
         ("command", po::value< vector<string> >(), "command")
         ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
         ;
@@ -740,7 +741,6 @@ int main(int argc, char* argv[], char *envp[] )
             show_help_text(visible_options);
             return 0;
         }
-
 
         if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
             return 0;
@@ -857,6 +857,10 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
             cmdLine.source = params["source"].as<string>().c_str();
+        }
+        if (params.count("replSet")) {
+            /* seed list of hosts for the repl set */
+            cmdLine.source = params["replSet"].as<string>().c_str();
         }
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();
