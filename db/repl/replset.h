@@ -1,5 +1,7 @@
+// replset.h
+
 /**
-*    Copyright (C) 2008 10gen Inc.info
+*    Copyright (C) 2008 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -14,17 +16,17 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
-#include "../cmdline.h"
-#include "replset.h"
+#pragma once
 
-namespace mongo { 
+namespace mongo {
 
-    ReplSet *theReplSet = 0;
+    class ReplSet;
+    extern ReplSet *theReplSet;
 
-    /* called at initialization */
-    bool startReplSets() {
-        return false; 
-    }
+    class ReplSet {
+        string _name;
+        vector<string> _members;
+    public:
+    };
 
 }
