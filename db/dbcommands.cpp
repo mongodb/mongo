@@ -891,7 +891,7 @@ namespace mongo {
             return true;
         }
         virtual void help( stringstream& help ) const {
-            help << " example: { filemd5 : ObjectId(aaaaaaa) , key : { ts : 1 } }";
+            help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
         }
         virtual LockType locktype(){ return READ; } 
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){

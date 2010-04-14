@@ -413,6 +413,47 @@ namespace mongo {
             }
         } disinctCmd;
 
+        class FileMD5Cmd : public PublicGridCommand {
+        public:
+            FileMD5Cmd() : PublicGridCommand("filemd5"){}
+            virtual void help( stringstream &help ) const {
+                help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
+            }
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string dbName = getDBName( ns );
+
+                string fullns = dbName;
+                fullns += ".";
+                {
+                    string root = cmdObj.getStringField( "root" );
+                    if ( root.size() == 0 )
+                        root = "fs";
+                    fullns += root;
+                }
+                fullns += ".chunks";
+
+                DBConfig * conf = grid.getDBConfig( dbName , false );
+                
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
+                    return passthrough( conf , cmdObj , result );
+                }
+                
+                ChunkManager * cm = conf->getChunkManager( fullns );
+                massert( 13091 , "how could chunk manager be null!" , cm );
+                uassert( 13092 , "GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id" << 1));
+
+                const Chunk& chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
+                
+                ScopedDbConnection conn( chunk.getShard() );
+                BSONObj res;
+                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                conn.done();
+
+                result.appendElements(res);
+                return ok;
+            }
+        } fileMD5Cmd;
+
         class MRCmd : public PublicGridCommand {
         public:
             MRCmd() : PublicGridCommand( "mapreduce" ){}
