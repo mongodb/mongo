@@ -26,19 +26,38 @@ struct __wt_row_indx;		typedef struct __wt_row_indx WT_ROW_INDX;
 struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
 
 /*
- * We use 32-bits to store file locations on database pages, so all such file
- * locations are counts of "database allocation units" (making an "allocation
- * unit" the smallest database chunk allocated from an underlying file).  In
- * the code, these are all "addresses" or "addrs".  To simplify bookkeeping,
- * database internal and leaf page sizes, and extent size, must be a multiple
- * of the allocation unit size.
+ * In WiredTiger there are "database allocation units", which is the smallest
+ * database chunk that can be allocated.  The smallest database allocation unit
+ * is 512B; the largest is 128MB.  (The maximum of 128MB is enforced by the
+ * software, it could be set as high as 4GB.)  Btree leaf and internal pages,
+ * as well as overflow chunks, are allocated in groups of 1 or more allocation
+ * units.
  *
- * The minimum database allocation unit is 512B so the minimum maximum database
- * size is 2TB, and the maximum maximum (assuming we could pass file offsets
- * that large, which we can't), is 4EB.   In summary, small allocation units
- * limit the database size, and as the allocation unit grows, the maximum size
- * of the database grows as well.
+ * We use 32-bit unsigned integers to store file locations on database pages,
+ * and all such file locations are counts of database allocation units.  In
+ * the code these are called "addrs".  To simplify bookkeeping, page sizes must
+ * be a multiple of the allocation unit size.
  *
+ * This means the minimum maximum database file size is 2TB (2^9 x 2^32), and
+ * the maximum maximum database file size is 512PB (2^27 x 2^32).
+ *
+ * In summary, small database allocation units limit the database file size,
+ * (but minimize wasted space when storing overflow items), and when the
+ * allocation unit grows, the maximum size of the database grows as well.
+ *
+ * The minimum btree leaf and internal page sizes are 512B, the maximum 256MB.
+ * (The maximum of 256MB is enforced by the software, it could be set as high
+ * as 4GB.)
+ *
+ * Key and data item lengths are stored in 32-bit unsigned integers, meaning
+ * the largest key or data item is 4GB.  Record numbers are stored in 64-bit
+ * unsigned integers, meaning the largest record number is "huge".
+ */
+
+#define	WT_MAX_ALLOCATION_UNIT	(256 * WT_MEGABYTE)
+#define	WT_MAX_PAGE_SIZE	(128 * WT_MEGABYTE)
+
+/*
  * Underneath the database layer is the cache and file layers.  In both, sizes
  * are stored as numbers of bytes.   In the cache layer, 32-bits is too small
  * (a cache might be larger than 4GB), so we use a 64-bit type.  In the file
@@ -51,9 +70,14 @@ struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
 #define	WT_OFF_TO_ADDR(db, off)						\
 	((u_int32_t)((off) / (db)->allocsize))
 
-/* Return bytes needed for an overflow item, rounded to an allocation unit. */
-#define	WT_OVFL_BYTES(db, len)						\
-	((u_int32_t)WT_ALIGN((len) + sizeof(WT_PAGE_HDR), (db)->allocsize))
+/*
+ * Return database allocation units needed for length (optionally including a
+ * page header), rounded to an allocation unit.
+ */
+#define	WT_BYTES_TO_ALLOC(db, len)					\
+	((u_int32_t)WT_ALIGN((len), (db)->allocsize))
+#define	WT_HDR_BYTES_TO_ALLOC(db, len)					\
+	WT_BYTES_TO_ALLOC(db, len + sizeof(WT_PAGE_HDR))
 
 /*
  * The first possible database addr is 512.  It is also always the first leaf

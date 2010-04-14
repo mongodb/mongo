@@ -21,7 +21,7 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
 
 	db = toc->db;
 
-	WT_RET(__wt_page_in(toc, addr, WT_OVFL_BYTES(db, len), &page));
+	WT_RET(__wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, len), &page));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
@@ -44,7 +44,8 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	db = toc->db;
 
 	/* Allocate a chunk of file space. */
-	WT_RET(__wt_page_alloc(toc, WT_OVFL_BYTES(db, dbt->size), &page));
+	WT_RET(__wt_page_alloc(
+	    toc, WT_HDR_BYTES_TO_ALLOC(db, dbt->size), &page));
 
 	/* Initialize the page and copy the overflow item in. */
 	page->hdr->type = WT_PAGE_OVFL;

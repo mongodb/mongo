@@ -904,7 +904,7 @@ eop:			__wt_api_db_errx(db,
 			case WT_ITEM_DUP_OVFL:
 				ovflp = WT_ITEM_BYTE_OVFL(item);
 				if (WT_ADDR_TO_OFF(db, ovflp->addr) +
-				    WT_OVFL_BYTES(db, ovflp->len) >
+				    WT_HDR_BYTES_TO_ALLOC(db, ovflp->len) >
 				    idb->fh->file_size)
 					goto eof;
 				WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));

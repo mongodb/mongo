@@ -102,26 +102,31 @@ __wt_db_btree_pagesize_set_verify(DB *db, u_int32_t allocsize,
 	    leafmin % 512 != 0 ||
 	    leafmax % 512 != 0) {
 		__wt_api_db_errx(
-		    db, "all page sizes must be a multiple of 512 bytes");
+		    db, "all sizes must be a multiple of 512 bytes");
 		return (WT_ERROR);
 	}
 
 	/*
-	 * Limit allocation and page sizes to 128MB.  There isn't a reason
-	 * (other than testing) we can't support larger sizes (any size up
-	 * to the smaller of an off_t and a size_t), but an application
-	 * specifying allocation or page sizes larger than 128MB is almost
+	 * Limit allocation units to 256MB, and page sizes to 128MB.  There's
+	 * no reason (other than testing) we can't support larger sizes (any
+	 * sizes up to the smaller of an off_t and a size_t should work), but
+	 * an application specifying larger allocation or page sizes is almost
 	 * certainly making a mistake.
 	 */
-#define	WT_MAX_SIZE	(128 * WT_MEGABYTE)
-	if (allocsize > WT_MAX_SIZE ||
-	    intlmin > WT_MAX_SIZE ||
-	    intlmax > WT_MAX_SIZE ||
-	    leafmin > WT_MAX_SIZE ||
-	    leafmax > WT_MAX_SIZE) {
-		__wt_api_db_errx(
-		    db, "all page sizes must less than or equal to 128MB");
+	if (allocsize > WT_MAX_ALLOCATION_UNIT) {
+		__wt_api_db_errx(db,
+		   "the allocation size must less than or equal to %luMB",
+		    (u_long)WT_MAX_ALLOCATION_UNIT / WT_MEGABYTE);
 		return (WT_ERROR);
 	}
-	return  (0);
+	if (intlmin > WT_MAX_PAGE_SIZE ||
+	    intlmax > WT_MAX_PAGE_SIZE ||
+	    leafmin > WT_MAX_PAGE_SIZE ||
+	    leafmax > WT_MAX_PAGE_SIZE) {
+		__wt_api_db_errx(db,
+		    "all page sizes must less than or equal to %luMB",
+		    (u_long)WT_MAX_PAGE_SIZE / WT_MEGABYTE);
+		return (WT_ERROR);
+	}
+	return (0);
 }
