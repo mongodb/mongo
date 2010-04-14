@@ -83,7 +83,7 @@ namespace mongo {
                 m.data->id = r.id();
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
-                    BSONObj err = BSON( "$err" << e.what() );
+                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
                     replyToQuery( QueryResult::ResultFlag_ErrSet, p , m , err );
                 }
             }

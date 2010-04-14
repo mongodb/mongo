@@ -176,9 +176,20 @@ namespace mongo {
             sort( _servers.rbegin() , _servers.rend() );
         
         _serverIndex = 0;
+
+        _needToSkip = q.ntoskip;
     }
     
     bool SerialServerClusteredCursor::more(){
+        
+        // TODO: optimize this by sending on first query and then back counting
+        //       tricky in case where 1st server doesn't have any after
+        //       need it to send n skipped
+        while ( _needToSkip > 0 && _current.more() ){
+            _current.next();
+            _needToSkip--;
+        }
+        
         if ( _current.more() )
             return true;
         
@@ -189,10 +200,6 @@ namespace mongo {
         ServerAndQuery& sq = _servers[_serverIndex++];
 
         _current.reset( query( sq._server , 0 , sq._extra ) );
-        if ( _current.more() )
-            return true;
-        
-        // this sq has nothing, so keep looking
         return more();
     }
     
@@ -207,6 +214,7 @@ namespace mongo {
                                                               const BSONObj& sortKey ) 
         : ClusteredCursor( q ) , _servers( servers ){
         _sortKey = sortKey.getOwned();
+        _needToSkip = q.ntoskip;
         _init();
     }
 
@@ -215,6 +223,7 @@ namespace mongo {
                                                               int options , const BSONObj& fields  )
         : ClusteredCursor( ns , q.obj , options , fields ) , _servers( servers ){
         _sortKey = q.getSort().copy();
+        _needToSkip = 0;
         _init();
     }
 
@@ -236,6 +245,17 @@ namespace mongo {
     }
 
     bool ParallelSortClusteredCursor::more(){
+
+        if ( _needToSkip > 0 ){
+            int n = _needToSkip;
+            _needToSkip = 0;
+            
+            while ( n > 0 && more() ){
+                next();
+                n--;
+            }
+        }
+        
         for ( int i=0; i<_numServers; i++ ){
             if ( _cursors[i].more() )
                 return true;

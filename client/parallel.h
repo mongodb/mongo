@@ -129,6 +129,8 @@ namespace mongo {
         unsigned _serverIndex;
         
         FilteringClientCursor _current;
+        
+        int _needToSkip;
     };
 
 
@@ -153,6 +155,7 @@ namespace mongo {
         BSONObj _sortKey;
         
         FilteringClientCursor * _cursors;
+        int _needToSkip;
     };
 
     /**

@@ -25,8 +25,26 @@ assert.eq( 100 , db.data.find().toArray().length );
 assert.eq( 77 , db.data.find().limit(77).itcount() , "limit test 1" );
 assert.eq( 1 , db.data.find().limit(1).itcount() , "limit test 2" );
 for ( var i=1; i<10; i++ ){
-    assert.eq( i , db.data.find().limit(i).itcount() , "limit test 3 : " + i );
+    assert.eq( i , db.data.find().limit(i).itcount() , "limit test 3a : " + i );
+    assert.eq( i , db.data.find().skip(i).limit(i).itcount() , "limit test 3b : " + i );
 }
+
+function assertOrder( start , num ){
+    var a = db.data.find().skip(start).limit(num).sort( { num : 1 } ).map( function(z){ return z.num; } );
+    var c = []
+    for ( var i=0; i<num; i++ )
+        c.push( start + i );
+    assert.eq( c , a , "assertOrder start: " + start + " num: " + num );
+}
+
+assertOrder( 0 , 10 );
+assertOrder( 5 , 10 );
+
+assert.eq( 5 , db.data.find().skip( num - 5 ).itcount() , "skip 1 " );
+assert.eq( 5 , db.data.find().skip( num - 5 ).sort( { num : 1 } ).itcount() , "skip 2 " );
+assert.eq( 5 , db.data.find().skip( num - 5 ).sort( { _id : 1 } ).itcount() , "skip 3 " );
+assert.eq( 0 , db.data.find().skip( num + 5 ).sort( { num : 1 } ).itcount() , "skip 4 " );
+assert.eq( 0 , db.data.find().skip( num + 5 ).sort( { _id : 1 } ).itcount() , "skip 5 " );
 
 
 // --- test save support ---
