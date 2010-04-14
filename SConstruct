@@ -381,9 +381,9 @@ if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
 else:
     commonFiles += [ "util/processinfo_none.cpp" ]
 
-coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" , 
-                    "db/matcher.cpp" , "db/indexkey.cpp" ]
+coreDbFiles = [ "db/commands.cpp" , "db/matcher.cpp" , "db/indexkey.cpp" ]
+coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.cpp" ]
+                    
 
 serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/replset.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher_covered.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp db/cmdline.cpp" )
 
