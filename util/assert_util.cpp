@@ -143,6 +143,7 @@ namespace mongo {
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
+            fclose( test );
             
             _path = lp;
             _enabled = 1;
