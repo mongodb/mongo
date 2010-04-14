@@ -60,8 +60,8 @@ wts_setup(int reopen, int logfile)
 
 	intl_size = 1 << g.c_internal_node;
 	leaf_size = 1 << g.c_leaf_node;
-	if ((ret =
-	    db->btree_pagesize_set(db, 0, intl_size, leaf_size, 0)) != 0) {
+	if ((ret = db->btree_pagesize_set(
+	    db, 0, intl_size, intl_size, leaf_size, leaf_size)) != 0) {
 		db->err(db, ret, "Db.btree_pagesize_set");
 		return (1);
 	}
