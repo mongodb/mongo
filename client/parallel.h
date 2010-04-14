@@ -110,6 +110,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> _cursor;
         
         BSONObj _next;
+        bool _done;
     };
 
     /**

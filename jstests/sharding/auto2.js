@@ -1,6 +1,6 @@
 // auto2.js
 
-s = new ShardingTest( "auto2" , 2 , 10 , 1 );
+s = new ShardingTest( "auto2" , 2 , 1 , 1 );
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );

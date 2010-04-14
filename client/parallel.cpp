@@ -58,8 +58,15 @@ namespace mongo {
         ScopedDbConnection conn( server );
         checkShardVersion( conn.conn() , _ns );
 
-        log(5) << "ClusteredCursor::query  server:" << server << " ns:" << _ns << " query:" << q << " num:" << num << " _fields:" << _fields << " options: " << _options << endl;
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns.c_str() , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+        if ( logLevel >= 5 ){
+            log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
+                   << " ns:" << _ns << " query:" << q << " num:" << num << 
+                " _fields:" << _fields << " options: " << _options << endl;
+        }
+        
+        auto_ptr<DBClientCursor> cursor = 
+            conn->query( _ns.c_str() , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+        
         if ( cursor->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( _ns , "ClusteredCursor::query" );
 
@@ -97,11 +104,11 @@ namespace mongo {
     
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ){
+        : _matcher( filter ) , _done( false ){
     }
 
     FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ){
+        : _matcher( filter ) , _cursor( cursor ) , _done( cursor.get() == 0 ){
     }
     
     FilteringClientCursor::~FilteringClientCursor(){
@@ -110,11 +117,15 @@ namespace mongo {
     void FilteringClientCursor::reset( auto_ptr<DBClientCursor> cursor ){
         _cursor = cursor;
         _next = BSONObj();
+        _done = _cursor.get() == 0;
     }
 
     bool FilteringClientCursor::more(){
         if ( ! _next.isEmpty() )
             return true;
+        
+        if ( _done )
+            return false;
         
         _advance();
         return ! _next.isEmpty();
@@ -122,6 +133,8 @@ namespace mongo {
     
     BSONObj FilteringClientCursor::next(){
         assert( ! _next.isEmpty() );
+        assert( ! _done );
+
         BSONObj ret = _next;
         _next = BSONObj();
         _advance();
@@ -135,12 +148,16 @@ namespace mongo {
         
         while ( _cursor->more() ){
             _next = _cursor->next();
-            if ( _matcher.matches( _next ) )
+            if ( _matcher.matches( _next ) ){
+                if ( ! _cursor->moreInCurrentBatch() )
+                    _next = _next.getOwned();
                 return;
+            }
             _next = BSONObj();
         }
+        _done = true;
     }
-
+    
     // --------  SerialServerClusteredCursor -----------
     
     SerialServerClusteredCursor::SerialServerClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , int sortOrder) : ClusteredCursor( q ){
