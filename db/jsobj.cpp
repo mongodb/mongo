@@ -1472,17 +1472,6 @@ namespace mongo {
             ss >> hex >> z;
             data[i] = z;
         }
-
-/*
-        string as = s.substr( 0 , 16 );
-        string bs = s.substr( 16 );
-
-        stringstream ssa(as);
-        ssa >> hex >> a;
-
-        stringstream ssb(bs);
-        ssb >> hex >> b;
-*/
     }
 
     Labeler::Label GT( "$gt" );
