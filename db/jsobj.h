@@ -172,6 +172,9 @@ namespace mongo {
 
         /** Set to the hex string value specified. */
         void init( string s );
+
+        time_t asTimeT();
+        Date_t asDateT() { return asTimeT() * (long long)1000; }
         
     };
     ostream& operator<<( ostream &s, const OID &o );

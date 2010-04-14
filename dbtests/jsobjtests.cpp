@@ -729,6 +729,30 @@ namespace JsobjTests {
                 ASSERT( a.woCompare( c ) < 0 );
             }
         };
+
+        class time {
+        public:
+            void run(){
+                OID oid;
+
+                {
+                    time_t before = ::time(0);
+                    oid.init();
+                    time_t after = ::time(0);
+                    ASSERT( oid.asTimeT() >= before );
+                    ASSERT( oid.asTimeT() <= after );
+                }
+
+                {
+                    Date_t before = jsTime();
+                    sleepsecs(1);
+                    oid.init();
+                    Date_t after = jsTime();
+                    ASSERT( oid.asDateT() >= before );
+                    ASSERT( oid.asDateT() <= after );
+                }
+            }
+        };
     } // namespace OIDTests
 
     namespace ValueStreamTests {
@@ -1497,6 +1521,7 @@ namespace JsobjTests {
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
             add< OIDTests::increasing >();
+            add< OIDTests::time >();
             add< ValueStreamTests::LabelBasic >();
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();

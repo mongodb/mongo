@@ -1474,6 +1474,16 @@ namespace mongo {
         }
     }
 
+    time_t OID::asTimeT(){
+        int time;
+        char* T = (char *) &time;
+        T[0] = data[3];
+        T[1] = data[2];
+        T[2] = data[1];
+        T[3] = data[0];
+        return time;
+    }
+
     Labeler::Label GT( "$gt" );
     Labeler::Label GTE( "$gte" );
     Labeler::Label LT( "$lt" );
