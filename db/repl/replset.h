@@ -30,6 +30,7 @@ namespace mongo {
             string host;
             int port;
         };
+        ReplSet(string cfgString);
     private:
         string _name;
         vector<Member> _members;
