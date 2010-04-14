@@ -55,16 +55,16 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	WT_RET(__wt_calloc(env, 25, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
-	stats[WT_STAT_EXTSIZE].desc = "database extent size";
 	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
-	stats[WT_STAT_FRAGSIZE].desc = "database fragment size";
-	stats[WT_STAT_INTLSIZE].desc = "internal page size";
+	stats[WT_STAT_INTLMAX].desc = "maximum internal page size";
+	stats[WT_STAT_INTLMIN].desc = "minimum internal page size";
 	stats[WT_STAT_ITEM_DATA_OVFL].desc = "overflow data items";
 	stats[WT_STAT_ITEM_DUP_DATA].desc = "duplicate data items";
 	stats[WT_STAT_ITEM_KEY_OVFL].desc = "overflow keys";
 	stats[WT_STAT_ITEM_TOTAL_DATA].desc = "total database data items";
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total database keys";
-	stats[WT_STAT_LEAFSIZE].desc = "leaf page size";
+	stats[WT_STAT_LEAFMAX].desc = "maximum leaf page size";
+	stats[WT_STAT_LEAFMIN].desc = "minimum leaf page size";
 	stats[WT_STAT_MAGIC].desc = "magic number";
 	stats[WT_STAT_MAJOR].desc = "major version number";
 	stats[WT_STAT_MINOR].desc = "minor version number";
@@ -89,16 +89,16 @@ void
 __wt_stat_clear_database_stats(WT_STATS *stats)
 {
 	stats[WT_STAT_BASE_RECNO].v = 0;
-	stats[WT_STAT_EXTSIZE].v = 0;
 	stats[WT_STAT_FIXED_LEN].v = 0;
-	stats[WT_STAT_FRAGSIZE].v = 0;
-	stats[WT_STAT_INTLSIZE].v = 0;
+	stats[WT_STAT_INTLMAX].v = 0;
+	stats[WT_STAT_INTLMIN].v = 0;
 	stats[WT_STAT_ITEM_DATA_OVFL].v = 0;
 	stats[WT_STAT_ITEM_DUP_DATA].v = 0;
 	stats[WT_STAT_ITEM_KEY_OVFL].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_DATA].v = 0;
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
-	stats[WT_STAT_LEAFSIZE].v = 0;
+	stats[WT_STAT_LEAFMAX].v = 0;
+	stats[WT_STAT_LEAFMIN].v = 0;
 	stats[WT_STAT_MAGIC].v = 0;
 	stats[WT_STAT_MAJOR].v = 0;
 	stats[WT_STAT_MINOR].v = 0;

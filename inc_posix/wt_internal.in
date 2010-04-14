@@ -135,7 +135,19 @@ struct __idb {
 	u_int32_t file_id;		/* In-memory file ID */
 	WT_FH	 *fh;			/* Backing file handle */
 
+	u_int32_t root_addr;		/* Root page addr */
+	u_int32_t root_len;		/* Root page len */
+
+	/*
+	 * The root page is pinned into memory when the database is opened
+	 * and/or created; if the root_page isn't set, there's usually not
+	 * much to do.
+	 */
+#define	WT_UNOPENED_DATABASE(idb)	((idb)->root_page == NULL ? 1 : 0)
 	WT_PAGE  *root_page;		/* Root page */
+
+	u_int32_t free_addr;		/* Free page addr */
+	u_int32_t free_len;		/* Free page len */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */

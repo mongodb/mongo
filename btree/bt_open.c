@@ -33,8 +33,20 @@ __wt_bt_open(WT_TOC *toc, int ok_create)
 	/* Open the fle. */
 	WT_RET(__wt_open(env, idb->name, idb->mode, ok_create, &idb->fh));
 
-	/* Get a permanent root page reference. */
-	WT_RET(__wt_bt_root_page(toc));
+	/*
+	 * If the file size is 0, write a description page; if the file size
+	 * is non-zero, update the DB handle based on the on-disk description
+	 * page.  (If the file isn't empty, there must be a description page.)
+	 */
+	if (idb->fh->file_size == 0)
+		WT_RET(__wt_bt_desc_write(toc));
+	else {
+		WT_RET(__wt_bt_desc_read(toc));
+
+		/* If there's a root page, pin it. */
+		if (idb->root_addr != WT_ADDR_INVALID)
+			WT_RET(__wt_bt_root_pin(toc, 1));
+	}
 
 	return (0);
 }
@@ -77,22 +89,13 @@ __wt_bt_open_verify_sizes(DB *db)
 	idb = db->idb;
 
 	/*
-	 * The application can set lots of sizes.  It's complicated enough
-	 * that instead of verifying them when they're set, we verify them
-	 * when the database is opened and we know we have the final values.
-	 * (Besides, if we verify them when they're set, the application
-	 * has to set them in a specific order or we'd have to have one set
-	 * function that took 10 parameters.)
+	 * The application can set lots of page sizes.  It's complicated, so
+	 * instead of verifying the relationships when they're set, verify
+	 * then when the database is opened and we know we have the final
+	 * values.  (Besides, if we verify the relationships when they're set,
+	 * the application has to set them in a specific order or we'd need
+	 * one set function that took 10 parameters.)
 	 *
-	 * Limit allocation and page sizes to 128MB.  There isn't a reason
-	 * (other than testing) we can't support larger sizes (any size up
-	 * to the smaller of an off_t and a size_t), but an application
-	 * specifying allocation or page sizes larger than 128MB is almost
-	 * certainly making a mistake.
-	 */
-#define	WT_UNEXPECTED(s)	((s) > 128 * WT_MEGABYTE)
-
-	/*
 	 * If the values haven't been set, set the defaults.
 	 *
 	 * Default to a small fragment size, so overflow items don't consume
@@ -100,11 +103,9 @@ __wt_bt_open_verify_sizes(DB *db)
 	 */
 	if (db->allocsize == 0)
 		db->allocsize = 512;
-	else if (WT_UNEXPECTED(db->allocsize))
-		goto unexpected;
 
 	/*
-	 * Internal pages are also fairly small, we want it to fit into the
+	 * Internal pages are also usually small, we want it to fit into the
 	 * L1 cache.   We try and put at least 40 keys on each internal page
 	 * (40 because that results in 100M keys in a level 5 Btree).  But,
 	 * if it's a small page, push anything bigger than about 50 bytes
@@ -117,15 +118,15 @@ __wt_bt_open_verify_sizes(DB *db)
 	 *	8K		204 bytes
 	 * and so on, roughly doubling for each power-of-two.
 	 */
-	if (db->intlsize == 0)
-		db->intlsize = 8 * 1024;
-	else if (WT_UNEXPECTED(db->intlsize))
-		goto unexpected;
+	if (db->intlmin == 0)
+		db->intlmin = WT_BTREE_INTLMIN_DEFAULT;
+	if (db->intlmax == 0)
+		db->intlmin = WT_MAX(db->intlmin, WT_BTREE_INTLMAX_DEFAULT);
 	if (db->intlitemsize == 0) {
-		if (db->intlsize <= 1024)
+		if (db->intlmin <= 1024)
 			db->intlitemsize = 50;
 		else
-			db->intlitemsize = db->intlsize / 40;
+			db->intlitemsize = db->intlmin / 40;
 	}
 
 	/*
@@ -143,18 +144,15 @@ __wt_bt_open_verify_sizes(DB *db)
 	 *	16K		409 bytes
 	 * and so on, roughly doubling for each power-of-two.
 	 */
-	if (db->leafsize == 0)
-		db->leafsize = 32 * 1024;
-	else if (WT_UNEXPECTED(db->leafsize)) {
-unexpected:	__wt_api_db_errx(db,
-		    "Allocation and page sizes are limited to 128MB");
-		return (WT_ERROR);
-	}
+	if (db->leafmin == 0)
+		db->leafmin = WT_BTREE_LEAFMIN_DEFAULT;
+	if (db->leafmax == 0)
+		db->leafmin = WT_MAX(db->leafmin, WT_BTREE_LEAFMAX_DEFAULT);
 	if (db->leafitemsize == 0) {
-		if (db->leafsize <= 4096)
+		if (db->leafmin <= 4096)
 			db->leafitemsize = 80;
 		else
-			db->leafitemsize = db->leafsize / 40;
+			db->leafitemsize = db->leafmin / 40;
 	}
 
 	/*
@@ -165,10 +163,6 @@ unexpected:	__wt_api_db_errx(db,
 		db->intlitemsize = WT_ITEM_MAX_LEN;
 	if (db->leafitemsize > WT_ITEM_MAX_LEN)
 		db->leafitemsize = WT_ITEM_MAX_LEN;
-
-	/* Extents are 10MB by default. */
-	if (db->extsize == 0)
-		db->extsize = WT_MEGABYTE;
 
 	/*
 	 * By default, any duplicate set that reaches 25% of a leaf page is
@@ -183,12 +177,11 @@ unexpected:	__wt_api_db_errx(db,
 		    "The fragment size must be a multiple of 512B");
 		return (WT_ERROR);
 	}
-	if (db->intlsize % db->allocsize != 0 ||
-	    db->leafsize % db->allocsize != 0 ||
-	    db->extsize % db->allocsize != 0) {
+	if (db->intlmin % db->allocsize != 0 ||
+	    db->leafmin % db->allocsize != 0) {
 		__wt_api_db_errx(db,
-		    "The internal, leaf and extent sizes must be a multiple "
-		    "of the fragment size");
+		    "The internal and leaf sizes must be a multiple of the "
+		    "fragment size");
 		return (WT_ERROR);
 	}
 
@@ -203,13 +196,13 @@ unexpected:	__wt_api_db_errx(db,
 	 */
 #define	WT_MINIMUM_DATA_SPACE(db, s)					\
 	    (((s) - (WT_PAGE_HDR_SIZE + WT_PAGE_DESC_SIZE + 10)) / 4)
-	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlsize)) {
+	if (db->intlitemsize > WT_MINIMUM_DATA_SPACE(db, db->intlmin)) {
 		__wt_api_db_errx(db,
 		    "The internal page size is too small for its maximum item "
 		    "size");
 		return (WT_ERROR);
 	}
-	if (db->leafitemsize > WT_MINIMUM_DATA_SPACE(db, db->leafsize)) {
+	if (db->leafitemsize > WT_MINIMUM_DATA_SPACE(db, db->leafmin)) {
 		__wt_api_db_errx(db,
 		    "The leaf page size is too small for its maximum item "
 		    "size");
@@ -221,7 +214,7 @@ unexpected:	__wt_api_db_errx(db,
 	 * objects on a page, otherwise it just doesn't make sense.
 	 */
 	if (F_ISSET(idb, WT_COLUMN) &&
-	    db->fixed_len != 0 && db->leafsize / db->fixed_len < 20) {
+	    db->fixed_len != 0 && db->leafmin / db->fixed_len < 20) {
 		__wt_api_db_errx(db,
 		    "The leaf page size cannot store at least 20 fixed-length "
 		    "objects");
@@ -232,43 +225,28 @@ unexpected:	__wt_api_db_errx(db,
 }
 
 /*
- * __wt_bt_root_page --
- *	Read in, and pin, the root page.
+ * __wt_bt_root_pin --
+ *	Pin/unpin the root page.
  */
 int
-__wt_bt_root_page(WT_TOC *toc)
+__wt_bt_root_pin(WT_TOC *toc, int pin)
 {
 	IDB *idb;
-	u_int32_t root_addr;
-	int isleaf;
+	WT_PAGE *root_page;
 
 	idb = toc->db->idb;
 
-	/*
-	 * Update the DB handle based on the information in the on-disk
-	 * WT_PAGE_DESC structure.  (If the file is not empty, there had
-	 * better be a description record.)
-	 */
-	WT_RET(__wt_bt_desc_read(toc, &root_addr));
+	WT_RET(__wt_bt_page_in(
+	    toc, idb->root_addr, idb->root_len, 1, &root_page));
+	if (pin) {
+		F_SET(root_page, WT_PINNED);
+		idb->root_page = root_page;
+	} else {
+		F_CLR(root_page, WT_PINNED);
+		idb->root_page = NULL;
+	}
 
-	/*
-	 * If the file is empty, the root address won't be set.  That's OK,
-	 * but we're done.  The caller can figure that out by looking at the
-	 * fact that we haven't set a root page reference.
-	 */
-	if (root_addr == WT_ADDR_INVALID)
-		return (0);
-
-	/*
-	 * Read the root page in, and pin it -- it's not going anywhere.
-	 *
-	 * The isleaf value tells us how big a page to read.  If the tree has
-	 * split, the root page is an internal page, otherwise it's a leaf page.
-	 */
-	isleaf = root_addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-	WT_RET(__wt_bt_page_in(toc, root_addr, isleaf, 1, &idb->root_page));
-	F_SET(idb->root_page, WT_PINNED);
-	WT_RET(__wt_bt_page_out(toc, idb->root_page, 0));
+	WT_RET(__wt_bt_page_out(toc, root_page, 0));
 
 	return (0);
 }

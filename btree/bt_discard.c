@@ -10,7 +10,6 @@
 #include "wt_internal.h"
 
 static void __wt_bt_page_discard_repl(ENV *, WT_REPL *);
-static int  __wt_bt_page_write(DB *, WT_PAGE *);
 
 /*
  * __wt_bt_page_reconcile --
@@ -27,25 +26,14 @@ __wt_bt_page_reconcile(DB *db, WT_PAGE *page, int reclaim)
 	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
 		(void)__wt_api_args(env, "Page.recycle");
 #endif
-	if (F_ISSET(page, WT_MODIFIED))
-		WT_RET(__wt_bt_page_write(db, page));
+	if (F_ISSET(page, WT_MODIFIED)) {
+		WT_RET(__wt_page_write(db, page));
+		F_CLR(page, WT_MODIFIED);
+	}
 
 	if (reclaim)
 		__wt_bt_page_discard(env, page);
 
-	return (0);
-}
-
-/*
- * __wt_bt_page_write --
- *	Write modified pages to disk.
- */
-static int
-__wt_bt_page_write(DB *db, WT_PAGE *page)
-{
-	WT_RET(__wt_cache_write(db, page));
-
-	F_CLR(page, WT_MODIFIED);
 	return (0);
 }
 
@@ -64,6 +52,13 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	WT_ASSERT(env, F_ISSET(page, WT_MODIFIED) == 0);
 
 	switch (page->hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		WT_INDX_FOREACH(page, cip, i)
+			if (cip->repl != NULL)
+				__wt_bt_page_discard_repl(env, cip->repl);
+		break;
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 	case WT_PAGE_ROW_INT:
@@ -85,13 +80,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 				__wt_bt_page_discard_repl(env, rip->repl);
 		}
 		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		WT_INDX_FOREACH(page, cip, i)
-			if (cip->repl != NULL)
-				__wt_bt_page_discard_repl(env, cip->repl);
-		break;
+	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_OVFL:
 	default:
 		break;

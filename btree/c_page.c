@@ -10,11 +10,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cache_alloc --
+ * __wt_page_alloc --
  *	Allocate bytes from a file.
  */
 int
-__wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
+__wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 {
 	ENV *env;
 	int ret;
@@ -29,11 +29,11 @@ __wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 }
 
 /*
- * __wt_cache_in --
+ * __wt_page_in --
  *	Return a database page, reading as necessary.
  */
 int
-__wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
+__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 {
 	DB *db;
 	ENV *env;
@@ -98,16 +98,6 @@ retry:	/* Search the cache for the page. */
 		__wt_hazard_clear(toc, e->page);
 	}
 
-	/*
-	 * If the caller doesn't know how big the page is, the caller is only
-	 * looking for a cache hit -- fail, we can't read the page.  (This is
-	 * the path we take when opening a new database where the root page
-	 * might be in the cache as a result of a bulk load.  Yeah, obscure,
-	 * but currently necessary.
-	 */
-	if (bytes == 0)
-		return (0);
-
 	__wt_cache_in_serial(toc, addr, bytes, pagep, ret);
 	if (ret == WT_RESTART) {
 		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
@@ -117,11 +107,11 @@ retry:	/* Search the cache for the page. */
 }
 
 /*
- * __wt_cache_out --
+ * __wt_page_out --
  *	Discard a reference to a database page.
  */
 int
-__wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
+__wt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
 	/*
 	 * If the page has been modified or flagged as useless, set the
@@ -133,4 +123,56 @@ __wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 	__wt_hazard_clear(toc, page);
 
 	return (0);
+}
+
+/*
+ * __wt_page_read --
+ *	Read a database page (same as read, but verify the checksum).
+ */
+int
+__wt_page_read(DB *db, WT_PAGE *page)
+{
+	ENV *env;
+	WT_FH *fh;
+	WT_PAGE_HDR *hdr;
+	off_t offset;
+	u_int32_t checksum;
+
+	env = db->env;
+	fh = db->idb->fh;
+	hdr = page->hdr;
+
+	offset = WT_ADDR_TO_OFF(db, page->addr);
+	WT_RET(__wt_read(env, fh, offset, page->bytes, hdr));
+
+	checksum = hdr->checksum;
+	hdr->checksum = 0;
+	if (checksum != __wt_cksum(hdr, page->bytes)) {
+		__wt_api_env_errx(env,
+		    "read checksum error on %lu bytes at file offset %llu",
+		    (u_quad)offset, (u_long)page->bytes);
+		return (WT_ERROR);
+	}
+	return (0);
+}
+
+/*
+ * __wt_page_write --
+ *	Write a database page.
+ */
+int
+__wt_page_write(DB *db, WT_PAGE *page)
+{
+	ENV *env;
+	WT_FH *fh;
+	WT_PAGE_HDR *hdr;
+
+	env = db->env;
+	fh = db->idb->fh;
+	hdr = page->hdr;
+
+	hdr->checksum = 0;
+	hdr->checksum = __wt_cksum(hdr, page->bytes);
+	return (__wt_write(
+	    env, fh, WT_ADDR_TO_OFF(db, page->addr), page->bytes, hdr));
 }

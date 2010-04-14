@@ -29,8 +29,8 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 
 	db = toc->db;
 
-	WT_RET((__wt_cache_alloc(
-	    toc, isleaf ? db->leafsize : db->intlsize, &page)));
+	WT_RET((__wt_page_alloc(
+	    toc, isleaf ? db->leafmin : db->intlmin, &page)));
 
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
@@ -42,10 +42,6 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
 	/* Set the space-available and first-free byte. */
 	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
 
-	/* If we're allocating page 0, initialize the WT_PAGE_DESC structure. */
-	if (page->addr == 0)
-		__wt_bt_desc_init(db, page);
-
 	*pagep = page;
 	return (0);
 }
@@ -56,15 +52,14 @@ __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
  */
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep)
+    WT_TOC *toc, u_int32_t addr, u_int32_t bytes, int inmem, WT_PAGE **pagep)
 {
 	DB *db;
 	WT_PAGE *page;
 
 	db = toc->db;
 
-	WT_RET((__wt_cache_in(
-	    toc, addr, isleaf ? db->leafsize : db->intlsize, &page)));
+	WT_RET((__wt_page_in(toc, addr, bytes, &page)));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
@@ -86,7 +81,7 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
 {
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
-	return (__wt_cache_out(toc, page, flags));
+	return (__wt_page_out(toc, page, flags));
 }
 
 /*

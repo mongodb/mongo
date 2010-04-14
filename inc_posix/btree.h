@@ -56,18 +56,19 @@ struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
 	((u_int32_t)WT_ALIGN((len) + sizeof(WT_PAGE_HDR), (db)->allocsize))
 
 /*
- * The first possible address is 0.  It is also always the first leaf page in
- * in the database because it's created first and never replaced.
+ * The first possible database addr is 512.  It is also always the first leaf
+ * page in the database because it's created first and never replaced.
  *
  * The invalid address is the largest possible offset, which isn't a possible
  * database address.
  */
-#define	WT_ADDR_FIRST_PAGE	0
+#define	WT_ADDR_FIRST_LEAF	512
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
  * The database itself needs a chunk of memory that describes it.   Here's
- * the structure.
+ * the structure.  This structure is written into the first 512 bytes of
+ * the file.
  *
  * !!!
  * Field order is important: there's a 8-byte type in the middle, and the
@@ -81,26 +82,37 @@ struct __wt_page_desc {
 	u_int16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
 	u_int16_t minorv;		/* 06-07: Minor version */
-	u_int32_t leafsize;		/* 08-11: Leaf page size */
-	u_int32_t intlsize;		/* 12-15: Internal page size */
-	u_int64_t base_recno;		/* 16-23: Base record number */
-	u_int32_t root_addr;		/* 24-27: Root address */
-	u_int32_t free_addr;		/* 28-31: Freelist address */
+
+#define	WT_BTREE_INTLMAX_DEFAULT	(2 * 1024)
+#define	WT_BTREE_INTLMIN_DEFAULT	(2 * 1024)
+	u_int32_t intlmax;		/* 08-11: Maximum intl page size */
+	u_int32_t intlmin;		/* 12-15: Minimum intl page size */
+
+#define	WT_BTREE_LEAFMAX_DEFAULT	WT_MEGABYTE
+#define	WT_BTREE_LEAFMIN_DEFAULT	(32 * 1024)
+	u_int32_t leafmax;		/* 16-19: Maximum leaf page size */
+	u_int32_t leafmin;		/* 20-23: Minimum leaf page size */
+
+	u_int64_t base_recno;		/* 24-31: Base record number */
+	u_int32_t root_addr;		/* 32-35: Root page address */
+	u_int32_t root_len;		/* 36-39: Root page length */
+	u_int32_t free_addr;		/* 40-43: Free list page address */
+	u_int32_t free_len;		/* 44-47: Free list page length */
 
 #define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
 #define	WT_PAGE_DESC_MASK	0x01	/* Valid bit mask */
-	u_int32_t flags;		/* 32-35: Flags */
+	u_int32_t flags;		/* 48-51: Flags */
 
-	u_int8_t  fixed_len;		/* 36:	  Fixed length byte count */
-	u_int8_t  unused1[3];		/* 37-39: Spare */
+	u_int8_t  fixed_len;		/* 51-52: Fixed length byte count */
+	u_int8_t  unused1[3];		/* Unused */
 
-	u_int32_t unused2[6];		/* 40-63: Spare */
+	u_int32_t unused2[114];		/* Unused */
 };
 /*
- * WT_PAGE_DESC_SIZE is the expected structure size --  we check at startup to
+ * WT_PAGE_DESC_SIZE is the expected structure size -- we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_PAGE_DESC_SIZE		64
+#define	WT_PAGE_DESC_SIZE		512
 
 /*
  * WT_PAGE --
@@ -171,14 +183,15 @@ struct __wt_page_hdr {
 	u_int32_t checksum;		/* 08-11: checksum */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col store fixed-length leaf page */
-#define	WT_PAGE_COL_INT		2	/* Col store internal page */
-#define	WT_PAGE_COL_VAR		3	/* Col store var-length leaf page */
-#define	WT_PAGE_DUP_INT		4	/* Duplicate tree internal page */
-#define	WT_PAGE_DUP_LEAF	5	/* Duplicate tree leaf page */
-#define	WT_PAGE_OVFL		6	/* Overflow page */
-#define	WT_PAGE_ROW_INT		7	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	8	/* Row-store leaf page */
+#define	WT_PAGE_DESCRIPT	1	/* Database description page */
+#define	WT_PAGE_COL_FIX		2	/* Col store fixed-length leaf page */
+#define	WT_PAGE_COL_INT		3	/* Col store internal page */
+#define	WT_PAGE_COL_VAR		4	/* Col store var-length leaf page */
+#define	WT_PAGE_DUP_INT		5	/* Duplicate tree internal page */
+#define	WT_PAGE_DUP_LEAF	6	/* Duplicate tree leaf page */
+#define	WT_PAGE_OVFL		7	/* Overflow page */
+#define	WT_PAGE_ROW_INT		8	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	9	/* Row-store leaf page */
 	u_int8_t type;			/* 12: page type */
 
 	/*
@@ -225,14 +238,9 @@ struct __wt_page_hdr {
 #define	WT_PAGE_HDR_SIZE		32
 
 /*
- * WT_PAGE_BYTE is the first usable data byte on the page.  Note the correction
- * for page addr of 0, the first address.   It would be simpler to put this at
- * the end of the page, but that would make it more difficult to figure out the
- * page size in a just opened database.
+ * WT_PAGE_BYTE is the first usable data byte on the page.
  */
-#define	WT_PAGE_BYTE(page)						\
-	(((u_int8_t *)(page)->hdr) +					\
-	WT_PAGE_HDR_SIZE + ((page)->addr == 0 ? WT_PAGE_DESC_SIZE : 0))
+#define	WT_PAGE_BYTE(page)	(((u_int8_t *)(page)->hdr) + WT_PAGE_HDR_SIZE)
 
 /*
  * WT_ROW_INDX --
@@ -526,10 +534,10 @@ struct __wt_off {
  */
 #define	WT_RECORDS(offp)	(*(u_int64_t *)(&(offp)->__record_chunk[0]))
 	u_int32_t __record_chunk[2];	/* Subtree record count */
-	u_int32_t addr;			/* Subtree address */
+	u_int32_t addr;			/* Subtree root page address */
 };
 /*
- * WT_OFF_SIZE is the expected structure size --  we check at startup to
+ * WT_OFF_SIZE is the expected structure size -- we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
 #define	WT_OFF_SIZE	12
@@ -564,9 +572,9 @@ struct __wt_ovfl {
  */
 #define	WT_FIX_REPEAT_FOREACH(db, page, p, i)				\
 	for ((p) = WT_PAGE_BYTE(page),					\
-	   (i) = (page)->hdr->u.entries; (i) > 0;			\
-	   (i) -= *(u_int16_t *)p,					\
-	   p = (u_int8_t *)p + (db)->fixed_len + sizeof(u_int16_t))
+	    (i) = (page)->hdr->u.entries; (i) > 0;			\
+	    (i) -= *(u_int16_t *)p,					\
+	    p = (u_int8_t *)p + (db)->fixed_len + sizeof(u_int16_t))
 /*
  * WT_FIX_REPEAT_ITERATE is a loop that walks fixed-length, repeat-counted
  * references on a page, visiting each entry the appropriate number of times.

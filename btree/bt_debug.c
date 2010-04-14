@@ -118,10 +118,10 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
 	fprintf(fp, "\n");
 
-	if (page->addr == 0)
-		__wt_bt_debug_desc(page, fp);
-
 	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
+		__wt_bt_debug_desc(page, fp);
+		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -155,26 +155,29 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 static void
 __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 {
-	WT_PAGE_DESC desc;
+	WT_PAGE_DESC *desc;
 
-	memcpy(
-	    &desc, (u_int8_t *)page->hdr + WT_PAGE_HDR_SIZE, WT_PAGE_DESC_SIZE);
-
+	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 	fprintf(fp, "\tdescription record: {\n"),
-	fprintf(fp, "\t\tmagic: %#lx, major: %lu, minor: %lu\n",
-	    (u_long)desc.magic, (u_long)desc.majorv, (u_long)desc.minorv);
-	fprintf(fp, "\t\tintlsize: %lu, leafsize: %lu, base record: %llu\n",
-	    (u_long)desc.intlsize, (u_long)desc.leafsize, desc.base_recno);
-	fprintf(fp, "\t\tfixed_len: %lu\n", (u_long)desc.fixed_len);
-	if (desc.root_addr == WT_ADDR_INVALID)
-		fprintf(fp, "\t\troot addr (none), ");
+	fprintf(fp, "\t\tmagic: %lu, major: %lu, minor: %lu\n",
+	    (u_long)desc->magic, (u_long)desc->majorv, (u_long)desc->minorv);
+	fprintf(fp, "\t\tinternal page min/max size: %lu/%lu\n",
+	    (u_long)desc->intlmin, (u_long)desc->intlmax);
+	fprintf(fp, "\t\tleaf page min/max size: %lu/%lu\n",
+	    (u_long)desc->leafmin, (u_long)desc->leafmax);
+	fprintf(fp, "\t\tbase record: %llu, fixed_len: %lu\n",
+	    (u_quad)desc->base_recno, (u_long)desc->fixed_len);
+	if (desc->root_addr == WT_ADDR_INVALID)
+		fprintf(fp, "\t\troot addr (none)\n");
 	else
-		fprintf(fp, "\t\troot addr %lu, ", (u_long)desc.root_addr);
-	if (desc.free_addr == WT_ADDR_INVALID)
-		fprintf(fp, "free addr (none)");
+		fprintf(fp, "\t\troot addr %lu, len %lu\n",
+		    (u_long)desc->root_addr, (u_long)desc->root_len);
+	if (desc->free_addr == WT_ADDR_INVALID)
+		fprintf(fp, "\t\tfree addr (none)\n");
 	else
-		fprintf(fp, "free addr %lu", (u_long)desc.free_addr);
-	fprintf(fp, "\n\t}\n");
+		fprintf(fp, "\t\tfree addr %lu, len %lu\n",
+		    (u_long)desc->free_addr, (u_long)desc->free_len);
+	fprintf(fp, "\t}\n");
 }
 
 /*

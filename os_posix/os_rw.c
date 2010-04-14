@@ -11,7 +11,7 @@
 
 /*
  * __wt_read --
- *	Read a file handle.
+ *	Read a chunk.
  */
 int
 __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
@@ -34,7 +34,7 @@ __wt_read(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)
 
 /*
  * __wt_write --
- *	Write a file handle.
+ *	Write a chunk.
  */
 int
 __wt_write(ENV *env, WT_FH *fh, off_t offset, u_int32_t bytes, void *buf)

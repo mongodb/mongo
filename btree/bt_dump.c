@@ -25,13 +25,18 @@ __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags)
 {
 	DB *db;
+	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int64_t fcnt;
 	u_int32_t addr;
 
 	db = toc->db;
+	idb = db->idb;
 	fcnt = 0;
+
+	if (WT_UNOPENED_DATABASE(idb))
+		return (0);
 
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
@@ -51,8 +56,8 @@ __wt_db_dump(WT_TOC *toc,
 	 * The first physical page of the database is guaranteed to be the first
 	 * leaf page in the database; walk the linked list of leaf pages.
 	 */
-	for (addr = WT_ADDR_FIRST_PAGE;;) {
-		WT_RET(__wt_bt_page_in(toc, addr, 1, 0, &page));
+	for (addr = WT_ADDR_FIRST_LEAF;;) {
+		WT_RET(__wt_bt_page_in(toc, addr, db->leafmin, 0, &page));
 		hdr = page->hdr;
 		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
@@ -224,7 +229,8 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 
 	/* Walk down the duplicates tree to the first leaf page. */
 	for (;;) {
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
+		WT_RET(__wt_bt_page_in(
+		    toc, addr, isleaf ? db->leafmin : db->intlmin, 0, &page));
 		if (isleaf)
 			break;
 
@@ -265,7 +271,7 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 		if (addr == WT_ADDR_INVALID)
 			break;
 
-		WT_ERR(__wt_bt_page_in(toc, addr, 1, 0, &page));
+		WT_ERR(__wt_bt_page_in(toc, addr, db->leafmin, 0, &page));
 	}
 
 	if (0) {

@@ -611,36 +611,6 @@ __wt_drain_evict(ENV *env,
 		f(name, fcnt);
 }
 
-/*
- * __wt_cache_write --
- *	Write a page to the backing database file.
- */
-int
-__wt_cache_write(DB *db, WT_PAGE *page)
-{
-	ENV *env;
-	WT_FH *fh;
-	WT_PAGE_HDR *hdr;
-	int ret;
-
-	env = db->env;
-	fh = db->idb->fh;
-
-	/* Update the checksum. */
-	hdr = page->hdr;
-	hdr->checksum = 0;
-	hdr->checksum = __wt_cksum(hdr, page->bytes);
-
-	/* Write, and if successful, clear the modified flag. */
-	if ((ret = __wt_write(
-	    env, fh, WT_ADDR_TO_OFF(db, page->addr), page->bytes, hdr)) != 0) {
-		__wt_api_env_err(env, ret, "cache unable to write page");
-		return (ret);
-	}
-
-	return (0);
-}
-
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_drain_hazard_check --

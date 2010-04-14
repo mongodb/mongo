@@ -43,9 +43,12 @@ __wt_db_bulk_load(WT_TOC *toc, u_int32_t flags,
 	 * fixed-length pages.
 	 */
 	if (F_ISSET(idb, WT_COLUMN) && db->fixed_len != 0)
-		return (__wt_bt_bulk_fix(toc, f, cb));
+		WT_RET(__wt_bt_bulk_fix(toc, f, cb));
+	else
+		WT_RET(__wt_bt_bulk_var(toc, flags, f, cb));
 
-	return (__wt_bt_bulk_var(toc, flags, f, cb));
+	/* Get a permanent root page reference. */
+	return (__wt_bt_root_pin(toc, 1));
 }
 
 /*
@@ -75,13 +78,14 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	    (F_ISSET(idb, WT_REPEAT_COMP) ? sizeof(u_int16_t) : 0);
 
 	/*
-	 * Allocate our first page -- we do this before we look at any keys
-	 * because the first key/data items may be overflow items, in which
-	 * case we would allocate page 0 as an overflow page, which is, for
-	 * lack of a better phrase, "bad".
+	 * Allocate our first page and set our handle to reference it,
+	 * then update the database descriptor record.
 	 */
 	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
 	page->hdr->type = WT_PAGE_COL_FIX;
+	idb->root_addr = page->addr;
+	idb->root_len = db->leafmin;
+	WT_ERR(__wt_bt_desc_write(toc));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (key != NULL) {
@@ -187,9 +191,6 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		}
 	}
 
-	/* Get a permanent root page reference. */
-	WT_TRET(__wt_bt_root_page(toc));
-
 	/* Wrap up reporting. */
 	if (f != NULL)
 		f(toc->name, insert_cnt);
@@ -242,14 +243,15 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	WT_CLEAR(lastkey_std);
 
 	/*
-	 * Allocate our first page -- we do this before we look at any keys
-	 * because the first key/data items may be overflow items, in which
-	 * case we would allocate page 0 as an overflow page, which is, for
-	 * lack of a better phrase, "bad".
+	 * Allocate our first page and set our handle to reference it,
+	 * then update the database descriptor record.
 	 */
 	WT_ERR(__wt_bt_page_alloc(toc, 1, &page));
 	page->hdr->type =
 	    F_ISSET(idb, WT_COLUMN) ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
+	idb->root_addr = page->addr;
+	idb->root_len = db->leafmin;
+	WT_ERR(__wt_bt_desc_write(toc));
 
 	while ((ret = cb(db, &key, &data)) == 0) {
 		if (F_ISSET(idb, WT_COLUMN) ) {
@@ -561,7 +563,7 @@ skip_read:	/*
 			++dup_count;
 			dup_space += data->size;
 
-			if (dup_space < db->leafsize / db->btree_dup_offpage)
+			if (dup_space < db->leafmin / db->btree_dup_offpage)
 				continue;
 
 			/*
@@ -593,9 +595,6 @@ skip_read:	/*
 			page = NULL;
 		}
 	}
-
-	/* Get a permanent root page reference. */
-	WT_TRET(__wt_bt_root_page(toc));
 
 	/* Wrap up reporting. */
 	if (f != NULL)
@@ -808,6 +807,7 @@ __wt_bt_promote(
 {
 	DB *db;
 	DBT *key, key_build;
+	IDB *idb;
 	WT_ITEM *key_item, item, *parent_key;
 	WT_OFF off;
 	WT_OVFL tmp_ovfl;
@@ -817,6 +817,7 @@ __wt_bt_promote(
 	void *parent_data;
 
 	db = toc->db;
+	idb = db->idb;
 
 	WT_CLEAR(item);
 
@@ -992,22 +993,23 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		/*
 		 * In case #1 and case #3, we're doing a root split:
 		 *
-		 * If it's the primary tree, update the WT_PAGE_DESC area
-		 * of the database.
-		 *
-		 * Update the returned database level.
+		 * If it's the primary tree, update the database's description.
 		 */
 		if (root_split &&
 		   (next->hdr->type == WT_PAGE_COL_INT ||
-		   next->hdr->type == WT_PAGE_ROW_INT))
-			WT_ERR(__wt_bt_desc_write(toc, *root_addrp));
+		   next->hdr->type == WT_PAGE_ROW_INT)) {
+			idb->root_addr = *root_addrp;
+			idb->root_len = db->leafmin;
+			WT_ERR(__wt_bt_desc_write(toc));
+		}
 
 		/* There's a new parent page, update the page's parent ref. */
 		page->hdr->prntaddr = next->addr;
 		parent = next;
 		next = NULL;
 	} else {
-		WT_ERR(__wt_bt_page_in(toc, parent_addr, 0, 1, &parent));
+		WT_ERR(
+		    __wt_bt_page_in(toc, parent_addr, db->intlmin, 1, &parent));
 
 		need_promotion = 0;
 	}
@@ -1106,8 +1108,8 @@ split:		WT_ERR(__wt_bt_page_alloc(toc, 0, &next));
 		    (parent_addr = parent->hdr->prntaddr) != WT_ADDR_INVALID) {
 			WT_ERR(__wt_bt_page_out(toc, parent, WT_MODIFIED));
 			parent = NULL;
-			WT_ERR(
-			    __wt_bt_page_in(toc, parent_addr, 0, 1, &parent));
+			WT_ERR(__wt_bt_page_in(
+			    toc, parent_addr, db->intlmin, 1, &parent));
 
 			switch (parent->hdr->type) {
 			case WT_PAGE_COL_INT:

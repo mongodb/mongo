@@ -54,16 +54,16 @@ struct __wt_stats {
  * Statistics entries for DB/IDB database.
  */
 #define	WT_STAT_BASE_RECNO			    0
-#define	WT_STAT_EXTSIZE				    1
-#define	WT_STAT_FIXED_LEN			    2
-#define	WT_STAT_FRAGSIZE			    3
-#define	WT_STAT_INTLSIZE			    4
-#define	WT_STAT_ITEM_DATA_OVFL			    5
-#define	WT_STAT_ITEM_DUP_DATA			    6
-#define	WT_STAT_ITEM_KEY_OVFL			    7
-#define	WT_STAT_ITEM_TOTAL_DATA			    8
-#define	WT_STAT_ITEM_TOTAL_KEY			    9
-#define	WT_STAT_LEAFSIZE			   10
+#define	WT_STAT_FIXED_LEN			    1
+#define	WT_STAT_INTLMAX				    2
+#define	WT_STAT_INTLMIN				    3
+#define	WT_STAT_ITEM_DATA_OVFL			    4
+#define	WT_STAT_ITEM_DUP_DATA			    5
+#define	WT_STAT_ITEM_KEY_OVFL			    6
+#define	WT_STAT_ITEM_TOTAL_DATA			    7
+#define	WT_STAT_ITEM_TOTAL_KEY			    8
+#define	WT_STAT_LEAFMAX				    9
+#define	WT_STAT_LEAFMIN				   10
 #define	WT_STAT_MAGIC				   11
 #define	WT_STAT_MAJOR				   12
 #define	WT_STAT_MINOR				   13

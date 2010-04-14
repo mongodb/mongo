@@ -16,6 +16,7 @@
 int
 __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 {
+	DB *db;
 	IDB *idb;
 	WT_COL_INDX *ip;
 	WT_PAGE *page;
@@ -27,14 +28,17 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
 
-	idb = toc->db->idb;
+	db = toc->db;
+	idb = db->idb;
+
+	if (WT_UNOPENED_DATABASE(idb))
+		return (WT_NOTFOUND);
+	page = idb->root_page;
 
 	/* Check for a record past the end of the database. */
-	if (idb->root_page->records < recno)
+	if (page->records < recno)
 		return (WT_NOTFOUND);
 
-	if ((page = idb->root_page) == NULL)
-		return (WT_NOTFOUND);
 	isleaf = page->hdr->type == WT_PAGE_COL_VAR ? 1 : 0;
 
 	/* Search the tree. */
@@ -61,7 +65,8 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(
+		    toc, addr, isleaf ? db->leafmin : db->intlmin, 1, &page));
 	}
 
 	/* Check for deleted items. */

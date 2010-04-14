@@ -16,30 +16,23 @@
 int
 __wt_bt_close(WT_TOC *toc)
 {
-	DB *db;
 	ENV *env;
 	IDB *idb;
-	WT_PAGE *page;
-	int isleaf, ret;
+	int ret;
 
 	env = toc->env;
-	db = toc->db;
-	idb = db->idb;
+	idb = toc->db->idb;
 	ret = 0;
 
+	if (WT_UNOPENED_DATABASE(idb))
+		return (0);
+
 	/*
-	 * Discard any pinned root page.  We have a direct reference but we
+	 * Discard the pinned root page.  We have a direct reference but we
 	 * have to get another one, otherwise the hazard pointers won't be
 	 * set/cleared appropriately.
 	 */
-	if (idb->root_page != NULL) {
-		isleaf = idb->root_page->addr == WT_ADDR_FIRST_PAGE ? 1 : 0;
-		WT_TRET(__wt_bt_page_in(
-		    toc, idb->root_page->addr, isleaf, 0, &page));
-		F_CLR(page, WT_PINNED);
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
-		idb->root_page = NULL;
-	}
+	WT_TRET(__wt_bt_root_pin(toc, 0));
 
 	/* Close the underlying file handle. */
 	WT_TRET(__wt_close(env, idb->fh));

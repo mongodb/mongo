@@ -80,7 +80,8 @@ static int __wt_api_db_btree_compare_int_set(
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
 
-	WT_RET((__wt_db_btree_compare_int_set_verify(db, btree_compare_int)));
+	WT_RET((__wt_db_btree_compare_int_set_verify(
+	    db, btree_compare_int)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_COMPARE_INT_SET);
 	db->btree_compare_int = btree_compare_int;
@@ -132,7 +133,8 @@ static int __wt_api_db_btree_dup_offpage_set(
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
 
-	WT_RET((__wt_db_btree_dup_offpage_set_verify(db, btree_dup_offpage)));
+	WT_RET((__wt_db_btree_dup_offpage_set_verify(
+	    db, btree_dup_offpage)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_DUP_OFFPAGE_SET);
 	db->btree_dup_offpage = btree_dup_offpage;
@@ -183,15 +185,17 @@ static int __wt_api_db_btree_itemsize_set(
 static int __wt_api_db_btree_pagesize_get(
 	DB *db,
 	u_int32_t *allocsize,
-	u_int32_t *intlsize,
-	u_int32_t *leafsize,
-	u_int32_t *extsize);
+	u_int32_t *intlmin,
+	u_int32_t *intlmax,
+	u_int32_t *leafmin,
+	u_int32_t *leafmax);
 static int __wt_api_db_btree_pagesize_get(
 	DB *db,
 	u_int32_t *allocsize,
-	u_int32_t *intlsize,
-	u_int32_t *leafsize,
-	u_int32_t *extsize)
+	u_int32_t *intlmin,
+	u_int32_t *intlmax,
+	u_int32_t *leafmin,
+	u_int32_t *leafmax)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
@@ -199,9 +203,10 @@ static int __wt_api_db_btree_pagesize_get(
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_PAGESIZE_GET);
 	*allocsize = db->allocsize;
-	*intlsize = db->intlsize;
-	*leafsize = db->leafsize;
-	*extsize = db->extsize;
+	*intlmin = db->intlmin;
+	*intlmax = db->intlmax;
+	*leafmin = db->leafmin;
+	*leafmax = db->leafmax;
 	__wt_unlock(env, ienv->mtx);
 	return (0);
 }
@@ -209,25 +214,30 @@ static int __wt_api_db_btree_pagesize_get(
 static int __wt_api_db_btree_pagesize_set(
 	DB *db,
 	u_int32_t allocsize,
-	u_int32_t intlsize,
-	u_int32_t leafsize,
-	u_int32_t extsize);
+	u_int32_t intlmin,
+	u_int32_t intlmax,
+	u_int32_t leafmin,
+	u_int32_t leafmax);
 static int __wt_api_db_btree_pagesize_set(
 	DB *db,
 	u_int32_t allocsize,
-	u_int32_t intlsize,
-	u_int32_t leafsize,
-	u_int32_t extsize)
+	u_int32_t intlmin,
+	u_int32_t intlmax,
+	u_int32_t leafmin,
+	u_int32_t leafmax)
 {
 	ENV *env = db->env;
 	IENV *ienv = env->ienv;
 
+	WT_RET((__wt_db_btree_pagesize_set_verify(
+	    db, allocsize, intlmin, intlmax, leafmin, leafmax)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_BTREE_PAGESIZE_SET);
 	db->allocsize = allocsize;
-	db->intlsize = intlsize;
-	db->leafsize = leafsize;
-	db->extsize = extsize;
+	db->intlmin = intlmin;
+	db->intlmax = intlmax;
+	db->leafmin = leafmin;
+	db->leafmax = leafmax;
 	__wt_unlock(env, ienv->mtx);
 	return (0);
 }
@@ -379,7 +389,8 @@ static int __wt_api_db_column_set(
 	WT_ENV_FCHK(env, "DB.column_set",
 	    flags, WT_APIMASK_DB_COLUMN_SET);
 
-	WT_RET((__wt_db_column_set_verify(db, fixed_len, dictionary, flags)));
+	WT_RET((__wt_db_column_set_verify(
+	    db, fixed_len, dictionary, flags)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, DB_COLUMN_SET);
 	db->fixed_len = fixed_len;
@@ -761,7 +772,8 @@ static int __wt_api_env_cache_hash_size_set(
 	u_int32_t cache_hash_size)
 {
 	IENV *ienv = env->ienv;
-	WT_RET((__wt_env_cache_hash_size_set_verify(env, cache_hash_size)));
+	WT_RET((__wt_env_cache_hash_size_set_verify(
+	    env, cache_hash_size)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_HASH_SIZE_SET);
 	env->cache_hash_size = cache_hash_size;
@@ -792,7 +804,8 @@ static int __wt_api_env_cache_size_set(
 	u_int32_t cache_size)
 {
 	IENV *ienv = env->ienv;
-	WT_RET((__wt_env_cache_size_set_verify(env, cache_size)));
+	WT_RET((__wt_env_cache_size_set_verify(
+	    env, cache_size)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, ENV_CACHE_SIZE_SET);
 	env->cache_size = cache_size;
@@ -949,7 +962,8 @@ static int __wt_api_env_hazard_size_set(
 	u_int32_t hazard_size)
 {
 	IENV *ienv = env->ienv;
-	WT_RET((__wt_env_hazard_size_set_verify(env, hazard_size)));
+	WT_RET((__wt_env_hazard_size_set_verify(
+	    env, hazard_size)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, ENV_HAZARD_SIZE_SET);
 	env->hazard_size = hazard_size;
@@ -1137,7 +1151,8 @@ static int __wt_api_env_toc_size_set(
 	u_int32_t toc_size)
 {
 	IENV *ienv = env->ienv;
-	WT_RET((__wt_env_toc_size_set_verify(env, toc_size)));
+	WT_RET((__wt_env_toc_size_set_verify(
+	    env, toc_size)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, ENV_TOC_SIZE_SET);
 	env->toc_size = toc_size;
@@ -1168,7 +1183,8 @@ static int __wt_api_env_verbose_set(
 	u_int32_t verbose)
 {
 	IENV *ienv = env->ienv;
-	WT_RET((__wt_env_verbose_set_verify(env, verbose)));
+	WT_RET((__wt_env_verbose_set_verify(
+	    env, verbose)));
 	__wt_lock(env, ienv->mtx);
 	WT_STAT_INCR(ienv->method_stats, ENV_VERBOSE_SET);
 	env->verbose = verbose;
@@ -1230,10 +1246,10 @@ __wt_methods_db_lockout(DB *db)
 	    (DB *, u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->btree_pagesize_get = (int (*)
-	    (DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
+	    (DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *))
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->bulk_load = (int (*)
 	    (DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **)))
@@ -1354,7 +1370,7 @@ __wt_methods_db_open_transition(DB *db)
 	    (DB *, u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->btree_pagesize_set = (int (*)
-	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
+	    (DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t ))
 	    __wt_db_lockout;
 	db->column_set = (int (*)
 	    (DB *, u_int32_t , const char *, u_int32_t ))

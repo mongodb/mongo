@@ -141,6 +141,8 @@ const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr)
 {
 	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
+		return ("database descriptor page");
 	case WT_PAGE_COL_FIX:
 		return ("column fixed-length leaf");
 	case WT_PAGE_COL_INT:

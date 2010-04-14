@@ -194,7 +194,7 @@ def func_method_getset(a, f):
 	# if the verification routine fails.
 	if config.count('verify'):
 		f.write('\tWT_RET((__wt_' +
-		    handle + '_' + method + '_verify(' + handle)
+		    handle + '_' + method + '_verify(\n\t    ' + handle)
 		s = ''
 		for l in args:
 			s += ', ' + l.split('/')[0]

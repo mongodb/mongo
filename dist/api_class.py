@@ -349,18 +349,20 @@ methods['db.btree_pagesize_get'] = Api(
 	'db.btree_pagesize_get',
 	'method, getter',
 	['allocsize/u_int32_t *@S',
-	 'intlsize/u_int32_t *@S',
-	 'leafsize/u_int32_t *@S',
-	 'extsize/u_int32_t *@S'],
+	 'intlmin/u_int32_t *@S',
+	 'intlmax/u_int32_t *@S',
+	 'leafmin/u_int32_t *@S',
+	 'leafmax/u_int32_t *@S'],
 	[],
 	['init'], [])
 methods['db.btree_pagesize_set'] = Api(
 	'db.btree_pagesize_set',
-	'method, setter',
+	'method, setter, verify',
 	['allocsize/u_int32_t @S',
-	 'intlsize/u_int32_t @S',
-	 'leafsize/u_int32_t @S',
-	 'extsize/u_int32_t @S'],
+	 'intlmin/u_int32_t @S',
+	 'intlmax/u_int32_t @S',
+	 'leafmin/u_int32_t @S',
+	 'leafmax/u_int32_t @S'],
 	[],
 	['init'], ['open'])
 
@@ -498,7 +500,8 @@ methods['db.open'] = Api(
 	['name/const char *@S',
 	 'mode/mode_t @S',
 	 'flags/u_int32_t @S'],
-	[ 'CREATE', 'RDONLY' ],
+	[ 'CREATE',
+	  'RDONLY' ],
 	['init'], [])
 
 methods['db.row_del'] = Api(

@@ -14,7 +14,7 @@ static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
 
 /*
  * __wt_bt_stat --
- *	Return Btree statistics.
+ *	Return btree statistics.
  */
 int
 __wt_bt_stat(WT_TOC *toc)
@@ -26,13 +26,13 @@ __wt_bt_stat(WT_TOC *toc)
 	db = toc->db;
 	idb = db->idb;
 
-	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
-
-	/* If no root page has been set, there's nothing to stat. */
-	if ((page = idb->root_page) == NULL)
+	if (WT_UNOPENED_DATABASE(idb))
 		return (0);
 
+	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
+
 	/* Check for one-page databases. */
+	page = idb->root_page;
 	return (page->hdr->type == WT_PAGE_ROW_LEAF ?
 	    __wt_bt_stat_page(toc, page) :
 	    __wt_bt_stat_level(toc, page->addr, 0));
@@ -59,7 +59,8 @@ __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
+		WT_RET(__wt_bt_page_in(toc, addr,
+		    isleaf ? db->leafmin : db->intlmin, 0, &page));
 
 		ret = __wt_bt_stat_page(toc, page);
 
@@ -112,19 +113,11 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 	IDB *idb;
 	WT_ITEM *item;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr, i;
+	u_int32_t i;
 
 	db = toc->db;
 	idb = db->idb;
 	hdr = page->hdr;
-	addr = page->addr;
-
-	/* Page 0 has the descriptor record, get all-database statistics. */
-	if (addr == WT_ADDR_FIRST_PAGE) {
-		__wt_bt_desc_stats(db, page);
-		WT_STAT_SET(idb->dstats, FRAGSIZE, db->allocsize);
-		WT_STAT_SET(idb->dstats, EXTSIZE, db->extsize);
-	}
 
 	/* Count the free space. */
 	WT_STAT_INCRV(idb->dstats, PAGE_FREE, page->space_avail);

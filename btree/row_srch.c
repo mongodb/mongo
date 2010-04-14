@@ -33,8 +33,9 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	WT_DB_FCHK(db,
 	    "__wt_bt_search_key_row", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
-	if ((page = idb->root_page) == NULL)
+	if (WT_UNOPENED_DATABASE(idb))
 		return (WT_NOTFOUND);
+	page = idb->root_page;
 	isleaf = page->hdr->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
 	/* Search the tree. */
@@ -104,7 +105,8 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 			WT_RET(__wt_bt_page_out(toc, page, 0));
 
 		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(toc, addr, isleaf, 1, &page));
+		WT_RET(__wt_bt_page_in(toc,
+		    addr, isleaf ? db->leafmin : db->intlmin, 1, &page));
 	}
 
 	/*

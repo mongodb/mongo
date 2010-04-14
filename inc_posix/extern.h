@@ -16,16 +16,10 @@ int
 __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 void
 __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp);
-void
-__wt_bt_desc_init(DB *db, WT_PAGE *page);
-void
-__wt_bt_desc_stats(DB *db, WT_PAGE *page);
 int
-__wt_bt_desc_verify(DB *db, WT_PAGE *page);
+__wt_bt_desc_read(WT_TOC *toc);
 int
-__wt_bt_desc_read(WT_TOC *toc, u_int32_t *root_addrp);
-int
-__wt_bt_desc_write(WT_TOC *toc, u_int32_t root_addr);
+__wt_bt_desc_write(WT_TOC *toc);
 int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags);
@@ -46,7 +40,7 @@ __wt_bt_item_type(WT_ITEM *item);
 int
 __wt_bt_open(WT_TOC *toc, int ok_create);
 int
-__wt_bt_root_page(WT_TOC *toc);
+__wt_bt_root_pin(WT_TOC *toc, int pin);
 int
 __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
 int
@@ -59,7 +53,7 @@ int
 __wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, int isleaf, int inmem, WT_PAGE **pagep);
+    WT_TOC *toc, u_int32_t addr, u_int32_t bytes, int inmem, WT_PAGE **pagep);
 int
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 int
@@ -108,8 +102,6 @@ void
 __wt_workq_cache_sync_server(ENV *env);
 void *
 __wt_cache_drain(void *arg);
-int
-__wt_cache_write(DB *db, WT_PAGE *page);
 void
 __wt_drain_chk(ENV *env);
 int
@@ -127,11 +119,15 @@ __wt_cache_in_serial_func(WT_TOC *toc);
 void *
 __wt_cache_io(void *arg);
 int
-__wt_cache_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
+__wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
 int
-__wt_cache_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep);
+__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep);
 int
-__wt_cache_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
+__wt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
+int
+__wt_page_read(DB *db, WT_PAGE *page);
+int
+__wt_page_write(DB *db, WT_PAGE *page);
 int
 __wt_cache_sync(
     WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
@@ -148,6 +144,9 @@ __wt_db_btree_dup_offpage_set_verify(DB *db, u_int32_t dup_offpage);
 int
 __wt_db_column_set_verify(DB *db,
     u_int32_t fixed_len, const char *dictionary, u_int32_t flags);
+int
+__wt_db_btree_pagesize_set_verify(DB *db, u_int32_t allocsize,
+    u_int32_t intlmin, u_int32_t intlmax, u_int32_t leafmin, u_int32_t leafmax);
 int
 __wt_env_db(ENV *env, DB **dbp);
 int

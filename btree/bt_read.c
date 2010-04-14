@@ -180,9 +180,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_CACHE_HB *hb;
 	WT_FH *fh;
 	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-	off_t offset;
-	u_int32_t addr, bytes, checksum, i;
+	u_int32_t addr, bytes, i;
 	int newpage, ret;
 
 	db = toc->db;
@@ -246,27 +244,11 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 
 		WT_STAT_INCR(cache->stats, CACHE_ALLOC);
 		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
-	} else {
-		offset = WT_ADDR_TO_OFF(db, addr);
-		WT_ERR(__wt_read(env, fh, offset, bytes, page->hdr));
-
-		/* Verify the checksum. */
-		hdr = page->hdr;
-		checksum = hdr->checksum;
-		hdr->checksum = 0;
-		if (checksum != __wt_cksum(hdr, bytes)) {
-			__wt_api_env_errx(env,
-			    "file offset %llu with length %lu was read and had "
-			    "a checksum error",
-			    (u_quad)offset, (u_long)bytes);
-			ret = WT_ERROR;
-			goto err;
-		}
 	}
-
-	/* Fill in the page structure. */
 	page->addr = addr;
 	page->bytes = bytes;
+	if (!newpage)
+		WT_ERR(__wt_page_read(db, page));
 
 	/*
 	 * If we found an empty slot in our original walk of the hash bucket,

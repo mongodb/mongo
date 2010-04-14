@@ -171,9 +171,10 @@ struct __db {
 	u_int32_t leafitemsize;
 
 	u_int32_t allocsize;
-	u_int32_t intlsize;
-	u_int32_t leafsize;
-	u_int32_t extsize;
+	u_int32_t intlmin;
+	u_int32_t intlmax;
+	u_int32_t leafmin;
+	u_int32_t leafmax;
 
 	u_int32_t fixed_len;
 	const char *dictionary;
@@ -223,10 +224,10 @@ struct __db {
 	    DB *, u_int32_t , u_int32_t );
 
 	int (*btree_pagesize_get)(
-	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
+	    DB *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *, u_int32_t *);
 
 	int (*btree_pagesize_set)(
-	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t );
+	    DB *, u_int32_t , u_int32_t , u_int32_t , u_int32_t , u_int32_t );
 
 	int (*bulk_load)(
 	    DB *, u_int32_t , void (*)(const char *, u_int64_t), int (*)(DB *, DBT **, DBT **));

@@ -132,7 +132,7 @@ config_process(DB *db, char **list)
 int
 config(DB *db, char *opt)
 {
-	u_int32_t a, b, c, d;
+	u_int32_t a, b, c, d, e;
 	u_long v;
 	int ret;
 	char *p, *ep;
@@ -149,24 +149,29 @@ format:		fprintf(stderr,
 		return (EXIT_FAILURE);
 	}
 	if (strcmp(opt, "allocsize") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, v, b, c, d));
+		return (db->btree_pagesize_set(db, v, b, c, d, e));
 	}
-	if (strcmp(opt, "intlsize") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
+	if (strcmp(opt, "intlmin") == 0) {
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, a, v, c, d));
+		return (db->btree_pagesize_set(db, a, v, c, d, e));
 	}
-	if (strcmp(opt, "leafsize") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
+	if (strcmp(opt, "intlmax") == 0) {
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, a, b, v, d));
+		return (db->btree_pagesize_set(db, a, b, v, d, e));
 	}
-	if (strcmp(opt, "extsize") == 0) {
-		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d)) != 0)
+	if (strcmp(opt, "leafmin") == 0) {
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
 			return (ret);
-		return (db->btree_pagesize_set(db, a, b, c, v));
+		return (db->btree_pagesize_set(db, a, v, c, d, e));
+	}
+	if (strcmp(opt, "leafmax") == 0) {
+		if ((ret = db->btree_pagesize_get(db, &a, &b, &c, &d, &e)) != 0)
+			return (ret);
+		return (db->btree_pagesize_set(db, a, b, v, d, e));
 	}
 
 	fprintf(stderr,

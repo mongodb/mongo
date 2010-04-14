@@ -23,12 +23,14 @@ typedef struct {
 	u_int64_t fcnt;				/* Progress counter */
 } VSTUFF;
 
+static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, VSTUFF *);
 static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, VSTUFF *);
 static int __wt_bt_verify_level(WT_TOC *, u_int32_t, int, VSTUFF *);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, VSTUFF *);
 static int __wt_bt_verify_page_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(WT_TOC *, WT_PAGE *);
+static int __wt_bt_verify_page_desc(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
 
 /*
@@ -59,22 +61,15 @@ __wt_bt_verify_int(
 	env = toc->env;
 	db = toc->db;
 	idb = db->idb;
+	page = NULL;
 	ret = 0;
+
+	if (WT_UNOPENED_DATABASE(idb))
+		return (0);
 
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.stream = stream;
 	vstuff.f = f;
-
-	/*
-	 * If we don't have a root page yet, read the database description
-	 * to get the allocation and page sizes.   If we still don't have
-	 * a root page, we're done, the file is empty.
-	 */
-	if (idb->root_page == NULL) {
-		WT_ERR(__wt_bt_root_page(toc));
-		if (idb->root_page == NULL)
-			return (0);
-	}
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -98,31 +93,38 @@ __wt_bt_verify_int(
 	}
 	WT_ERR(bit_alloc(env, vstuff.frags, &vstuff.fragbits));
 
+	/* Verify the descriptor page. */
+	WT_ERR(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	WT_TRET(__wt_bt_verify_page(toc, page, &vstuff));
+	WT_ERR(__wt_bt_page_out(toc, page, 0));
+	page = NULL;
+
 	/* Check for one-page databases. */
 	switch (idb->root_page->hdr->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		WT_TRET(__wt_bt_verify_level(
-		    toc, idb->root_page->addr, 0, &vstuff));
+		WT_TRET(__wt_bt_verify_level(toc, idb->root_addr, 0, &vstuff));
 		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_bt_page_in(toc, WT_ADDR_FIRST_PAGE, 1, 0, &page));
-		ret = __wt_bt_verify_page(toc, page, &vstuff);
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
+		WT_ERR(__wt_bt_page_in(
+		    toc, idb->root_addr, idb->root_len, 0, &page));
+		WT_TRET(__wt_bt_verify_page(toc, page, &vstuff));
 		break;
 	WT_ILLEGAL_FORMAT_ERR(db, ret);
 	}
 
 	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
-err:	if (vstuff.fragbits != NULL)
-		__wt_free(env, vstuff.fragbits, 0);
+err:	if (page != NULL)
+		WT_TRET(__wt_bt_page_out(toc, page, 0));
 
 	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
 		vstuff.f(toc->name, vstuff.fcnt);
+	if (vstuff.fragbits != NULL)
+		__wt_free(env, vstuff.fragbits, 0);
 
 	return (ret);
 }
@@ -242,7 +244,8 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, int isleaf, VSTUFF *vs)
 			WT_ERR(__wt_bt_page_out(toc, prev, 0));
 		prev = page;
 		page = NULL;
-		WT_ERR(__wt_bt_page_in(toc, addr, isleaf, 0, &page));
+		WT_ERR(__wt_bt_page_in(toc, addr,
+		    isleaf ? db->leafmin : db->intlmin, 0, &page));
 
 		/* Verify the page. */
 		WT_ERR(__wt_bt_verify_page(toc, page, vs));
@@ -362,17 +365,19 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	DB *db;
 	DBT *cd_ref, child_dbt, *pd_ref, parent_dbt;
 	ENV *env;
+	IDB *idb;
+	WT_COL_INDX *parent_cip;
 	WT_OFF *offp;
 	WT_PAGE *parent;
 	WT_PAGE_HDR *hdr;
 	WT_ROW_INDX *child_rip, *parent_rip;
-	WT_COL_INDX *parent_cip;
-	u_int32_t addr, frags, i, nextaddr, root_addr;
+	u_int32_t addr, frags, i, nextaddr;
 	int (*func)(DB *, const DBT *, const DBT *);
 	int ret;
 
 	db = toc->db;
 	env = toc->env;
+	idb = db->idb;
 	parent = NULL;
 	hdr = child->hdr;
 	addr = child->addr;
@@ -399,18 +404,15 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		}
 
 		/*
-		 * If this is the primary root page, confirm the description
-		 * record (which we've already read in) points to the right
-		 * place.
+		 * Only one page can have no parents or siblings -- the root
+		 * page.
 		 */
 		if (hdr->type == WT_PAGE_COL_INT ||
 		    hdr->type == WT_PAGE_ROW_INT) {
-			WT_RET(__wt_bt_desc_read(toc, &root_addr));
-			if (root_addr != addr) {
+			if (idb->root_addr != addr) {
 				__wt_api_db_errx(db,
-				    "page at addr %lu appears to be a root "
-				    "page which doesn't match the database "
-				    "descriptor record", (u_long)addr);
+				    "page at addr %lu is disconnected from "
+				    "the tree", (u_long)addr);
 				return (WT_ERROR);
 			}
 			return (0);
@@ -425,7 +427,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 	 * starting at the top.   Then, read the page in.  Since we've already
 	 * verified it, we can build the in-memory information.
 	 */
-	frags = WT_OFF_TO_ADDR(db, db->intlsize);
+	frags = WT_OFF_TO_ADDR(db, db->intlmin);
 	for (i = 0; i < frags; ++i)
 		if (!bit_test(vs->fragbits, hdr->prntaddr + i)) {
 			__wt_api_db_errx(db,
@@ -434,7 +436,7 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 			    (u_long)addr);
 			return (WT_ERROR);
 		}
-	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, 0, 1, &parent));
+	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, db->intlmin, 1, &parent));
 
 	/*
 	 * Search the parent for the reference to the child page, and set
@@ -575,7 +577,8 @@ noref:			__wt_api_db_errx(db,
 		if (nextaddr == WT_ADDR_INVALID)
 			parent = NULL;
 		else {
-			WT_RET(__wt_bt_page_in(toc, nextaddr, 0, 1, &parent));
+			WT_RET(__wt_bt_page_in(
+			    toc, nextaddr, db->intlmin, 1, &parent));
 			parent_rip = parent->u.r_indx;
 		}
 	} else
@@ -628,7 +631,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	DB *db;
 	WT_PAGE_HDR *hdr;
 	VSTUFF *vs;
-	u_int32_t addr, frags, i;
+	u_int32_t addr;
 
 	vs = vs_arg;
 
@@ -640,21 +643,9 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	if (vs != NULL && vs->f != NULL && ++vs->fcnt % 10 == 0)
 		vs->f(toc->name, vs->fcnt);
 
-	/*
-	 * If we're verifying the whole tree, complain if there's a page
-	 * we've already verified.
-	 */
-	if (vs != NULL && vs->fragbits != NULL) {
-		frags = WT_OFF_TO_ADDR(db, page->bytes);
-		for (i = 0; i < frags; ++i)
-			if (bit_test(vs->fragbits, addr + i)) {
-				__wt_api_db_errx(db,
-				    "page at addr %lu already verified",
-				    (u_long)addr);
-				return (WT_ERROR);
-			}
-		bit_nset(vs->fragbits, addr, addr + (frags - 1));
-	}
+	/* Update frags list. */
+	if (vs != NULL && vs->fragbits != NULL)
+		WT_RET(__wt_bt_verify_addfrag(toc, page, vs));
 
 	/*
 	 * FUTURE:
@@ -663,6 +654,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 
 	/* Check the page type. */
 	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
@@ -709,12 +701,11 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	 * page.
 	 */
 
-	/* Page 0 has the descriptor record. */
-	if (addr == WT_ADDR_FIRST_PAGE)
-		WT_RET(__wt_bt_desc_verify(db, page));
-
 	/* Verify the items on the page. */
 	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
+		WT_RET(__wt_bt_verify_page_desc(toc, page));
+		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
@@ -923,7 +914,7 @@ eop:			__wt_api_db_errx(db,
 					break;
 				offp = WT_ITEM_BYTE_OFF(item);
 				if (WT_ADDR_TO_OFF(db, offp->addr) +
-				    db->intlsize > idb->fh->file_size)
+				    db->intlmin > idb->fh->file_size)
 					goto eof;
 				WT_ERR(__wt_bt_verify_level(
 				    toc, offp->addr, 0, vs));
@@ -933,7 +924,7 @@ eop:			__wt_api_db_errx(db,
 					break;
 				offp = WT_ITEM_BYTE_OFF(item);
 				if (WT_ADDR_TO_OFF(db, offp->addr) +
-				    db->leafsize > idb->fh->file_size) {
+				    db->leafmin > idb->fh->file_size) {
 eof:					__wt_api_db_errx(db,
 					    "off-page reference in item %lu on "
 					    "page at addr %lu extends past the "
@@ -1071,7 +1062,7 @@ __wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
 		/* Check if the reference is past the end-of-file. */
 		if (WT_ADDR_TO_OFF(db, offp->addr) +
 		    (F_ISSET(hdr, WT_OFFPAGE_REF_LEAF) ?
-		    db->leafsize : db->intlsize) > idb->fh->file_size) {
+		    db->leafmin : db->intlmin) > idb->fh->file_size) {
 			__wt_api_db_errx(db,
 			    "off-page reference in object %lu on page at "
 			    "addr %lu extends past the end of the file",
@@ -1143,6 +1134,93 @@ eop:				__wt_api_db_errx(db,
 }
 
 /*
+ * __wt_bt_verify_page_desc --
+ *	Verify the database description on page 0.
+ */
+static int
+__wt_bt_verify_page_desc(WT_TOC *toc, WT_PAGE *page)
+{
+	DB *db;
+	WT_PAGE_DESC *desc;
+	u_int i;
+	u_int8_t *p;
+	int ret;
+
+	db = toc->db;
+	ret = 0;
+
+	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
+	if (desc->magic != WT_BTREE_MAGIC) {
+		__wt_api_db_errx(db, "magic number %#lx, expected %#lx",
+		    (u_long)desc->magic, WT_BTREE_MAGIC);
+		ret = WT_ERROR;
+	}
+	if (desc->majorv != WT_BTREE_MAJOR_VERSION) {
+		__wt_api_db_errx(db, "major version %d, expected %d",
+		    (int)desc->majorv, WT_BTREE_MAJOR_VERSION);
+		ret = WT_ERROR;
+	}
+	if (desc->minorv != WT_BTREE_MINOR_VERSION) {
+		__wt_api_db_errx(db, "minor version %d, expected %d",
+		    (int)desc->minorv, WT_BTREE_MINOR_VERSION);
+		ret = WT_ERROR;
+	}
+	if (desc->intlmin != db->intlmin) {
+		__wt_api_db_errx(db,
+		    "minimum internal page size %lu, expected %lu",
+		    (u_long)db->intlmin, (u_long)desc->intlmin);
+		ret = WT_ERROR;
+	}
+	if (desc->intlmax != db->intlmax) {
+		__wt_api_db_errx(db,
+		    "maximum internal page size %lu, expected %lu",
+		    (u_long)db->intlmax, (u_long)desc->intlmax);
+		ret = WT_ERROR;
+	}
+	if (desc->leafmin != db->leafmin) {
+		__wt_api_db_errx(db, "minimum leaf page size %lu, expected %lu",
+		    (u_long)db->leafmin, (u_long)desc->leafmin);
+		ret = WT_ERROR;
+	}
+	if (desc->leafmax != db->leafmax) {
+		__wt_api_db_errx(db, "maximum leaf page size %lu, expected %lu",
+		    (u_long)db->leafmax, (u_long)desc->leafmax);
+		ret = WT_ERROR;
+	}
+	if (desc->base_recno != 0) {
+		__wt_api_db_errx(db, "base recno %llu, expected 0",
+		    (u_quad)desc->base_recno);
+		ret = WT_ERROR;
+	}
+	if (desc->fixed_len == 0 && F_ISSET(desc, WT_PAGE_DESC_REPEAT)) {
+		__wt_api_db_errx(db,
+		    "repeat counts configured but no fixed length record "
+		    "size specified");
+		ret = WT_ERROR;
+	}
+	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {
+		__wt_api_db_errx(db,
+		    "unexpected flags found in description record");
+		ret = WT_ERROR;
+	}
+
+	for (p = (u_int8_t *)desc->unused1,
+	    i = sizeof(desc->unused1); i > 0; --i)
+		if (*p != '\0')
+			goto unused_not_clear;
+	for (p = (u_int8_t *)desc->unused2,
+	    i = sizeof(desc->unused2); i > 0; --i)
+		if (*p != '\0') {
+unused_not_clear:	__wt_api_db_errx(db,
+			    "unexpected values found in description record's "
+			    "unused fields");
+			ret = WT_ERROR;
+		}
+
+	return (ret);
+}
+
+/*
  * __wt_bt_verify_ovfl --
  *	Verify an overflow item.
  */
@@ -1159,6 +1237,32 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
 	WT_TRET(__wt_bt_page_out(toc, pagep, 0));
 
 	return (ret);
+}
+
+/*
+ * __wt_bt_verify_addfrag --
+ *	Add a new set of fragments to the list, and complain if we've already
+ *	verified this chunk of the file.
+ */
+static int
+__wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+{
+	DB *db;
+	u_int32_t addr, frags, i;
+
+	db = toc->db;
+
+	addr = page->addr;
+	frags = WT_OFF_TO_ADDR(db, page->bytes);
+	for (i = 0; i < frags; ++i)
+		if (bit_test(vs->fragbits, addr + i)) {
+			__wt_api_db_errx(db,
+			    "page fragment at addr %lu already verified",
+			    (u_long)addr);
+			return (WT_ERROR);
+		}
+	bit_nset(vs->fragbits, addr, addr + (frags - 1));
+	return (0);
 }
 
 /*
