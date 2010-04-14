@@ -262,6 +262,8 @@ ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
 }
 
 printShardingStatus = function( configDB ){
+    if (configDB === undefined)
+        configDB = db.getSisterDB('config')
     
     var version = configDB.getCollection( "version" ).findOne();
     if ( version == null ){

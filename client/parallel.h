@@ -102,7 +102,8 @@ namespace mongo {
         
         bool more();
         BSONObj next();
-
+        
+        BSONObj peek();
     private:
         void _advance();
         
@@ -110,6 +111,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> _cursor;
         
         BSONObj _next;
+        bool _done;
     };
 
     /**
@@ -146,14 +148,11 @@ namespace mongo {
     private:
         void _init();
         
-        void advance();
-
         int _numServers;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;
         
         FilteringClientCursor * _cursors;
-        BSONObj * _nexts;
     };
 
     /**
