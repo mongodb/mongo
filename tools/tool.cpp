@@ -34,9 +34,11 @@ namespace mongo {
 
     CmdLine cmdLine;
 
-    Tool::Tool( string name , bool localDBAllowed , string defaultDB , string defaultCollection ) :
-        _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , _conn(0), _paired(false) {
-    
+    Tool::Tool( string name , bool localDBAllowed , string defaultDB , 
+                string defaultCollection , bool usesstdout ) :
+        _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
+        _usesstdout(usesstdout), _conn(0), _paired(false) {
+        
         _options = new po::options_description( "options" );
         _options->add_options()
             ("help","produce help message")
@@ -111,7 +113,7 @@ namespace mongo {
         }
 
         if ( _params.count( "help" ) ){
-            printHelp(cerr);
+            printHelp(cout);
             return 0;
         }
 
@@ -153,8 +155,8 @@ namespace mongo {
                     return -1;
                 }
             }
-
-            cerr << "connected to: " << _host << endl;
+            
+            (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
         }
         else {
             if ( _params.count( "directoryperdb" ) ) {

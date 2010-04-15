@@ -40,6 +40,7 @@ public:
             ("csv","export to csv instead of json")
             ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
             ;
+        _usesstdout = false;
     }
     
     int run(){
