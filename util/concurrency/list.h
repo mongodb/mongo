@@ -28,6 +28,7 @@ namespace mongo {
             int port;
         };
         List1<MemberInfo> _members;
+        _members.head()->next();
 
 */
 template<typename T>
