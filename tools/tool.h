@@ -35,7 +35,8 @@ namespace mongo {
 
     class Tool {
     public:
-        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , string defaultCollection="");
+        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , 
+              string defaultCollection="", bool usesstdout=true );
         virtual ~Tool();
 
         int main( int argc , char ** argv );
@@ -90,6 +91,8 @@ namespace mongo {
 
         string _username;
         string _password;
+        
+        bool _usesstdout;
 
         void addFieldOptions();
         void needFields();
