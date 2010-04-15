@@ -14,7 +14,7 @@
  *	Allocate bytes from a file.
  */
 int
-__wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
+__wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
 {
 	ENV *env;
 	int ret;
@@ -22,9 +22,9 @@ __wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
 	*pagep = NULL;
 	env = toc->env;
 
-	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
+	WT_ASSERT(env, size % WT_FRAGMENT == 0);
 
-	__wt_cache_in_serial(toc, WT_ADDR_INVALID, bytes, pagep, ret);
+	__wt_cache_in_serial(toc, WT_ADDR_INVALID, size, pagep, ret);
 	return (ret);
 }
 
@@ -33,7 +33,7 @@ __wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep)
  *	Return a database page, reading as necessary.
  */
 int
-__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
+__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 {
 	DB *db;
 	ENV *env;
@@ -53,7 +53,7 @@ __wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep)
 	ienv = env->ienv;
 	cache = ienv->cache;
 
-	WT_ASSERT(env, bytes % WT_FRAGMENT == 0);
+	WT_ASSERT(env, size % WT_FRAGMENT == 0);
 
 retry:	/* Search the cache for the page. */
 	found = 0;
@@ -98,7 +98,7 @@ retry:	/* Search the cache for the page. */
 		__wt_hazard_clear(toc, e->page);
 	}
 
-	__wt_cache_in_serial(toc, addr, bytes, pagep, ret);
+	__wt_cache_in_serial(toc, addr, size, pagep, ret);
 	if (ret == WT_RESTART) {
 		WT_STAT_INCR(cache->stats, CACHE_READ_RESTARTS);
 		goto retry;
@@ -143,14 +143,14 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	hdr = page->hdr;
 
 	offset = WT_ADDR_TO_OFF(db, page->addr);
-	WT_RET(__wt_read(env, fh, offset, page->bytes, hdr));
+	WT_RET(__wt_read(env, fh, offset, page->size, hdr));
 
 	checksum = hdr->checksum;
 	hdr->checksum = 0;
-	if (checksum != __wt_cksum(hdr, page->bytes)) {
+	if (checksum != __wt_cksum(hdr, page->size)) {
 		__wt_api_env_errx(env,
 		    "read checksum error on %lu bytes at file offset %llu",
-		    (u_quad)offset, (u_long)page->bytes);
+		    (u_quad)offset, (u_long)page->size);
 		return (WT_ERROR);
 	}
 	return (0);
@@ -172,7 +172,7 @@ __wt_page_write(DB *db, WT_PAGE *page)
 	hdr = page->hdr;
 
 	hdr->checksum = 0;
-	hdr->checksum = __wt_cksum(hdr, page->bytes);
+	hdr->checksum = __wt_cksum(hdr, page->size);
 	return (__wt_write(
-	    env, fh, WT_ADDR_TO_OFF(db, page->addr), page->bytes, hdr));
+	    env, fh, WT_ADDR_TO_OFF(db, page->addr), page->size, hdr));
 }

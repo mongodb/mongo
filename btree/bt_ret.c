@@ -71,9 +71,9 @@ __wt_bt_dbt_return(WT_TOC *toc,
 			key->data = toc->key.data;
 			key->size = toc->key.size;
 		} else if (callback == NULL) {
-			if (toc->key.data_len < rip->size)
+			if (toc->key.mem_size < rip->size)
 				WT_RET(__wt_realloc(env,
-				    &toc->key.data_len,
+				    &toc->key.mem_size,
 				    rip->size, &toc->key.data));
 			memcpy(toc->key.data, rip->data, rip->size);
 			toc->key.size = rip->size;
@@ -173,26 +173,27 @@ item_set:	if (callback != NULL &&
 	}
 
 	if (ovfl != NULL) {
-		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+		WT_RET(
+		    __wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &ovfl_page));
 		orig = WT_PAGE_BYTE(ovfl_page);
-		size = ovfl->len;
+		size = ovfl->size;
 	}
 
 	if (idb->huffman_data == NULL) {
-		if (toc->data.data_len < size)
+		if (toc->data.mem_size < size)
 			WT_ERR(__wt_realloc(
-			    env, &toc->data.data_len, size, &toc->data.data));
+			    env, &toc->data.mem_size, size, &toc->data.data));
 		memcpy(toc->data.data, orig, size);
 		toc->data.size = size;
 	} else
 		 WT_ERR(__wt_huffman_decode(idb->huffman_data, orig, size,
-		     &toc->data.data, &toc->data.data_len, &toc->data.size));
+		     &toc->data.data, &toc->data.mem_size, &toc->data.size));
 
 	data->data = toc->data.data;
 	data->size = toc->data.size;
 
 err:	if (ovfl != NULL)
-		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+		WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
 
 	return (ret != 0 ? ret :
 	    (callback == NULL ? 0 : callback(db, key, data)));

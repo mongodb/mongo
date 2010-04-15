@@ -74,19 +74,15 @@ struct __wt_sdbt;		typedef struct __wt_sdbt WT_SDBT;
  * Return database allocation units needed for length (optionally including a
  * page header), rounded to an allocation unit.
  */
-#define	WT_BYTES_TO_ALLOC(db, len)					\
-	((u_int32_t)WT_ALIGN((len), (db)->allocsize))
-#define	WT_HDR_BYTES_TO_ALLOC(db, len)					\
-	WT_BYTES_TO_ALLOC(db, len + sizeof(WT_PAGE_HDR))
+#define	WT_BYTES_TO_ALLOC(db, size)					\
+	((u_int32_t)WT_ALIGN((size), (db)->allocsize))
+#define	WT_HDR_BYTES_TO_ALLOC(db, size)					\
+	WT_BYTES_TO_ALLOC(db, (size) + sizeof(WT_PAGE_HDR))
 
 /*
- * The first possible database addr is 512.  It is also always the first leaf
- * page in the database because it's created first and never replaced.
- *
  * The invalid address is the largest possible offset, which isn't a possible
  * database address.
  */
-#define	WT_ADDR_FIRST_LEAF	512
 #define	WT_ADDR_INVALID		UINT32_MAX
 
 /*
@@ -119,9 +115,9 @@ struct __wt_page_desc {
 
 	u_int64_t base_recno;		/* 24-31: Base record number */
 	u_int32_t root_addr;		/* 32-35: Root page address */
-	u_int32_t root_len;		/* 36-39: Root page length */
+	u_int32_t root_size;		/* 36-39: Root page length */
 	u_int32_t free_addr;		/* 40-43: Free list page address */
-	u_int32_t free_len;		/* 44-47: Free list page length */
+	u_int32_t free_size;		/* 44-47: Free list page length */
 
 #define	WT_PAGE_DESC_REPEAT	0x01	/* Repeat count compression */
 #define	WT_PAGE_DESC_MASK	0x01	/* Valid bit mask */
@@ -152,7 +148,7 @@ struct __wt_page {
 	 * page sizes to 128MB.
 	 */
 	u_int32_t addr;			/* Page's allocation address */
-	u_int32_t bytes;		/* Page size */
+	u_int32_t size;			/* Page size */
 
 	WT_PAGE_HDR *hdr;		/* Page's on-disk representation */
 
@@ -218,21 +214,7 @@ struct __wt_page_hdr {
 #define	WT_PAGE_ROW_LEAF	9	/* Row-store leaf page */
 	u_int8_t type;			/* 12: page type */
 
-	/*
-	 * Currently unused -- in the middle so we can grab the top byte for
-	 * another field, and the bottom byte for more flags without getting
-	 * crazy.
-	 */
-	u_int8_t unused[2];		/* 13-14: unused padding */
-
-	/*
-	 * WT_OFFPAGE_REF_LEAF --
-	 *	Used on WT_PAGE_COL_INT pages (column-store internal pages),
-	 *	specifies if offpage references are to internal pages or to
-	 *	leaf pages.  See note at __wt_off structure.
-	 */
-#define	WT_OFFPAGE_REF_LEAF	0x01	/* Offpage structures reference leaf */
-	u_int8_t flags;			/* 15: flags */
+	u_int8_t unused[3];		/* 13-15: unused padding */
 
 	union {
 		u_int32_t datalen;	/* 16-19: overflow data length */
@@ -241,25 +223,23 @@ struct __wt_page_hdr {
 
 	/*
 	 * Parent, forward and reverse page links.  Pages are linked at their
-	 * level, that is, all the main btree leaf pages are linked, each set
-	 * of offpage duplicate leaf pages are linked, and each level of
-	 * internal pages are linked.
+	 * level: all the main btree leaf pages are linked, each set of offpage
+	 * duplicate leaf pages are linked, and each level of internal pages
+	 * are linked.
 	 */
 	u_int32_t prntaddr;		/* 20-23: parent page */
-	u_int32_t prevaddr;		/* 24-27: previous page */
-	u_int32_t nextaddr;		/* 28-31: next page */
+	u_int32_t prntsize;		/* 24-27: parent page size */
+	u_int32_t prevaddr;		/* 28-31: previous page */
+	u_int32_t prevsize;		/* 32-35: previous page size */
+	u_int32_t nextaddr;		/* 36-39: next page */
+	u_int32_t nextsize;		/* 40-43: next page size */
 };
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must be a multiple of a 4-byte boundary.
- *
- * It would be possible to reduce this by two bytes, by moving the odd-sized
- * fields to the end of the structure (and using something other than "sizeof"
- * for the check, as compilers usually pad the sizeof() operator to the next
- * 4-byte boundary), but I don't think two bytes are worth the effort.
  */
-#define	WT_PAGE_HDR_SIZE		32
+#define	WT_PAGE_HDR_SIZE		44
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.
@@ -328,18 +308,22 @@ struct __wt_col_indx {
 /*
  * On both row- and column-store internal pages, the on-page data referenced
  * by the WT_INDX page_data field is a WT_OFF structure, which contains a
- * record count and a page address.   These macros reach into the on-page
+ * record count and a page addr/size pair.   Macros to reach into the on-page
  * structure and return the values.
  */
-#define	WT_COL_OFF_ADDR(ip)						\
-	(((WT_OFF *)((ip)->page_data))->addr)
 #define	WT_COL_OFF_RECORDS(ip)						\
 	WT_RECORDS((WT_OFF *)((ip)->page_data))
+#define	WT_COL_OFF_ADDR(ip)						\
+	(((WT_OFF *)((ip)->page_data))->addr)
+#define	WT_COL_OFF_SIZE(ip)						\
+	(((WT_OFF *)((ip)->page_data))->size)
 
-#define	WT_ROW_OFF_ADDR(ip)						\
-	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
 #define	WT_ROW_OFF_RECORDS(ip)						\
 	WT_RECORDS((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))
+#define	WT_ROW_OFF_ADDR(ip)						\
+	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->addr)
+#define	WT_ROW_OFF_SIZE(ip)						\
+	(((WT_OFF *)WT_ITEM_BYTE((ip)->page_data))->size)
 
 /*
  * WT_BIN_INDX --
@@ -449,20 +433,20 @@ struct __wt_item {
  *
  * WT_PAGE_ROW_INT (row-store internal pages):
  * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- * followed by a WT_ITEM_OFF_INT/OFF_LEAF item).
+ * followed by a WT_ITEM_OFF item).
  *
  * WT_PAGE_ROW_LEAF (row-store primary leaf pages):
  * -- Variable-length key followed by a single variable-length/data item (a
  *    WT_ITEM_KEY/KEY_OVFL item followed by a WT_ITEM_DATA/DATA_OVFL item);
  * -- Variable-length key/offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- *    followed by a WT_ITEM_OFF_INT/OFF_LEAF item);
+ *    followed by a WT_ITEM_OFF item);
  * -- Variable-length key followed a sets of duplicates that have not yet been
  *    moved into their own tree (a WT_ITEM_KEY/KEY_OVFL item followed by two
  *    or more WT_ITEM_DUP/DUP_OVFL items).
  *
  * WT_PAGE_DUP_INT (row-store offpage duplicates internal pages):
  * Variable-length key and offpage-reference pairs (a WT_ITEM_KEY/KEY_OVFL item
- * followed by a WT_ITEM_OFF_INT/OFF_LEAF item).
+ * followed by a WT_ITEM_OFF item).
  *
  * WT_PAGE_DUP_LEAF (row-store offpage duplicates leaf pages):
  * Variable-length data items (WT_ITEM_DUP/DUP_OVFL).
@@ -483,13 +467,12 @@ struct __wt_item {
 #define	WT_ITEM_DATA_OVFL	0x04000000 /* Overflow data */
 #define	WT_ITEM_DUP		0x05000000 /* Duplicate data */
 #define	WT_ITEM_DUP_OVFL	0x06000000 /* Overflow duplicate data */
-#define	WT_ITEM_OFF_INT		0x07000000 /* Offpage-tree reference */
-#define	WT_ITEM_OFF_LEAF	0x08000000 /* Offpage-leaf reference */
+#define	WT_ITEM_OFF		0x07000000 /* Offpage-tree reference */
 
 #define	WT_ITEM_LEN(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x00ffffff)
-#define	WT_ITEM_LEN_SET(addr, len)					\
-	(((WT_ITEM *)(addr))->__item_chunk = WT_ITEM_TYPE(addr) | (len))
+#define	WT_ITEM_LEN_SET(addr, size)					\
+	(((WT_ITEM *)(addr))->__item_chunk = WT_ITEM_TYPE(addr) | (size))
 #define	WT_ITEM_TYPE(addr)						\
 	(((WT_ITEM *)(addr))->__item_chunk & 0x0f000000)
 #define	WT_ITEM_TYPE_SET(addr, type)					\
@@ -511,12 +494,12 @@ struct __wt_item {
 	((WT_OVFL *)(WT_ITEM_BYTE(addr)))
 
 /*
- * The number of bytes required to store a WT_ITEM followed by len additional
+ * The number of bytes required to store a WT_ITEM followed by additional
  * bytes.  Align the entry and the data itself to a 4-byte boundary so it's
  * possible to directly access WT_ITEMs on the page.
  */
-#define	WT_ITEM_SPACE_REQ(len)						\
-	WT_ALIGN(sizeof(WT_ITEM) + (len), sizeof(u_int32_t))
+#define	WT_ITEM_SPACE_REQ(size)						\
+	WT_ALIGN(sizeof(WT_ITEM) + (size), sizeof(u_int32_t))
 
 /* WT_ITEM_NEXT is the first byte of the next item. */
 #define	WT_ITEM_NEXT(item)						\
@@ -529,23 +512,8 @@ struct __wt_item {
 	    (i) > 0; (item) = WT_ITEM_NEXT(item), --(i))
 
 /*
- * Btree internal items and offpage duplicates reference another page.
- *
- * !!!
- * We need a page's size before reading it, and as internal and leaf nodes are
- * potentially of different sizes, we have to know the page's tree level to know
- * its size.  We could store the level or type of the root of the offpage tree
- * in the WT_OFF structure, but that costs another 4 bytes (with alignment).
- *
- * On pages with variable-length items, we encode the information in the item
- * type: WT_ITEM_OFFP_INTL is an internal page reference, and WT_ITEM_OFFP_LEAF
- * is a leaf page reference.
- *
- * On pages without variable-length items (column-store internal pages), we
- * encode the information in the page header's flags field.
- *
- * This complicates the code, but 4 bytes per offpage reference is a real cost
- * we don't want to pay.
+ * WT_OFF --
+ *	Btree internal items and offpage duplicates reference another tree.
  */
 struct __wt_off {
 /*
@@ -559,12 +527,13 @@ struct __wt_off {
 #define	WT_RECORDS(offp)	(*(u_int64_t *)(&(offp)->__record_chunk[0]))
 	u_int32_t __record_chunk[2];	/* Subtree record count */
 	u_int32_t addr;			/* Subtree root page address */
+	u_int32_t size;			/* Subtree root page length */
 };
 /*
  * WT_OFF_SIZE is the expected structure size -- we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  */
-#define	WT_OFF_SIZE	12
+#define	WT_OFF_SIZE	16
 
 /* WT_OFF_FOREACH is a loop that walks offpage references on a page */
 #define	WT_OFF_FOREACH(page, offp, i)					\
@@ -576,8 +545,8 @@ struct __wt_off {
  * structure.
  */
 struct __wt_ovfl {
-	u_int32_t len;			/* Overflow length */
 	u_int32_t addr;			/* Overflow address */
+	u_int32_t size;			/* Overflow length */
 };
 /*
  * WT_OVFL_SIZE is the expected structure size --  we check at startup to

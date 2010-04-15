@@ -29,7 +29,7 @@ __wt_db_dump(WT_TOC *toc,
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 	u_int64_t fcnt;
-	u_int32_t addr;
+	u_int32_t addr, size;
 
 	db = toc->db;
 	idb = db->idb;
@@ -56,8 +56,8 @@ __wt_db_dump(WT_TOC *toc,
 	 * The first physical page of the database is guaranteed to be the first
 	 * leaf page in the database; walk the linked list of leaf pages.
 	 */
-	for (addr = WT_ADDR_FIRST_LEAF;;) {
-		WT_RET(__wt_bt_page_in(toc, addr, db->leafmin, 0, &page));
+	WT_RET(__wt_bt_leaf_first(toc, idb->root_addr, idb->root_size, &page));
+	for (;;) {
 		hdr = page->hdr;
 		switch (hdr->type) {
 		case WT_PAGE_COL_FIX:
@@ -75,9 +75,11 @@ __wt_db_dump(WT_TOC *toc,
 		}
 
 		addr = hdr->nextaddr;
-		WT_RET(__wt_bt_page_out(toc, page, 0));
+		size = hdr->nextsize;
+		WT_RET(__wt_bt_page_out(toc, &page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
+		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
 
 		/* Report progress every 10 pages. */
 		if (f != NULL && ++fcnt % 10 == 0)
@@ -96,8 +98,7 @@ __wt_db_dump(WT_TOC *toc,
 	u_int32_t __type = WT_ITEM_TYPE(WT_ITEM_NEXT(item));		\
 	(yesno) = __type == WT_ITEM_DUP ||				\
 	    __type == WT_ITEM_DUP_OVFL ||				\
-	    __type == WT_ITEM_OFF_INT ||				\
-	    __type == WT_ITEM_OFF_LEAF ? 1 : 0;				\
+	    __type == WT_ITEM_OFF ? 1 : 0;				\
 }
 
 /*
@@ -161,7 +162,7 @@ __wt_bt_dump_page_item(
 		case WT_ITEM_DUP_OVFL:
 			ovfl = WT_ITEM_BYTE_OVFL(item);
 			WT_ERR(__wt_bt_ovfl_in(
-			    toc, ovfl->addr, ovfl->len, &ovfl_page));
+			    toc, ovfl->addr, ovfl->size, &ovfl_page));
 
 			/*
 			 * If we're already in a duplicate set, dump
@@ -177,18 +178,17 @@ __wt_bt_dump_page_item(
 			 */
 			if (dup_ahead) {
 				WT_ERR(__wt_bt_data_copy_to_dbt(db,
-				    WT_PAGE_BYTE(ovfl_page), ovfl->len,
+				    WT_PAGE_BYTE(ovfl_page), ovfl->size,
 				    &last_key_ovfl));
 				last_key = &last_key_ovfl;
 				dup_ahead = 0;
 			} else
 				func(
-				   WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
+				   WT_PAGE_BYTE(ovfl_page), ovfl->size, stream);
 
-			WT_ERR(__wt_bt_page_out(toc, ovfl_page, 0));
+			WT_ERR(__wt_bt_page_out(toc, &ovfl_page, 0));
 			break;
-		case WT_ITEM_OFF_INT:
-		case WT_ITEM_OFF_LEAF:
+		case WT_ITEM_OFF:
 			WT_ERR(__wt_bt_dump_offpage(
 			    toc, last_key, item, stream, func));
 			break;
@@ -197,7 +197,7 @@ __wt_bt_dump_page_item(
 	}
 
 err:	/* Discard any space allocated to hold an overflow key. */
-	__wt_free(env, last_key_ovfl.data, last_key_ovfl.data_len);
+	__wt_free(env, last_key_ovfl.data, last_key_ovfl.mem_size);
 
 	return (ret);
 }
@@ -211,38 +211,22 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
     FILE *stream, void (*func)(u_int8_t *, u_int32_t, FILE *))
 {
 	DB *db;
+	WT_OFF *off;
 	WT_OVFL *ovfl;
 	WT_PAGE *page, *ovfl_page;
-	u_int32_t addr, i;
-	int isleaf, ret;
+	u_int32_t addr, size, i;
+	int ret;
 
 	db = toc->db;
 	page = NULL;
 
 	/*
-	 * Callers pass us a reference to an on-page WT_ITEM_OFF_INT/LEAF.
+	 * Callers pass us a reference to an on-page WT_ITEM_OFF.
 	 *
-	 * We need to know what kind of page we're getting, use the item type.
+	 * Walk down the duplicates tree to the first leaf page.
 	 */
-	addr = WT_ITEM_BYTE_OFF(item)->addr;
-	isleaf = WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0;
-
-	/* Walk down the duplicates tree to the first leaf page. */
-	for (;;) {
-		WT_RET(__wt_bt_page_in(
-		    toc, addr, isleaf ? db->leafmin : db->intlmin, 0, &page));
-		if (isleaf)
-			break;
-
-		/* Get the page's first WT_OFF structure. */
-		__wt_bt_first_offp(page, &addr, &isleaf);
-
-		if ((ret = __wt_bt_page_out(toc, page, 0)) != 0) {
-			page = NULL;
-			goto err;
-		}
-	}
-
+	off = WT_ITEM_BYTE_OFF(item);
+	WT_RET(__wt_bt_leaf_first(toc, off->addr, off->size, &page));
 	for (;;) {
 		WT_ITEM_FOREACH(page, item, i) {
 			func(key->data, key->size, stream);
@@ -254,29 +238,26 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 			case WT_ITEM_DUP_OVFL:
 				ovfl = WT_ITEM_BYTE_OVFL(item);
 				WT_ERR(__wt_bt_ovfl_in(toc,
-				    ovfl->addr, ovfl->len, &ovfl_page));
-				func(
-				    WT_PAGE_BYTE(ovfl_page), ovfl->len, stream);
-				WT_ERR(__wt_bt_page_out(toc, ovfl_page, 0));
+				    ovfl->addr, ovfl->size, &ovfl_page));
+				func(WT_PAGE_BYTE(
+				    ovfl_page), ovfl->size, stream);
+				WT_ERR(__wt_bt_page_out(toc, &ovfl_page, 0));
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}
 		}
 
 		addr = page->hdr->nextaddr;
-		if ((ret = __wt_bt_page_out(toc, page, 0)) != 0) {
-			page = NULL;
-			goto err;
-		}
+		size = page->hdr->nextsize;
+		WT_ERR(__wt_bt_page_out(toc, &page, 0));
 		if (addr == WT_ADDR_INVALID)
 			break;
-
-		WT_ERR(__wt_bt_page_in(toc, addr, db->leafmin, 0, &page));
+		WT_ERR(__wt_bt_page_in(toc, addr, size, 0, &page));
 	}
 
 	if (0) {
 err:		if (page != NULL)
-			(void)__wt_bt_page_out(toc, page, 0);
+			(void)__wt_bt_page_out(toc, &page, 0);
 	}
 	return (ret);
 }
@@ -317,11 +298,11 @@ static const char hex[] = "0123456789abcdef";
  *	itself terminated with a <newline> character.
  */
 static void
-__wt_bt_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_print_nl(u_int8_t *data, u_int32_t size, FILE *stream)
 {
-	if (data[len - 1] == '\n')
-		--len;
-	__wt_bt_print(data, len, stream);
+	if (data[size - 1] == '\n')
+		--size;
+	__wt_bt_print(data, size, stream);
 	fprintf(stream, "\n");
 }
 
@@ -330,11 +311,11 @@ __wt_bt_print_nl(u_int8_t *data, u_int32_t len, FILE *stream)
  *	Output a single key/data entry in printable characters, where possible.
  */
 void
-__wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream)
 {
 	int ch;
 
-	for (; len > 0; --len, ++data) {
+	for (; size > 0; --size, ++data) {
 		ch = data[0];
 		if (isprint(ch))
 			fprintf(stream, "%c", ch);
@@ -349,9 +330,9 @@ __wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream)
  *	Output a single key/data entry in hex.
  */
 static void
-__wt_bt_hexprint(u_int8_t *data, u_int32_t len, FILE *stream)
+__wt_bt_hexprint(u_int8_t *data, u_int32_t size, FILE *stream)
 {
-	for (; len > 0; --len, ++data)
+	for (; size > 0; --size, ++data)
 		fprintf(stream, "%x%x",
 		    hex[(data[0] & 0xf0) >> 4], hex[data[0] & 0x0f]);
 	fprintf(stream, "\n");

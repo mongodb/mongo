@@ -21,7 +21,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	WT_PAGE *page;
 	WT_ROW_INDX *ip;
 	WT_SDBT *rdbt;
-	u_int32_t addr, base, indx, limit;
+	u_int32_t addr, base, indx, limit, size;
 	int cmp, isleaf, ret;
 
 	toc->srch_page = NULL;			/* Return values. */
@@ -35,11 +35,10 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 
 	if (WT_UNOPENED_DATABASE(idb))
 		return (WT_NOTFOUND);
-	page = idb->root_page;
-	isleaf = page->hdr->type == WT_PAGE_ROW_LEAF ? 1 : 0;
 
 	/* Search the tree. */
-	for (;;) {
+	for (page = idb->root_page;;) {
+		isleaf = page->hdr->type == WT_PAGE_ROW_LEAF;
 		for (base = 0,
 		    limit = page->indx_count; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -97,16 +96,12 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 
 		/* Get the address for the child page. */
 		addr = WT_ROW_OFF_ADDR(ip);
-		isleaf =
-		    WT_ITEM_TYPE(ip->page_data) == WT_ITEM_OFF_LEAF ? 1 : 0;
+		size = WT_ROW_OFF_SIZE(ip);
 
-		/* We're done with the page. */
+		/* Walk down to the next page. */
 		if (page != idb->root_page)
-			WT_RET(__wt_bt_page_out(toc, page, 0));
-
-		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(toc,
-		    addr, isleaf ? db->leafmin : db->intlmin, 1, &page));
+			WT_RET(__wt_bt_page_out(toc, &page, 0));
+		WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 	}
 
 	/*
@@ -132,6 +127,6 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	return (0);
 
 err:	if (page != idb->root_page)
-		WT_RET(__wt_bt_page_out(toc, page, 0));
+		WT_RET(__wt_bt_page_out(toc, &page, 0));
 	return (ret);
 }

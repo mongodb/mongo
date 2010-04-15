@@ -34,7 +34,7 @@ serial['cache_in'] = Serial(
 	'cache_in',
 	'WT_WORKQ_READ',
 	['u_int32_t addr/addr',
-	 'u_int32_t bytes/bytes',
+	 'u_int32_t size/size',
 	 'WT_PAGE **pagep/pagep'])
 
 serial['flist_free'] = Serial(

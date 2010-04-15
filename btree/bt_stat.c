@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_level(WT_TOC *, u_int32_t, int);
+static int __wt_bt_stat_level(WT_TOC *, u_int32_t, u_int32_t);
 static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
 
 /*
@@ -35,7 +35,7 @@ __wt_bt_stat(WT_TOC *toc)
 	page = idb->root_page;
 	return (page->hdr->type == WT_PAGE_ROW_LEAF ?
 	    __wt_bt_stat_page(toc, page) :
-	    __wt_bt_stat_level(toc, page->addr, 0));
+	    __wt_bt_stat_level(toc, page->addr, page->size));
 }
 
 /*
@@ -43,24 +43,23 @@ __wt_bt_stat(WT_TOC *toc)
  *	Stat a level of a tree.
  */
 static int
-__wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
+__wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 {
 	DB *db;
 	IDB *idb;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	u_int32_t addr_arg;
-	int first, isleaf_arg, ret;
+	u_int32_t addr_arg, size_arg;
+	int first, ret;
 
 	db = toc->db;
 	idb = db->idb;
-	isleaf_arg = ret = 0;
+	ret = 0;
 	addr_arg = WT_ADDR_INVALID;
 
 	for (first = 1; addr != WT_ADDR_INVALID;) {
 		/* Get the next page and stat it. */
-		WT_RET(__wt_bt_page_in(toc, addr,
-		    isleaf ? db->leafmin : db->intlmin, 0, &page));
+		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
 
 		ret = __wt_bt_stat_page(toc, page);
 
@@ -77,8 +76,7 @@ __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 			case WT_PAGE_COL_INT:
 			case WT_PAGE_DUP_INT:
 			case WT_PAGE_ROW_INT:
-				__wt_bt_first_offp(
-				    page, &addr_arg, &isleaf_arg);
+				__wt_bt_off_first(page, &addr_arg, &size_arg);
 				break;
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_VAR:
@@ -89,14 +87,14 @@ __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, int isleaf)
 			}
 		}
 
-		WT_TRET(__wt_bt_page_out(toc, page, 0));
+		WT_TRET(__wt_bt_page_out(toc, &page, 0));
 		if (ret != 0)
 			return (ret);
 	}
 
 	if (addr_arg != WT_ADDR_INVALID) {
 		WT_STAT_INCR(idb->dstats, TREE_LEVEL);
-		ret = __wt_bt_stat_level(toc, addr_arg, isleaf_arg);
+		ret = __wt_bt_stat_level(toc, addr_arg, size_arg);
 	}
 
 	return (ret);
@@ -112,6 +110,7 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 	DB *db;
 	IDB *idb;
 	WT_ITEM *item;
+	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int32_t i;
 
@@ -179,12 +178,10 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 		case WT_ITEM_DATA_OVFL:
 			WT_STAT_INCR(idb->dstats, ITEM_TOTAL_DATA);
 			break;
-		case WT_ITEM_OFF_INT:
-		case WT_ITEM_OFF_LEAF:
+		case WT_ITEM_OFF:
 			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);
-			WT_RET(__wt_bt_stat_level(toc,
-			    WT_ITEM_BYTE_OFF(item)->addr,
-			    WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0));
+			off = WT_ITEM_BYTE_OFF(item);
+			WT_RET(__wt_bt_stat_level(toc, off->addr, off->size));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}

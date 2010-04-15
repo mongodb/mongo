@@ -136,7 +136,7 @@ struct __idb {
 	WT_FH	 *fh;			/* Backing file handle */
 
 	u_int32_t root_addr;		/* Root page addr */
-	u_int32_t root_len;		/* Root page len */
+	u_int32_t root_size;		/* Root page size */
 
 	/*
 	 * The root page is pinned into memory when the database is opened
@@ -147,7 +147,7 @@ struct __idb {
 	WT_PAGE  *root_page;		/* Root page */
 
 	u_int32_t free_addr;		/* Free page addr */
-	u_int32_t free_len;		/* Free page len */
+	u_int32_t free_size;		/* Free page size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_data;		/* Data huffman encoding */

@@ -74,7 +74,7 @@ struct __dbt {
 	void	 *data;			/* returned/specified data */
 	u_int32_t size;			/* returned/specified data length */
 
-	u_int32_t data_len;		/* associated memory size */
+	u_int32_t mem_size;		/* associated memory size */
 
 					/* callback return */
 	int (*callback)(DB *, DBT *, DBT *);

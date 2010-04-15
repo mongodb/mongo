@@ -55,14 +55,14 @@ __wt_bt_desc_read(WT_TOC *toc)
 	db->leafmax = desc->leafmax;
 	db->leafmin = desc->leafmin;
 	db->idb->root_addr = desc->root_addr;
-	db->idb->root_len = desc->root_len;
+	db->idb->root_size = desc->root_size;
 	db->idb->free_addr = desc->free_addr;
-	db->idb->free_len = desc->free_len;
+	db->idb->free_size = desc->free_size;
 	db->fixed_len = desc->fixed_len;
 
 	__wt_bt_desc_stats(db, desc);		/* Update statistics. */
 
-	return (__wt_bt_page_out(toc, page, 0));
+	return (__wt_bt_page_out(toc, &page, 0));
 }
 
 /*
@@ -78,7 +78,6 @@ __wt_bt_desc_write(WT_TOC *toc)
 	WT_FH *fh;
 	WT_PAGE *page;
 	WT_PAGE_DESC *desc;
-	WT_PAGE_HDR *hdr;
 
 	env = toc->env;
 	db = toc->db;
@@ -86,17 +85,9 @@ __wt_bt_desc_write(WT_TOC *toc)
 	fh = idb->fh;
 
 	/* If the file size is 0, allocate a new page. */
-	if (fh->file_size == 0) {
-		WT_RET(__wt_bt_page_alloc(toc, 512, &page));
-
-		/*
-		 * Initialize the page header -- all we really care about is
-		 * the LSN, checksum and type.
-		 */
-		hdr = page->hdr;
-		hdr->type = WT_PAGE_DESCRIPT;
-		hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
-	} else
+	if (fh->file_size == 0)
+		WT_RET(__wt_bt_page_alloc(toc, WT_PAGE_DESCRIPT, 512, &page));
+	else
 		WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
 
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
@@ -109,16 +100,16 @@ __wt_bt_desc_write(WT_TOC *toc)
 	desc->leafmin = db->leafmin;
 	desc->base_recno = 0;
 	desc->root_addr = idb->root_addr;
-	desc->root_len = idb->root_len;
+	desc->root_size = idb->root_size;
 	desc->free_addr = idb->free_addr;
-	desc->free_len = idb->free_len;
+	desc->free_size = idb->free_size;
 	desc->fixed_len = (u_int8_t)db->fixed_len;
 	desc->flags = 0;
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		F_SET(desc, WT_PAGE_DESC_REPEAT);
 
 	/* Write and flush the page. */
-	WT_RET(__wt_bt_page_out(toc, page, WT_MODIFIED));
+	WT_RET(__wt_bt_page_out(toc, &page, WT_MODIFIED));
 	WT_RET(__wt_fsync(env, fh));
 
 	__wt_bt_desc_stats(db, desc);			/* Update statistics */

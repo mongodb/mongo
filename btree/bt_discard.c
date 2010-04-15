@@ -64,7 +64,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		bp = (u_int8_t *)page->hdr;
-		ep = (u_int8_t *)bp + page->bytes;
+		ep = (u_int8_t *)bp + page->size;
 		WT_INDX_FOREACH(page, rip, i) {
 			/*
 			 * For each entry, see if the data was an allocation,
@@ -89,7 +89,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	if (page->u.indx != NULL)
 		__wt_free(env, page->u.indx, 0);
 
-	__wt_free(env, page->hdr, page->bytes);
+	__wt_free(env, page->hdr, page->size);
 	__wt_free(env, page, sizeof(WT_PAGE));
 }
 

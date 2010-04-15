@@ -21,22 +21,19 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
  *	Allocate a new btree page from the cache.
  */
 int
-__wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep)
+__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t bytes, WT_PAGE **pagep)
 {
-	DB *db;
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 
-	db = toc->db;
-
-	WT_RET((__wt_page_alloc(
-	    toc, isleaf ? db->leafmin : db->intlmin, &page)));
+	WT_RET((__wt_page_alloc(toc, bytes, &page)));
 
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
 	 * the fragment addresses to the "unset" value.
 	 */
 	hdr = page->hdr;
+	hdr->type = (u_int8_t)type;
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
 	/* Set the space-available and first-free byte. */
@@ -77,8 +74,14 @@ __wt_bt_page_in(
  *	Return a btree page to the cache.
  */
 int
-__wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
+__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 {
+	WT_PAGE *page;
+
+	/* Kill our caller's reference, it avoids coding mistakes. */
+	page = *pagep;
+	*pagep = NULL;
+
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
 	return (__wt_page_out(toc, page, flags));
@@ -177,7 +180,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 {
 	IDB *idb;
 	WT_ITEM *item;
-	WT_OFF *offp;
+	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	WT_ROW_INDX *ip;
 	u_int64_t records;
@@ -191,9 +194,9 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 	/*
 	 * Walk the page, building indices and finding the end of the page.
 	 *
-	 *	The page contains sorted key/offpage-reference pairs.  Keys
-	 *	are on-page (WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.
-	 *	Offpage references are WT_ITEM_OFFPAGE items.
+	 * The page contains sorted key/offpage-reference pairs.  Keys are
+	 * on-page (WT_ITEM_KEY) or overflow (WT_ITEM_KEY_OVFL) items.
+	 * Offpage references are WT_ITEM_OFF items.
 	 */
 	WT_ITEM_FOREACH(page, item, i)
 		switch (WT_ITEM_TYPE(item)) {
@@ -208,10 +211,9 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 			ip->data = item;
 			ip->size = 0;
 			break;
-		case WT_ITEM_OFF_INT:
-		case WT_ITEM_OFF_LEAF:
-			offp = WT_ITEM_BYTE_OFF(item);
-			records += WT_RECORDS(offp);
+		case WT_ITEM_OFF:
+			off = WT_ITEM_BYTE_OFF(item);
+			records += WT_RECORDS(off);
 			ip->page_data = item;
 			++ip;
 			break;
@@ -250,7 +252,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	 * single on-page (WT_ITEM_DATA) or overflow (WT_ITEM_DATA_OVFL) item;
 	 * a group of duplicate data items where each duplicate is an on-page
 	 * (WT_ITEM_DUP) or overflow (WT_ITEM_DUP_OVFL) item; or an offpage
-	 * reference (WT_ITEM_OFF_LEAF or WT_ITEM_OFF_INT).
+	 * reference (WT_ITEM_OFF).
 	 */
 	ip = NULL;
 	indx_count = 0;
@@ -285,8 +287,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 				ip->page_data = item;
 			++records;
 			break;
-		case WT_ITEM_OFF_INT:
-		case WT_ITEM_OFF_LEAF:
+		case WT_ITEM_OFF:
 			ip->page_data = item;
 			records += WT_ROW_OFF_RECORDS(ip);
 			break;
@@ -308,7 +309,7 @@ static int
 __wt_bt_page_inmem_col_int(WT_PAGE *page)
 {
 	WT_COL_INDX *ip;
-	WT_OFF *offp;
+	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int64_t records;
 	u_int32_t i;
@@ -321,16 +322,16 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	 * Walk the page, building indices and finding the end of the page.
 	 * The page contains WT_OFF structures.
 	 */
-	WT_OFF_FOREACH(page, offp, i) {
-		ip->page_data = offp;
+	WT_OFF_FOREACH(page, off, i) {
+		ip->page_data = off;
 		++ip;
-		records += WT_RECORDS(offp);
+		records += WT_RECORDS(off);
 	}
 
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)offp);
+	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)off);
 	return (0);
 }
 
@@ -395,7 +396,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 			ip->size = WT_ITEM_LEN(item);
 			break;
 		case WT_ITEM_DUP_OVFL:
-			ip->size = WT_ITEM_BYTE_OVFL(item)->len;
+			ip->size = WT_ITEM_BYTE_OVFL(item)->size;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
@@ -493,9 +494,10 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	item = ip->data;
 	if (WT_ITEM_TYPE(item) == WT_ITEM_KEY_OVFL) {
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+		WT_RET(
+		    __wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &ovfl_page));
 		orig = WT_PAGE_BYTE(ovfl_page);
-		size = ovfl->len;
+		size = ovfl->size;
 	} else {
 		orig = WT_ITEM_BYTE(item);
 		size = WT_ITEM_LEN(item);
@@ -513,14 +515,14 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 
 	/* Copy the item into place; if the item is compressed, decode it. */
 	if (idb->huffman_key == NULL) {
-		if (size > dbt->data_len)
+		if (size > dbt->mem_size)
 			WT_ERR(__wt_realloc(
-			    env, &dbt->data_len, size, &dbt->data));
+			    env, &dbt->mem_size, size, &dbt->data));
 		dbt->size = size;
 		memcpy(dbt->data, orig, size);
 	} else
 		WT_ERR(__wt_huffman_decode(idb->huffman_key,
-		    orig, size, &dbt->data, &dbt->data_len, &dbt->size));
+		    orig, size, &dbt->data, &dbt->mem_size, &dbt->size));
 
 	/*
 	 * If no target DBT specified (that is, we're intending to persist this
@@ -533,7 +535,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	}
 
 err:	if (ovfl_page != NULL)
-		WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+		WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
 
 	return (ret);
 }

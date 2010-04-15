@@ -14,14 +14,14 @@
  *	Read an overflow item from the cache.
  */
 int
-__wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep)
+__wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 {
 	DB *db;
 	WT_PAGE *page;
 
 	db = toc->db;
 
-	WT_RET(__wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, len), &page));
+	WT_RET(__wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, size), &page));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
@@ -60,7 +60,7 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
 
 	/* Write the overflow item back to the file. */
-	return (__wt_bt_page_out(toc, page, WT_MODIFIED));
+	return (__wt_bt_page_out(toc, &page, WT_MODIFIED));
 }
 
 /*
@@ -77,7 +77,7 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
 	int ret;
 
 	/* Read in the overflow record. */
-	WT_RET(__wt_bt_ovfl_in(toc, from->addr, from->len, &ovfl_page));
+	WT_RET(__wt_bt_ovfl_in(toc, from->addr, from->size, &ovfl_page));
 
 	/*
 	 * Copy the overflow record to a new location, and set our return
@@ -85,12 +85,12 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
 	 */
 	WT_CLEAR(dbt);
 	dbt.data = WT_PAGE_BYTE(ovfl_page);
-	dbt.size = from->len;
+	dbt.size = from->size;
 	ret = __wt_bt_ovfl_write(toc, &dbt, &copy->addr);
-	copy->len = from->len;
+	copy->size = from->size;
 
 	/* Discard the overflow record. */
-	WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+	WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
 
 	return (ret);
 }
@@ -108,12 +108,12 @@ __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy)
 
 	db = toc->db;
 
-	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &ovfl_page));
+	WT_RET(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &ovfl_page));
 
 	ret = __wt_bt_data_copy_to_dbt(
-	    db, WT_PAGE_BYTE(ovfl_page), ovfl->len, copy);
+	    db, WT_PAGE_BYTE(ovfl_page), ovfl->size, copy);
 
-	WT_TRET(__wt_bt_page_out(toc, ovfl_page, 0));
+	WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
 
 	return (ret);
 }

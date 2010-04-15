@@ -552,7 +552,7 @@ __wt_drain_evict(ENV *env,
 	WT_CACHE *cache;
 	WT_STATS *stats;
 	u_int64_t fcnt;
-	u_int32_t bytes, drain_elem;
+	u_int32_t drain_elem, size;
 
 	cache = env->ienv->cache;
 	stats = cache->stats;
@@ -590,11 +590,11 @@ __wt_drain_evict(ENV *env,
 		 * page if it's modified.   If the write fails for any reason,
 		 * the page remains in the cache.
 		 */
-		bytes = e->page->bytes;
+		size = e->page->size;
 		if (__wt_bt_page_reconcile(e->db, e->page, reclaim) || !reclaim)
 			e->state = WT_OK;
 		else {
-			WT_CACHE_PAGE_OUT(cache, bytes);
+			WT_CACHE_PAGE_OUT(cache, size);
 
 			/* Give the slot to the I/O server. */
 			e->state = WT_EMPTY;

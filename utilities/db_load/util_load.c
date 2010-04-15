@@ -201,10 +201,10 @@ bulk_read(DBT *dbt, int iskey)
 		}
 		if (ch == '\n')
 			break;
-		if (len >= dbt->data_len) {
+		if (len >= dbt->mem_size) {
 			if ((dbt->data = realloc(dbt->data, len + 128)) == NULL)
 				return (errno);
-			dbt->data_len = len + 128;
+			dbt->mem_size = len + 128;
 		}
 		((u_int8_t *)(dbt->data))[len] = ch;
 	}

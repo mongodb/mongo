@@ -37,20 +37,20 @@ typedef struct {
 
 typedef struct {
 	u_int32_t addr;
-	u_int32_t bytes;
+	u_int32_t size;
 	WT_PAGE **pagep;
 } __wt_cache_in_args;
-#define	 __wt_cache_in_serial(toc, _addr, _bytes, _pagep, ret) do {\
+#define	 __wt_cache_in_serial(toc, _addr, _size, _pagep, ret) do {\
 	__wt_cache_in_args _args;\
 	_args.addr = _addr;\
-	_args.bytes = _bytes;\
+	_args.size = _size;\
 	_args.pagep = _pagep;\
 	(ret) = __wt_toc_serialize_func(\
 	    toc, WT_WORKQ_READ, __wt_cache_in_serial_func, &_args);\
 } while (0)
-#define	__wt_cache_in_unpack(toc, _addr, _bytes, _pagep) do {\
+#define	__wt_cache_in_unpack(toc, _addr, _size, _pagep) do {\
 	_addr = ((__wt_cache_in_args *)(toc)->wq_args)->addr;\
-	_bytes = ((__wt_cache_in_args *)(toc)->wq_args)->bytes;\
+	_size = ((__wt_cache_in_args *)(toc)->wq_args)->size;\
 	_pagep = ((__wt_cache_in_args *)(toc)->wq_args)->pagep;\
 } while (0)
 

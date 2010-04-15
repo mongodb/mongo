@@ -22,7 +22,7 @@ struct __wt_sync_req;		typedef struct __wt_sync_req WT_SYNC_REQ;
 struct __wt_read_req {
 	WT_TOC	  *toc;			/* Requesting thread */
 	u_int32_t  addr;		/* Address */
-	u_int32_t  bytes;		/* Bytes */
+	u_int32_t  size;		/* Bytes */
 	WT_PAGE  **pagep;		/* Returned page */
 };
 

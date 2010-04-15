@@ -83,42 +83,64 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 
 	env = db->env;
 
-	if (copy->data == NULL || copy->data_len < len)
-		WT_RET(__wt_realloc(env, &copy->data_len, len, &copy->data));
+	if (copy->data == NULL || copy->mem_size < len)
+		WT_RET(__wt_realloc(env, &copy->mem_size, len, &copy->data));
 	memcpy(copy->data, data, copy->size = len);
 
 	return (0);
 }
 
 /*
- * __wt_bt_first_offp --
+ * __wt_bt_leaf_first --
+ *	Walk the tree and return the first leaf page.
+ */
+int
+__wt_bt_leaf_first(
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
+{
+	IDB *idb;
+	WT_PAGE *page;
+
+	idb = toc->db->idb;
+
+	for (addr = idb->root_addr, size = idb->root_size;;) {
+		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
+		switch (page->hdr->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_DUP_INT:
+		case WT_PAGE_ROW_INT:
+			__wt_bt_off_first(page, &addr, &size);
+			break;
+		default:
+			*pagep = page;
+			return (0);
+		}
+		WT_RET(__wt_bt_page_out(toc, &page, 0));
+	}
+	/* NOTREACHED */
+}
+
+/*
+ * __wt_bt_off_first --
  *	In a couple of places in the code, we're trying to walk down the
  *	internal pages from the root, and we need to get the WT_OFF
  *	information for the first key/WT_OFF pair on the page.
  */
 void
-__wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp)
+__wt_bt_off_first(WT_PAGE *page, u_int32_t *addrp, u_int32_t *sizep)
 {
 	WT_ITEM *item;
-	WT_PAGE_HDR *hdr;
+	WT_OFF *off;
 
-	hdr = page->hdr;
-	switch (hdr->type) {
-	case WT_PAGE_COL_INT:
-		*addrp = ((WT_OFF *)WT_PAGE_BYTE(page))-> addr;
-		*isleafp = F_ISSET(hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
-		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_ROW_INT:
+	if (page->hdr->type == WT_PAGE_COL_INT)
+		off = (WT_OFF *)WT_PAGE_BYTE(page);
+	else {
 		item = (WT_ITEM *)WT_PAGE_BYTE(page);
 		item = WT_ITEM_NEXT(item);
-
-		*addrp = WT_ITEM_BYTE_OFF(item)->addr;
-		*isleafp = WT_ITEM_TYPE(item) == WT_ITEM_OFF_LEAF ? 1 : 0;
-		break;
-	default:
-		break;
+		off = WT_ITEM_BYTE_OFF(item);
 	}
+	*addrp = off->addr;
+	*sizep = off->size;
 }
 
 /*
@@ -130,7 +152,7 @@ void
 __wt_bt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *p)
 {
 	page->first_free = p;
-	page->space_avail = page->bytes - (u_int)(p - (u_int8_t *)page->hdr);
+	page->space_avail = page->size - (u_int)(p - (u_int8_t *)page->hdr);
 }
 
 /*
@@ -187,10 +209,8 @@ __wt_bt_item_type(WT_ITEM *item)
 		return ("key");
 	case WT_ITEM_KEY_OVFL:
 		return ("key-overflow");
-	case WT_ITEM_OFF_INT:
+	case WT_ITEM_OFF:
 		return ("offpage tree");
-	case WT_ITEM_OFF_LEAF:
-		return ("offpage leaf");
 	default:
 		break;
 	}

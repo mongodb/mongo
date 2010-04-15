@@ -237,7 +237,7 @@ __wt_bt_root_pin(WT_TOC *toc, int pin)
 	idb = toc->db->idb;
 
 	WT_RET(__wt_bt_page_in(
-	    toc, idb->root_addr, idb->root_len, 1, &root_page));
+	    toc, idb->root_addr, idb->root_size, 1, &root_page));
 	if (pin) {
 		F_SET(root_page, WT_PINNED);
 		idb->root_page = root_page;
@@ -246,7 +246,7 @@ __wt_bt_root_pin(WT_TOC *toc, int pin)
 		idb->root_page = NULL;
 	}
 
-	WT_RET(__wt_bt_page_out(toc, root_page, 0));
+	WT_RET(__wt_bt_page_out(toc, &root_page, 0));
 
 	return (0);
 }

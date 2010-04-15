@@ -79,9 +79,9 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	WT_CACHE *cache;
 	WT_PAGE **pagep;
 	WT_READ_REQ *rr, *rr_end;
-	u_int32_t addr, bytes;
+	u_int32_t addr, size;
 
-	__wt_cache_in_unpack(toc, addr, bytes, pagep);
+	__wt_cache_in_unpack(toc, addr, size, pagep);
 
 	env = toc->env;
 	ienv = env->ienv;
@@ -98,7 +98,7 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 			 * field that turns the slot on.
 			 */
 			rr->addr = addr;
-			rr->bytes = bytes;
+			rr->size = size;
 			rr->pagep = pagep;
 			WT_MEMORY_FLUSH;
 			rr->toc = toc;
@@ -180,7 +180,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_CACHE_HB *hb;
 	WT_FH *fh;
 	WT_PAGE *page;
-	u_int32_t addr, bytes, i;
+	u_int32_t addr, size, i;
 	int newpage, ret;
 
 	db = toc->db;
@@ -191,7 +191,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	fh = idb->fh;
 
 	addr = rr->addr;
-	bytes = rr->bytes;
+	size = rr->size;
 	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
 
 	/*
@@ -234,19 +234,19 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	 * better alignment from the underlying heap memory allocator.
 	 */
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_PAGE), &page));
-	WT_ERR(__wt_calloc(env, (size_t)bytes, sizeof(u_int8_t), &page->hdr));
+	WT_ERR(__wt_calloc(env, (size_t)size, sizeof(u_int8_t), &page->hdr));
 
 	/* If it's an allocation, extend the file; otherwise read the page. */
 	if (newpage) {
 		/* Extend the file. */
 		addr = WT_OFF_TO_ADDR(db, fh->file_size);
-		fh->file_size += bytes;
+		fh->file_size += size;
 
 		WT_STAT_INCR(cache->stats, CACHE_ALLOC);
 		WT_STAT_INCR(idb->stats, DB_CACHE_ALLOC);
 	}
 	page->addr = addr;
-	page->bytes = bytes;
+	page->size = size;
 	if (!newpage)
 		WT_ERR(__wt_page_read(db, page));
 
@@ -286,7 +286,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_MEMORY_FLUSH;
 	empty->state = WT_OK;
 
-	WT_CACHE_PAGE_IN(cache, bytes);
+	WT_CACHE_PAGE_IN(cache, size);
 
 	WT_VERBOSE(env, WT_VERB_CACHE,
 	    (env, "cache I/O server %s element/page %#lx/%lu",
@@ -300,7 +300,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 
 err:	if (page != NULL) {
 		if (page->hdr != NULL)
-			__wt_free(env, page->hdr, bytes);
+			__wt_free(env, page->hdr, size);
 		__wt_free(env, page, sizeof(WT_PAGE));
 	}
 	return (ret);

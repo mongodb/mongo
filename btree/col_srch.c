@@ -22,8 +22,8 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	WT_PAGE *page;
 	WT_SDBT *rdbt;
 	u_int64_t record_cnt;
-	u_int32_t addr, i;
-	int isleaf, ret;
+	u_int32_t addr, size, i;
+	int ret;
 
 	toc->srch_page = NULL;			/* Return values. */
 	toc->srch_ip = NULL;
@@ -33,18 +33,17 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 
 	if (WT_UNOPENED_DATABASE(idb))
 		return (WT_NOTFOUND);
-	page = idb->root_page;
 
 	/* Check for a record past the end of the database. */
+	page = idb->root_page;
 	if (page->records < recno)
 		return (WT_NOTFOUND);
-
-	isleaf = page->hdr->type == WT_PAGE_COL_VAR ? 1 : 0;
 
 	/* Search the tree. */
 	for (record_cnt = 0;;) {
 		/* If it's a leaf page, return the page and index. */
-		if (isleaf) {
+		if (page->hdr->type == WT_PAGE_COL_FIX ||
+		    page->hdr->type == WT_PAGE_COL_VAR) {
 			ip = page->u.c_indx + ((recno - record_cnt) - 1);
 			break;
 		}
@@ -58,15 +57,12 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 
 		/* ip references the subtree containing the record. */
 		addr = WT_COL_OFF_ADDR(ip);
-		isleaf = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? 1 : 0;
+		size = WT_COL_OFF_SIZE(ip);
 
-		/* We're done with the page. */
+		/* Walk down to the next page. */
 		if (page != idb->root_page)
-			WT_RET(__wt_bt_page_out(toc, page, 0));
-
-		/* Get the next page. */
-		WT_RET(__wt_bt_page_in(
-		    toc, addr, isleaf ? db->leafmin : db->intlmin, 1, &page));
+			WT_RET(__wt_bt_page_out(toc, &page, 0));
+		WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 	}
 
 	/* Check for deleted items. */
@@ -81,6 +77,6 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	return (0);
 
 err:	if (page != idb->root_page)
-		(void)__wt_bt_page_out(toc, page, 0);
+		(void)__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }

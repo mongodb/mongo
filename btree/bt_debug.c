@@ -88,10 +88,10 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1));
 
-	fprintf(fp, "\taddr %lu, bytes %lu, lsn %lu/%lu\n",
-	    (u_long)page->addr, (u_long)page->bytes,
+	fprintf(fp, "\taddr %lu, size %lu, lsn %lu/%lu\n",
+	    (u_long)page->addr, (u_long)page->size,
 	    (u_long)hdr->lsn[0], (u_long)hdr->lsn[1]);
 
 	fprintf(fp, "\t%s: ", __wt_bt_hdr_type(hdr));
@@ -171,12 +171,12 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 		fprintf(fp, "\t\troot addr (none)\n");
 	else
 		fprintf(fp, "\t\troot addr %lu, len %lu\n",
-		    (u_long)desc->root_addr, (u_long)desc->root_len);
+		    (u_long)desc->root_addr, (u_long)desc->root_size);
 	if (desc->free_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\tfree addr (none)\n");
 	else
 		fprintf(fp, "\t\tfree addr %lu, len %lu\n",
-		    (u_long)desc->free_addr, (u_long)desc->free_len);
+		    (u_long)desc->free_addr, (u_long)desc->free_size);
 	fprintf(fp, "\t}\n");
 }
 
@@ -198,7 +198,7 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 	WT_RET(__wt_bt_debug_set_fp(ofile, &fp, &do_close));
 
 	fprintf(fp, "addr: %lu-%lu {\n", (u_long)page->addr,
-	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->bytes) - 1));
+	    (u_long)page->addr + (WT_OFF_TO_ADDR(db, page->size) - 1));
 
 	/*
 	 * If we've created the binary tree, dump it, otherwise dump the
@@ -311,7 +311,7 @@ static int
 __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 {
 	DB *db;
-	WT_OFF *offp;
+	WT_OFF *off;
 	WT_OVFL *ovfl;
 
 	db = toc->db;
@@ -328,14 +328,13 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		fprintf(fp, " {addr %lu; len %lu}",
-		    (u_long)ovfl->addr, (u_long)ovfl->len);
+		fprintf(fp, " {addr/size %lu/%lu}",
+		    (u_long)ovfl->addr, (u_long)ovfl->size);
 		break;
-	case WT_ITEM_OFF_INT:
-	case WT_ITEM_OFF_LEAF:
-		offp = WT_ITEM_BYTE_OFF(item);
-		fprintf(fp, " {addr: %lu, records %llu}\n",
-		    (u_long)offp->addr, WT_RECORDS(offp));
+	case WT_ITEM_OFF:
+		off = WT_ITEM_BYTE_OFF(item);
+		fprintf(fp, " {addr/size: %lu/%lu, records %llu}\n",
+		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
 		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -353,14 +352,13 @@ __wt_bt_debug_item(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 static void
 __wt_bt_debug_page_col_int(WT_PAGE *page, FILE *fp)
 {
-	WT_OFF *offp;
+	WT_OFF *off;
 	u_int32_t i;
-	char *ref;
 
-	ref = F_ISSET(page->hdr, WT_OFFPAGE_REF_LEAF) ? "leaf" : "tree";
-	WT_OFF_FOREACH(page, offp, i)
-		fprintf(fp, "\toffpage %s { addr: %lu, records %llu }\n",
-		    ref, (u_long)offp->addr, (u_quad)WT_RECORDS(offp));
+	WT_OFF_FOREACH(page, off, i)
+		fprintf(fp, "\toffpage { addr/size: %lu/%lu, records %llu }\n",
+		    (u_long)off->addr,
+		    (u_long)off->size, (u_quad)WT_RECORDS(off));
 }
 
 /*
@@ -401,7 +399,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	IDB *idb;
 	WT_OVFL *ovfl;
 	WT_PAGE *page;
-	u_int32_t len;
+	u_int32_t size;
 	u_int8_t *p;
 	void *hp;
 	int ret;
@@ -416,25 +414,24 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	case WT_ITEM_KEY:
 		hp = idb->huffman_key;
 		p = WT_ITEM_BYTE(item);
-		len = WT_ITEM_LEN(item);
+		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_DATA:
 	case WT_ITEM_DUP:
 		hp = idb->huffman_data;
 		p = WT_ITEM_BYTE(item);
-		len = WT_ITEM_LEN(item);
+		size = WT_ITEM_LEN(item);
 		break;
 	case WT_ITEM_KEY_OVFL:
 	case WT_ITEM_DATA_OVFL:
 	case WT_ITEM_DUP_OVFL:
 		ovfl = WT_ITEM_BYTE_OVFL(item);
-		WT_ERR(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->len, &page));
+		WT_ERR(__wt_bt_ovfl_in(toc, ovfl->addr, ovfl->size, &page));
 		hp = idb->huffman_data;
 		p = WT_PAGE_BYTE(page);
-		len = ovfl->len;
+		size = ovfl->size;
 		break;
-	case WT_ITEM_OFF_INT:
-	case WT_ITEM_OFF_LEAF:
+	case WT_ITEM_OFF:
 		return (0);
 	WT_ILLEGAL_FORMAT(db);
 	}
@@ -442,16 +439,16 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	/* Uncompress the item as necessary. */
 	if (hp != NULL) {
 		WT_ERR(__wt_huffman_decode(
-		    hp, p, len, &toc->scratch.data,
-		    &toc->scratch.data_len, &toc->scratch.size));
+		    hp, p, size, &toc->scratch.data,
+		    &toc->scratch.mem_size, &toc->scratch.size));
 		p = toc->scratch.data;
-		len = toc->scratch.size;
+		size = toc->scratch.size;
 	}
 
-	__wt_bt_print(p, len, fp);
+	__wt_bt_print(p, size, fp);
 
 err:	if (page != NULL)
-		(void)__wt_bt_page_out(toc, page, 0);
+		(void)__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }
 

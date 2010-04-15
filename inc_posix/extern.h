@@ -24,13 +24,16 @@ int
 __wt_db_dump(WT_TOC *toc,
     FILE *stream, void (*f)(const char *, u_int64_t), u_int32_t flags);
 void
-__wt_bt_print(u_int8_t *data, u_int32_t len, FILE *stream);
+__wt_bt_print(u_int8_t *data, u_int32_t size, FILE *stream);
 int
 __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
+int
+__wt_bt_leaf_first(
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
 void
-__wt_bt_first_offp(WT_PAGE *page, u_int32_t *addrp, int *isleafp);
+__wt_bt_off_first(WT_PAGE *page, u_int32_t *addrp, u_int32_t *sizep);
 void
 __wt_bt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *p);
 const char *
@@ -42,7 +45,7 @@ __wt_bt_open(WT_TOC *toc, int ok_create);
 int
 __wt_bt_root_pin(WT_TOC *toc, int pin);
 int
-__wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t len, WT_PAGE **pagep);
+__wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
 int
 __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp);
 int
@@ -50,12 +53,12 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy);
 int
 __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy);
 int
-__wt_bt_page_alloc(WT_TOC *toc, int isleaf, WT_PAGE **pagep);
+__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t bytes, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
     WT_TOC *toc, u_int32_t addr, u_int32_t bytes, int inmem, WT_PAGE **pagep);
 int
-__wt_bt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
+__wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
@@ -119,9 +122,9 @@ __wt_cache_in_serial_func(WT_TOC *toc);
 void *
 __wt_cache_io(void *arg);
 int
-__wt_page_alloc(WT_TOC *toc, u_int32_t bytes, WT_PAGE **pagep);
+__wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep);
 int
-__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t bytes, WT_PAGE **pagep);
+__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
 int
 __wt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 int

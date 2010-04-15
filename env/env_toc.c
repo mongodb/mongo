@@ -75,9 +75,9 @@ __wt_wt_toc_close(WT_TOC *toc)
 	ret = 0;
 
 	/* Discard DBT memory. */
-	__wt_free(env, toc->key.data, toc->key.data_len);
-	__wt_free(env, toc->data.data, toc->data.data_len);
-	__wt_free(env, toc->scratch.data, toc->scratch.data_len);
+	__wt_free(env, toc->key.data, toc->key.mem_size);
+	__wt_free(env, toc->data.data, toc->data.mem_size);
+	__wt_free(env, toc->scratch.data, toc->scratch.mem_size);
 
 	/* Free any memory we've been accumulating. */
 	if (toc->flist != NULL)
