@@ -39,7 +39,9 @@ def foundxulrunner( env , options ):
     env.Prepend( RPATH=[ libroot ] )
 
     env.Prepend( CPPPATH=[ incroot + "stable/" , 
-                           incroot + "unstable/" ] )
+                           incroot + "unstable/" ,
+                           incroot ] )
+    env.Prepend( CPPPATH=[ "/usr/include/nspr/" ] )
     
     env.Append( CPPDEFINES=[ "XULRUNNER" , "OLDJS" ] )
     if best.find( "1.9.0" ) >= 0 or best.endswith("1.9"):

@@ -42,6 +42,7 @@
 #endif
 
 #include "jsapi.h"
+#include "jsobj.h"
 #include "jsdate.h"
 #include "jsregexp.h"
 
