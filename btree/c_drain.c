@@ -227,6 +227,98 @@ err:	if (cache->drain != NULL)
 }
 
 /*
+ * __wt_drain_sync --
+ *	Flush all of the pages for any specified sync calls.
+ */
+static int
+__wt_drain_sync(ENV *env, int *didworkp)
+{
+	WT_CACHE *cache;
+	WT_CACHE_ENTRY *e, **drain;
+	WT_SYNC_REQ *sr, *sr_end;
+	WT_TOC *toc;
+	DB *db;
+	u_int32_t drain_elem, i, j;
+	void (*f)(const char *, u_int64_t);
+
+	cache = env->ienv->cache;
+
+	/* Check if we need to run. */
+	sr = cache->sync_request;
+	sr_end =
+	    sr + sizeof(cache->sync_request) / sizeof(cache->sync_request[0]);
+	for (toc = NULL; sr < sr_end; ++sr)
+		if (sr->toc != NULL) {
+			/*
+			 * We only do a single sync per call; that's OK, if by
+			 * some chance there is more than one sync request, we
+			 * will find it on our next loop.
+			 */
+			toc = sr->toc;
+			f = sr->f;
+
+			/* We've got it -- clear the slot. */
+			sr->toc = NULL;
+			WT_MEMORY_FLUSH;
+			break;
+		}
+	if (toc == NULL)
+		return (0);
+	db = toc->db;
+
+	drain = cache->drain;
+	drain_elem = 0;
+	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
+		/*
+		 * Skip pages that aren't ours to take -- pinned pages are OK,
+		 * we're not discarding the pages from memory.
+		 */
+		if (e->state != WT_OK)
+			continue;
+
+		/* We only want modified pages from the specified database. */
+		if (e->db != db || !F_ISSET(e->page, WT_MODIFIED))
+			continue;
+
+		/*
+		 * If a page is marked as useless, clear its generation
+		 * number so we'll choose it.  We're rather do this in
+		 * when returning a page to the cache, but we don't have
+		 * a reference to the WT_CACHE_ENTRY at that point.
+		 */
+		if (F_ISSET(e->page, WT_DISCARD))
+			e->gen = 0;
+
+		/* Allocate more space as necessary. */
+		if (drain_elem * sizeof(WT_CACHE_ENTRY *) >= cache->drain_len) {
+			WT_RET(__wt_realloc(env, &cache->drain_len,
+			    (drain_elem + 100) * sizeof(WT_CACHE_ENTRY *),
+			    &cache->drain));
+			drain = cache->drain + drain_elem;
+		}
+
+		*drain++ = e;
+		++drain_elem;
+	}
+	cache->drain_elem = drain_elem;
+
+	WT_VERBOSE(env, WT_VERB_CACHE, (env,
+	    "cache drain server flushing file %s, %lu of %llu total cache "
+	    "pages",
+	    db->idb->name, (u_long)drain_elem,
+	    (u_quad)WT_CACHE_PAGES_INUSE(cache)));
+
+	if (drain_elem != 0)
+		__wt_drain(env, 0, f, toc->name);
+
+	/* Wake the caller. */
+	__wt_unlock(env, toc->mtx);
+
+	*didworkp = 1;
+	return (0);
+}
+
+/*
  * __wt_drain_trickle --
  *	Select a group of pages to trickle out.
  */
@@ -331,98 +423,6 @@ __wt_drain_trickle(ENV *env, int *didworkp)
 	__wt_drain(env, 1, NULL, NULL);
 	*didworkp = 1;
 
-	return (0);
-}
-
-/*
- * __wt_drain_sync --
- *	Flush all of the pages for any specified sync calls.
- */
-static int
-__wt_drain_sync(ENV *env, int *didworkp)
-{
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e, **drain;
-	WT_SYNC_REQ *sr, *sr_end;
-	WT_TOC *toc;
-	DB *db;
-	u_int32_t drain_elem, i, j;
-	void (*f)(const char *, u_int64_t);
-
-	cache = env->ienv->cache;
-
-	/* Check if we need to run. */
-	sr = cache->sync_request;
-	sr_end =
-	    sr + sizeof(cache->sync_request) / sizeof(cache->sync_request[0]);
-	for (toc = NULL; sr < sr_end; ++sr)
-		if (sr->toc != NULL) {
-			/*
-			 * We only do a single sync per call; that's OK, if by
-			 * some chance there is more than one sync request, we
-			 * will find it on our next loop.
-			 */
-			toc = sr->toc;
-			f = sr->f;
-
-			/* We've got it -- clear the slot. */
-			sr->toc = NULL;
-			WT_MEMORY_FLUSH;
-			break;
-		}
-	if (toc == NULL)
-		return (0);
-	db = toc->db;
-
-	drain = cache->drain;
-	drain_elem = 0;
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
-		/*
-		 * Skip pages that aren't ours to take -- pinned pages are OK,
-		 * we're not discarding the pages from memory.
-		 */
-		if (e->state != WT_OK)
-			continue;
-
-		/* We only want modified pages from the specified database. */
-		if (e->db != db || !F_ISSET(e->page, WT_MODIFIED))
-			continue;
-
-		/*
-		 * If a page is marked as useless, clear its generation
-		 * number so we'll choose it.  We're rather do this in
-		 * when returning a page to the cache, but we don't have
-		 * a reference to the WT_CACHE_ENTRY at that point.
-		 */
-		if (F_ISSET(e->page, WT_DISCARD))
-			e->gen = 0;
-
-		/* Allocate more space as necessary. */
-		if (drain_elem * sizeof(WT_CACHE_ENTRY *) >= cache->drain_len) {
-			WT_RET(__wt_realloc(env, &cache->drain_len,
-			    (drain_elem + 100) * sizeof(WT_CACHE_ENTRY *),
-			    &cache->drain));
-			drain = cache->drain + drain_elem;
-		}
-
-		*drain++ = e;
-		++drain_elem;
-	}
-	cache->drain_elem = drain_elem;
-
-	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "cache drain server flushing file %s, %lu of %llu total cache "
-	    "pages",
-	    db->idb->name, (u_long)drain_elem,
-	    (u_quad)WT_CACHE_PAGES_INUSE(cache)));
-
-	if (drain_elem != 0)
-		__wt_drain(env, 0, f, toc->name);
-
-	/* Wake the caller. */
-	__wt_unlock(env, toc->mtx);
-
-	*didworkp = 1;
 	return (0);
 }
 
