@@ -51,6 +51,8 @@ namespace mongo {
             if( *q == 0 )
                 break;
         }
+
+        boost::thread t(ReplSet::healthThread);
     }
 
     /* called at initialization */

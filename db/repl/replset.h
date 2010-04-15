@@ -34,7 +34,6 @@ namespace mongo {
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     class ReplSet {
-        vector<RemoteServer> _seeds;
     public:
         string name;
 
@@ -46,7 +45,10 @@ namespace mongo {
 
     private:
         string _name;
+        vector<RemoteServer> _seeds;
         vector<RemoteServer> _members;
+        static void healthThread();
+        void health();
     };
 
 }

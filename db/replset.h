@@ -1,3 +1,5 @@
+/* THIS FILE IS FOR REPLICA PAIRS, NOT REPLICA SETS.  We should rename. */
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
