@@ -21,12 +21,12 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
  *	Allocate a new btree page from the cache.
  */
 int
-__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t bytes, WT_PAGE **pagep)
+__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t size, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 
-	WT_RET((__wt_page_alloc(toc, bytes, &page)));
+	WT_RET((__wt_page_alloc(toc, size, &page)));
 
 	/*
 	 * Generally, the defaults values of 0 on page are correct; set
@@ -49,14 +49,14 @@ __wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t bytes, WT_PAGE **pagep)
  */
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, u_int32_t bytes, int inmem, WT_PAGE **pagep)
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, int inmem, WT_PAGE **pagep)
 {
 	DB *db;
 	WT_PAGE *page;
 
 	db = toc->db;
 
-	WT_RET((__wt_page_in(toc, addr, bytes, &page)));
+	WT_RET((__wt_page_in(toc, addr, size, &page)));
 
 	/* Verify the page. */
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
