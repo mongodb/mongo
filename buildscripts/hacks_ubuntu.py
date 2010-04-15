@@ -45,5 +45,8 @@ def foundxulrunner( env , options ):
     
     env.Append( CPPDEFINES=[ "XULRUNNER" , "OLDJS" ] )
     if best.find( "1.9.0" ) >= 0 or best.endswith("1.9"):
-        env.Append( CPPDEFINES=[ "XULRUNNER190" ] )
+        if best.endswith( "1.9.1.9" ):
+            pass
+        else:
+            env.Append( CPPDEFINES=[ "XULRUNNER190" ] )
     return True
