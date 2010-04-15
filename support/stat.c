@@ -221,7 +221,7 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 67, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 63, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_DB_BTREE_COMPARE_DUP_GET].desc =
 	    "db.btree_compare_dup_get";
@@ -248,14 +248,12 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_DB_COL_GET].desc = "db.col_get";
 	stats[WT_STAT_DB_COL_PUT].desc = "db.col_put";
 	stats[WT_STAT_DB_DUMP].desc = "db.dump";
-	stats[WT_STAT_DB_ERR].desc = "db.err";
 	stats[WT_STAT_DB_ERRCALL_GET].desc = "db.errcall_get";
 	stats[WT_STAT_DB_ERRCALL_SET].desc = "db.errcall_set";
 	stats[WT_STAT_DB_ERRFILE_GET].desc = "db.errfile_get";
 	stats[WT_STAT_DB_ERRFILE_SET].desc = "db.errfile_set";
 	stats[WT_STAT_DB_ERRPFX_GET].desc = "db.errpfx_get";
 	stats[WT_STAT_DB_ERRPFX_SET].desc = "db.errpfx_set";
-	stats[WT_STAT_DB_ERRX].desc = "db.errx";
 	stats[WT_STAT_DB_HUFFMAN_SET].desc = "db.huffman_set";
 	stats[WT_STAT_DB_OPEN].desc = "db.open";
 	stats[WT_STAT_DB_ROW_DEL].desc = "db.row_del";
@@ -273,14 +271,12 @@ __wt_stat_alloc_method_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].desc = "env.cache_size_set";
 	stats[WT_STAT_ENV_CLOSE].desc = "env.close";
 	stats[WT_STAT_ENV_DB].desc = "env.db";
-	stats[WT_STAT_ENV_ERR].desc = "env.err";
 	stats[WT_STAT_ENV_ERRCALL_GET].desc = "env.errcall_get";
 	stats[WT_STAT_ENV_ERRCALL_SET].desc = "env.errcall_set";
 	stats[WT_STAT_ENV_ERRFILE_GET].desc = "env.errfile_get";
 	stats[WT_STAT_ENV_ERRFILE_SET].desc = "env.errfile_set";
 	stats[WT_STAT_ENV_ERRPFX_GET].desc = "env.errpfx_get";
 	stats[WT_STAT_ENV_ERRPFX_SET].desc = "env.errpfx_set";
-	stats[WT_STAT_ENV_ERRX].desc = "env.errx";
 	stats[WT_STAT_ENV_HAZARD_SIZE_GET].desc = "env.hazard_size_get";
 	stats[WT_STAT_ENV_HAZARD_SIZE_SET].desc = "env.hazard_size_set";
 	stats[WT_STAT_ENV_MSGCALL_GET].desc = "env.msgcall_get";
@@ -324,14 +320,12 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_DB_COL_GET].v = 0;
 	stats[WT_STAT_DB_COL_PUT].v = 0;
 	stats[WT_STAT_DB_DUMP].v = 0;
-	stats[WT_STAT_DB_ERR].v = 0;
 	stats[WT_STAT_DB_ERRCALL_GET].v = 0;
 	stats[WT_STAT_DB_ERRCALL_SET].v = 0;
 	stats[WT_STAT_DB_ERRFILE_GET].v = 0;
 	stats[WT_STAT_DB_ERRFILE_SET].v = 0;
 	stats[WT_STAT_DB_ERRPFX_GET].v = 0;
 	stats[WT_STAT_DB_ERRPFX_SET].v = 0;
-	stats[WT_STAT_DB_ERRX].v = 0;
 	stats[WT_STAT_DB_HUFFMAN_SET].v = 0;
 	stats[WT_STAT_DB_OPEN].v = 0;
 	stats[WT_STAT_DB_ROW_DEL].v = 0;
@@ -347,14 +341,12 @@ __wt_stat_clear_method_stats(WT_STATS *stats)
 	stats[WT_STAT_ENV_CACHE_SIZE_SET].v = 0;
 	stats[WT_STAT_ENV_CLOSE].v = 0;
 	stats[WT_STAT_ENV_DB].v = 0;
-	stats[WT_STAT_ENV_ERR].v = 0;
 	stats[WT_STAT_ENV_ERRCALL_GET].v = 0;
 	stats[WT_STAT_ENV_ERRCALL_SET].v = 0;
 	stats[WT_STAT_ENV_ERRFILE_GET].v = 0;
 	stats[WT_STAT_ENV_ERRFILE_SET].v = 0;
 	stats[WT_STAT_ENV_ERRPFX_GET].v = 0;
 	stats[WT_STAT_ENV_ERRPFX_SET].v = 0;
-	stats[WT_STAT_ENV_ERRX].v = 0;
 	stats[WT_STAT_ENV_HAZARD_SIZE_GET].v = 0;
 	stats[WT_STAT_ENV_HAZARD_SIZE_SET].v = 0;
 	stats[WT_STAT_ENV_MSGCALL_GET].v = 0;

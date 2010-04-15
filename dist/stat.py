@@ -24,8 +24,9 @@ class Stat:
 method_stats = {}
 import api_class
 api = api_class.methods
-for i in sorted(api.iteritems()):
-	method_stats[i[0].replace('.', '_').upper()] = Stat([], i[0])
+for l in sorted(api.iteritems()):
+	if not l[1].config.count('noauto'):
+		method_stats[l[0].replace('.', '_').upper()] = Stat([], l[0])
 
 # print_def --
 #	Print the #defines for the stat.h file.
