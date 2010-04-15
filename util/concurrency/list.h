@@ -46,7 +46,7 @@ public:
     T* head() const { return _head; }
 
     void push(T* t) {
-        boostlock lk(_m);
+        boost::mutex::scoped_lock lk(_m);
         t->_next = _head;
         _head = t;
     }
