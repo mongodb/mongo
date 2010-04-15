@@ -1472,17 +1472,30 @@ namespace mongo {
             ss >> hex >> z;
             data[i] = z;
         }
+    }
 
-/*
-        string as = s.substr( 0 , 16 );
-        string bs = s.substr( 16 );
+    void OID::init(Date_t date, bool max){
+        int time = (int) (date / 1000);
+        char* T = (char *) &time;
+        data[0] = T[3];
+        data[1] = T[2];
+        data[2] = T[1];
+        data[3] = T[0];
 
-        stringstream ssa(as);
-        ssa >> hex >> a;
+        if (max)
+            *(long long*)(data + 4) = 0xFFFFFFFFFFFFFFFFll;
+        else
+            *(long long*)(data + 4) = 0x0000000000000000ll;
+    }
 
-        stringstream ssb(bs);
-        ssb >> hex >> b;
-*/
+    time_t OID::asTimeT(){
+        int time;
+        char* T = (char *) &time;
+        T[0] = data[3];
+        T[1] = data[2];
+        T[2] = data[1];
+        T[3] = data[0];
+        return time;
     }
 
     Labeler::Label GT( "$gt" );

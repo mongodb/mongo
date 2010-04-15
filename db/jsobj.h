@@ -172,6 +172,12 @@ namespace mongo {
 
         /** Set to the hex string value specified. */
         void init( string s );
+
+        /** Set to the min/max OID that could be generated at given timestamp. */
+        void init( Date_t date, bool max=false );
+
+        time_t asTimeT();
+        Date_t asDateT() { return asTimeT() * (long long)1000; }
         
     };
     ostream& operator<<( ostream &s, const OID &o );

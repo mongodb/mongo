@@ -729,7 +729,49 @@ namespace JsobjTests {
                 ASSERT( a.woCompare( c ) < 0 );
             }
         };
+
+        class ToDate {
+        public:
+            void run(){
+                OID oid;
+
+                {
+                    time_t before = ::time(0);
+                    oid.init();
+                    time_t after = ::time(0);
+                    ASSERT( oid.asTimeT() >= before );
+                    ASSERT( oid.asTimeT() <= after );
+                }
+
+                {
+                    Date_t before = jsTime();
+                    sleepsecs(1);
+                    oid.init();
+                    Date_t after = jsTime();
+                    ASSERT( oid.asDateT() >= before );
+                    ASSERT( oid.asDateT() <= after );
+                }
+            }
+        };
+
+        class FromDate {
+        public:
+            void run(){
+                OID min, oid, max;
+                Date_t now = jsTime();
+                oid.init(); // slight chance this has different time. If its a problem, can change.
+                min.init(now);
+                max.init(now, true);
+
+                ASSERT_EQUALS( (unsigned)oid.asTimeT() , now/1000 );
+                ASSERT_EQUALS( (unsigned)min.asTimeT() , now/1000 );
+                ASSERT_EQUALS( (unsigned)max.asTimeT() , now/1000 );
+                ASSERT( BSON("" << min).woCompare( BSON("" << oid) ) < 0  );
+                ASSERT( BSON("" << max).woCompare( BSON("" << oid)  )> 0  );
+            }
+        };
     } // namespace OIDTests
+
 
     namespace ValueStreamTests {
 
@@ -1497,6 +1539,8 @@ namespace JsobjTests {
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
             add< OIDTests::increasing >();
+            add< OIDTests::ToDate >();
+            add< OIDTests::FromDate >();
             add< ValueStreamTests::LabelBasic >();
             add< ValueStreamTests::LabelShares >();
             add< ValueStreamTests::LabelDouble >();

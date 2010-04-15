@@ -1949,6 +1949,10 @@
 			Name="replsets"
 			>
 			<File
+				RelativePath="..\db\repl\health.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\db\repl\replset.cpp"
 				>
 			</File>

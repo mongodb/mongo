@@ -860,7 +860,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("replSet")) {
             /* seed list of hosts for the repl set */
-            cmdLine.source = params["replSet"].as<string>().c_str();
+            cmdLine.replSet = params["replSet"].as<string>().c_str();
         }
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();

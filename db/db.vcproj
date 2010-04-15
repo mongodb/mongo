@@ -1897,11 +1897,23 @@
 			Name="replsets"
 			>
 			<File
+				RelativePath=".\repl\health.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\health.h"
+				>
+			</File>
+			<File
 				RelativePath=".\repl\replset.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\repl\replset.h"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\replset_commands.cpp"
 				>
 			</File>
 		</Filter>

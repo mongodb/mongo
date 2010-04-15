@@ -23,16 +23,32 @@ namespace mongo {
     class ReplSet;
     extern ReplSet *theReplSet;
 
+    struct RemoteServer { 
+        RemoteServer() : _port(-1) { }
+        RemoteServer(string h, int p = -1) : _host(h), _port(p) { 
+        }
+        string _host;
+        int _port;
+        bool operator<(const RemoteServer& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
+    };
+
     /* information about the entire repl set, such as the various servers in the set, and their state */
     class ReplSet {
     public:
-        class Member { 
-            string host;
-            int port;
-        };
+        string name;
+
+        /* cfgString format is 
+           replsetname/host1,host2:port,...
+           where :port is optional, and 
+           */
+        ReplSet(string cfgString);
+
     private:
         string _name;
-        vector<Member> _members;
+        vector<RemoteServer> _seeds;
+        vector<RemoteServer> _members;
+        static void healthThread();
+        void health();
     };
 
 }
