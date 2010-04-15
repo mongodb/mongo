@@ -20,6 +20,10 @@
 
 namespace mongo {
 
+    const int WaitBetween = 5;
+    const int Timeout = 15;
+    const int NFailures = 3;
+
     class ServerToMonitor {
     };
 
