@@ -1475,7 +1475,7 @@ namespace mongo {
     }
 
     void OID::init(Date_t date, bool max){
-        int time = date / 1000;
+        int time = (int) (date / 1000);
         char* T = (char *) &time;
         data[0] = T[3];
         data[1] = T[2];
