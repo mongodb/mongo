@@ -1941,6 +1941,14 @@
 				>
 			</File>
 		</Filter>
+		<Filter
+			Name="concurrency"
+			>
+			<File
+				RelativePath="..\util\concurrency\list.h"
+				>
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>

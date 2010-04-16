@@ -268,13 +268,19 @@ namespace mongo {
                     return false;
                 }
                 
+                ShardKeyPattern proposedKey( key );
                 {
                     ScopedDbConnection conn( config->getPrimary() );
                     BSONObjBuilder b; 
                     b.append( "ns" , ns ); 
                     b.appendBool( "unique" , true ); 
-                    if ( conn->count( config->getName() + ".system.indexes" , b.obj() ) ){
-                        errmsg = "can't shard collection with unique indexes";
+                    
+                    auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
+                    while ( cursor->more() ){
+                        BSONObj idx = cursor->next();
+                        if ( proposedKey.uniqueAllowd( idx["key"].embeddedObjectUserCheck() ) )
+                            continue;
+                        errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
                         conn.done();
                         return false;
                     }

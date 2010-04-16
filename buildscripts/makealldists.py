@@ -114,7 +114,7 @@ def logfh(distro, distro_version, arch, mongo_version):
 
 def spawn(distro, distro_version, arch, spec, directory, opts):
     (mongo_version, suffix, pkg_version) = parse_mongo_version_spec(spec)
-    argv = ["makedist.py"] + opts + [ directory, distro, distro_version, arch ] + [ spec ]
+    argv = ["python", "makedist.py"] + opts + [ directory, distro, distro_version, arch ] + [ spec ]
 #    cmd = "mkdir -p %s; cd %s; touch foo.deb; echo %s %s %s %s %s | tee Packages " % ( directory, directory, directory, distro, distro_version, arch, mongo_version )
 #    print cmd
 #    argv = ["sh", "-c", cmd]
@@ -141,9 +141,7 @@ def lose(name, logfh, losefh):
     print >> losefh, "=== End loser %s ===" % name
 
 def wait(procs, winfh, losefh, winners, losers):
-    # emit a blank line, so that the buildbot doesn't kill us off
-    # while waiting for output.
-    sys.stdout.write('.')
+    print "."
     sys.stdout.flush()
     try:
         (pid, stat) = os.wait()
@@ -181,6 +179,7 @@ def __main__():
     repodir=tempfile.mkdtemp()
 
     print "makedist output under: %s\nmerge directory: %s\ncombined repo: %s\n" % (outputroot, mergedir, repodir)
+    sys.stdout.flush()
     # Add more dist/version/architecture tuples as they're supported.
     dists = (("ubuntu", "10.4"),
              ("ubuntu", "9.10"),
@@ -237,7 +236,7 @@ def __main__():
     
     merge_directories_concatenating_conflicts(mergedir, glob.glob(outputroot+'/*'))
 
-    argv=["mergerepositories.py", mergedir, repodir]
+    argv=["python", "mergerepositories.py", mergedir, repodir]
     print "running %s" % argv
     print " ".join(argv)
     r = subprocess.Popen(argv).wait()

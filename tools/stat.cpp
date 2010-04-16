@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "client/dbclient.h"
 #include "db/json.h"
+#include "../util/httpclient.h"
 
 #include "tool.h"
 
@@ -38,6 +39,7 @@ namespace mongo {
             _sleep = 1;
             _rowNum = 0;
             _showHeaders = true;
+            _http = false;
 
             add_hidden_options()
                 ( "sleep" , po::value<int>() , "time to sleep between calls" )
@@ -45,6 +47,7 @@ namespace mongo {
             add_options()
                 ("noheaders", "don't output column names")
                 ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
+                ("http", "use http instead of raw db connection")
                 ;
 
             addPositionArg( "sleep" , 1 );
@@ -56,6 +59,33 @@ namespace mongo {
         }
 
         BSONObj stats(){
+            if ( _http ){
+                HttpClient c;
+                HttpClient::Result r;
+                
+                string url;
+                {
+                    stringstream ss;
+                    ss << "http://" << _host;
+                    if ( _host.find( ":" ) == string::npos )
+                        ss << ":28017";
+                    ss << "/_status";
+                    url = ss.str();
+                }
+
+                if ( c.get( url , &r ) != 200 ){
+                    cout << "error (http): " << r.getEntireResponse() << endl;
+                    return BSONObj();
+                }
+                
+                BSONObj x = fromjson( r.getBody() );
+                BSONElement e = x["serverStatus"];
+                if ( e.type() != Object ){
+                    cout << "BROKEN: " << x << endl;
+                    return BSONObj();
+                }
+                return e.embeddedObjectUserCheck();
+            }
             BSONObj out;
             if ( ! conn().simpleCommand( _db , &out , "serverStatus" ) ){
                 cout << "error: " << out << endl;
@@ -154,6 +184,13 @@ namespace mongo {
             return ss.str();
         }
         
+        virtual void preSetup(){
+            if ( hasParam( "http" ) ){
+                _http = true;
+                _noconnection = true;
+            }
+        }
+
         int run(){ 
             _sleep = getParam( "sleep" , _sleep );
             if ( hasParam( "noheaders" ) ) {
@@ -171,7 +208,14 @@ namespace mongo {
                 if ( now.isEmpty() )
                     return -2;
                 
-                cout << doRow( prev , now ) << endl;
+                try {
+                    cout << doRow( prev , now ) << endl;
+                }
+                catch ( AssertionException& e ){
+                    cout << "\nerror: " << e.what() << "\n"
+                         << now
+                         << endl;
+                }
                 
                 prev = now;
             }
@@ -183,6 +227,7 @@ namespace mongo {
         int _rowNum;
         int _rowCount;
         bool _showHeaders;
+        bool _http;
     };
 
 }

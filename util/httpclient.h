@@ -31,9 +31,25 @@ namespace mongo {
             const string& getEntireResponse() const {
                 return _entireResponse;
             }
+        
+            const map<string,string> getHeaders() const {
+                return _headers;
+            }
+            
+            const string& getBody() const {
+                return _body;
+            }
+            
         private:
+            
+            void _init( int code , string entire );
+
             int _code;
             string _entireResponse;
+
+            map<string,string> _headers;
+            string _body;
+            
             friend class HttpClient;
         };
         

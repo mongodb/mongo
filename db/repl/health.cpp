@@ -20,11 +20,7 @@
 
 namespace mongo { 
 
-    void ReplSet::health() { 
-    }
-
-    void ReplSet::healthThread() {
-        theReplSet->health();
+    void ReplSet::startHealth() {
     }
 
 }

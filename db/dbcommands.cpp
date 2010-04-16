@@ -1844,6 +1844,7 @@ namespace mongo {
             stringstream ss;
             ss << "assertion: " << e.what();
             result.append( "errmsg" , ss.str() );
+            result.append( "code" , e.getCode() );
             return false;
         }
         

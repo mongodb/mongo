@@ -26,9 +26,10 @@ namespace mongo {
         const char *p = cfgString.c_str();
         const char *q = strchr(p, '/');
         uassert(13093, "bad --replset config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", q != 0 && p != q);
-        name = string(p, q-p);
+        _name = string(p, q-p);
 
         set<RemoteServer> temp;
+        vector<RemoteServer> *seeds = new vector<RemoteServer>;
         while( 1 ) {
             p = q + 1;
             q = strchr(p, ',');
@@ -45,14 +46,16 @@ namespace mongo {
                 // no port specified.
                 m = RemoteServer(string(p,q-p));
             }
-            uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 );
+            uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
             temp.insert(m);
-            _seeds.push_back(m);
+            seeds->push_back(m);
             if( *q == 0 )
                 break;
         }
 
-        boost::thread t(ReplSet::healthThread);
+        _seeds = seeds;
+
+        startHealth();
     }
 
     /* called at initialization */

@@ -145,10 +145,24 @@ namespace mongo {
         return dir;
     }
 
+    bool ShardKeyPattern::uniqueAllowd( const BSONObj& otherPattern ) const {
+        BSONObjIterator a( pattern );
+        BSONObjIterator b( otherPattern );
+        
+        while ( a.more() && b.more() ){
+            BSONElement x = a.next();
+            BSONElement y = b.next();
+            if ( strcmp( x.fieldName() , y.fieldName() ) )
+                return false;
+        }
+        
+        return ! a.more();
+    }
+    
     string ShardKeyPattern::toString() const {
         return pattern.toString();
     }
-
+    
     /* things to test for compound : 
        x hasshardkey 
        _ getFilter (hard?)
@@ -157,6 +171,24 @@ namespace mongo {
     */
     class ShardKeyUnitTest : public UnitTest {
     public:
+        
+        void testUniqueAllowd(){
+            {
+                ShardKeyPattern k( BSON( "x" << 1 ) );
+                assert( ! k.uniqueAllowd( BSON( "a" << 1 ) ) );
+                assert( k.uniqueAllowd( BSON( "x" << 1 ) ) );
+                assert( k.uniqueAllowd( BSON( "x" << 1 << "a" << 1 ) ) );
+                assert( ! k.uniqueAllowd( BSON( "a" << 1 << "x" << 1 ) ) );
+            }
+            { 
+                ShardKeyPattern k( BSON( "x" << 1 << "y" << 1 ) );
+                assert( ! k.uniqueAllowd( BSON( "x" << 1 ) ) );
+                assert( ! k.uniqueAllowd( BSON( "x" << 1 << "z" << 1 ) ) );
+                assert( k.uniqueAllowd( BSON( "x" << 1 << "y" << 1 ) ) );
+                assert( k.uniqueAllowd( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
+            }
+        }
+        
         void hasshardkeytest() { 
             BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
             ShardKeyPattern k( BSON( "num" << 1 ) );
@@ -220,13 +252,14 @@ namespace mongo {
             BSONObj b = BSON( "key" << 999 );
 
             assert( k.compare(a,b) < 0 );
-
+            
             assert( k.canOrder( fromjson("{key:1}") ) == 1 );
             assert( k.canOrder( fromjson("{zz:1}") ) == 0 );
             assert( k.canOrder( fromjson("{key:-1}") ) == -1 );
             
             testCanOrder();
             getfilt();
+            testUniqueAllowd();
             // add middle multitype tests
         }
     } shardKeyTest;
