@@ -22,6 +22,7 @@ static int wts_sync(void);
 int
 wts_setup(int reopen, int logfile)
 {
+	time_t now;
 	ENV *env;
 	DB *db;
 	WT_TOC *toc;
@@ -48,6 +49,13 @@ wts_setup(int reopen, int logfile)
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
+		(void)time(&now);
+		fprintf(g.logfp,
+		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+		fprintf(g.logfp, "%s", ctime(&now));
+		fprintf(g.logfp,
+		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
+
 		env->verbose_set(env,
 		    WT_VERB_CACHE |
 		    // WT_VERB_HAZARD |
