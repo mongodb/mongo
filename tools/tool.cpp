@@ -37,7 +37,7 @@ namespace mongo {
     Tool::Tool( string name , bool localDBAllowed , string defaultDB , 
                 string defaultCollection , bool usesstdout ) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) , 
-        _usesstdout(usesstdout), _conn(0), _paired(false) {
+        _usesstdout(usesstdout), _noconnection(false), _conn(0), _paired(false) {
         
         _options = new po::options_description( "options" );
         _options->add_options()
@@ -126,15 +126,20 @@ namespace mongo {
                 logLevel = s.length();
             }
         }
+        
+        preSetup();
 
         bool useDirectClient = hasParam( "dbpath" );
-
+        
         if ( ! useDirectClient ) {
             _host = "127.0.0.1";
             if ( _params.count( "host" ) )
                 _host = _params["host"].as<string>();
-
-            if ( _host.find( "," ) == string::npos ){
+            
+            if ( _noconnection ){
+                // do nothing
+            }
+            else if ( _host.find( "," ) == string::npos ){
                 DBClientConnection * c = new DBClientConnection();
                 _conn = c;
 

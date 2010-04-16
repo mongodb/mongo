@@ -72,6 +72,8 @@ namespace mongo {
             }
             return _db + "." + _coll;
         }
+        
+        virtual void preSetup(){}
 
         virtual int run() = 0;
 
@@ -93,6 +95,7 @@ namespace mongo {
         string _password;
         
         bool _usesstdout;
+        bool _noconnection;
 
         void addFieldOptions();
         void needFields();
@@ -101,8 +104,10 @@ namespace mongo {
         BSONObj _fieldsObj;
 
         
-    private:
         string _host;
+
+    protected:
+
         mongo::DBClientBase * _conn;
         bool _paired;
 
