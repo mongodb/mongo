@@ -246,7 +246,7 @@ __wt_bt_root_pin(WT_TOC *toc, int pin)
 		idb->root_page = NULL;
 	}
 
-	WT_RET(__wt_bt_page_out(toc, &root_page, 0));
+	__wt_bt_page_out(toc, &root_page, 0);
 
 	return (0);
 }

@@ -41,10 +41,10 @@ __wt_db_row_del(WT_TOC *toc, DBT *key)
 		new = NULL;
 
 	/* Delete the item. */
-	__wt_bt_del_serial(toc, new, ret);
+	__wt_bt_del_serial(toc, page, new, ret);
 
 err:	if (page != NULL && page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 
 	return (ret);
 }
@@ -56,10 +56,13 @@ err:	if (page != NULL && page != idb->root_page)
 int
 __wt_bt_del_serial_func(WT_TOC *toc)
 {
+	WT_PAGE *page;
 	WT_REPL *new, *repl;
 	WT_ROW_INDX *ip;
 
-	__wt_bt_del_unpack(toc, new);
+	__wt_bt_del_unpack(toc, page, new);
+
+	WT_PAGE_MODIFY(page);
 
 	/* The entry we're updating is the last one pushed on the stack. */
 	ip = toc->srch_ip;

@@ -96,7 +96,7 @@ __wt_bt_verify_int(
 	/* Verify the descriptor page. */
 	WT_ERR(__wt_bt_page_in(toc, 0, 512, 0, &page));
 	WT_TRET(__wt_bt_verify_page(toc, page, &vstuff));
-	WT_ERR(__wt_bt_page_out(toc, &page, 0));
+	__wt_bt_page_out(toc, &page, 0);
 	page = NULL;
 
 	/* Check for one-page databases. */
@@ -119,7 +119,7 @@ __wt_bt_verify_int(
 	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (page != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 
 	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
@@ -243,7 +243,7 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, VSTUFF *vs)
 	    addr = hdr->nextaddr, size = hdr->nextsize) {
 		/* Discard any previous page and get the next page. */
 		if (prev != NULL)
-			WT_ERR(__wt_bt_page_out(toc, &prev, 0));
+			__wt_bt_page_out(toc, &prev, 0);
 		prev = page;
 		page = NULL;
 		WT_ERR(__wt_bt_page_in(toc, addr, size, 0, &page));
@@ -342,9 +342,9 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, VSTUFF *vs)
 	}
 
 err:	if (prev != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &prev, 0));
+		__wt_bt_page_out(toc, &prev, 0);
 	if (page != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 
 	__wt_free(env, page_dbt.data, page_dbt.mem_size);
 	__wt_free(env, prev_dbt.data, prev_dbt.mem_size);
@@ -574,7 +574,7 @@ noref:			__wt_api_db_errx(db,
 		}
 
 		/* Switch for the subsequent page at the parent level. */
-		WT_RET(__wt_bt_page_out(toc, &parent, 0));
+		__wt_bt_page_out(toc, &parent, 0);
 		if (nextaddr != WT_ADDR_INVALID) {
 			WT_RET(__wt_bt_page_in(
 			    toc, nextaddr, nextsize, 1, &parent));
@@ -612,7 +612,7 @@ err_set:	ret = WT_ERROR;
 
 done:
 err:	if (parent != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &parent, 0));
+		__wt_bt_page_out(toc, &parent, 0);
 
 	__wt_free(env, child_dbt.data, child_dbt.mem_size);
 	__wt_free(env, parent_dbt.data, parent_dbt.mem_size);
@@ -1209,7 +1209,7 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
 
 	ret = __wt_bt_verify_page(toc, page, vs);
 
-	WT_TRET(__wt_bt_page_out(toc, &page, 0));
+	__wt_bt_page_out(toc, &page, 0);
 
 	return (ret);
 }

@@ -76,7 +76,7 @@ __wt_db_dump(WT_TOC *toc,
 
 		addr = hdr->nextaddr;
 		size = hdr->nextsize;
-		WT_RET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 		if (addr == WT_ADDR_INVALID)
 			break;
 		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
@@ -186,7 +186,7 @@ __wt_bt_dump_page_item(
 				func(
 				   WT_PAGE_BYTE(ovfl_page), ovfl->size, stream);
 
-			WT_ERR(__wt_bt_page_out(toc, &ovfl_page, 0));
+			__wt_bt_page_out(toc, &ovfl_page, 0);
 			break;
 		case WT_ITEM_OFF:
 			WT_ERR(__wt_bt_dump_offpage(
@@ -219,6 +219,7 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 
 	db = toc->db;
 	page = NULL;
+	ret = 0;
 
 	/*
 	 * Callers pass us a reference to an on-page WT_ITEM_OFF.
@@ -241,7 +242,7 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 				    ovfl->addr, ovfl->size, &ovfl_page));
 				func(WT_PAGE_BYTE(
 				    ovfl_page), ovfl->size, stream);
-				WT_ERR(__wt_bt_page_out(toc, &ovfl_page, 0));
+				__wt_bt_page_out(toc, &ovfl_page, 0);
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}
@@ -249,16 +250,14 @@ __wt_bt_dump_offpage(WT_TOC *toc, DBT *key, WT_ITEM *item,
 
 		addr = page->hdr->nextaddr;
 		size = page->hdr->nextsize;
-		WT_ERR(__wt_bt_page_out(toc, &page, 0));
-		if (addr == WT_ADDR_INVALID)
+		__wt_bt_page_out(toc, &page, 0);
+		if (addr == WT_ADDR_INVALID ||
+		    (ret = __wt_bt_page_in(toc, addr, size, 0, &page)) != 0)
 			break;
-		WT_ERR(__wt_bt_page_in(toc, addr, size, 0, &page));
 	}
 
-	if (0) {
-err:		if (page != NULL)
-			(void)__wt_bt_page_out(toc, &page, 0);
-	}
+err:	if (page != NULL)
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }
 

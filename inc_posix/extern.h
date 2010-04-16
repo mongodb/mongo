@@ -53,18 +53,18 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy);
 int
 __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy);
 int
-__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t bytes, WT_PAGE **pagep);
+__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t size, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
-    WT_TOC *toc, u_int32_t addr, u_int32_t bytes, int inmem, WT_PAGE **pagep);
-int
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, int inmem, WT_PAGE **pagep);
+void
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags);
 int
 __wt_bt_page_inmem(DB *db, WT_PAGE *page);
 int
 __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt);
 int
-__wt_bt_page_reconcile(DB *db, WT_PAGE *page, int reclaim);
+__wt_bt_page_reconcile(DB *db, WT_PAGE *page);
 void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
@@ -125,8 +125,6 @@ int
 __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep);
 int
 __wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
-int
-__wt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags);
 int
 __wt_page_read(DB *db, WT_PAGE *page);
 int

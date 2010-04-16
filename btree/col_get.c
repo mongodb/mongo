@@ -38,6 +38,6 @@ __wt_db_col_get(WT_TOC *toc, u_int64_t recno, DBT *data)
 	ret = __wt_bt_dbt_return(toc, NULL, data, page, toc->srch_ip, 0);
 
 err:	if (page != NULL && page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }

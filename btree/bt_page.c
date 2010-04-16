@@ -28,16 +28,16 @@ __wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t size, WT_PAGE **pagep)
 
 	WT_RET((__wt_page_alloc(toc, size, &page)));
 
+	/* Set the space-available and first-free byte. */
+	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
+
 	/*
-	 * Generally, the defaults values of 0 on page are correct; set
-	 * the fragment addresses to the "unset" value.
+	 * Generally, the default values of 0 on page are correct; set the
+	 * related page addresses to the "unset" value.
 	 */
 	hdr = page->hdr;
 	hdr->type = (u_int8_t)type;
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
-
-	/* Set the space-available and first-free byte. */
-	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
 
 	*pagep = page;
 	return (0);
@@ -73,18 +73,34 @@ __wt_bt_page_in(
  * __wt_bt_page_out --
  *	Return a btree page to the cache.
  */
-int
+void
 __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 {
 	WT_PAGE *page;
 
-	/* Kill our caller's reference, it avoids coding mistakes. */
+	WT_ENV_FCHK_ASSERT(
+	    toc->env, "__wt_bt_page_out", flags, WT_APIMASK_BT_PAGE_OUT);
+
+	/*
+	 * This function exists to help in debugging: First, clear the caller's
+	 * reference so we don't accidentally use a page after discarding our
+	 * reference.  Second, verify the page if we're running in diagnostic
+	 * mode.
+	 */
 	page = *pagep;
 	*pagep = NULL;
 
 	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 
-	return (__wt_page_out(toc, page, flags));
+	/* The caller may have decided the page isn't worth keeping around. */
+	if (LF_ISSET(WT_DISCARD))
+		F_SET(page, WT_DISCARD);
+
+	/*
+	 * Clearing the hazard reference technically belongs in the cache layer,
+	 * but this is a trivial function already.
+	 */
+	__wt_hazard_clear(toc, page);
 }
 
 /*
@@ -535,7 +551,7 @@ __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt)
 	}
 
 err:	if (ovfl_page != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
+		__wt_bt_page_out(toc, &ovfl_page, 0);
 
 	return (ret);
 }

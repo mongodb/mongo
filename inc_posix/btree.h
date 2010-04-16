@@ -175,6 +175,17 @@ struct __wt_page {
 	} u;
 	u_int32_t indx_count;		/* Entry count */
 
+	/*
+	 * The page write generation is set in two ways: First, if the page is
+	 * taken from the cache, it has to be done by the workQ because the
+	 * workQ is responsible for serialization between readers and writers.
+	 * Second, if a page is allocated, it's only available to a single
+	 * thread of control by definition, so we set as the page is allocated.
+	 */
+#define	WT_PAGE_MODIFY(p)						\
+	(++(p)->write_gen)
+	u_int32_t volatile write_gen;	/* Write generation */
+
 	u_int32_t flags;
 };
 /*
@@ -183,7 +194,7 @@ struct __wt_page {
  * padding it won't break the world, but we don't want to waste space, and there
  * are a lot of these structures.
  */
-#define	WT_PAGE_SIZE		40
+#define	WT_PAGE_SIZE		44
 
 /*
  * WT_PAGE_HDR --

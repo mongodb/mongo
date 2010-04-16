@@ -189,7 +189,15 @@ struct __wt_cache_entry {
 	WT_PAGE	 *page;			/* Page */
 
 	u_int32_t addr;			/* Page's allocation address */
-	u_int32_t gen;			/* LRU generation number */
+
+	/*
+	 * We track two generation numbers: First, the page's read generation
+	 * which we use to find pages which are no longer useful in the cache
+	 * (it's our LRU value).  Second, the write generation, which we use
+	 * to find pages which are clean and can be discarded.
+	 */
+	u_int32_t read_gen;		/* Read generation */
+	u_int32_t write_gen;		/* Write generation */
 
 	/*
 	 * State is used in lots of different places, so declare it volatile to

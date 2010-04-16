@@ -1,15 +1,18 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
+	WT_PAGE *page;
 	WT_REPL *new;
 } __wt_bt_del_args;
-#define	 __wt_bt_del_serial(toc, _new, ret) do {\
+#define	 __wt_bt_del_serial(toc, _page, _new, ret) do {\
 	__wt_bt_del_args _args;\
+	_args.page = _page;\
 	_args.new = _new;\
 	(ret) = __wt_toc_serialize_func(\
 	    toc, WT_WORKQ_SPIN, __wt_bt_del_serial_func, &_args);\
 } while (0)
-#define	__wt_bt_del_unpack(toc, _new) do {\
+#define	__wt_bt_del_unpack(toc, _page, _new) do {\
+	_page = ((__wt_bt_del_args *)(toc)->wq_args)->page;\
 	_new = ((__wt_bt_del_args *)(toc)->wq_args)->new;\
 } while (0)
 

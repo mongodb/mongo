@@ -47,7 +47,13 @@ __wt_cache_create(ENV *env)
 		"cache initialization: %lu MB, %lu hash buckets",
 		(u_long)env->cache_size, (u_long)cache->hb_size));
 
-	/* Create an array of WT_CACHE_ENTRY structures in each bucket. */
+	/*
+	 * Create an array of WT_CACHE_ENTRY structures in each bucket -- we
+	 * allocate 10 to start with, which is larger than the 4 we calculated
+	 * above.  This #define isn't in the usual place, because it being
+	 * wrong means there's something wrong with the above calculation.
+	 */
+#define	WT_CACHE_ENTRY_DEFAULT	10
 	for (i = 0; i < cache->hb_size; ++i) {
 		hb = &cache->hb[i];
 		WT_ERR(__wt_calloc(env, WT_CACHE_ENTRY_DEFAULT,
@@ -61,6 +67,8 @@ __wt_cache_create(ENV *env)
 
 	WT_STAT_SET(
 	    cache->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
+	WT_STAT_SET(
+	    cache->stats, CACHE_MAX_BUCKET_ENTRIES, WT_CACHE_ENTRY_DEFAULT);
 
 	return (0);
 

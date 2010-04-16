@@ -247,6 +247,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	}
 	page->addr = addr;
 	page->size = size;
+	page->write_gen = newpage ? 1 : 0;
 	if (!newpage)
 		WT_ERR(__wt_page_read(db, page));
 
@@ -268,8 +269,8 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 
 	/*
 	 * Get a hazard reference before we mark the entry OK, the cache drain
-	 * server shouldn't pick our new page, but there's no reason to risk
-	 * it.
+	 * server shouldn't pick our new page with its high read-generation,
+	 * but there's no reason to risk it.
 	 */
 	__wt_hazard_set(toc, page);
 
@@ -279,10 +280,11 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	 * The state turns on the entry for both the cache drain server thread
 	 * and any readers.
 	 */
-	empty->addr = addr;
 	empty->db = db;
-	empty->gen = ++ienv->page_gen;
 	empty->page = page;
+	empty->addr = addr;
+	empty->read_gen = ++ienv->read_gen;
+	empty->write_gen = 0;
 	WT_MEMORY_FLUSH;
 	empty->state = WT_OK;
 
@@ -321,7 +323,8 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 	env = toc->env;
 	cache = env->ienv->cache;
 
-	entries = hb->entry_size + WT_CACHE_ENTRY_DEFAULT;
+#define	WT_CACHE_ENTRY_GROW	20
+	entries = hb->entry_size + WT_CACHE_ENTRY_GROW;
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "I/O server: hash bucket %lu grows to %lu entries",
@@ -347,7 +350,7 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 	*emptyp = e;
 
 	/* Initialize newly allocated slots' state. */
-	for (i = 0; i < WT_CACHE_ENTRY_DEFAULT; ++e, ++i)
+	for (i = 0; i < WT_CACHE_ENTRY_GROW; ++e, ++i)
 		e->state = WT_EMPTY;
 
 	/* Schedule the previous array to be freed. */

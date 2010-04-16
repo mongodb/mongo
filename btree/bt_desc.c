@@ -62,7 +62,8 @@ __wt_bt_desc_read(WT_TOC *toc)
 
 	__wt_bt_desc_stats(db, desc);		/* Update statistics. */
 
-	return (__wt_bt_page_out(toc, &page, 0));
+	__wt_bt_page_out(toc, &page, 0);
+	return (0);
 }
 
 /*
@@ -73,13 +74,11 @@ int
 __wt_bt_desc_write(WT_TOC *toc)
 {
 	DB *db;
-	ENV *env;
 	IDB *idb;
 	WT_FH *fh;
 	WT_PAGE *page;
 	WT_PAGE_DESC *desc;
 
-	env = toc->env;
 	db = toc->db;
 	idb = db->idb;
 	fh = idb->fh;
@@ -108,9 +107,15 @@ __wt_bt_desc_write(WT_TOC *toc)
 	if (F_ISSET(idb, WT_REPEAT_COMP))
 		F_SET(desc, WT_PAGE_DESC_REPEAT);
 
-	/* Write and flush the page. */
-	WT_RET(__wt_bt_page_out(toc, &page, WT_MODIFIED));
-	WT_RET(__wt_fsync(env, fh));
+	/*
+	 * Update the page.
+	 *
+	 * XXX
+	 * I'm not currently serializing updates to this page, and I'm pretty
+	 * sure that's a bug -- review this when we start working btree splits.
+	 */
+	WT_PAGE_MODIFY(page);
+	__wt_bt_page_out(toc, &page, 0);
 
 	__wt_bt_desc_stats(db, desc);			/* Update statistics */
 

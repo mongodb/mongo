@@ -115,7 +115,7 @@ __wt_bt_leaf_first(
 			*pagep = page;
 			return (0);
 		}
-		WT_RET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 	}
 	/* NOTREACHED */
 }

@@ -193,7 +193,7 @@ item_set:	if (callback != NULL &&
 	data->size = toc->data.size;
 
 err:	if (ovfl != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
+		__wt_bt_page_out(toc, &ovfl_page, 0);
 
 	return (ret != 0 ? ret :
 	    (callback == NULL ? 0 : callback(db, key, data)));

@@ -16,25 +16,9 @@ static void __wt_bt_page_discard_repl(ENV *, WT_REPL *);
  *	Move a page from its in-memory state out to disk.
  */
 int
-__wt_bt_page_reconcile(DB *db, WT_PAGE *page, int reclaim)
+__wt_bt_page_reconcile(DB *db, WT_PAGE *page)
 {
-	ENV *env;
-
-	env = db->env;
-
-#ifdef HAVE_DIAGNOSTIC
-	if (F_ISSET(page, ~WT_APIMASK_WT_PAGE))
-		(void)__wt_api_args(env, "Page.recycle");
-#endif
-	if (F_ISSET(page, WT_MODIFIED)) {
-		WT_RET(__wt_page_write(db, page));
-		F_CLR(page, WT_MODIFIED);
-	}
-
-	if (reclaim)
-		__wt_bt_page_discard(env, page);
-
-	return (0);
+	return (__wt_page_write(db, page));
 }
 
 /*
@@ -49,7 +33,8 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	u_int32_t i;
 	void *bp, *ep;
 
-	WT_ASSERT(env, F_ISSET(page, WT_MODIFIED) == 0);
+	WT_ENV_FCHK_ASSERT(
+	    env, "__wt_bt_page_discard", page->flags, WT_APIMASK_WT_PAGE);
 
 	switch (page->hdr->type) {
 	case WT_PAGE_COL_FIX:

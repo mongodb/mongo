@@ -87,7 +87,7 @@ retry:	/* Search the cache for the page. */
 			 * Update the generation number and clear any discard
 			 * flag, it's clearly wrong.
 			 */
-			e->gen = ++ienv->page_gen;
+			e->read_gen = ++ienv->read_gen;
 			F_CLR(e->page, WT_DISCARD);
 			*pagep = e->page;
 
@@ -104,25 +104,6 @@ retry:	/* Search the cache for the page. */
 		goto retry;
 	}
 	return (ret);
-}
-
-/*
- * __wt_page_out --
- *	Discard a reference to a database page.
- */
-int
-__wt_page_out(WT_TOC *toc, WT_PAGE *page, u_int32_t flags)
-{
-	/*
-	 * If the page has been modified or flagged as useless, set the
-	 * local flag.
-	 */
-	if (LF_ISSET(WT_DISCARD | WT_MODIFIED))
-		F_SET(page, LF_ISSET(WT_DISCARD | WT_MODIFIED));
-
-	__wt_hazard_clear(toc, page);
-
-	return (0);
 }
 
 /*
@@ -149,8 +130,8 @@ __wt_page_read(DB *db, WT_PAGE *page)
 	hdr->checksum = 0;
 	if (checksum != __wt_cksum(hdr, page->size)) {
 		__wt_api_env_errx(env,
-		    "read checksum error on %lu bytes at file offset %llu",
-		    (u_quad)offset, (u_long)page->size);
+		    "read checksum error: addr/size %lu/%lu at offset %llu",
+		    (u_long)page->addr, (u_long)page->size, (u_quad)offset);
 		return (WT_ERROR);
 	}
 	return (0);
@@ -169,8 +150,8 @@ __wt_page_write(DB *db, WT_PAGE *page)
 
 	env = db->env;
 	fh = db->idb->fh;
-	hdr = page->hdr;
 
+	hdr = page->hdr;
 	hdr->checksum = 0;
 	hdr->checksum = __wt_cksum(hdr, page->size);
 	return (__wt_write(

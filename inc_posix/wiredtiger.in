@@ -468,16 +468,15 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
-#define	WT_DISCARD					0x00000004
+#define	WT_DISCARD					0x00000001
 #define	WT_DUPLICATES					0x00000001
 #define	WT_HUFFMAN_DATA					0x00000004
 #define	WT_HUFFMAN_KEY					0x00000002
 #define	WT_INSERT					0x00000001
 #define	WT_MEMORY_CHECK					0x00000001
-#define	WT_MODIFIED					0x00000002
 #define	WT_NOWRITE					0x00000002
 #define	WT_OSWRITE					0x00000001
-#define	WT_PINNED					0x00000001
+#define	WT_PINNED					0x00000002
 #define	WT_PRINTABLES					0x00000001
 #define	WT_RDONLY					0x00000002
 #define	WT_REPEAT_COMP					0x00000001
@@ -491,6 +490,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_VERB_SERVERS					0x00000001
 #define	WT_WORKQ_RUN					0x00000001
 
+#define	WT_APIMASK_BT_PAGE_OUT				0x00000001
 #define	WT_APIMASK_BT_SEARCH_KEY_ROW			0x00000001
 #define	WT_APIMASK_DB_BULK_LOAD				0x00000001
 #define	WT_APIMASK_DB_CLOSE				0x00000003
@@ -520,7 +520,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_IDB					0x00000007
 #define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
-#define	WT_APIMASK_WT_PAGE				0x00000007
+#define	WT_APIMASK_WT_PAGE				0x00000003
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

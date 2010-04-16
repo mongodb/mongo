@@ -20,7 +20,8 @@ class Serial:
 serial['bt_del'] = Serial(
 	'bt_del',
 	'WT_WORKQ_SPIN',
-	['WT_REPL *new/new'])
+	['WT_PAGE *page/page',
+	 'WT_REPL *new/new'])
 
 serial['bt_repl'] = Serial(
 	'bt_repl',

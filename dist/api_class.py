@@ -573,6 +573,8 @@ flags['wiredtiger_env_init'] = [
 ###################################################
 # Internal routine flag declarations
 ###################################################
+flags['bt_page_out'] = [
+	'DISCARD' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
 
@@ -590,5 +592,4 @@ flags['ienv'] = [
 	'WORKQ_RUN' ]
 flags['wt_page'] = [
 	'DISCARD',
-	'MODIFIED',
 	'PINNED' ]

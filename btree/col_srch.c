@@ -61,7 +61,7 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
-			WT_RET(__wt_bt_page_out(toc, &page, 0));
+			__wt_bt_page_out(toc, &page, 0);
 		WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 	}
 
@@ -77,6 +77,6 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	return (0);
 
 err:	if (page != idb->root_page)
-		(void)__wt_bt_page_out(toc, &page, 0);
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }

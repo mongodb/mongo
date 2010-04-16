@@ -448,7 +448,7 @@ __wt_bt_debug_item_data(WT_TOC *toc, WT_ITEM *item, FILE *fp)
 	__wt_bt_print(p, size, fp);
 
 err:	if (page != NULL)
-		(void)__wt_bt_page_out(toc, &page, 0);
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }
 

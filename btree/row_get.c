@@ -55,6 +55,6 @@ __wt_db_row_get(WT_TOC *toc, DBT *key, DBT *data)
 	ret = __wt_bt_dbt_return(toc, key, data, page, ip, 0);
 
 err:	if (page != NULL && page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }

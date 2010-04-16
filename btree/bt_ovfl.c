@@ -59,8 +59,8 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	/* Copy the record into place. */
 	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
 
-	/* Write the overflow item back to the file. */
-	return (__wt_bt_page_out(toc, &page, WT_MODIFIED));
+	__wt_bt_page_out(toc, &page, 0);
+	return (0);
 }
 
 /*
@@ -89,9 +89,7 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy)
 	ret = __wt_bt_ovfl_write(toc, &dbt, &copy->addr);
 	copy->size = from->size;
 
-	/* Discard the overflow record. */
-	WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
-
+	__wt_bt_page_out(toc, &ovfl_page, 0);
 	return (ret);
 }
 
@@ -113,7 +111,7 @@ __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy)
 	ret = __wt_bt_data_copy_to_dbt(
 	    db, WT_PAGE_BYTE(ovfl_page), ovfl->size, copy);
 
-	WT_TRET(__wt_bt_page_out(toc, &ovfl_page, 0));
+	__wt_bt_page_out(toc, &ovfl_page, 0);
 
 	return (ret);
 }

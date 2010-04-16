@@ -41,10 +41,10 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 		new = NULL;
 
 	/* Delete the item. */
-	__wt_bt_del_serial(toc, new, ret);
+	__wt_bt_del_serial(toc, page, new, ret);
 
 err:	if (page != NULL && page != idb->root_page)
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 
 	return (ret);
 }

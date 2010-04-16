@@ -154,8 +154,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
-			WT_ERR(__wt_bt_page_out(
-			    toc, &page, WT_DISCARD | WT_MODIFIED));
+			__wt_bt_page_out(toc, &page, WT_DISCARD);
 
 			/* Switch to the next page. */
 			page = next;
@@ -187,8 +186,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(toc, page, page->records, NULL);
-			WT_ERR(__wt_bt_page_out(
-			    toc, &page, WT_DISCARD | WT_MODIFIED));
+			__wt_bt_page_out(toc, &page, WT_DISCARD);
 		}
 	}
 
@@ -198,7 +196,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 
 	if (0) {
 err:		if (page != NULL)
-			(void)__wt_bt_page_out(toc, &page, 0);
+			__wt_bt_page_out(toc, &page, 0);
 	}
 
 	return (ret == 1 ? 0 : ret);
@@ -489,8 +487,7 @@ skip_read:	/*
 			WT_ERR(__wt_bt_promote(toc, page, page->records, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
-			WT_ERR(__wt_bt_page_out(
-			    toc, &page, WT_DISCARD | WT_MODIFIED));
+			__wt_bt_page_out(toc, &page, WT_DISCARD);
 
 			/* Switch to the next page. */
 			page = next;
@@ -594,8 +591,7 @@ skip_read:	/*
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(toc, page, page->records, NULL);
-			WT_ERR(__wt_bt_page_out(
-			    toc, &page, WT_DISCARD | WT_MODIFIED));
+			__wt_bt_page_out(toc, &page, WT_DISCARD);
 		}
 	}
 
@@ -605,7 +601,7 @@ skip_read:	/*
 
 	if (0) {
 err:		if (page != NULL)
-			(void)__wt_bt_page_out(toc, &page, 0);
+			__wt_bt_page_out(toc, &page, 0);
 	}
 
 	__wt_free(env, data_comp.data, data_comp.mem_size);
@@ -751,7 +747,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			    toc, page, page->records, &root_addr));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
-			WT_RET(__wt_bt_page_out(toc, &page, WT_MODIFIED));
+			__wt_bt_page_out(toc, &page, 0);
 
 			/* Switch to the next page. */
 			page = next;
@@ -779,9 +775,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	if ((tret = __wt_bt_promote(toc,
 	    page, page->records, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
-	if ((tret = __wt_bt_page_out(
-	    toc, &page, WT_MODIFIED)) != 0 && (ret == 0 || ret == 1))
-		ret = tret;
+	__wt_bt_page_out(toc, &page, 0);
 
 	/*
 	 * Replace the caller's duplicate set with a WT_OFF structure, and
@@ -995,7 +989,7 @@ split:		switch (page->hdr->type) {
 			next->hdr->prntsize = parent->hdr->prntsize;
 
 			/* Discard the old parent page, we have a new one. */
-			WT_ERR(__wt_bt_page_out(toc, &parent, WT_MODIFIED));
+			__wt_bt_page_out(toc, &parent, 0);
 
 			need_promotion = 1;
 		}
@@ -1108,7 +1102,7 @@ split:		switch (page->hdr->type) {
 		while (
 		    (parent_addr = parent->hdr->prntaddr) != WT_ADDR_INVALID) {
 			parent_size = parent->hdr->prntsize;
-			WT_ERR(__wt_bt_page_out(toc, &parent, WT_MODIFIED));
+			__wt_bt_page_out(toc, &parent, 0);
 			WT_ERR(__wt_bt_page_in(
 			    toc, parent_addr, parent_size, 1, &parent));
 
@@ -1126,9 +1120,9 @@ split:		switch (page->hdr->type) {
 
 err:	/* Discard the parent page. */
 	if (parent != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &parent, WT_MODIFIED));
+		__wt_bt_page_out(toc, &parent, 0);
 	if (next != NULL)
-		WT_TRET(__wt_bt_page_out(toc, &next, WT_MODIFIED));
+		__wt_bt_page_out(toc, &next, 0);
 
 	return (ret);
 }

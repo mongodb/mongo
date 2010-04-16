@@ -87,7 +87,7 @@ __wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 			}
 		}
 
-		WT_TRET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 		if (ret != 0)
 			return (ret);
 	}

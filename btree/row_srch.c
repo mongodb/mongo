@@ -100,7 +100,7 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 
 		/* Walk down to the next page. */
 		if (page != idb->root_page)
-			WT_RET(__wt_bt_page_out(toc, &page, 0));
+			__wt_bt_page_out(toc, &page, 0);
 		WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 	}
 
@@ -127,6 +127,6 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	return (0);
 
 err:	if (page != idb->root_page)
-		WT_RET(__wt_bt_page_out(toc, &page, 0));
+		__wt_bt_page_out(toc, &page, 0);
 	return (ret);
 }
