@@ -225,7 +225,27 @@ struct __wt_page_hdr {
 #define	WT_PAGE_ROW_LEAF	9	/* Row-store leaf page */
 	u_int8_t type;			/* 12: page type */
 
-	u_int8_t unused[3];		/* 13-15: unused padding */
+	/*
+	 * WiredTiger is no-overwrite: each time a page is written, it's written
+	 * to an unused disk location so torn writes can't corrupt the database.
+	 * This means that writing a page requires updating the page's parent to
+	 * reference the new location.  We don't want to repeatedly write the
+	 * parent on a database flush, so we sort the pages for writing based on
+	 * their level in the tree.
+	 *
+	 * We don't need the tree level on disk and we could move this field to
+	 * the WT_PAGE structure -- that said, it's only a byte, and it is quite
+	 * a bit more difficult to figure out a tree level whenever we bring a
+	 * page into memory versus setting it once when the page is created.
+	 *
+	 * Leaf pages are level 1, each higher level of the tree increases by 1.
+	 * The maximum tree level is 255, larger than any practical fan-out.
+	 */
+#define	WT_LNONE	0
+#define	WT_LLEAF	1
+	u_int8_t level;			/* 13: tree level */
+
+	u_int8_t unused[2];		/* 14-15: unused padding */
 
 	union {
 		u_int32_t datalen;	/* 16-19: overflow data length */

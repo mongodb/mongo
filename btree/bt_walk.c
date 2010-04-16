@@ -31,8 +31,10 @@ __wt_bt_stat(WT_TOC *toc)
 
 	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
 
-	/* Check for one-page databases. */
 	page = idb->root_page;
+	WT_STAT_SET(idb->dstats, LEVEL, page->hdr->level);
+
+	/* Check for one-page databases. */
 	return (page->hdr->type == WT_PAGE_ROW_LEAF ?
 	    __wt_bt_stat_page(toc, page) :
 	    __wt_bt_stat_level(toc, page->addr, page->size));

@@ -52,7 +52,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 {
 	WT_STATS *stats;
 
-	WT_RET(__wt_calloc(env, 25, sizeof(WT_STATS), &stats));
+	WT_RET(__wt_calloc(env, 26, sizeof(WT_STATS), &stats));
 
 	stats[WT_STAT_BASE_RECNO].desc = "base record number";
 	stats[WT_STAT_FIXED_LEN].desc = "database fixed-record size";
@@ -65,6 +65,7 @@ __wt_stat_alloc_database_stats(ENV *env, WT_STATS **statsp)
 	stats[WT_STAT_ITEM_TOTAL_KEY].desc = "total database keys";
 	stats[WT_STAT_LEAFMAX].desc = "maximum leaf page size";
 	stats[WT_STAT_LEAFMIN].desc = "minimum leaf page size";
+	stats[WT_STAT_LEVEL].desc = "levels in the btree";
 	stats[WT_STAT_MAGIC].desc = "magic number";
 	stats[WT_STAT_MAJOR].desc = "major version number";
 	stats[WT_STAT_MINOR].desc = "minor version number";
@@ -99,6 +100,7 @@ __wt_stat_clear_database_stats(WT_STATS *stats)
 	stats[WT_STAT_ITEM_TOTAL_KEY].v = 0;
 	stats[WT_STAT_LEAFMAX].v = 0;
 	stats[WT_STAT_LEAFMIN].v = 0;
+	stats[WT_STAT_LEVEL].v = 0;
 	stats[WT_STAT_MAGIC].v = 0;
 	stats[WT_STAT_MAJOR].v = 0;
 	stats[WT_STAT_MINOR].v = 0;

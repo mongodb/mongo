@@ -40,6 +40,7 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 {
 	DB *db;
 	WT_PAGE *page;
+	WT_PAGE_HDR *hdr;
 
 	db = toc->db;
 
@@ -48,9 +49,11 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	    toc, WT_HDR_BYTES_TO_ALLOC(db, dbt->size), &page));
 
 	/* Initialize the page and copy the overflow item in. */
-	page->hdr->type = WT_PAGE_OVFL;
-	page->hdr->u.datalen = dbt->size;
-	page->hdr->prntaddr =
+	hdr = page->hdr;
+	hdr->type = WT_PAGE_OVFL;
+	hdr->level = WT_LLEAF;
+	hdr->u.datalen = dbt->size;
+	hdr->prntaddr =
 	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
 
 	/* Return the page address to the caller. */

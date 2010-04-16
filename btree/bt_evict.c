@@ -33,8 +33,7 @@ static int
 __wt_drain_compare_level(const void *a, const void *b)
 {
 	WT_CACHE_ENTRY *a_entry, *b_entry;
-	WT_PAGE_HDR *a_hdr, *b_hdr;
-	int a_level, b_level;
+	u_int a_level, b_level;
 
 	/*
 	 * The array may contain entries set to NULL for various reasons (for
@@ -47,49 +46,13 @@ __wt_drain_compare_level(const void *a, const void *b)
 		return (a_entry == NULL &&
 		    b_entry == NULL ? 0 : a_entry == NULL ? -1 : 1);
 
-	a_hdr = a_entry->page->hdr;
-	b_hdr = b_entry->page->hdr;
+	a_level = a_entry->page->hdr->level;
+	b_level = b_entry->page->hdr->level;
 
 	/*
-	 * The idea is to minimize the I/O in reconciliation, we'd like to find
-	 * the pages we need in the cache.
+	 * Sort in descending order, the bigger a page's level, the sooner
+	 * we want to write it.
 	 */
-	switch (a_hdr->type) {
-	case WT_PAGE_DUP_LEAF:
-		a_level = 1;
-		break;
-	case WT_PAGE_DUP_INT:
-		a_level = 2;
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		a_level = 3;
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		a_level = 4;
-		break;
-	}
-
-	switch (b_hdr->type) {
-	case WT_PAGE_DUP_LEAF:
-		b_level = 1;
-		break;
-	case WT_PAGE_DUP_INT:
-		b_level = 2;
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		b_level = 3;
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		b_level = 4;
-		break;
-	}
-
 	return (a_level > b_level ? 1 : (a_level < b_level ? -1 : 0));
 }
 
@@ -492,14 +455,13 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 
 		/*
 		 * The page is still being read and/or written by other threads,
-		 * for all we know.  Copy the page's write generation to our
-		 * local information and write the page.   If: (1) the workQ
-		 * updates the page's write generation number before it allows
-		 * page modification, (2) we copy the page's write generation
-		 * number before we write the page to the backing store, (3) no
-		 * thread is currently accessing the page, and (4) the page's
-		 * write generation is the same as our copy, then the page is
-		 * clean.
+		 * for all we know.  Copy the page's write generation to the
+		 * WT_CACHE_ENTRY and write the page.   If (1) the workQ updates
+		 * the page's write generation number before allowing page
+		 * modification, (2) we copy the page's write generation number
+		 * before we write the page to the backing store, (3) no thread
+		 * is currently accessing the page, and (4) the page's write
+		 * generation is the same as our copy, then the page is clean.
 		 */
 		page = e->page;
 		if (e->write_gen != page->write_gen) {
@@ -512,16 +474,15 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 
 			/*
 			 * If something bad happens, we can't discard the page,
-			 * clear its reference.
+			 * clear our reference.
 			 */
 			if (__wt_bt_page_reconcile(e->db, page))
 				(*drain) = NULL;
 		} else {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server discarding element/page "
-			    "%#lx/%#lu (%lu != %lu)",
-			    WT_PTR_TO_ULONG(e), (u_long)e->addr,
-			    (u_long)e->write_gen, (u_long)page->write_gen));
+			    "%#lx/%#lu",
+			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
 
 			WT_STAT_INCR(stats, CACHE_EVICT);
 		}
@@ -655,20 +616,23 @@ __wt_drain_evict(ENV *env)
 		__wt_drain_hazard_check(env, e);
 #endif
 		/*
-		 * If the page has been modified since we looked at it, keep
-		 * it in the cache.
-		 *
-		 * XXX
-		 * This is probably where we have to figure out if a page is
-		 * dirty because sync is re-dirtying pages, or a different
-		 * thread accessed the page.
+		 * Take a page reference, then clean up the entry.  We don't
+		 * have to clear these fields (the state field is the only
+		 * status any thread should be checking), but hopefully it
+		 * will catch illegal references sooner rather than later.
 		 */
 		page = e->page;
+
+		e->db = NULL;
 		e->page = NULL;
+		e->read_gen = 0;
+		e->write_gen = 0;
+		WT_MEMORY_FLUSH;
+		e->state = WT_EMPTY;
+
+		/* Free the memory. */
 		WT_CACHE_PAGE_OUT(cache, page->size);
 		__wt_bt_page_discard(env, page);
-
-		e->state = WT_EMPTY;
 	}
 }
 

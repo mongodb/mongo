@@ -53,7 +53,8 @@ __wt_bt_ovfl_copy(WT_TOC *toc, WT_OVFL *from, WT_OVFL *copy);
 int
 __wt_bt_ovfl_to_dbt(WT_TOC *toc, WT_OVFL *ovfl, DBT *copy);
 int
-__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t size, WT_PAGE **pagep);
+__wt_bt_page_alloc(
+    WT_TOC *toc, u_int type, u_int level, u_int32_t size, WT_PAGE **pagep);
 int
 __wt_bt_page_in(
     WT_TOC *toc, u_int32_t addr, u_int32_t size, int inmem, WT_PAGE **pagep);

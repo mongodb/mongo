@@ -438,6 +438,16 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
 		}
 	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, hdr->prntsize, 1, &parent));
 
+	/* Check that the tree levels match up. */
+	if (hdr->level + 1 != parent->hdr->level) {
+		__wt_api_db_errx(db,
+		    "parent's level of page at addr %lu is not one more than "
+		    "the page's level (parent level: %lu, child level %lu)",
+		    (u_long)addr,
+		    (u_long)parent->hdr->level, (u_long)hdr->level);
+		return (WT_ERROR);
+	}
+
 	/*
 	 * Search the parent for the reference to the child page, and set
 	 * off to reference the offpage structure.
@@ -678,8 +688,36 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 		return (WT_ERROR);
 	}
 
-	if (hdr->unused[0] != '\0' ||
-	    hdr->unused[1] != '\0' || hdr->unused[2] != '\0') {
+	/* Check the page level. */
+	switch (hdr->type) {
+	case WT_PAGE_DESCRIPT:
+		if (hdr->level != WT_LNONE)
+			goto err_level;
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_OVFL:
+	case WT_PAGE_ROW_LEAF:
+		if (hdr->level != WT_LLEAF)
+			goto err_level;
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		if (hdr->level <= WT_LLEAF) {
+err_level:		__wt_api_db_errx(db,
+			    "%s page at addr %lu has incorrect tree level "
+			    "of %lu",
+			    __wt_bt_hdr_type(hdr),
+			    (u_long)addr, (u_long)hdr->level);
+			return (WT_ERROR);
+		}
+		break;
+	WT_ILLEGAL_FORMAT(db);
+	}
+
+	if (hdr->unused[0] != '\0' || hdr->unused[1] != '\0') {
 		__wt_api_db_errx(db,
 		    "page at addr %lu has non-zero unused header fields",
 		    (u_long)addr);

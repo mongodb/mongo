@@ -190,6 +190,7 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	cache = ienv->cache;
 	fh = idb->fh;
 
+	*rr->pagep = NULL;
 	addr = rr->addr;
 	size = rr->size;
 	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
@@ -267,6 +268,8 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 			WT_ERR(__wt_cache_hb_entry_grow(toc, hb, &empty));
 	}
 
+	WT_CACHE_PAGE_IN(cache, size);
+
 	/*
 	 * Get a hazard reference before we mark the entry OK, the cache drain
 	 * server shouldn't pick our new page with its high read-generation,
@@ -287,8 +290,6 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	empty->write_gen = 0;
 	WT_MEMORY_FLUSH;
 	empty->state = WT_OK;
-
-	WT_CACHE_PAGE_IN(cache, size);
 
 	WT_VERBOSE(env, WT_VERB_CACHE,
 	    (env, "cache I/O server %s element/page %#lx/%lu",

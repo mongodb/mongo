@@ -21,22 +21,25 @@ static int  __wt_bt_page_inmem_row_leaf(DB *, WT_PAGE *);
  *	Allocate a new btree page from the cache.
  */
 int
-__wt_bt_page_alloc(WT_TOC *toc, u_int type, u_int32_t size, WT_PAGE **pagep)
+__wt_bt_page_alloc(
+    WT_TOC *toc, u_int type, u_int level, u_int32_t size, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
 
 	WT_RET((__wt_page_alloc(toc, size, &page)));
 
-	/* Set the space-available and first-free byte. */
+	/* In-memory page structure: the space-available and first-free byte. */
 	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
 
 	/*
-	 * Generally, the default values of 0 on page are correct; set the
-	 * related page addresses to the "unset" value.
+	 * Generally, the default values of 0 on page are correct; set the type
+	 * and the level, and set the related page addresses to the "unset"
+	 * value.
 	 */
 	hdr = page->hdr;
 	hdr->type = (u_int8_t)type;
+	hdr->level = (u_int8_t)level;
 	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
 	*pagep = page;

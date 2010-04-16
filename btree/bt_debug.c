@@ -96,12 +96,11 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 
 	fprintf(fp, "\t%s: ", __wt_bt_hdr_type(hdr));
 	if (hdr->type == WT_PAGE_OVFL)
-		fprintf(fp, "%lu bytes\n", (u_long)hdr->u.datalen);
+		fprintf(fp, "bytes %lu\n", (u_long)hdr->u.datalen);
 	else {
-		fprintf(fp, "%lu entries, %llu records\n",
-		    (u_long)hdr->u.entries, page->records);
-		fprintf(fp,
-		    "\tfirst-free %#lx, space avail: %lu\n",
+		fprintf(fp, "level %lu, entries %lu, records %llu\n",
+		    (u_long)hdr->level, (u_long)hdr->u.entries, page->records);
+		fprintf(fp, "\tfirst-free %#lx, space avail %lu\n",
 		    (u_long)page->first_free, (u_long)page->space_avail);
 	}
 	if (hdr->prntaddr == WT_ADDR_INVALID)
@@ -170,12 +169,12 @@ __wt_bt_debug_desc(WT_PAGE *page, FILE *fp)
 	if (desc->root_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\troot addr (none)\n");
 	else
-		fprintf(fp, "\t\troot addr %lu, len %lu\n",
+		fprintf(fp, "\t\troot addr %lu, size %lu\n",
 		    (u_long)desc->root_addr, (u_long)desc->root_size);
 	if (desc->free_addr == WT_ADDR_INVALID)
 		fprintf(fp, "\t\tfree addr (none)\n");
 	else
-		fprintf(fp, "\t\tfree addr %lu, len %lu\n",
+		fprintf(fp, "\t\tfree addr %lu, size %lu\n",
 		    (u_long)desc->free_addr, (u_long)desc->free_size);
 	fprintf(fp, "\t}\n");
 }

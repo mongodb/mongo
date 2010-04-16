@@ -85,7 +85,8 @@ __wt_bt_desc_write(WT_TOC *toc)
 
 	/* If the file size is 0, allocate a new page. */
 	if (fh->file_size == 0)
-		WT_RET(__wt_bt_page_alloc(toc, WT_PAGE_DESCRIPT, 512, &page));
+		WT_RET(__wt_bt_page_alloc(
+		    toc, WT_PAGE_DESCRIPT, WT_LNONE, 512, &page));
 	else
 		WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
 
