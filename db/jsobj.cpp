@@ -138,8 +138,8 @@ namespace mongo {
             }
             break;
         case jstOID:
-            s << "ObjId(";
-            s << __oid() << ')';
+            s << "ObjectId('";
+            s << __oid() << "')";
             break;
         case BinData:
             s << "BinData";
