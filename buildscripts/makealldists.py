@@ -141,6 +141,8 @@ def lose(name, logfh, losefh):
     print >> losefh, "=== End loser %s ===" % name
 
 def wait(procs, winfh, losefh, winners, losers):
+    print "."
+    sys.stdout.flush()
     try:
         (pid, stat) = os.wait()
     except OSError, err:

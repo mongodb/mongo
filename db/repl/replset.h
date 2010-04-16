@@ -1,4 +1,4 @@
-// replset.h
+// /db/repl/replset.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "../../util/concurrency/list.h"
+
 namespace mongo {
 
     class ReplSet;
@@ -25,17 +27,21 @@ namespace mongo {
 
     struct RemoteServer { 
         RemoteServer() : _port(-1) { }
-        RemoteServer(string h, int p = -1) : _host(h), _port(p) { 
-        }
+        RemoteServer(string h, int p = -1) : _host(h), _port(p) { }
+        bool operator<(const RemoteServer& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
+    private:
+        // invariant (except full obj assignment):
         string _host;
         int _port;
-        bool operator<(const RemoteServer& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
     };
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
+    /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
+             singleton and long lived.
+    */
     class ReplSet {
     public:
-        string name;
+        string getName() const { return _name; }
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
@@ -45,10 +51,22 @@ namespace mongo {
 
     private:
         string _name;
-        vector<RemoteServer> _seeds;
-        vector<RemoteServer> _members;
-        static void healthThread();
-        void health();
+        const vector<RemoteServer> *_seeds;
+
+        struct MemberInfo : public List1<MemberInfo>::Base {
+            const char *host;
+            int port;
+        };
+        List1<MemberInfo> _members;
+
+        void f() { 
+            MemberInfo* m = _members.head();
+            if( m ) 
+                m->next();
+            _members.orphan(m);
+        }
+
+        void startHealth();
     };
 
 }
