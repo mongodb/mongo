@@ -100,6 +100,7 @@ void	 key_gen(DBT *, u_int64_t);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);
 int	 wts_del(u_int64_t);
+int	 wts_dump(void);
 int	 wts_ops(void);
 int	 wts_read_row_scan(void);
 int	 wts_read_col_scan(void);

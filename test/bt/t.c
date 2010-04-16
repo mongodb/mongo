@@ -78,21 +78,24 @@ main(int argc, char *argv[])
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		config();
 
-		bdb_setup(0);		/* Open the databases */
+		bdb_setup(0);			/* Open the databases */
 		wts_setup(0, log);
 
 		config_dump(1);
 
-		if (wts_bulk_load())	/* Load initial records */
+		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 
-		if (wts_verify())	/* Verify the database */
+		if (wts_verify())		/* Verify the database */
+			goto err;
+
+		if (g.dump && wts_dump())	/* Optional dump */
 			goto err;
 
 		track("flushing & re-opening WT", 0);
-		wts_teardown();		/* Re-open the WT database */
+		wts_teardown();			/* Re-open the WT database */
 		wts_setup(1, log);
-					/* Scan through some records */
+						/* Scan through some records */
 		switch (g.c_database_type) {
 		case ROW:
 			if (wts_read_row_scan())
@@ -105,14 +108,13 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (wts_ops())		/* Random operations */
+		if (wts_ops())			/* Random operations */
 			goto err;
 
-					/* Optional statistics */
-		if (g.stats && wts_stats())
+		if (g.stats && wts_stats())	/* Optional statistics */
 			goto err;
 
-					/* Close the databases */
+						/* Close the databases */
 		track("shutting down BDB", 0);
 		bdb_teardown();	
 		track("shutting down WT", 0);

@@ -43,7 +43,7 @@ wts_setup(int reopen, int logfile)
 	/* Open the log file. */
 	if (logfile) {
 		p = fname(WT_PREFIX, "log");
-		if ((g.logfp = fopen(p, "w")) == NULL) {
+		if ((g.logfp = fopen(p, reopen ? "a" : "w")) == NULL) {
 			fprintf(stderr,
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
@@ -138,8 +138,6 @@ int
 wts_bulk_load()
 {
 	DB *db;
-	FILE *fp;
-	char *p;
 	int ret;
 
 	db = g.wts_db;
@@ -157,21 +155,31 @@ wts_bulk_load()
 		db->err(db, ret, "Db.bulk_load");
 		return (1);
 	}
+	return (0);
+}
 
-	if (g.dump) {
-		track("dump", 0);
-		p = fname(WT_PREFIX, "dump");
-		if ((fp = fopen(p, "w")) == NULL) {
-			db->err(db, errno, "fopen: %s", p);
-			return (1);
-		}
-		if ((ret = db->dump(db, fp, track,
-		    g.dump == DUMP_DEBUG ? WT_DEBUG : WT_PRINTABLES)) != 0) {
-			db->err(db, ret, "Db.dump");
-			return (1);
-		}
-		(void)fclose(fp);
+int
+wts_dump()
+{
+	DB *db;
+	FILE *fp;
+	char *p;
+	int ret;
+
+	db = g.wts_db;
+
+	track("dump", 0);
+	p = fname(WT_PREFIX, "dump");
+	if ((fp = fopen(p, "w")) == NULL) {
+		db->err(db, errno, "fopen: %s", p);
+		return (1);
 	}
+	if ((ret = db->dump(db, fp, track,
+	    g.dump == DUMP_DEBUG ? WT_DEBUG : WT_PRINTABLES)) != 0) {
+		db->err(db, ret, "Db.dump");
+		return (1);
+	}
+	(void)fclose(fp);
 
 	return (0);
 }
