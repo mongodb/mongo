@@ -760,7 +760,7 @@ namespace mongo {
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientPaired.  You do not need to specify this parameter
-           @param timeout tcp timeout in seconds - this is for read/write, not connect
+           @param timeout tcp timeout in seconds - this is for read/write, not connect.  Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0,int timeout=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
