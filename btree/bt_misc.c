@@ -98,10 +98,7 @@ int
 __wt_bt_leaf_first(
     WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 {
-	IDB *idb;
 	WT_PAGE *page;
-
-	idb = toc->db->idb;
 
 	for (;;) {
 		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
