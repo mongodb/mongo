@@ -103,7 +103,7 @@ __wt_bt_leaf_first(
 
 	idb = toc->db->idb;
 
-	for (addr = idb->root_addr, size = idb->root_size;;) {
+	for (;;) {
 		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
 		switch (page->hdr->type) {
 		case WT_PAGE_COL_INT:
