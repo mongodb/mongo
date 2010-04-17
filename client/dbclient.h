@@ -160,7 +160,7 @@ namespace mongo {
         /**
          * if this query has an orderby, hint, or some other field
          */
-        bool isComplex() const;
+        bool isComplex( bool * hasDollar = 0 ) const;
         
         BSONObj getFilter() const;
         BSONObj getSort() const;
