@@ -55,7 +55,7 @@ namespace mongo {
 
         _seeds = seeds;
 
-        startHealth();
+        startHealthThreads();
     }
 
     /* called at initialization */

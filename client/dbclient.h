@@ -388,6 +388,7 @@ namespace mongo {
 			@param cmd  the command object to execute.  For example, { ismaster : 1 }
 			@param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
 			       set.
+            @param options see enum QueryOptions - normally not needed to run a command
 			@return true if the command returned "ok".
         */
         virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
@@ -675,16 +676,15 @@ namespace mongo {
     class DBClientBase : public DBClientWithCommands, public DBConnector {
     public:
         /** send a query to the database.
-         ns:            namespace to query, format is <dbname>.<collectname>[.<collectname>]*
-         query:         query to perform on the collection.  this is a BSONObj (binary JSON)
+         @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
+         @param query query to perform on the collection.  this is a BSONObj (binary JSON)
          You may format as
            { query: { ... }, orderby: { ... } }
          to specify a sort order.
-         nToReturn:     n to return.  0 = unlimited
-         nToSkip:       start with the nth item
-         fieldsToReturn:
-         optional template of which fields to select. if unspecified, returns all fields
-         queryOptions:  see options enum at top of this file
+         @param nToReturn n to return.  0 = unlimited
+         @param nToSkip start with the nth item
+         @param fieldsToReturn optional template of which fields to select. if unspecified, returns all fields
+         @param queryOptions see options enum at top of this file
 
          @return    cursor.   0 if error (connection failure)
          @throws AssertionException
@@ -760,9 +760,10 @@ namespace mongo {
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientPaired.  You do not need to specify this parameter
-           @param timeout tcp timeout in seconds - this is for read/write, not connect.  Connect timeout is fixed, but short, at 5 seconds.
+           @param timeout tcp timeout in seconds - this is for read/write, not connect.  
+           Connect timeout is fixed, but short, at 5 seconds.
          */
-        DBClientConnection(bool _autoReconnect=false,DBClientPaired* cp=0,int timeout=0) :
+        DBClientConnection(bool _autoReconnect=false, DBClientPaired* cp=0, int timeout=0) :
                 clientPaired(cp), failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _timeout(timeout) { }
 
         /** Connect to a Mongo database server.

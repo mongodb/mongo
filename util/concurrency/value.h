@@ -1,4 +1,4 @@
-// replset.h
+// value.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -7,7 +7,7 @@
 *    it under the terms of the GNU Affero General Public License, version 3,
 *    as published by the Free Software Foundation.
 *
-*    This program is distributed in the hope that it will be useful,
+*    This program is distributed in the hope that it will be useful,b
 *    but WITHOUT ANY WARRANTY; without even the implied warranty of
 *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 *    GNU Affero General Public License for more details.
@@ -18,13 +18,25 @@
 
 #pragma once
 
-namespace mongo {
+namespace mongo { 
 
-    struct HealthOptions { 
-        // see http://www.mongodb.org/display/DOCS/Replica+Set+Internals
-        unsigned heartbeatSleepMillis;
-        unsigned heartbeatTimeoutMillis;
-        unsigned connRetries;
-    };
+class DiagStr { 
+    char buf1[256];
+    char buf2[256];
+    char *p;
+public:
+    DiagStr() {
+        memset(buf1, 0, 256);
+        memset(buf2, 0, 256);
+        p = buf1;
+    }
+    const char * get() const { return p; }
+
+    void set(const char *s) {
+        char *q = (p==buf1) ? buf2 : buf1;
+        strncpy(q, s, 255);
+        p = q;
+    }
+};
 
 }

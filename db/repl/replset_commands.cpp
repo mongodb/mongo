@@ -22,6 +22,10 @@
 
 namespace mongo { 
 
+    /* commands in other files:
+         replSetHeartbeat - health.cpp
+         */
+
     class CmdReplSetGetStatus : public Command {
     public:
         virtual bool slaveOk() {

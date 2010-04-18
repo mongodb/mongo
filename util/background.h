@@ -19,17 +19,36 @@
 
 namespace mongo {
 
-    /* object-orienty background thread dispatching.
+    /** object-orienty background thread dispatching.
 
        subclass and define run()
 
-       It is ok to call go() more than once -- if the previous invocation
+       It is ok to call go(), that is, run the job, more than once -- if the 
+       previous invocation
        has finished. Thus one pattern of use is to embed a backgroundjob
        in your object and reuse it (or same thing with inheritance).
+
+       note when job destructs, the thread is not terminated if still running.
+       generally if the thread could still be running, allocate the job dynamically 
+       and set deleteSelf to true.
     */
-    class BackgroundJob {
+    /* example
+    class ConnectBG : public BackgroundJob {
+    public:
+        int sock;
+        int res;
+        SockAddr farEnd;
+        void run() {
+            res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
+        }
+    };
+    */
+    class BackgroundJob : boost::noncopyable {
     protected:
-        /* define this to do your work! */
+        /** define this to do your work! 
+            after this returns, state is set to done
+            (and deletes if deleteSelf true) 
+        */
         virtual void run() = 0;
 
     public:

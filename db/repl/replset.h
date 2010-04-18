@@ -54,19 +54,17 @@ namespace mongo {
         const vector<RemoteServer> *_seeds;
 
         struct MemberInfo : public List1<MemberInfo>::Base {
+            MemberInfo() : dead(false), lastHeartbeat(0) { }
+            bool dead;
             const char *host;
             int port;
+
+            int lastHeartbeat;
         };
         List1<MemberInfo> _members;
 
-        void f() { 
-            MemberInfo* m = _members.head();
-            if( m ) 
-                m->next();
-            _members.orphan(m);
-        }
-
-        void startHealth();
+        void startHealthThreads();
+        friend class FeedbackThread;
     };
 
 }
