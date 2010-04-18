@@ -17,38 +17,47 @@
 #include "stdafx.h"
 #include "../cmdline.h"
 #include "replset.h"
+#include "../../util/sock.h"
 
 namespace mongo { 
 
     ReplSet *theReplSet = 0;
 
     ReplSet::ReplSet(string cfgString) {
+        cmdLine.port;
+
         const char *p = cfgString.c_str();
         const char *q = strchr(p, '/');
         uassert(13093, "bad --replset config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", q != 0 && p != q);
         _name = string(p, q-p);
 
-        set<RemoteServer> temp;
-        vector<RemoteServer> *seeds = new vector<RemoteServer>;
+        set<HostAndPort> temp;
+        vector<HostAndPort> *seeds = new vector<HostAndPort>;
         while( 1 ) {
             p = q + 1;
             q = strchr(p, ',');
             if( q == 0 ) q = strchr(p,0);
             uassert(13094, "bad --replset config string", p != q);
             const char *colon = strchr(p, ':');
-            RemoteServer m;
+            HostAndPort m;
             if( colon && colon < q ) {
                 int port = atoi(colon+1);
                 uassert(13095, "bad --replset port #", port > 0);
-                m = RemoteServer(string(p,colon-p),port);
+                m = HostAndPort(string(p,colon-p),port);
             }
             else { 
                 // no port specified.
-                m = RemoteServer(string(p,q-p));
+                m = HostAndPort(string(p,q-p));
             }
             uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
             temp.insert(m);
-            seeds->push_back(m);
+
+            uassert(10000, "can't use localhost in replset host list", !m.isLocalHost());
+
+            if( m.isSelf() )
+                log() << "replSet: ignoring seed " << m.toString() << " (=self)" << endl;
+            else
+                seeds->push_back(m);
             if( *q == 0 )
                 break;
         }

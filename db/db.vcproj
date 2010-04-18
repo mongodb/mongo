@@ -1905,6 +1905,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\hostandport.h"
+				>
+			</File>
+			<File
 				RelativePath=".\repl\replset.cpp"
 				>
 			</File>

@@ -19,21 +19,11 @@
 #pragma once
 
 #include "../../util/concurrency/list.h"
+#include "../../util/hostandport.h"
 
 namespace mongo {
 
-    class ReplSet;
-    extern ReplSet *theReplSet;
-
-    struct RemoteServer { 
-        RemoteServer() : _port(-1) { }
-        RemoteServer(string h, int p = -1) : _host(h), _port(p) { }
-        bool operator<(const RemoteServer& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
-    private:
-        // invariant (except full obj assignment):
-        string _host;
-        int _port;
-    };
+    extern class ReplSet *theReplSet;
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -51,7 +41,7 @@ namespace mongo {
 
     private:
         string _name;
-        const vector<RemoteServer> *_seeds;
+        const vector<HostAndPort> *_seeds;
 
         struct MemberInfo : public List1<MemberInfo>::Base {
             MemberInfo() : dead(false), lastHeartbeat(0) { }
