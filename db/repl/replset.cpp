@@ -52,7 +52,7 @@ namespace mongo {
             uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
             temp.insert(m);
 
-            uassert(10000, "can't use localhost in replset host list", !m.isLocalHost());
+            uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
 
             if( m.isSelf() )
                 log() << "replSet: ignoring seed " << m.toString() << " (=self)" << endl;
