@@ -30,7 +30,7 @@ namespace mongo {
 
     Query& Query::where(const string &jscode, BSONObj scope) { 
         /* use where() before sort() and hint() and explain(), else this will assert. */
-        assert( !obj.hasField("query") );
+        assert( ! isComplex() );
         BSONObjBuilder b;
         b.appendElements(obj);
         b.appendWhere(jscode, scope);
@@ -39,7 +39,7 @@ namespace mongo {
     }
 
     void Query::makeComplex() {
-        if ( obj.hasElement( "query" ) )
+        if ( isComplex() )
             return;
         BSONObjBuilder b;
         b.append( "query", obj );
@@ -76,14 +76,28 @@ namespace mongo {
         return *this; 
     }
 
-    bool Query::isComplex() const{
-        return obj.hasElement( "query" );
+    bool Query::isComplex( bool * hasDollar ) const{
+        if ( obj.hasElement( "query" ) ){
+            if ( hasDollar )
+                hasDollar[0] = false;
+            return true;
+        }
+
+        if ( obj.hasElement( "$query" ) ){
+            if ( hasDollar )
+                hasDollar[0] = true;
+            return true;
+        }
+
+        return false;
     }
         
     BSONObj Query::getFilter() const {
-        if ( ! isComplex() )
+        bool hasDollar;
+        if ( ! isComplex( &hasDollar ) )
             return obj;
-        return obj.getObjectField( "query" );
+        
+        return obj.getObjectField( hasDollar ? "$query" : "query" );
     }
     BSONObj Query::getSort() const {
         if ( ! isComplex() )

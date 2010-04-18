@@ -669,6 +669,38 @@ namespace mongo {
         int true_false = -1;
         while ( i.more() ){
             BSONElement e = i.next();
+
+            if (e.type() == Object){
+                BSONObj obj = e.embeddedObject();
+                BSONElement e2 = obj.firstElement();
+                if ( strcmp(e2.fieldName(), "$slice") == 0 ){
+                    if (e2.isNumber()){
+                        int i = e2.numberInt();
+                        if (i < 0)
+                            add(e.fieldName(), i, -i); // limit is now positive
+                        else
+                            add(e.fieldName(), 0, i);
+
+                    } else if (e2.type() == Array) {
+                        BSONObj arr = e2.embeddedObject();
+                        uassert(13099, "$slice array wrong size", arr.nFields() == 2 );
+
+                        BSONObjIterator it(arr);
+                        int skip = it.next().numberInt();
+                        int limit = it.next().numberInt();
+                        uassert(13100, "$slice limit must be positive", limit > 0 );
+                        add(e.fieldName(), skip, limit);
+
+                    } else {
+                        uassert(13098, "$slice only supports numbers and [skip, limit] arrays", false);
+                    }
+                } else {
+                    uassert(13097, string("Unsupported projection option: ") + obj.firstElement().fieldName(), false);
+                }
+
+                continue;
+            }
+
             add (e.fieldName(), e.trueValue());
 
             // validate input
@@ -687,15 +719,36 @@ namespace mongo {
         if (field.empty()){ // this is the field the user referred to
             _include = include;
         } else {
+            _include = !include;
+
             const size_t dot = field.find('.');
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos)); 
 
             boost::shared_ptr<FieldMatcher>& fm = _fields[subfield];
             if (!fm)
-                fm.reset(new FieldMatcher(!include));
+                fm.reset(new FieldMatcher());
 
             fm->add(rest, include);
+        }
+    }
+
+    void FieldMatcher::add(const string& field, int skip, int limit){
+        _special = true; // can't include or exclude whole object
+
+        if (field.empty()){ // this is the field the user referred to
+            _skip = skip;
+            _limit = limit;
+        } else {
+            const size_t dot = field.find('.');
+            const string subfield = field.substr(0,dot);
+            const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
+
+            boost::shared_ptr<FieldMatcher>& fm = _fields[subfield];
+            if (!fm)
+                fm.reset(new FieldMatcher());
+
+            fm->add(rest, skip, limit);
         }
     }
 
@@ -705,10 +758,26 @@ namespace mongo {
 
     //b will be the value part of an array-typed BSONElement
     void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a ) const {
+        int skip = _skip;
+        int limit = _limit;
+
+        if (skip < 0){
+            skip = max(0, skip + a.nFields());
+        }
+
         int i=0;
         BSONObjIterator it(a);
         while (it.more()){
             BSONElement e = it.next();
+
+            if (skip){
+                skip--;
+                continue;
+            }
+
+            if (limit != -1 && (limit-- == 0)){
+                break;
+            }
 
             switch(e.type()){
                 case Array:{
@@ -730,8 +799,6 @@ namespace mongo {
                     if (_include)
                         b.appendAs(e, b.numStr(i++).c_str());
             }
-            
-
         }
     }
 
@@ -745,7 +812,7 @@ namespace mongo {
         else {
             FieldMatcher& subfm = *field->second;
             
-            if (subfm._fields.empty() || !(e.type()==Object || e.type()==Array) ){
+            if ((subfm._fields.empty() && !subfm._special) || !(e.type()==Object || e.type()==Array) ){
                 if (subfm._include)
                     b.append(e);
             }

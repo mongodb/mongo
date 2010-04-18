@@ -114,6 +114,61 @@ namespace mongo {
         bool _done;
     };
 
+
+    class Servers {
+    public:
+        Servers(){
+        }
+        
+        void add( const ServerAndQuery& s ){
+            add( s._server , s._extra );
+        }
+        
+        void add( const string& server , const BSONObj& filter ){
+            vector<BSONObj>& mine = _filters[server];
+            mine.push_back( filter.getOwned() );
+        }
+        
+        // TOOO: pick a less horrible name
+        class View {
+            View( const Servers* s ){
+                for ( map<string, vector<BSONObj> >::const_iterator i=s->_filters.begin(); i!=s->_filters.end(); ++i ){
+                    _servers.push_back( i->first );
+                    _filters.push_back( i->second );
+                }
+            }
+        public:
+            int size() const {
+                return _servers.size();
+            }
+
+            string getServer( int n ) const {
+                return _servers[n];
+            }
+
+            vector<BSONObj> getFilter( int n ) const {
+                return _filters[ n ];
+            }
+            
+        private:
+            vector<string> _servers;
+            vector< vector<BSONObj> > _filters;
+
+            friend class Servers;
+        };
+
+        View view() const {
+            return View( this );
+        }
+        
+
+    private:
+        map<string, vector<BSONObj> > _filters;
+
+        friend class View;
+    };
+
+
     /**
      * runs a query in serial across any number of servers
      * returns all results from 1 server, then the next, etc...

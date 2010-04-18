@@ -1037,6 +1037,17 @@ namespace QueryTests {
         };
     };
 
+    namespace queryobjecttests {
+        class names1 {
+        public:
+            void run(){
+                ASSERT_EQUALS( BSON( "x" << 1 ) , QUERY( "query" << BSON( "x" << 1 ) ).getFilter() );
+                ASSERT_EQUALS( BSON( "x" << 1 ) , QUERY( "$query" << BSON( "x" << 1 ) ).getFilter() );
+            }
+            
+        };
+    }
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -1085,8 +1096,10 @@ namespace QueryTests {
             add< HelperByIdTest >();
             add< FindingStart >();
             add< WhatsMyUri >();
-
+            
             add< parsedtests::basic1 >();
+            
+            add< queryobjecttests::names1 >();
         }
     } myall;
     

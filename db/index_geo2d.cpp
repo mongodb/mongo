@@ -1002,7 +1002,7 @@ namespace mongo {
     public:
         GeoSearch( const Geo2dType * g , const GeoHash& n , int numWanted=100 , BSONObj filter=BSONObj() , double maxDistance = numeric_limits<double>::max() )
             : _spec( g ) , _n( n ) , _start( n ) ,
-              _numWanted( numWanted ) , _filter( filter ) , 
+              _numWanted( numWanted ) , _filter( filter ) , _maxDistance( maxDistance ) ,
               _hopper( new GeoHopper( g , numWanted , n , filter , maxDistance ) )
         {
             assert( g->getDetails() );
@@ -1043,6 +1043,10 @@ namespace mongo {
                     if ( ! _prefix.constrains() )
                         break;
                     _prefix = _prefix.up();
+                    
+                    double temp = _spec->distance( _prefix , _start );
+                    if ( ( temp * 5 ) > _maxDistance )
+                        break;
                 }
             }
             GEODEBUG( "done part 1" );
@@ -1106,6 +1110,7 @@ namespace mongo {
         GeoHash _prefix;
         int _numWanted;
         BSONObj _filter;
+        double _maxDistance;
         shared_ptr<GeoHopper> _hopper;
 
         long long _nscanned;
@@ -1584,7 +1589,11 @@ namespace mongo {
             if ( cmdObj["query"].type() == Object )
                 filter = cmdObj["query"].embeddedObject();
 
-            GeoSearch gs( g , n , numWanted , filter );
+            double maxDistance = numeric_limits<double>::max();
+            if ( cmdObj["maxDistance"].isNumber() )
+                maxDistance = cmdObj["maxDistance"].number();
+
+            GeoSearch gs( g , n , numWanted , filter , maxDistance );
 
             if ( cmdObj["start"].type() == String){
                 GeoHash start = (string) cmdObj["start"].valuestr();
