@@ -41,6 +41,7 @@ namespace mongo {
         }
     } cmdReplSetHeartbeat;
 
+    /* poll every other set member to check its status */
     class FeedbackThread : public BackgroundJob {
     public:
         ReplSet::MemberInfo *m;
@@ -51,6 +52,9 @@ namespace mongo {
                     BSONObj info;
                     bool ok = conn.simpleCommand("admin", &info, "replSetHeartbeat");
                     log() << "TEMP heartbeat " << ok << ' ' << info.toString() << endl;
+                    if( ok ) {
+                        m->lastHeartbeat = time(0);
+                    }
                 }
                 catch(...) { 
                     log() << "TEMP heartbeat not ok" << endl;

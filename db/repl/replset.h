@@ -59,8 +59,9 @@ namespace mongo {
             const char *host;
             int port;
 
-            int lastHeartbeat;
+            time_t lastHeartbeat;
         };
+        /* all members of the set EXCEPT SELF. */
         List1<MemberInfo> _members;
 
         void startHealthThreads();
