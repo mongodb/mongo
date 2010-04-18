@@ -40,7 +40,7 @@ namespace mongo {
     private:
         // invariant (except full obj assignment):
         string _host;
-        int _port;
+        int _port; // -1 indicates unspecified
     };
 
     /** returns true if strings share a common starting prefix */
@@ -56,7 +56,8 @@ namespace mongo {
     }
 
     inline bool HostAndPort::isSelf() const { 
-        if( _port != cmdLine.port )
+        int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
+        if( p != cmdLine.port )
             return false;
         assert( _host != "localhost" && _host != "127.0.0.1" );
         return sameStart(getHostName().c_str(), _host.c_str());
@@ -64,7 +65,8 @@ namespace mongo {
 
     inline string HostAndPort::toString() {
         stringstream ss;
-        ss << _host << ':' << _port;
+        ss << _host;
+        if( _port != -1 ) ss << ':' << _port;
         return ss.str();
     }
 
