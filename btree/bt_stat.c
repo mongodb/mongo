@@ -29,7 +29,7 @@ __wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 	db = toc->db;
 	ret = 0;
 
-	WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
+	WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
 
 	WT_ERR(__wt_bt_stat_page(toc, page));
 
