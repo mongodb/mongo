@@ -94,7 +94,9 @@ namespace mongo {
         */
         virtual bool requiresAuth() { return true; }
 
-        Command(const char *_name);
+        /** @param webUI expose the command in the web ui as /<name> ? */
+        Command(const char *_name, bool webUI = false);
+
         virtual ~Command() {}
 
     protected:
@@ -107,6 +109,7 @@ namespace mongo {
         }
 
         static map<string,Command*> * _commands;
+        static map<string,Command*> * _webCommands;
 
     public:
         static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);

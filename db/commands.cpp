@@ -25,16 +25,24 @@
 
 namespace mongo {
 
+    map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
 
-    Command::Command(const char *_name) : name(_name) {
+    Command::Command(const char *_name, bool web) : name(_name) {
         // register ourself.
-        if ( _commands == 0 )
+        if ( _commands == 0 ) {
             _commands = new map<string,Command*>;
+        }
         Command*& c = (*_commands)[name];
         if ( c )
             log() << "warning: 2 commands with name: " << _name << endl;
         c = this;
+
+        if( web ) {
+            if( _webCommands == 0 )
+                _webCommands = new map<string,Command*>;
+            (*_webCommands)[name] = this;
+        }
     }
 
     void Command::help( stringstream& help ) const {

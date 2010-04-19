@@ -311,8 +311,6 @@ namespace mongo {
             const SockAddr &from
         )
         {
-            //out() << "url [" << url << "]" << endl;
-            
             if ( url.size() > 1 ) {
                 
                 if ( url.find( "/_status" ) == 0 ){
@@ -349,11 +347,14 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongodb " << getHostName() << ':' << mongo::cmdLine.port << ' ';
+                z << "mongod " << "host:" << getHostName() << " port:" << mongo::cmdLine.port << ' ';
                 dbname = z.str();
             }
-            ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n<pre>";
-
+            ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n";
+            ss << "<pre>";
+            ss << "json:\n";
+            ss << " <a href=\"/_status\">_status</a>\n";
+            ss << '\n';
             doUnlockedStuff(ss);
 
             {
