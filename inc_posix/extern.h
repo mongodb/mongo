@@ -17,6 +17,8 @@ __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 void
 __wt_bt_debug_dbt(const char *tag, void *arg_dbt, FILE *fp);
 int
+__wt_bt_stat_desc(WT_TOC *toc);
+int
 __wt_bt_desc_read(WT_TOC *toc);
 int
 __wt_bt_desc_write(WT_TOC *toc);

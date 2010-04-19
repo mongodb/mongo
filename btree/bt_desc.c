@@ -9,18 +9,22 @@
 
 #include "wt_internal.h"
 
-static void __wt_bt_desc_stats(DB *, WT_PAGE_DESC *);
-
 /*
- * __wt_bt_desc_stats --
+ * __wt_bt_stat_desc --
  *	Fill in the statistics from the database description.
  */
-static void
-__wt_bt_desc_stats(DB *db, WT_PAGE_DESC *desc)
+int
+__wt_bt_stat_desc(WT_TOC *toc)
 {
+	WT_PAGE *page;
+	WT_PAGE_DESC *desc;
 	WT_STATS *stats;
 
-	stats = db->idb->dstats;
+	stats = toc->db->idb->dstats;
+
+	/* Read the database's description page. */
+	WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 
 	WT_STAT_SET(stats, MAGIC, desc->magic);
 	WT_STAT_SET(stats, MAJOR, desc->majorv);
@@ -31,6 +35,9 @@ __wt_bt_desc_stats(DB *db, WT_PAGE_DESC *desc)
 	WT_STAT_SET(stats, LEAFMIN, desc->leafmin);
 	WT_STAT_SET(stats, BASE_RECNO, desc->base_recno);
 	WT_STAT_SET(stats, FIXED_LEN, desc->fixed_len);
+
+	__wt_bt_page_out(toc, &page, 0);
+	return (0);
 }
 
 /*
@@ -59,8 +66,6 @@ __wt_bt_desc_read(WT_TOC *toc)
 	db->idb->free_addr = desc->free_addr;
 	db->idb->free_size = desc->free_size;
 	db->fixed_len = desc->fixed_len;
-
-	__wt_bt_desc_stats(db, desc);		/* Update statistics. */
 
 	__wt_bt_page_out(toc, &page, 0);
 	return (0);
@@ -117,8 +122,6 @@ __wt_bt_desc_write(WT_TOC *toc)
 	 */
 	WT_PAGE_MODIFY(page);
 	__wt_bt_page_out(toc, &page, 0);
-
-	__wt_bt_desc_stats(db, desc);			/* Update statistics */
 
 	return (0);
 }

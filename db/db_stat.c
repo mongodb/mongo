@@ -32,6 +32,7 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 		__wt_stat_clear_database_stats(idb->dstats);
 		WT_STAT_SET(
 		    idb->dstats, TREE_LEVEL, idb->root_page->hdr->level);
+		WT_RET(__wt_bt_stat_desc(toc));
 		WT_RET(__wt_bt_stat(toc, idb->root_addr, idb->root_size));
 
 		fprintf(stream, "Database statistics: %s\n", idb->name);
