@@ -28,11 +28,15 @@ __wt_db_stat_print(WT_TOC *toc, FILE *stream)
 	__wt_stat_print(env, idb->stats, stream);
 
 	/* Clear the database stats, then call Btree stat to fill them in. */
-	__wt_stat_clear_database_stats(idb->dstats);
-	WT_RET(__wt_bt_stat(toc));
+	if (!WT_UNOPENED_DATABASE(idb)) {
+		__wt_stat_clear_database_stats(idb->dstats);
+		WT_STAT_SET(
+		    idb->dstats, TREE_LEVEL, idb->root_page->hdr->level);
+		WT_RET(__wt_bt_stat(toc, idb->root_addr, idb->root_size));
 
-	fprintf(stream, "Database statistics: %s\n", idb->name);
-	__wt_stat_print(env, idb->dstats, stream);
+		fprintf(stream, "Database statistics: %s\n", idb->name);
+		__wt_stat_print(env, idb->dstats, stream);
+	}
 
 	/* Underlying file handle statistics. */
 	if (idb->fh != NULL) {

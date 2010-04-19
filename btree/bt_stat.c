@@ -9,95 +9,57 @@
 
 #include "wt_internal.h"
 
-static int __wt_bt_stat_level(WT_TOC *, u_int32_t, u_int32_t);
 static int __wt_bt_stat_page(WT_TOC *, WT_PAGE *);
 
 /*
  * __wt_bt_stat --
- *	Return btree statistics.
+ *	Depth-first recursive walk of a btree, calculating statistics.
  */
 int
-__wt_bt_stat(WT_TOC *toc)
+__wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size)
 {
 	DB *db;
-	IDB *idb;
+	WT_COL_INDX *page_cip;
+	WT_OFF *off;
 	WT_PAGE *page;
+	WT_ROW_INDX *page_rip;
+	u_int32_t i;
+	int ret;
 
 	db = toc->db;
-	idb = db->idb;
-
-	if (WT_UNOPENED_DATABASE(idb))
-		return (0);
-
-	WT_STAT_INCR(idb->dstats, TREE_LEVEL);
-
-	page = idb->root_page;
-	WT_STAT_SET(idb->dstats, LEVEL, page->hdr->level);
-
-	/* Check for one-page databases. */
-	return (page->hdr->type == WT_PAGE_ROW_LEAF ?
-	    __wt_bt_stat_page(toc, page) :
-	    __wt_bt_stat_level(toc, page->addr, page->size));
-}
-
-/*
- * __wt_bt_stat_level --
- *	Stat a level of a tree.
- */
-static int
-__wt_bt_stat_level(WT_TOC *toc, u_int32_t addr, u_int32_t size)
-{
-	DB *db;
-	IDB *idb;
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-	u_int32_t addr_arg, size_arg;
-	int first, ret;
-
-	db = toc->db;
-	idb = db->idb;
 	ret = 0;
-	addr_arg = WT_ADDR_INVALID;
 
-	for (first = 1; addr != WT_ADDR_INVALID;) {
-		/* Get the next page and stat it. */
-		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
+	WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
 
-		ret = __wt_bt_stat_page(toc, page);
+	WT_ERR(__wt_bt_stat_page(toc, page));
 
-		/*
-		 * If we're walking an internal page, we'll want to descend
-		 * to the first offpage in this level, save the address and
-		 * level information for the next iteration.
-		 */
-		hdr = page->hdr;
-		addr = hdr->nextaddr;
-		if (first) {
-			first = 0;
-			switch (hdr->type) {
-			case WT_PAGE_COL_INT:
-			case WT_PAGE_DUP_INT:
-			case WT_PAGE_ROW_INT:
-				__wt_bt_off_first(page, &addr_arg, &size_arg);
-				break;
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_VAR:
-			case WT_PAGE_DUP_LEAF:
-			case WT_PAGE_ROW_LEAF:
-				break;
-			WT_ILLEGAL_FORMAT(db);
-			}
+	switch (page->hdr->type) {
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(page, page_cip, i) {
+			off = (WT_OFF *)page_cip->page_data;
+			WT_ERR(__wt_bt_stat(toc, off->addr, off->size));
 		}
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_INDX_FOREACH(page, page_rip, i) {
+			off = WT_ITEM_BYTE_OFF(page_rip->page_data);
+			WT_ERR(__wt_bt_stat(toc, off->addr, off->size));
+		}
+		break;
+	case WT_PAGE_COL_FIX:
+		WT_ERR(__wt_bt_stat_page(toc, page));
+		break;
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_LEAF:
+		WT_ERR(__wt_bt_stat_page(toc, page));
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
 
+err: if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
-		if (ret != 0)
-			return (ret);
-	}
-
-	if (addr_arg != WT_ADDR_INVALID) {
-		WT_STAT_INCR(idb->dstats, TREE_LEVEL);
-		ret = __wt_bt_stat_level(toc, addr_arg, size_arg);
-	}
 
 	return (ret);
 }
@@ -183,7 +145,7 @@ __wt_bt_stat_page(WT_TOC *toc, WT_PAGE *page)
 		case WT_ITEM_OFF:
 			WT_ASSERT(toc->env, hdr->type == WT_PAGE_ROW_LEAF);
 			off = WT_ITEM_BYTE_OFF(item);
-			WT_RET(__wt_bt_stat_level(toc, off->addr, off->size));
+			WT_RET(__wt_bt_stat(toc, off->addr, off->size));
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}

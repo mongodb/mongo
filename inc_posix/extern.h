@@ -72,7 +72,7 @@ int
 __wt_bt_dbt_return(WT_TOC *toc,
     DBT *key, DBT *data, WT_PAGE *page, void *ip, int key_return);
 int
-__wt_bt_stat(WT_TOC *toc);
+__wt_bt_stat(WT_TOC *toc, u_int32_t addr, u_int32_t size);
 int
 __wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
 int
