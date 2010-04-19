@@ -52,7 +52,7 @@ namespace mongo {
             } 
             
             bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
-                ScopedDbConnection conn( conf->getPrimary() );
+                ShardConnection conn( conf->getPrimary() );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 result.appendElements( res );
@@ -154,7 +154,7 @@ namespace mongo {
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
-                    ScopedDbConnection conn( conf->getPrimary() );
+                    ShardConnection conn( conf->getPrimary() );
                     result.append( "n" , (double)conn->count( fullns , filter ) );
                     conn.done();
                     return true;
@@ -205,7 +205,7 @@ namespace mongo {
                 long long storageSize=0;
                 int nindexes=0;
                 for ( set<string>::iterator i=servers.begin(); i!=servers.end(); i++ ){
-                    ScopedDbConnection conn( *i );
+                    ShardConnection conn( *i );
                     BSONObj res;
                     if ( ! conn->runCommand( dbName , cmdObj , res ) ){
                         errmsg = "failed on shard: " + res.toString();
@@ -292,7 +292,7 @@ namespace mongo {
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
 
-                    ScopedDbConnection conn( c->getShard() );
+                    ShardConnection conn( c->getShard() );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , fixCmdObj(cmdObj, c) , res );
                     conn.done();
@@ -382,7 +382,7 @@ namespace mongo {
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
 
-                    ScopedDbConnection conn( c->getShard() );
+                    ShardConnection conn( c->getShard() );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     conn.done();
@@ -444,7 +444,7 @@ namespace mongo {
 
                 const Chunk& chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
                 
-                ScopedDbConnection conn( chunk.getShard() );
+                ShardConnection conn( chunk.getShard() );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
@@ -547,7 +547,7 @@ namespace mongo {
                 timingBuilder.append( "shards" , t.millis() );
 
                 Timer t2;
-                ScopedDbConnection conn( conf->getPrimary() );
+                ShardConnection conn( conf->getPrimary() );
                 BSONObj finalResult;
                 if ( ! conn->runCommand( dbName , finalCmd.obj() , finalResult ) ){
                     errmsg = "final reduce failed: ";

@@ -77,7 +77,7 @@ namespace mongo {
         
             log(3) << "single getmore: " << ns << endl;
 
-            ScopedDbConnection dbcon( r.singleServerName() );
+            ShardConnection dbcon( r.singleServerName() );
             DBClientBase& _c = dbcon.conn();
 
             // TODO 

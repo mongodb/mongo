@@ -59,7 +59,7 @@ namespace mongo {
         }
         
         if ( sort ){
-            ScopedDbConnection conn( getShard() );
+            ShardConnection conn( getShard() );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
@@ -83,7 +83,7 @@ namespace mongo {
                 return _manager->getShardKey().extractKey( end );
         }
         
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         BSONObj result;
         if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
                                                  << "keyPattern" << _manager->getShardKey().key()
@@ -169,7 +169,7 @@ namespace mongo {
             filter = b.obj();
         }
         
-        ScopedDbConnection fromconn( from );
+        ShardConnection fromconn( from );
 
         BSONObj startRes;
         bool worked = fromconn->runCommand( "admin" ,
@@ -293,7 +293,7 @@ namespace mongo {
     }
 
     long Chunk::getPhysicalSize() const{
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         
         BSONObj result;
         uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
@@ -308,7 +308,7 @@ namespace mongo {
 
     
     long Chunk::countObjects( const BSONObj& filter ) const{
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         
         BSONObj f = getFilter();
         if ( ! filter.isEmpty() )
@@ -395,7 +395,7 @@ namespace mongo {
     }
     
     void Chunk::ensureIndex(){
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
         conn.done();
     }
@@ -419,7 +419,7 @@ namespace mongo {
         _config( config ) , _ns( ns ) , _key( pattern ) , _unique( unique ){
         Chunk temp(0);
         
-        ScopedDbConnection conn( temp.modelServer() );
+        ShardConnection conn( temp.modelServer() );
         auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  ns ) );
         while ( cursor->more() ){
             BSONObj d = cursor->next();
@@ -585,7 +585,7 @@ namespace mongo {
         // delete data from mongod
         for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
             string shard = i->first;
-            ScopedDbConnection conn( shard );
+            ShardConnection conn( shard );
             conn->dropCollection( _ns );
             conn.done();
         }
@@ -599,13 +599,13 @@ namespace mongo {
         
         // remove chunk data
         Chunk temp(0);
-        ScopedDbConnection conn( temp.modelServer() );
+        ShardConnection conn( temp.modelServer() );
         conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
         for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ScopedDbConnection conn( i->first );
+            ShardConnection conn( i->first );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
