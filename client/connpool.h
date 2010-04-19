@@ -74,7 +74,7 @@ namespace mongo {
     /** Use to get a connection from the pool.  On exceptions things
        clean up nicely.
     */
-    class ScopedDbConnection {
+    class ScopedDbConnection : boost::noncopyable {
         const string host;
         DBClientBase *_conn;
     public:
