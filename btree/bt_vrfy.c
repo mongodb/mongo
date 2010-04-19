@@ -21,17 +21,17 @@ typedef struct {
 
 	void (*f)(const char *, u_int64_t);	/* Progress callback */
 	u_int64_t fcnt;				/* Progress counter */
-} VSTUFF;
+} WT_VSTUFF;
 
-static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, VSTUFF *);
-static int __wt_bt_verify_checkfrag(DB *, VSTUFF *);
-static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, VSTUFF *);
-static int __wt_bt_verify_level(WT_TOC *, u_int32_t, u_int32_t, VSTUFF *);
-static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, VSTUFF *);
+static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
+static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_bt_verify_level(WT_TOC *, u_int32_t, u_int32_t, WT_VSTUFF *);
+static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, WT_VSTUFF *);
 static int __wt_bt_verify_page_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, VSTUFF *);
+static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -54,7 +54,7 @@ __wt_bt_verify_int(
 	DB *db;
 	ENV *env;
 	IDB *idb;
-	VSTUFF vstuff;
+	WT_VSTUFF vstuff;
 	WT_PAGE *page;
 	int ret;
 
@@ -135,7 +135,7 @@ err:	if (page != NULL)
  *	Verify a level of a tree.
  */
 static int
-__wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, VSTUFF *vs)
+__wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_VSTUFF *vs)
 {
 	DB *db;
 	DBT *page_dbt_ref, page_dbt, *prev_dbt_ref, prev_dbt;
@@ -360,7 +360,7 @@ err:	if (prev != NULL)
  *	Verify the page is in the right place in the tree.
  */
 static int
-__wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, VSTUFF *vs)
+__wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, WT_VSTUFF *vs)
 {
 	DB *db;
 	DBT *cd_ref, child_dbt, *pd_ref, parent_dbt;
@@ -639,7 +639,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 {
 	DB *db;
 	WT_PAGE_HDR *hdr;
-	VSTUFF *vs;
+	WT_VSTUFF *vs;
 	u_int32_t addr;
 
 	vs = vs_arg;
@@ -765,7 +765,7 @@ err_level:		__wt_api_db_errx(db,
  *	Walk a page of WT_ITEMs, and verify them.
  */
 static int
-__wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+__wt_bt_verify_page_item(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	struct {
 		u_int32_t indx;			/* Item number */
@@ -1238,7 +1238,7 @@ unused_not_clear:	__wt_api_db_errx(db,
  *	Verify an overflow item.
  */
 static int
-__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
+__wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, WT_VSTUFF *vs)
 {
 	WT_PAGE *page;
 	int ret;
@@ -1258,7 +1258,7 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, VSTUFF *vs)
  *	verified this chunk of the file.
  */
 static int
-__wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
+__wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	DB *db;
 	u_int32_t addr, frags, i;
@@ -1283,7 +1283,7 @@ __wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, VSTUFF *vs)
  *	Verify we've checked all the fragments in the file.
  */
 static int
-__wt_bt_verify_checkfrag(DB *db, VSTUFF *vs)
+__wt_bt_verify_checkfrag(DB *db, WT_VSTUFF *vs)
 {
 	int ffc, ffc_start, ffc_end, frags, ret;
 
