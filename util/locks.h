@@ -83,7 +83,9 @@ namespace mongo {
         }
         
         ~RWLock(){
-            check( pthread_rwlock_destroy( &_lock ) );
+            if ( ! __destroyingStatics ){
+                check( pthread_rwlock_destroy( &_lock ) );
+            }
         }
 
         void lock(){
@@ -119,4 +121,25 @@ namespace mongo {
     
 
 #endif
+
+    struct rwlock {
+        rwlock( RWLock& lock , bool write )
+            : _lock( lock ) , _write( write ){
+
+            if ( _write )
+                _lock.lock();
+            else
+                _lock.lock_shared();
+        }
+
+        ~rwlock(){
+            if ( _write )
+                _lock.unlock();
+            else
+                _lock.unlock_shared();
+        }
+        
+        RWLock& _lock;
+        bool _write;
+    };
 }
