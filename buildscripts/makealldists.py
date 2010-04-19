@@ -29,14 +29,16 @@ def pushrepo(repodir):
         # Note: be very careful not to produce s3names containing
         # sequences of repeated slashes: s3 doesn't treat a////b as
         # equivalent to a/b.
-        s3name='distros-archive/'+time.strftime('%Y%m%d')+tail
-        #print fn, s3name
-        s3cp(bucket, fn, s3name)
-        s3name='distros'+tail
-        s3cp(bucket, fn, s3name)        
+        s3name1='distros-archive/'+time.strftime('%Y%m%d')+tail
+        s3name2='distros'+tail
+#        s3cp(bucket, fn, s3name1)
+#        s3cp(bucket, fn, s3name2)        
         if s3name.endswith('.deb'):
             newdebs.append(s3name)
-    [bucket.delete(deb) for deb in set(olddebs).difference(set(newdebs))]
+    # FIXME: we ought to clean out old debs eventually, but this will
+    # blow away too much if we're trying to push a subset of what's
+    # supposed to be available.
+    #[bucket.delete(deb) for deb in set(olddebs).difference(set(newdebs))]
     
 def cat (inh, outh):
     inh.seek(0)
@@ -185,7 +187,8 @@ def __main__():
              ("ubuntu", "9.10"),
              ("ubuntu", "9.4"),
              ("ubuntu", "8.10"),
-             ("debian", "5.0"))
+             ("debian", "5.0"),
+             ("centos", "5.4"),)
     arches = ("x86", "x86_64")
     mongos = branches.split(',')
     # Run a makedist for each distro/version/architecture tuple above.
@@ -197,6 +200,7 @@ def __main__():
     count = 0
     for ((distro, distro_version), arch, spec) in gen([dists, arches, mongos]):
         count+=1
+        opts = makedistopts
         (mongo_version,_,_) = parse_mongo_version_spec(spec)
         # blech: the "Packages.gz" metadata files in a Debian
         # repository will clobber each other unless we make a
@@ -204,11 +208,13 @@ def __main__():
         # building.
         if distro in ["debian", "ubuntu"]:
             outputdir = "%s/%s/%s" % (outputroot, mongo_version, distro)
+        elif distro in ["centos", "fedora", "redhat"]:
+            outputdir = "%s/%s/%s/%s/os" % (outputroot, mongo_version, distro, distro_version)
         else:
-            outputdir = outputroot
-            makedistopts += "--subdirs"
+            raise Exception("unsupported distro %s" % distro)
+            #opts += ["--subdirs"]
 
-        procs.append(spawn(distro, distro_version, arch, spec, outputdir, makedistopts))
+        procs.append(spawn(distro, distro_version, arch, spec, outputdir, opts))
 
         if len(procs) == 8:
             wait(procs, winfh, losefh, winners, losers)
@@ -235,6 +241,19 @@ def __main__():
     sys.stderr.flush()
     
     merge_directories_concatenating_conflicts(mergedir, glob.glob(outputroot+'/*'))
+    # this is sort of ridiculous, but the outputs from rpmbuild look
+    # like RPM/<arch>, but the repo wants to look like
+    # <arch>/RPM.
+    for dist in os.listdir(mergedir):
+        if dist in ["centos", "fedora", "redhat"]:
+            distdir="%s/%s" % (mergedir, dist)
+            rpmdirs = subprocess.Popen(["find", distdir, "-type", "d", "-a", "-name", "RPMS"], stdout=subprocess.PIPE).communicate()[0].split('\n')[:-1]
+            for rpmdir in rpmdirs:
+                for arch in os.listdir(rpmdir):
+                    archdir="%s/../%s" % (rpmdir, arch)
+                    os.mkdir(archdir)
+                    os.rename("%s/%s" % (rpmdir, arch), "%s/RPMS" % (archdir,))
+                os.rmdir(rpmdir)
 
     argv=["python", "mergerepositories.py", mergedir, repodir]
     print "running %s" % argv

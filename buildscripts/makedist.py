@@ -769,7 +769,7 @@ def main():
 
     # FIXME: this should also include the mongo version or something.
     if "subdirs" in kwargs:
-        kwargs["localdir"] = "%s/%s/%s/%s" % (rootdir, distro_name, distro_version, arch, kwargs["mongo_version"])
+        kwargs["localdir"] = "%s/%s/%s/%s/%s" % (rootdir, distro_name, distro_version, arch, kwargs["mongo_version"])
     else:
         kwargs["localdir"] = rootdir
 

@@ -123,16 +123,8 @@ def tryRackSpace():
 
 class Err(Exception):
     pass
-def run_for_effect(argv):
-    print " ".join(argv)
-    r=subprocess.Popen(argv).wait()
-    if r!=0:
-        raise Err("subprocess %s exited %d" % (argv, r))
 
-if __name__ == "__main__":
-    (dir, outdir) = sys.argv[-2:]
-    dirtail=dir.rstrip('\/').split('/')[-1]
-
+def merge_apt_repo(dir, outdir):
     gpgdir=settings.makedist['gpg_homedir']
     keyfile=settings.makedist['ssh_keyfile']
 
@@ -157,6 +149,23 @@ Description: 10gen packages"""
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "cd ./"+dirtail + " && " + makeaptrelease])
         run_for_effect(["scp", "-o", "StrictHostKeyChecking no", "-i", keyfile, "-r", "ubuntu@"+ubuntu.node.public_ip[0]+":./"+dirtail +'/*', outdir])
 
+
+def run_for_effect(argv):
+    print " ".join(argv)
+    r=subprocess.Popen(argv).wait()
+    if r!=0:
+        raise Err("subprocess %s exited %d" % (argv, r))
+
+if __name__ == "__main__":
+    (flavor, dir, outdir) = sys.argv[-3:]
+    dirtail=dir.rstrip('\/').split('/')[-1]
+
+    if flavor == "deb":
+        merge_apt_repo(dir, outdir)
+    elif flavor == "rpm":
+        merge_yum_repo(dir, outdir)
+    else:
+        Err("unknown pkg flavor %s" % flavor)
     # TODO: yum repositories
 
     
