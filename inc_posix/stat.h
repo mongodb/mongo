@@ -64,20 +64,19 @@ struct __wt_stats {
 #define	WT_STAT_ITEM_TOTAL_KEY			    8
 #define	WT_STAT_LEAFMAX				    9
 #define	WT_STAT_LEAFMIN				   10
-#define	WT_STAT_LEVEL				   11
-#define	WT_STAT_MAGIC				   12
-#define	WT_STAT_MAJOR				   13
-#define	WT_STAT_MINOR				   14
-#define	WT_STAT_PAGE_COL_FIXED			   15
-#define	WT_STAT_PAGE_COL_INTERNAL		   16
-#define	WT_STAT_PAGE_COL_VARIABLE		   17
-#define	WT_STAT_PAGE_DUP_INTERNAL		   18
-#define	WT_STAT_PAGE_DUP_LEAF			   19
-#define	WT_STAT_PAGE_FREE			   20
-#define	WT_STAT_PAGE_INTERNAL			   21
-#define	WT_STAT_PAGE_LEAF			   22
-#define	WT_STAT_PAGE_OVERFLOW			   23
-#define	WT_STAT_TREE_LEVEL			   24
+#define	WT_STAT_MAGIC				   11
+#define	WT_STAT_MAJOR				   12
+#define	WT_STAT_MINOR				   13
+#define	WT_STAT_PAGE_COL_FIXED			   14
+#define	WT_STAT_PAGE_COL_INTERNAL		   15
+#define	WT_STAT_PAGE_COL_VARIABLE		   16
+#define	WT_STAT_PAGE_DUP_INTERNAL		   17
+#define	WT_STAT_PAGE_DUP_LEAF			   18
+#define	WT_STAT_PAGE_FREE			   19
+#define	WT_STAT_PAGE_INTERNAL			   20
+#define	WT_STAT_PAGE_LEAF			   21
+#define	WT_STAT_PAGE_OVERFLOW			   22
+#define	WT_STAT_TREE_LEVEL			   23
 
 /*
  * Statistics entries for DB/IDB handle.

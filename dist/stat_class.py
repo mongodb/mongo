@@ -79,7 +79,6 @@ idb_dstats['ITEM_TOTAL_DATA'] = Stat([], 'total database data items')
 idb_dstats['ITEM_TOTAL_KEY'] = Stat([], 'total database keys')
 idb_dstats['LEAFMAX'] = Stat([], 'maximum leaf page size')
 idb_dstats['LEAFMIN'] = Stat([], 'minimum leaf page size')
-idb_dstats['LEVEL'] = Stat([], 'levels in the btree')
 idb_dstats['MAGIC'] = Stat([], 'magic number')
 idb_dstats['MAJOR'] = Stat([], 'major version number')
 idb_dstats['MINOR'] = Stat([], 'minor version number')
@@ -92,7 +91,7 @@ idb_dstats['PAGE_FREE'] = Stat([], 'unused on-page space in bytes')
 idb_dstats['PAGE_INTERNAL'] = Stat([], 'row-store internal pages')
 idb_dstats['PAGE_LEAF'] = Stat([], 'row-store leaf pages')
 idb_dstats['PAGE_OVERFLOW'] = Stat([], 'overflow pages')
-idb_dstats['TREE_LEVEL'] = Stat([], 'number of levels in the Btree')
+idb_dstats['TREE_LEVEL'] = Stat([], 'number of levels in the btree')
 
 ##########################################
 # FH handle statistics
