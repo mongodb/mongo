@@ -9,8 +9,15 @@
 
 #include "wt_internal.h"
 
+typedef struct {
+	FILE *stream;				/* Dump file stream */
+	void (*f)(const char *, u_int64_t);	/* Progress callback */
+	u_int64_t fcnt;				/* Progress counter */
+} WT_DSTUFF;
+
+static int __wt_bt_dump(WT_TOC *, u_int32_t, u_int32_t, u_int32_t, WT_DSTUFF *);
 static int  __wt_bt_dump_offpage(WT_TOC *, DBT *,
-    WT_ITEM *, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
+		WT_ITEM *, FILE *, void (*)(u_int8_t *, u_int32_t, FILE *));
 static int  __wt_bt_dump_page_fixed(WT_TOC *, WT_PAGE *, FILE *, u_int32_t);
 static int  __wt_bt_dump_page_item(WT_TOC *, WT_PAGE *, FILE *, u_int32_t);
 static void __wt_bt_hexprint(u_int8_t *, u_int32_t, FILE *);
@@ -26,14 +33,11 @@ __wt_db_dump(WT_TOC *toc,
 {
 	DB *db;
 	IDB *idb;
-	WT_PAGE *page;
-	WT_PAGE_HDR *hdr;
-	u_int64_t fcnt;
-	u_int32_t addr, size;
+	WT_DSTUFF dstuff;
+	int ret;
 
 	db = toc->db;
 	idb = db->idb;
-	fcnt = 0;
 
 	if (WT_UNOPENED_DATABASE(idb))
 		return (0);
@@ -45,52 +49,83 @@ __wt_db_dump(WT_TOC *toc,
 		 * if we're dumping in debugging mode, we want to confirm the
 		 * page is OK before walking it.
 		 */
-		return (__wt_bt_verify_int(toc, f, stream));
+		return (__wt_bt_verify(toc, f, stream));
 #else
 		__wt_api_db_errx(db, "library not built for debugging");
 		return (WT_ERROR);
 #endif
 	}
 
-	/*
-	 * The first physical page of the database is guaranteed to be the first
-	 * leaf page in the database; walk the linked list of leaf pages.
-	 */
-	WT_RET(__wt_bt_leaf_first(toc, idb->root_addr, idb->root_size, &page));
-	for (;;) {
-		hdr = page->hdr;
-		switch (hdr->type) {
-		case WT_PAGE_COL_FIX:
-			WT_RET(
-			    __wt_bt_dump_page_fixed(toc, page, stream, flags));
-			break;
-		case WT_PAGE_COL_VAR:
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_DUP_LEAF:
-		case WT_PAGE_ROW_LEAF:
-			WT_RET(
-			    __wt_bt_dump_page_item(toc, page, stream, flags));
-			break;
-		WT_ILLEGAL_FORMAT(db);
-		}
-
-		addr = hdr->nextaddr;
-		size = hdr->nextsize;
-		__wt_bt_page_out(toc, &page, 0);
-		if (addr == WT_ADDR_INVALID)
-			break;
-		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
-
-		/* Report progress every 10 pages. */
-		if (f != NULL && ++fcnt % 10 == 0)
-			f(toc->name, fcnt);
-	}
+	dstuff.stream = stream;
+	dstuff.f = f;
+	dstuff.fcnt = 0;
+	ret = __wt_bt_dump(toc, idb->root_addr, idb->root_size, flags, &dstuff);
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f(toc->name, fcnt);
+		f(toc->name, dstuff.fcnt);
 
-	return (0);
+	return (ret);
+}
+
+/*
+ * __wt_bt_dump --
+ *	Depth-first recursive walk of a btree.
+ */
+static int
+__wt_bt_dump(
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, u_int32_t flags, WT_DSTUFF *dp)
+{
+	DB *db;
+	WT_COL_INDX *page_cip;
+	WT_OFF *off;
+	WT_PAGE *page;
+	WT_ROW_INDX *page_rip;
+	u_int32_t i;
+	int ret;
+
+	db = toc->db;
+	ret = 0;
+
+	WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
+
+	switch (page->hdr->type) {
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(page, page_cip, i) {
+			off = (WT_OFF *)page_cip->page_data;
+			WT_ERR(
+			    __wt_bt_dump(toc, off->addr, off->size, flags, dp));
+		}
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_INDX_FOREACH(page, page_rip, i) {
+			off = WT_ITEM_BYTE_OFF(page_rip->page_data);
+			WT_ERR(
+			    __wt_bt_dump(toc, off->addr, off->size, flags, dp));
+		}
+		break;
+	case WT_PAGE_COL_FIX:
+		WT_ERR(__wt_bt_dump_page_fixed(toc, page, dp->stream, flags));
+		break;
+	case WT_PAGE_COL_VAR:
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_LEAF:
+		WT_ERR(__wt_bt_dump_page_item(toc, page, dp->stream, flags));
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
+
+	__wt_bt_page_out(toc, &page, 0);
+
+	/* Report progress every 10 pages. */
+	if (dp->f != NULL && ++dp->fcnt % 10 == 0)
+		dp->f(toc->name, dp->fcnt);
+
+err:	if (page != NULL)
+		__wt_bt_page_out(toc, &page, 0);
+
+	return (ret);
 }
 
 /* Check if the next page entry is part of a duplicate data set. */

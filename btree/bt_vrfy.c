@@ -40,15 +40,15 @@ static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
-	return (__wt_bt_verify_int(toc, f, NULL));
+	return (__wt_bt_verify(toc, f, NULL));
 }
 
 /*
- * __wt_bt_verify_int --
+ * __wt_bt_verify --
  *	Verify a Btree, optionally dumping each page in debugging mode.
  */
 int
-__wt_bt_verify_int(
+__wt_bt_verify(
     WT_TOC *toc, void (*f)(const char *, u_int64_t), FILE *stream)
 {
 	DB *db;

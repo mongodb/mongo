@@ -78,7 +78,7 @@ __wt_bt_sync(WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t));
 int
-__wt_bt_verify_int(
+__wt_bt_verify(
     WT_TOC *toc, void (*f)(const char *, u_int64_t), FILE *stream);
 int
 __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg);

@@ -63,14 +63,14 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_dump.c (C)
                                                                     _
 			func(last_key->data, last_key->size, stream);
-../btree/bt_dump.c  149  Warning 644: Variable 'last_key' (line 113) may not
+../btree/bt_dump.c  188  Warning 644: Variable 'last_key' (line 152) may not
     have been initialized
-../btree/bt_dump.c  113  Info 830: Location cited in prior message
+../btree/bt_dump.c  152  Info 830: Location cited in prior message
                                      _
 			if (dup_ahead) {
-../btree/bt_dump.c  179  Warning 644: Variable 'dup_ahead' (line 119) may not
+../btree/bt_dump.c  218  Warning 644: Variable 'dup_ahead' (line 158) may not
     have been initialized
-../btree/bt_dump.c  119  Info 830: Location cited in prior message
+../btree/bt_dump.c  158  Info 830: Location cited in prior message
 
 --- Module:   ../btree/bt_misc.c (C)
 
