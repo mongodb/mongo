@@ -27,14 +27,15 @@ namespace mongo {
     class BufBuilder;
     class Client;
 
-// db "commands" (sent via db.$cmd.findOne(...))
-// subclass to make a command.
+    /** mongodb "commands" (sent via db.$cmd.findOne(...))
+        subclass to make a command.  define a singleton object for it.
+        */
     class Command {
     public:
         
         enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
 
-        string name;
+        const string name;
 
         /* run the given command
            implement this...
