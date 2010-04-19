@@ -34,6 +34,8 @@
 
 #include "../util/queue.h"
 
+#include "shard.h"
+
 using namespace std;
 
 namespace mongo {
