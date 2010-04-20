@@ -509,6 +509,41 @@ namespace mongo {
         return name;
     }
 
+    void ConfigServer::logChange( const string& what , const string& ns , const BSONObj& detail ){
+        static bool createdCapped = false;
+        static AtomicUInt num;
+        
+        ShardConnection conn( _primary );
+        
+        if ( ! createdCapped ){
+            conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+            createdCapped = true;
+        }
+     
+        stringstream id;
+        id << ourHostname << "-";
+        {
+            struct tm t;
+            time_t tt = time(0);
+            localtime_r( &tt , &t );
+            id << ( 1900 + t.tm_year ) << "-"
+               << t.tm_mon << "-"
+               << t.tm_mday << "-"
+               << t.tm_hour << "-"
+               << t.tm_min << "-"
+                ;
+        }
+        id << num++;
+
+        conn->insert( "config.changelog" , BSON( "_id" << id.str() << 
+                                                 "server" << ourHostname <<
+                                                 "time" << DATENOW <<
+                                                 "what" << what <<
+                                                 "ns" << ns << 
+                                                 "details" << detail ) );
+        conn.done();
+    }
+
     ConfigServer configServer;    
     Grid grid;
 

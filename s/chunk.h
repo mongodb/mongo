@@ -112,6 +112,8 @@ namespace mongo {
         virtual void serialize(BSONObjBuilder& to);
         virtual void unserialize(const BSONObj& from);
         virtual string modelServer();
+        
+        void appendShortVersion( const char * name , BSONObjBuilder& b );
 
         virtual void save( bool check=false );
         

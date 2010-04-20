@@ -188,6 +188,13 @@ namespace mongo {
          */
         int checkConfigVersion();
         
+        /**
+         * log a change to config.changes 
+         * @param what e.g. "split" , "migrate"
+         * @param msg any more info
+         */
+        void logChange( const string& what , const string& ns , const BSONObj& detail = BSONObj() );
+
         static int VERSION;
         
     private:

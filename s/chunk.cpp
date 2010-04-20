@@ -121,9 +121,13 @@ namespace mongo {
     
     Chunk * Chunk::split( const BSONObj& m ){
         uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
-        
+
         log(1) << " before split on: "  << m << '\n'
                << "\t self  : " << toString() << endl;
+        
+        BSONObjBuilder detail(256);
+        appendShortVersion( "before" , detail );
+        
 
         uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
         uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
@@ -148,14 +152,23 @@ namespace mongo {
                << "\t left : " << toString() << '\n' 
                << "\t right: "<< s->toString() << endl;
         
+        appendShortVersion( "left" , detail );
+        s->appendShortVersion( "right" , detail );
         
         _manager->save();
         
+        configServer.logChange( "split" , _ns , detail.obj() );
+
         return s;
     }
 
     bool Chunk::moveAndCommit( const string& to , string& errmsg ){
         uassert( 10167 ,  "can't move shard to its current location!" , to != getShard() );
+        
+        BSONObjBuilder detail;
+        detail.append( "from" , _shard );
+        detail.append( "to" , to );
+        appendShortVersion( "chunk" , detail );
 
         log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard << " -> " << to << endl;
         
@@ -229,6 +242,9 @@ namespace mongo {
         }
         
         fromconn.done();
+        
+        configServer.logChange( "migrate" , _ns , detail.obj() );
+        
         return true;
     }
     
@@ -319,6 +335,13 @@ namespace mongo {
         
         conn.done();
         return (long)n;
+    }
+
+    void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        bb.append( "min" , _min );
+        bb.append( "max" , _max );
+        bb.done();
     }
     
     bool Chunk::operator==( const Chunk& s ) const{
