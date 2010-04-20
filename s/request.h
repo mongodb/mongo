@@ -72,10 +72,6 @@ namespace mongo {
         
         string singleServerName();
         
-        const char * primaryName(){
-            return _config->getPrimary().c_str();
-        }
-
         // ---- low level access ----
 
         void reply( Message & response ){

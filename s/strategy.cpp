@@ -28,7 +28,7 @@ namespace mongo {
     // ----- Strategy ------
 
     void Strategy::doWrite( int op , Request& r , string server ){
-        ScopedDbConnection dbcon( server );
+        ShardConnection dbcon( server );
         DBClientBase &_c = dbcon.conn();
         
         /* TODO FIX - do not case and call DBClientBase::say() */
@@ -40,7 +40,7 @@ namespace mongo {
 
     void Strategy::doQuery( Request& r , string server ){
         try{
-            ScopedDbConnection dbcon( server );
+            ShardConnection dbcon( server );
             DBClientBase &c = dbcon.conn();
             
             checkShardVersion( c , r.getns() );
@@ -69,7 +69,7 @@ namespace mongo {
     }
     
     void Strategy::insert( string server , const char * ns , const BSONObj& obj ){
-        ScopedDbConnection dbcon( server );
+        ShardConnection dbcon( server );
         checkShardVersion( dbcon.conn() , ns );
         dbcon->insert( ns , obj );
         dbcon.done();
@@ -88,7 +88,7 @@ namespace mongo {
             int secsToSleep = 0;
             while ( 1 ){
                 try {
-                    ScopedDbConnection conn( _addr );
+                    ShardConnection conn( _addr );
                     
                     BSONObj result;
                     
@@ -220,7 +220,7 @@ namespace mongo {
     }
 
     bool lockNamespaceOnServer( const string& server , const string& ns ){
-        ScopedDbConnection conn( server );
+        ShardConnection conn( server );
         bool res = lockNamespaceOnServer( conn.conn() , ns );
         conn.done();
         return res;

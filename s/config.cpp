@@ -31,6 +31,7 @@
 namespace mongo {
 
     int ConfigServer::VERSION = 2;
+    Shard Shard::EMPTY;
 
     /* --- DBConfig --- */
 
@@ -44,11 +45,11 @@ namespace mongo {
         return _sharded.find( ns ) != _sharded.end();
     }
 
-    string DBConfig::getShard( const string& ns ){
+    const Shard& DBConfig::getShard( const string& ns ){
         if ( isSharded( ns ) )
-            return "";
+            return Shard::EMPTY;
         
-        uassert( 10178 ,  "no primary!" , _primary.size() );
+        uassert( 10178 ,  "no primary!" , _primary.ok() );
         return _primary;
     }
     
@@ -207,7 +208,7 @@ namespace mongo {
         
         // 4
         {
-            ScopedDbConnection conn( _primary );
+            ShardConnection conn( _primary );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -219,7 +220,7 @@ namespace mongo {
         // 5
         for ( set<string>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
             string s = *i;
-            ScopedDbConnection conn( s );
+            ShardConnection conn( s );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -263,7 +264,7 @@ namespace mongo {
     /* --- Grid --- */
     
     string Grid::pickShardForNewDB(){
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
         
@@ -283,7 +284,7 @@ namespace mongo {
     }
 
     bool Grid::knowAboutShard( string name ) const{
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
         return ! shard.isEmpty();
@@ -314,7 +315,7 @@ namespace mongo {
                     else
                         cc->_primary = pickShardForNewDB();
                     
-                    if ( cc->_primary.size() ){
+                    if ( cc->_primary.ok() ){
                         cc->save();
                         log() << "\t put [" << database << "] on: " << cc->_primary << endl;
                     }
@@ -341,7 +342,7 @@ namespace mongo {
     }
 
     unsigned long long Grid::getNextOpTime() const {
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         
         BSONObj result;
         massert( 10421 ,  "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
@@ -411,21 +412,21 @@ namespace mongo {
     
     bool ConfigServer::allUp( string& errmsg ){
         try {
-            ScopedDbConnection conn( _primary );
+            ShardConnection conn( _primary );
             conn->getLastError();
             conn.done();
             return true;
         }
         catch ( DBException& ){
             log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
-            errmsg = _primary + " seems down";
+            errmsg = (string)_primary + " seems down";
             return false;
         }
         
     }
     
     int ConfigServer::dbConfigVersion(){
-        ScopedDbConnection conn( _primary );
+        ShardConnection conn( _primary );
         int version = dbConfigVersion( conn.conn() );
         conn.done();
         return version;
@@ -454,7 +455,7 @@ namespace mongo {
             return 0;
         
         if ( cur == 0 ){
-            ScopedDbConnection conn( _primary );
+            ShardConnection conn( _primary );
             conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             pool.flush();
             assert( VERSION == dbConfigVersion( conn.conn() ) );
@@ -469,7 +470,7 @@ namespace mongo {
     void ConfigServer::reloadSettings(){
         set<string> got;
         
-        ScopedDbConnection conn( _primary );
+        ShardConnection conn( _primary );
         auto_ptr<DBClientCursor> c = conn->query( "config.settings" , BSONObj() );
         while ( c->more() ){
             BSONObj o = c->next();

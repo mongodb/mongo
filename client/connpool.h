@@ -74,7 +74,7 @@ namespace mongo {
     /** Use to get a connection from the pool.  On exceptions things
        clean up nicely.
     */
-    class ScopedDbConnection {
+    class ScopedDbConnection : boost::noncopyable {
         const string host;
         DBClientBase *_conn;
     public:
@@ -83,11 +83,17 @@ namespace mongo {
             uassert( 11004 ,  "did you call done already" , _conn );
             return _conn; 
         }
-
+        
         /** get the associated connection object */
         DBClientBase& conn() {
             uassert( 11005 ,  "did you call done already" , _conn );
             return *_conn;
+        }
+
+        /** get the associated connection object */
+        DBClientBase* get() {
+            uassert( 13102 ,  "did you call done already" , _conn );
+            return _conn;
         }
 
         /** throws UserException if can't connect */
