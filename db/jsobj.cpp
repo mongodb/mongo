@@ -738,9 +738,15 @@ namespace mongo {
                 e = i.next();
                 if ( e.eoo() )
                     break;
-                s << ",\n";
-                for( int x = 0; x < pretty; x++ )
-                    s << "  ";
+                s << ",";
+                if ( pretty ) {
+                    s << "\n";
+                    for( int x = 0; x < pretty; x++ )
+                        s << "  ";
+                }
+                else {
+                    s << " ";
+                }
             }
         s << " }";
         return s.str();
