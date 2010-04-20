@@ -552,6 +552,7 @@ namespace mongo {
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
         snapshotThread.go();
+        clientCursorMonitor.go();
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.

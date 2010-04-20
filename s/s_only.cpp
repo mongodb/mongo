@@ -33,6 +33,9 @@ namespace mongo {
     }
 
     boost::thread_specific_ptr<Client> currentClient;
+
+    Client::Client( const char * s ){ assert(!"this shouldn't be called"); }
     Client::~Client(){ assert(!"this shouldn't be called"); }
+    bool Client::shutdown(){ assert(!"this shouldn't be called"); return true; }
 
 }

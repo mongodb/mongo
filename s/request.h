@@ -35,42 +35,43 @@ namespace mongo {
         // ---- message info -----
 
 
-        const char * getns(){
+        const char * getns() const {
             return _d.getns();
         }
-        int op(){
+        int op() const {
             return _m.data->operation();
         }
-        bool expectResponse(){
+        bool expectResponse() const {
             return op() == dbQuery || op() == dbGetMore;
         }
-        
-        MSGID id(){
+        bool isCommand() const;
+
+        MSGID id() const {
             return _id;
         }
 
-        DBConfig * getConfig(){
+        DBConfig * getConfig() const {
             return _config;
         }
-        bool isShardingEnabled(){
+        bool isShardingEnabled() const {
             return _config->isShardingEnabled();
         }
         
-        ChunkManager * getChunkManager(){
+        ChunkManager * getChunkManager() const {
             return _chunkManager;
         }
         
-        int getClientId(){
+        int getClientId() const {
             return _clientId;
         }
-        ClientInfo * getClientInfo(){
+        ClientInfo * getClientInfo() const {
             return _clientInfo;
         }
 
         // ---- remote location info -----
 
         
-        string singleServerName();
+        string singleServerName() const ;
         
         // ---- low level access ----
 
@@ -78,9 +79,9 @@ namespace mongo {
             _p->reply( _m , response , _id );
         }
         
-        Message& m(){ return _m; }
-        DbMessage& d(){ return _d; }
-        AbstractMessagingPort* p(){ return _p; }
+        Message& m() { return _m; }
+        DbMessage& d() { return _d; }
+        AbstractMessagingPort* p() const { return _p; }
 
         void process( int attempt = 0 );
         
