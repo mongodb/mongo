@@ -64,7 +64,7 @@ namespace mongo {
         // in some cases the timeout will actually be 2x this value - eg we do a partial send,
         // then the timeout fires, then we try to send again, then the timeout fires again with
         // no data sent, then we detect that the other side is down
-        MessagingPort(int timeout = 0);
+        MessagingPort(int timeout = 0, int logLevel = 0 );
 
         virtual ~MessagingPort();
 
@@ -97,6 +97,7 @@ namespace mongo {
     public:
         SockAddr farEnd;
         int _timeout;
+        int _logLevel; // passed to log() when logging errors
 
         friend class PiggyBackData;
     };

@@ -36,6 +36,10 @@ namespace mongo {
                 errmsg = "not a replset member";
                 return false;
             }
+            if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
+                errmsg = "set names do not match";
+                return false;
+            }
             result.append("set", theReplSet->getName());
             return true;
         }
@@ -45,19 +49,47 @@ namespace mongo {
     class FeedbackThread : public BackgroundJob {
     public:
         ReplSet::MemberInfo *m;
+
+    private:
+        void down() {
+            m->health = 0.0;
+            if( m->upSince ) {
+                m->upSince = 0;
+                log() << "replSet " << m->fullName() << " is now down" << endl;
+            }
+        }
+
+    public:
+
         void run() { 
+            mongo::lastError.reset( new LastError() );
             DBClientConnection conn(true, 0, 10);
+            conn._logLevel = 2;
+            string err;
+            conn.connect(m->fullName(), err);
+
+            BSONObj cmd = BSON( "replSetHeartbeat" << theReplSet->getName() );
             while( 1 ) {
                 try { 
                     BSONObj info;
-                    bool ok = conn.simpleCommand("admin", &info, "replSetHeartbeat");
-                    log() << "TEMP heartbeat " << ok << ' ' << info.toString() << endl;
+                    bool ok = conn.runCommand("admin", cmd, info);
+                    m->lastHeartbeat = time(0);
                     if( ok ) {
-                        m->lastHeartbeat = time(0);
+                        if( m->upSince == 0 ) {
+                            log() << "replSet " << m->fullName() << " is now up" << endl;
+                            m->upSince = m->lastHeartbeat;
+                        }
+                        m->health = 1.0;
+                        m->lastHeartbeatErrMsg.set("");
+                    }
+                    else { 
+                        down();
+                        m->lastHeartbeatErrMsg.set(info.getStringField("errmsg"));
                     }
                 }
                 catch(...) { 
-                    log() << "TEMP heartbeat not ok" << endl;
+                    down();
+                    m->lastHeartbeatErrMsg.set("connect/transport error");
                 }
                 sleepsecs(2);
             }
@@ -75,9 +107,17 @@ namespace mongo {
         }
 
         while( m ) {
-            v.push_back( BSON( "name" << m->fullName() ) );
+            BSONObjBuilder bb;
+            bb.append("name", m->fullName());
+            bb.append("health", m->health);
+            bb.append("uptime", (unsigned) (m->upSince ? (time(0)-m->upSince) : 0));
+            bb.appendDate("lastHeartbeat", m->lastHeartbeat);
+            bb.append("errmsg", m->lastHeartbeatErrMsg.get());
+            v.push_back(bb.obj());
             m = m->next();
         }
+        b.append("set", getName());
+        b.appendDate("date", time(0));
         b.append("members", v);
     }
 
@@ -86,6 +126,7 @@ namespace mongo {
         while( m ) {
             FeedbackThread *f = new FeedbackThread();
             f->m = m;
+            f->go();
             m = m->next();
         }
     }

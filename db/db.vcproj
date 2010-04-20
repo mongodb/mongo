@@ -1724,6 +1724,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\message_server_port.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\miniwebserver.cpp"
 					>
 				</File>
@@ -1930,6 +1934,14 @@
 			</File>
 			<File
 				RelativePath=".\repl\replset_commands.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\rs_config.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\rs_config.h"
 				>
 			</File>
 		</Filter>

@@ -30,6 +30,11 @@ public:
         memset(buf2, 0, 256);
         p = buf1;
     }
+
+    /** this string COULD be mangled but with the double buffering, assuming writes 
+        are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
+        diagnostic strings, where their content isn't critical.
+        */
     const char * get() const { return p; }
 
     void set(const char *s) {

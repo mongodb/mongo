@@ -374,6 +374,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\stats.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -446,6 +450,10 @@
 				</File>
 				<File
 					RelativePath="..\db\commands.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\db\stats\counters.cpp"
 					>
 				</File>
 				<File

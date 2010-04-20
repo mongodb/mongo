@@ -24,12 +24,11 @@ namespace mongo {
     ReplSet *theReplSet = 0;
 
     ReplSet::ReplSet(string cfgString) {
-        cmdLine.port;
-
         const char *p = cfgString.c_str();
         const char *q = strchr(p, '/');
-        uassert(13093, "bad --replset config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", q != 0 && p != q);
+        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", q != 0 && p != q);
         _name = string(p, q-p);
+        log() << "replSet: " << cfgString << endl;
 
         set<HostAndPort> temp;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
@@ -37,19 +36,19 @@ namespace mongo {
             p = q + 1;
             q = strchr(p, ',');
             if( q == 0 ) q = strchr(p,0);
-            uassert(13094, "bad --replset config string", p != q);
+            uassert(13094, "bad --replSet config string", p != q);
             const char *colon = strchr(p, ':');
             HostAndPort m;
             if( colon && colon < q ) {
                 int port = atoi(colon+1);
-                uassert(13095, "bad --replset port #", port > 0);
+                uassert(13095, "bad --replSet port #", port > 0);
                 m = HostAndPort(string(p,colon-p),port);
             }
             else { 
                 // no port specified.
                 m = HostAndPort(string(p,q-p), cmdLine.port);
             }
-            uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
+            uassert(13096, "bad --replSet config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
             temp.insert(m);
 
             uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());

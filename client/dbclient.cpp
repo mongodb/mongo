@@ -465,7 +465,7 @@ namespace mongo {
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server = auto_ptr<SockAddr>(new SockAddr(ip.c_str(), port));
-        p = auto_ptr<MessagingPort>(new MessagingPort( _timeout ));
+        p = auto_ptr<MessagingPort>(new MessagingPort( _timeout, _logLevel ));
 
         if (server->getAddr() == "0.0.0.0"){
             failed = true;
@@ -491,22 +491,22 @@ namespace mongo {
             return;
 
         lastReconnectTry = time(0);
-        log() << "trying reconnect to " << serverAddress << endl;
+        log(_logLevel) << "trying reconnect to " << serverAddress << endl;
         string errmsg;
         string tmp = serverAddress;
         failed = false;
         if ( !connect(tmp.c_str(), errmsg) ) { 
-            log() << "reconnect " << serverAddress << " failed " << errmsg << endl;
+            log(_logLevel) << "reconnect " << serverAddress << " failed " << errmsg << endl;
 			return;
 		}
 
-		log() << "reconnect " << serverAddress << " ok" << endl;
+		log(_logLevel) << "reconnect " << serverAddress << " ok" << endl;
 		for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) { 
 			const char *dbname = i->first.c_str();
 			const char *username = i->second.first.c_str();
 			const char *password = i->second.second.c_str();
 			if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-				log() << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
+				log(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
 		}
     }
 
@@ -610,7 +610,7 @@ namespace mongo {
         if ( ! runCommand( nsToDatabase( ns.c_str() ) , 
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) , 
                            info ) ){
-            log() << "dropIndex failed: " << info << endl;
+            log(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();
@@ -908,7 +908,7 @@ namespace mongo {
                     BSONObj o;
                     c.isMaster(im, &o);
                     if ( retry )
-                        log() << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
+                        log(_logLevel) << "checkmaster: " << c.toString() << ' ' << o.toString() << '\n';
                     if ( im ) {
                         master = (State) (x + 2);
                         return;
@@ -916,7 +916,7 @@ namespace mongo {
                 }
                 catch (AssertionException&) {
                     if ( retry )
-                        log() << "checkmaster: caught exception " << c.toString() << '\n';
+                        log(_logLevel) << "checkmaster: caught exception " << c.toString() << '\n';
                 }
                 x = x^1;
             }

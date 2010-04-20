@@ -1760,6 +1760,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\message_server_port.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\util\miniwebserver.cpp"
 					>
 				</File>

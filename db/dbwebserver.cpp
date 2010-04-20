@@ -368,6 +368,8 @@ namespace mongo {
                             headers.push_back( "Content-Type: text/plain" );
                         }
                         responseMsg = j;
+                        if( h ) 
+                            responseMsg += '\n';
                         return;
 
                     }
