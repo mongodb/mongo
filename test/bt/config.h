@@ -27,7 +27,6 @@ static CONFIG c[] = {
 	{ "data_max",		0,		0,		32,	4096,		&g.c_data_max },
 	{ "data_min",		0,		0,		10,	32,		&g.c_data_min },
 	{ "database_type",	0,		C_IGNORE,	1,	3,		&g.c_database_type },
-	{ "duplicates",		C_ROW,		C_IGNORE,	0,	1,		&g.c_duplicates },
 	{ "duplicates_pct",	C_ROW,		C_IGNORE,	0,	80,		&g.c_duplicates_pct },
 	{ "huffman_data",	C_ROW|C_VAR,	0,		0,	1,		&g.c_huffman_data },
 	{ "huffman_key",	C_ROW,		0,		0,	1,		&g.c_huffman_key },

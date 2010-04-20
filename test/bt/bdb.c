@@ -26,7 +26,7 @@ bdb_setup(int reopen)
 	    (g.c_read_pct == 100 ? 0 : DB_INIT_LOCK) |
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
-	if (g.c_duplicates)
+	if (g.c_duplicates_pct)
 		assert(db->set_flags(db, DB_DUP) == 0);
 
 	p = fname(BDB_PREFIX, "db");
