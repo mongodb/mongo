@@ -899,13 +899,14 @@ namespace mongo {
                 }
                 assert( !dl.isNull() );
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
+                Ordering ordering = Ordering::make(idxKey);
                 keyUpdates += changes[x].added.size();
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
                         idx.head.btree()->bt_insert(
                                                     idx.head,
-                                                    dl, *changes[x].added[i], idxKey, /*dupsAllowed*/true, idx);
+                                                    dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
                     }
                     catch (AssertionException&) {
                         ss << " exception update index ";
@@ -938,6 +939,7 @@ namespace mongo {
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
+        Ordering ordering = Ordering::make(order);
         int n = 0;
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             if( ++n == 2 ) { 
@@ -946,7 +948,7 @@ namespace mongo {
             assert( !recordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, recordLoc,
-                                            *i, order, dupsAllowed, idx);
+                                            *i, ordering, dupsAllowed, idx);
             }
             catch (AssertionException& e) {
                 if( e.code == 10287 && idxNo == d->nIndexes ) { 

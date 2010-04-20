@@ -82,7 +82,7 @@ namespace mongo {
         }
         bool found;
         bucket = indexDetails.head.btree()->
-        locate(indexDetails, indexDetails.head, startKey, order, keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
+            locate(indexDetails, indexDetails.head, startKey, Ordering::make(order), keyOfs, found, direction > 0 ? minDiskLoc : maxDiskLoc, direction);
         skipUnusedKeys();
         checkEnd();        
     }
@@ -192,7 +192,7 @@ namespace mongo {
         bool found;
 
         /* TODO: Switch to keep indexdetails and do idx.head! */
-        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, order, keyOfs, found, locAtKeyOfs, direction);
+        bucket = indexDetails.head.btree()->locate(indexDetails, indexDetails.head, keyAtKeyOfs, Ordering::make(order), keyOfs, found, locAtKeyOfs, direction);
         RARELY log() << "  key seems to have moved in the index, refinding. found:" << found << endl;
         if ( ! bucket.isNull() )
             skipUnusedKeys();

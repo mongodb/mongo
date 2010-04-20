@@ -981,16 +981,19 @@ namespace mongo {
         static bool initial( const IndexDetails& id , const Geo2dType * spec , 
                              BtreeLocation& min , BtreeLocation&  max , 
                              GeoHash start ,
-                             int & found , GeoAccumulator * hopper ){
+                             int & found , GeoAccumulator * hopper )
+        {
             
+            Ordering ordering = Ordering::make(spec->_order);
+
             min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
-                                                  spec->_order , min.pos , min.found , minDiskLoc );
+                                                  ordering , min.pos , min.found , minDiskLoc );
             min.checkCur( found , hopper );
             max = min;
             
             if ( min.bucket.isNull() ){
                 min.bucket = id.head.btree()->locate( id , id.head , start.wrap() , 
-                                                      spec->_order , min.pos , min.found , minDiskLoc , -1 );
+                                                      ordering , min.pos , min.found , minDiskLoc , -1 );
                 min.checkCur( found , hopper );
             }
             
@@ -1094,7 +1097,7 @@ namespace mongo {
             }
 
             BtreeLocation loc;
-            loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , _spec->_order , 
+            loc.bucket = id.head.btree()->locate( id , id.head , toscan.wrap() , Ordering::make(_spec->_order) , 
                                                         loc.pos , loc.found , minDiskLoc );
             loc.checkCur( _found , _hopper.get() );
             while ( loc.hasPrefix( toscan ) && loc.advance( 1 , _found , _hopper.get() ) )

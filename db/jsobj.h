@@ -2021,15 +2021,26 @@ namespace mongo {
         return s;
     }
 
+    /** A precomputation of a BSON key pattern.
+        The constructor is private to make conversion more explicit so we notice where we call make().
+        Over time we should push this up higher and higher.
+        */
     class Ordering { 
         const unsigned bits;
         Ordering(unsigned b) : bits(b) { }
     public:
+        /** so, for key pattern { a : 1, b : -1 }
+            get(0) == 1
+            get(1) == -1
+        */
         int get(int i) const { 
             return ((1 << i) & bits) ? -1 : 1;
         }
 
-        static Ordering make(BSONObj& obj) {
+        // for woCompare...
+        unsigned descending(unsigned mask) const { return bits & mask; }
+
+        static Ordering make(const BSONObj& obj) {
             unsigned b = 0;
             BSONObjIterator k(obj);
             unsigned n = 0;

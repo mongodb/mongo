@@ -797,7 +797,7 @@ namespace mongo {
 
         BSONObjIterator i(*this);
         BSONObjIterator j(r);
-        int k = 0;
+        unsigned mask = 1;
         while ( 1 ) {
             // so far, equal...
 
@@ -811,12 +811,12 @@ namespace mongo {
             int x;
             {
                 x = l.woCompare( r, considerFieldName );
-                if ( o.get(k) < 0 )
+                if( o.descending(mask) )
                     x = -x;
             }
             if ( x != 0 )
                 return x;
-            k++;
+            mask << 1;
         }
         return -1;
     }
