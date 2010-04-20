@@ -94,4 +94,16 @@ namespace mongo {
             throw UserException( 9003 , (string)"error on Model::save: " + errmsg );
     }
 
+    BSONObj Model::toObject(){
+        BSONObjBuilder b;
+        serialize( b );
+        return b.obj();
+    }
+
+    void Model::append( const char * name , BSONObjBuilder& b ){
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        serialize( bb );
+        bb.done();
+    }
+
 } // namespace mongo
