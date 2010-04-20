@@ -302,7 +302,13 @@ namespace mongo {
                 s << "{ \"$date\" : ";
             else
                 s << "Date( ";
-            s << date();
+            if( pretty ) {
+                Date_t d = date();
+                if( d == 0 ) s << '0';
+                else
+                    s << '"' << date().toString() << '"';
+            } else
+                s << date();
             if ( format == Strict )
                 s << " }";
             else

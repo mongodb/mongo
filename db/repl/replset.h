@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../../util/concurrency/list.h"
+#include "../../util/concurrency/value.h"
 #include "../../util/hostandport.h"
 
 namespace mongo {
@@ -48,11 +49,20 @@ namespace mongo {
         void addMemberIfMissing(const HostAndPort& p);
 
         struct MemberInfo : public List1<MemberInfo>::Base {
-            MemberInfo(string h, int p) : dead(false), port(p), lastHeartbeat(0), host(h) { }
+            MemberInfo(string h, int p) : port(p), host(h) {
+                dead = false;
+                lastHeartbeat = 0;
+                upSince = 0;
+                health = -1.0;
+            }
+
             bool dead;
             const int port;
-            time_t lastHeartbeat;
             const string host;
+            double health;
+            time_t lastHeartbeat;
+            time_t upSince;
+            DiagStr lastHeartbeatErrMsg;
 
             string fullName() {
                 if( port < 0 ) return host;

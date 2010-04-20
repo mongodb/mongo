@@ -165,8 +165,6 @@ namespace mongo {
 #endif
     }
 
-
-
 #define asctime _asctime_not_threadsafe_
 #define gmtime _gmtime_not_threadsafe_
 #define localtime _localtime_not_threadsafe_
@@ -246,6 +244,11 @@ namespace mongo {
         Date_t(unsigned long long m): millis(m) {}
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
+        string toString() const { 
+            char buf[64];
+            time_t_to_String(millis, buf);
+            return buf;
+        }
     };
 
     inline Date_t jsTime() {

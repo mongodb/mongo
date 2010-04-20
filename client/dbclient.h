@@ -371,6 +371,10 @@ namespace mongo {
     class DBClientWithCommands : public DBClientInterface {
         set<string> _seenIndexes;
     public:
+        /** controls how chatty the client is about network errors & such.  See log.h */
+        int _logLevel;
+
+        DBClientWithCommands() : _logLevel(0) { }
 
 		/** helper function.  run a simple command where the command expression is simply
 			  { command : 1 }
