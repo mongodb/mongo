@@ -123,6 +123,24 @@ namespace mongo {
         b.appendNumber( "last_ms" , _last_time );
         b.append("last_finished", _last);
     }
+
+
+    void GenericCounter::hit( const string& name , int count ){
+        scoped_lock lk( _mutex );
+        _counts[name]++;
+    }
+    
+    BSONObj GenericCounter::getObj() {
+        BSONObjBuilder b(128);
+        {
+            mongo::mutex::scoped_lock lk( _mutex );
+            for ( map<string,long long>::iterator i=_counts.begin(); i!=_counts.end(); i++ ){
+                b.appendNumber( i->first.c_str() , i->second );
+            }
+        }
+        return b.obj();
+    }
+
     
 
     OpCounters globalOpCounters;

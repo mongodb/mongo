@@ -27,13 +27,18 @@
 
 #include "stdafx.h"
 #include "../util/message.h"
-#include "../db/dbmessage.h"
+#include "../util/processinfo.h"
+
 #include "../client/connpool.h"
+
+#include "../db/dbmessage.h"
 #include "../db/commands.h"
+#include "../db/stats/counters.h"
 
 #include "config.h"
 #include "chunk.h"
 #include "strategy.h"
+#include "stats.h"
 
 namespace mongo {
 
@@ -73,6 +78,77 @@ namespace mongo {
                 return true;
             }
         } netstat;
+        
+        class ServerStatusCmd : public Command {
+        public:
+            ServerStatusCmd() : Command( "serverStatus" , true ){
+                _started = time(0);
+            }
+            
+            virtual bool slaveOk() { return true; }
+            virtual LockType locktype(){ return NONE; } 
+            
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+                result.append("uptime",(double) (time(0)-_started));
+                result.appendDate( "localTime" , jsTime() );
+
+                {
+                    BSONObjBuilder t( result.subobjStart( "mem" ) );
+                    
+                    ProcessInfo p;
+                    if ( p.supported() ){
+                        t.appendNumber( "resident" , p.getResidentSize() );
+                        t.appendNumber( "virtual" , p.getVirtualMemorySize() );
+                        t.appendBool( "supported" , true );
+                    }
+                    else {
+                        result.append( "note" , "not all mem info support on this platform" );
+                        t.appendBool( "supported" , false );
+                    }
+                    
+                    t.done();
+                }
+
+                {
+                    BSONObjBuilder bb( result.subobjStart( "connections" ) );
+                    bb.append( "current" , connTicketHolder.used() );
+                    bb.append( "available" , connTicketHolder.available() );
+                    bb.done();
+                }
+                
+                {
+                    BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
+                    bb.append("note", "fields vary by platform");
+                    ProcessInfo p;
+                    p.getExtraInfo(bb);
+                    bb.done();
+                }
+                
+                result.append( "opcounters" , globalOpCounters.getObj() );
+                {
+                    BSONObjBuilder bb( result.subobjStart( "ops" ) );
+                    bb.append( "sharded" , opsSharded.getObj() );
+                    bb.append( "notSharded" , opsNonSharded.getObj() );
+                    bb.done();
+                }
+
+                result.append( "shardCursorType" , shardedCursorTypes.getObj() );
+                
+                {
+                    BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
+                    asserts.append( "regular" , assertionCount.regular );
+                    asserts.append( "warning" , assertionCount.warning );
+                    asserts.append( "msg" , assertionCount.msg );
+                    asserts.append( "user" , assertionCount.user );
+                    asserts.append( "rollovers" , assertionCount.rollovers );
+                    asserts.done();
+                }
+
+                return 1;
+            }
+
+            time_t _started;
+        } cmdServerStatus;
 
         class ListGridCommands : public GridAdminCmd {
         public:

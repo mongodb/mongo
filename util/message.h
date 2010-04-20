@@ -246,4 +246,7 @@ namespace mongo {
 
     void setClientId( int id );
     int getClientId();
+
+    extern TicketHolder connTicketHolder;
+
 } // namespace mongo

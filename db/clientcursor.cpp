@@ -297,5 +297,23 @@ namespace mongo {
             return true;
         }
     } cmdCursorInfo;
+    
+    void ClientCursorMonitor::run(){
+        Client::initThread("snapshotthread");
+        Client& client = cc();
+        
+        unsigned old = curTimeMillis();
+
+        while ( ! inShutdown() ){
+            unsigned now = curTimeMillis();
+            ClientCursor::idleTimeReport( now - old );
+            old = now;
+            sleepsecs(4);
+        }
+
+        client.shutdown();
+    }
+
+    ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo

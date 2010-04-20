@@ -88,14 +88,26 @@ namespace mongo {
             nextjsobj = data;
         }
 
-        const char * getns() {
+        const char * getns() const {
             return data;
         }
-        void getns(Namespace& ns) {
+        void getns(Namespace& ns) const {
             ns = data;
         }
+
+        const char * afterNS() const {
+            return data + strlen( data ) + 1;
+        }
         
-        
+        int getInt( int num ) const {
+            const int * foo = (const int*)afterNS();
+            return foo[num];
+        }
+
+        int getQueryNToReturn() const {
+            return getInt( 1 );
+        }
+
         void resetPull(){
             nextjsobj = data;
         }
@@ -117,7 +129,7 @@ namespace mongo {
             return i;
         }
 
-        OID* getOID() {
+        OID* getOID() const {
             return (OID *) (data + strlen(data) + 1); // skip namespace
         }
 
@@ -129,7 +141,7 @@ namespace mongo {
         }
 
         /* for insert and update msgs */
-        bool moreJSObjs() {
+        bool moreJSObjs() const {
             return nextjsobj != 0;
         }
         BSONObj nextJsObj() {
@@ -151,7 +163,7 @@ namespace mongo {
             return js;
         }
 
-        const Message& msg() {
+        const Message& msg() const {
             return m;
         }
 

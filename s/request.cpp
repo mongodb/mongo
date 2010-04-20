@@ -21,13 +21,17 @@
 
 #include "stdafx.h"
 #include "server.h"
+
 #include "../db/commands.h"
 #include "../db/dbmessage.h"
+#include "../db/stats/counters.h"
+
 #include "../client/connpool.h"
 
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
+#include "stats.h"
 
 namespace mongo {
 
@@ -61,7 +65,7 @@ namespace mongo {
         
     }
     
-    string Request::singleServerName(){
+    string Request::singleServerName() const {
         if ( _chunkManager ){
             if ( _chunkManager->numChunks() > 1 )
                 throw UserException( 8060 , "can't call singleServerName on a sharded collection" );
@@ -80,14 +84,18 @@ namespace mongo {
         assert( op > dbMsg );
         
         Strategy * s = SINGLE;
+        OpCounters * counter = &opsNonSharded;
         
         _d.markSet();
-
+        
         if ( _chunkManager ){
             s = SHARDED;
+            counter = &opsSharded;
         }
-
+        
+        bool iscmd = false;
         if ( op == dbQuery ) {
+            iscmd = isCommand();
             try {
                 s->queryOp( *this );
             }
@@ -108,8 +116,15 @@ namespace mongo {
         else {
             s->writeOp( op, *this );
         }
+
+        globalOpCounters.gotOp( op , iscmd );
+        counter->gotOp( op , iscmd );
     }
     
+    bool Request::isCommand() const {
+        int x = _d.getQueryNToReturn();
+        return ( x == 1 || x == -1 ) && strstr( getns() , ".$cmd" );
+    }
     
     ClientInfo::ClientInfo( int clientId ) : _id( clientId ){
         _cur = &_a;

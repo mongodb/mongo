@@ -40,7 +40,7 @@ namespace mongo {
             log(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << endl;
             
             try {
-                if ( ( q.ntoreturn == -1 || q.ntoreturn == 1 ) && strstr(q.ns, ".$cmd") ) {
+                if ( r.isCommand() ){
                     BSONObjBuilder builder;
                     bool ok = Command::runAgainstRegistered(q.ns, q.query, builder);
                     if ( ok ) {

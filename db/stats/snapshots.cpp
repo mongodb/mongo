@@ -122,8 +122,6 @@ namespace mongo {
                         log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;
                     }
 
-                    // TODO: this should really be somewhere else, like in a special ClientCursor thread
-                    ClientCursor::idleTimeReport( (unsigned)(elapsed/1000) );
                 }
 
                 prev = s;

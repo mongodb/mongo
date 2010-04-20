@@ -42,8 +42,6 @@
 
 namespace mongo {
 
-    TicketHolder connTicketHolder( 20000 );
-
     extern int otherTraceLevel;
     void flushOpLog( stringstream &ss );
 

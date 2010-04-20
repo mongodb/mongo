@@ -28,8 +28,10 @@ namespace mongo {
 
         MessagingPort * grab = 0;
         MessageHandler * handler;
-
+        
         void threadRun(){
+            TicketHolderReleaser connTicketReleaser( &connTicketHolder );
+        
             assert( grab );
             auto_ptr<MessagingPort> p( grab );
             grab = 0;
@@ -71,9 +73,30 @@ namespace mongo {
         virtual void accepted(MessagingPort * p) {
             assert( ! pms::grab );
             pms::grab = p;
-            boost::thread thr( pms::threadRun );
-            while ( pms::grab )
-                sleepmillis(1);
+            
+            if ( ! connTicketHolder.tryAcquire() ){
+                log() << "connection refused because too many open connections" << endl;
+
+                // TODO: would be nice if we notified them...
+                p->shutdown();
+                
+                pms::grab = 0;
+                sleepmillis(2); // otherwise we'll hard loop
+                return;
+            }
+
+            try {
+                boost::thread thr( pms::threadRun );
+                while ( pms::grab ){
+                    sleepmillis(1);
+                }
+            }
+            catch ( boost::thread_resource_error& ){
+                log() << "can't create new thread, closing connection" << endl;
+                p->shutdown();
+                pms::grab = 0;
+                sleepmillis(2);
+            }
         }
         
         void run(){
@@ -87,6 +110,7 @@ namespace mongo {
         return new PortMessageServer( port , handler );
     }    
 
+    TicketHolder connTicketHolder(20000);
 }
 
 #endif

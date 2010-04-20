@@ -191,4 +191,6 @@ s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : primary.ge
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards again" );
 assert.eq( 3 , s.config.chunks.count() , "only 3 chunks" );
 
+print( "YO : " + tojson( db.runCommand( "serverStatus" ) ) );
+
 s.stop();
