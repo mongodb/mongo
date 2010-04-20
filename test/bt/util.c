@@ -51,23 +51,24 @@ key_gen(DBT *key, u_int64_t keyno)
 			    "%s: %s\n", g.progname, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
+		for (i = 0; i < blen; ++i)
+			buf[i] = 'a' + i % 26;
 	}
 
-	klen = g.key_rand_len[keyno %
-	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
-
 	/* The key always starts with a 10-digit string (the specified cnt). */
-	len = snprintf(buf, g.c_key_max, "%010llu", keyno);
-	if (len < klen)
-		memset(buf + len, 'a', klen - len);
+	sprintf(buf, "%010llu", keyno);
+	buf[10] = '/';
+
 	key->data = buf;
-	key->size = klen;
+	key->size = g.key_rand_len[keyno %
+	    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
 }
 
 void
 data_gen(DBT *data)
 {
 	static size_t blen;
+	static u_int r;
 	static char *buf;
 	size_t i, len;
 	char *p;
@@ -94,6 +95,15 @@ data_gen(DBT *data)
 		for (i = 0; i < blen; ++i)
 			buf[i] = 'A' + i % 26;
 	}
+
+	/*
+	 * The data always starts with a 10-digit string (the specified cnt), to
+	 * ensure every data item is greater than the last data item -- if we're
+	 * bulk-loading a duplicate data item, it must be larger than previous
+	 * data items.
+	 */
+	sprintf(buf, "%010u", ++r);
+	buf[10] = '/';
 
 	switch (g.c_database_type) {
 	case FIX:
