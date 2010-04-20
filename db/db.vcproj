@@ -1936,6 +1936,14 @@
 				RelativePath=".\repl\replset_commands.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\repl\rs_config.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\rs_config.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="old_repl"
