@@ -465,7 +465,7 @@ namespace mongo {
 #endif
 
         {
-            const char * foo = strstr( versionString , "." ) + 1;
+            const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ){
                 cout << "****\n" 

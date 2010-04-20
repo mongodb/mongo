@@ -28,13 +28,13 @@ namespace mongo {
     {}
 
     string MiniWebServer::parseURL( const char * buf ) {
-        const char * urlStart = strstr( buf , " " );
+        const char * urlStart = strchr( buf , ' ' );
         if ( ! urlStart )
             return "/";
 
         urlStart++;
 
-        const char * end = strstr( urlStart , " " );
+        const char * end = strchr( urlStart , ' ' );
         if ( ! end ) {
             end = strchr( urlStart , '\r' );
             if ( ! end ) {
@@ -82,7 +82,7 @@ namespace mongo {
     }
 
     string MiniWebServer::parseMethod( const char * headers ) {
-        const char * end = strstr( headers , " " );
+        const char * end = strchr( headers , ' ' );
         if ( ! end )
             return "GET";
         return string( headers , (int)(end-headers) );

@@ -137,8 +137,8 @@ namespace mongo {
             const char *ns = r.getns();
             
             if ( r.isShardingEnabled() && 
-                 strstr( ns , ".system.indexes" ) == strstr( ns , "." ) && 
-                 strstr( ns , "." ) ){
+                 strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && 
+                 strchr( ns , '.' ) ) {
                 log(1) << " .system.indexes write for: " << ns << endl;
                 handleIndexWrite( op , r );
                 return;
