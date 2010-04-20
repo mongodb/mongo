@@ -47,7 +47,7 @@ typedef struct {
 
 	void *wts_db;				/* WT DB handle */
 	void *wts_toc;				/* WT WT_TOC handle */
-	FILE *logfp;				/* WT log file stream */
+	FILE *wts_log;				/* WT log file stream */
 
 	enum                                    /* Dumps */
 	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;

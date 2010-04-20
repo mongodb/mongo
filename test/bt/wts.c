@@ -44,16 +44,16 @@ wts_setup(int reopen, int logfile)
 	/* Open the log file. */
 	if (logfile) {
 		p = fname(WT_PREFIX, "log");
-		if ((g.logfp = fopen(p, reopen ? "a" : "w")) == NULL) {
+		if ((g.wts_log = fopen(p, reopen ? "a" : "w")) == NULL) {
 			fprintf(stderr,
 			    "%s: %s: %s\n", g.progname, p, strerror(errno));
 			exit (EXIT_FAILURE);
 		}
 		(void)time(&now);
-		fprintf(g.logfp,
+		fprintf(g.wts_log,
 		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
-		fprintf(g.logfp, "%s", ctime(&now));
-		fprintf(g.logfp,
+		fprintf(g.wts_log, "%s", ctime(&now));
+		fprintf(g.wts_log,
 		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n");
 
 		env->verbose_set(env,
@@ -63,7 +63,7 @@ wts_setup(int reopen, int logfile)
 		    WT_VERB_SERVERS |
 		    // WT_VERB_FILEOPS |
 		    0);
-		env->msgfile_set(env, g.logfp);
+		env->msgfile_set(env, g.wts_log);
 	}
 
 	intl_size = 1 << g.c_internal_node;
@@ -138,8 +138,8 @@ wts_teardown()
 	assert(toc->close(toc, 0) == 0);
 	assert(wiredtiger_simple_teardown(g.progname, g.wts_db) == 0);
 
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
+	if (g.wts_log != NULL)
+		(void)fclose(g.wts_log);
 }
 
 int
