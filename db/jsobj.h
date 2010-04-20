@@ -220,7 +220,7 @@ namespace mongo {
     public:
         string toString( bool includeFieldName = true ) const;
         operator string() const { return toString(); }
-        string jsonString( JsonStringFormat format, bool includeFieldNames = true ) const;
+        string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
 
         /** Returns the type of the element */
         BSONType type() const {
@@ -756,8 +756,10 @@ namespace mongo {
         string toString( bool isArray = false ) const;
         operator string() const { return toString(); }
         
-        /** Properly formatted JSON string. */
-        string jsonString( JsonStringFormat format = Strict ) const;
+        /** Properly formatted JSON string. 
+            @param pretty if tru1 we try to add some lf's and indentation
+        */
+        string jsonString( JsonStringFormat format = Strict, int pretty = 0 ) const;
 
         /** note: addFields always adds _id even if not specified */
         int addFields(BSONObj& from, set<string>& fields); /* returns n added */

@@ -148,9 +148,13 @@ namespace mongo {
             ss << "Content-Type: text/html\r\n";
         }
         else {
-            for ( vector<string>::iterator i = headers.begin(); i != headers.end(); i++ )
+            for ( vector<string>::iterator i = headers.begin(); i != headers.end(); i++ ) {
+                assert( strncmp("Content-Length", i->c_str(), 14) );
                 ss << *i << "\r\n";
+            }
         }
+        ss << "Connection: close\r\n";
+        ss << "Content-Length: " << responseMsg.size() << "\r\n";
         ss << "\r\n";
         ss << responseMsg;
         string response = ss.str();

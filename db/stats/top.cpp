@@ -148,7 +148,7 @@ namespace mongo {
 
     class TopCmd : public Command {
     public:
-        TopCmd() : Command( "top" ){}
+        TopCmd() : Command( "top", true ){}
 
         virtual bool slaveOk(){ return true; }
         virtual bool adminOnly(){ return true; }

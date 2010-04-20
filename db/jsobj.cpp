@@ -197,7 +197,7 @@ namespace mongo {
         return ret.str();
     }
 
-    string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames ) const {
+    string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         stringstream s;
         if ( includeFieldNames )
             s << '"' << escape( fieldName() ) << "\" : ";
@@ -229,7 +229,7 @@ namespace mongo {
             s << "null";
             break;
         case Object:
-            s << embeddedObject().jsonString( format );
+            s << embeddedObject().jsonString( format, pretty );
             break;
         case Array: {
             if ( embeddedObject().isEmpty() ) {
@@ -241,7 +241,7 @@ namespace mongo {
             BSONElement e = i.next();
             if ( !e.eoo() )
                 while ( 1 ) {
-                    s << e.jsonString( format, false );
+                    s << e.jsonString( format, false, pretty );
                     e = i.next();
                     if ( e.eoo() )
                         break;
@@ -724,7 +724,7 @@ namespace mongo {
         return digestToString( d );
     }
 
-    string BSONObj::jsonString( JsonStringFormat format ) const {
+    string BSONObj::jsonString( JsonStringFormat format, int pretty ) const {
 
         if ( isEmpty() ) return "{}";
 
@@ -734,11 +734,13 @@ namespace mongo {
         BSONElement e = i.next();
         if ( !e.eoo() )
             while ( 1 ) {
-                s << e.jsonString( format );
+                s << e.jsonString( format, true, pretty+1 );
                 e = i.next();
                 if ( e.eoo() )
                     break;
-                s << ", ";
+                s << ",\n";
+                for( int x = 0; x < pretty; x++ )
+                    s << "  ";
             }
         s << " }";
         return s.str();

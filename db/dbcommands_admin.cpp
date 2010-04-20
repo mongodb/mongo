@@ -37,7 +37,7 @@ namespace mongo {
 
     class FeaturesCmd : public Command {
     public:
-        FeaturesCmd() : Command( "features" ){}
+        FeaturesCmd() : Command( "features", true ){}
 
         virtual bool slaveOk(){ return true; }
         virtual bool readOnly(){ return true; }

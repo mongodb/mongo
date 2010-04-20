@@ -284,7 +284,7 @@ namespace mongo {
     // Alternatively, make this command admin-only?
     class CmdCursorInfo : public Command {
     public:
-        CmdCursorInfo() : Command( "cursorInfo" ) {}
+        CmdCursorInfo() : Command( "cursorInfo", true ) {}
         virtual bool slaveOk() { return true; }
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }";

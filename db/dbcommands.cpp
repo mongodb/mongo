@@ -339,7 +339,7 @@ namespace mongo {
         virtual bool slaveOk() {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus") {
+        CmdServerStatus() : Command("serverStatus", true) {
             started = time(0);
         }
         
@@ -452,7 +452,7 @@ namespace mongo {
             help << "check if any asserts have occurred on the server";
         }
         virtual LockType locktype(){ return WRITE; } 
-        CmdAssertInfo() : Command("assertinfo") {}
+        CmdAssertInfo() : Command("assertinfo",true) {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
             result.appendBool("asserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet() || lastAssert[3].isSet());

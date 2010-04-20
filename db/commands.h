@@ -112,6 +112,7 @@ namespace mongo {
         static map<string,Command*> * _webCommands;
 
     public:
+        static const map<string,Command*>* webCommands() { return _webCommands; }
         static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );

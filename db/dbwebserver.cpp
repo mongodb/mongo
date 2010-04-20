@@ -74,6 +74,12 @@ namespace mongo {
         return _bold ? "</b>" : "";
     }
 
+    bool execCommand( Command * c ,
+                      Client& client , int queryOptions , 
+                      const char *ns, BSONObj& cmdObj , 
+                      BSONObjBuilder& result, 
+                      bool fromRepl );
+
     class DbWebServer : public MiniWebServer {
     public:
         DbWebServer(const string& ip, int port)
@@ -313,6 +319,37 @@ namespace mongo {
         {
             if ( url.size() > 1 ) {
                 
+                /* run a command from the web ui */
+                const char *p = url.c_str();
+                if( *p == '/' ) {
+                    const char *h = strstr(p, "?text");
+                    string cmd = p+1;
+                    if( h && h > p+1 ) 
+                        cmd = string(p+1, h-p-1);
+                    const map<string,Command*> *m = Command::webCommands();
+                    if( m && m->count(cmd) ) {
+                        Command *c = m->find(cmd)->second;
+                        Client& client = cc();
+                        BSONObjBuilder result;
+                        BSONObjBuilder b;
+                        b.append(c->name, 1);
+                        BSONObj cmdObj = b.obj();
+                        bool ok = 
+                            execCommand(c, client, 0, "admin.", cmdObj, result, false);
+                        responseCode = 200;
+                        string j = result.done().jsonString(JS, h != 0 ? 1 : 0);
+                        if( h == 0 ) { 
+                            headers.push_back( "Content-Type: application/json" );
+                        }
+                        else { 
+                            headers.push_back( "Content-Type: text/plain" );
+                        }
+                        responseMsg = j;
+                        return;
+
+                    }
+                }
+
                 if ( url.find( "/_status" ) == 0 ){
                     if ( ! allowed( rq , headers, from ) ){
                         responseCode = 401;
@@ -334,7 +371,7 @@ namespace mongo {
                     responseCode = 401;
                     responseMsg = "not allowed\n";
                     return;
-                }                
+                }
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
             }
@@ -352,9 +389,17 @@ namespace mongo {
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n";
             ss << "<pre>";
-            ss << "json:\n";
-            ss << " <a href=\"/_status\">_status</a>\n";
-            ss << '\n';
+            //ss << "<a href=\"/_status\">_status</a>";
+            {
+                const map<string, Command*> *m = Command::webCommands();
+                if( m ) {
+                    for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
+                        ss << "<a href=\"/" << i->first << "?text\">" << i->first << "</a> ";
+                    }
+                    ss << "\n";
+                }
+            }
+            ss << "\n";
             doUnlockedStuff(ss);
 
             {

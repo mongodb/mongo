@@ -38,7 +38,7 @@ namespace mongo {
             return false;   
         }
         virtual LockType locktype(){ return NONE; }
-        CmdReplSetGetStatus() : Command("replSetGetStatus") { }
+        CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             return true;
         }
