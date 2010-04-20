@@ -64,6 +64,23 @@ namespace mongo {
         }
     };
 
+    void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 
+        MemberInfo *m =_members.head();
+        vector<BSONObj> v;
+
+        // add self
+        {
+            HostAndPort h(getHostName(), cmdLine.port);
+            v.push_back( BSON( "name" << h.toString() << "self" << true ) );
+        }
+
+        while( m ) {
+            v.push_back( BSON( "name" << m->fullName() ) );
+            m = m->next();
+        }
+        b.append("members", v);
+    }
+
     void ReplSet::startHealthThreads() {
         MemberInfo* m = _members.head();
         while( m ) {

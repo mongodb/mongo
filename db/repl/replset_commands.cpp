@@ -40,6 +40,13 @@ namespace mongo {
         virtual LockType locktype(){ return NONE; }
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( theReplSet == 0 ) {
+                errmsg = "not a repl set";
+                return false;
+            }
+
+            theReplSet->summarizeStatus(result);
+
             return true;
         }
     } cmdReplSetGetStatus;

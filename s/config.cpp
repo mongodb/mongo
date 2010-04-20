@@ -526,7 +526,7 @@ namespace mongo {
                 return;
             
             log() << "DBConfig serialization broken\n" 
-                  << "in  : " << o.toString()  << "\n"
+                  << "in  : " << o.toString()  << '\n'
                   << "out : " << out.toString() 
                   << endl;
             assert(0);

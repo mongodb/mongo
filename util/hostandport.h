@@ -37,6 +37,10 @@ namespace mongo {
         bool isLocalHost() const;
 
         string toString();
+
+        string host() const { return _host; }
+        int port() const { return _port; }
+
     private:
         // invariant (except full obj assignment):
         string _host;

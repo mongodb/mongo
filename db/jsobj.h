@@ -1198,10 +1198,10 @@ namespace mongo {
             b.append((void *) e.value(), e.valuesize());
         }
 
+        /** append an element but with a new name */
         void appendAs(const BSONElement& e, const string& as) {
             appendAs( e , as.c_str() );
         }
-
 
         /** add a subobject as a member */
         void append(const char *fieldName, BSONObj subObj) {
@@ -1210,6 +1210,7 @@ namespace mongo {
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
 
+        /** add a subobject as a member */
         void append(const string& fieldName , BSONObj subObj) {
             append( fieldName.c_str() , subObj );
         }
@@ -1230,8 +1231,7 @@ namespace mongo {
             b.append(fieldName);
             b.append((void *) subObj.objdata(), subObj.objsize());
         }
-        void append(const char *fieldName, BSONArray arr) { appendArray(fieldName, arr); }
-        
+        void append(const char *fieldName, BSONArray arr) { appendArray(fieldName, arr); }        
 
         /** add header for a new subarray and return bufbuilder for writing to
             the subarray's body */

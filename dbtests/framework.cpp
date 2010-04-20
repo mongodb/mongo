@@ -53,7 +53,7 @@ namespace mongo {
                 ss << result;
 
                 for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ){
-                    ss << "\t" << *i << "\n";
+                    ss << "\t" << *i << '\n';
                 }
                 
                 return ss.str();

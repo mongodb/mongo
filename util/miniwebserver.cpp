@@ -36,9 +36,9 @@ namespace mongo {
 
         const char * end = strstr( urlStart , " " );
         if ( ! end ) {
-            end = strstr( urlStart , "\r" );
+            end = strchr( urlStart , '\r' );
             if ( ! end ) {
-                end = strstr( urlStart , "\n" );
+                end = strchr( urlStart , '\n' );
             }
         }
 
@@ -164,7 +164,7 @@ namespace mongo {
     }
     
     string MiniWebServer::getHeader( const char * req , string wanted ){
-        const char * headers = strstr( req , "\n" );
+        const char * headers = strchr( req , '\n' );
         if ( ! headers )
             return "";
         pcrecpp::StringPiece input( headers + 1 );

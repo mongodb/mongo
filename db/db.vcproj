@@ -1808,6 +1808,18 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="concurrency"
+				>
+				<File
+					RelativePath="..\util\concurrency\list.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\concurrency\value.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="shard"
@@ -1942,14 +1954,6 @@
 			</File>
 			<File
 				RelativePath=".\replset.h"
-				>
-			</File>
-		</Filter>
-		<Filter
-			Name="concurrency"
-			>
-			<File
-				RelativePath="..\util\concurrency\list.h"
 				>
 			</File>
 		</Filter>

@@ -47,7 +47,7 @@ namespace mongo {
             }
             else { 
                 // no port specified.
-                m = HostAndPort(string(p,q-p));
+                m = HostAndPort(string(p,q-p), cmdLine.port);
             }
             uassert(13096, "bad --replset config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
             temp.insert(m);
@@ -63,8 +63,21 @@ namespace mongo {
         }
 
         _seeds = seeds;
+        for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
+            addMemberIfMissing(*i);
 
         startHealthThreads();
+    }
+
+    void ReplSet::addMemberIfMissing(const HostAndPort& h) { 
+        MemberInfo *m = _members.head();
+        while( m ) {
+            if( h.host() == m->host && h.port() == m->port )
+                return;
+            m = m->next();
+        }
+        MemberInfo *nm = new MemberInfo(h.host(), h.port());
+        _members.push(nm);
     }
 
     /* called at initialization */

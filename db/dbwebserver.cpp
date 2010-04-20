@@ -175,10 +175,10 @@ namespace mongo {
         
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
-            ss << mongodVersion() << "\n";
-            ss << "git hash: " << gitVersion() << "\n";
-            ss << "sys info: " << sysInfo() << "\n";
-            ss << "\n";
+            ss << mongodVersion() << '\n';
+            ss << "git hash: " << gitVersion() << '\n';
+            ss << "sys info: " << sysInfo() << '\n';
+            ss << '\n';
             ss << "dbwritelocked:  " << dbMutex.info().isLocked() << " (initial)\n";
             ss << "uptime:    " << time(0)-started << " seconds\n";
             if ( replAllDead )
@@ -402,10 +402,10 @@ namespace mongo {
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
                         ss << "<a href=\"/" << i->first << "?text\">" << i->first << "</a> ";
                     }
-                    ss << "\n";
+                    ss << '\n';
                 }
             }
-            ss << "\n";
+            ss << '\n';
             doUnlockedStuff(ss);
 
             {
@@ -582,7 +582,7 @@ namespace mongo {
             if ( one ) {
                 if ( cursor->more() ) {
                     BSONObj obj = cursor->next();
-                    out << obj.jsonString() << "\n";
+                    out << obj.jsonString() << '\n';
                 }
                 else {
                     responseCode = 404;
@@ -606,7 +606,7 @@ namespace mongo {
 
             out << "  \"total_rows\" : " << howMany << " ,\n";
             out << "  \"query\" : " << query.jsonString() << " ,\n";
-            out << "  \"millis\" : " << t.millis() << "\n";
+            out << "  \"millis\" : " << t.millis() << '\n';
             out << "}\n";
         }
 

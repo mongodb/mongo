@@ -241,7 +241,12 @@ namespace mongo {
             BSONElement e = i.next();
             if ( !e.eoo() )
                 while ( 1 ) {
-                    s << e.jsonString( format, false, pretty );
+                    if( pretty ) {
+                        s << '\n';
+                        for( int x = 0; x < pretty; x++ )
+                            s << "  ";
+                    }
+                    s << e.jsonString( format, false, pretty?pretty+1:0 );
                     e = i.next();
                     if ( e.eoo() )
                         break;
@@ -734,13 +739,13 @@ namespace mongo {
         BSONElement e = i.next();
         if ( !e.eoo() )
             while ( 1 ) {
-                s << e.jsonString( format, true, pretty+1 );
+                s << e.jsonString( format, true, pretty?pretty+1:0 );
                 e = i.next();
                 if ( e.eoo() )
                     break;
                 s << ",";
                 if ( pretty ) {
-                    s << "\n";
+                    s << '\n';
                     for( int x = 0; x < pretty; x++ )
                         s << "  ";
                 }

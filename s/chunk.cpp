@@ -122,7 +122,7 @@ namespace mongo {
     Chunk * Chunk::split( const BSONObj& m ){
         uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
         
-        log(1) << " before split on: "  << m << "\n"
+        log(1) << " before split on: "  << m << '\n'
                << "\t self  : " << toString() << endl;
 
         uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
@@ -145,7 +145,7 @@ namespace mongo {
         _manager->_chunkMap[_max] = this;
         
         log(1) << " after split:\n" 
-               << "\t left : " << toString() << "\n" 
+               << "\t left : " << toString() << '\n' 
                << "\t right: "<< s->toString() << endl;
         
         
@@ -667,10 +667,10 @@ namespace mongo {
 
     string ChunkManager::toString() const {
         stringstream ss;
-        ss << "ChunkManager: " << _ns << " key:" << _key.toString() << "\n";
+        ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             const Chunk* c = *i;
-            ss << "\t" << c->toString() << "\n";
+            ss << "\t" << c->toString() << '\n';
         }
         return ss.str();
     }

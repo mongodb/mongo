@@ -39,17 +39,27 @@ namespace mongo {
            */
         ReplSet(string cfgString);
 
+        void summarizeStatus(BSONObjBuilder&) const;
+
     private:
         string _name;
         const vector<HostAndPort> *_seeds;
 
-        struct MemberInfo : public List1<MemberInfo>::Base {
-            MemberInfo() : dead(false), lastHeartbeat(0) { }
-            bool dead;
-            const char *host;
-            int port;
+        void addMemberIfMissing(const HostAndPort& p);
 
+        struct MemberInfo : public List1<MemberInfo>::Base {
+            MemberInfo(string h, int p) : dead(false), port(p), lastHeartbeat(0), host(h) { }
+            bool dead;
+            const int port;
             time_t lastHeartbeat;
+            const string host;
+
+            string fullName() {
+                if( port < 0 ) return host;
+                stringstream ss;
+                ss << host << ':' << port;
+                return ss.str();
+            }
         };
         /* all members of the set EXCEPT SELF. */
         List1<MemberInfo> _members;

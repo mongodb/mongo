@@ -57,10 +57,10 @@ namespace mongo {
             
             if ( logLevel > 4 ){
                 StringBuilder ss;
-                ss << " shard query servers: " << servers.size() << "\n";
+                ss << " shard query servers: " << servers.size() << '\n';
                 for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ){
                     const ServerAndQuery& s = *i;
-                    ss << "       " << s.toString() << "\n";
+                    ss << "       " << s.toString() << '\n';
                 }
                 log() << ss.str();
             }
