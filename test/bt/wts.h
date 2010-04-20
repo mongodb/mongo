@@ -62,7 +62,6 @@ typedef struct {
 	u_int32_t c_data_max;
 	u_int32_t c_data_min;
 	u_int32_t c_database_type;
-	u_int32_t c_duplicates;
 	u_int32_t c_duplicates_pct;
 	u_int32_t c_huffman_data;
 	u_int32_t c_huffman_key;
