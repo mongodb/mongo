@@ -319,6 +319,29 @@ namespace mongo {
         {
             if ( url.size() > 1 ) {
                 
+                if ( url.find( "/_status" ) == 0 ){
+                    if ( ! allowed( rq , headers, from ) ){
+                        responseCode = 401;
+                        headers.push_back( "Content-Type: text/plain" );
+                        responseMsg = "not allowed\n";
+                        return;
+                    }              
+                    headers.push_back( "Content-Type: application/json" );
+                    generateServerStatus( url , responseMsg );
+                    responseCode = 200;
+                    return;
+                }
+
+                if ( ! cmdLine.rest ) {
+                    responseCode = 403;
+                    stringstream ss;
+                    ss << "REST is not enabled.  use --rest to turn on.\n";
+                    ss << "check that port " << _port << " is secured for the network too.\n";
+                    responseMsg = ss.str();
+                    headers.push_back( "Content-Type: text/plain" );
+                    return;
+                }
+
                 /* run a command from the web ui */
                 const char *p = url.c_str();
                 if( *p == '/' ) {
@@ -350,23 +373,6 @@ namespace mongo {
                     }
                 }
 
-                if ( url.find( "/_status" ) == 0 ){
-                    if ( ! allowed( rq , headers, from ) ){
-                        responseCode = 401;
-                        responseMsg = "not allowed\n";
-                        return;
-                    }              
-                    headers.push_back( "Content-Type: application/json" );
-                    generateServerStatus( url , responseMsg );
-                    responseCode = 200;
-                    return;
-                }
-
-                if ( ! cmdLine.rest ){
-                    responseCode = 403;
-                    responseMsg = "rest is not enabled.  use --rest to turn on";
-                    return;
-                }
                 if ( ! allowed( rq , headers, from ) ){
                     responseCode = 401;
                     responseMsg = "not allowed\n";

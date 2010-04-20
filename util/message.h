@@ -41,9 +41,10 @@ namespace mongo {
             assert(!"You must overwrite one of the accepted methods");
         }
 
+        const int _port;
+
     private:
         string _ip;
-        int _port;
         bool _logConnect;
     };
 
