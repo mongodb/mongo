@@ -789,6 +789,38 @@ namespace mongo {
         return false;
     }
 
+    int BSONObj::woCompare(const BSONObj& r, const Ordering &o, bool considerFieldName) const { 
+        if ( isEmpty() )
+            return r.isEmpty() ? 0 : -1;
+        if ( r.isEmpty() )
+            return 1;
+
+        BSONObjIterator i(*this);
+        BSONObjIterator j(r);
+        int k = 0;
+        while ( 1 ) {
+            // so far, equal...
+
+            BSONElement l = i.next();
+            BSONElement r = j.next();
+            if ( l.eoo() )
+                return r.eoo() ? 0 : -1;
+            if ( r.eoo() )
+                return 1;
+
+            int x;
+            {
+                x = l.woCompare( r, considerFieldName );
+                if ( o.get(k) < 0 )
+                    x = -x;
+            }
+            if ( x != 0 )
+                return x;
+            k++;
+        }
+        return -1;
+    }
+
     /* well ordered compare */
     int BSONObj::woCompare(const BSONObj &r, const BSONObj &idxKey,
                            bool considerFieldName) const {

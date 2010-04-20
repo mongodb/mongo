@@ -653,6 +653,8 @@ namespace mongo {
     
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
     
+    class Ordering;
+
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
        object in a binary representation.
@@ -896,6 +898,9 @@ namespace mongo {
         // Alternative output format
         string hexDump() const;
         
+        int woCompare(const BSONObj& r, const Ordering &o,
+                      bool considerFieldName=true) const;
+
         /**wo='well ordered'.  fields must be in same order in each object.
            Ordering is with respect to the signs of the elements in idxKey.
 		   @return  <0 if l<r. 0 if l==r. >0 if l>r
@@ -2015,6 +2020,31 @@ namespace mongo {
             s.insert( it.next() );
         return s;
     }
+
+    class Ordering { 
+        const unsigned bits;
+        Ordering(unsigned b) : bits(b) { }
+    public:
+        int get(int i) const { 
+            return ((1 << i) & bits) ? -1 : 1;
+        }
+
+        static Ordering make(BSONObj& obj) {
+            unsigned b = 0;
+            BSONObjIterator k(obj);
+            unsigned n = 0;
+            while( 1 ) { 
+                BSONElement e = k.next();
+                if( e.eoo() )
+                    break;
+                uassert( 13103, "too many compound keys", n <= 31 );
+                if( e.number() < 0 )
+                    b |= (1 << n);
+                n++;
+            }
+            return Ordering(b);
+        }
+    };
     
     class BSONObjIteratorSorted {
     public:
