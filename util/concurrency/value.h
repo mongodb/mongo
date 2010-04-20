@@ -20,6 +20,10 @@
 
 namespace mongo { 
 
+/** this string COULD be mangled but with the double buffering, assuming writes 
+    are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
+    diagnostic strings, where their content isn't critical.
+    */
 class DiagStr { 
     char buf1[256];
     char buf2[256];
@@ -31,10 +35,6 @@ public:
         p = buf1;
     }
 
-    /** this string COULD be mangled but with the double buffering, assuming writes 
-        are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
-        diagnostic strings, where their content isn't critical.
-        */
     const char * get() const { return p; }
 
     void set(const char *s) {

@@ -55,8 +55,8 @@ namespace mongo {
     }
 
     int BucketBasics::Size() const {
-        assert( _Size == BucketSize );
-        return _Size;
+        assert( _wasSize == BucketSize );
+        return BucketSize;
     }
     inline void BucketBasics::setNotPacked() {
         flags &= ~Packed;
@@ -189,7 +189,8 @@ namespace mongo {
     void BucketBasics::init() {
         parent.Null();
         nextChild.Null();
-        _Size = BucketSize;
+        _wasSize = BucketSize;
+        _reserved1 = 0;
         flags = Packed;
         n = 0;
         emptySize = totalDataSize();

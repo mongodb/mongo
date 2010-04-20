@@ -152,7 +152,7 @@ namespace mongo {
             ss << "    n: " << n << endl;
             ss << "    parent: " << parent.toString() << endl;
             ss << "    nextChild: " << parent.toString() << endl;
-            ss << "    Size: " << _Size << " flags:" << flags << endl;
+            ss << "    flags:" << flags << endl;
             ss << "    emptySize: " << emptySize << " topSize: " << topSize << endl;
             return ss.str();
         }
@@ -164,7 +164,12 @@ namespace mongo {
     protected:
         void _shape(int level, stringstream&);
         DiskLoc nextChild; // child bucket off and to the right of the highest key.
-        int _Size; // total size of this btree node in bytes. constant.
+
+    private:
+        unsigned short _wasSize; // can be reused, value is 8192 in current pdfile version Apr2010
+        unsigned short _reserved1; // zero
+
+    protected:
         int Size() const;
         int flags;
         int emptySize; // size of the empty region
