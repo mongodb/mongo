@@ -269,7 +269,7 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 	 * number of duplicate data items for each such key is a random value
 	 * in-between 2 and the value of duplicate_cnt.
 	 */
-	if (g.c_duplicates_pct == 0 ||
+	if (key.size == 0 || g.c_duplicates_pct == 0 ||
 	    (u_int32_t)rand() % 100 > g.c_duplicates_pct) {
 		if (++g.key_cnt > g.c_total) {
 			g.key_cnt = g.c_total;
