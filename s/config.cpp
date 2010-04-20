@@ -524,8 +524,7 @@ namespace mongo {
         id << ourHostname << "-";
         {
             struct tm t;
-            time_t tt = time(0);
-            localtime_r( &tt , &t );
+            time_t_to_Struct( time(0) , &t );
             id << ( 1900 + t.tm_year ) << "-"
                << t.tm_mon << "-"
                << t.tm_mday << "-"
