@@ -31,6 +31,7 @@
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
+#include "stats.h"
 
 namespace mongo {
 
@@ -83,11 +84,13 @@ namespace mongo {
         assert( op > dbMsg );
         
         Strategy * s = SINGLE;
+        OpCounters * counter = &opsNonSharded;
         
         _d.markSet();
         
         if ( _chunkManager ){
             s = SHARDED;
+            counter = &opsSharded;
         }
         
         bool iscmd = false;
@@ -115,6 +118,7 @@ namespace mongo {
         }
 
         globalOpCounters.gotOp( op , iscmd );
+        counter->gotOp( op , iscmd );
     }
     
     bool Request::isCommand() const {

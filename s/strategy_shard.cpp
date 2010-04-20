@@ -20,6 +20,8 @@
 #include "request.h"
 #include "chunk.h"
 #include "cursors.h"
+#include "stats.h"
+
 #include "../client/connpool.h"
 #include "../db/commands.h"
 
@@ -93,6 +95,7 @@ namespace mongo {
             assert( cursor );
             
             log(5) << "   cursor type: " << cursor->type() << endl;
+            shardedCursorTypes.hit( cursor->type() );
 
             ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
             if ( ! cc->sendNextBatch( r ) ){

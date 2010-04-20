@@ -38,6 +38,7 @@
 #include "config.h"
 #include "chunk.h"
 #include "strategy.h"
+#include "stats.h"
 
 namespace mongo {
 
@@ -124,6 +125,14 @@ namespace mongo {
                 }
                 
                 result.append( "opcounters" , globalOpCounters.getObj() );
+                {
+                    BSONObjBuilder bb( result.subobjStart( "ops" ) );
+                    bb.append( "sharded" , opsSharded.getObj() );
+                    bb.append( "notSharded" , opsNonSharded.getObj() );
+                    bb.done();
+                }
+
+                result.append( "shardCursorType" , shardedCursorTypes.getObj() );
                 
                 {
                     BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
