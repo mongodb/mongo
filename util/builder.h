@@ -102,10 +102,6 @@ namespace mongo {
             append( (void *)str.c_str(), str.length() + 1 );
         }
 
-        void append( int val , int padding ){
-            
-        }
-
         int len() const {
             return l;
         }

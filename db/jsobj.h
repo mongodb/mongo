@@ -44,6 +44,7 @@ namespace mongo {
     class BSONObjBuilder;
     class BSONArrayBuilder;
     class BSONObjBuilderValueStream;
+    class BSONObjIterator;
 
 #pragma pack(1)
 
@@ -1627,6 +1628,8 @@ namespace mongo {
         bool owned() const {
             return &b == &buf_;
         }
+
+        BSONObjIterator iterator() const ;
         
     private:
         // Append the provided arr object as an array.
@@ -1751,29 +1754,35 @@ namespace mongo {
         BSONObjIterator(const BSONObj& jso) {
             int sz = jso.objsize();
             if ( sz == 0 ) {
-                pos = theend = 0;
+                _pos = _theend = 0;
                 return;
             }
-            pos = jso.objdata() + 4;
-            theend = jso.objdata() + sz;
+            _pos = jso.objdata() + 4;
+            _theend = jso.objdata() + sz;
         }
+        
+        BSONObjIterator( const char * start , const char * end ){
+            _pos = start + 4;
+            _theend = end;
+        }
+        
         /** @return true if more elements exist to be enumerated. */
         bool moreWithEOO() {
-            return pos < theend;
+            return _pos < _theend;
         }
         bool more(){
-            return pos < theend && pos[0];
+            return _pos < _theend && _pos[0];
         }
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd = false ) {
-            assert( pos < theend );
-            BSONElement e( pos, checkEnd ? (int)(theend - pos) : -1 );
-            pos += e.size( checkEnd ? (int)(theend - pos) : -1 );
+            assert( _pos < _theend );
+            BSONElement e( _pos, checkEnd ? (int)(_theend - _pos) : -1 );
+            _pos += e.size( checkEnd ? (int)(_theend - _pos) : -1 );
             return e;
         }
     private:
-        const char *pos;
-        const char *theend;
+        const char* _pos;
+        const char* _theend;
     };
 
     /* iterator a BSONObj which is an array, in array order.
@@ -1987,6 +1996,12 @@ namespace mongo {
         BSONObjBuilder b;
         dotted2nested(b, obj);
         return b.obj();
+    }
+
+    inline BSONObjIterator BSONObjBuilder::iterator() const {
+        const char * s = b.buf() + offset_;
+        const char * e = b.buf() + b.len();
+        return BSONObjIterator( s , e );
     }
     
     /* WARNING: nested/dotted conversions are not 100% reversible

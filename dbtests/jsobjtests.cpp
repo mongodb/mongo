@@ -1480,6 +1480,38 @@ namespace JsobjTests {
         }
     };
 
+    class BuilderPartialItearte {
+    public:
+        void run(){
+            {
+                BSONObjBuilder b;
+                b.append( "x" , 1 );
+                b.append( "y" , 2 );
+                
+                BSONObjIterator i = b.iterator();
+                ASSERT( i.more() );
+                ASSERT_EQUALS( 1 , i.next().numberInt() );
+                ASSERT( i.more() );
+                ASSERT_EQUALS( 2 , i.next().numberInt() );
+                ASSERT( ! i.more() );
+
+                b.append( "z" , 3 );
+
+                i = b.iterator();
+                ASSERT( i.more() );
+                ASSERT_EQUALS( 1 , i.next().numberInt() );
+                ASSERT( i.more() );
+                ASSERT_EQUALS( 2 , i.next().numberInt() );
+                ASSERT( i.more() );
+                ASSERT_EQUALS( 3 , i.next().numberInt() );
+                ASSERT( ! i.more() );
+
+                ASSERT_EQUALS( BSON( "x" << 1 << "y" << 2 << "z" << 3 ) , b.obj() );
+            }
+                
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "jsobj" ){
@@ -1574,6 +1606,7 @@ namespace JsobjTests {
             add< InvalidIDFind >();
             add< ElementSetTest >();
             add< EmbeddedNumbers >();
+            add< BuilderPartialItearte >();
         }
     } myall;
     
