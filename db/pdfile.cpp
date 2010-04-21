@@ -45,6 +45,8 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
+    const int MaxExtentSize = 0x7ff00000;
+
     map<string, unsigned> BackgroundOperation::dbsInProg;
     set<string> BackgroundOperation::nsInProg;
 
@@ -359,7 +361,7 @@ namespace mongo {
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( 10357 ,  "shutdown in progress", !goingAway );
-        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
+        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= MaxExtentSize );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
         DiskLoc loc;
@@ -925,9 +927,12 @@ namespace mongo {
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
+        assert( len < MaxExtentSize );
         int x = initialExtentSize(len);
         int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
         int sz = y > x ? y : x;
+        if ( sz < lastExtentLen || sz > MaxExtentSize )
+            sz = lastExtentLen;
         sz = ((int)sz) & 0xffffff00;
         assert( sz > len );
         return sz;
