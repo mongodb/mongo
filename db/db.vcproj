@@ -1583,10 +1583,6 @@
 					>
 				</File>
 				<File
-					RelativePath=".\jsobj.h"
-					>
-				</File>
-				<File
 					RelativePath=".\json.h"
 					>
 				</File>
@@ -1966,6 +1962,18 @@
 			</File>
 			<File
 				RelativePath=".\replset.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="bson"
+			>
+			<File
+				RelativePath=".\bsonelement.h"
+				>
+			</File>
+			<File
+				RelativePath=".\jsobj.h"
 				>
 			</File>
 		</Filter>

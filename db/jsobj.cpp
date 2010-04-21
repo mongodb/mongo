@@ -133,7 +133,7 @@ namespace mongo {
         case DBRef:
             s << "DBRef('" << valuestr() << "',";
             {
-                OID *x = (OID *) (valuestr() + valuestrsize());
+                mongo::OID *x = (mongo::OID *) (valuestr() + valuestrsize());
                 s << *x << ')';
             }
             break;
@@ -256,7 +256,7 @@ namespace mongo {
             break;
         }
         case DBRef: {
-            OID *x = (OID *) (valuestr() + valuestrsize());
+            mongo::OID *x = (mongo::OID *) (valuestr() + valuestrsize());
             if ( format == TenGen )
                 s << "Dbref( ";
             else
@@ -1735,6 +1735,5 @@ namespace mongo {
         qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
         _cur = 0;
     }
-
 
 } // namespace mongo
