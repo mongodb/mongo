@@ -31,9 +31,6 @@ int
 __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
-int
-__wt_bt_leaf_first(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep);
 void
 __wt_bt_off_first(WT_PAGE *page, u_int32_t *addrp, u_int32_t *sizep);
 void
