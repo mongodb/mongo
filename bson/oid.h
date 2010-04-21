@@ -74,18 +74,18 @@ namespace mongo {
                 s << u;
             }
             /*
-            s.width( 16 );
-            s << a;
-            s.width( 8 );
-            s << b;
-            s << dec;
+              s.width( 16 );
+              s << a;
+              s.width( 8 );
+              s << b;
+              s << dec;
             */
             return s.str();
         }
         
         /**
            sets the contents to a new oid / randomized value
-         */
+        */
         void init();
 
         /** Set to the hex string value specified. */
@@ -103,12 +103,12 @@ namespace mongo {
     /** Formatting mode for generating JSON from BSON.
         See <http://mongodb.onconfluence.com/display/DOCS/Mongo+Extended+JSON>
         for details.
-     */
+    */
     enum JsonStringFormat {
         /** strict RFC format */
         Strict,
         /** 10gen format, which is close to JS format.  This form is understandable by
-        javascript running inside the Mongo server via eval() */
+            javascript running inside the Mongo server via eval() */
         TenGen,
         /** Javascript JSON compatible */
         JS
