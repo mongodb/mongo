@@ -1736,4 +1736,6 @@ namespace mongo {
         _cur = 0;
     }
 
+    BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
+
 } // namespace mongo

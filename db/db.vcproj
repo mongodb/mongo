@@ -1969,7 +1969,15 @@
 			Name="bson"
 			>
 			<File
+				RelativePath="..\bson\bsonelement.h"
+				>
+			</File>
+			<File
 				RelativePath=".\bsonelement.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\bsontypes.h"
 				>
 			</File>
 			<File
