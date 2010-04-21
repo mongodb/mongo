@@ -105,7 +105,7 @@ namespace mongo {
 
             log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
-            conn->update( getNS() , q , o );
+            conn->update( getNS() , q , o , true );
             
         }
         
