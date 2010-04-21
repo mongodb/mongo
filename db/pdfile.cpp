@@ -931,10 +931,15 @@ namespace mongo {
         int x = initialExtentSize(len);
         int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
         int sz = y > x ? y : x;
-        if ( sz < lastExtentLen || sz > MaxExtentSize )
+
+        if ( sz < lastExtentLen )
             sz = lastExtentLen;
+        else if ( sz > MaxExtentSize )
+            sz = MaxExtentSize;
+        
         sz = ((int)sz) & 0xffffff00;
         assert( sz > len );
+        
         return sz;
     }
 
