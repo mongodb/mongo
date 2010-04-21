@@ -759,9 +759,10 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			page = next;
 		}
 
-		++dup_count;			/* Total duplicate count. */
-		++page->records;		/* On-page key/data count. */
-		++page->hdr->u.entries;		/* On-page entry count. */
+		++dup_count;			/* Total duplicate count */
+		++page->records;		/* On-page key/data count */
+		++page->hdr->u.entries;		/* On-page entry count */
+		++leaf_page->records;		/* Parent page key/data count */
 
 		/* Copy the data item onto the page. */
 		WT_ITEM_LEN_SET(&data_item, data->size);
