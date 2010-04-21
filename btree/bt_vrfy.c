@@ -404,19 +404,30 @@ __wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, WT_VSTUFF *vs)
 		}
 
 		/*
-		 * Only one page can have no parents or siblings -- the root
-		 * page.
+		 * Two types of pages can have no parents or siblings; in a
+		 * primary tree, the root page, and the root of an off-page
+		 * duplicate set.
 		 */
-		if (hdr->type == WT_PAGE_COL_INT ||
-		    hdr->type == WT_PAGE_ROW_INT) {
-			if (idb->root_addr != addr) {
-				__wt_api_db_errx(db,
-				    "page at addr %lu is disconnected from "
-				    "the tree", (u_long)addr);
-				return (WT_ERROR);
-			}
+		switch (hdr->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_ROW_INT:
+			if (idb->root_addr == addr)
+				return (0);
+			break;
+		case WT_PAGE_DUP_INT:
+			/*
+			 * XXX
+			 * We need to add checks that the duplicate tree is
+			 * referenced once (and only once), in the primary.
+			 */
 			return (0);
+		default:
+			break;
 		}
+		__wt_api_db_errx(db,
+		    "page at addr %lu is disconnected from the tree",
+		    (u_long)addr);
+		return (WT_ERROR);
 	}
 
 	/*
