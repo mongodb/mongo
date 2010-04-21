@@ -40,7 +40,11 @@ static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
-	return (__wt_bt_verify(toc, f, NULL));
+	IDB *idb;
+
+	idb = toc->db->idb;
+
+	return (WT_UNOPENED_DATABASE(idb) ? 0 : __wt_bt_verify(toc, f, NULL));
 }
 
 /*
@@ -63,9 +67,6 @@ __wt_bt_verify(
 	idb = db->idb;
 	page = NULL;
 	ret = 0;
-
-	if (WT_UNOPENED_DATABASE(idb))
-		return (0);
 
 	memset(&vstuff, 0, sizeof(vstuff));
 	vstuff.stream = stream;
@@ -95,28 +96,13 @@ __wt_bt_verify(
 
 	/* Verify the descriptor page. */
 	WT_ERR(__wt_bt_page_in(toc, 0, 512, 0, &page));
-	WT_TRET(__wt_bt_verify_page(toc, page, &vstuff));
+	WT_ERR(__wt_bt_verify_page(toc, page, &vstuff));
 	__wt_bt_page_out(toc, &page, 0);
-	page = NULL;
 
-	/* Check for one-page databases. */
-	switch (idb->root_page->hdr->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		WT_TRET(__wt_bt_verify_level(
-		    toc, idb->root_addr, idb->root_size, &vstuff));
-		break;
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__wt_bt_page_in(
-		    toc, idb->root_addr, idb->root_size, 0, &page));
-		WT_TRET(__wt_bt_verify_page(toc, page, &vstuff));
-		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
-	}
+	WT_ERR(
+	    __wt_bt_verify_level(toc, idb->root_addr, idb->root_size, &vstuff));
 
-	WT_TRET(__wt_bt_verify_checkfrag(db, &vstuff));
+	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
@@ -156,7 +142,7 @@ __wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_VSTUFF *vs)
 	WT_CLEAR(page_dbt);
 
 	/*
-	 * Callers pass us a reference to an on-page WT_ITEM_OFF.
+	 * Callers pass us an page addr/size pair.
 	 *
 	 * The plan is pretty simple.  We read through the levels of the tree,
 	 * from top to bottom (root level to leaf level), and from left to
@@ -1218,15 +1204,15 @@ __wt_bt_verify_page_desc(WT_TOC *toc, WT_PAGE *page)
 		    (u_quad)desc->base_recno);
 		ret = WT_ERROR;
 	}
+	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {
+		__wt_api_db_errx(db,
+		    "unexpected flags found in description record");
+		ret = WT_ERROR;
+	}
 	if (desc->fixed_len == 0 && F_ISSET(desc, WT_PAGE_DESC_REPEAT)) {
 		__wt_api_db_errx(db,
 		    "repeat counts configured but no fixed length record "
 		    "size specified");
-		ret = WT_ERROR;
-	}
-	if (F_ISSET(desc, ~WT_PAGE_DESC_MASK)) {
-		__wt_api_db_errx(db,
-		    "unexpected flags found in description record");
 		ret = WT_ERROR;
 	}
 
