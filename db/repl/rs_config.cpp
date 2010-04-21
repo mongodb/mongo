@@ -62,7 +62,7 @@ namespace mongo {
     }
 
     static inline void configAssert(bool expr) {
-        uassert(13109, "bad admin.replset config", expr);
+        uassert(13122, "bad admin.replset config", expr);
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
