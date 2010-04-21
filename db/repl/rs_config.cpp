@@ -30,14 +30,10 @@ ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
     conn.connect(h.toString());
     auto_ptr<DBClientCursor> c = conn.query("admin.replset");
     set<string> hosts;
-    int n = 0;
     BSONObj o = c->nextSafe();
     uassert(13109, "multiple rows in admin.replset not supported", !c->more());
 
     { 
-        n++;
-        BSONObj o = c->nextSafe();
-
         _id = o.getStringField("_id");
         version = o.getIntField("version");
         uassert(13115, "bad admin.replset config: version", version > 0);
@@ -70,9 +66,8 @@ ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
             hosts.insert(m.h.toString());
         }
     }
-    uassert(13117, "bad admin.replset config", n != 1 || !_id.empty());
+    uassert(13117, "bad admin.replset config", !_id.empty());
 }
-
 
 }
 

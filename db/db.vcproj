@@ -1973,7 +1973,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\bsonelement.h"
+				RelativePath="..\bson\bsonobjbuilder.h"
 				>
 			</File>
 			<File
@@ -1982,6 +1982,10 @@
 			</File>
 			<File
 				RelativePath=".\jsobj.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\oid.h"
 				>
 			</File>
 		</Filter>
