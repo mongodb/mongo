@@ -408,7 +408,7 @@ namespace mongo {
 			}
 	}
 
-    bool BSONElement::trueValue() const {
+    inline bool BSONElement::trueValue() const {
             switch( type() ) {
                 case NumberLong:
                     return *reinterpret_cast< const long long* >( value() ) != 0;
