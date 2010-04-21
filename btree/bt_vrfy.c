@@ -951,6 +951,8 @@ eof:					__wt_api_db_errx(db,
 				WT_ERR(__wt_bt_verify_level(
 				    toc, off->addr, off->size, vs));
 				break;
+			case WT_ITEM_KEY:
+			case WT_ITEM_DATA:
 			default:
 				break;
 			}
@@ -975,7 +977,7 @@ eof:					__wt_api_db_errx(db,
 			WT_ERR(__wt_bt_ovfl_to_dbt(toc, (WT_OVFL *)
 			    WT_ITEM_BYTE(item), current->item));
 			break;
-		default:
+		default:	/* No other values are possible. */
 			break;
 		}
 
@@ -1021,7 +1023,7 @@ eof:					__wt_api_db_errx(db,
 			last_data = current;
 			current = swap_tmp;
 			break;
-		default:
+		default:	/* No other values are possible. */
 			break;
 		}
 	}
