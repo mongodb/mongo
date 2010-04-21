@@ -53,8 +53,6 @@ public:
     /* can throw exception */
     ReplSetConfig(const HostAndPort& h);
 
-    bool ok() const { return !_id.empty(); }
-
     struct Member {
         HostAndPort h;
         double priority;  /* 0 means can never be primary */
@@ -64,8 +62,9 @@ public:
     string _id;
     int version;
     HealthOptions healthOptions;
+    string md5;
 
-    /* TODO: adde getLastErrorDefaults */
+    /* TODO: add getLastErrorDefaults */
 
 private:
     void from(BSONObj);

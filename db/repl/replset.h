@@ -32,21 +32,34 @@ namespace mongo {
     */
     class ReplSet {
     public:
+        bool fatal;
+
+        bool ok() const { return !fatal; }
+
+        /* @return replica set's logical name */
         string getName() const { return _name; }
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
-           where :port is optional, and 
-           */
+           where :port is optional.
+
+           throws exception if a problem initializing.
+        */
         ReplSet(string cfgString);
 
+        // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
 
     private:
         string _name;
         const vector<HostAndPort> *_seeds;
 
-        void addMemberIfMissing(const HostAndPort& p);
+        /** load our configuration from admin.replset.  try seed machines too. 
+            throws exception if a problem.
+        */
+        void loadConfig();
+
+//        void addMemberIfMissing(const HostAndPort& p);
 
         struct MemberInfo : public List1<MemberInfo>::Base {
             MemberInfo(string h, int p) : port(p), host(h) {

@@ -1708,9 +1708,9 @@ namespace mongo {
         }
     }
 
-    bool startReplSets();
     void startReplication() {
-        if( startReplSets() ) 
+        /* if we are going to be a replica set, we aren't doing other forms of replication. */
+        if( !cmdLine.replSet.empty() )
             return;
 
         /* this was just to see if anything locks for longer than it should -- we need to be careful
