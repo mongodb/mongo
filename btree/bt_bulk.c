@@ -271,7 +271,7 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 				ret = WT_ERROR;
 				goto err;
 			}
-			if (key->size == 0) {
+			if (key != NULL && key->size == 0) {
 				__wt_api_db_errx(db,
 				    "zero-length keys are not supported");
 				ret = WT_ERROR;
@@ -358,6 +358,7 @@ skip_read:	/*
 				WT_ITEM_TYPE_SET(dup_data,
 				    WT_ITEM_TYPE(dup_data) == WT_ITEM_DATA ?
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
+			++dup_count;
 
 			WT_STAT_INCR(idb->stats, BULK_DUP_DATA_READ);
 
@@ -435,9 +436,12 @@ skip_read:	/*
 				/*
 				 * Set and re-set the page entry count -- we're
 				 * moving a single key PLUS the duplicate set.
+				 * Since dup_count was incremented to reflect
+				 * the key/data pair we're loading right now,
+				 * it's the right number of elements to move.
 				 */
-				page->hdr->u.entries -= (dup_count + 1);
-				next->hdr->u.entries += (dup_count + 1);
+				page->hdr->u.entries -= dup_count;
+				next->hdr->u.entries += dup_count;
 
 				/*
 				 * Move the duplicate set and adjust the page
@@ -561,7 +565,6 @@ skip_read:	/*
 		if (LF_ISSET(WT_DUPLICATES) &&
 		    (WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP ||
 		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP_OVFL)) {
-			++dup_count;
 			dup_space += data->size;
 
 			if (dup_space < db->leafmin / db->btree_dup_offpage)
@@ -854,6 +857,11 @@ __wt_bt_promote(
 			break;
 		case WT_ITEM_DUP_OVFL:
 		case WT_ITEM_KEY_OVFL:
+			/*
+			 * Assume overflow keys remain overflow keys when they
+			 * are promoted; not necessarily true if internal nodes
+			 * are larger than leaf nodes), but that's unlikely.
+			 */
 			WT_CLEAR(tmp_ovfl);
 			WT_RET(__wt_bt_ovfl_copy(toc,
 			    WT_ITEM_BYTE_OVFL(key_item), &tmp_ovfl));
