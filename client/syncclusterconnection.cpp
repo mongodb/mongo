@@ -209,6 +209,9 @@ namespace mongo {
     }
     
     void SyncClusterConnection::insert( const string &ns, BSONObj obj ){ 
+
+        uassert( 13119 , "SyncClusterConnection::insert obj has to have an _id" , obj["_id"].type() );
+        
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 8003 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
@@ -229,6 +232,11 @@ namespace mongo {
     }
 
     void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ 
+
+        if ( upsert ){
+            uassert( 13120 , "SyncClusterConnection::update upsert query needs _id" , query.obj["_id"].type() );
+        }
+        
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
