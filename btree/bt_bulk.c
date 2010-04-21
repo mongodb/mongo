@@ -140,7 +140,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 */
 		if (len > page->space_avail) {
 			WT_ERR(__wt_bt_page_alloc(toc,
-			    WT_LLEAF, WT_PAGE_COL_FIX, db->leafmin, &next));
+			    WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &next));
 			next->hdr->prevaddr = page->addr;
 			next->hdr->prevsize = page->size;
 			page->hdr->nextaddr = next->addr;
@@ -678,7 +678,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	 * place.
 	 */
 	WT_RET(__wt_bt_page_alloc(
-	    toc, WT_LLEAF, WT_PAGE_DUP_LEAF, db->leafmin, &page));
+	    toc, WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
 	page->hdr->u.entries = dup_count;
 	page->records = dup_count;
 	len = (u_int32_t)(leaf_page->first_free - (u_int8_t *)dup_data);
@@ -734,7 +734,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 		 */
 		if (WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
 			WT_RET(__wt_bt_page_alloc(toc,
-			    WT_LLEAF, WT_PAGE_DUP_LEAF, db->leafmin, &next));
+			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &next));
 			next->hdr->prevaddr = page->addr;
 			next->hdr->prevsize = page->size;
 			page->hdr->nextaddr = next->addr;
