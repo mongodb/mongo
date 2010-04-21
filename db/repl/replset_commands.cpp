@@ -41,7 +41,8 @@ namespace mongo {
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( theReplSet == 0 ) {
-                errmsg = "not a repl set";
+                errmsg = ReplSet::startupStatusMsg.empty() ? 
+                    errmsg = "not a repl set" : ReplSet::startupStatusMsg;
                 return false;
             }
 

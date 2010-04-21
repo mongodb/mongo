@@ -39,7 +39,7 @@ public:
 
         string foo = obj["foo"].String(); // exception if not a string type or DNE
     */
-    string String()             const { return chk(mongo::String).toString(); }
+    string String()             const { return chk(mongo::String).valuestr(); }
     Date_t Date()               const { return chk(mongo::Date).date(); }
     double Number()             const { return chk(isNumber()).number(); }
     double Double()             const { return chk(NumberDouble)._numberDouble(); }
