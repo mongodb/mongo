@@ -415,7 +415,8 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 			ip->size = WT_ITEM_LEN(item);
 			break;
 		case WT_ITEM_DUP_OVFL:
-			ip->size = WT_ITEM_BYTE_OVFL(item)->size;
+			ip->data = WT_ITEM_BYTE(item);
+			ip->size = 0;
 			break;
 		WT_ILLEGAL_FORMAT(db);
 		}
