@@ -70,7 +70,18 @@ namespace mongo {
     }
 
     void ReplSet::loadConfig() {
-        ReplSetConfig local(HostAndPort::me());
+        try {
+            vector<ReplSetConfig> configs;
+            configs.push_back( ReplSetConfig(HostAndPort::me()) );
+            for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ )
+                configs.push_back( ReplSetConfig(*i) );
+        }
+        catch(AssertionException&) { 
+            log() << "replSet: error loading configurations. admin.replset may be misconfigured\n";
+            log() << "replSet: replication will not start" << endl;
+            fatal = true;
+            throw;
+        }
     }
 
     /*void ReplSet::addMemberIfMissing(const HostAndPort& h) { 

@@ -66,6 +66,8 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        log(2) << "load ReplSetConfig " << h.toString() << endl;
+
         DBClientConnection conn(false, 0, 20);
         conn._logLevel = 2;
         string err;
