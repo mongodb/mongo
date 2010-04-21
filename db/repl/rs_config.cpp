@@ -18,14 +18,22 @@
 
 #include "stdafx.h"
 #include "rs_config.h"
+#include "../../client/dbclient.h"
+#include "../../util/hostandport.h"
 
 namespace mongo { 
 
 /* try to refresh */
 void ReplSetConfig::reload(const HostAndPort& h) {
-
-
-
+    DBClientConnection conn(false, 0, 20);
+    conn._logLevel = 2;
+    string err;
+    conn.connect(h.toString());
+    auto_ptr<DBClientCursor> c = conn.query("admin.system.replset");
+    while( c->more() ) { 
+        c->nextSafe();
+    }
 }
 
 }
+

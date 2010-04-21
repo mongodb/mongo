@@ -36,7 +36,8 @@ namespace mongo {
 
         bool isLocalHost() const;
 
-        string toString();
+        // @returns host:port
+        string toString() const; 
 
         string host() const { return _host; }
         int port() const { return _port; }
@@ -67,7 +68,7 @@ namespace mongo {
         return sameStart(getHostName().c_str(), _host.c_str());
     }
 
-    inline string HostAndPort::toString() {
+    inline string HostAndPort::toString() const {
         stringstream ss;
         ss << _host;
         if( _port != -1 ) ss << ':' << _port;

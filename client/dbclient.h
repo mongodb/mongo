@@ -200,8 +200,6 @@ namespace mongo {
 
 	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
-        friend class DBClientBase;
-        bool init();
     public:
 		/** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
@@ -310,9 +308,9 @@ namespace mongo {
         void decouple() { _ownCursor = false; }
         
     private:
-        
+        friend class DBClientBase;
+        bool init();        
         int nextBatchSize();
-
         DBConnector *connector;
         string ns;
         BSONObj query;
@@ -324,7 +322,6 @@ namespace mongo {
         int batchSize;
         auto_ptr<Message> m;
         stack< BSONObj > _putBack;
-
         int resultFlags;
         long long cursorId;
         int nReturned;
@@ -798,7 +795,7 @@ namespace mongo {
 
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
 
-        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query=Query(), int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) {
             checkConnection();
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
