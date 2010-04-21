@@ -50,22 +50,25 @@ Additionally an object in this collection holds global configuration settings fo
 
 class ReplSetConfig {
 public:
+    /* can throw exception */
+    ReplSetConfig(const HostAndPort& h);
+
+    bool ok() const { return !_id.empty(); }
+
     struct Member {
         HostAndPort h;
         double priority;  /* 0 means can never be primary */
         bool arbiterOnly;
     };
-
-    bool ok() const { return !_id.empty(); }
-
+    vector<Member> members;
     string _id;
     int version;
     HealthOptions healthOptions;
-    vector<Member> members;
-    /* TODO getLastErrorDefaults */
 
-    /* can throw exception */
-    ReplSetConfig(const HostAndPort& h);
+    /* TODO: adde getLastErrorDefaults */
+
+private:
+    void from(BSONObj);
 };
 
 }

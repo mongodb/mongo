@@ -103,47 +103,6 @@ namespace mongo {
      \endcode
      */
     class BSONObj {
-        friend class BSONObjIterator;
-        class Holder {
-        public:
-            Holder( const char *objdata ) :
-            _objdata( objdata ) {
-            }
-            ~Holder() {
-                free((void *)_objdata);
-                _objdata = 0;
-            }
-        private:
-            const char *_objdata;
-        };
-        const char *_objdata;
-        boost::shared_ptr< Holder > _holder;
-        void init(const char *data, bool ifree) {
-            if ( ifree )
-                _holder.reset( new Holder( data ) );
-            _objdata = data;
-            if ( ! isValid() ){
-                stringstream ss;
-                ss << "Invalid BSONObj spec size: " << objsize();
-                try {
-                    BSONElement e = firstElement();
-                    ss << " first element:" << e.toString() << " ";
-                }
-                catch ( ... ){}
-                string s = ss.str();
-                massert( 10334 ,  s , 0 );
-            }
-        }
-#pragma pack(1)
-        static struct EmptyObject {
-            EmptyObject() {
-                len = 5;
-                jstype = EOO;
-            }
-            int len;
-            char jstype;
-        } emptyObject;
-#pragma pack()
     public:
         /** Construct a BSONObj from data in the proper format. 
             @param ifree true if the BSONObj should free() the msgdata when 
@@ -282,6 +241,7 @@ namespace mongo {
             return *(reinterpret_cast<const int*>(objdata()));
         }
 
+        /** performs a cursory check on the object's size only. */
         bool isValid();
 
         /** @return if the user is a valid user doc
@@ -306,17 +266,23 @@ namespace mongo {
             }
         }
 
-        // Alternative output format
+        /** Alternative output format */
         string hexDump() const;
         
+        /**wo='well ordered'.  fields must be in same order in each object.
+           Ordering is with respect to the signs of the elements 
+           and allows ascending / descending key mixing.
+		   @return  <0 if l<r. 0 if l==r. >0 if l>r
+        */
         int woCompare(const BSONObj& r, const Ordering &o,
                       bool considerFieldName=true) const;
 
         /**wo='well ordered'.  fields must be in same order in each object.
-           Ordering is with respect to the signs of the elements in idxKey.
+           Ordering is with respect to the signs of the elements 
+           and allows ascending / descending key mixing.
 		   @return  <0 if l<r. 0 if l==r. >0 if l>r
         */
-        int woCompare(const BSONObj& r, const BSONObj &idxKey = BSONObj(),
+        int woCompare(const BSONObj& r, const BSONObj &ordering = BSONObj(),
                       bool considerFieldName=true) const;
         
         int woSortOrder( const BSONObj& r , const BSONObj& sortKey ) const;
@@ -337,10 +303,6 @@ namespace mongo {
             return BSONElement(objdata() + 4);
         }
 
-		/** use getField() instead. */
-        //BSONElement getField(const char *name) const;
-        //BSONElement getField(string name) const {
-
 		/** @return true if field exists in the object */
         bool hasElement(const char *name) const;
 
@@ -351,11 +313,10 @@ namespace mongo {
 		*/
 		bool getObjectID(BSONElement& e) const;
 
-        /** makes a copy of the object. 
-        */
+        /** makes a copy of the object. */
         BSONObj copy() const;
 
-        /* make sure the data buffer is under the control of BSONObj's and not a remote buffer */
+        /* make sure the data buffer is under the control of this BSONObj and not a remote buffer */
         BSONObj getOwned() const{
             if ( !isOwned() )
                 return copy();
@@ -385,6 +346,7 @@ namespace mongo {
         /** true unless corrupt */
         bool valid() const;
         
+        /** @return an md5 value for this object. */
         string md5() const;
         
         bool operator==( const BSONObj& other ){
@@ -411,12 +373,55 @@ namespace mongo {
             opNEAR = 0x13,
             opWITHIN = 0x14,
             opMAX_DISTANCE=0x15
-        };        
+        };               
+
+private:
+        friend class BSONObjIterator;
+        class Holder {
+        public:
+            Holder( const char *objdata ) :
+            _objdata( objdata ) {
+            }
+            ~Holder() {
+                free((void *)_objdata);
+                _objdata = 0;
+            }
+        private:
+            const char *_objdata;
+        };
+        const char *_objdata;
+        boost::shared_ptr< Holder > _holder;
+        void init(const char *data, bool ifree) {
+            if ( ifree )
+                _holder.reset( new Holder( data ) );
+            _objdata = data;
+            if ( ! isValid() ){
+                stringstream ss;
+                ss << "Invalid BSONObj spec size: " << objsize();
+                try {
+                    BSONElement e = firstElement();
+                    ss << " first element:" << e.toString() << " ";
+                }
+                catch ( ... ){}
+                string s = ss.str();
+                massert( 10334 ,  s , 0 );
+            }
+        }
+#pragma pack(1)
+        static struct EmptyObject {
+            EmptyObject() {
+                len = 5;
+                jstype = EOO;
+            }
+            int len;
+            char jstype;
+        } emptyObject;
+#pragma pack()
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );
 
-    struct BSONArray: BSONObj {
+    struct BSONArray : BSONObj {
         // Don't add anything other than forwarding constructors!!!
         BSONArray(): BSONObj() {}
         explicit BSONArray(const BSONObj& obj): BSONObj(obj) {}

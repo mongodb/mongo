@@ -21,7 +21,6 @@
 #include "jsobj.h"
 #include "nonce.h"
 #include "../util/atomic_int.h"
-#include "../util/goodies.h"
 #include "../util/base64.h"
 #include "../util/md5.hpp"
 #include <limits>
@@ -96,7 +95,7 @@ namespace mongo {
         case Object:
             s << embeddedObject().toString();
             break;
-        case Array:
+        case mongo::Array:
             s << embeddedObject().toString( true );
             break;
         case Undefined:
@@ -231,7 +230,7 @@ namespace mongo {
         case Object:
             s << embeddedObject().jsonString( format, pretty );
             break;
-        case Array: {
+        case mongo::Array: {
             if ( embeddedObject().isEmpty() ) {
                 s << "[]";
                 break;
@@ -397,7 +396,7 @@ namespace mongo {
             x = valuestrsize() + 4 + 12;
             break;
         case Object:
-        case Array:
+        case mongo::Array:
             massert( 10316 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = objsize();
             break;
@@ -1737,5 +1736,26 @@ namespace mongo {
     }
 
     BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
+
+    /** transform a BSON array into a vector of BSONElements.
+        we match array # positions with their vector position, and ignore 
+        any non-numeric fields. 
+        */
+    vector<BSONElement> BSONElement::Array() const { 
+        chk(mongo::Array);
+        vector<BSONElement> v;
+        BSONObjIterator i(Obj());
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const char *f = e.fieldName();
+            try {
+                unsigned u = stringToNum(f);
+                assert( u < 4096 );
+                v[u] = e;
+            }
+            catch(unsigned) { }
+        }
+        return v;
+    }
 
 } // namespace mongo

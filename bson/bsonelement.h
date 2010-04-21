@@ -39,16 +39,23 @@ public:
 
         string foo = obj["foo"].String(); // exception if not a string type or DNE
     */
-    string String()  const { return chk(mongo::String).toString(); }
-    Date_t Date()    const { return chk(mongo::Date).date(); }
-    double Number()  const { return chk(isNumber()).number(); }
-    double Double()  const { return chk(NumberDouble)._numberDouble(); }
-    long long Long() const { return chk(NumberLong)._numberLong(); }
-    int Int()        const { return chk(NumberInt)._numberInt(); }
-    bool Bool()      const { return chk(mongo::Bool).boolean(); }
-    BSONObj Obj()    const;
-    mongo::OID OID() const { return chk(jstOID).__oid(); }
-    void Null()      const { chk(isNull()); }
+    string String()             const { return chk(mongo::String).toString(); }
+    Date_t Date()               const { return chk(mongo::Date).date(); }
+    double Number()             const { return chk(isNumber()).number(); }
+    double Double()             const { return chk(NumberDouble)._numberDouble(); }
+    long long Long()            const { return chk(NumberLong)._numberLong(); }
+    int Int()                   const { return chk(NumberInt)._numberInt(); }
+    bool Bool()                 const { return chk(mongo::Bool).boolean(); }
+    BSONObj Obj()               const;
+    vector<BSONElement> Array() const; // see implementation for detailed comments
+    mongo::OID OID()            const { return chk(jstOID).__oid(); }
+    void Null()                 const { chk(isNull()); }
+    void OK()                   const { chk(ok()); }
+
+    /** Use ok() to check if a value is assigned:
+          if( myObj["foo"].ok() ) ...
+    */
+    bool ok() const { return !eoo(); }
 
     string toString( bool includeFieldName = true ) const;
     operator string() const { return toString(); }
@@ -64,11 +71,9 @@ public:
     int canonicalType() const;
 
     /** Indicates if it is the end-of-object element, which is present at the end of 
-        every BSON object. 
+        every BSON object.
     */
-    bool eoo() const {
-        return type() == EOO;
-    }
+    bool eoo() const { return type() == EOO; }
 
     /** Size of the element.
         @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size. 
@@ -276,7 +281,7 @@ public:
     bool mayEncapsulate() const {
         switch ( type() ){
         case Object:
-        case Array:
+        case mongo::Array:
         case CodeWScope:
             return true;
         default:
@@ -288,7 +293,7 @@ public:
     bool isABSONObj() const {
         switch( type() ){
         case Object:
-        case Array:
+        case mongo::Array:
             return true;
         default:
             return false;
@@ -383,7 +388,7 @@ private:
             return 15;
         case Object:
             return 20;
-        case Array:
+        case mongo::Array:
             return 25;
         case BinData:
             return 30;

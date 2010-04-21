@@ -25,7 +25,7 @@
 namespace mongo {
 
     /** Utility for creating a BSONObj.
-        See also the BSON( a << b << c ) macro.
+        See also the BSON() and BSON_ARRAY() macros.
     */
     class BSONObjBuilder : boost::noncopyable {
     public:

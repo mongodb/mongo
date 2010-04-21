@@ -23,51 +23,52 @@
 
 namespace mongo { 
 
-ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
-    DBClientConnection conn(false, 0, 20);
-    conn._logLevel = 2;
-    string err;
-    conn.connect(h.toString());
-    auto_ptr<DBClientCursor> c = conn.query("admin.replset");
-    set<string> hosts;
-    BSONObj o = c->nextSafe();
-    uassert(13109, "multiple rows in admin.replset not supported", !c->more());
-
-    { 
+    void ReplSetConfig::from(BSONObj o) {
         _id = o["_id"].String();
         version = o["version"].numberInt();
         uassert(13115, "bad admin.replset config: version", version > 0);
 
-        BSONObj settings = o.getObjectField("settings");
-        if( !settings.isEmpty() ) {
-            if( settings.hasField("connRetries") )
-                healthOptions.connRetries = settings.getIntField("connRetries");
-            if( settings.hasField("heartbeatSleep") )
-                healthOptions.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].number() * 1000);
-            if( settings.hasField("heartbeatTimeout" ) )
-                healthOptions.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].number() * 1000);
+        if( o["settings"].ok() ) {
+            BSONObj settings = o["settings"].Obj();
+            if( settings["connRetries"].ok() )
+                healthOptions.connRetries = settings["connRetries"].numberInt();
+            if( settings["heartbeatSleep"].ok() )
+                healthOptions.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].Number() * 1000);
+            if( settings["heartbeatTimeout"].ok() )
+                healthOptions.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
             healthOptions.check();
         }
 
-        BSONObjIterator i(o.getObjectField("members"));
-        while( i.more() ) {
-            BSONObj memb = i.next().embeddedObject();
+        set<string> hosts;
+        vector<BSONElement> members = o["members"].Array();
+        for( unsigned i = 0; i < members.size(); i++ ) {
+            BSONObj mobj = members[i].Obj();
             Member m;
-            string s = memb.getStringField("host");
+            string s = mobj["host"].String();
             try {
                 m.h = HostAndPort::fromString(s);
-                m.arbiterOnly = memb.getBoolField("arbiterOnly");
-                m.priority = memb.hasField("priority") ? memb["priority"].number() : 1.0;
+                m.arbiterOnly = mobj.getBoolField("arbiterOnly");
+                BSONElement pri = mobj["priority"];
+                m.priority = pri.ok() ? pri.number() : 1.0;
             }
             catch(...) { 
                 uassert(13107, "bad admin.replset config", false);
             }
-            uassert(13108, "bad admin.replset config", hosts.count(m.h.toString()) == 0);
+            uassert(13108, "bad admin.replset config dups?", hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
         }
+        uassert(13117, "bad admin.replset config", !_id.empty());
     }
-    uassert(13117, "bad admin.replset config", !_id.empty());
-}
+
+    ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        DBClientConnection conn(false, 0, 20);
+        conn._logLevel = 2;
+        string err;
+        conn.connect(h.toString());
+        auto_ptr<DBClientCursor> c = conn.query("admin.replset");
+        BSONObj o = c->nextSafe();
+        uassert(13109, "multiple rows in admin.replset not supported", !c->more());
+        from(o);
+    }
 
 }
-
