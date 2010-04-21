@@ -28,7 +28,7 @@
 #include "security.h"
 #include "json.h"
 #include "reccache.h"
-#include "replset.h"
+#include "replpair.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"

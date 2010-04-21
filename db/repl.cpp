@@ -75,7 +75,7 @@ namespace mongo {
     
 } // namespace mongo
 
-#include "replset.h"
+#include "replpair.h"
 
 namespace mongo {
 

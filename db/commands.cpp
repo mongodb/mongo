@@ -21,7 +21,7 @@
 #include "jsobj.h"
 #include "commands.h"
 #include "client.h"
-#include "replset.h"
+#include "replpair.h"
 
 namespace mongo {
 

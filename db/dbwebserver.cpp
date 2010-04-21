@@ -24,7 +24,7 @@
 #include "../util/md5.hpp"
 #include "db.h"
 #include "repl.h"
-#include "replset.h"
+#include "replpair.h"
 #include "instance.h"
 #include "security.h"
 #include "stats/snapshots.h"

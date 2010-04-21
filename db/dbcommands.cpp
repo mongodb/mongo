@@ -29,7 +29,7 @@
 #include "json.h"
 #include "repl.h"
 #include "repl_block.h"
-#include "replset.h"
+#include "replpair.h"
 #include "commands.h"
 #include "db.h"
 #include "instance.h"

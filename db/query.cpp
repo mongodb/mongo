@@ -27,7 +27,7 @@
 #include "../util/lruishmap.h"
 #include "json.h"
 #include "repl.h"
-#include "replset.h"
+#include "replpair.h"
 #include "scanandorder.h"
 #include "security.h"
 #include "curop.h"

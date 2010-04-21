@@ -1,5 +1,3 @@
-/* THIS FILE IS FOR REPLICA PAIRS, NOT REPLICA SETS.  We should rename. */
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -142,6 +140,7 @@ namespace mongo {
         
         return strcmp( client, "local" ) == 0;
     }
+
     inline bool isMasterNs( const char *ns ) {
         char cl[ 256 ];
         nsToDatabase( ns, cl );
