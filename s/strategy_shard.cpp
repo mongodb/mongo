@@ -196,7 +196,17 @@ namespace mongo {
             
             if ( ! save ){
                 if ( toupdate.firstElement().fieldName()[0] == '$' ){
-                    // TODO: check for $set, etc.. on shard key
+                    BSONObjIterator ops(toupdate);
+                    while(ops.more()){
+                        BSONElement op(ops.next());
+                        if (op.type() != Object)
+                            continue;
+                        BSONObjIterator fields(op.embeddedObject());
+                        while(fields.more()){
+                            const string field = fields.next().fieldName();
+                            uassert(13123, "Can't modify shard key's value", ! manager->getShardKey().partOfShardKey(field));
+                        }
+                    }
                 }
                 else if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
                     throw UserException( 8014 , "change would move shards!" );
