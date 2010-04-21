@@ -352,18 +352,20 @@ skip_read:	/*
 			/*
 			 * The first duplicate in the set is already on the
 			 * page, but with an item type set to WT_ITEM_DATA or
-			 * WT_ITEM_DATA_OVFL.  Correct the type.
+			 * WT_ITEM_DATA_OVFL.  Correct the type and dup_count.
 			 */
-			if (dup_count == 1)
+			if (++dup_count == 1) {
+				dup_count = 2;
 				WT_ITEM_TYPE_SET(dup_data,
 				    WT_ITEM_TYPE(dup_data) == WT_ITEM_DATA ?
 				    WT_ITEM_DUP : WT_ITEM_DUP_OVFL);
-			++dup_count;
+			}
 
 			WT_STAT_INCR(idb->stats, BULK_DUP_DATA_READ);
 
 			key = NULL;
-		}
+		} else
+			dup_count = 0;
 
 		/* Create overflow objects if the key or data won't fit. */
 		if (key != NULL && key->size > db->leafitemsize) {
@@ -432,16 +434,21 @@ skip_read:	/*
 			 * We use a check of dup_count instead of checking the
 			 * WT_DUPLICATES flag, since we have to check it anyway.
 			 */
-			if (dup_count > 1) {
+			if (dup_count != 0) {
 				/*
-				 * Set and re-set the page entry count -- we're
-				 * moving a single key PLUS the duplicate set.
-				 * Since dup_count was incremented to reflect
-				 * the key/data pair we're loading right now,
-				 * it's the right number of elements to move.
+				 * Reset the page entry and record counts -- we
+				 * are moving a single key plus the duplicate
+				 * set.
+				 *
+				 * Since dup_count was already incremented to
+				 * reflect the data item we're loading now, it
+				 * is the right number of elements to move, that
+				 * is, move (dup_count - 1) + 1 for the key.
 				 */
 				page->hdr->u.entries -= dup_count;
+				page->records -= dup_count - 1;
 				next->hdr->u.entries += dup_count;
+				next->records += dup_count - 1;
 
 				/*
 				 * Move the duplicate set and adjust the page
@@ -548,10 +555,7 @@ skip_read:	/*
 		 * data sets start.  Additionally, reset the counter and
 		 * space calculation.
 		 */
-		if (LF_ISSET(WT_DUPLICATES) &&
-		    WT_ITEM_TYPE(&data_item) != WT_ITEM_DUP &&
-		    WT_ITEM_TYPE(&data_item) != WT_ITEM_DUP_OVFL) {
-			dup_count = 1;
+		if (LF_ISSET(WT_DUPLICATES) && dup_count == 0) {
 			dup_space = data->size;
 			dup_data = (WT_ITEM *)page->first_free;
 		}
@@ -562,9 +566,7 @@ skip_read:	/*
 		 * the (roughly) 25% of the page space boundary.  If it does,
 		 * move it offpage.
 		 */
-		if (LF_ISSET(WT_DUPLICATES) &&
-		    (WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP ||
-		    WT_ITEM_TYPE(&data_item) == WT_ITEM_DUP_OVFL)) {
+		if (LF_ISSET(WT_DUPLICATES) && dup_count != 0) {
 			dup_space += data->size;
 
 			if (dup_space < db->leafmin / db->btree_dup_offpage)
