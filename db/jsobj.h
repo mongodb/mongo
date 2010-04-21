@@ -217,7 +217,27 @@ namespace mongo {
     class BSONElement {
         friend class BSONObjIterator;
         friend class BSONObj;
+        const BSONElement& chk(int t) const { 
+            uassert(13111, "unexpected or missing type value in BSON object", t == type());
+            return *this;
+        }
+        const BSONElement& chk(bool expr) const { 
+            uassert(13118, "unexpected or missing type value in BSON object", expr);
+            return *this;
+        }
     public:
+        /** These functions, which start with a capital letter, throw a UserException if the 
+            element is not of the required type. Example:
+              string foo = obj["foo"].String(); // exception if not a string type or DNE
+        */
+        string String() const { return chk(mongo::String).toString(); }
+        Date_t Date() const { return chk(mongo::Date).date(); }
+        double Number() const { return chk(isNumber()).number(); }
+        double Double() const { return chk(NumberDouble)._numberDouble(); }
+        long long Long() const { return chk(NumberLong)._numberLong(); }
+        int Int() const { return chk(NumberInt)._numberInt(); }
+        bool Bool() const { return chk(mongo::Bool).boolean(); }
+
         string toString( bool includeFieldName = true ) const;
         operator string() const { return toString(); }
         string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
@@ -231,50 +251,7 @@ namespace mongo {
             the main purpose is numbers.  any numeric type will return NumberDouble
             Note: if the order changes, indexes have to be re-built or than can be corruption
          */
-        int canonicalType() const {
-            BSONType t = type();
-            switch ( t ){
-            case MinKey:
-            case MaxKey:
-                return t;
-            case EOO:
-            case Undefined:
-                return 0;
-            case jstNULL:
-                return 5;
-            case NumberDouble:
-            case NumberInt:
-            case NumberLong:
-                return 10;
-            case String:
-            case Symbol:
-                return 15;
-            case Object:
-                return 20;
-            case Array:
-                return 25;
-            case BinData:
-                return 30;
-            case jstOID:
-                return 35;
-            case Bool:
-                return 40;
-            case Date:
-            case Timestamp:
-                return 45;
-            case RegEx:
-                return 50;
-            case DBRef:
-                return 55;
-            case Code:
-                return 60;
-            case CodeWScope:
-                return 65;
-            default:
-                assert(0);
-                return -1;
-            }
-        }
+        int canonicalType() const;
 
         /** Indicates if it is the end-of-object element, which is present at the end of 
             every BSON object. 
@@ -312,9 +289,7 @@ namespace mongo {
             return size() - fieldNameSize() - 1;
         }
 
-        bool isBoolean() const {
-            return type() == Bool;
-        }
+        bool isBoolean() const { return type() == mongo::Bool; }
 
         /** @return value of a boolean element.  
             You must assure element is a boolean before 
@@ -341,7 +316,7 @@ namespace mongo {
                     return *reinterpret_cast< const double* >( value() ) != 0;
                 case NumberInt:
                     return *reinterpret_cast< const int* >( value() ) != 0;
-                case Bool:
+                case mongo::Bool:
                     return boolean();
                 case EOO:
                 case jstNULL:
@@ -371,9 +346,9 @@ namespace mongo {
             case NumberLong:
             case NumberDouble:
             case NumberInt:
-            case String:
-            case Bool:
-            case Date:
+            case mongo::String:
+            case mongo::Bool:
+            case mongo::Date:
             case jstOID:
                 return true;
             default: 
@@ -467,7 +442,7 @@ namespace mongo {
 
         /** Get the string value of the element.  If not a string returns "". */
         const char *valuestrsafe() const {
-            return type() == String ? valuestr() : "";
+            return type() == mongo::String ? valuestr() : "";
         }
         /** Get the string value of the element.  If not a string returns "". */
         string str() const { return valuestrsafe(); }
@@ -492,7 +467,7 @@ namespace mongo {
 
         string ascode() const {
             switch( type() ){
-            case String:
+            case mongo::String:
             case Code:
                 return valuestr();
             case CodeWScope:
@@ -2091,5 +2066,50 @@ namespace mongo {
         int _nfields;
         int _cur;
     };
+
+    inline int BSONElement::canonicalType() const {
+			BSONType t = type();
+			switch ( t ){
+			case MinKey:
+			case MaxKey:
+				return t;
+			case EOO:
+			case Undefined:
+				return 0;
+			case jstNULL:
+				return 5;
+			case NumberDouble:
+			case NumberInt:
+			case NumberLong:
+				return 10;
+            case mongo::String:
+			case Symbol:
+				return 15;
+			case Object:
+				return 20;
+			case Array:
+				return 25;
+			case BinData:
+				return 30;
+			case jstOID:
+				return 35;
+            case mongo::Bool:
+				return 40;
+            case mongo::Date:
+			case Timestamp:
+				return 45;
+			case RegEx:
+				return 50;
+			case DBRef:
+				return 55;
+			case Code:
+				return 60;
+			case CodeWScope:
+				return 65;
+			default:
+				assert(0);
+				return -1;
+			}
+	}
 
 } // namespace mongo

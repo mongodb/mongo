@@ -228,7 +228,9 @@ namespace mongo {
         BSONObj nextSafe() {
             BSONObj o = next();
             BSONElement e = o.firstElement();
-            assert( strcmp(e.fieldName(), "$err") != 0 );
+            if( strcmp(e.fieldName(), "$err") == 0 ) { 
+                uassert(13106, "nextSafe() returns $err", false);
+            }
             return o;
         }
 

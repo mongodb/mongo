@@ -23,42 +23,40 @@ namespace mongo {
 
     ReplSet *theReplSet = 0;
 
+    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
     ReplSet::ReplSet(string cfgString) {
-        const char *p = cfgString.c_str();
-        const char *q = strchr(p, '/');
-        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", q != 0 && p != q);
-        _name = string(p, q-p);
+        const char *p = cfgString.c_str(); 
+        const char *slash = strchr(p, '/');
+        uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
+        _name = string(p, slash-p);
         log() << "replSet: " << cfgString << endl;
 
         set<HostAndPort> temp;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
+        p = slash + 1;
         while( 1 ) {
-            p = q + 1;
-            q = strchr(p, ',');
-            if( q == 0 ) q = strchr(p,0);
-            uassert(13094, "bad --replSet config string", p != q);
-            const char *colon = strchr(p, ':');
-            HostAndPort m;
-            if( colon && colon < q ) {
-                int port = atoi(colon+1);
-                uassert(13095, "bad --replSet port #", port > 0);
-                m = HostAndPort(string(p,colon-p),port);
+            const char *comma = strchr(p, ',');
+            if( comma == 0 ) comma = strchr(p,0);
+            uassert(13094, "bad --replSet config string", p != comma);
+            {
+                HostAndPort m;
+                try {
+                    m = HostAndPort::fromString(string(p, comma-p));
+                }
+                catch(...) {
+                    uassert(13114, "bad --replSet seed hostname", false);
+                }
+                uassert(13096, "bad --replSet config string - dups?", temp.count(m) == 0 );
+                temp.insert(m);
+                uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
+                if( m.isSelf() )
+                    log() << "replSet: ignoring seed " << m.toString() << " (=self)" << endl;
+                else
+                    seeds->push_back(m);
+                if( *comma == 0 )
+                    break;
+                p = comma + 1;
             }
-            else { 
-                // no port specified.
-                m = HostAndPort(string(p,q-p), cmdLine.port);
-            }
-            uassert(13096, "bad --replSet config string - dups?", temp.count(m) == 0 ); // these uasserts leak seeds but that's ok
-            temp.insert(m);
-
-            uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
-
-            if( m.isSelf() )
-                log() << "replSet: ignoring seed " << m.toString() << " (=self)" << endl;
-            else
-                seeds->push_back(m);
-            if( *q == 0 )
-                break;
         }
 
         _seeds = seeds;

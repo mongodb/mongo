@@ -62,7 +62,7 @@ namespace mongo {
         switch ( type() ) {
         case EOO:
             return "EOO";
-        case Date:
+        case mongo::Date:
             s << "new Date(" << date() << ')';
             break;
         case RegEx:
@@ -90,7 +90,7 @@ namespace mongo {
         case NumberInt:
             s << _numberInt();
             break;
-        case Bool:
+        case mongo::Bool:
             s << ( boolean() ? "true" : "false" );
             break;
         case Object:
@@ -123,7 +123,7 @@ namespace mongo {
             }
             break;
         case Symbol:
-        case String:
+        case mongo::String:
             if ( valuestrsize() > 80 )
                 s << '"' << string(valuestr()).substr(0, 70) << "...\"";
             else {
@@ -202,7 +202,7 @@ namespace mongo {
         if ( includeFieldNames )
             s << '"' << escape( fieldName() ) << "\" : ";
         switch ( type() ) {
-        case String:
+        case mongo::String:
         case Symbol:
             s << '"' << escape( valuestr() ) << '"';
             break;
@@ -222,7 +222,7 @@ namespace mongo {
                 massert( 10311 ,  message.c_str(), false );
             }
             break;
-        case Bool:
+        case mongo::Bool:
             s << ( boolean() ? "true" : "false" );
             break;
         case jstNULL:
@@ -297,7 +297,7 @@ namespace mongo {
             s << "\" }";
             break;
         }
-        case Date:
+        case mongo::Date:
             if ( format == Strict )
                 s << "{ \"$date\" : ";
             else
@@ -366,14 +366,14 @@ namespace mongo {
         case MaxKey:
         case MinKey:
             break;
-        case Bool:
+        case mongo::Bool:
             x = 1;
             break;
         case NumberInt:
             x = 4;
             break;
         case Timestamp:
-        case Date:
+        case mongo::Date:
         case NumberDouble:
         case NumberLong:
             x = 8;
@@ -383,7 +383,7 @@ namespace mongo {
             break;
         case Symbol:
         case Code:
-        case String:
+        case mongo::String:
             massert( 10313 ,  "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3 );
             x = valuestrsize() + 4;
             break;
@@ -601,7 +601,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case Symbol:
-        case String: {
+        case mongo::String: {
             int x = valuestrsize();
             if ( x > 0 && valuestr()[x-1] == 0 )
                 return;

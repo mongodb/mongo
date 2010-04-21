@@ -21,10 +21,21 @@
 namespace mongo {
 
     struct HealthOptions { 
+        HealthOptions() { 
+            heartbeatSleepMillis = 2000;
+            heartbeatTimeoutMillis = 10;
+            connRetries = 3;
+        }
+
         // see http://www.mongodb.org/display/DOCS/Replica+Set+Internals
         unsigned heartbeatSleepMillis;
         unsigned heartbeatTimeoutMillis;
         unsigned connRetries;
+
+        void check() {
+            uassert(13112, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
+            uassert(13113, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
+        }
     };
 
 }

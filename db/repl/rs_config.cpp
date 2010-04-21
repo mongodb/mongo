@@ -23,17 +23,53 @@
 
 namespace mongo { 
 
-/* try to refresh */
-void ReplSetConfig::reload(const HostAndPort& h) {
+ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
     DBClientConnection conn(false, 0, 20);
     conn._logLevel = 2;
     string err;
     conn.connect(h.toString());
-    auto_ptr<DBClientCursor> c = conn.query("admin.system.replset");
+    auto_ptr<DBClientCursor> c = conn.query("admin.replset");
+    set<string> hosts;
+    int n = 0;
     while( c->more() ) { 
-        c->nextSafe();
+        n++;
+        BSONObj o = c->nextSafe();
+
+        _id = o.getStringField("_id");
+        version = o.getIntField("version");
+        uassert(13115, "bad admin.replset config: version", version > 0);
+
+        BSONObj settings = o.getObjectField("settings");
+        if( !settings.isEmpty() ) {
+            if( settings.hasField("connRetries") )
+                healthOptions.connRetries = settings.getIntField("connRetries");
+            if( settings.hasField("heartbeatSleep") )
+                healthOptions.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].number() * 1000);
+            if( settings.hasField("heartbeatTimeout" ) )
+                healthOptions.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].number() * 1000);
+            healthOptions.check();
+        }
+
+        BSONObjIterator i(o.getObjectField("members"));
+        while( i.more() ) {
+            BSONObj memb = i.next().embeddedObject();
+            Member m;
+            string s = memb.getStringField("host");
+            try {
+                m.h = HostAndPort::fromString(s);
+                m.arbiterOnly = memb.getBoolField("arbiterOnly");
+                m.priority = memb.hasField("priority") ? memb["priority"].number() : 1.0;
+            }
+            catch(...) { 
+                uassert(13107, "bad admin.replset config", false);
+            }
+            uassert(13108, "bad admin.replset config", hosts.count(m.h.toString()) == 0);
+            hosts.insert(m.h.toString());
+        }
     }
+    uassert(13117, "bad admin.replset config", n != 1 || !_id.empty());
 }
+
 
 }
 

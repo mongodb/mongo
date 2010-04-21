@@ -28,7 +28,7 @@ namespace mongo {
 /* 
 http://www.mongodb.org/display/DOCS/Replica+Set+Internals#ReplicaSetInternals-Configuration
 
-admin.system.replset
+admin.replset
 
 This collection has one object per server in the set.  The objects have the form:
 
@@ -36,6 +36,7 @@ This collection has one object per server in the set.  The objects have the form
    [, priority: <priority>]
    [, arbiterOnly : true]
  }
+
 Additionally an object in this collection holds global configuration settings for the set:
 
  { _id : <logical_set_name>, settings:
@@ -54,14 +55,17 @@ public:
         double priority;  /* 0 means can never be primary */
         bool arbiterOnly;
     };
-    struct Cfg {
-        string set;
-        HealthOptions healthOptions;
-        /* TODO getLastErrorDefaults */
-    };
+
+    bool ok() const { return !_id.empty(); }
+
+    string _id;
+    int version;
+    HealthOptions healthOptions;
+    vector<Member> members;
+    /* TODO getLastErrorDefaults */
 
     /* can throw exception */
-    void reload(const HostAndPort& h);
+    ReplSetConfig(const HostAndPort& h);
 };
 
 }
