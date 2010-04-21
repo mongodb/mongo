@@ -604,10 +604,22 @@ namespace mongo {
                     ss << host << ":" << CmdLine::ShardServerPort;
                     host = ss.str();
                 }
+                
+                string name = "";
+                if ( cmdObj["name"].type() == String )
+                    name = cmdObj["name"].valuestrsafe();
+                
+                if ( name.size() == 0 ){
+                    stringstream ss;
+                    ss << "shard";
+                    ss << conn->count( "config.shards" );
+                    name = ss.str();
+                }
 
                 BSONObj shard;
                 {
                     BSONObjBuilder b;
+                    b.append( "_id" , name );
                     b.append( "host" , host );
                     if ( cmdObj["maxSize"].isNumber() )
                         b.append( cmdObj["maxSize"] );
@@ -620,7 +632,7 @@ namespace mongo {
                     conn.done();
                     return false;
                 }
-
+                
                 try {
                     ShardConnection newShardConn( host );
                     newShardConn->getLastError();
@@ -634,15 +646,19 @@ namespace mongo {
                     return false;
                 }
                 
-                
-
+                log() << "going to add shard: " << shard << endl;
                 conn->insert( "config.shards" , shard );
+                errmsg = conn->getLastError();
+                if ( errmsg.size() ){
+                    log() << "error adding shard: " << shard << " err: " << errmsg << endl;
+                    return false;
+                }
                 result.append( "added" , shard["host"].valuestrsafe() );
                 conn.done();
                 return true;
             }
         } addServer;
-
+        
         class RemoveShardCmd : public GridAdminCmd {
         public:
             RemoveShardCmd() : GridAdminCmd("removeshard") { }
