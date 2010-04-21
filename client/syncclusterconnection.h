@@ -47,6 +47,8 @@ namespace mongo {
 
         // --- from DBClientInterface
 
+        virtual BSONObj findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions);
+
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
 
@@ -85,7 +87,7 @@ namespace mongo {
         auto_ptr<DBClientCursor> _queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
                                                 const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
         
-        bool _isReadOnly( const string& name );
+        int _lockType( const string& name );
 
         void _checkLast();
         
@@ -93,7 +95,9 @@ namespace mongo {
 
         string _address;
         vector<DBClientConnection*> _conns;
+        
         map<string,int> _lockTypes;
+        mongo::mutex _mutex;
     };
     
 

@@ -126,26 +126,50 @@ namespace mongo {
         _conns.push_back( c );
     }
 
+    BSONObj SyncClusterConnection::findOne(const string &ns, Query query, const BSONObj *fieldsToReturn, int queryOptions) {
+        
+        if ( ns.find( ".$cmd" ) != string::npos ){
+            string cmdName = query.obj.firstElement().fieldName();
+
+            int lockType = _lockType( cmdName );
+
+            if ( lockType > 0 ){ // write $cmd
+                string errmsg;
+                if ( ! prepare( errmsg ) )
+                    throw UserException( 13104 , (string)"SyncClusterConnection::insert prepare failed: " + errmsg );
+                
+                vector<BSONObj> all;
+                for ( size_t i=0; i<_conns.size(); i++ ){
+                    all.push_back( _conns[i]->findOne( ns , query , 0 , queryOptions ).getOwned() );
+                }
+                
+                _checkLast();
+                
+                for ( size_t i=0; i<all.size(); i++ ){
+                    BSONObj temp = all[i];
+                    if ( isOk( temp ) )
+                        continue;
+                    stringstream ss;
+                    ss << "write $cmd failed on a shard: " << temp.jsonString();
+                    ss << " " << _conns[i]->toString();
+                    throw UserException( 13105 , ss.str() );
+                }
+                
+                return all[0];
+            }
+        }
+
+        return DBClientBase::findOne( ns , query , fieldsToReturn , queryOptions );
+    }
+
+
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
                                                           const BSONObj *fieldsToReturn, int queryOptions, int batchSize ){ 
 
         if ( ns.find( ".$cmd" ) != string::npos ){
             string cmdName = query.obj.firstElement().fieldName();
-
-            int lockType = 0;
-            
-            map<string,int>::iterator i = _lockTypes.find( cmdName );
-            if ( i == _lockTypes.end() ){
-                BSONObj info;
-                uassert( 13053 , "help failed" , _commandOnActive( "admin" , BSON( cmdName << "1" << "help" << 1 ) , info ) );
-                lockType = info["lockType"].numberInt();
-                _lockTypes[cmdName] = lockType;
-            }
-            else {
-                lockType = i->second;
-            }
-            
-            uassert( 13054 , (string)"write $cmd not supported in SyncClusterConnection: " + cmdName , lockType <= 0 );
+            int lockType = _lockType( cmdName );
+            uassert( 13054 , (string)"write $cmd not supported in SyncClusterConnection::query for:" + cmdName , lockType <= 0 );
         }
 
         return _queryOnActive( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
@@ -251,5 +275,22 @@ namespace mongo {
         assert(0);
     }
 
+    int SyncClusterConnection::_lockType( const string& name ){
+        {
+            scoped_lock lk(_mutex);
+            map<string,int>::iterator i = _lockTypes.find( name );
+            if ( i != _lockTypes.end() )
+                return i->second;
+        }
+        
+        BSONObj info;
+        uassert( 13053 , "help failed" , _commandOnActive( "admin" , BSON( name << "1" << "help" << 1 ) , info ) );
+
+        int lockType = info["lockType"].numberInt();
+
+        scoped_lock lk(_mutex);
+        _lockTypes[name] = lockType;
+        return lockType;
+    }
 
 }
