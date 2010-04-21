@@ -34,8 +34,8 @@ ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
     uassert(13109, "multiple rows in admin.replset not supported", !c->more());
 
     { 
-        _id = o.getStringField("_id");
-        version = o.getIntField("version");
+        _id = o["_id"].String();
+        version = o["version"].numberInt();
         uassert(13115, "bad admin.replset config: version", version > 0);
 
         BSONObj settings = o.getObjectField("settings");
