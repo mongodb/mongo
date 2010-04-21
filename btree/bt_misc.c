@@ -91,33 +91,6 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 }
 
 /*
- * __wt_bt_leaf_first --
- *	Walk the tree and return the first leaf page.
- */
-int
-__wt_bt_leaf_first(
-    WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
-{
-	WT_PAGE *page;
-
-	for (;;) {
-		WT_RET(__wt_bt_page_in(toc, addr, size, 0, &page));
-		switch (page->hdr->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_DUP_INT:
-		case WT_PAGE_ROW_INT:
-			__wt_bt_off_first(page, &addr, &size);
-			break;
-		default:
-			*pagep = page;
-			return (0);
-		}
-		__wt_bt_page_out(toc, &page, 0);
-	}
-	/* NOTREACHED */
-}
-
-/*
  * __wt_bt_off_first --
  *	In a couple of places in the code, we're trying to walk down the
  *	internal pages from the root, and we need to get the WT_OFF
