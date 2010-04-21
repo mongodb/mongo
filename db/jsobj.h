@@ -36,18 +36,18 @@
 
 namespace mongo {
 
-    class BSONObj;
-    class BSONElement;
-    class Record;
-    class BSONObjBuilder;
     class BSONArrayBuilder;
+    class BSONElement;
+    class BSONObj;
+    class BSONObjBuilder;
     class BSONObjBuilderValueStream;
     class BSONObjIterator;
+    class Ordering;
+    class Record;
     struct BSONArray; // empty subclass of BSONObj useful for overloading
 
     extern BSONObj maxKey;
     extern BSONObj minKey;
-
 }
 
 #include "../bson/bsontypes.h"
@@ -65,8 +65,6 @@ namespace mongo {
     };
     
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
-    
-    class Ordering;
 
     /**
 	   C++ representation of a "BSON" object -- that is, an extended JSON-style 
