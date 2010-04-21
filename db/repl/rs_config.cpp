@@ -31,7 +31,10 @@ ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
     auto_ptr<DBClientCursor> c = conn.query("admin.replset");
     set<string> hosts;
     int n = 0;
-    while( c->more() ) { 
+    BSONObj o = c->nextSafe();
+    uassert(13109, "multiple rows in admin.replset not supported", !c->more());
+
+    { 
         n++;
         BSONObj o = c->nextSafe();
 
