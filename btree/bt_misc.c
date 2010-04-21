@@ -207,7 +207,7 @@ __wt_bt_item_type(WT_ITEM *item)
 	case WT_ITEM_KEY_OVFL:
 		return ("key-overflow");
 	case WT_ITEM_OFF:
-		return ("offpage tree");
+		return ("off-page");
 	default:
 		break;
 	}
