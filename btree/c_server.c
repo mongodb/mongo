@@ -683,11 +683,14 @@ __wt_drain_chk(ENV *env)
 			__wt_abort(env);
 			break;
 		case WT_OK:
-			if (e->addr != e->page->addr) {
-				__wt_api_env_errx(env, "e->addr != page->addr");
-				__wt_abort(env);
-			}
-			break;
+			if (e->addr == e->page->addr)
+				break;
+			__wt_api_env_errx(env,
+			    "element %#lx: e->addr != page->addr (%lu != %lu)",
+			    WT_PTR_TO_ULONG(e),
+			    (u_long)e->addr, (u_long)e->page->addr);
+			__wt_abort(env);
+			/* NOTREACHED */
 		}
 }
 #endif
