@@ -291,10 +291,10 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_MEMORY_FLUSH;
 	empty->state = WT_OK;
 
-	WT_VERBOSE(env, WT_VERB_CACHE,
-	    (env, "cache I/O server %s element/page %#lx/%lu",
+	WT_VERBOSE(env, WT_VERB_CACHE, (env,
+	    "cache I/O server %s element/page %#llx/%lu",
 	    newpage ? "allocated" : "read",
-	    WT_PTR_TO_ULONG(empty), (u_long)addr));
+	    WT_PTR_TO_UQUAD(empty), (u_long)addr));
 
 	/* Return the page to the caller. */
 	*rr->pagep = page;

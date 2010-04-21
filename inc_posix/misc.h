@@ -29,7 +29,7 @@ extern "C" {
  * Convert a pointer to an unsigned long so we can print it without compiler
  * complaint.
  */
-#define	WT_PTR_TO_ULONG(p)	((u_long)(uintptr_t)(p))
+#define	WT_PTR_TO_UQUAD(p)	((u_quad)(uintptr_t)(p))
 
 /* Flag check for API functions. */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\

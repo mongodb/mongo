@@ -261,7 +261,7 @@ __wt_mtrack(ENV *env, const void *f, const void *a, const char *file, int line)
 			} while (mp > mtrack->list);
 
 		__wt_api_env_errx(env,
-		    "mtrack: %#lx: not found", WT_PTR_TO_ULONG(f));
+		    "mtrack: %#llx: not found", WT_PTR_TO_UQUAD(f));
 	}
 
 	if (a == NULL)
@@ -338,7 +338,7 @@ __wt_mtrack_dump(ENV *env)
 	for (mp = mtrack->list; mp < mtrack->next; ++mp)
 		if (mp->addr != NULL)
 			__wt_api_env_errx(env,
-			    "mtrack: %#lx {%s/%d}: never freed",
-			        WT_PTR_TO_ULONG(mp->addr), mp->file, mp->line);
+			    "mtrack: %#llx {%s/%d}: never freed",
+			        WT_PTR_TO_UQUAD(mp->addr), mp->file, mp->line);
 }
 #endif

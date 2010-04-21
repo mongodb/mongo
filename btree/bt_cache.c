@@ -177,8 +177,8 @@ __wt_cache_dump(ENV *env)
 		case WT_OK:
 		case WT_DRAIN:
 			__wt_msg(env,
-			    "\t%#lx {addr/size: %lu: %lu, state: %s}",
-			    WT_PTR_TO_ULONG(e->page),
+			    "\t%#llx {addr/size: %lu: %lu, state: %s}",
+			    WT_PTR_TO_UQUAD(e->page),
 			    (u_long)e->addr, (u_long)e->page->size,
 			    e->state == WT_OK ? "OK" : "cache-drain");
 			break;

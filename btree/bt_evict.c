@@ -466,8 +466,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 		page = e->page;
 		if (e->write_gen != page->write_gen) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache drain server writing element/page %#lx/%lu",
-			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
+			    "cache drain server writing element/page %#llx/%lu",
+			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
 
 			e->write_gen = page->write_gen;
 			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
@@ -481,8 +481,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 		} else {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server discarding element/page "
-			    "%#lx/%#lu",
-			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
+			    "%#llx/%#lu",
+			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
 
 			WT_STAT_INCR(stats, CACHE_EVICT);
 		}
@@ -583,8 +583,8 @@ __wt_drain_hazchk(ENV *env)
 		if (*hazard == page) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache drain server skipping hazard referenced "
-			    "element/page %#lx/%lu",
-			    WT_PTR_TO_ULONG(e), (u_long)e->addr));
+			    "element/page %#llx/%lu",
+			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
 			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 
 			e->state = WT_OK;
@@ -686,8 +686,8 @@ __wt_drain_chk(ENV *env)
 			if (e->addr == e->page->addr)
 				break;
 			__wt_api_env_errx(env,
-			    "element %#lx: e->addr != page->addr (%lu != %lu)",
-			    WT_PTR_TO_ULONG(e),
+			    "element %#llx: e->addr != page->addr (%lu != %lu)",
+			    WT_PTR_TO_UQUAD(e),
 			    (u_long)e->addr, (u_long)e->page->addr);
 			__wt_abort(env);
 			/* NOTREACHED */
