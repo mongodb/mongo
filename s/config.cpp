@@ -30,8 +30,12 @@
 
 namespace mongo {
 
-    int ConfigServer::VERSION = 2;
+    int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
+
+    string ShardNS::database = "config.databases";
+    string ShardNS::chunk = "config.chunks";
+    string ShardNS::shard = "config.shards";
 
     /* --- DBConfig --- */
 
@@ -112,7 +116,7 @@ namespace mongo {
     }
 
     void DBConfig::serialize(BSONObjBuilder& to){
-        to.append("name", _name);
+        to.append("_id", _name);
         to.appendBool("partitioned", _shardingEnabled );
         to.append("primary", _primary );
         
@@ -129,7 +133,7 @@ namespace mongo {
     }
     
     void DBConfig::unserialize(const BSONObj& from){
-        _name = from.getStringField("name");
+        _name = from.getStringField("_id");
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
 
         _shardingEnabled = from.getBoolField("partitioned");
@@ -163,7 +167,7 @@ namespace mongo {
     
     bool DBConfig::doload(){
         BSONObjBuilder b;
-        b.append("name", _name.c_str());
+        b.append("_id", _name.c_str());
         BSONObj q = b.done();
         return load(q);
     }
@@ -441,7 +445,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count( "config.shard" ) || conn.count( "config.databases" ) ){
+            if ( conn.count( ShardNS::shard ) || conn.count( ShardNS::database ) ){
                 version = 1;
             }
         }
@@ -449,7 +453,7 @@ namespace mongo {
         return version;
     }
     
-    int ConfigServer::checkConfigVersion(){
+    int ConfigServer::checkConfigVersion( bool upgrade ){
         int cur = dbConfigVersion();
         if ( cur == VERSION )
             return 0;
@@ -462,7 +466,111 @@ namespace mongo {
             conn.done();
             return 0;
         }
+        
+        if ( cur == 2 ){
 
+            // need to upgrade
+            assert( VERSION == 3 );
+            if ( ! upgrade ){
+                log() << "newer version of mongo meta data\n"
+                      << "need to --upgrade after shutting all mongos down"
+                      << endl;
+                return -9;
+            }
+            
+            ShardConnection conn( _primary );
+            
+            // do a backup
+            string backupName;
+            {
+                stringstream ss;
+                ss << "config-backup-" << terseCurrentTime();
+                backupName = ss.str();
+            }
+            log() << "backing up config to: " << backupName << endl;
+            conn->copyDatabase( "config" , backupName );
+
+            map<string,string> hostToShard;            
+            set<string> shards;
+            // shards
+            {
+                unsigned n = 0;
+                auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , BSONObj() );
+                while ( c->more() ){
+                    BSONObj o = c->next();
+                    string host = o["host"].String();
+
+                    string name = "";
+                    
+                    BSONElement id = o["_id"];
+                    if ( id.type() == String ){
+                        name = id.String();
+                    }
+                    else {
+                        stringstream ss;
+                        ss << "shard" << hostToShard.size();
+                        name = ss.str();
+                    }
+                    
+                    hostToShard[host] = name;
+                    shards.insert( name );
+                    n++;
+                }
+                
+                assert( n == hostToShard.size() );
+                assert( n == shards.size() );
+                
+                conn->remove( ShardNS::shard , BSONObj() );
+                
+                for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ){
+                    conn->insert( ShardNS::shard , BSON( "_id" << i->second << "host" << i->first ) );
+                }
+            }
+
+            // databases
+            {
+                auto_ptr<DBClientCursor> c = conn->query( ShardNS::database , BSONObj() );
+                map<string,BSONObj> newDBs;
+                unsigned n = 0;
+                while ( c->more() ){
+                    BSONObj old = c->next();
+
+                    BSONObjBuilder b(old.objsize());
+                    b.appendAs( old["name"] , "_id" );
+                    
+                    BSONObjIterator i(old);
+                    while ( i.more() ){
+                        BSONElement e = i.next();
+                        if ( strcmp( "_id" , e.fieldName() ) == 0 ||
+                             strcmp( "name" , e.fieldName() ) == 0 ){
+                            continue;
+                        }
+                        
+                        b.append( e );
+                    }
+
+                    BSONObj x = b.obj();
+                    cout << old << "\n\t" << x << endl;
+                    newDBs[old["name"].String()] = x;
+                    n++;
+                }
+
+                assert( n == newDBs.size() );
+                
+                conn->remove( ShardNS::database , BSONObj() );
+                
+                for ( map<string,BSONObj>::iterator i=newDBs.begin(); i!=newDBs.end(); i++ ){
+                    conn->insert( ShardNS::database , i->second );
+                }
+                
+            }
+
+            conn->update( "config.version" , BSONObj() , BSON( "_id" << 1 << "version" << VERSION ) );
+            conn.done();
+            pool.flush();
+            return 1;
+        }
+        
         log() << "don't know how to upgrade " << cur << " to " << VERSION << endl;
         return -8;
     }
@@ -521,18 +629,7 @@ namespace mongo {
         }
      
         stringstream id;
-        id << ourHostname << "-";
-        {
-            struct tm t;
-            time_t_to_Struct( time(0) , &t );
-            id << ( 1900 + t.tm_year ) << "-"
-               << t.tm_mon << "-"
-               << t.tm_mday << "-"
-               << t.tm_hour << "-"
-               << t.tm_min << "-"
-                ;
-        }
-        id << num++;
+        id << ourHostname << "-" << terseCurrentTime() << "-" << num++;
 
         conn->insert( "config.changelog" , BSON( "_id" << id.str() << 
                                                  "server" << ourHostname <<
@@ -568,7 +665,7 @@ namespace mongo {
 
         void a(){
             BSONObjBuilder b;
-            b << "name" << "abc";
+            b << "_id" << "abc";
             b.appendBool( "partitioned" , true );
             b << "primary" << "myserver";
             
@@ -578,7 +675,7 @@ namespace mongo {
 
         void b(){
             BSONObjBuilder b;
-            b << "name" << "abc";
+            b << "_id" << "abc";
             b.appendBool( "partitioned" , true );
             b << "primary" << "myserver";
             

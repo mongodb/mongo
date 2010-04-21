@@ -30,6 +30,13 @@
 #include "shard.h"
 
 namespace mongo {
+
+    struct ShardNS {
+        static string database;
+        static string shard;
+        static string chunk;
+    };
+
     
     class Grid;
     class ConfigServer;
@@ -186,7 +193,7 @@ namespace mongo {
         /**
          * @return 0 = ok, otherwise error #
          */
-        int checkConfigVersion();
+        int checkConfigVersion( bool upgrade );
         
         /**
          * log a change to config.changes 

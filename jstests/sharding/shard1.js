@@ -18,7 +18,7 @@ s.adminCommand( { enablesharding : "test" } );
 assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );
-dbconfig = s.config.databases.findOne( { name : "test" } );
+dbconfig = s.config.databases.findOne( { _id : "test" } );
 assert.eq( dbconfig.sharded["test.foo"] , { key : { num : 1 } , unique : false } , "Sharded content" );
 
 assert.eq( 1 , s.config.chunks.count() );

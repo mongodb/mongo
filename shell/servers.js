@@ -181,7 +181,11 @@ ShardingTest.prototype.getDB = function( name ){
 }
 
 ShardingTest.prototype.getServerName = function( dbname ){
-    return this.config.databases.findOne( { name : dbname } ).primary;
+    var x = this.config.databases.findOne( { _id : dbname } );
+    if ( x )
+        return x.primary;
+    this.config.databases.find().forEach( printjson );
+    throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
 }
 
 ShardingTest.prototype.getServer = function( dbname ){

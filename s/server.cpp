@@ -146,8 +146,9 @@ int main(int argc, char* argv[], char *envp[] ) {
     options.add_options()
         ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
         ( "test" , "just run unit tests" )
+        ( "upgrade" , "upgrade meta data version" )
         ;
-
+    
 
     // parse options
     po::variables_map params;
@@ -222,9 +223,14 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 8;
     }
     
-    int configError = configServer.checkConfigVersion();
+    int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
     if ( configError ){
-        cout << "config server error: " << configError << endl;
+        if ( configError > 0 ){
+            cout << "upgrade success!" << endl;
+        }
+        else {
+            cout << "config server error: " << configError << endl;
+        }
         return configError;
     }
     configServer.reloadSettings();
