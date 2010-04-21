@@ -24,6 +24,7 @@
 namespace mongo { 
 
     void ReplSetConfig::from(BSONObj o) {
+        md5 = o.md5();
         _id = o["_id"].String();
         version = o["version"].numberInt();
         uassert(13115, "bad admin.replset config: version", version > 0);
@@ -60,12 +61,19 @@ namespace mongo {
         uassert(13117, "bad admin.replset config", !_id.empty());
     }
 
+    static inline void configAssert(bool expr) {
+        uassert(13122, "bad admin.replset config", expr);
+    }
+
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        log(2) << "load ReplSetConfig " << h.toString() << endl;
+
         DBClientConnection conn(false, 0, 20);
         conn._logLevel = 2;
         string err;
         conn.connect(h.toString());
         auto_ptr<DBClientCursor> c = conn.query("admin.replset");
+        configAssert(c->more());
         BSONObj o = c->nextSafe();
         uassert(13109, "multiple rows in admin.replset not supported", !c->more());
         from(o);

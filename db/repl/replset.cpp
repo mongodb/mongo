@@ -16,15 +16,16 @@
 
 #include "stdafx.h"
 #include "../cmdline.h"
-#include "replset.h"
 #include "../../util/sock.h"
+#include "replset.h"
+#include "rs_config.h"
 
 namespace mongo { 
 
     ReplSet *theReplSet = 0;
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) {
+    ReplSet::ReplSet(string cfgString) : fatal(false) {
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
@@ -60,13 +61,30 @@ namespace mongo {
         }
 
         _seeds = seeds;
-        for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
-            addMemberIfMissing(*i);
+        //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
+        //    addMemberIfMissing(*i);
+
+        loadConfig();
 
         startHealthThreads();
     }
 
-    void ReplSet::addMemberIfMissing(const HostAndPort& h) { 
+    void ReplSet::loadConfig() {
+        try {
+            vector<ReplSetConfig> configs;
+            configs.push_back( ReplSetConfig(HostAndPort::me()) );
+            for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ )
+                configs.push_back( ReplSetConfig(*i) );
+        }
+        catch(AssertionException&) { 
+            log() << "replSet: error loading configurations. admin.replset may be misconfigured\n";
+            log() << "replSet: replication will not start" << endl;
+            fatal = true;
+            throw;
+        }
+    }
+
+    /*void ReplSet::addMemberIfMissing(const HostAndPort& h) { 
         MemberInfo *m = _members.head();
         while( m ) {
             if( h.host() == m->host && h.port() == m->port )
@@ -75,15 +93,22 @@ namespace mongo {
         }
         MemberInfo *nm = new MemberInfo(h.host(), h.port());
         _members.push(nm);
-    }
+    }*/
 
     /* called at initialization */
-    bool startReplSets() {
-        assert( theReplSet == 0 );
-        if( cmdLine.replSet.empty() )
-            return false;
-        theReplSet = new ReplSet(cmdLine.replSet);
-        return false; 
+    void startReplSets() {
+        mongo::lastError.reset( new LastError() );
+        try { 
+            assert( theReplSet == 0 );
+            if( cmdLine.replSet.empty() )
+                return;
+            theReplSet = new ReplSet(cmdLine.replSet);
+        }
+        catch(...) { 
+            log() << "Caught exception in repl set management thread" << endl;
+            if( theReplSet ) 
+                theReplSet->fatal = true;
+        }
     }
 
 }

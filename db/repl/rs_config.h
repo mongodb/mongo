@@ -50,10 +50,12 @@ Additionally an object in this collection holds global configuration settings fo
 
 class ReplSetConfig {
 public:
-    /* can throw exception */
+    /* if something is misconfigured, throws an exception. 
+       if couldn't be queried or is just blank, ok() will be false.
+       */
     ReplSetConfig(const HostAndPort& h);
 
-    bool ok() const { return !_id.empty(); }
+    bool ok() const { return _ok; }
 
     struct Member {
         HostAndPort h;
@@ -64,10 +66,12 @@ public:
     string _id;
     int version;
     HealthOptions healthOptions;
+    string md5;
 
-    /* TODO: adde getLastErrorDefaults */
+    /* TODO: add getLastErrorDefaults */
 
 private:
+    bool _ok;
     void from(BSONObj);
 };
 

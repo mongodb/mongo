@@ -70,6 +70,7 @@ namespace mongo {
 
     void setupSignals();
     void closeAllSockets();
+    void startReplSets();
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
     void setRecCacheSize(unsigned MB);
@@ -553,6 +554,10 @@ namespace mongo {
 
         snapshotThread.go();
         clientCursorMonitor.go();
+
+        if( !cmdLine.replSet.empty() )
+            boost::thread t(startReplSets);
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -1151,4 +1156,3 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 
 #include "recstore.h"
 #include "reccache.h"
-

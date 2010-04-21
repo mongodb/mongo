@@ -29,6 +29,10 @@ namespace mongo {
 
         HostAndPort(string h, int p = -1) : _host(h), _port(p) { }
 
+        static HostAndPort me() { 
+            return HostAndPort("localhost", cmdLine.port);
+        }
+
         static HostAndPort fromString(string s) {
             const char *p = s.c_str();
             uassert(13110, "HostAndPort: bad config string", *p);
