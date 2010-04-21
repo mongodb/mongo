@@ -32,6 +32,9 @@ namespace mongo {
     */
     class ReplSet {
     public:
+        void fillIsMaster(BSONObjBuilder&);
+
+        static string startupStatusMsg;
         bool fatal;
 
         bool ok() const { return !fatal; }

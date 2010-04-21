@@ -46,6 +46,7 @@
 #include "security.h"
 #include "cmdline.h"
 #include "repl_block.h"
+#include "repl/replset.h"
 
 namespace mongo {
     
@@ -271,7 +272,7 @@ namespace mongo {
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
         if ( replAllDead ) {
-            result.append("ismaster", 0.0);
+            result.append("ismaster", 0);
             if( authed ) { 
                 if ( replPair )
                     result.append("remote", replPair->remote);
@@ -350,6 +351,17 @@ namespace mongo {
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
 			   one is not authenticated for admin db to be safe.
 			*/
+
+            if( !cmdLine.replSet.empty() ) {
+                if( theReplSet == 0 ) { 
+                    result.append("ismaster", 0);
+                    result.append("ok", false);
+                    result.append("msg", "still initializing");
+                    return true;
+                }
+                theReplSet->fillIsMaster(result);
+                return true;
+            }
             
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
             appendReplicationInfo( result , authed );

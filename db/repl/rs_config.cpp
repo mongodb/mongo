@@ -66,17 +66,31 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
-        log(2) << "load ReplSetConfig " << h.toString() << endl;
+        int level = 2;
+        DEV level = 0;
+        _ok = false;
+        log(0) << "replSet load config from: " << h.toString() << endl;
 
-        DBClientConnection conn(false, 0, 20);
-        conn._logLevel = 2;
-        string err;
-        conn.connect(h.toString());
-        auto_ptr<DBClientCursor> c = conn.query("admin.replset");
-        configAssert(c->more());
+        auto_ptr<DBClientCursor> c;
+        try {
+            DBClientConnection conn(false, 0, 20);
+            conn._logLevel = 2;
+            string err;
+            conn.connect(h.toString());
+            c = conn.query("admin.replset");
+            if( !c->more() )
+                return;
+        }
+        catch( UserException& e) { 
+            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << endl;
+            return;
+        }
+
         BSONObj o = c->nextSafe();
         uassert(13109, "multiple rows in admin.replset not supported", !c->more());
         from(o);
+        _ok = true;
+        log(level) << "replSet load ok" << endl;
     }
 
 }
