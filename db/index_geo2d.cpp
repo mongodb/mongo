@@ -1048,7 +1048,7 @@ namespace mongo {
                     _prefix = _prefix.up();
                     
                     double temp = _spec->distance( _prefix , _start );
-                    if ( ( temp * 5 ) > _maxDistance )
+                    if ( temp > ( _maxDistance * 2 ) )
                         break;
                 }
             }
