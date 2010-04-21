@@ -262,34 +262,55 @@ cb_bulk(DB *db, DBT **keyp, DBT **datap)
 
 	db = NULL;
 
-	/*
-	 * Generate a set of duplicates for each key if duplicates have been
-	 * configured.  The duplicate_pct configuration is a percentage, which
-	 * defines the number of keys that get duplicate data items, and the
-	 * number of duplicate data items for each such key is a random value
-	 * in-between 2 and the value of duplicate_cnt.
-	 */
-	if (key.size == 0 || g.c_duplicates_pct == 0 ||
-	    (u_int32_t)rand() % 100 > g.c_duplicates_pct) {
-		if (++g.key_cnt > g.c_total) {
-			g.key_cnt = g.c_total;
-			return (1);
-		}
-
-		key_gen(&key, g.key_cnt);
+	if (++g.key_cnt > g.c_total) {
+		g.key_cnt = g.c_total;
+		return (1);
 	}
-	data_gen(&data);
 
-	switch (g.c_database_type) {
-	case FIX:
-	case VAR:
-		*keyp = NULL;
+	if (g.replay) {
+		switch (g.c_database_type) {
+		case FIX:
+		case VAR:
+			*keyp = NULL;
+			break;
+		case ROW:
+			replay(&g.b1, &g.b1_size, &g.b1_len);
+			key.data = g.b1;
+			key.size = g.b1_size;
+			*keyp = &key;
+			break;
+		}
+		replay(&g.b2, &g.b2_size, &g.b2_len);
+		data.data = g.b2;
+		data.size = g.b2_size;
 		*datap = &data;
-		break;
-	case ROW:
-		*keyp = &key;
+	} else {
+		/*
+		 * Generate a set of duplicates for each key if duplicates have
+		 * been configured.  The duplicate_pct configuration is a
+		 * percentage, which defines the number of keys that get
+		 * duplicate data items, and the number of duplicate data items
+		 * for each such key is a random value in-between 2 and the
+		 * value of duplicate_cnt.
+		 */
+		if (g.key_cnt == 1 || g.c_duplicates_pct == 0 ||
+		    (u_int32_t)rand() % 100 > g.c_duplicates_pct)
+			key_gen(&key, g.key_cnt);
+		data_gen(&data);
+
+		switch (g.c_database_type) {
+		case FIX:
+		case VAR:
+			*keyp = NULL;
+			break;
+		case ROW:
+			*keyp = &key;
+			fprintf(g.op_log,
+			    "%.*s\n", (int)key.size, (char *)key.data);
+			break;
+		}
 		*datap = &data;
-		break;
+		fprintf(g.op_log, "%.*s\n", (int)data.size, (char *)data.data);
 	}
 
 	/* Insert the item into BDB. */

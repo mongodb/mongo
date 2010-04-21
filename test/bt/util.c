@@ -26,7 +26,7 @@ key_gen(DBT *key, u_int64_t keyno)
 {
 	static size_t blen;
 	static char *buf;
-	size_t i, len, klen;
+	size_t i;
 
 	/*
 	 * The key is a variable length item with a leading 10-digit value.
@@ -49,7 +49,7 @@ key_gen(DBT *key, u_int64_t keyno)
 		if ((buf = malloc(blen)) == NULL) {
 			fprintf(stderr,
 			    "%s: %s\n", g.progname, strerror(errno));
-			exit (EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 		for (i = 0; i < blen; ++i)
 			buf[i] = 'a' + i % 26;
@@ -90,7 +90,7 @@ data_gen(DBT *data)
 		if ((buf = malloc(blen)) == NULL) {
 			fprintf(stderr,
 			    "%s: %s\n", g.progname, strerror(errno));
-			exit (EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 		for (i = 0; i < blen; ++i)
 			buf[i] = 'A' + i % 26;
@@ -122,6 +122,32 @@ data_gen(DBT *data)
 
 	data->data = p;
 	data->size = len;
+}
+
+void
+replay(u_int8_t **bufp, size_t *sizep, size_t *lenp)
+{
+	static u_int8_t buf[6 * 1024];
+	size_t len;
+
+	if (fgets(buf, sizeof(buf), g.op_log) == NULL) {
+		if (feof(g.op_log)) {
+			printf("end of replay log reached, exiting\n");
+			exit(EXIT_SUCCESS);
+		}
+		fprintf(stderr, ": %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	len = strlen(buf);
+	buf[--len] = '\0';
+
+	if (len > *lenp && (*bufp = realloc(*bufp, len + 10)) == NULL) {
+		fprintf(stderr, "realloc: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	*lenp = len + 10;
+	*sizep = len;
+	memcpy(*bufp, buf, len);
 }
 
 void

@@ -49,10 +49,21 @@ typedef struct {
 	void *wts_toc;				/* WT WT_TOC handle */
 	FILE *wts_log;				/* WT log file stream */
 
+	FILE *op_log;				/* Operations log */
+
+	u_int8_t *b1;				/* Scratch buffers for replay */
+	size_t	  b1_size;
+	size_t	  b1_len;
+	u_int8_t *b2;
+	size_t	  b2_size;
+	size_t	  b2_len;
+
 	enum                                    /* Dumps */
 	    { DUMP_DEBUG=1, DUMP_PRINT=2 } dump;
 
 	u_int32_t run_cnt;			/* Run counter */
+
+	int replay;				/* Replaying a run. */
 
 	int stats;				/* Statistics */
 
@@ -96,6 +107,7 @@ void	 config_single(char *);
 void	 data_gen(DBT *);
 char	*fname(const char *, const char *);
 void	 key_gen(DBT *, u_int64_t);
+void	 replay(u_int8_t **, size_t *, size_t *);
 void	 track(const char *, u_int64_t);
 int	 wts_bulk_load(void);
 int	 wts_del(u_int64_t);

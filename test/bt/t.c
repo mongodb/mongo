@@ -34,7 +34,7 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	log = 0;
-	while ((ch = getopt(argc, argv, "1C:cd:lsv")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:cd:lrsv")) != EOF)
 		switch (ch) {
 		case '1':
 			g.c_runs = 1;
@@ -58,6 +58,10 @@ main(int argc, char *argv[])
 			}
 		case 'l':
 			log = 1;
+			break;
+		case 'r':
+			g.replay = 1;
+			g.c_runs = 1;
 			break;
 		case 's':
 			g.stats = 1;
@@ -95,8 +99,10 @@ main(int argc, char *argv[])
 		track("flushing & re-opening WT", 0);
 		wts_teardown();			/* Re-open the WT database */
 		wts_setup(1, log);
-						/* Scan through some records */
-		switch (g.c_database_type) {
+
+	/* XXX: can't get dups, don't have cursor ops yet. */
+	if (g.c_duplicates_pct == 0) {
+		switch (g.c_database_type) {	/* Scan through some records */
 		case ROW:
 			if (wts_read_row_scan())
 				goto err;
@@ -110,6 +116,7 @@ main(int argc, char *argv[])
 
 		if (wts_ops())			/* Random operations */
 			goto err;
+	}
 
 		if (g.stats && wts_stats())	/* Optional statistics */
 			goto err;
@@ -138,8 +145,8 @@ static void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: %s [-1clsv] [-C config] [-d debug | print] "
+	    "usage: %s [-1clrsv] [-C config] [-d debug | print] "
 	    "[name=value ...]\n",
 	    g.progname);
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }

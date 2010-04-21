@@ -35,9 +35,21 @@ void
 config(void)
 {
 	CONFIG *cp;
+	char *p;
 
 	/* Clean up from any previous runs. */
 	(void)system("rm -f __bdb* __wt*");
+
+	/* Open an operations log file. */
+	if (g.op_log != NULL) {
+		(void)fclose(g.op_log);
+		g.op_log = NULL;
+	}
+	p = fname(NULL, "ops");
+	if ((g.op_log = fopen(p, g.replay ? "r" : "w")) == NULL) {
+		fprintf(stderr, "%s: %s\n", p, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 
 	/* Pick a random number seed. */
 	cp = config_find("rand_seed");
@@ -84,7 +96,7 @@ config_dump(int logfile)
 		p = fname(WT_PREFIX, "run");
 		if ((fp = fopen(p, "w")) == NULL) {
 			fprintf(stderr, "%s: %s\n", p, strerror(errno));
-			exit (EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 	} else
 		fp = stdout;
@@ -125,7 +137,7 @@ config_file(char *fname)
 
 	if ((fp = fopen(fname, "r")) == NULL) {
 		fprintf(stderr, "%s: %s\n", fname, strerror(errno));
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		for (p = buf; *p != '\0'; ++p)
@@ -151,7 +163,7 @@ config_single(char *s)
 	if ((vp = strchr(s, '=')) == NULL) {
 		fprintf(stderr,
 		    "%s: %s: illegal command-line value\n", g.progname, s);
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 	*vp++ = '\0';
 
@@ -163,7 +175,7 @@ config_single(char *s)
 		    "%s: %s: value of %lu outside min/max values of %lu-%lu\n",
 		    g.progname, s,
 		    (u_long)*cp->v, (u_long)cp->min, (u_long)cp->max);
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -184,7 +196,7 @@ config_find(const char *s)
 	    "%s: %s: unknown configuration value; use the -c option to "
 	    "display available configuration values\n",
 	    g.progname, s);
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /*
