@@ -29,6 +29,20 @@ namespace mongo {
 
         HostAndPort(string h, int p = -1) : _host(h), _port(p) { }
 
+        static HostAndPort fromString(string s) {
+            const char *p = s.c_str();
+            uassert(13110, "HostAndPort: bad config string", *p);
+            const char *colon = strchr(p, ':');
+            HostAndPort m;
+            if( colon ) {
+                int port = atoi(colon+1);
+                uassert(13095, "HostAndPort: bad port #", port > 0);
+                return HostAndPort(string(p,colon-p),port);
+            }
+            // no port specified.
+            return HostAndPort(p, cmdLine.port);
+        }
+
         bool operator<(const HostAndPort& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
 
         /* returns true if the host/port combo identifies this process instance. */
