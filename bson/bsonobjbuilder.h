@@ -1,8 +1,8 @@
 /* bsonobjbuilder.h
 
    Classes in this file:
-     BSONObjBuilder
-     BSONArrayBuilder
+   BSONObjBuilder
+   BSONArrayBuilder
 */
 
 /*    Copyright 2009 10gen Inc.
@@ -26,7 +26,7 @@ namespace mongo {
 
     /** Utility for creating a BSONObj.
         See also the BSON( a << b << c ) macro.
-     */
+    */
     class BSONObjBuilder : boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
@@ -86,7 +86,7 @@ namespace mongo {
         }
         
         /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
-           style fields in it.
+            style fields in it.
         */
         void appendArray(const char *fieldName, BSONObj subObj) {
             b.append((char) Array);
@@ -212,7 +212,7 @@ namespace mongo {
         }
         /** Append a time_t date.
             @param dt a C-style 32 bit date value, that is
-                      the number of seconds since January 1, 1970, 00:00:00 GMT
+            the number of seconds since January 1, 1970, 00:00:00 GMT
         */
         void appendTimeT(const char *fieldName, time_t dt) {
             b.append((char) Date);
@@ -221,7 +221,7 @@ namespace mongo {
         }
         /** Append a date.  
             @param dt a Java-style 64 bit date value, that is 
-                      the number of milliseconds since January 1, 1970, 00:00:00 GMT
+            the number of milliseconds since January 1, 1970, 00:00:00 GMT
         */
         void appendDate(const char *fieldName, Date_t dt) {
             b.append((char) Date);
@@ -325,7 +325,7 @@ namespace mongo {
             @param fieldName name of the field
             @param len length of the binary data in bytes
             @param type type information for the data. @see BinDataType.  Use ByteArray if you 
-                   don't care about the type.
+            don't care about the type.
             @param data the byte array
         */
         void appendBinData( const char *fieldName, int len, BinDataType type, const char *data ) {
@@ -341,7 +341,7 @@ namespace mongo {
         
         /**
            @param len the length of data
-         */
+        */
         void appendBinDataArray( const char * fieldName , const char * data , int len ){
             b.append( (char) BinData );
             b.append( fieldName );
@@ -353,7 +353,7 @@ namespace mongo {
 
         /** Append to the BSON object a field of type CodeWScope.  This is a javascript code 
             fragment accompanied by some scope that goes with it.
-            */
+        */
         void appendCodeWScope( const char *fieldName, const char *code, const BSONObj &scope ) {
             b.append( (char) CodeWScope );
             b.append( fieldName );
@@ -378,7 +378,7 @@ namespace mongo {
         
         /**
            these are the min/max when comparing, not strict min/max elements for a given type
-         */
+        */
         void appendMinForType( const string& field , int type );
         void appendMaxForType( const string& field , int type );
 
@@ -392,12 +392,12 @@ namespace mongo {
         }
 
         /* Append an array of ints 
-        void appendArray( const char *fieldName, const vector< int >& vals ) {
-            BSONObjBuilder arrBuilder;
-            for ( unsigned i = 0; i < vals.size(); ++i )
-                arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
-            marshalArray( fieldName, arrBuilder.done() );
-        }*/
+           void appendArray( const char *fieldName, const vector< int >& vals ) {
+           BSONObjBuilder arrBuilder;
+           for ( unsigned i = 0; i < vals.size(); ++i )
+           arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
+           marshalArray( fieldName, arrBuilder.done() );
+           }*/
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
@@ -467,7 +467,7 @@ namespace mongo {
 
         // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )
         struct ForceExplicitString {
-        ForceExplicitString( const string &str ) : str_( str ) {}
+            ForceExplicitString( const string &str ) : str_( str ) {}
             string str_;
         };
 
