@@ -359,7 +359,7 @@ namespace mongo {
                         BSONObj cmdObj = b.obj();
                         bool ok = 
                             execCommand(c, client, 0, "admin.", cmdObj, result, false);
-                        responseCode = 200;
+                        responseCode = ok ? 200 : 500;
                         string j = result.done().jsonString(JS, h != 0 ? 1 : 0);
                         if( h == 0 ) { 
                             headers.push_back( "Content-Type: application/json" );
