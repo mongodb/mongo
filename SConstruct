@@ -1176,6 +1176,7 @@ elif not onlyServer:
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." )
+        shellEnv.Append( CPPPATH=["32bit/"] )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )
 
