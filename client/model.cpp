@@ -57,6 +57,31 @@ namespace mongo {
         BSONObjBuilder b;
         serialize( b );
         
+        BSONElement myId;
+        {
+            BSONObjIterator i = b.iterator();
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName() , "_id" ) == 0 ){
+                    myId = e;
+                    break;
+                }
+            }
+        }
+
+        if ( myId.type() ){
+            if ( _id.isEmpty() ){
+                _id = myId.wrap();
+            }
+            else if ( myId.woCompare( _id.firstElement() ) ){
+                stringstream ss;
+                ss << "_id from serialize and stored differ: ";
+                ss << "[" << myId << "] != ";
+                ss << "[" << _id.firstElement() << "]";
+                throw UserException( 13121 , ss.str() );
+            }
+        }
+
         if ( _id.isEmpty() ){
             OID oid;
             oid.init();
@@ -78,7 +103,7 @@ namespace mongo {
             BSONObj q = qb.obj();
             BSONObj o = b.obj();
 
-            log(4) << "updated old model" << getNS() << "  " << q << " " << o << endl;
+            log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
             conn->update( getNS() , q , o );
             

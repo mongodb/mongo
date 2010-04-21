@@ -427,7 +427,7 @@ sed -i 's/dh_installinit/dh_installinit --name=mongodb/' debian/rules) || exit 1
 """
 #$RPM_BUILD_ROOT/usr/lib/libmongoclient.a  $RPM_BUILD_ROOT/usr/lib64/libmongoclient.a
     mangle_files_for_new_deb_xulrunner_commands = """
-( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/xulrunner-dev/xulrunner-1.9.1-dev/g' debian/control )
+( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}" && sed -i 's/xulrunner-dev/xulrunner-1.9.2-dev/g' debian/control )
 """
 
     mangle_files_for_ancient_redhat_commands = """
@@ -501,7 +501,7 @@ rpm -ivh /usr/src/redhat/RPMS/{distro_arch}/boost-devel-1.38.0-1.{distro_arch}.r
     unversioned_deb_xulrunner_prereqs = ["xulrunner-dev"]
 
     old_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9-dev"]
-    new_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9.1-dev"]
+    new_versioned_deb_xulrunner_prereqs = ["xulrunner-1.9.2-dev"]
 
     common_deb_prereqs = [ "build-essential", "dpkg-dev", "libreadline-dev", "libpcap-dev", "libpcre3-dev", "git-core", "scons", "debhelper", "devscripts", "git-core" ]
 
