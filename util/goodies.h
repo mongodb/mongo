@@ -165,6 +165,18 @@ namespace mongo {
 #endif
     }
 
+    inline string terseCurrentTime(){
+        struct tm t;
+        time_t_to_Struct( time(0) , &t );
+        stringstream ss;
+        ss << ( 1900 + t.tm_year ) << "-"
+           << t.tm_mon << "-"
+           << t.tm_mday << "-"
+           << t.tm_hour << "-"
+           << t.tm_min;
+        return ss.str();
+    }
+
 #define asctime _asctime_not_threadsafe_
 #define gmtime _gmtime_not_threadsafe_
 #define localtime _localtime_not_threadsafe_
