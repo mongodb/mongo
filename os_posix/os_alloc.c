@@ -31,7 +31,7 @@ __wt_calloc_func(ENV *env, u_int32_t number, u_int32_t size, void *retp
 	 * !!!
 	 * This function MUST handle a NULL ENV structure reference.
 	 */
-	WT_ASSERT(env, size != 0);
+	WT_ASSERT(env, number != 0 && size != 0);
 
 	if (env != NULL && env->ienv != NULL && env->ienv->stats != NULL)
 		WT_STAT_INCR(env->ienv->stats, MEMALLOC);
