@@ -2027,7 +2027,8 @@ namespace mongo {
         */
     class Ordering { 
         const unsigned bits;
-        Ordering(unsigned b) : bits(b) { }
+        const unsigned nkeys;
+        Ordering(unsigned b,unsigned n) : bits(b),nkeys(n) { }
     public:
         /** so, for key pattern { a : 1, b : -1 }
             get(0) == 1
@@ -2039,6 +2040,13 @@ namespace mongo {
 
         // for woCompare...
         unsigned descending(unsigned mask) const { return bits & mask; }
+        
+        operator string() const {
+            StringBuilder buf(32);
+            for ( unsigned i=0; i<nkeys; i++)
+                buf.append( get(i) > 0 ? "+" : "-" );
+            return buf.str();
+        }
 
         static Ordering make(const BSONObj& obj) {
             unsigned b = 0;
@@ -2053,7 +2061,7 @@ namespace mongo {
                     b |= (1 << n);
                 n++;
             }
-            return Ordering(b);
+            return Ordering(b,n);
         }
     };
     

@@ -816,7 +816,7 @@ namespace mongo {
             }
             if ( x != 0 )
                 return x;
-            mask << 1;
+            mask <<= 1;
         }
         return -1;
     }

@@ -999,9 +999,11 @@ namespace mongo {
     /* --- BtreeBuilder --- */
 
     BtreeBuilder::BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx) : 
+      dupsAllowed(_dupsAllowed), 
+      idx(_idx), 
+      n(0),
       order( idx.keyPattern() ),
-      ordering( Ordering::make(idx.keyPattern()) ),
-      dupsAllowed(_dupsAllowed), idx(_idx), n(0) 
+      ordering( Ordering::make(idx.keyPattern()) )
     {
         first = cur = BtreeBucket::addBucket(idx);
         b = cur.btreemod();
