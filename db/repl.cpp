@@ -356,7 +356,7 @@ namespace mongo {
                 if( theReplSet == 0 ) { 
                     result.append("ismaster", 0);
                     result.append("ok", false);
-                    result.append("msg", "still initializing");
+                    result.append("msg", "replSet still trying to initialize");
                     return true;
                 }
                 theReplSet->fillIsMaster(result);

@@ -92,24 +92,29 @@ namespace mongo {
 
             ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
             ss << "\n<b>replication</b>\n";
-            ss << "master: " << replSettings.master << '\n';
-            ss << "slave:  " << replSettings.slave << '\n';
-            if ( replPair ) {
-                ss << "replpair:\n";
-                ss << replPair->getInfo();
+            if( replSet ) {
+                ss << "<a title=\"see replSetGetStatus link top of page\">--replSet mode</a>\n";
             }
-            bool seemCaughtUp = getInitialSyncCompleted();
-            if ( !seemCaughtUp ) ss << "<b>";
-            ss <<   "initialSyncCompleted: " << seemCaughtUp;
-            if ( !seemCaughtUp ) ss << "</b>";
-            ss << '\n';
+            else {
+                ss << "master: " << replSettings.master << '\n';
+                ss << "slave:  " << replSettings.slave << '\n';
+                if ( replPair ) {
+                    ss << "replpair:\n";
+                    ss << replPair->getInfo();
+                }
+                bool seemCaughtUp = getInitialSyncCompleted();
+                if ( !seemCaughtUp ) ss << "<b>";
+                ss <<   "initialSyncCompleted: " << seemCaughtUp;
+                if ( !seemCaughtUp ) ss << "</b>";
+                ss << '\n';
+            }
             
             auto_ptr<SnapshotDelta> delta = statsSnapshots.computeDelta();
             if ( delta.get() ){
-                ss << "\n<b>DBTOP  (occurences|percent of elapsed)</b>\n";
-                ss << "<table border=1>";
+                ss << "\n<b>dbtop</b> (occurences|percent of elapsed)\n";
+                ss << "<table border=1 cellpadding=2 cellspacing=0>";
                 ss << "<tr align='left'>";
-                ss << "<th>NS</th>"
+                ss << "<th><a title=\"namespace\">NS</a></th>"
                       "<th colspan=2>total</th>"
                       "<th colspan=2>Reads</th>"
                       "<th colspan=2>Writes</th>"
@@ -179,24 +184,26 @@ namespace mongo {
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
             ss << '\n';
-            ss << "dbwritelocked:  " << dbMutex.info().isLocked() << " (initial)\n";
-            ss << "uptime:    " << time(0)-started << " seconds\n";
+            ss << "<a title=\"snapshot: was the db in the write lock when this page was generated?\">";
+            ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
+            ss << "uptime:       " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-            ss << "\nassertions:\n";
+            ss << "\n";
+            ss << "<a title=\"information on caught assertion exceptions\">";
+            ss << "assertions:</a>\n";
             for ( int i = 0; i < 4; i++ ) {
                 if ( lastAssert[i].isSet() ) {
-                    ss << "<b>";
                     if ( i == 3 ) ss << "usererr";
                     else ss << i;
-                    ss << "</b>" << ' ' << lastAssert[i].toString();
+                    ss << ' ' << lastAssert[i].toString();
                 }
             }
 
             ss << "\nreplInfo:  " << replInfo << "\n\n";
 
             ss << "Clients:\n";
-            ss << "<table border=1>";
+            ss << "<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
                << "<th>Thread</th>" 
              
@@ -392,10 +399,10 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongod " << "host:" << getHostName() << " port:" << mongo::cmdLine.port << ' ';
+                z << "mongod " << getHostName() << ":" << mongo::cmdLine.port;
                 dbname = z.str();
             }
-            ss << dbname << "</title></head><body><h2>" << dbname << "</h2><p>\n";
+            ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
             {
@@ -408,6 +415,7 @@ namespace mongo {
                 }
             }
             ss << '\n';
+            ss << "rest/admin port:" << _port << "\n";
             doUnlockedStuff(ss);
 
             {

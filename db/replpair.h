@@ -157,7 +157,7 @@ namespace mongo {
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
         if( replSet ) {
-            uassert(13124, "not master still in initialization", theReplSet); // during initialization, no queries allowed whatsover
+            uassert(13124, "not master - replSet still initializing", theReplSet); // during initialization, no queries allowed whatsover
             notMasterUnless( theReplSet->isMaster("") || pq.hasOption( QueryOption_SlaveOk ) );
             return;
         }
