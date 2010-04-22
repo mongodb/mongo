@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    RWLock chunkSplitLock;
+
     // -------  Shard --------
 
     int Chunk::MaxChunkSize = 1024 * 1204 * 200;
@@ -254,7 +256,12 @@ namespace mongo {
         if ( _dataWritten < MaxChunkSize / 5 )
             return false;
         
-        log(1) << "\t want to split chunk : " << this << endl;
+        if ( ! chunkSplitLock.lock_try(0) )
+            return false;
+        
+        rwlock lk( chunkSplitLock , 1 , true );
+
+        log(1) << "\t splitIfShould : " << this << endl;
 
         _dataWritten = 0;
         
