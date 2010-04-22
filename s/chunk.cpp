@@ -356,6 +356,9 @@ namespace mongo {
     }
     
     void Chunk::serialize(BSONObjBuilder& to){
+        
+        to.append( "_id" , genID( _ns , _min ) );
+
         if ( _lastmod )
             to.appendTimestamp( "lastmod" , _lastmod );
         else 
@@ -365,6 +368,19 @@ namespace mongo {
         to << "min" << _min;
         to << "max" << _max;
         to << "shard" << _shard;
+    }
+
+    string Chunk::genID( const string& ns , const BSONObj& o ){
+        StringBuilder buf( ns.size() + o.objsize() + 16 );
+        buf << ns << "-";
+
+        BSONObjIterator i(o);
+        while ( i.more() ){
+            BSONElement e = i.next();
+            buf << e.fieldName() << "_" << e.toString( false );
+        }
+
+        return buf.str();
     }
     
     void Chunk::unserialize(const BSONObj& from){

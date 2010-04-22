@@ -123,6 +123,8 @@ namespace mongo {
         
         static int MaxChunkSize;
 
+        static string genID( const string& ns , const BSONObj& min );
+        
     private:
         
         // main shard info
