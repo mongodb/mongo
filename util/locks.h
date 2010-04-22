@@ -147,8 +147,8 @@ namespace mongo {
 #endif
 
     struct rwlock {
-        rwlock( RWLock& lock , bool write , bool alreadyHaveLock = false )
-            : _lock( lock ) , _write( write ){
+        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
+            : _lock( (RWLock&)lock ) , _write( write ){
 
             if ( ! alreadyHaveLock ){
                 if ( _write )

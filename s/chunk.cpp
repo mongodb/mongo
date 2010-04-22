@@ -144,11 +144,14 @@ namespace mongo {
         s->_markModified();
         _markModified();
         
-        _manager->_chunks.push_back( s );
-        _manager->_chunkMap[s->getMax()] = s;
-        
-        setMax(m.getOwned());
-        _manager->_chunkMap[_max] = this;
+        {
+            rwlock lk( _manager->_lock , true );
+            _manager->_chunks.push_back( s );
+            _manager->_chunkMap[s->getMax()] = s;
+            
+            setMax(m.getOwned());
+            _manager->_chunkMap[_max] = this;
+        }
         
         log(1) << " after split:\n" 
                << "\t left : " << toString() << '\n' 
@@ -511,6 +514,8 @@ namespace mongo {
     }
 
     Chunk& ChunkManager::findChunk( const BSONObj & obj ){
+        rwlock lk( _lock , false ); 
+
         BSONObj key = _key.extractKey(obj);
         ChunkMap::iterator it = _chunkMap.upper_bound(key);
         if (it != _chunkMap.end()){
@@ -525,7 +530,8 @@ namespace mongo {
     }
 
     Chunk* ChunkManager::findChunkOnServer( const string& server ) const {
-
+        rwlock lk( _lock , false ); 
+ 
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
             if ( c->getShard() == server )
@@ -536,6 +542,8 @@ namespace mongo {
     }
 
     int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+        rwlock lk( _lock , false ); 
+ 
         FieldRangeSet ranges(_ns.c_str(), query, false);
         BSONObjIterator fields(_key.key());
         BSONElement field = fields.next();
@@ -583,12 +591,16 @@ namespace mongo {
     }
 
     void ChunkManager::getAllServers( set<string>& allServers ){
+        rwlock lk( _lock , false ); 
+        
         for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
             allServers.insert( (*i)->getShard() );
         }        
     }
     
     void ChunkManager::ensureIndex(){
+        rwlock lk( _lock , false ); 
+ 
         set<string> seen;
         
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
@@ -601,6 +613,8 @@ namespace mongo {
     }
     
     void ChunkManager::drop(){
+        rwlock lk( _lock , true ); 
+        
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
         map<string,ShardChunkVersion> seen;
@@ -663,6 +677,8 @@ namespace mongo {
     }
     
     void ChunkManager::save(){
+        rwlock lk( _lock , false ); 
+        
         ShardChunkVersion a = getVersion();
         
         set<string> withRealChunks;
@@ -700,8 +716,10 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion() const{
+        rwlock lk( _lock , false ); 
+        
         ShardChunkVersion max = 0;
-
+        
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
             if ( c->_lastmod > max )
@@ -712,6 +730,8 @@ namespace mongo {
     }
 
     string ChunkManager::toString() const {
+        rwlock lk( _lock , false );         
+
         stringstream ss;
         ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
