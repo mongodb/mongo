@@ -695,6 +695,12 @@ namespace mongo {
 
     /* -- DBClientCursor ---------------------------------------------- */
 
+#ifdef _DEBUG
+#define CHECK_OBJECT( o , msg ) massert( 10337 ,  (string)"object not valid" + (msg) , (o).isValid() )
+#else
+#define CHECK_OBJECT( o , msg )
+#endif
+
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
         CHECK_OBJECT( query , "assembleRequest query" );
         // see query.h for the protocol we are using here.
