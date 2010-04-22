@@ -626,9 +626,9 @@ namespace mongo {
                     shard = b.obj();
                 }
 
-                BSONObj old = conn->findOne( "config.shards" , shard );
+                BSONObj old = conn->findOne( "config.shards" , BSON( "host" << host ) );
                 if ( ! old.isEmpty() ){
-                    result.append( "msg" , "already exists" );
+                    result.append( "msg" , "host already used" );
                     conn.done();
                     return false;
                 }
