@@ -172,12 +172,14 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ok = false;
             op.debug().str << " exception ";
-            LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
-            log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
-            if ( q.query.valid() )
-                log() << "  query:" << q.query.toString() << endl;
-            else
-                log() << "  query object is not valid!" << endl;
+            LOGSOME problem() << " Caught Assertion in query ns:" << q.ns << ' ' << e.toString() << '\n';
+            if( q.ntoskip || q.ntoreturn )
+                log() << "   ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
+            if ( q.query.valid() ) {
+                if( !q.query.isEmpty() )
+                    log() << "   query:" << q.query.toString() << endl;
+            } else
+                log() << "   query object is not valid!" << endl;
 
             BSONObjBuilder err;
             err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
