@@ -229,6 +229,8 @@ namespace mongo {
             BSONObj o = next();
             BSONElement e = o.firstElement();
             if( strcmp(e.fieldName(), "$err") == 0 ) { 
+                if( logLevel >= 5 )
+                    log() << "nextSafe() error " << o.toString() << endl;
                 uassert(13106, "nextSafe() returns $err", false);
             }
             return o;

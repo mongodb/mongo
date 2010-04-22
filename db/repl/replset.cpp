@@ -76,31 +76,50 @@ namespace mongo {
         startHealthThreads();
     }
 
+    ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
     string ReplSet::startupStatusMsg;
 
     void ReplSet::loadConfig() {
-        startupStatusMsg = "loading admin.replset config";
         while( 1 ) {
+            startupStatus = LOADINGCONFIG;
+            startupStatusMsg = "loading admin.system.replset config";
             try {
                 vector<ReplSetConfig> configs;
                 configs.push_back( ReplSetConfig(HostAndPort::me()) );
-                for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ )
+                for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ ) {
                     configs.push_back( ReplSetConfig(*i) );
+                }
                 int nok = 0;
+                int nempty = 0;
                 for( vector<ReplSetConfig>::iterator i = configs.begin(); i != configs.end(); i++ ) { 
                     if( i->ok() )
                         nok++;
+                    if( i->empty() )
+                        nempty++;
                 }
-                if( nok == 0 ) { 
-                    startupStatusMsg = "can't currently get admin.replset config from self or any seed";
-                    log() << "replSet can't get admin.replset config from self or any seed.\n";
-                    log() << "replSet sleeping 1 minute and will try again." << endl;
+                if( nok == 0 ) {
+
+                    if( nempty == configs.size() ) {
+                        startupStatus = EMPTYCONFIG;
+                        startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
+                        log() << "replSet can't get admin.system.replset config from self or any seed.\n";
+                        log() << "replSet have you ran commant replSetInitiate yet?\n";
+                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                    }
+                    else {
+                        startupStatusMsg = "can't currently get admin.system.replset config from self or any seed";
+                        log() << "replSet can't get admin.system.replset config from self or any seed.\n";
+                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                    }
+
                     sleepsecs(60);
                     continue;
                 }
             }
             catch(AssertionException&) { 
-                log() << "replSet error loading configurations. admin.replset may be misconfigured\n";
+                startupStatus = BADCONFIG;
+                startupStatusMsg = "replSet bad config";
+                log() << "replSet error loading configurations. admin.system.replset may be misconfigured\n";
                 log() << "replSet replication will not start" << endl;
                 fatal = true;
                 throw;
@@ -108,6 +127,7 @@ namespace mongo {
             break;
         }
         startupStatusMsg = "?";
+        startupStatus = FINISHME;
     }
 
     /*void ReplSet::addMemberIfMissing(const HostAndPort& h) { 

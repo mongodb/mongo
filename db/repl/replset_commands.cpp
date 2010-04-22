@@ -22,21 +22,45 @@
 
 namespace mongo { 
 
+    class CmdReplSetInitiate : public Command { 
+    public:
+        virtual LockType locktype(){ return WRITE; }
+        virtual bool slaveOk() { return true; }
+        virtual bool adminOnly() { return true; }
+        virtual bool logTheOp() { return false; }
+        CmdReplSetInitiate() : Command("replSetInitiate") { }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !replSet ) { 
+                errmsg = "not running with --replSet";
+                return false;
+            }
+            if( theReplSet ) {
+                errmsg = "already initialized";
+                return false;
+            }            
+            if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
+                errmsg = "config already exists, but is bad";
+                return false;
+            }
+            if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
+                result.append("startupStatus", ReplSet::startupStatus);
+                errmsg = "all seed hosts must be reachable to initiate set";
+                return false;
+            }
+
+            return true;
+        }
+    } cmdReplSetInitiate;
+
     /* commands in other files:
          replSetHeartbeat - health.cpp
          */
 
     class CmdReplSetGetStatus : public Command {
     public:
-        virtual bool slaveOk() {
-            return true;
-        }
-        virtual bool adminOnly() {
-            return true;
-        }
-        virtual bool logTheOp() {
-            return false;   
-        }
+        virtual bool slaveOk() { return true; }
+        virtual bool adminOnly() { return true; }
+        virtual bool logTheOp() { return false; }
         virtual LockType locktype(){ return NONE; }
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -45,6 +69,7 @@ namespace mongo {
                 return false;
             }
             if( theReplSet == 0 ) {
+                result.append("startupState", ReplSet::startupStatus);
                 errmsg = ReplSet::startupStatusMsg.empty() ? 
                     errmsg = "replset unknown error 1" : ReplSet::startupStatusMsg;
                 return false;

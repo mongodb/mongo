@@ -68,6 +68,9 @@ public:
     HealthOptions healthOptions;
     string md5;
 
+    // true if could connect, and there is no cfg object there at all
+    bool empty() { return version == -2; }
+
     /* TODO: add getLastErrorDefaults */
 
 private:

@@ -26,8 +26,9 @@ namespace mongo {
     void ReplSetConfig::from(BSONObj o) {
         md5 = o.md5();
         _id = o["_id"].String();
-        version = o["version"].numberInt();
-        uassert(13115, "bad admin.replset config: version", version > 0);
+        int v = o["version"].numberInt();
+        uassert(13115, "bad local.system.replset config: version", v > 0);
+        version = v;
 
         if( o["settings"].ok() ) {
             BSONObj settings = o["settings"].Obj();
@@ -53,19 +54,19 @@ namespace mongo {
                 m.priority = pri.ok() ? pri.number() : 1.0;
             }
             catch(...) { 
-                uassert(13107, "bad admin.replset config", false);
+                uassert(13107, "bad local.system.replset config", false);
             }
-            uassert(13108, "bad admin.replset config dups?", hosts.count(m.h.toString()) == 0);
+            uassert(13108, "bad local.system.replset config dups?", hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
         }
-        uassert(13117, "bad admin.replset config", !_id.empty());
+        uassert(13117, "bad local.system.replset config", !_id.empty());
     }
 
     static inline void configAssert(bool expr) {
-        uassert(13122, "bad admin.replset config", expr);
+        uassert(13122, "bad local.system.replset config", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+    ReplSetConfig::ReplSetConfig(const HostAndPort& h) : version(-4) {
         int level = 2;
         DEV level = 0;
         _ok = false;
@@ -77,9 +78,13 @@ namespace mongo {
             conn._logLevel = 2;
             string err;
             conn.connect(h.toString());
-            c = conn.query("admin.replset");
-            if( !c->more() )
+            version = -3;
+            c = conn.query("local.system.replset");
+            if( !c->more() ) {
+                version = -2;
                 return;
+            }
+            version = -1;
         }
         catch( UserException& e) { 
             log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << endl;
@@ -87,7 +92,7 @@ namespace mongo {
         }
 
         BSONObj o = c->nextSafe();
-        uassert(13109, "multiple rows in admin.replset not supported", !c->more());
+        uassert(13109, "multiple rows in local.system.replset not supported", !c->more());
         from(o);
         _ok = true;
         log(level) << "replSet load ok" << endl;

@@ -24,6 +24,7 @@
 
 namespace mongo { 
 
+    /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public Command {
     public:
         virtual bool slaveOk() { return true; }
@@ -44,7 +45,7 @@ namespace mongo {
                 errmsg = "set names do not match";
                 return false;
             }
-            result.append("set", theReplSet->getName());
+            //result.append("set", theReplSet->getName());
             return true;
         }
     } cmdReplSetHeartbeat;
@@ -64,7 +65,6 @@ namespace mongo {
         }
 
     public:
-
         void run() { 
             mongo::lastError.reset( new LastError() );
             DBClientConnection conn(true, 0, 10);
