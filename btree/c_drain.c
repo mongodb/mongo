@@ -474,8 +474,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 		page = e->page;
 		if (e->write_gen != page->write_gen) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache writing element/page %#llx/%lu",
-			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
+			    "cache writing element/page %p/%lu",
+			    e, (u_long)e->addr));
 
 			e->write_gen = page->write_gen;
 			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
@@ -488,8 +488,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 				(*drain) = NULL;
 		} else {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache discarding element/page %#llx/%#lu",
-			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
+			    "cache discarding element/page %p/%#lu",
+			    e, (u_long)e->addr));
 
 			WT_STAT_INCR(stats, CACHE_EVICT);
 		}
@@ -590,8 +590,8 @@ __wt_drain_hazard_check(ENV *env)
 		if (*hazard == page) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
 			    "cache skipping hazard referenced element/page "
-			    "%#llx/%lu",
-			    WT_PTR_TO_UQUAD(e), (u_long)e->addr));
+			    "%p/%lu",
+			    e, (u_long)e->addr));
 			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 
 			e->state = WT_OK;
@@ -622,8 +622,8 @@ __wt_drain_evict(ENV *env)
 #ifdef HAVE_DIAGNOSTIC
 		__wt_drain_hazard_validate(env, e);
 #endif
-		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache evicted element %#llx", WT_PTR_TO_UQUAD(e)));
+		WT_VERBOSE(
+		    env, WT_VERB_CACHE, (env, "cache evicted element %p", e));
 		/*
 		 * Take a page reference, then clean up the entry.  We don't
 		 * have to clear these fields (the state field is the only
@@ -691,9 +691,8 @@ __wt_drain_validate(ENV *env)
 			if (e->addr == e->page->addr)
 				break;
 			__wt_api_env_errx(env,
-			    "element %#llx: e->addr != page->addr (%lu != %lu)",
-			    WT_PTR_TO_UQUAD(e),
-			    (u_long)e->addr, (u_long)e->page->addr);
+			    "element %p: e->addr != page->addr (%lu != %lu)",
+			    e, (u_long)e->addr, (u_long)e->page->addr);
 			__wt_abort(env);
 			/* NOTREACHED */
 		}

@@ -240,8 +240,7 @@ __wt_bt_debug_col_indx(WT_TOC *toc, WT_COL_INDX *cip, FILE *fp)
 	WT_CC_QUIET(toc, NULL);
 
 	if (cip->page_data != NULL)
-		fprintf(fp,
-		    "\tpage_data: %#llx", WT_PTR_TO_UQUAD(cip->page_data));
+		fprintf(fp, "\tpage_data: %p", cip->page_data);
 	if (cip->repl != NULL)
 		__wt_bt_debug_repl(cip->repl, fp);
 	fprintf(fp, "\n");

@@ -21,9 +21,8 @@ __wt_hazard_set(WT_TOC *toc, WT_PAGE *page)
 
 	env = toc->env;
 
-	WT_VERBOSE(env, WT_VERB_HAZARD,
-	    (env, "toc %#llx hazard %#llx: set",
-	    WT_PTR_TO_UQUAD(toc), WT_PTR_TO_UQUAD(page)));
+	WT_VERBOSE(env,
+	    WT_VERB_HAZARD, (env, "toc %p hazard %p: set", toc, page));
 
 	/* Set the caller's hazard pointer. */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)
@@ -52,9 +51,8 @@ __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page)
 
 	env = toc->env;
 
-	WT_VERBOSE(env, WT_VERB_HAZARD,
-	    (env, "toc %#llx hazard %#llx: clr",
-	    WT_PTR_TO_UQUAD(toc), WT_PTR_TO_UQUAD(page)));
+	WT_VERBOSE(env,
+	    WT_VERB_HAZARD, (env, "toc %p hazard %p: clr", toc, page));
 
 	/* Clear the caller's hazard pointer. */
 	for (hp = toc->hazard; hp < toc->hazard + env->hazard_size; ++hp)

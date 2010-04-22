@@ -175,20 +175,19 @@ __wt_toc_dump(ENV *env)
 	__wt_mb_add(&mb, "%s\n", ienv->sep);
 	for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 		__wt_mb_add(&mb,
-		    "toc: %#llx (gen: %lu) {\n\tworkq func: ",
-		    WT_PTR_TO_UQUAD(toc), (u_long)toc->gen);
+		    "toc: %p (gen: %lu) {\n\tworkq func: ",
+		    toc, (u_long)toc->gen);
 		if (toc->wq_func == NULL)
 			__wt_mb_add(&mb, "none");
 		else
-			__wt_mb_add(&mb,
-			    "%#llx", WT_PTR_TO_UQUAD(toc->wq_func));
+			__wt_mb_add(&mb, "%p", toc->wq_func);
 
 		__wt_mb_add(&mb, "state: %s", __wt_toc_print_state(toc));
 
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = toc->hazard;
 		    hp < toc->hazard + env->hazard_size; ++hp)
-			__wt_mb_add(&mb, "%#llx ", WT_PTR_TO_UQUAD(*hp));
+			__wt_mb_add(&mb, "%p ", *hp);
 
 		__wt_mb_add(&mb, "\n}");
 		if (toc->name != NULL)

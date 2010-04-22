@@ -280,9 +280,8 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_CACHE_ENTRY_SET(empty, db, page, addr, ++ienv->read_gen, 0, WT_OK);
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "cache %s element/page %#llx/%lu",
-	    newpage ? "allocated" : "read",
-	    WT_PTR_TO_UQUAD(empty), (u_long)addr));
+	    "cache %s element/page %p/%lu",
+	    newpage ? "allocated" : "read", empty, (u_long)addr));
 
 	/* Return the page to the caller. */
 	*rr->pagep = page;

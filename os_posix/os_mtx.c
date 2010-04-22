@@ -74,8 +74,8 @@ __wt_lock(ENV *env, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(env, WT_VERB_MUTEX,
-	    (env, "lock %s mutex (%#llx)",  mtx->name, WT_PTR_TO_UQUAD(mtx)));
+	WT_VERBOSE(env,
+	    WT_VERB_MUTEX, (env, "lock %s mutex (%p)",  mtx->name, mtx));
 
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));
 
@@ -115,8 +115,8 @@ __wt_unlock(ENV *env, WT_MTX *mtx)
 {
 	int ret;
 
-	WT_VERBOSE(env, WT_VERB_MUTEX, (env,
-	    "unlock %s mutex (%#llx)",  mtx->name, WT_PTR_TO_UQUAD(mtx)));
+	WT_VERBOSE(env,
+	    WT_VERB_MUTEX, (env, "unlock %s mutex (%p)",  mtx->name, mtx));
 
 	ret = 0;
 	WT_ERR(pthread_mutex_lock(&mtx->mtx));

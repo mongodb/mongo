@@ -51,11 +51,11 @@ FlexeLint for C/C++ (Unix) Vers. 8.00x, Copyright Gimpel Software 1985-2008
 --- Module:   ../btree/bt_debug.c (C)
                                                                         _
 		    (u_long)off->addr, (u_long)off->size, WT_RECORDS(off));
-../btree/bt_debug.c  336  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  335  Info 740: Unusual pointer cast (incompatible indirect
     types)
                                                              _
 		    (u_long)off->size, (u_quad)WT_RECORDS(off));
-../btree/bt_debug.c  360  Info 740: Unusual pointer cast (incompatible indirect
+../btree/bt_debug.c  359  Info 740: Unusual pointer cast (incompatible indirect
     types)
 
 --- Module:   ../btree/bt_desc.c (C)

@@ -25,12 +25,6 @@ extern "C" {
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
 #define	WT_MAX(a, b)	((a) < (b) ? (b) : (a))
 
-/*
- * Convert a pointer to an unsigned long so we can print it without compiler
- * complaint.
- */
-#define	WT_PTR_TO_UQUAD(p)	((u_quad)(uintptr_t)(p))
-
 /* Flag check for API functions. */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
