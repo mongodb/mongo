@@ -105,8 +105,6 @@ void
 __wt_workq_cache_sync_server(ENV *env);
 void *
 __wt_cache_drain(void *arg);
-void
-__wt_drain_chk(ENV *env);
 int
 __wt_cache_create(ENV *env);
 void
