@@ -92,7 +92,15 @@ namespace mongo {
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msgid,msg && *msg ? msg : "massert failure");
         breakpoint();
-        printStackTrace(); // TEMP?? should we get rid of this?  TODO
+        printStackTrace();
+        throw MsgAssertionException(msgid, msg);
+    }
+
+    void msgassertedNoTrace(int msgid, const char *msg) {
+        assertionCount.condrollover( ++assertionCount.warning );
+        log() << "Assertion: " << msgid << ":" << msg << endl;
+        lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
+        raiseError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
     }
 

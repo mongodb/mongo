@@ -299,7 +299,7 @@ namespace mongo {
     } cmdCursorInfo;
     
     void ClientCursorMonitor::run(){
-        Client::initThread("snapshotthread");
+        Client::initThread("clientcursormon");
         Client& client = cc();
         
         unsigned old = curTimeMillis();

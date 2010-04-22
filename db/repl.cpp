@@ -344,7 +344,7 @@ namespace mongo {
             return true;
         }
         virtual LockType locktype(){ return NONE; }
-        CmdIsMasterOld(const char * name="ismaster") : Command(name, true) { }
+        CmdIsMasterOld(const char * name="ismaster") : Command(name, name=="isMaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
 			   authenticated.
@@ -357,6 +357,7 @@ namespace mongo {
                     result.append("ismaster", 0);
                     result.append("ok", false);
                     result.append("msg", "replSet still trying to initialize");
+                    result.append("info", ReplSet::startupStatusMsg);
                     return true;
                 }
                 theReplSet->fillIsMaster(result);

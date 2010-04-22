@@ -37,6 +37,7 @@ namespace mongo {
                 errmsg = "not a replset member";
                 return false;
             }
+            result.append("rs", true);
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;

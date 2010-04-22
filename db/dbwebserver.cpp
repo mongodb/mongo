@@ -114,15 +114,17 @@ namespace mongo {
                 ss << "\n<b>dbtop</b> (occurences|percent of elapsed)\n";
                 ss << "<table border=1 cellpadding=2 cellspacing=0>";
                 ss << "<tr align='left'>";
-                ss << "<th><a title=\"namespace\">NS</a></th>"
-                      "<th colspan=2>total</th>"
-                      "<th colspan=2>Reads</th>"
-                      "<th colspan=2>Writes</th>"
-                      "<th colspan=2>Queries</th>"
-                      "<th colspan=2>GetMores</th>"
-                      "<th colspan=2>Inserts</th>"
-                      "<th colspan=2>Updates</th>"
-                      "<th colspan=2>Removes</th>";
+                ss << "<th><a title=\"namespace\" href=\""
+                    "http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F"
+                    "\">NS</a></th>"
+                    "<th colspan=2>total</th>"
+                    "<th colspan=2>Reads</th>"
+                    "<th colspan=2>Writes</th>"
+                    "<th colspan=2>Queries</th>"
+                    "<th colspan=2>GetMores</th>"
+                    "<th colspan=2>Inserts</th>"
+                    "<th colspan=2>Updates</th>"
+                    "<th colspan=2>Removes</th>";
                 ss << "</tr>";
                 
                 display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
@@ -184,7 +186,9 @@ namespace mongo {
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
             ss << '\n';
-            ss << "<a title=\"snapshot: was the db in the write lock when this page was generated?\">";
+            ss << "<a "
+                << "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\""
+                << "title=\"snapshot: was the db in the write lock when this page was generated?\">";
             ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
             ss << "uptime:       " << time(0)-started << " seconds\n";
             if ( replAllDead )
@@ -194,7 +198,10 @@ namespace mongo {
             ss << "assertions:</a>\n";
             for ( int i = 0; i < 4; i++ ) {
                 if ( lastAssert[i].isSet() ) {
-                    if ( i == 3 ) ss << "usererr";
+                    if ( i == 3 ) ss << "uassert";
+                    else if( i == 2 ) ss << "massert";
+                    else if( i == 0 ) ss << "assert";
+                    else if( i == 1 ) ss << "warnassert";
                     else ss << i;
                     ss << ' ' << lastAssert[i].toString();
                 }
@@ -415,7 +422,9 @@ namespace mongo {
                 }
             }
             ss << '\n';
-            ss << "rest/admin port:" << _port << "\n";
+            ss << "<a "
+                "title=\"click for documentation on this http interface\""
+                "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">HTTP</a> admin port:" << _port << "\n";
             doUnlockedStuff(ss);
 
             {

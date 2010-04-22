@@ -150,6 +150,7 @@ namespace mongo {
     void uasserted(int msgid, const char *msg);
     inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
     void uassert_nothrow(const char *msg); // reported via lasterror, but don't throw exception
+    void msgassertedNoTrace(int msgid, const char *msg);
     void msgasserted(int msgid, const char *msg);
     inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
 
@@ -160,7 +161,6 @@ namespace mongo {
 #define assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-//#define uassert( 10269 , _Expression) (void)( (!!(_Expression)) || (uasserted(#_Expression, __FILE__, __LINE__), 0) )
 #define uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )

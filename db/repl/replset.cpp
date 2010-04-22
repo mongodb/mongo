@@ -103,7 +103,7 @@ namespace mongo {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
                         log() << "replSet can't get admin.system.replset config from self or any seed.\n";
-                        log() << "replSet have you ran commant replSetInitiate yet?\n";
+                        log() << "replSet have you ran replSetInitiate yet?\n";
                         log() << "replSet sleeping 1 minute and will try again." << endl;
                     }
                     else {
@@ -118,8 +118,8 @@ namespace mongo {
             }
             catch(AssertionException&) { 
                 startupStatus = BADCONFIG;
-                startupStatusMsg = "replSet bad config";
-                log() << "replSet error loading configurations. admin.system.replset may be misconfigured\n";
+                startupStatusMsg = "replSet error loading set config";
+                log() << "replSet error loading configurations\n";
                 log() << "replSet replication will not start" << endl;
                 fatal = true;
                 throw;

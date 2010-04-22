@@ -31,7 +31,7 @@ namespace mongo {
         CmdReplSetInitiate() : Command("replSetInitiate") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
-                errmsg = "not running with --replSet";
+                errmsg = "server is not running with --replSet";
                 return false;
             }
             if( theReplSet ) {
@@ -39,7 +39,8 @@ namespace mongo {
                 return false;
             }            
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
-                errmsg = "config already exists, but is bad";
+                errmsg = "server already in BADCONFIG state (check logs); not initiating";
+                result.append("info", ReplSet::startupStatusMsg);
                 return false;
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
@@ -54,7 +55,7 @@ namespace mongo {
 
     /* commands in other files:
          replSetHeartbeat - health.cpp
-         */
+    */
 
     class CmdReplSetGetStatus : public Command {
     public:

@@ -18,6 +18,7 @@
 
 #include "stdafx.h"
 #include "rs_config.h"
+#include "replset.h"
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
 
@@ -66,7 +67,8 @@ namespace mongo {
         uassert(13122, "bad local.system.replset config", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(const HostAndPort& h) : version(-4) {
+    ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+        version = -5;
         int level = 2;
         DEV level = 0;
         _ok = false;
@@ -78,10 +80,26 @@ namespace mongo {
             conn._logLevel = 2;
             string err;
             conn.connect(h.toString());
+            version = -4;
+
+            {
+                /* first, make sure other node is configured to be a replset. just to be safe. */
+                BSONObj cmd = BSON( "replSetHeartbeat" << "preloadconfig?" );
+                BSONObj info;
+                bool ok = conn.runCommand("admin", cmd, info);
+                cout << h.toString() << " " << ok << " " << info.toString() << endl;
+                if( !info["rs"].trueValue() ) { 
+                    stringstream ss;
+                    ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
+                    msgassertedNoTrace(10000, ss.str().c_str()); // not caught as not a user exception - we want it not caught
+                }
+            }
+
             version = -3;
+
             c = conn.query("local.system.replset");
             if( !c->more() ) {
-                version = -2;
+                version = -2; /* -2 is a sentinel - see ReplSetConfig::empty() */
                 return;
             }
             version = -1;
