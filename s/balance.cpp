@@ -60,9 +60,16 @@ namespace mongo {
         
         OID hack;
         hack.init();
-
+        
+        BSONObjBuilder updateQuery;
+        updateQuery.append( "_id" , "balancer" );
+        if ( x["x"].type() )
+            updateQuery.append( x["x"] );
+        else
+            updateQuery.append( "x" , BSON( "$exists" << false ) );
+        
         conn.update( ShardNS::settings , 
-                     BSON( "_id" << "balancer" ) , 
+                     updateQuery.obj() ,
                      BSON( "$set" << BSON( "who" << _myid << "x" << hack ) ) ,
                      true );
         
