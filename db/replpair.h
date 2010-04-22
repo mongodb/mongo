@@ -102,10 +102,6 @@ namespace mongo {
 
     extern ReplPair *replPair;
 
-    inline void notMasterUnless(bool expr) { 
-        uassert( 10107 , "not master" , expr );
-    }
-
     /* note we always return true for the "local" namespace.
 
        we should not allow most operations when not the master
@@ -115,23 +111,18 @@ namespace mongo {
 
        If 'client' is not specified, the current client is used.
     */
-    inline bool isMaster( const char *client = 0 ) {
+    inline bool _isMaster( const char *client = 0 ) {
         if( replSet ) {
-            if( theReplSet ) return theReplSet->isMaster(client);
+            if( theReplSet ) 
+                return theReplSet->isMaster(client);
             return false;
         }
 
 		if( ! replSettings.slave ) 
 			return true;
 
-        if ( !client ) {
-            Database *database = cc().database();
-            assert( database );
-            client = database->name.c_str();
-        }
-
         if ( replAllDead )
-            return strcmp( client, "local" ) == 0;
+            return false;
 
         if ( replPair ) {
 			if( replPair->state == ReplPair::State_Master )
@@ -148,7 +139,21 @@ namespace mongo {
         if ( cc().isGod() )
             return true;
         
+        return false;
+    }
+    inline bool isMaster(const char *client = 0) {
+        if( _isMaster(client) )
+            return true;
+        if ( !client ) {
+            Database *database = cc().database();
+            assert( database );
+            client = database->name.c_str();
+        }
         return strcmp( client, "local" ) == 0;
+    }
+
+    inline void notMasterUnless(bool expr) { 
+        uassert( 10107 , "not master" , expr );
     }
 
     /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
@@ -156,12 +161,10 @@ namespace mongo {
        query the nonmaster member of a replica pair.
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
-        if( replSet ) {
-            uassert(13124, "not master - replSet still initializing", theReplSet); // during initialization, no queries allowed whatsover
-            notMasterUnless( theReplSet->isMaster("") || pq.hasOption( QueryOption_SlaveOk ) );
-            return;
-        }
-        notMasterUnless(isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave);
+        if( replSet ) 
+            notMasterUnless(isMaster());
+        else
+            notMasterUnless(isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
     }
 
     inline bool isMasterNs( const char *ns ) {

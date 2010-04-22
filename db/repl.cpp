@@ -337,14 +337,14 @@ namespace mongo {
         }
     }
 
-    class CmdIsMaster : public Command {
+    class CmdIsMasterOld : public Command {
     public:
         virtual bool requiresAuth() { return false; }
         virtual bool slaveOk() {
             return true;
         }
         virtual LockType locktype(){ return NONE; }
-        CmdIsMaster() : Command("ismaster", true) { }
+        CmdIsMasterOld(const char * name="ismaster") : Command(name, true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
 			   authenticated.
@@ -367,6 +367,11 @@ namespace mongo {
             appendReplicationInfo( result , authed );
             return true;
         }
+    } cmdismasterold;
+    /** Camelcase preferred for everything in MongoDB.  But we support old form for legacy reasons above. */
+    class CmdIsMaster : public CmdIsMasterOld { 
+    public:
+        CmdIsMaster() : CmdIsMasterOld("isMaster") { }
     } cmdismaster;
 
     class CmdIsInitialSyncComplete : public Command {

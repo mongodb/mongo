@@ -94,7 +94,7 @@ namespace mongo {
         */
         virtual bool requiresAuth() { return true; }
 
-        /** @param webUI expose the command in the web ui as /<name> ? */
+        /** @param webUI expose the command in the web ui as localhost:28017/<name> */
         Command(const char *_name, bool webUI = false);
 
         virtual ~Command() {}

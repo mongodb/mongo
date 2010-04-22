@@ -660,10 +660,16 @@ namespace mongo {
         BSONObj snapshotHint;
         
         if( logLevel >= 2 )
-            log() << "runQuery: " << ns << jsobj << endl;
+            log() << "query: " << ns << jsobj << endl;
         
         long long nscanned = 0;
-        ss << ns << " ntoreturn:" << pq.getNumToReturn();
+        ss << ns;
+        {
+            // only insert if nonzero. 
+            int n =  pq.getNumToReturn();
+            if( n ) 
+                ss << " ntoreturn:" << n;
+        }
         curop.setQuery(jsobj);
         
         BSONObjBuilder cmdResBuf;
@@ -752,7 +758,6 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
             
-
         if ( ! explain && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 

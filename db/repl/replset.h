@@ -34,10 +34,12 @@ namespace mongo {
     class ReplSet {
     public:
         bool isMaster(const char *client) { 
+//
             return false;
         }
         void fillIsMaster(BSONObjBuilder&);
 
+        static enum StartupStatus { PRESTART, LOADINGCONFIG, BADCONFIG, EMPTYCONFIG, FINISHME } startupStatus;
         static string startupStatusMsg;
         bool fatal;
 

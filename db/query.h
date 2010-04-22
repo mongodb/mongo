@@ -159,6 +159,7 @@ namespace mongo {
         ~ParsedQuery(){}
 
         const char * ns() const { return _ns; }
+        bool isLocalDB() const { return strncmp(_ns, "local.", 6) == 0; }
 
         const BSONObj& getFilter() const { return _filter; }
         FieldMatcher* getFields() const { return _fields.get(); }

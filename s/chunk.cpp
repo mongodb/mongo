@@ -541,9 +541,9 @@ namespace mongo {
         return 0;
     }
 
-    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::_getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
         rwlock lk( _lock , false ); 
- 
+
         FieldRangeSet ranges(_ns.c_str(), query, false);
         BSONObjIterator fields(_key.key());
         BSONElement field = fields.next();
@@ -558,8 +558,7 @@ namespace mongo {
             chunks.push_back(&findChunk(BSON(field.fieldName() << range.min())));
             return 1;
         } else if (!range.nontrivial()) {
-            chunks = _chunks;
-            return chunks.size();
+            return -1; // all chunks
         } else {
             set<Chunk*, ChunkCmp> chunkSet;
 
@@ -590,9 +589,37 @@ namespace mongo {
         }
     }
 
+    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+        int ret = _getChunksForQuery(chunks, query);
+
+        if (ret == -1){
+            chunks = _chunks;
+            return chunks.size();
+        }
+
+        return ret;
+    }
+
+    int ChunkManager::getShardsForQuery( set<string>& shards , const BSONObj& query ){
+        vector<Chunk*> chunks;
+        int ret = _getChunksForQuery(chunks, query);
+
+        if (ret == -1){
+            getAllServers(shards);
+        } else {
+            for ( vector<Chunk*>::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
+                Chunk* c = *it;
+                shards.insert(c->getShard());
+            }
+        }
+
+        return shards.size();
+    }
+
     void ChunkManager::getAllServers( set<string>& allServers ){
         rwlock lk( _lock , false ); 
         
+        // TODO: cache this
         for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
             allServers.insert( (*i)->getShard() );
         }        

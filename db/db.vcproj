@@ -339,7 +339,7 @@
 	</References>
 	<Files>
 		<Filter
-			Name="misc and third party"
+			Name="libs"
 			>
 			<File
 				RelativePath="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp"
@@ -1961,7 +1961,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\replset.h"
+				RelativePath=".\replpair.h"
 				>
 			</File>
 		</Filter>
