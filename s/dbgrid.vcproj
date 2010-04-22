@@ -350,6 +350,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\config_migrate.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\cursors.cpp"
 				>
 			</File>
