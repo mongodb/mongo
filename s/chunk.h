@@ -187,7 +187,12 @@ namespace mongo {
          * @return number of Chunk added to the vector
          */
         int getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
-        
+
+        /**
+         * @return number of Shards added to the set
+         */
+        int getShardsForQuery( set<string>& shards , const BSONObj& query );
+
         void getAllServers( set<string>& allServers );
 
         void save();
@@ -225,6 +230,11 @@ namespace mongo {
 
         friend class Chunk;
         static unsigned long long NextSequenceNumber;
+
+        /**
+         * @return number of Chunk matching the query or -1 for all chunks.
+         */
+        int _getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
     };
 
     // like BSONObjCmp. for use as an STL comparison functor
