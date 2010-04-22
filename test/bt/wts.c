@@ -60,7 +60,7 @@ wts_setup(int reopen, int logfile)
 		    WT_VERB_CACHE |
 		    // WT_VERB_HAZARD |
 		    // WT_VERB_MUTEX |
-		    WT_VERB_SERVERS |
+		    // WT_VERB_SERVERS |
 		    // WT_VERB_FILEOPS |
 		    0);
 		env->msgfile_set(env, g.wts_log);
