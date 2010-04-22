@@ -701,11 +701,8 @@ namespace mongo {
         mongolock lk(false); // read lock
         Client::Context ctx( ns , dbpath , &lk );
 
-        /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
-           so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
-           query the nonmaster member of a replica pair.
-        */
-        uassert( 10107 , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
+        replVerifyReadsOk(pq);
+        //uassert( ?? , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
 
         BSONElement hint = useHints ? pq.getHint() : BSONElement();
         bool explain = pq.isExplain();

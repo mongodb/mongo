@@ -102,6 +102,10 @@ namespace mongo {
 
     extern ReplPair *replPair;
 
+    inline void notMasterUnless(bool expr) { 
+        uassert( 10107 , "not master" , expr );
+    }
+
     /* note we always return true for the "local" namespace.
 
        we should not allow most operations when not the master
@@ -145,6 +149,19 @@ namespace mongo {
             return true;
         
         return strcmp( client, "local" ) == 0;
+    }
+
+    /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
+       so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
+       query the nonmaster member of a replica pair.
+    */
+    inline void replVerifyReadsOk(ParsedQuery& pq) {
+        if( replSet ) {
+            uassert(13124, "not master still in initialization", theReplSet); // during initialization, no queries allowed whatsover
+            notMasterUnless( theReplSet->isMaster("") || pq.hasOption( QueryOption_SlaveOk ) );
+            return;
+        }
+        notMasterUnless(isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave);
     }
 
     inline bool isMasterNs( const char *ns ) {
