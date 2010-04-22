@@ -69,27 +69,32 @@ namespace mongo {
 //        void addMemberIfMissing(const HostAndPort& p);
 
         struct MemberInfo : public List1<MemberInfo>::Base {
-            MemberInfo(string h, int p) : port(p), host(h) {
-                dead = false;
-                lastHeartbeat = 0;
-                upSince = 0;
-                health = -1.0;
+            MemberInfo(string h, int p) : _port(p), _host(h) {
+                _dead = false;
+                _lastHeartbeat = 0;
+                _upSince = 0;
+                _health = -1.0;
             }
-
-            bool dead;
-            const int port;
-            const string host;
-            double health;
-            time_t lastHeartbeat;
-            time_t upSince;
-            DiagStr lastHeartbeatErrMsg;
-
-            string fullName() {
-                if( port < 0 ) return host;
+            string fullName() const {
+                if( _port < 0 ) return _host;
                 stringstream ss;
-                ss << host << ':' << port;
+                ss << _host << ':' << _port;
                 return ss.str();
             }
+            double health() const { return _health; }
+            time_t upSince() const { return _upSince; }
+            time_t lastHeartbeat() const { return _lastHeartbeat; }
+        private:
+            friend class FeedbackThread; // feedbackthread is the primary writer to these objects
+
+            bool _dead;
+            const int _port;
+            const string _host;
+            double _health;
+            time_t _lastHeartbeat;
+            time_t _upSince;
+        public:
+            DiagStr _lastHeartbeatErrMsg;
         };
         /* all members of the set EXCEPT SELF. */
         List1<MemberInfo> _members;

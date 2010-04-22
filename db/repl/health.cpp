@@ -56,9 +56,9 @@ namespace mongo {
 
     private:
         void down() {
-            m->health = 0.0;
-            if( m->upSince ) {
-                m->upSince = 0;
+            m->_health = 0.0;
+            if( m->_upSince ) {
+                m->_upSince = 0;
                 log() << "replSet " << m->fullName() << " is now down" << endl;
             }
         }
@@ -77,23 +77,23 @@ namespace mongo {
                 try { 
                     BSONObj info;
                     bool ok = conn.runCommand("admin", cmd, info);
-                    m->lastHeartbeat = time(0);
+                    m->_lastHeartbeat = time(0);
                     if( ok ) {
-                        if( m->upSince == 0 ) {
+                        if( m->_upSince == 0 ) {
                             log() << "replSet " << m->fullName() << " is now up" << endl;
-                            m->upSince = m->lastHeartbeat;
+                            m->_upSince = m->_lastHeartbeat;
                         }
-                        m->health = 1.0;
-                        m->lastHeartbeatErrMsg.set("");
+                        m->_health = 1.0;
+                        m->_lastHeartbeatErrMsg.set("");
                     }
                     else { 
                         down();
-                        m->lastHeartbeatErrMsg.set(info.getStringField("errmsg"));
+                        m->_lastHeartbeatErrMsg.set(info.getStringField("errmsg"));
                     }
                 }
                 catch(...) { 
                     down();
-                    m->lastHeartbeatErrMsg.set("connect/transport error");
+                    m->_lastHeartbeatErrMsg.set("connect/transport error");
                 }
                 sleepsecs(2);
             }
@@ -113,10 +113,10 @@ namespace mongo {
         while( m ) {
             BSONObjBuilder bb;
             bb.append("name", m->fullName());
-            bb.append("health", m->health);
-            bb.append("uptime", (unsigned) (m->upSince ? (time(0)-m->upSince) : 0));
-            bb.appendDate("lastHeartbeat", m->lastHeartbeat);
-            bb.append("errmsg", m->lastHeartbeatErrMsg.get());
+            bb.append("health", m->health());
+            bb.append("uptime", (unsigned) (m->upSince() ? (time(0)-m->upSince()) : 0));
+            bb.appendDate("lastHeartbeat", m->lastHeartbeat());
+            bb.append("errmsg", m->_lastHeartbeatErrMsg.get());
             v.push_back(bb.obj());
             m = m->next();
         }
