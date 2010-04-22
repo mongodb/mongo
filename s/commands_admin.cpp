@@ -745,6 +745,15 @@ namespace mongo {
             }
             CmdShardingGetLastError() : Command("getlasterror") { }
             virtual bool run(const char *nsraw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                {
+                    LastError * le = lastError.get();
+                    assert( le );
+                    if ( le->msg.size() ){
+                        le->appendSelf( result );
+                        return true;
+                    }
+                }
+                
                 string dbName = nsraw;
                 dbName = dbName.substr( 0 , dbName.size() - 5 );
                 

@@ -72,6 +72,11 @@ namespace mongo {
         virtual ~ShardedMessageHandler(){}
         virtual void process( Message& m , AbstractMessagingPort* p ){
             Request r( m , p );
+
+            lastError.setID( r.getClientId() );
+            LastError * le = lastError.get( true );
+            lastError.startRequest( m );
+            
             if ( logLevel > 5 ){
                 log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
             }
@@ -80,6 +85,8 @@ namespace mongo {
                 r.process();
             }
             catch ( DBException& e ){
+                le->raiseError( e.getCode() , e.what() );
+
                 m.data->id = r.id();
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
