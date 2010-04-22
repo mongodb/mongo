@@ -20,6 +20,7 @@
 
 #include "../client/dbclient.h"
 #include "../db/commands.h"
+#include "../db/replpair.h"
 
 class MockDBClientConnection : public DBClientConnection {
 public:
