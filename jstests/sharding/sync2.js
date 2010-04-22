@@ -7,13 +7,13 @@ s2 = s._mongos[1];
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
-s.getDB( "test" ).foo.save( { num : 1 } );
-s.getDB( "test" ).foo.save( { num : 2 } );
-s.getDB( "test" ).foo.save( { num : 3 } );
-s.getDB( "test" ).foo.save( { num : 4 } );
-s.getDB( "test" ).foo.save( { num : 5 } );
-s.getDB( "test" ).foo.save( { num : 6 } );
-s.getDB( "test" ).foo.save( { num : 7 } );
+s.getDB( "test" ).foo.insert( { num : 1 } );
+s.getDB( "test" ).foo.insert( { num : 2 } );
+s.getDB( "test" ).foo.insert( { num : 3 } );
+s.getDB( "test" ).foo.insert( { num : 4 } );
+s.getDB( "test" ).foo.insert( { num : 5 } );
+s.getDB( "test" ).foo.insert( { num : 6 } );
+s.getDB( "test" ).foo.insert( { num : 7 } );
 
 assert.eq( 7 , s.getDB( "test" ).foo.find().toArray().length , "normal A" );
 assert.eq( 7 , s2.getDB( "test" ).foo.find().toArray().length , "other A" );
