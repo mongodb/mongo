@@ -1973,7 +1973,23 @@
 				>
 			</File>
 			<File
+				RelativePath="..\bson\bsoninlines.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\bsonmisc.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\bsonobj.h"
+				>
+			</File>
+			<File
 				RelativePath="..\bson\bsonobjbuilder.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\bsonobjiterator.h"
 				>
 			</File>
 			<File
@@ -1986,6 +2002,10 @@
 			</File>
 			<File
 				RelativePath="..\bson\oid.h"
+				>
+			</File>
+			<File
+				RelativePath="..\bson\ordering.h"
 				>
 			</File>
 		</Filter>

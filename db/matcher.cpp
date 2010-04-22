@@ -780,6 +780,35 @@ namespace mongo {
         return false;
     }
 
+    /*- just for testing -- */
+#pragma pack(1)
+    struct JSObj1 {
+        JSObj1() {
+            totsize=sizeof(JSObj1);
+            n = NumberDouble;
+            strcpy_s(nname, 5, "abcd");
+            N = 3.1;
+            s = String;
+            strcpy_s(sname, 7, "abcdef");
+            slen = 10;
+            strcpy_s(sval, 10, "123456789");
+            eoo = EOO;
+        }
+        unsigned totsize;
+
+        char n;
+        char nname[5];
+        double N;
+
+        char s;
+        char sname[7];
+        unsigned slen;
+        char sval[10];
+
+        char eoo;
+    };
+#pragma pack()
+
     struct JSObj1 js1;
 
 #pragma pack(1)
