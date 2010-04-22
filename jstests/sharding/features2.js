@@ -111,4 +111,13 @@ assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );
 
+// count
+
+db.countaa.save({"regex" : /foo/i})
+db.countaa.save({"regex" : /foo/i})
+db.countaa.save({"regex" : /foo/i})
+assert.eq( 3 , db.countaa.count() , "counta1" );
+assert.eq( 3 , db.countaa.find().itcount() , "counta1" );
+
+
 s.stop();
