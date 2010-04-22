@@ -47,7 +47,7 @@ __wt_workq_cache_read_server(ENV *env)
 	/* Wake the cache drain thread if it's sleeping and it needs to run. */
 	if (cache->drain_sleeping &&
 	    (bytes_inuse > bytes_max || cache->read_lockout)) {
-		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		WT_VERBOSE(env, WT_VERB_SERVERS,
 		    (env, "workQ waking cache drain server: read lockout "
 		    "%sset, bytes-inuse %llu of bytes-max %llu",
 		    cache->read_lockout ? "" : "not ",
@@ -59,7 +59,7 @@ __wt_workq_cache_read_server(ENV *env)
 
 	/* A read is scheduled -- wake the I/O thread if it's sleeping. */
 	if (!cache->read_lockout && cache->io_sleeping) {
-		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
+		WT_VERBOSE(env, WT_VERB_SERVERS,
 		    (env, "workQ waking cache I/O server"));
 
 		__wt_unlock(env, cache->mtx_io);
@@ -136,8 +136,8 @@ __wt_cache_io(void *arg)
 		 * No need for an explicit memory flush, the io_sleeping flag
 		 * is declared volatile.
 		 */
-		WT_VERBOSE(env, WT_VERB_CACHE | WT_VERB_SERVERS,
-		    (env, "cache I/O server sleeping"));
+		WT_VERBOSE(env,
+		    WT_VERB_SERVERS, (env, "cache I/O server sleeping"));
 		cache->io_sleeping = 1;
 		__wt_lock(env, cache->mtx_io);
 
@@ -271,28 +271,16 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_CACHE_PAGE_IN(cache, size);
 
 	/*
-	 * Get a hazard reference before we mark the entry OK, the cache drain
-	 * server shouldn't pick our new page with its high read-generation,
-	 * but there's no reason to risk it.
+	 * Get a hazard reference before we mark the entry OK: the cache drain
+	 * server shouldn't pick a new page with a high read-generation, but
+	 * there's no reason to risk it.
 	 */
 	__wt_hazard_set(toc, page);
 
-	/*
-	 * Fill in everything but the state, flush, then fill in the state.  No
-	 * additional flush is necessary, the state field is declared volatile.
-	 * The state turns on the entry for both the cache drain server thread
-	 * and any readers.
-	 */
-	empty->db = db;
-	empty->page = page;
-	empty->addr = addr;
-	empty->read_gen = ++ienv->read_gen;
-	empty->write_gen = 0;
-	WT_MEMORY_FLUSH;
-	empty->state = WT_OK;
+	WT_CACHE_ENTRY_SET(empty, db, page, addr, ++ienv->read_gen, 0, WT_OK);
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "cache I/O server %s element/page %#llx/%lu",
+	    "cache %s element/page %#llx/%lu",
 	    newpage ? "allocated" : "read",
 	    WT_PTR_TO_UQUAD(empty), (u_long)addr));
 
@@ -327,16 +315,16 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 #define	WT_CACHE_ENTRY_GROW	20
 	entries = hb->entry_size + WT_CACHE_ENTRY_GROW;
 
-	WT_VERBOSE(env, WT_VERB_CACHE, (env,
-	    "I/O server: hash bucket %lu grows to %lu entries",
-	    (u_long)(hb - cache->hb), entries));
-
 	/*
 	 * Lock the hash buckets, we can't copy them while the cache drain
 	 * server has them pinned (that is, has references to pages in the
 	 * bucket).
 	 */
 	__wt_lock(env, cache->mtx_hb);
+
+	WT_VERBOSE(env, WT_VERB_CACHE, (env,
+	    "cache hash bucket %lu grows to %lu entries",
+	    (u_long)(hb - cache->hb), entries));
 
 	/* Allocate the new WT_ENTRY array. */
 	WT_RET(__wt_calloc(env, (size_t)entries, sizeof(WT_CACHE_ENTRY), &new));
