@@ -94,11 +94,15 @@ namespace mongo {
             log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
-            BSONElement id = _id["_id"];
-            b.append( id );
+            if ( myId.eoo() ){
+                myId = _id["_id"];
+                b.append( myId );
+            }
+            
+            assert( ! myId.eoo() );
 
             BSONObjBuilder qb;
-            qb.append( id );
+            qb.append( myId );
             
             BSONObj q = qb.obj();
             BSONObj o = b.obj();
