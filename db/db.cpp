@@ -30,6 +30,7 @@
 #include "clientcursor.h"
 #include "pdfile.h"
 #include "stats/counters.h"
+#include "repl/replset.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -555,8 +556,10 @@ namespace mongo {
         snapshotThread.go();
         clientCursorMonitor.go();
 
-        if( !cmdLine.replSet.empty() )
+        if( !cmdLine.replSet.empty() ) {
+            replSet = true;
             boost::thread t(startReplSets);
+        }
 
         listen(listenPort);
 

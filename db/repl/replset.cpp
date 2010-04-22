@@ -22,6 +22,7 @@
 
 namespace mongo { 
 
+    bool replSet = false;
     ReplSet *theReplSet = 0;
 
     void ReplSet::fillIsMaster(BSONObjBuilder& b) {
@@ -125,8 +126,10 @@ namespace mongo {
         mongo::lastError.reset( new LastError() );
         try { 
             assert( theReplSet == 0 );
-            if( cmdLine.replSet.empty() )
+            if( cmdLine.replSet.empty() ) {
+                assert(!replSet);
                 return;
+            }
             theReplSet = new ReplSet(cmdLine.replSet);
         }
         catch(...) { 

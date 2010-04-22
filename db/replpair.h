@@ -22,6 +22,7 @@
 #include "../client/dbclient.h"
 #include "repl.h"
 #include "cmdline.h"
+#include "repl/replset.h"
 
 namespace mongo {
 
@@ -111,6 +112,11 @@ namespace mongo {
        If 'client' is not specified, the current client is used.
     */
     inline bool isMaster( const char *client = 0 ) {
+        if( replSet ) {
+            if( theReplSet ) return theReplSet->isMaster(client);
+            return false;
+        }
+
 		if( ! replSettings.slave ) 
 			return true;
 

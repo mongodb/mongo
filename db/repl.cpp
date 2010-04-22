@@ -352,7 +352,7 @@ namespace mongo {
 			   one is not authenticated for admin db to be safe.
 			*/
 
-            if( !cmdLine.replSet.empty() ) {
+            if( replSet ) {
                 if( theReplSet == 0 ) { 
                     result.append("ismaster", 0);
                     result.append("ok", false);

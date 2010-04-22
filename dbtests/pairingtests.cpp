@@ -18,7 +18,7 @@
  */
 
 #include "stdafx.h"
-#include "../db/replset.h"
+#include "../db/replpair.h"
 #include "dbtests.h"
 #include "mockdbclient.h"
 #include "../db/cmdline.h"

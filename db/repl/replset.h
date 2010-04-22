@@ -24,7 +24,8 @@
 
 namespace mongo {
 
-    extern class ReplSet *theReplSet;
+    extern bool replSet; // true if using repl sets
+    extern class ReplSet *theReplSet; // null until initialized
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -32,6 +33,9 @@ namespace mongo {
     */
     class ReplSet {
     public:
+        bool isMaster(const char *client) { 
+            return false;
+        }
         void fillIsMaster(BSONObjBuilder&);
 
         static string startupStatusMsg;

@@ -32,8 +32,12 @@ namespace mongo {
         virtual LockType locktype(){ return NONE; }
         CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( theReplSet == 0 ) { 
+            if( !replSet ) {
                 errmsg = "not a replset member";
+                return false;
+            }
+            if( theReplSet == 0 ) { 
+                errmsg = "still initializing";
                 return false;
             }
             if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
