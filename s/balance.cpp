@@ -25,6 +25,7 @@
 #include "server.h"
 #include "shard.h"
 #include "config.h"
+#include "chunk.h"
 
 namespace mongo {
     
@@ -70,6 +71,101 @@ namespace mongo {
         return _myid == x["who"].String() && hack == x["x"].OID();
     }
     
+    void Balancer::balance( DBClientBase& conn ){
+        log() << "i'm going to do some balancing" << endl;
+        
+        auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
+        while ( cursor->more() ){
+            BSONObj db = cursor->next();
+            BSONObjIterator i( db["sharded"].Obj() );
+            while ( i.more() ){
+                BSONElement e = i.next();
+                BSONObj data = e.Obj().getOwned();
+                string ns = e.fieldName();
+                balance( conn , ns , data );
+            }
+        }
+    }
+
+    void Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data ){
+        log(4) << "balancer: balance(" << ns << ")" << endl;
+
+        map< string,vector<BSONObj> > shards;
+        {
+            auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
+            while ( cursor->more() ){
+                BSONObj chunk = cursor->next();
+                vector<BSONObj>& chunks = shards[chunk["shard"].String()];
+                chunks.push_back( chunk.getOwned() );
+            }
+        }
+        
+        if ( shards.size() == 0 )
+            return;
+
+        pair<string,unsigned> min("",9999999);
+        pair<string,unsigned> max("",0);
+        
+        for ( map< string,vector<BSONObj> >::iterator i=shards.begin(); i!=shards.end(); ++i ){
+            string shard = i->first;
+            unsigned size = i->second.size();
+            
+            if ( size < min.second ){
+                min.first = shard;
+                min.second = size;
+            }
+            
+            if ( size > max.second ){
+                max.first = shard;
+                max.second = size;
+            }
+        }
+        
+        log(6) << "min: " << min.first << "\t" << min.second << endl;
+        log(6) << "max: " << max.first << "\t" << max.second << endl;
+        
+        if ( ( max.second - min.second ) < 10 )
+            return;
+
+        string from = max.first;
+        string to = min.first;
+
+        BSONObj chunkToMove = pickChunk( shards[from] , shards[to] );
+        log(1) << "balancer: move a chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+
+        DBConfig * cfg = grid.getDBConfig( ns );
+        assert( cfg );
+        
+        ChunkManager * cm = cfg->getChunkManager( ns );
+        assert( cm );
+        
+        Chunk& c = cm->findChunk( chunkToMove["min"].Obj() );
+        assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        
+        string errmsg;
+        if ( c.moveAndCommit( to , errmsg ) )
+            return;
+
+        log() << "balancer: MOVE FAILED **** " << errmsg << "\n"
+              << "  from: " << from << " to: " << to << " chunk: " << chunkToMove << endl;
+    }
+    
+    BSONObj Balancer::pickChunk( vector<BSONObj>& from, vector<BSONObj>& to ){
+        assert( from.size() > to.size() );
+        
+        if ( to.size() == 0 )
+            return from[0];
+        
+        if ( from[0]["min"].Obj().woCompare( to[to.size()-1]["max"].Obj() , BSONObj() , false ) == 0 )
+            return from[0];
+
+        if ( from[from.size()-1]["max"].Obj().woCompare( to[0]["min"].Obj() , BSONObj() , false ) == 0 )
+            return from[from.size()-1];
+
+        return from[0];
+    }
+    
+
     void Balancer::run(){
 
         { // init stuff, don't want to do at static init
@@ -93,7 +189,7 @@ namespace mongo {
                               true );
                 
                 if ( shouldIBalance( conn.conn() ) ){
-                    log() << "i'm going to do some balancing" << endl;
+                    balance( conn.conn() );
                 }
                 
                 conn.done();

@@ -32,6 +32,10 @@ namespace mongo {
 
     private:
         bool shouldIBalance( DBClientBase& conn );
+        void balance( DBClientBase& conn );
+        void balance( DBClientBase& conn , const string& ns , const BSONObj& data );
+        
+        BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
         
         string _myid;
         time_t _started;
