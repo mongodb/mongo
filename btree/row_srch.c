@@ -33,9 +33,6 @@ __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags)
 	WT_DB_FCHK(db,
 	    "__wt_bt_search_key_row", flags, WT_APIMASK_BT_SEARCH_KEY_ROW);
 
-	if (WT_UNOPENED_DATABASE(idb))
-		return (WT_NOTFOUND);
-
 	/* Search the tree. */
 	for (page = idb->root_page;;) {
 		isleaf = page->hdr->type == WT_PAGE_ROW_LEAF;

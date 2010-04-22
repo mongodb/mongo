@@ -31,9 +31,6 @@ __wt_bt_search_col(WT_TOC *toc, u_int64_t recno)
 	db = toc->db;
 	idb = db->idb;
 
-	if (WT_UNOPENED_DATABASE(idb))
-		return (WT_NOTFOUND);
-
 	/* Check for a record past the end of the database. */
 	page = idb->root_page;
 	if (page->records < recno)

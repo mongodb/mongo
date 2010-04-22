@@ -42,9 +42,6 @@ __wt_db_dump(WT_TOC *toc,
 	db = toc->db;
 	idb = db->idb;
 
-	if (WT_UNOPENED_DATABASE(idb))
-		return (0);
-
 	if (LF_ISSET(WT_DEBUG)) {
 #ifdef HAVE_DIAGNOSTIC
 		/*

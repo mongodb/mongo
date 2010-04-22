@@ -40,11 +40,7 @@ static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 int
 __wt_db_verify(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
-	IDB *idb;
-
-	idb = toc->db->idb;
-
-	return (WT_UNOPENED_DATABASE(idb) ? 0 : __wt_bt_verify(toc, f, NULL));
+	return (__wt_bt_verify(toc, f, NULL));
 }
 
 /*
