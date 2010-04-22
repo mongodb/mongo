@@ -195,12 +195,10 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-	if (0) {
-err:		if (page != NULL)
-			__wt_bt_page_out(toc, &page, 0);
-	}
+err:	if (page != NULL)
+		__wt_bt_page_out(toc, &page, 0);
 
-	return (ret == 1 ? 0 : ret);
+	return (ret);
 }
 
 /*
@@ -228,8 +226,8 @@ __wt_bt_bulk_var(WT_TOC *toc, u_int32_t flags,
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	ret = 0;
 	type = F_ISSET(idb, WT_COLUMN) ? WT_PAGE_COL_VAR : WT_PAGE_ROW_LEAF;
+	ret = 0;
 
 	dup_space = dup_count = 0;
 	insert_cnt = 0;
@@ -604,16 +602,14 @@ skip_read:	/*
 	if (f != NULL)
 		f(toc->name, insert_cnt);
 
-	if (0) {
-err:		if (page != NULL)
-			__wt_bt_page_out(toc, &page, 0);
-	}
+err:	if (page != NULL)
+		__wt_bt_page_out(toc, &page, 0);
 
 	__wt_free(env, data_comp.data, data_comp.mem_size);
 	__wt_free(env, key_comp.data, key_comp.mem_size);
 	__wt_free(env, lastkey_ovfl.data, lastkey_ovfl.mem_size);
 
-	return (ret == 1 ? 0 : ret);
+	return (ret);
 }
 
 /*
@@ -805,11 +801,11 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 
 /*
  * __wt_bt_promote --
- *	Promote the first WT_ITEM on a variable length page to a parent.
+ *	Promote the first entry on a page to its parent.
  */
 static int
 __wt_bt_promote(
-    WT_TOC *toc, WT_PAGE *page, u_int64_t increment, u_int32_t *root_addrp)
+    WT_TOC *toc, WT_PAGE *page, u_int64_t incr, u_int32_t *root_addrp)
 {
 	DB *db;
 	DBT *key, key_build;
@@ -994,7 +990,7 @@ split:		switch (page->hdr->type) {
 			if (parent->hdr->prntaddr == WT_ADDR_INVALID) {
 				root_split = 1;
 				WT_ERR(__wt_bt_promote(
-				    toc, parent, increment, root_addrp));
+				    toc, parent, incr, root_addrp));
 			} else
 				root_split = 0;
 
@@ -1105,7 +1101,7 @@ split:		switch (page->hdr->type) {
 	 * the key from the newly allocated internal page to its parent.
 	 */
 	if (need_promotion)
-		ret = __wt_bt_promote(toc, parent, increment, root_addrp);
+		ret = __wt_bt_promote(toc, parent, incr, root_addrp);
 	else	/*
 		 * We've finished promoting the new page's key into the tree.
 		 * What remains is to push the new record counts all the way
@@ -1121,14 +1117,14 @@ split:		switch (page->hdr->type) {
 
 			switch (parent->hdr->type) {
 			case WT_PAGE_COL_INT:
-				__wt_bt_promote_col_rec(parent, increment);
+				__wt_bt_promote_col_rec(parent, incr);
 				break;
 			case WT_PAGE_ROW_INT:
-				__wt_bt_promote_row_rec(parent, increment);
+				__wt_bt_promote_row_rec(parent, incr);
 				break;
 			WT_ILLEGAL_FORMAT(db);
 			}
-			parent->records += increment;
+			parent->records += incr;
 		}
 
 err:	/* Discard the parent page. */
@@ -1248,7 +1244,7 @@ __wt_bt_promote_row_indx(
  *	Promote the record count to a column-store parent.
  */
 static void
-__wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t increment)
+__wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t incr)
 {
 	WT_COL_INDX *ip;
 
@@ -1257,7 +1253,7 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t increment)
 	 * the subtree referenced by the last entry in each parent page.
 	 */
 	ip = parent->u.c_indx + (parent->indx_count - 1);
-	WT_COL_OFF_RECORDS(ip) += increment;
+	WT_COL_OFF_RECORDS(ip) += incr;
 }
 
 /*
@@ -1265,7 +1261,7 @@ __wt_bt_promote_col_rec(WT_PAGE *parent, u_int64_t increment)
  *	Promote the record count to a row-store parent.
  */
 static void
-__wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t increment)
+__wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t incr)
 {
 	WT_ROW_INDX *ip;
 
@@ -1274,7 +1270,7 @@ __wt_bt_promote_row_rec(WT_PAGE *parent, u_int64_t increment)
 	 * the subtree referenced by the last entry in each parent page.
 	 */
 	ip = parent->u.r_indx + (parent->indx_count - 1);
-	WT_ROW_OFF_RECORDS(ip) += increment;
+	WT_ROW_OFF_RECORDS(ip) += incr;
 }
 
 /*
