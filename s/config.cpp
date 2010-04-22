@@ -32,10 +32,12 @@ namespace mongo {
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
-
+    
     string ShardNS::database = "config.databases";
     string ShardNS::chunk = "config.chunks";
     string ShardNS::shard = "config.shards";
+    string ShardNS::mongos = "config.mongos";
+    string ShardNS::settings = "config.settings";
 
     /* --- DBConfig --- */
 
@@ -457,7 +459,7 @@ namespace mongo {
         set<string> got;
         
         ShardConnection conn( _primary );
-        auto_ptr<DBClientCursor> c = conn->query( "config.settings" , BSONObj() );
+        auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
         while ( c->more() ){
             BSONObj o = c->next();
             string name = o["_id"].valuestrsafe();
@@ -466,13 +468,16 @@ namespace mongo {
                 log(1) << "MaxChunkSize: " << o["value"] << endl;
                 Chunk::MaxChunkSize = o["value"].numberInt() * 1024 * 1024;
             }
+            else if ( name == "balancer" ){
+                // ones we ignore here
+            }
             else {
                 log() << "warning: unknown setting [" << name << "]" << endl;
             }
         }
 
         if ( ! got.count( "chunksize" ) ){
-            conn->insert( "config.settings" , BSON( "_id" << "chunksize"  <<
+            conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
                                                     "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
         }
 
