@@ -181,9 +181,26 @@ struct __wt_cache_hb {
  * There is an additional synchronization between the cache drain server and
  * the I/O server; only the cache drain server can remove pages from the cache,
  * and only the I/O server can add pages to the cache.  The cache drain server
- * sets the state field to WT_NOTHING when it's discarded the page, and the I/O
- * server sets the state field to WT_OK when it's instantiated a new page.
+ * sets the state field to WT_EMPTY after it has discarded the page, and the
+ * I/O server sets the state field to WT_OK when it's instantiated a new page.
+ *
+ * WT_CACHE_ENTRY_SET --
+ *	Fill in everything but the state, flush, then fill in the state.  No
+ * additional flush is necessary, the state field is declared volatile.  The
+ * state turns on the entry for both the cache drain server thread as well as
+ * any readers.
  */
+#define	WT_CACHE_ENTRY_SET(e,						\
+    _db, _page, _addr, _read_gen, _write_gen, _state) do {		\
+	(e)->db = _db;							\
+	(e)->page = _page;						\
+	(e)->addr = _addr;						\
+	(e)->read_gen = _read_gen;					\
+	(e)->write_gen = _write_gen;					\
+	WT_MEMORY_FLUSH;						\
+	(e)->state = _state;						\
+} while (0);
+
 struct __wt_cache_entry {
 	DB	 *db;			/* Page's backing database */
 	WT_PAGE	 *page;			/* Page */
