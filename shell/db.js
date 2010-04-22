@@ -289,6 +289,8 @@ DB.prototype.help = function() {
     print("\tdb.stats()");
     print("\tdb.version() current version of the server");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
+
+    return __magicNoPrint;
 }
 
 DB.prototype.printCollectionStats = function(){

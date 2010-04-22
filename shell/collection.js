@@ -60,6 +60,7 @@ DBCollection.prototype.help = function() {
     print("\tdb."+shortName+".update(query, object[, upsert_bool, multi_bool])");
     print("\tdb."+shortName+".validate() - SLOW");
     print("\tdb."+shortName+".getShardVersion() - only for use with sharding");
+    return __magicNoPrint;
 }
 
 DBCollection.prototype.getFullName = function(){
