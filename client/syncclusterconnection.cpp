@@ -210,7 +210,8 @@ namespace mongo {
     
     void SyncClusterConnection::insert( const string &ns, BSONObj obj ){ 
 
-        uassert( 13119 , "SyncClusterConnection::insert obj has to have an _id" , obj["_id"].type() );
+        uassert( 13119 , (string)"SyncClusterConnection::insert obj has to have an _id: " + obj.jsonString() , 
+                 ns.find( ".system.indexes" ) != string::npos || obj["_id"].type() );
         
         string errmsg;
         if ( ! prepare( errmsg ) )

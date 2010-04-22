@@ -480,6 +480,11 @@ namespace mongo {
             conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
                                                     "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
         }
+        
+        
+        // indexes
+        conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
+        conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
 
         conn.done();
     }

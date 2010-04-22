@@ -726,6 +726,8 @@ namespace mongo {
     }
     
     ShardChunkVersion ChunkManager::getVersion( const string& server ) const{
+        rwlock lk( _lock , false ); 
+
         // TODO: cache or something?
         
         ShardChunkVersion max = 0;
