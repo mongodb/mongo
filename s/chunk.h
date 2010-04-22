@@ -168,8 +168,8 @@ namespace mongo {
             return _ns;
         }
         
-        int numChunks(){ return _chunks.size(); }
-        Chunk* getChunk( int i ){ return _chunks[i]; }
+        int numChunks(){ rwlock lk( _lock , false ); return _chunks.size(); }
+        Chunk* getChunk( int i ){ rwlock lk( _lock , false ); return _chunks[i]; }
         bool hasShardKey( const BSONObj& obj );
 
         Chunk& findChunk( const BSONObj& obj );
@@ -187,6 +187,11 @@ namespace mongo {
          * @return number of Chunk added to the vector
          */
         int getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
+
+        /**
+         * @return number of Shards added to the set
+         */
+        int getShardsForQuery( set<string>& shards , const BSONObj& query );
 
         void getAllServers( set<string>& allServers );
 
@@ -217,12 +222,19 @@ namespace mongo {
         map<string,unsigned long long> _maxMarkers;
 
         typedef map<BSONObj,Chunk*,BSONObjCmp> ChunkMap;
-        ChunkMap _chunkMap;
+        ChunkMap _chunkMap; // max -> Chunk
 
         unsigned long long _sequenceNumber;
         
+        RWLock _lock;
+
         friend class Chunk;
         static unsigned long long NextSequenceNumber;
+
+        /**
+         * @return number of Chunk matching the query or -1 for all chunks.
+         */
+        int _getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
     };
 
     // like BSONObjCmp. for use as an STL comparison functor

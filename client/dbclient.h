@@ -722,7 +722,7 @@ namespace mongo {
         /**
            updates objects matching query
          */
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = false , bool multi = false );
         
         virtual string getServerAddress() const = 0;
         

@@ -35,6 +35,8 @@ namespace mongo {
         static string database;
         static string shard;
         static string chunk;
+        static string mongos;
+        static string settings;
     };
 
     

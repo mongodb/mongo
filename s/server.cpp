@@ -26,6 +26,7 @@
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
+#include "balance.h"
 
 namespace mongo {
 
@@ -113,6 +114,8 @@ namespace mongo {
     }
 
     void start() {
+        balancer.go();
+
         log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
         //l.listen();
