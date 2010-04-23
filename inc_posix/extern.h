@@ -11,6 +11,9 @@ __wt_bt_int_compare(DB *db, const DBT *user_dbt, const DBT *tree_dbt);
 int
 __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp);
 int
+__wt_bt_debug_addr(
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, char *ofile, FILE *fp);
+int
 __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
 int
 __wt_bt_debug_inmem(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp);
@@ -20,6 +23,8 @@ int
 __wt_bt_stat_desc(WT_TOC *toc);
 int
 __wt_bt_desc_read(WT_TOC *toc);
+int
+__wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size);
 int
 __wt_bt_desc_write(WT_TOC *toc);
 int
