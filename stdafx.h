@@ -96,7 +96,6 @@ namespace mongo {
 
 ///using namespace std;
 
-#undef yassert
 #include <boost/archive/iterators/base64_from_binary.hpp>
 #include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
@@ -127,7 +126,6 @@ namespace mongo {
 #include <boost/thread/xtime.hpp>
 #undef assert
 #define assert xassert
-#define yassert 1
 
 namespace mongo {
     using namespace boost::filesystem;

@@ -39,8 +39,6 @@
 #undef uassert
 #pragma push_macro("wassert")
 #undef wassert
-#pragma push_macro("yassert")
-#undef yassert
 #pragma push_macro("xassert")
 #undef xassert
 #pragma push_macro("ASSERT_ID_DUPKEY")

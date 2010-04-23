@@ -105,11 +105,8 @@ namespace mongo {
 // PRINTFL; prints file:line
 #define PRINTFL cout << __FILE__ ":" << __LINE__ << endl
 
-#undef yassert
-
 #undef assert
 #define assert xassert
-#define yassert 1
 
     struct WrappingInt {
         WrappingInt() {

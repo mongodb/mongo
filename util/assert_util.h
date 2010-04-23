@@ -165,8 +165,6 @@ namespace mongo {
 
 #define xassert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
-#define yassert 1
-
     /* warning only - keeps going */
 #define wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
 

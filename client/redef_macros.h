@@ -32,7 +32,6 @@
 #pragma pop_macro("massert")
 #pragma pop_macro("uassert")
 #pragma pop_macro("wassert")
-#pragma pop_macro("yassert")
 #pragma pop_macro("xassert")
 #pragma pop_macro("ASSERT_ID_DUPKEY")
 #pragma pop_macro("ASSERT_STREAM_GOOD")
