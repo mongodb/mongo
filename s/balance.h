@@ -35,6 +35,9 @@ namespace mongo {
         void balance( DBClientBase& conn );
         void balance( DBClientBase& conn , const string& ns , const BSONObj& data );
         
+        void ping();
+        void ping( DBClientBase& conn );
+
         BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
         
         string _myid;

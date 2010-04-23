@@ -54,7 +54,7 @@ namespace mongo {
                 return false;
             }
             
-            log(3) << "balancer: going to take over" << endl;
+            log() << "balancer: going to take over" << endl;
             // we want to take over, so fall through to below
         }
         
@@ -74,12 +74,12 @@ namespace mongo {
                      true );
         
         x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        log(3) << "balancer: after update: " << x << endl;
+        log() << "balancer: after update: " << x << endl;
         return _myid == x["who"].String() && hack == x["x"].OID();
     }
     
     void Balancer::balance( DBClientBase& conn ){
-        log() << "i'm going to do some balancing" << endl;
+        log(1) << "i'm going to do some balancing" << endl;
         
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
         while ( cursor->more() ){
@@ -138,7 +138,7 @@ namespace mongo {
         string to = min.first;
 
         BSONObj chunkToMove = pickChunk( shards[from] , shards[to] );
-        log(1) << "balancer: move a chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
+        log() << "balancer: move a chunk from [" << from << "] to [" << to << "] " << chunkToMove << endl;        
 
         DBConfig * cfg = grid.getDBConfig( ns );
         assert( cfg );
@@ -172,6 +172,30 @@ namespace mongo {
         return from[0];
     }
     
+    void Balancer::ping(){
+        assert( _myid.size() && _started );
+        try {
+            ShardConnection conn( configServer.getPrimary() );
+            ping( conn.conn() );
+            conn.done();
+        }
+        catch ( std::exception& e ){
+            log() << "bare ping failed: " << e.what() << endl;
+        }
+        
+    }
+
+    void Balancer::ping( DBClientBase& conn ){
+        WriteConcern w = conn.getWriteConcern();
+        conn.setWriteConcern( W_NONE );
+
+        conn.update( ShardNS::mongos , 
+                      BSON( "_id" << _myid ) , 
+                      BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started) ) ) , 
+                      true );
+
+        conn.setWriteConcern( w);
+    }
 
     void Balancer::run(){
 
@@ -183,17 +207,15 @@ namespace mongo {
             
             _started = time(0);
         }
-
+        
+        ping();
 
         while ( ! inShutdown() ){
             sleepsecs( 30 );
             
             try {
                 ShardConnection conn( configServer.getPrimary() );
-                conn->update( ShardNS::mongos , 
-                              BSON( "_id" << _myid ) , 
-                              BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started) ) ) , 
-                              true );
+                ping( conn.conn() );
                 
                 if ( shouldIBalance( conn.conn() ) ){
                     balance( conn.conn() );
