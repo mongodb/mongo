@@ -189,10 +189,10 @@ namespace mongo {
 
     class CmdLogCollection : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         CmdLogCollection() : Command( "logCollection" ) {}
         virtual void help( stringstream &help ) const {
             help << "examples: { logCollection: <collection ns>, start: 1 }, "

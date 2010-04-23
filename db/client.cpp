@@ -264,8 +264,8 @@ namespace mongo {
     class HandshakeCmd : public Command {
     public:
         HandshakeCmd() : Command( "handshake" ){}
-        virtual LockType locktype(){ return NONE; } 
-        virtual bool slaveOk(){ return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly(){ return false; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();

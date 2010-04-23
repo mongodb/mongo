@@ -1542,8 +1542,8 @@ namespace mongo {
     class Geo2dFindNearCmd : public Command {
     public:
         Geo2dFindNearCmd() : Command( "geoNear" ){}
-        virtual LockType locktype(){ return READ; } 
-        bool slaveOk() { return true; }
+        virtual LockType locktype() const { return READ; } 
+        bool slaveOk() const { return true; }
         bool slaveOverrideOk() { return true; }
         bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
@@ -1643,8 +1643,8 @@ namespace mongo {
     class GeoWalkCmd : public Command {
     public:
         GeoWalkCmd() : Command( "geoWalk" ){}
-        virtual LockType locktype(){ return READ; } 
-        bool slaveOk() { return true; }
+        virtual LockType locktype() const { return READ; } 
+        bool slaveOk() const { return true; }
         bool slaveOverrideOk() { return true; }
         bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();

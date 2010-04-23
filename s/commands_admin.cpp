@@ -53,7 +53,7 @@ namespace mongo {
             GridAdminCmd( const char * n ) : Command( n ){
                 dbgridCommands.insert( n );
             }
-            virtual bool slaveOk(){
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual bool adminOnly() {
@@ -61,7 +61,7 @@ namespace mongo {
             }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
         };
 
         // --------------- misc commands ----------------------
@@ -85,8 +85,8 @@ namespace mongo {
                 _started = time(0);
             }
             
-            virtual bool slaveOk() { return true; }
-            virtual LockType locktype(){ return NONE; } 
+            virtual bool slaveOk() const { return true; }
+            virtual LockType locktype() const { return NONE; } 
             
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
                 result.append("uptime",(double) (time(0)-_started));
@@ -686,8 +686,8 @@ namespace mongo {
 
         class IsDbGridCmd : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
-            virtual bool slaveOk() {
+            virtual LockType locktype() const { return NONE; } 
+            virtual bool slaveOk() const {
                 return true;
             }
             IsDbGridCmd() : Command("isdbgrid") { }
@@ -700,9 +700,9 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {
@@ -718,9 +718,9 @@ namespace mongo {
 
         class CmdShardingGetPrevError : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {
@@ -735,9 +735,9 @@ namespace mongo {
 
         class CmdShardingGetLastError : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {

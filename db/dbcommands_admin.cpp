@@ -39,9 +39,9 @@ namespace mongo {
     public:
         FeaturesCmd() : Command( "features", true ){}
 
-        virtual bool slaveOk(){ return true; }
+        virtual bool slaveOk() const { return true; }
         virtual bool readOnly(){ return true; }
-        virtual LockType locktype(){ return READ; } 
+        virtual LockType locktype() const { return READ; } 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             result.append( "readlock" , readLockSupported() );
             if ( globalScriptEngine ){
@@ -58,9 +58,11 @@ namespace mongo {
     public:
         CleanCmd() : Command( "clean" ){}
 
-        virtual bool slaveOk(){ return true; }
-        virtual LockType locktype(){ return WRITE; } 
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return WRITE; } 
         
+        virtual void help(stringstream& h) const { h << "internal"; }
+
         bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             string dropns = cc().database()->name + "." + cmdObj.firstElement().valuestrsafe();
             
@@ -87,11 +89,13 @@ namespace mongo {
     public:
         ValidateCmd() : Command( "validate" ){}
 
-        virtual bool slaveOk(){
+        virtual bool slaveOk() const {
             return true;
         }
         
-        virtual LockType locktype(){ return WRITE; } 
+        virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow."; }
+
+        virtual LockType locktype() const { return READ; } 
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
         
         bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
@@ -281,7 +285,7 @@ namespace mongo {
     public:
         UnlockCommand() : Command( "unlock" ) { }
         virtual bool readOnly() { return true; }
-        virtual bool slaveOk(){ return true; }
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly(){ return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( lockedForWriting ) { 
@@ -337,13 +341,14 @@ namespace mongo {
         };
     public:
         FSyncCommand() : Command( "fsync" ){}
-        virtual LockType locktype(){ return WRITE; } 
-        virtual bool slaveOk(){ return true; }
+        virtual LockType locktype() const { return WRITE; } 
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly(){ return true; }
         /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
         }*/
+        virtual void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/fsync+Command"; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
@@ -380,8 +385,8 @@ namespace mongo {
     class LogRotateCmd : public Command {
     public:
         LogRotateCmd() : Command( "logRotate" ){}
-        virtual LockType locktype(){ return NONE; } 
-        virtual bool slaveOk(){ return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly(){ return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             rotateLogs();
@@ -392,9 +397,10 @@ namespace mongo {
     
     class ListCommandsCmd : public Command {
     public:
-        ListCommandsCmd() : Command( "listCommands" ){}
-        virtual LockType locktype(){ return NONE; } 
-        virtual bool slaveOk(){ return true; }
+        virtual void help( stringstream &help ) const { help << "get a list of all db commands"; }
+        ListCommandsCmd() : Command( "listCommands", false ){}
+        virtual LockType locktype() const { return NONE; } 
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly(){ return false; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );

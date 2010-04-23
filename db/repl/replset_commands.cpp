@@ -24,8 +24,8 @@ namespace mongo {
 
     class CmdReplSetInitiate : public Command { 
     public:
-        virtual LockType locktype(){ return WRITE; }
-        virtual bool slaveOk() { return true; }
+        virtual LockType locktype() const { return WRITE; }
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() { return true; }
         virtual bool logTheOp() { return false; }
         CmdReplSetInitiate() : Command("replSetInitiate") { }
@@ -59,10 +59,15 @@ namespace mongo {
 
     class CmdReplSetGetStatus : public Command {
     public:
-        virtual bool slaveOk() { return true; }
+        virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() { return true; }
         virtual bool logTheOp() { return false; }
-        virtual LockType locktype(){ return NONE; }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream &help ) const {
+            help << "Report status of a replica set from the POV of this server\n";
+            help << "{ replSetGetStatus : 1 }";
+        }
+
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 

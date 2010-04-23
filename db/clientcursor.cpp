@@ -285,11 +285,11 @@ namespace mongo {
     class CmdCursorInfo : public Command {
     public:
         CmdCursorInfo() : Command( "cursorInfo", true ) {}
-        virtual bool slaveOk() { return true; }
+        virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }";
         }
-        virtual LockType locktype(){ return NONE; }
+        virtual LockType locktype() const { return NONE; }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             recursive_scoped_lock lock(ClientCursor::ccmutex);
             result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );

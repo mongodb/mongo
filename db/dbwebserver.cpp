@@ -189,15 +189,13 @@ namespace mongo {
             ss << mongodVersion() << '\n';
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
-            ss << '\n';
             ss << "<a "
                 << "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\""
                 << "title=\"snapshot: was the db in the write lock when this page was generated?\">";
             ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
-            ss << "uptime:       " << time(0)-started << " seconds\n";
+            ss << "uptime: " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-            ss << "\n";
             ss << "<a title=\"information on caught assertion exceptions\">";
             ss << "assertions:</a>\n";
             for ( int i = 0; i < 4; i++ ) {
@@ -211,7 +209,7 @@ namespace mongo {
                 }
             }
 
-            ss << "Clients:\n";
+            ss << "\nClients:\n";
             ss << "<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
                << "<th>Thread</th>" 
@@ -358,6 +356,31 @@ namespace mongo {
                     return;
                 }
 
+                if( url.find("/_commands") == 0 ) {
+                    if ( ! allowed( rq , headers, from ) ){
+                        responseCode = 401;
+                        headers.push_back( "Content-Type: text/plain" );
+                        responseMsg = "not allowed\n";
+                        return;
+                    }              
+                    headers.push_back( "Content-Type: text/html" );
+                    stringstream ss;
+                    ss << "<html><title>Commands List</title><body><h1><a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a> List</h1>\n";
+                    ss << "<p><a href=\"/\">Back</a></p>\n";
+                    const map<string, Command*> *m = Command::commandsByBestName();
+                    ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock<br>\n";
+                    ss << "<table border=1 cellpadding=2 cellspacing=0>";
+                    ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
+                    for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
+                        i->second->htmlHelp(ss);
+                    }
+                    ss << "</table>";
+                    ss << "</body></html>";
+                    responseMsg = ss.str();
+                    responseCode = 200;
+                    return;
+                }
+
                 /* run a command from the web ui */
                 const char *p = url.c_str();
                 if( *p == '/' ) {
@@ -412,13 +435,20 @@ namespace mongo {
                 dbname = z.str();
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
+            ss << "<a href=\"/_commands\">List all commands</a>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
-                        ss << "<a href=\"/" << i->first << "?text\">" << i->first << "</a> ";
+                        stringstream h;
+                        i->second->help(h);
+                        string help = h.str();
+                        ss << "<a href=\"/" << i->first << "?text\"";
+                        if( help != "no help defined" )
+                            ss << " title=\"" << help << '"';
+                        ss << ">" << i->first << "</a> ";
                     }
                     ss << '\n';
                 }

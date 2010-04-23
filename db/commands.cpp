@@ -25,24 +25,88 @@
 
 namespace mongo {
 
+    map<string,Command*> * Command::_commandsByBestName;
     map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
 
-    Command::Command(const char *_name, bool web) : name(_name) {
-        // register ourself.
-        if ( _commands == 0 ) {
-            _commands = new map<string,Command*>;
+    void Command::htmlHelp(stringstream& ss) const {
+        string helpStr;
+        {
+            stringstream h;
+            help(h);
+            helpStr = h.str();
         }
+        ss << "\n<tr><td>";
+        bool web = _webCommands->count(name) != 0;
+        if( web ) ss << "<a href=\"/" << name << "?text\">";
+        ss << name;
+        if( web ) ss << "</a>";
+        ss << "</td>\n";
+        ss << "<td>";
+        int l = locktype();
+        //if( l == NONE ) ss << "N ";
+        if( l == READ ) ss << "R ";
+        else if( l == WRITE ) ss << "W ";
+        if( slaveOk() )
+            ss << "S ";
+        ss << "</td>";
+        ss << "<td>";
+        if( helpStr != "no help defined" ) {
+            const char *p = helpStr.c_str();
+            while( *p ) { 
+                if( *p == '{' )
+                    ss << "<code>";
+                else if( *p == '}' ) {
+                    ss << "}</code>";
+                    p++;
+                    continue;
+                }
+                if( strncmp(p, "http:", 5) == 0 ) { 
+                    ss << "<a href=\"";
+                    const char *q = p;
+                    while( *q && *q != ' ' && *q != '\n' )
+                        ss << *q++;
+                    ss << "\">";
+                    q = p;
+                    if( startsWith(q, "http://www.mongodb.org/display/") )
+                        q += 31;
+                    while( *q && *q != ' ' && *q != '\n' ) {
+                        ss << (*q == '+' ? ' ' : *q);
+                        q++;
+                    }
+                    ss << "</a>";
+                    p = q;
+                    continue;
+                }
+                if( *p == '\n' ) ss << "<br>";
+                else ss << *p;
+                p++;
+            }
+        }
+        ss << "</td>";
+        ss << "</tr>\n";
+    }
+
+    Command::Command(const char *_name, bool web, const char *oldName) : name(_name) {
+        // register ourself.
+        if ( _commands == 0 )
+            _commands = new map<string,Command*>;
+        if( _commandsByBestName == 0 )
+            _commandsByBestName = new map<string,Command*>;
         Command*& c = (*_commands)[name];
         if ( c )
             log() << "warning: 2 commands with name: " << _name << endl;
         c = this;
+        (*_commandsByBestName)[name] = this;
 
         if( web ) {
             if( _webCommands == 0 )
                 _webCommands = new map<string,Command*>;
             (*_webCommands)[name] = this;
         }
+
+        if( oldName )
+            (*_commands)[oldName] = this;
     }
 
     void Command::help( stringstream& help ) const {

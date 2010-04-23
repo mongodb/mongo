@@ -36,7 +36,7 @@ namespace mongo {
         public:
             PublicGridCommand( const char * n ) : Command( n ){
             }
-            virtual bool slaveOk(){
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual bool adminOnly() {
@@ -44,7 +44,7 @@ namespace mongo {
             }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
 
         protected:
             string getDBName( string ns ){
