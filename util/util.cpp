@@ -121,9 +121,12 @@ namespace mongo {
 
 #ifndef _SCONS
     // only works in scons
-    const char * gitVersion(){ return "!scons"; }
+    const char * gitVersion(){ return "not-scons"; }
 #if defined(_WIN32)
-    const char * sysInfo(){ return "!scons WIN"; }
+    const char * sysInfo(){ 
+        if( sizeof(char *) == 8 ) return "not-scons windows 64bit";
+        return "not-scons windows 32bit";
+    }
 #else
     const char * sysInfo(){ return ""; }
 #endif

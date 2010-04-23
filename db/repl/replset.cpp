@@ -89,7 +89,7 @@ namespace mongo {
     void ReplSet::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
-            startupStatusMsg = "loading admin.system.replset config";
+            startupStatusMsg = "loading admin.system.replset config (LOADINGCONFIG)";
             try {
                 vector<ReplSetConfig> configs;
                 configs.push_back( ReplSetConfig(HostAndPort::me()) );
@@ -109,13 +109,13 @@ namespace mongo {
                     if( nempty == configs.size() ) {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed.\n";
+                        log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)\n";
                         log() << "replSet have you ran replSetInitiate yet?\n";
                         log() << "replSet sleeping 1 minute and will try again." << endl;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg = "can't currently get admin.system.replset config from self or any seed";
+                        startupStatusMsg = "can't currently get admin.system.replset config from self or any seed (EMPTYUNREACHABLE)";
                         log() << "replSet can't get admin.system.replset config from self or any seed.\n";
                         log() << "replSet sleeping 1 minute and will try again." << endl;
                     }
@@ -126,7 +126,7 @@ namespace mongo {
             }
             catch(AssertionException&) { 
                 startupStatus = BADCONFIG;
-                startupStatusMsg = "replSet error loading set config";
+                startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations\n";
                 log() << "replSet replication will not start" << endl;
                 fatal = true;

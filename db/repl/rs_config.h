@@ -60,9 +60,12 @@ public:
     bool ok() const { return _ok; }
 
     struct Member {
+        Member() : votes(1), priority(1.0), arbiterOnly(false) { }
         HostAndPort h;
-        double priority;  /* 0 means can never be primary */
+        double priority;      /* 0 means can never be primary */
         bool arbiterOnly;
+        unsigned votes;       /* how many votes this node gets. default 1. */
+        void check() const;   /* check validity, assert if not. */
     };
     vector<Member> members;
     string _id;
@@ -78,6 +81,8 @@ public:
 private:
     bool _ok;
     void from(BSONObj);
+    void clear();
+    BSONObj bson() const;
 };
 
 }

@@ -24,12 +24,33 @@
 
 namespace mongo { 
 
+    BSONObj ReplSetConfig::bson() const { 
+        BSONObjBuilder b;
+        b.append("_id", _id).append("version", version);
+        return b.obj();
+    }
+
+    static inline void mchk(bool expr) {
+        uassert(13126, "bad Member config", expr);
+    }
+
+    void ReplSetConfig::Member::check() const {
+        mchk(priority >= 0 && priority <= 1000);
+        mchk(votes >= 0 && votes <= 100);
+    }
+
+    void ReplSetConfig::clear() { 
+        version = -5;
+        _ok = false;
+    }
+
     void ReplSetConfig::from(BSONObj o) {
         md5 = o.md5();
         _id = o["_id"].String();
-        int v = o["version"].numberInt();
-        uassert(13115, "bad local.system.replset config: version", v > 0);
-        version = v;
+        if( o["version"].ok() ) {
+            version = o["version"].numberInt();
+            uassert(13115, "bad local.system.replset config: version", version > 0);
+        }
 
         if( o["settings"].ok() ) {
             BSONObj settings = o["settings"].Obj();
@@ -51,8 +72,9 @@ namespace mongo {
             try {
                 m.h = HostAndPort::fromString(s);
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
-                BSONElement pri = mobj["priority"];
-                m.priority = pri.ok() ? pri.number() : 1.0;
+                try { m.priority = mobj["priority"].Number(); } catch(...) { }
+                try { m.votes = (unsigned) mobj["votes"].Number(); } catch(...) { }
+                m.check();
             }
             catch(...) { 
                 uassert(13107, "bad local.system.replset config", false);
@@ -68,15 +90,17 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg) { 
+        clear();
         from(cfg);
+        configAssert( version < 0 /*unspecified*/ || version == 1 );
+        version = 1;
         _ok = true;
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
-        version = -5;
+        clear();
         int level = 2;
         DEV level = 0;
-        _ok = false;
         log(0) << "replSet load config from: " << h.toString() << endl;
 
         auto_ptr<DBClientCursor> c;
