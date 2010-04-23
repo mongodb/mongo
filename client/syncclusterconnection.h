@@ -18,6 +18,7 @@
 
 #include "../stdafx.h"
 #include "dbclient.h"
+#include "redef_macros.h"
 
 namespace mongo {
 
@@ -102,3 +103,5 @@ namespace mongo {
     
 
 };
+
+#include "undef_macros.h"

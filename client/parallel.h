@@ -21,6 +21,8 @@
 
 #include "../stdafx.h"
 #include "dbclient.h"
+#include "redef_macros.h"
+
 #include "../db/dbmessage.h"
 #include "../db/matcher.h"
 
@@ -270,3 +272,5 @@ namespace mongo {
 
     
 }
+
+#include "undef_macros.h"

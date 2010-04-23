@@ -960,3 +960,5 @@ namespace mongo {
     DBClientBase * createDirectClient();
     
 } // namespace mongo
+
+#include "undef_macros.h"
