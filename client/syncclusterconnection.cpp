@@ -229,7 +229,15 @@ namespace mongo {
     }
 
     void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ){ 
-        assert(0); 
+        string errmsg;
+        if ( ! prepare( errmsg ) )
+            throw UserException( 8020 , (string)"SyncClusterConnection::remove prepare failed: " + errmsg );
+        
+        for ( size_t i=0; i<_conns.size(); i++ ){
+            _conns[i]->remove( ns , query , justOne );
+        }
+        
+        _checkLast();
     }
 
     void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ){ 
