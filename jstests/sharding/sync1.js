@@ -18,4 +18,9 @@ assert.eq( 2 , t.find().itcount() , "B2" );
 test.tempStart();
 test.checkHashes( "test" , "B3" );
 
+
+assert.eq( 2 , t.find().itcount() , "C1" );
+t.remove( { x : 1 } )
+assert.eq( 1 , t.find().itcount() , "C2" );
+
 test.stop();
