@@ -149,11 +149,9 @@ namespace mongo {
      */
     class BSONSizeTracker {
     public:
-#define BSONSizeTrackerSize 10
-
         BSONSizeTracker(){
             _pos = 0;
-            for ( int i=0; i<BSONSizeTrackerSize; i++ )
+            for ( int i=0; i<SIZE; i++ )
                 _sizes[i] = 512; // this is the default, so just be consistent
         }
         
@@ -162,7 +160,7 @@ namespace mongo {
         
         void got( int size ){
             _sizes[_pos++] = size;
-            if ( _pos >= BSONSizeTrackerSize )
+            if ( _pos >= SIZE )
                 _pos = 0;
         }
         
@@ -171,7 +169,7 @@ namespace mongo {
          */
         int getSize() const {
             int x = 16; // sane min
-            for ( int i=0; i<BSONSizeTrackerSize; i++ ){
+            for ( int i=0; i<SIZE; i++ ){
                 if ( _sizes[i] > x )
                     x = _sizes[i];
             }
@@ -179,8 +177,9 @@ namespace mongo {
         }
         
     private:
+        enum { SIZE = 10 };
         int _pos;
-        int _sizes[BSONSizeTrackerSize];
+        int _sizes[SIZE];
     };
 
 }

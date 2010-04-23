@@ -176,6 +176,7 @@ namespace mongo {
             _buf.grow( 1 )[0] = c;
             return *this;
         }
+#undef SBNUM
 
         void append( const char * str ){
             int x = strlen( str );
