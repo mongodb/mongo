@@ -850,29 +850,23 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
  */
 static int
 __wt_bt_promote(WT_TOC *toc,
-    WT_PAGE *page, u_int64_t incr, WT_STACK *stack, u_int32_t *root_addrp)
+    WT_PAGE *page, u_int64_t incr, WT_STACK *stack, u_int32_t *dup_root_addrp)
 {
 	DB *db;
 	DBT *key, key_build;
 	ENV *env;
-	IDB *idb;
 	WT_ITEM *key_item, item, *parent_key;
 	WT_OFF off;
 	WT_OVFL tmp_ovfl;
 	WT_PAGE *next, *parent;
-	u_int32_t tmp_root_addr;
 	u_int type;
-	int need_promotion, ret, root_split;
+	int need_promotion, ret;
 	void *parent_data;
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
 
 	WT_CLEAR(item);
-
-	if (root_addrp == NULL)
-		root_addrp = &tmp_root_addr;
 	next = parent = NULL;
 
 	/*
@@ -1027,10 +1021,24 @@ split:		switch (page->hdr->type) {
 		WT_ERR(__wt_bt_page_alloc(
 		    toc, type, page->hdr->level + 1, db->intlmin, &next));
 
-		/* Case #1 -- there's no parent, it's a modified root split. */
+		/*
+		 * Case #1 -- there's no parent, it's a root split.  If in a
+		 * primary tree, update the description page, in an off-page
+		 * duplicates tree, return the root of the off-page tree.
+		 */
 		if (parent == NULL) {
-			root_split =  1;
-			*root_addrp = next->addr;
+			switch (type) {
+			case WT_PAGE_COL_INT:
+			case WT_PAGE_ROW_INT:
+				WT_ERR(__wt_bt_desc_write_root(
+				    toc, next->addr, db->intlmin));
+				break;
+			case WT_PAGE_DUP_INT:
+				*dup_root_addrp = next->addr;
+				break;
+			default:
+				break;
+			}
 			need_promotion = 0;
 		}
 		/*
@@ -1054,12 +1062,9 @@ split:		switch (page->hdr->type) {
 			if (stack->page[stack->level + 1] == NULL) {
 				++stack->level;
 				WT_ERR(__wt_bt_promote(
-				    toc, parent, incr, stack, root_addrp));
+				    toc, parent, incr, stack, dup_root_addrp));
 				--stack->level;
-
-				root_split = 1;
-			} else
-				root_split = 0;
+			}
 
 			next->hdr->prntaddr = parent->hdr->prntaddr;
 			next->hdr->prntsize = parent->hdr->prntsize;
@@ -1069,14 +1074,6 @@ split:		switch (page->hdr->type) {
 
 			need_promotion = 1;
 		}
-
-		/*
-		 * In case #1 and case #3, we're doing a root split, update
-		 * the description page.
-		 */
-		if (root_split &&
-		   (type == WT_PAGE_COL_INT || type == WT_PAGE_ROW_INT))
-			__wt_bt_desc_write_root(toc, *root_addrp, db->intlmin);
 
 		/* There's a new parent page, update the page's parent ref. */
 		page->hdr->prntaddr = next->addr;
@@ -1159,7 +1156,8 @@ split:		switch (page->hdr->type) {
 	 */
 	if (need_promotion) {
 		++stack->level;
-		WT_RET(__wt_bt_promote(toc, parent, incr, stack, root_addrp));
+		WT_RET(__wt_bt_promote(
+		    toc, parent, incr, stack, dup_root_addrp));
 		--stack->level;
 	} else {
 		/*
