@@ -311,7 +311,7 @@ env["LIBPATH"] = []
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
-env.Append( CPPDEFINES=[ "_SCONS" ] )
+env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
 env.Append( CPPPATH=[ "." ] )
 
 

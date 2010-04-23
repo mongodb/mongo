@@ -20,9 +20,6 @@
 #include "../client/dbclient.h"
 #include "dbtests.h"
 #include "../db/concurrency.h"
-
-// must be last
-#include "../client/cleanup.h"
  
 namespace ClientTests {
     
@@ -157,16 +154,6 @@ namespace ClientTests {
         }
     };
 
-    class HiddenMacros{
-    public:
-        void run(){
-            ASSERT_EQUALS(&malloc, &std::malloc);
-#ifdef assert
-            ASSERT(!"assert macro still defined");
-#endif
-        }
-    };
-    
     class All : public Suite {
     public:
         All() : Suite( "client" ){
@@ -179,7 +166,6 @@ namespace ClientTests {
             add<CS_10>();
             add<PushBack>();
             add<Create>();
-            add<HiddenMacros>();
         }
         
     } all;
