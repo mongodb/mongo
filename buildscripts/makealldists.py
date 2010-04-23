@@ -33,8 +33,8 @@ def pushrepo(repodir):
         s3name2='distros'+tail
         s3cp(bucket, fn, s3name1)
         s3cp(bucket, fn, s3name2)        
-        if s3name.endswith('.deb'):
-            newdebs.append(s3name)
+        if s3name1.endswith('.deb'):
+            newdebs.append(s3name1)
     # FIXME: we ought to clean out old debs eventually, but this will
     # blow away too much if we're trying to push a subset of what's
     # supposed to be available.
