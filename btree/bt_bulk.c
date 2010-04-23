@@ -15,7 +15,6 @@
  */
 typedef struct {
 	WT_PAGE **page;				/* page stack */
-	u_int level;				/* stack level */
 	u_int size;				/* stack size */
 } WT_STACK;
 
@@ -27,7 +26,7 @@ static int  __wt_bt_dbt_copy(ENV *, DBT *, DBT *);
 static int  __wt_bt_dup_offpage(WT_TOC *, WT_PAGE *, DBT **, DBT **,
 	DBT *, WT_ITEM *, u_int32_t, int (*cb)(DB *, DBT **, DBT **));
 static int  __wt_bt_promote(
-	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int32_t *);
+	WT_TOC *, WT_PAGE *, u_int64_t, WT_STACK *, u_int, u_int32_t *);
 static int  __wt_bt_promote_col_indx(WT_TOC *, WT_PAGE *, void *);
 static int  __wt_bt_promote_row_indx(WT_TOC *, WT_PAGE *, WT_ITEM *, void *);
 static void __wt_bt_promote_col_rec(WT_PAGE *, u_int64_t);
@@ -169,7 +168,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 			 * the newly allocated page.
 			 */
 			WT_ERR(__wt_bt_promote(
-			    toc, page, page->records, &stack, NULL));
+			    toc, page, page->records, &stack, 0, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
@@ -204,7 +203,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(
-			    toc, page, page->records, &stack, NULL);
+			    toc, page, page->records, &stack, 0, NULL);
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
 		}
 	}
@@ -520,7 +519,7 @@ skip_read:	/*
 			 * the newly allocated page.
 			 */
 			WT_ERR(__wt_bt_promote(
-			    toc, page, page->records, &stack, NULL));
+			    toc, page, page->records, &stack, 0, NULL));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
@@ -621,7 +620,7 @@ skip_read:	/*
 		/* Promote a key from any partially-filled page and write it. */
 		if (page != NULL) {
 			ret = __wt_bt_promote(
-			    toc, page, page->records, &stack, NULL);
+			    toc, page, page->records, &stack, 0, NULL);
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
 		}
 	}
@@ -784,7 +783,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			 * there may be a new offpage duplicates root page.
 			 */
 			WT_RET(__wt_bt_promote(toc,
-			    page, page->records, &stack, &root_addr));
+			    page, page->records, &stack, 0, &root_addr));
 			next->hdr->prntaddr = page->hdr->prntaddr;
 			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, 0);
@@ -813,8 +812,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	 *
 	 * Promote a key from any partially-filled page and write it.
 	 */
-	if ((tret = __wt_bt_promote(toc, page,
-	    page->records, &stack, &root_addr)) != 0 && (ret == 0 || ret == 1))
+	if ((tret = __wt_bt_promote(toc, page, page->records,
+	    &stack, 0, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
 	__wt_bt_page_out(toc, &page, 0);
 
@@ -849,8 +848,8 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
  *	Promote the first entry on a page to its parent.
  */
 static int
-__wt_bt_promote(WT_TOC *toc,
-    WT_PAGE *page, u_int64_t incr, WT_STACK *stack, u_int32_t *dup_root_addrp)
+__wt_bt_promote(WT_TOC *toc, WT_PAGE *page, u_int64_t incr,
+    WT_STACK *stack, u_int level, u_int32_t *dup_root_addrp)
 {
 	DB *db;
 	DBT *key, key_build;
@@ -981,7 +980,7 @@ __wt_bt_promote(WT_TOC *toc,
 	 * of 20, which is probably big enough for any tree we'll ever see in
 	 * the field.
 	 */
-	if (stack->size == 0 || stack->level == stack->size - 1) {
+	if (stack->size == 0 || level == stack->size - 1) {
 		u_int32_t bytes_allocated = stack->size * sizeof(WT_PAGE *);
 		WT_RET(__wt_realloc(env, &bytes_allocated,
 		    (stack->size + WT_STACK_ALLOC_INCR) * sizeof(WT_PAGE *),
@@ -999,7 +998,7 @@ __wt_bt_promote(WT_TOC *toc,
 	 * If we don't have a parent page, it's case #1 -- allocate the parent
 	 * page immediately.
 	 */
-	if ((parent = stack->page[stack->level]) != NULL)
+	if ((parent = stack->page[level]) != NULL)
 		need_promotion = 0;
 	else {
 split:		switch (page->hdr->type) {
@@ -1059,12 +1058,9 @@ split:		switch (page->hdr->type) {
 			 * a key from both of the parent pages.  First, promote
 			 * the key from the existing parent page.
 			 */
-			if (stack->page[stack->level + 1] == NULL) {
-				++stack->level;
-				WT_ERR(__wt_bt_promote(
-				    toc, parent, incr, stack, dup_root_addrp));
-				--stack->level;
-			}
+			if (stack->page[level + 1] == NULL)
+				WT_ERR(__wt_bt_promote(toc, parent,
+				    incr, stack, level + 1, dup_root_addrp));
 
 			next->hdr->prntaddr = parent->hdr->prntaddr;
 			next->hdr->prntsize = parent->hdr->prntsize;
@@ -1078,7 +1074,7 @@ split:		switch (page->hdr->type) {
 		/* There's a new parent page, update the page's parent ref. */
 		page->hdr->prntaddr = next->addr;
 		page->hdr->prntsize = next->size;
-		stack->page[stack->level] = parent = next;
+		stack->page[level] = parent = next;
 		next = NULL;
 	}
 
@@ -1154,12 +1150,10 @@ split:		switch (page->hdr->type) {
 	 * The promotion for case #2 and the second part of case #3 -- promote
 	 * the key from the newly allocated internal page to its parent.
 	 */
-	if (need_promotion) {
-		++stack->level;
+	if (need_promotion)
 		WT_RET(__wt_bt_promote(
-		    toc, parent, incr, stack, dup_root_addrp));
-		--stack->level;
-	} else {
+		    toc, parent, incr, stack, level + 1, dup_root_addrp));
+	else {
 		/*
 		 * We've finished promoting the new page's key into the tree.
 		 * What remains is to push the new record counts all the way
@@ -1167,8 +1161,7 @@ split:		switch (page->hdr->type) {
 		 * page, so proceed from there to the root.
 		 */
 		u_int i;
-		for (i = stack->level + 1;
-		     (parent = stack->page[i]) != NULL; ++i) {
+		for (i = level + 1; (parent = stack->page[i]) != NULL; ++i) {
 			switch (parent->hdr->type) {
 			case WT_PAGE_COL_INT:
 				__wt_bt_promote_col_rec(parent, incr);
