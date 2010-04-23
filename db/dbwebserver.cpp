@@ -93,14 +93,14 @@ namespace mongo {
             if( ClientCursor::byLocSize()>500 )
                 ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
 
-            ss << "\n<b>replication</b>\n";
+            ss << "\nreplication: ";
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
                 ss << "<a title=\"see replSetGetStatus link top of page\">--replSet mode</a>\n";
             }
             else {
-                ss << "master: " << replSettings.master << '\n';
+                ss << "\nmaster: " << replSettings.master << '\n';
                 ss << "slave:  " << replSettings.slave << '\n';
                 if ( replPair ) {
                     ss << "replpair:\n";
@@ -192,7 +192,6 @@ namespace mongo {
             ss << "<a "
                 << "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\""
                 << "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
             ss << "uptime: " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
@@ -457,13 +456,15 @@ namespace mongo {
             ss << "<a "
                 "title=\"click for documentation on this http interface\""
                 "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">HTTP</a> admin port:" << _port << "\n";
+
             doUnlockedStuff(ss);
 
+            ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
             {
                 Timer t;
                 readlocktry lk( "" , 2000 );
                 if ( lk.got() ){
-                    ss << "time to get dblock: " << t.millis() << "ms\n";
+                    ss << "time to get readlock: " << t.millis() << "ms\n";
                     doLockedStuff(ss);
                 }
                 else {
