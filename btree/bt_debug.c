@@ -71,6 +71,23 @@ __wt_bt_debug_dump(WT_TOC *toc, char *ofile, FILE *fp)
 }
 
 /*
+ * __wt_bt_debug_addr --
+ *	Dump a page in debugging mode based on its addr/size.
+ */
+int
+__wt_bt_debug_addr(
+    WT_TOC *toc, u_int32_t addr, u_int32_t size, char *ofile, FILE *fp)
+{
+	WT_PAGE *page;
+	int ret;
+
+	WT_RET(__wt_bt_page_in(toc, addr, size, 1, &page));
+	ret = __wt_bt_debug_page(toc, page, ofile, fp);
+	__wt_bt_page_out(toc, &page, 0);
+	return (ret);
+}
+
+/*
  * __wt_bt_debug_page --
  *	Dump a page in debugging mode.
  */
