@@ -406,14 +406,14 @@ __wt_drain_trickle(ENV *env, int *didworkp)
 
 	/*
 	 * Discarding pages is done in 4 steps:
-	 *	Write the modified pages (slow)
-	 *	Set the WT_DRAIN state (fast)
 	 *	Check for hazard references (fast)
+	 *	Set the WT_DRAIN state (fast)
+	 *	Write any dirty pages (slow)
 	 *	Discard the memory (fast)
 	 */
-	__wt_drain_write(env, NULL, NULL);
 	__wt_drain_set(env);
 	__wt_drain_hazard_check(env);
+	__wt_drain_write(env, NULL, NULL);
 	__wt_drain_evict(env);
 
 	cache->drain_elem = 0;
@@ -442,8 +442,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 	/*
 	 * Sort the pages for writing; we'd like to write leaf pages first so
 	 * we minimize the I/O we do during reconcilation.  This is almost
-	 * certainly not enough, we'll want to do much, much better planning
-	 * than this, at some point.
+	 * certainly not enough, we'll want to do better planning than this
+	 * at some point.
 	 */
 	qsort(cache->drain, (size_t)cache->drain_elem,
 	    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_level);
@@ -474,8 +474,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 		page = e->page;
 		if (e->write_gen != page->write_gen) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache writing element/page %p/%lu",
-			    e, (u_long)e->addr));
+			    "cache writing element/page/addr %p/%p/%lu",
+			    e, e->page, (u_long)e->addr));
 
 			e->write_gen = page->write_gen;
 			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
@@ -486,13 +486,8 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 			 */
 			if (__wt_bt_page_reconcile(e->db, page))
 				(*drain) = NULL;
-		} else {
-			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache discarding element/page %p/%#lu",
-			    e, (u_long)e->addr));
-
+		} else
 			WT_STAT_INCR(stats, CACHE_EVICT);
-		}
 	}
 
 	/* Wrap up reporting. */
@@ -589,9 +584,9 @@ __wt_drain_hazard_check(ENV *env)
 		 */
 		if (*hazard == page) {
 			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache skipping hazard referenced element/page "
-			    "%p/%lu",
-			    e, (u_long)e->addr));
+			    "cache skip hazard referenced element/page/addr "
+			    "%p/%p/%lu",
+			    e, e->page, (u_long)e->addr));
 			WT_STAT_INCR(stats, CACHE_EVICT_HAZARD);
 
 			e->state = WT_OK;
@@ -622,8 +617,10 @@ __wt_drain_evict(ENV *env)
 #ifdef HAVE_DIAGNOSTIC
 		__wt_drain_hazard_validate(env, e);
 #endif
-		WT_VERBOSE(
-		    env, WT_VERB_CACHE, (env, "cache evicted element %p", e));
+		WT_VERBOSE(env, WT_VERB_CACHE, (env,
+		    "cache evicting element/page/addr %p/%p/%lu",
+		    e, e->page, (u_long)e->addr));
+
 		/*
 		 * Take a page reference, then clean up the entry.  We don't
 		 * have to clear these fields (the state field is the only
@@ -633,7 +630,6 @@ __wt_drain_evict(ENV *env)
 		page = e->page;
 		WT_CACHE_ENTRY_SET(
 		    e, NULL, NULL, WT_ADDR_INVALID, 0, 0, WT_EMPTY);
-
 
 		/* Free the memory. */
 		WT_CACHE_PAGE_OUT(cache, page->size);
@@ -683,16 +679,17 @@ __wt_drain_validate(ENV *env)
 		switch (e->state) {
 		case WT_DRAIN:
 			__wt_api_env_errx(env,
-			    "e->state == WT_DRAIN (e: %#lx, addr: %lu)",
-			    (u_long)e, (u_long)e->addr);
+			    "element/page/addr %p/%p/%lu: state == WT_DRAIN",
+			    e, e->page, (u_long)e->addr);
 			__wt_abort(env);
 			break;
 		case WT_OK:
 			if (e->addr == e->page->addr)
 				break;
 			__wt_api_env_errx(env,
-			    "element %p: e->addr != page->addr (%lu != %lu)",
-			    e, (u_long)e->addr, (u_long)e->page->addr);
+			    "element/page %p/%p: e->addr != page->addr "
+			    "(%lu != %lu)",
+			    e, e->page, (u_long)e->addr, (u_long)e->page->addr);
 			__wt_abort(env);
 			/* NOTREACHED */
 		}
