@@ -230,7 +230,7 @@ DBQuery.prototype.snapshot = function(){
 DBQuery.prototype.shellPrint = function(){
     try {
         var n = 0;
-        while ( this.hasNext() && n < 20 ){
+        while ( this.hasNext() && n < DBQuery.shellBatchSize ){
             var s = tojson( this.next() , "" , true );
             print( s );
             n++;
@@ -252,3 +252,5 @@ DBQuery.prototype.shellPrint = function(){
 DBQuery.prototype.toString = function(){
     return "DBQuery: " + this._ns + " -> " + tojson( this.query );
 }
+
+DBQuery.shellBatchSize = 20;

@@ -115,7 +115,6 @@ namespace mongo {
     };
     extern Nullstream nullstream;
     
-#define LOGIT { ss << x; return *this; }
 
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
@@ -134,6 +133,7 @@ namespace mongo {
             }
             ss.str("");
         }
+#define LOGIT { ss << x; return *this; }
         Logstream& operator<<(const char *x) LOGIT
         Logstream& operator<<(char *x) LOGIT
         Logstream& operator<<(char x) LOGIT
@@ -148,6 +148,7 @@ namespace mongo {
         Logstream& operator<<(long long x) LOGIT
         Logstream& operator<<(unsigned long long x) LOGIT
         Logstream& operator<<(bool x) LOGIT
+#undef LOGIT
         Logstream& operator<<(const LazyString& x) {
             ss << x.val();
             return *this;

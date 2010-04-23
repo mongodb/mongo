@@ -275,4 +275,6 @@ namespace mongo {
         static ListeningSockets* _instance;
     };
 
+#undef SOCK_FAMILY_UNKNOWN_ERROR
+
 } // namespace mongo
