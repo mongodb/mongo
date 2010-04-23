@@ -90,8 +90,12 @@ namespace mongo {
         void doLockedStuff(stringstream& ss) {
             ss << "# databases: " << dbHolder.size() << '\n';
 
-            ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
+            if( ClientCursor::byLocSize()>500 )
+                ss << bold(ClientCursor::byLocSize()>10000) << "Cursors byLoc.size(): " << ClientCursor::byLocSize() << bold() << '\n';
+
             ss << "\n<b>replication</b>\n";
+            if( *replInfo )
+                ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
                 ss << "<a title=\"see replSetGetStatus link top of page\">--replSet mode</a>\n";
             }
@@ -206,8 +210,6 @@ namespace mongo {
                     ss << ' ' << lastAssert[i].toString();
                 }
             }
-
-            ss << "\nreplInfo:  " << replInfo << "\n\n";
 
             ss << "Clients:\n";
             ss << "<table border=1 cellpadding=2 cellspacing=0>";
