@@ -64,7 +64,6 @@ namespace mongo {
             DBs::const_iterator it = m.find(db);
             return it != m.end();
         }
-
         
         Database * get( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
