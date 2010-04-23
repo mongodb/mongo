@@ -141,11 +141,13 @@ replay(u_int8_t **bufp, size_t *sizep, size_t *lenp)
 	len = strlen(buf);
 	buf[--len] = '\0';
 
-	if (len > *lenp && (*bufp = realloc(*bufp, len + 10)) == NULL) {
-		fprintf(stderr, "realloc: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
+	if (len > *lenp) {
+		if ((*bufp = realloc(*bufp, len + 10)) == NULL) {
+			fprintf(stderr, "realloc: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		*lenp = len + 10;
 	}
-	*lenp = len + 10;
 	*sizep = len;
 	memcpy(*bufp, buf, len);
 }
