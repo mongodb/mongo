@@ -264,7 +264,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } 
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.getField(name);
+            BSONElement e = cmdObj.firstElement();
             log() << "dropDatabase " << ns << endl;
             int p = (int) e.number();
             if ( p != 1 )
@@ -289,7 +289,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } 
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.getField(name);
+            BSONElement e = cmdObj.firstElement();
             log() << "repairDatabase " << ns << endl;
             int p = (int) e.number();
             if ( p != 1 )
@@ -320,7 +320,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } 
         CmdProfile() : Command("profile") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONElement e = cmdObj.getField(name);
+            BSONElement e = cmdObj.firstElement();
             result.append("was", (double) cc().database()->profile);
             int p = (int) e.number();
             bool ok = false;
@@ -632,7 +632,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const { help << "drop a collection\n{drop : <collectionName>}"; }
         virtual LockType locktype() const { return WRITE; } 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string nsToDrop = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
+            string nsToDrop = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop.c_str());
             if ( !cmdLine.quiet )
                 log() << "CMD: drop " << nsToDrop << endl;
@@ -666,7 +666,7 @@ namespace mongo {
         }
         virtual void help( stringstream& help ) const { help << "count objects in collection"; }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
             string err;
             long long n = runCount(ns.c_str(), cmdObj, err);
             long long nn = n;
@@ -704,7 +704,7 @@ namespace mongo {
             help << "create a collection";
         }
         virtual bool run(const char *_ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
             string err;
             bool ok = userCreateNS(ns.c_str(), cmdObj, err, true);
             if ( !ok && !err.empty() )
@@ -1520,7 +1520,7 @@ namespace mongo {
         }
 
         bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string ns = cc().database()->name + '.' + cmdObj.getField(name).valuestr();
+            string ns = cc().database()->name + '.' + cmdObj.firstElement().valuestr();
 
             string key = cmdObj["key"].valuestrsafe();
             BSONObj keyPattern = BSON( key << 1 );

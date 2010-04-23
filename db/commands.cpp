@@ -129,9 +129,7 @@ namespace mongo {
         bool ok = false;
         bool valid = false;
 
-        BSONElement e;
-        e = jsobj.firstElement();
-
+        BSONElement e = jsobj.firstElement();
         map<string,Command*>::iterator i;
 
         if ( e.eoo() )
