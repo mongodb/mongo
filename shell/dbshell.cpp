@@ -191,7 +191,7 @@ string fixHost( string url , string host , string port ){
     string newurl = host;
     if ( port.size() > 0 )
         newurl += ":" + port;
-    else if (host.find(':') != string::npos){
+    else if (host.find(':') == string::npos){
         // need to add port with IPv6 addresses
         newurl += ":27017";
     }
