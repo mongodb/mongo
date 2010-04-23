@@ -151,7 +151,7 @@ namespace mongo {
         TopCmd() : Command( "top", true ){}
 
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly(){ return true; }
+        virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream& help ) const { help << "usage by collection"; }
 

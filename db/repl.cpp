@@ -136,14 +136,15 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;
         }
         virtual LockType locktype() const { return WRITE; }
-        CmdReplacePeer() : Command("replacepeer") { }
+        void help(stringstream&h) const { h << "replace a node in a replica pair"; }
+        CmdReplacePeer() : Command("replacePeer", false, "replacepeer") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( replPair == 0 ) {
                 errmsg = "not paired";
@@ -197,12 +198,13 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;   
         }
+        virtual void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return WRITE; }
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -219,13 +221,14 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;
         }
         virtual LockType locktype() const { return WRITE; }
+        void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj.getBoolField( "force" ) ) {
@@ -416,7 +419,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual LockType locktype() const { return WRITE; }

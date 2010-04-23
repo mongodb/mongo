@@ -49,12 +49,18 @@ namespace mongo {
         else if( l == WRITE ) ss << "W ";
         if( slaveOk() )
             ss << "S ";
+        if( adminOnly() )
+            ss << "A";
         ss << "</td>";
         ss << "<td>";
         if( helpStr != "no help defined" ) {
             const char *p = helpStr.c_str();
             while( *p ) { 
-                if( *p == '{' )
+                if( *p == '<' ) {
+                    ss << "&lt;";
+                    p++; continue;
+                }
+                else if( *p == '{' )
                     ss << "<code>";
                 else if( *p == '}' ) {
                     ss << "}</code>";
@@ -73,6 +79,8 @@ namespace mongo {
                     while( *q && *q != ' ' && *q != '\n' ) {
                         ss << (*q == '+' ? ' ' : *q);
                         q++;
+                        if( *q == '#' ) 
+                            while( *q && *q != ' ' && *q != '\n' ) q++;
                     }
                     ss << "</a>";
                     p = q;

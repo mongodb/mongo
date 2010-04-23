@@ -368,7 +368,7 @@ namespace mongo {
                     ss << "<html><title>Commands List</title><body><h1><a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a> List</h1>\n";
                     ss << "<p><a href=\"/\">Back</a></p>\n";
                     const map<string, Command*> *m = Command::commandsByBestName();
-                    ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock<br>\n";
+                    ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
                     ss << "<table border=1 cellpadding=2 cellspacing=0>";
                     ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 

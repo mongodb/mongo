@@ -56,7 +56,7 @@ namespace mongo {
             virtual bool slaveOk() const {
                 return true;
             }
-            virtual bool adminOnly() {
+            virtual bool adminOnly() const {
                 return true;
             }
 

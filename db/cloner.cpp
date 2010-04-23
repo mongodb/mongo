@@ -584,7 +584,7 @@ namespace mongo {
     class CmdCopyDbGetNonce : public Command {
     public:
         CmdCopyDbGetNonce() : Command("copydbgetnonce") { }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool slaveOk() const {
@@ -625,7 +625,7 @@ namespace mongo {
     class CmdCopyDb : public Command {
     public:
         CmdCopyDb() : Command("copydb") { }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool slaveOk() const {
@@ -675,7 +675,7 @@ namespace mongo {
     class CmdRenameCollection : public Command {
     public:
         CmdRenameCollection() : Command( "renameCollection" ) {}
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool slaveOk() const {

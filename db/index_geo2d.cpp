@@ -1544,6 +1544,7 @@ namespace mongo {
         Geo2dFindNearCmd() : Command( "geoNear" ){}
         virtual LockType locktype() const { return READ; } 
         bool slaveOk() const { return true; }
+        void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
         bool slaveOverrideOk() { return true; }
         bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();

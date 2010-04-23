@@ -38,7 +38,7 @@ namespace mongo {
     class FeaturesCmd : public Command {
     public:
         FeaturesCmd() : Command( "features", true ){}
-
+        void help(stringstream& h) const { h << "return on build level feature settings"; }
         virtual bool slaveOk() const { return true; }
         virtual bool readOnly(){ return true; }
         virtual LockType locktype() const { return READ; } 
@@ -286,7 +286,7 @@ namespace mongo {
         UnlockCommand() : Command( "unlock" ) { }
         virtual bool readOnly() { return true; }
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly(){ return true; }
+        virtual bool adminOnly() const { return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( lockedForWriting ) { 
 				log() << "command: unlock requested" << endl;
@@ -343,7 +343,7 @@ namespace mongo {
         FSyncCommand() : Command( "fsync" ){}
         virtual LockType locktype() const { return WRITE; } 
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly(){ return true; }
+        virtual bool adminOnly() const { return true; }
         /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { 
             string x = cmdObj["exec"].valuestrsafe();
             return !x.empty();
@@ -387,7 +387,7 @@ namespace mongo {
         LogRotateCmd() : Command( "logRotate" ){}
         virtual LockType locktype() const { return NONE; } 
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly(){ return true; }
+        virtual bool adminOnly() const { return true; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             rotateLogs();
             return 1;
@@ -401,7 +401,7 @@ namespace mongo {
         ListCommandsCmd() : Command( "listCommands", false ){}
         virtual LockType locktype() const { return NONE; } 
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly(){ return false; }
+        virtual bool adminOnly() const { return false; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
             for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ){

@@ -26,9 +26,10 @@ namespace mongo {
     public:
         virtual LockType locktype() const { return WRITE; }
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() { return true; }
+        virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         CmdReplSetInitiate() : Command("replSetInitiate") { }
+        virtual void help(stringstream& h) const { h << "Initiate/christen a replica set."; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";
@@ -60,7 +61,7 @@ namespace mongo {
     class CmdReplSetGetStatus : public Command {
     public:
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() { return true; }
+        virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {

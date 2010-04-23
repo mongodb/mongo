@@ -407,11 +407,13 @@ namespace mongo {
 
         class MapReduceCommand : public Command {
         public:
-            MapReduceCommand() : Command("mapreduce"){}
+            MapReduceCommand() : Command("mapReduce", false, "mapreduce"){}
             virtual bool slaveOk() const { return true; }
         
             virtual void help( stringstream &help ) const {
-                help << "see http://www.mongodb.org/display/DOCS/MapReduce";
+                help << "Run a map/reduce operation on the server.\n";
+                help << "Note this is used for aggregation, not querying, in MongoDB.\n";
+                help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
             virtual LockType locktype() const { return NONE; } 
             bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){

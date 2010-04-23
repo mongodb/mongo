@@ -74,7 +74,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
     };
@@ -83,6 +83,7 @@ namespace mongo {
     public:
         virtual LockType locktype() const { return NONE; } 
         WriteBackCommand() : MongodShardCommand( "writebacklisten" ){}
+        void help(stringstream& h) const { h<<"internal"; }
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
             BSONElement e = cmdObj.firstElement();

@@ -55,7 +55,7 @@ namespace mongo {
         virtual LockType locktype() const = 0;
 
         /* Return true if only the admin ns has privileges to run this command. */
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return false;
         }
 

@@ -55,6 +55,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -75,6 +76,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        void help(stringstream& h) const { h << "de-authenticate"; }
         virtual LockType locktype() const { return NONE; }
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -95,6 +97,7 @@ namespace mongo {
             return true;
         }
         virtual LockType locktype() const { return WRITE; } // TODO: make this READ
+        virtual void help(stringstream& ss) const { ss << "internal"; }
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log(1) << " authenticate: " << cmdObj << endl;

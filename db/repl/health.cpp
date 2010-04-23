@@ -28,9 +28,10 @@ namespace mongo {
     class CmdReplSetHeartbeat : public Command {
     public:
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() { return false; }
+        virtual bool adminOnly() const { return false; }
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream &help ) const { help<<"internal"; }
         CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) {

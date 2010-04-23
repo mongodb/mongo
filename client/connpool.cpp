@@ -127,6 +127,7 @@ namespace mongo {
     class PoolFlushCmd : public Command {
     public:
         PoolFlushCmd() : Command( "connpoolsync" ){}
+        virtual void help( stringstream &help ) const { help<<"internal"; }
         virtual LockType locktype() const { return NONE; }
         virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.flush();
