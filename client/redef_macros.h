@@ -61,7 +61,6 @@
 #pragma pop_macro("ONCE")
 
 // db/instance.h
-#pragma pop_macro("OPREAD")
 #pragma pop_macro("OPWRITE")
 
 // stdafx.h

@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+    inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.data, m.data->len); }
+    inline void opwrite(m)(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len); }
+
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
     void receivedDelete(Message& m, CurOp& op);
@@ -223,7 +226,7 @@ namespace mongo {
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
-                OPWRITE;
+                opwrite(m);
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -241,14 +244,14 @@ namespace mongo {
 
             }
             else {
-                OPREAD;
+                opread(m);
             }
         }
         else if( op == dbGetMore ) {
-            OPREAD;
+            opread(m);
         }
         else {
-            OPWRITE;
+            opwrite(m);
         }
         
         globalOpCounters.gotOp( op , isCommand );
