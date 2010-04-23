@@ -101,9 +101,11 @@ namespace mongo {
     }
 
 // PRINT(2+2);  prints "2+2: 4"
-#define PRINT(x) cout << #x ": " << (x) << endl
+#define MONGO_PRINT(x) cout << #x ": " << (x) << endl
+#define PRINT MONGO_PRINT
 // PRINTFL; prints file:line
-#define PRINTFL cout << __FILE__ ":" << __LINE__ << endl
+#define MONGO_PRINTFL cout << __FILE__ ":" << __LINE__ << endl
+#define PRINTFL MONGO_PRINTFL
 
 #undef assert
 #define assert xassert
@@ -174,10 +176,14 @@ namespace mongo {
         return ss.str();
     }
 
-#define asctime _asctime_not_threadsafe_
-#define gmtime _gmtime_not_threadsafe_
-#define localtime _localtime_not_threadsafe_
-#define ctime _ctime_is_not_threadsafe_
+#define MONGO_asctime _asctime_not_threadsafe_
+#define asctime MONGO_asctime
+#define MONGO_gmtime _gmtime_not_threadsafe_
+#define gmtime MONGO_gmtime
+#define MONGO_localtime _localtime_not_threadsafe_
+#define localtime MONGO_localtime
+#define MONGO_ctime _ctime_is_not_threadsafe_
+#define ctime MONGO_ctime
 
 #if defined(_WIN32) || defined(__sunos__)
     inline void sleepsecs(int s) {

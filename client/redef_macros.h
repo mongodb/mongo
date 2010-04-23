@@ -16,54 +16,51 @@
  */
 
 // If you define a new global un-prefixed macro, please add it here and in undef_macros
-// The push_macro and pop_macro pragmas as specific to MSVC and GCC
 
 // #pragma once // this file is intended to be processed multiple times
 
 #if defined(MONGO_MACROS_CLEANED)
 
 // util/allocator.h
-#pragma pop_macro("malloc")
-#pragma pop_macro("realloc")
+#define malloc MONGO_malloc
+#define realloc MONGO_realloc
 
 // util/assert_util.h
-#pragma pop_macro("assert")
-#pragma pop_macro("dassert")
-#pragma pop_macro("massert")
-#pragma pop_macro("uassert")
-#pragma pop_macro("wassert")
-#pragma pop_macro("xassert")
-#pragma pop_macro("ASSERT_ID_DUPKEY")
-#pragma pop_macro("ASSERT_STREAM_GOOD")
-#pragma pop_macro("BOOST_CHECK_EXCEPTION")
-#pragma pop_macro("DESTRUCTOR_GUARD")
+#define assert MONGO_assert
+#define dassert MONGO_dassert
+#define massert MONGO_massert
+#define uassert MONGO_uassert
+#define wassert MONGO_wassert
+#define xassert MONGO_xassert
+#define ASSERT_ID_DUPKEY MONGO_ASSERT_ID_DUPKEY
+#define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
+#define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION
+#define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
 
 // util/goodies.h
-#pragma pop_macro("PRINT")
-#pragma pop_macro("PRINTFL")
-#pragma pop_macro("asctime")
-#pragma pop_macro("gmtime")
-#pragma pop_macro("localtime")
-#pragma pop_macro("ctime")
+#define PRINT MONGO_PRINT
+#define PRINTFL MONGO_PRINTFL
+#define asctime MONGO_asctime
+#define gmtime MONGO_gmtime
+#define localtime MONGO_localtime
+#define ctime MONGO_ctime
 
 // util/log.h
-#pragma pop_macro("OUTPUT_ERRNOX")
-#pragma pop_macro("OUTPUT_ERRNO")
+#define OUTPUT_ERRNOX MONGO_OUTPUT_ERRNOX
+#define OUTPUT_ERRNO MONGO_OUTPUT_ERRNO
 
 // util/debug_util.h
-#pragma pop_macro("WIN")
-#pragma pop_macro("DEV")
-#pragma pop_macro("DEBUGGING")
-#pragma pop_macro("SOMETIMES")
-#pragma pop_macro("OCCASIONALLY")
-#pragma pop_macro("RARELY")
-#pragma pop_macro("ONCE")
-
-// db/instance.h
-#pragma pop_macro("OPWRITE")
+#define WIN MONGO_WIN
+#define DEV MONGO_DEV
+#define DEBUGGING MONGO_DEBUGGING
+#define SOMETIMES MONGO_SOMETIMES
+#define OCCASIONALLY MONGO_OCCASIONALLY
+#define RARELY MONGO_RARELY
+#define ONCE MONGO_ONCE
+#define strcasecmp MONGO_strcasecmp 
 
 // stdafx.h
-#pragma pop_macro("null")
+#define null MONGO_null
 
 #undef MONGO_MACROS_CLEANED
 #endif

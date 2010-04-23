@@ -243,8 +243,11 @@ namespace mongo {
     void initLogging( const string& logpath , bool append );
     void rotateLogs( int signal = 0 );
 
-#define OUTPUT_ERRNOX(x) "errno:" << x << " " << strerror(x) 
-#define OUTPUT_ERRNO OUTPUT_ERRNOX(errno)
+#define MONGO_OUTPUT_ERRNOX(x) "errno:" << x << " " << strerror(x) 
+#define OUTPUT_ERRNOX MONGO_OUTPUT_ERRNOX
+
+#define MONGO_OUTPUT_ERRNO OUTPUT_ERRNOX(errno)
+#define OUTPUT_ERRNO MONGO_OUTPUT_ERRNO
 
     string errnostring( const char * prefix = 0 );
 

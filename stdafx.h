@@ -155,6 +155,7 @@ namespace mongo {
 
     typedef char _TCHAR;
 
-#define null (0)
+#define MONGO_null (0)
+#define null MONGO_null
 
 } // namespace mongo

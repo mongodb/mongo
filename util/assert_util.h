@@ -158,46 +158,55 @@ namespace mongo {
 #undef assert
 #endif
 
-#define assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define assert MONGO_assert
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-#define uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
+#define MONGO_uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
+#define uassert MONGO_uassert
 
-#define xassert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_xassert MONGO_assert
+#define xassert MONGO_xassert
 
     /* warning only - keeps going */
-#define wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define wassert MONGO_wassert
 
     /* display a message, no context, and throw assertionexception
 
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define massert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msgid, msg), 0) )
+#define MONGO_massert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msgid, msg), 0) )
+#define massert MONGO_massert
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
     */
 #if defined(_DEBUG)
-#define dassert assert
+# define MONGO_dassert assert
 #else
-#define dassert(x) 
+# define MONGO_dassert(x) 
 #endif
+#define dassert MONGO_dassert
 
     // some special ids that we want to duplicate
     
     // > 10000 asserts
     // < 10000 UserException
     
-#define ASSERT_ID_DUPKEY 11000
+#define MONGO_ASSERT_ID_DUPKEY 11000
+#define ASSERT_ID_DUPKEY MONGO_ASSERT_ID_DUPKEY
 
     void streamNotGood( int code , string msg , std::ios& myios );
 
-#define ASSERT_STREAM_GOOD(msgid,msg,stream) (void)( (!!((stream).good())) || (mongo::streamNotGood(msgid, msg, stream), 0) )
+#define MONGO_ASSERT_STREAM_GOOD(msgid,msg,stream) (void)( (!!((stream).good())) || (mongo::streamNotGood(msgid, msg, stream), 0) )
+#define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
 
 } // namespace mongo
 
-#define BOOST_CHECK_EXCEPTION( expression ) \
+#define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION
+#define MONGO_BOOST_CHECK_EXCEPTION( expression ) \
 	try { \
 		expression; \
 	} catch ( const std::exception &e ) { \
@@ -207,7 +216,8 @@ namespace mongo {
 		massert( 10437 ,  "unknown boost failed" , false );   \
 	}
 
-#define DESTRUCTOR_GUARD( expression ) \
+#define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
+#define MONGO_DESTRUCTOR_GUARD( expression ) \
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
