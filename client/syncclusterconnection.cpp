@@ -245,16 +245,26 @@ namespace mongo {
         if ( upsert ){
             uassert( 13120 , "SyncClusterConnection::update upsert query needs _id" , query.obj["_id"].type() );
         }
-        
-        string errmsg;
-        if ( ! prepare( errmsg ) )
-            throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
+
+        if ( _writeConcern ){
+            string errmsg;
+            if ( ! prepare( errmsg ) )
+                throw UserException( 8005 , (string)"SyncClusterConnection::udpate prepare failed: " + errmsg );
+        }
 
         for ( size_t i=0; i<_conns.size(); i++ ){
-            _conns[i]->update( ns , query , obj , upsert , multi );
+            try {
+                _conns[i]->update( ns , query , obj , upsert , multi );
+            }
+            catch ( std::exception& e ){
+                if ( _writeConcern )
+                    throw e;
+            }
         }
         
-        _checkLast();
+        if ( _writeConcern ){
+            _checkLast();
+        }
     }
 
     string SyncClusterConnection::_toString() const { 

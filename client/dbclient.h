@@ -72,6 +72,16 @@ namespace mongo {
         UpdateOption_Multi = 1 << 1
     };
 
+    /**
+     * controls how much a clients cares about writes
+     * default is NORMAL
+     */
+    enum WriteConcern {
+        W_NONE = 0 , // TODO: not every connection type fully supports this
+        W_NORMAL = 1
+        // TODO SAFE = 2
+    };
+
     class BSONObj;
 
     /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
@@ -679,7 +689,18 @@ namespace mongo {
      abstract class that implements the core db operations
      */
     class DBClientBase : public DBClientWithCommands, public DBConnector {
+
+    protected:
+        WriteConcern _writeConcern;
+
     public:
+        DBClientBase(){
+            _writeConcern = W_NORMAL;
+        }
+        
+        WriteConcern getWriteConcern() const { return _writeConcern; }
+        void setWriteConcern( WriteConcern w ){ _writeConcern = w; }
+        
         /** send a query to the database.
          @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
          @param query query to perform on the collection.  this is a BSONObj (binary JSON)
@@ -735,7 +756,7 @@ namespace mongo {
                     n++;
             return n;
         }
-    };
+    }; // end DBClientBase
     
     class DBClientPaired;
     
