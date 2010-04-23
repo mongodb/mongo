@@ -42,13 +42,7 @@ def tryEC2():
 # I don't think libcloud's Nodes implement __enter__ and __exit__, and
 # I like the with statement for ensuring that we don't leak nodes when
 # we don't have to.
-class ubuntuNode(object):
-    def __init__(self):
-        image=NodeImage('ami-bf07ead6', 'ubuntu 10.4', EC2)
-        size=NodeSize('m1.large', 'large', None, None, None, None, EC2)
-
-        self.node = EC2Driver.create_node(image=image, name="ubuntu-test", size=size, securitygroup=['default', 'dist-slave', 'buildbot-slave'], keyname='kp1')
-
+class ec2node(object):
     def initWait(self):
         print "waiting for node to spin up"
         # Wait for EC2 to tell us the node is running.
@@ -99,6 +93,21 @@ class ubuntuNode(object):
         print "shutting down node %s" % self.node
         self.node.destroy()
 
+class ubuntuNode(ec2node):
+    def __init__(self):
+        image=NodeImage('ami-bf07ead6', 'ubuntu 10.4', EC2)
+        size=NodeSize('m1.large', 'large', None, None, None, None, EC2)
+
+        self.node = EC2Driver.create_node(image=image, name="ubuntu-test", size=size, securitygroup=['default', 'dist-slave', 'buildbot-slave'], keyname='kp1')
+
+class centosNode(ec2node):
+    def __init__(self):
+        image=NodeImage('ami-ccb35ea5', 'ubuntu 10.4', EC2)
+        size=NodeSize('m1.large', 'large', None, None, None, None, EC2)
+
+        self.node = EC2Driver.create_node(image=image, name="ubuntu-test", size=size, securitygroup=['default', 'dist-slave', 'buildbot-slave'], keyname='kp1')
+
+
         
 def tryRackSpace():
     driver=get_driver(Provider.RACKSPACE)
@@ -123,14 +132,21 @@ def tryRackSpace():
 
 class Err(Exception):
     pass
-def run_for_effect(argv):
-    print " ".join(argv)
-    r=subprocess.Popen(argv).wait()
-    if r!=0:
-        raise Err("subprocess %s exited %d" % (argv, r))
 
-if __name__ == "__main__":
-    (dir, outdir) = sys.argv[-2:]
+def merge_yum_repo(dir, outdir):
+    dirtail=dir.rstrip('\/').split('/')[-1]
+    keyfile=settings.makedist['ssh_keyfile']
+    makeyumrepo="""find . -name RPMS | while read dir; do (cd $dir/.. && createrepo .); done"""
+    with centosNode() as centos:
+        centos.initWait()
+        print centos.node
+        run_for_effect(["scp", "-o", "StrictHostKeyChecking no","-i", keyfile, "-r", dir, "root@"+centos.node.public_ip[0]+":"])
+        run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "root@"+centos.node.public_ip[0], "cd ./" + dirtail + " && " + makeyumrepo])
+        run_for_effect(["scp", "-o", "StrictHostKeyChecking no", "-i", keyfile, "-r", "root@"+centos.node.public_ip[0]+":./"+dirtail +'/*', outdir])
+
+        
+
+def merge_apt_repo(dir, outdir):
     dirtail=dir.rstrip('\/').split('/')[-1]
 
     gpgdir=settings.makedist['gpg_homedir']
@@ -150,13 +166,29 @@ Description: 10gen packages"""
         ubuntu.initWait()
         print ubuntu.node
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "sudo", "sh", "-c", "\"export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get -y install debhelper\""])
-        run_for_effect(["scp", "-o", "StrictHostKeyChecking no","-i", keyfile, "-r", dir, "ubuntu@"+ubuntu.node.public_ip[0]+":"])
+        run_for_effect(["scp", "-o", "StrictHostKeyChecking no","-i", keyfile, "-r", dir, "ubuntu@"+ubuntu.node.public_ip[0]+":"])        
         run_for_effect(["scp", "-o", "StrictHostKeyChecking no","-i", keyfile, "-r", gpgdir, "ubuntu@"+ubuntu.node.public_ip[0]+":.gnupg"])
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "sh", "-c",  "\"ls -lR ./" + dirtail + "\""])
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "cd ./"+dirtail + " && " + makeaptrepo])
         run_for_effect(["ssh", "-o", "StrictHostKeyChecking no","-i", keyfile, "ubuntu@"+ubuntu.node.public_ip[0], "cd ./"+dirtail + " && " + makeaptrelease])
         run_for_effect(["scp", "-o", "StrictHostKeyChecking no", "-i", keyfile, "-r", "ubuntu@"+ubuntu.node.public_ip[0]+":./"+dirtail +'/*', outdir])
 
+
+def run_for_effect(argv):
+    print " ".join(argv)
+    r=subprocess.Popen(argv).wait()
+    if r!=0:
+        raise Err("subprocess %s exited %d" % (argv, r))
+
+if __name__ == "__main__":
+    (flavor, dir, outdir) = sys.argv[-3:]
+
+    if flavor == "deb":
+        merge_apt_repo(dir, outdir)
+    elif flavor == "rpm":
+        merge_yum_repo(dir, outdir)
+    else:
+        Err("unknown pkg flavor %s" % flavor)
     # TODO: yum repositories
 
     

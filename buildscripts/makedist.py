@@ -363,7 +363,6 @@ class SshConnection (object):
 
     def recvFiles(self, files):
         self.sshWait()
-        print files
         for (remotefile, localfile) in files:
             LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
                              "-o", "ControlMaster auto",
@@ -448,8 +447,10 @@ mkdir -p "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
 mkdir -p "{pkg_product_dir}/{distro_version}/10gen/source"
 ( cd "{pkg_name}{pkg_name_suffix}-{pkg_version}"; debuild ) || exit 1
 # Try installing it
-dpkg -i *.deb
+dpkg -i {pkg_name}{pkg_name_suffix}*.deb
 ps ax | grep mongo || {{ echo "no running mongo" >/dev/stderr; exit 1; }}
+dpkg --remove $(for f in {pkg_name}{pkg_name_suffix}*.deb ; do echo ${{f%%_*}}; done)
+dpkg --purge $(for f in {pkg_name}{pkg_name_suffix}*.deb ; do echo ${{f%%_*}}; done)
 cp {pkg_name}{pkg_name_suffix}*.deb "{pkg_product_dir}/{distro_version}/10gen/binary-{distro_arch}"
 cp {pkg_name}{pkg_name_suffix}*.dsc "{pkg_product_dir}/{distro_version}/10gen/source"
 cp {pkg_name}{pkg_name_suffix}*.tar.gz "{pkg_product_dir}/{distro_version}/10gen/source"
@@ -522,7 +523,9 @@ mv "`tar tzf tarball.tgz | sed 's|/.*||' | sort -u | head -n1`" "{pkg_name}{pkg_
             self.get_mongo_commands = """
 git clone git://github.com/mongodb/mongo.git
 """
-            if kwargs['mongo_version'][0] == 'v':
+            # This is disabled for the moment.  it's for building the
+            # tip of some versioned branch.
+            if None: #kwargs['mongo_version'][0] == 'v':
                 self.get_mongo_commands +="""
 ( cd mongo && git archive --prefix="{pkg_name}{pkg_name_suffix}-{pkg_version}/" "`git log origin/{mongo_version} | sed -n '1s/^commit //p;q'`" ) | tar xf -
 """
@@ -623,18 +626,13 @@ git clone git://github.com/mongodb/mongo.git
 
 class ScriptFile(object):
     def __init__(self, configurator, **kwargs):
-        self.mongo_version       = kwargs["mongo_version"] if kwargs['mongo_version'][0] != 'n' else 'HEAD'
-        self.mongo_pub_version       = kwargs["mongo_version"].lstrip('n') if kwargs['mongo_version'][0] in 'n' else 'latest'
+        self.configurator = configurator
+        self.mongo_version_spec = kwargs['mongo_version_spec']
         self.mongo_arch       = kwargs["arch"] if kwargs["arch"] == "x86_64" else "i686"
-        self.pkg_version        = kwargs["pkg_version"]
-        self.pkg_name_suffix    = kwargs["pkg_name_suffix"] if "pkg_name_suffix" in kwargs else ""
         self.pkg_prereqs        = configurator.default("pkg_prereqs")
         self.pkg_name           = configurator.default("pkg_name")
         self.pkg_product_dir    = configurator.default("pkg_product_dir")
-        self.pkg_name_conflicts = configurator.default("pkg_name_conflicts") if self.pkg_name_suffix else []
-        self.pkg_name_conflicts.remove(self.pkg_name_suffix) if self.pkg_name_suffix and self.pkg_name_suffix in self.pkg_name_conflicts else []
         #self.formatter          = configurator.default("commands")
-        self.formatter          = configurator.default("preamble_commands") + configurator.default("install_prereqs") + configurator.default("get_mongo") + configurator.default("mangle_mongo") + (configurator.nightly_build_mangle_files if kwargs['mongo_version'][0] == 'n' else '') +(configurator.default("build_prerequisites") if kwargs['mongo_version'][0] != 'n' else '') + configurator.default("install_for_packaging") + configurator.default("build_package")
         self.distro_name        = configurator.default("distro_name")
         self.distro_version     = configurator.default("distro_version")
         self.distro_arch        = configurator.default("distro_arch")
@@ -677,25 +675,49 @@ class ScriptFile(object):
             return self.bogoformat(formatter, **kwargs)
 
     def genscript(self):
-        return self.fmt(self.formatter,
-                   mongo_version=self.mongo_version,
-                   distro_name=self.distro_name,
-                   distro_version=self.distro_version,
-                   distro_arch=self.distro_arch,
-                   pkg_prereq_str=" ".join(self.pkg_prereqs),
-                   pkg_name=self.pkg_name,
-                   pkg_name_suffix=self.pkg_name_suffix,
-                   pkg_version=self.pkg_version,
-                   pkg_product_dir=self.pkg_product_dir,
-                   # KLUDGE: rpm specs and deb
-                   # control files use
-                   # comma-separated conflicts,
-                   # but there's no reason to
-                   # suppose this works elsewhere
-                   pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in self.pkg_name_conflicts]),
-                   mongo_arch=self.mongo_arch,
-                   mongo_pub_version=self.mongo_pub_version
-                   )
+        script=''
+        formatter = self.configurator.default("preamble_commands") + self.configurator.default("install_prereqs")
+        script+=self.fmt(formatter,
+                         distro_name=self.distro_name,
+                         distro_version=self.distro_version,
+                         distro_arch=self.distro_arch,
+                         pkg_name=self.pkg_name,
+                         pkg_product_dir=self.pkg_product_dir,
+                         mongo_arch=self.mongo_arch,
+                         pkg_prereq_str=" ".join(self.pkg_prereqs),
+                         )
+
+        specs=self.mongo_version_spec.split(',')
+        for spec in specs:
+            (version, pkg_name_suffix, pkg_version) = parse_mongo_version_spec(spec)
+            mongo_version       = version if version[0] != 'n' else 'HEAD'
+            mongo_pub_version       = version.lstrip('n') if version[0] in 'n' else 'latest'
+            pkg_name_suffix    = pkg_name_suffix if pkg_name_suffix else ''
+            pkg_version        = pkg_version
+            pkg_name_conflicts = self.configurator.default("pkg_name_conflicts") if pkg_name_suffix else []
+            pkg_name_conflicts.remove(pkg_name_suffix) if pkg_name_suffix and pkg_name_suffix in pkg_name_conflicts else []
+            formatter          =  self.configurator.default("get_mongo") + self.configurator.default("mangle_mongo") + (self.configurator.nightly_build_mangle_files if version[0] == 'n' else '') +(self.configurator.default("build_prerequisites") if version[0] != 'n' else '') + self.configurator.default("install_for_packaging") + self.configurator.default("build_package")
+            script+=self.fmt(formatter,
+                             mongo_version=mongo_version,
+                             distro_name=self.distro_name,
+                             distro_version=self.distro_version,
+                             distro_arch=self.distro_arch,
+                             pkg_prereq_str=" ".join(self.pkg_prereqs),
+                             pkg_name=self.pkg_name,
+                             pkg_name_suffix=pkg_name_suffix,
+                             pkg_version=pkg_version,
+                             pkg_product_dir=self.pkg_product_dir,
+                             # KLUDGE: rpm specs and deb
+                             # control files use
+                             # comma-separated conflicts,
+                             # but there's no reason to
+                             # suppose this works elsewhere
+                             pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in pkg_name_conflicts]),
+                             mongo_arch=self.mongo_arch,
+                             mongo_pub_version=mongo_pub_version
+                             )
+            script+='rm -rf mongo'
+        return script
 
     def __enter__(self):
         self.localscript=None
@@ -717,6 +739,28 @@ class ScriptFile(object):
 class Configurator(SshConnectionConfigurator, EC2InstanceConfigurator, ScriptFileConfigurator, BaseHostConfigurator):
     def __init__(self, **kwargs):
         super(Configurator, self).__init__(**kwargs)
+
+def parse_mongo_version_spec (spec):
+    foo = spec.split(":")
+    mongo_version = foo[0] # this can be a commit id, a
+                           # release id "r1.2.2", or a branch name
+                           # starting with v.
+    if len(foo) > 1:
+        pkg_name_suffix = foo[1] 
+    if len(foo) > 2 and foo[2]:
+        pkg_version = foo[2]
+    else:
+        pkg_version = time.strftime("%Y%m%d")
+    if not pkg_name_suffix:
+        if mongo_version[0] in ["r", "v"]:
+            nums = mongo_version.split(".")
+            if int(nums[1]) % 2 == 0:
+                pkg_name_suffix = "-stable"
+            else:
+                pkg_name_suffix = "-unstable"
+        else:
+            pkg_name_suffix = ""
+    return (mongo_version, pkg_name_suffix, pkg_version)
 
 def main():
 #    checkEnvironment()
@@ -755,33 +799,15 @@ def main():
     kwargs["distro_name"]    = distro_name
     kwargs["distro_version"] = distro_version
     kwargs["arch"]           = arch
-
-    foo = mongo_version_spec.split(":")
-    kwargs["mongo_version"] = foo[0] # this can be a commit id, a
-                                     # release id "r1.2.2", or a
-                                     # branch name starting with v.
-    if len(foo) > 1:
-        kwargs["pkg_name_suffix"] = foo[1] 
-    if len(foo) > 2 and foo[2]:
-        kwargs["pkg_version"] = foo[2]
-    else:
-        kwargs["pkg_version"] = time.strftime("%Y%m%d")
-
+    kwargs['mongo_version_spec'] = mongo_version_spec
+    
+    kwargs["localdir"] = rootdir
     # FIXME: this should also include the mongo version or something.
-    if "subdirs" in kwargs:
-        kwargs["localdir"] = "%s/%s/%s/%s" % (rootdir, distro_name, distro_version, arch, kwargs["mongo_version"])
-    else:
-        kwargs["localdir"] = rootdir
+#    if "subdirs" in kwargs:
+#        kwargs["localdir"] = "%s/%s/%s/%s/%s" % (rootdir, distro_name, distro_version, arch, kwargs["mongo_version"])
+#    else:
 
-    if "pkg_name_suffix" not in kwargs:
-        if kwargs["mongo_version"][0] in ["r", "v"]:
-            nums = kwargs["mongo_version"].split(".")
-            if int(nums[1]) % 2 == 0:
-                kwargs["pkg_name_suffix"] = "-stable"
-            else:
-                kwargs["pkg_name_suffix"] = "-unstable"
-        else:
-            kwargs["pkg_name_suffix"] = ""
+
 
 
     kwargs['gpg_homedir'] = kwargs["gpg_homedir"] if "gpg_homedir" in kwargs else os.path.expanduser("~/.gnupg") 
