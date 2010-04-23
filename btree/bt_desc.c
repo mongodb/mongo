@@ -72,8 +72,30 @@ __wt_bt_desc_read(WT_TOC *toc)
 }
 
 /*
+ * __wt_bt_desc_write_root --
+ *	Update the root information on the description page.
+ */
+int
+__wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size)
+{
+	IDB *idb;
+	WT_PAGE *page;
+	WT_PAGE_DESC *desc;
+
+	idb = toc->db->idb;
+
+	WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
+	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
+	desc->root_addr = idb->root_addr = root_addr;
+	desc->root_size = idb->root_size = root_size;
+	WT_PAGE_MODIFY(page);
+	__wt_bt_page_out(toc, &page, 0);
+	return (0);
+}
+
+/*
  * __wt_bt_desc_write --
- *	Update the root addr.
+ *	Update the description page.
  */
 int
 __wt_bt_desc_write(WT_TOC *toc)
