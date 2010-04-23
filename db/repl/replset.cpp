@@ -106,7 +106,7 @@ namespace mongo {
                 }
                 if( nok == 0 ) {
 
-                    if( nempty == configs.size() ) {
+                    if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
                         log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)\n";
