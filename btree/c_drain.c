@@ -172,6 +172,7 @@ __wt_cache_drain(void *arg)
 		 * should be blocked.
 		 */
 		__wt_lock(env, cache->mtx_hb);
+
 		WT_ERR(__wt_drain_sync(env, &didwork));
 		WT_ERR(__wt_drain_trickle(env, &didwork));
 
@@ -411,7 +412,6 @@ __wt_drain_trickle(ENV *env, int *didworkp)
 	 *	Discard the memory (fast)
 	 */
 	__wt_drain_write(env, NULL, NULL);
-
 	__wt_drain_set(env);
 	__wt_drain_hazard_check(env);
 	__wt_drain_evict(env);
