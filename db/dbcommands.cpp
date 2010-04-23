@@ -726,9 +726,9 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "drop indexes for a collection";
         }
-        CmdDropIndexes(const char *cmdname = "dropIndexes") : Command(cmdname, false, "deleteIndexes") { }
+        CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
-            BSONElement e = jsobj.getField(name.c_str());
+            BSONElement e = jsobj.firstElement();
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             if ( !cmdLine.quiet )
@@ -781,7 +781,7 @@ namespace mongo {
 
             static DBDirectClient db;
 
-            BSONElement e = jsobj.getField(name.c_str());
+            BSONElement e = jsobj.firstElement();
             string toDeleteNs = cc().database()->name + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             log() << "CMD: reIndex " << toDeleteNs << endl;

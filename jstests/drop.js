@@ -13,7 +13,7 @@ assert.eq( 0, db.system.indexes.find( {ns:"test.jstests_drop"} ).count() , "D" )
 f.resetIndexCache();
 f.ensureIndex( {a:1} );
 assert.eq( 2, db.system.indexes.find( {ns:"test.jstests_drop"} ).count() , "E" );
-assert.commandWorked( db.runCommand( {deleteIndexes:"jstests_drop",index:"*"} ) );
+assert.commandWorked( db.runCommand( {deleteIndexes:"jstests_drop",index:"*"} ), "delete indexes A" );
 assert.eq( 1, db.system.indexes.find( {ns:"test.jstests_drop"} ).count() , "G" );
 
 // make sure we can still use it

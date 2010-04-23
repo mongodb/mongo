@@ -39,7 +39,7 @@ namespace mongo {
         }
         void fillIsMaster(BSONObjBuilder&);
 
-        static enum StartupStatus { PRESTART, LOADINGCONFIG, BADCONFIG, EMPTYCONFIG, FINISHME } startupStatus;
+        static enum StartupStatus { PRESTART, LOADINGCONFIG, BADCONFIG, EMPTYCONFIG, EMPTYUNREACHABLE, FINISHME } startupStatus;
         static string startupStatusMsg;
         bool fatal;
 

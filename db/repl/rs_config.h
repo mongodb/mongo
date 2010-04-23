@@ -55,6 +55,8 @@ public:
        */
     ReplSetConfig(const HostAndPort& h);
 
+    ReplSetConfig(BSONObj cfg);
+
     bool ok() const { return _ok; }
 
     struct Member {

@@ -121,8 +121,12 @@ namespace mongo {
 
 #ifndef _SCONS
     // only works in scons
-    const char * gitVersion(){ return ""; }
+    const char * gitVersion(){ return "!scons"; }
+#if defined(_WIN32)
+    const char * sysInfo(){ return "!scons WIN"; }
+#else
     const char * sysInfo(){ return ""; }
+#endif
 #endif
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }

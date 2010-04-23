@@ -32,7 +32,14 @@ namespace mongo {
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
+/*
     ReplSet::ReplSet(string cfgString) : fatal(false) {
+
+    }
+*/
+    /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
+    ReplSet::ReplSet(string cfgString) : fatal(false) {
+
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
@@ -107,6 +114,7 @@ namespace mongo {
                         log() << "replSet sleeping 1 minute and will try again." << endl;
                     }
                     else {
+                        startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get admin.system.replset config from self or any seed";
                         log() << "replSet can't get admin.system.replset config from self or any seed.\n";
                         log() << "replSet sleeping 1 minute and will try again." << endl;

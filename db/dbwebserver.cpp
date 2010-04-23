@@ -97,7 +97,7 @@ namespace mongo {
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
-                ss << "<a title=\"see replSetGetStatus link top of page\">--replSet mode</a>\n";
+                ss << "<a title=\"see replSetGetStatus link top of page\">--replSet </a>" << cmdLine.replSet << '\n';
             }
             else {
                 ss << "\nmaster: " << replSettings.master << '\n';

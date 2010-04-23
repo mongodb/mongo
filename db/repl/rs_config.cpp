@@ -67,6 +67,11 @@ namespace mongo {
         uassert(13122, "bad local.system.replset config", expr);
     }
 
+    ReplSetConfig::ReplSetConfig(BSONObj cfg) { 
+        from(cfg);
+        _ok = true;
+    }
+
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
         version = -5;
         int level = 2;

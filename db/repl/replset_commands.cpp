@@ -16,9 +16,10 @@
 
 #include "stdafx.h"
 #include "../cmdline.h"
-#include "replset.h"
 #include "health.h"
 #include "../commands.h"
+#include "replset.h"
+#include "rs_config.h"
 
 namespace mongo { 
 
@@ -50,6 +51,8 @@ namespace mongo {
                 return false;
             }
 
+            ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
+
             return true;
         }
     } cmdReplSetInitiate;
@@ -76,7 +79,7 @@ namespace mongo {
                 return false;
             }
             if( theReplSet == 0 ) {
-                result.append("startupState", ReplSet::startupStatus);
+                result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = ReplSet::startupStatusMsg.empty() ? 
                     errmsg = "replset unknown error 1" : ReplSet::startupStatusMsg;
                 return false;
