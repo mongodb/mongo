@@ -162,8 +162,12 @@ namespace mongo {
 #define assert MONGO_assert
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-#define MONGO_uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
-#define uassert MONGO_uassert
+    inline void uassert(unsigned msgid, string msg, bool expr) {
+        if( !expr ) uasserted(msgid, msg.c_str());
+    }
+    inline void uassert(unsigned msgid, const char * msg, bool expr) {
+        if( !expr ) uasserted(msgid, msg);
+    }
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -174,8 +178,12 @@ namespace mongo {
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define MONGO_massert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::msgasserted(msgid, msg), 0) )
-#define massert MONGO_massert
+    inline void massert(unsigned msgid, string msg, bool expr) {
+        if( !expr) msgasserted(msgid, msg.c_str());
+    }
+    inline void massert(unsigned msgid, const char * msg, bool expr) {
+        if( !expr) msgasserted(msgid, msg);
+    }
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
@@ -194,10 +202,12 @@ namespace mongo {
     
     enum { ASSERT_ID_DUPKEY = 11000 };
 
+    /* throws a uassertion with an appropriate msg */
     void streamNotGood( int code , string msg , std::ios& myios );
 
-#define MONGO_ASSERT_STREAM_GOOD(msgid,msg,stream) (void)( (!!((stream).good())) || (mongo::streamNotGood(msgid, msg, stream), 0) )
-#define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
+    inline void assertStreamGood(unsigned msgid, string msg, std::ios& myios) { 
+        if( !myios.good() ) streamNotGood(msgid, msg, myios);
+    }
 
 } // namespace mongo
 

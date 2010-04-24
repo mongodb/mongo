@@ -28,10 +28,7 @@
 // util/assert_util.h
 #define assert MONGO_assert
 #define dassert MONGO_dassert
-#define massert MONGO_massert
-#define uassert MONGO_uassert
 #define wassert MONGO_wassert
-#define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
 #define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
 

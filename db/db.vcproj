@@ -1011,6 +1011,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\client\redef_macros.h"
+				>
+			</File>
+			<File
 				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>

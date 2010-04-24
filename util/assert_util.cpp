@@ -108,10 +108,9 @@ namespace mongo {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here
-        ss << msg << " stream invalie: " << errnoWithDescription();
+        ss << msg << " stream invalid: " << errnoWithDescription();
         throw UserException( code , ss.str() );
     }
-    
     
     mongo::mutex *Assertion::_mutex = new mongo::mutex();
 
