@@ -31,7 +31,6 @@
 #define massert MONGO_massert
 #define uassert MONGO_uassert
 #define wassert MONGO_wassert
-#define ASSERT_ID_DUPKEY MONGO_ASSERT_ID_DUPKEY
 #define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
 #define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
@@ -56,10 +55,6 @@
 #define OCCASIONALLY MONGO_OCCASIONALLY
 #define RARELY MONGO_RARELY
 #define ONCE MONGO_ONCE
-#define strcasecmp MONGO_strcasecmp 
-
-// stdafx.h
-#define null MONGO_null
 
 #undef MONGO_MACROS_CLEANED
 #endif

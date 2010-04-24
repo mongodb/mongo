@@ -154,8 +154,4 @@ namespace mongo {
     void printSysInfo();
 
     typedef char _TCHAR;
-
-#define MONGO_null (0)
-#define null MONGO_null
-
 } // namespace mongo

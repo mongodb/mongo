@@ -20,6 +20,8 @@
 
 #if defined(_WIN32)
 
+enum {null = 0};
+
 namespace mongo {
 
 	void shutdown();

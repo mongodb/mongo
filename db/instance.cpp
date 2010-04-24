@@ -57,7 +57,7 @@ namespace mongo {
 
     string bind_ip = "";
 
-    char *appsrvPath = null;
+    char *appsrvPath = NULL;
 
     DiagLog _diaglog;
 

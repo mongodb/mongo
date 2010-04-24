@@ -464,7 +464,7 @@ namespace mongo {
 
     Timer startupSrandTimer;
 
-    void _initAndListen(int listenPort, const char *appserverLoc = null) {
+    void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
 #if !defined(_WIN32)
         pid_t pid = 0;
@@ -544,7 +544,7 @@ namespace mongo {
         while( 1 )
             sleepsecs( 100 );
     }
-    void initAndListen(int listenPort, const char *appserverLoc = null) {
+    void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch ( std::exception &e ) {
             problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;

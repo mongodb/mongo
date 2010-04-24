@@ -31,7 +31,6 @@
 #undef massert
 #undef uassert
 #undef wassert
-#undef ASSERT_ID_DUPKEY
 #undef ASSERT_STREAM_GOOD
 #undef BOOST_CHECK_EXCEPTION
 #undef DESTRUCTOR_GUARD
@@ -56,10 +55,6 @@
 #undef OCCASIONALLY
 #undef RARELY
 #undef ONCE
-#undef strcasecmp
-
-// stdafx.h
-#undef null
 
 #define MONGO_MACROS_CLEANED
 #endif

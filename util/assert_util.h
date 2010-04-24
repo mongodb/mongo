@@ -192,8 +192,7 @@ namespace mongo {
     // > 10000 asserts
     // < 10000 UserException
     
-#define MONGO_ASSERT_ID_DUPKEY 11000
-#define ASSERT_ID_DUPKEY MONGO_ASSERT_ID_DUPKEY
+    enum { ASSERT_ID_DUPKEY = 11000 };
 
     void streamNotGood( int code , string msg , std::ios& myios );
 

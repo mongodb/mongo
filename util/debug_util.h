@@ -75,8 +75,7 @@ namespace mongo {
 #define ONCE MONGO_ONCE
 
 #if defined(_WIN32)
-#define MONGO_strcasecmp _stricmp
-#define strcasecmp MONGO_strcasecmp
+    inline int strcasecmp(const char* s1, const char* s2) {return _stricmp(s1, s2);}
 #endif
 
     // Sets SIGTRAP handler to launch GDB
