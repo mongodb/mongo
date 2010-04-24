@@ -910,11 +910,6 @@ eop:			__wt_api_db_errx(db,
 		 * When walking the whole file, verify off-page duplicate trees
 		 * (any off-page reference on a row-store leaf page) as well as
 		 * overflow references.
-		 *
-		 * Check to see if addresses are past EOF; the check is simple
-		 * and won't catch edge cases where the page starts before the
-		 * EOF, but extends past EOF.  That's OK, those are not likely
-		 * cases, and we'll fail when we try and read the page.
 		 */
 		if (vs != NULL && vs->fragbits != NULL)
 			switch (item_type) {
