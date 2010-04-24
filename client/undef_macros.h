@@ -19,6 +19,10 @@
 
 // #pragma once // this file is intended to be processed multiple times
 
+
+/** MONGO_EXPOSE_MACROS - when defined, indicates that you are compiling a mongo program rather
+                          than just using the C++ driver.
+*/
 #if !defined(MONGO_EXPOSE_MACROS) && !defined(MONGO_MACROS_CLEANED)
 
 // util/allocator.h
@@ -28,10 +32,7 @@
 // util/assert_util.h
 #undef assert
 #undef dassert
-#undef massert
-#undef uassert
 #undef wassert
-#undef ASSERT_STREAM_GOOD
 #undef BOOST_CHECK_EXCEPTION
 #undef DESTRUCTOR_GUARD
 
@@ -42,10 +43,6 @@
 #undef gmtime
 #undef localtime
 #undef ctime
-
-// util/log.h
-#undef OUTPUT_ERRNOX
-#undef OUTPUT_ERRNO
 
 // util/debug_util.h
 #undef WIN

@@ -1018,6 +1018,10 @@
 				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\client\undef_macros.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="db"
