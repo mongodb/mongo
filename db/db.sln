@@ -18,6 +18,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongos", "..\s\dbgrid.vcpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "..\dbtests\test.vcproj", "{215B2D68-0A70-4D10-8E75-B33010C62A91}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", "{2F760952-C71B-4865-998F-AABAE96D1373}"
+	ProjectSection(SolutionItems) = preProject
+		..\util\mmap_posix.cpp = ..\util\mmap_posix.cpp
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
