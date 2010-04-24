@@ -20,7 +20,7 @@
 
 #if defined(_WIN32)
 
-enum {null = 0};
+#define null (0)
 
 namespace mongo {
 
