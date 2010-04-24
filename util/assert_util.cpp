@@ -108,7 +108,7 @@ namespace mongo {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here
-        ss << msg << " stream invalie: " << OUTPUT_ERRNO;
+        ss << msg << " stream invalie: " << errnoWithDescription();
         throw UserException( code , ss.str() );
     }
     
@@ -209,11 +209,11 @@ namespace mongo {
         loggingManager.rotate();
     }
 
-    string errnostring( const char * prefix ){
+    string errnoWithPrefix( const char * prefix ){
         stringstream ss;
         if ( prefix )
             ss << prefix << ": ";
-        ss << OUTPUT_ERRNO;
+        ss << errnoWithDescription();
         return ss.str();
     }
 

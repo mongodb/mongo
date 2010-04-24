@@ -1473,6 +1473,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\file_allocator.h"
+					>
+				</File>
+				<File
 					RelativePath="..\util\goodies.h"
 					>
 				</File>

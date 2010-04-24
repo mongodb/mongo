@@ -700,7 +700,7 @@ namespace mongo {
         if ( lockFile ){
             log() << "\t shutdown: removing fs lock..." << endl;
             if( ftruncate( lockFile , 0 ) ) 
-                log() << "\t couldn't remove fs lock " << OUTPUT_ERRNO << endl;
+                log() << "\t couldn't remove fs lock " << errnoWithDescription() << endl;
             flock( lockFile, LOCK_UN );
         }
 #endif

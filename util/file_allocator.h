@@ -161,13 +161,13 @@ namespace mongo {
                             long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                             if ( fd <= 0 ) {
                                 stringstream ss;
-                                ss << "couldn't open " << name << ' ' << OUTPUT_ERRNO;
+                                ss << "couldn't open " << name << ' ' << errnoWithDescription;
                                 massert( 10439 ,  ss.str(), fd <= 0 );
                             }
 
 #if defined(POSIX_FADV_DONTNEED)
                             if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) { 
-                                log() << "warning: posix_fadvise fails " << name << ' ' << OUTPUT_ERRNO << endl;
+                                log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription << endl;
                             }
 #endif
   
@@ -192,7 +192,7 @@ namespace mongo {
                                         towrite = z;
                                     
                                     int written = write( fd , buf , towrite );
-                                    massert( 10443 , errnostring("write failed" ), written > 0 );
+                                    massert( 10443 , errnoWithPrefix("write failed" ), written > 0 );
                                     left -= written;
                                 }
                                 log() << "done allocating datafile " << name << ", size: " << size/1024/1024 << "MB, took " << ((double)t.millis())/1000.0 << " secs" << endl;
