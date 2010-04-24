@@ -108,7 +108,7 @@ namespace mongo {
         start = start - ( (unsigned long long)start % pageSize );
         char x = 0;
         if ( mincore( start , 128 , &x ) ){
-            log() << "mincore failed: " << OUTPUT_ERRNO << endl;
+            log() << "mincore failed: " << OUTPUT_ERRNO() << endl;
             return 1;
         }
         return x & 0x1;
