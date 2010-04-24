@@ -42,7 +42,7 @@
 namespace mongo {
 
     inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.data, m.data->len); }
-    inline void opwrite(m)(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len); }
+    inline void opwrite(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len); }
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
