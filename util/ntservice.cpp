@@ -20,15 +20,13 @@
 
 #if defined(_WIN32)
 
-#define null (0)
-
 namespace mongo {
 
 	void shutdown();
 
-	SERVICE_STATUS_HANDLE ServiceController::_statusHandle = null;
+	SERVICE_STATUS_HANDLE ServiceController::_statusHandle = NULL;
 	std::wstring ServiceController::_serviceName;
-	ServiceCallback ServiceController::_serviceCallback = null;
+	ServiceCallback ServiceController::_serviceCallback = NULL;
 
 	ServiceController::ServiceController() {
     }
@@ -47,8 +45,8 @@ namespace mongo {
 			commandLine += arg + " ";
 		}
 		
-		SC_HANDLE schSCManager = ::OpenSCManager( null, null, SC_MANAGER_ALL_ACCESS );
-		if ( schSCManager == null )
+		SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
+		if ( schSCManager == NULL )
 			return false;
 		
 		std::basic_ostringstream< TCHAR > commandLineWide;
@@ -58,9 +56,9 @@ namespace mongo {
 		SC_HANDLE schService = ::CreateService( schSCManager, serviceName.c_str(), displayName.c_str(),
 												SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 												SERVICE_AUTO_START, SERVICE_ERROR_NORMAL,
-												commandLineWide.str().c_str(), null, null, L"\0\0", null, null );
+												commandLineWide.str().c_str(), NULL, NULL, L"\0\0", NULL, NULL );
 
-		if ( schService == null ) {
+		if ( schService == NULL ) {
 			::CloseServiceHandle( schSCManager );
 			return false;
 		}
@@ -90,13 +88,13 @@ namespace mongo {
     }
     
     bool ServiceController::removeService( const std::wstring& serviceName ) {
-		SC_HANDLE schSCManager = ::OpenSCManager( null, null, SC_MANAGER_ALL_ACCESS );
-		if ( schSCManager == null )
+		SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
+		if ( schSCManager == NULL )
 			return false;
 
 		SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
 
-		if ( schService == null ) {
+		if ( schService == NULL ) {
 			::CloseServiceHandle( schSCManager );
 			return false;
 		}
@@ -125,14 +123,14 @@ namespace mongo {
 	
         SERVICE_TABLE_ENTRY dispTable[] = {
 			{ (LPTSTR)serviceName.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceController::initService },
-			{ null, null }
+			{ NULL, NULL }
 		};
 
 		return StartServiceCtrlDispatcher( dispTable );
     }
     
     bool ServiceController::reportStatus( DWORD reportState, DWORD waitHint ) {
-		if ( _statusHandle == null )
+		if ( _statusHandle == NULL )
 			return false;
 
 		static DWORD checkPoint = 1;

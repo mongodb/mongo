@@ -1509,6 +1509,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\ntservice.h"
+					>
+				</File>
+				<File
 					RelativePath="..\util\sock.h"
 					>
 				</File>
