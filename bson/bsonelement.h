@@ -17,7 +17,11 @@
 
 #pragma once
 
+#include <vector>
+
 namespace mongo {
+
+    class OpTime;
 
 /** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
@@ -203,20 +207,6 @@ public:
 
     BSONObj codeWScopeObject() const;
 
-    string ascode() const {
-        switch( type() ){
-        case mongo::String:
-        case Code:
-            return valuestr();
-        case CodeWScope:
-            return codeWScopeCode();
-        default:
-            log() << "can't convert type: " << (int)(type()) << " to code" << endl;
-        }
-        uassert( 10062 ,  "not code" , 0 );
-        return "";
-    }
-
     /** Get binary data.  Element must be of type BinData */
     const char *binData(int& len) const { 
         // BinData: <int len> <byte subtype> <byte[len] data>
@@ -300,10 +290,6 @@ public:
         }
     }
 
-    OpTime optime() const {
-        return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
-    }
-
     Date_t timestampTime() const{
         unsigned long long t = ((unsigned int*)(value() + 4 ))[0];
         return t * 1000;
@@ -345,6 +331,10 @@ public:
         }
         totalSize = -1;
     }
+
+    string BSONElement::_asCode() const;
+    OpTime _opTime() const;
+
 private:
     const char *data;
     mutable int fieldNameSize_; // cached value

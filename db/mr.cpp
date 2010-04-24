@@ -155,10 +155,10 @@ namespace mongo {
                 }
              
                 { // code
-                    mapCode = cmdObj["map"].ascode();
-                    reduceCode = cmdObj["reduce"].ascode();
+                    mapCode = cmdObj["map"]._asCode();
+                    reduceCode = cmdObj["reduce"]._asCode();
                     if ( cmdObj["finalize"].type() ){
-                        finalizeCode = cmdObj["finalize"].ascode();
+                        finalizeCode = cmdObj["finalize"]._asCode();
                     }
                     checkCodeWScope( "map" , cmdObj );
                     checkCodeWScope( "reduce" , cmdObj );

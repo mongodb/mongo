@@ -42,3 +42,5 @@
 #include "../bson/bsonobjiterator.h"
 #include "../bson/bsoninlines.h"
 #include "../bson/ordering.h"
+
+#include "../bson/bson_db.h"

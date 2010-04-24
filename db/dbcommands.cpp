@@ -1478,7 +1478,7 @@ namespace mongo {
                 }
             }
             else if ( p["$keyf"].type() ){
-                keyf = p["$keyf"].ascode();
+                keyf = p["$keyf"]._asCode();
             }
             else {
                 // no key specified, will use entire object as key
@@ -1499,10 +1499,10 @@ namespace mongo {
 
             string finalize;
             if (p["finalize"].type())
-                finalize = p["finalize"].ascode();
+                finalize = p["finalize"]._asCode();
 
             return group( realdbname , ns , q ,
-                          key , keyf , reduce.ascode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
+                          key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );
         }

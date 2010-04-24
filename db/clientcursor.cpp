@@ -269,7 +269,7 @@ namespace mongo {
         
         BSONElement e = last.obj()["ts"];
         if ( e.type() == Date || e.type() == Timestamp )
-            _slaveReadTill = e.optime();
+            _slaveReadTill = e._opTime();
     }
     
     void ClientCursor::updateSlaveLocation( CurOp& curop ){

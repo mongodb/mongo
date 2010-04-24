@@ -183,6 +183,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\bson_db.h"
+				>
+			</File>
+			<File
 				RelativePath="..\bsonelement.h"
 				>
 			</File>

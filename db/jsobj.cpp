@@ -334,7 +334,7 @@ namespace mongo {
             break;
 
         case Code:
-            s << ascode();
+            s << _asCode();
             break;
 
         case Timestamp:

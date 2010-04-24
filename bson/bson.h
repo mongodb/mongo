@@ -33,20 +33,36 @@
 
 #pragma once
 
-//#include <iostream>
+#include <iostream>
 #include <sstream>
+
+namespace mongo {
+
+#if !defined(assert) 
+    void assert(bool expr) {
+        if(!expr) std::cout << "assertion failure in bson library" << std::endl;
+    }
+#endif
+#if !defined(uassert)
+    void uassert(unsigned msgid, const char *msg, bool expr) {
+        if(!expr) std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
+    }
+    void massert(unsigned msgid, const char *msg, bool expr) { 
+        if(!expr) std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
+    }
+#endif
+
+}
 
 /*
 #include "../util/builder.h"
-#include "../util/optime.h"
 #include "boost/utility.hpp"
 #include <set>
 */
 #include "../bson/bsontypes.h"
 #include "../bson/oid.h"
-/*
-#include "../bson/oid.h"
 #include "../bson/bsonelement.h"
+/*
 #include "../bson/bsonobj.h"
 #include "../bson/bsonmisc.h"
 #include "../bson/bsonobjbuilder.h"
