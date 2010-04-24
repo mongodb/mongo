@@ -379,13 +379,13 @@ namespace mongo {
                     if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
                          dup2( child_stdout, STDERR_FILENO ) == -1 )
                     {
-                        cout << "Unable to dup2 child output: " << OUTPUT_ERRNO << endl;
+                        cout << "Unable to dup2 child output: " << OUTPUT_ERRNO() << endl;
                         ::_Exit(-1); //do not pass go, do not call atexit handlers
                     }
 
                     execvp( argv[ 0 ], const_cast<char**>(argv) );
 
-                    cout << "Unable to start program: " << OUTPUT_ERRNO << endl;
+                    cout << "Unable to start program: " << OUTPUT_ERRNO() << endl;
                     ::_Exit(-1);
                 }
 
