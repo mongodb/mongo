@@ -897,7 +897,7 @@ item_len:			__wt_api_db_errx(db,
 			break;
 		}
 
-		/* Check if the item's data is entirely on the page. */
+		/* Check if the item is entirely on the page. */
 		if ((u_int8_t *)WT_ITEM_NEXT(item) > end) {
 eop:			__wt_api_db_errx(db,
 			    "item %lu on page at addr %lu extends past the end "
@@ -905,42 +905,52 @@ eop:			__wt_api_db_errx(db,
 			    (u_long)item_num, (u_long)addr);
 			goto err_set;
 		}
+		switch (item_type) {
+		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_DUP_OVFL:
+			ovflp = WT_ITEM_BYTE_OVFL(item);
+			if (WT_ADDR_TO_OFF(db, ovflp->addr) +
+			    WT_HDR_BYTES_TO_ALLOC(db, ovflp->size) >
+			    idb->fh->file_size)
+				goto eof;
+			break;
+		case WT_ITEM_OFF:
+			off = WT_ITEM_BYTE_OFF(item);
+			if (WT_ADDR_TO_OFF(db, off->addr) +
+			    off->size > idb->fh->file_size) {
+eof:					__wt_api_db_errx(db,
+				    "off-page reference in item %lu on "
+				    "page at addr %lu extends past the "
+				    "end of the file",
+				    (u_long)item_num, (u_long)addr);
+				goto err_set;
+			}
+			break;
+		default:
+			break;
+		}
 
 		/*
-		 * When walking the whole file, verify off-page duplicate trees
-		 * (any off-page reference on a row-store leaf page) as well as
-		 * overflow references.
+		 * When walking the whole file, verify overflow references, as
+		 * well as off-page duplicate trees (any off-page reference on
+		 * a row-store leaf page).
 		 */
-		if (vs != NULL && vs->fragbits != NULL)
+		if (vs != NULL)
 			switch (item_type) {
 			case WT_ITEM_KEY_OVFL:
 			case WT_ITEM_DATA_OVFL:
 			case WT_ITEM_DUP_OVFL:
 				ovflp = WT_ITEM_BYTE_OVFL(item);
-				if (WT_ADDR_TO_OFF(db, ovflp->addr) +
-				    WT_HDR_BYTES_TO_ALLOC(db, ovflp->size) >
-				    idb->fh->file_size)
-					goto eof;
 				WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
 				break;
 			case WT_ITEM_OFF:
-				if (hdr->type != WT_PAGE_ROW_LEAF)
-					break;
-				off = WT_ITEM_BYTE_OFF(item);
-				if (WT_ADDR_TO_OFF(db, off->addr) +
-				    off->size > idb->fh->file_size) {
-eof:					__wt_api_db_errx(db,
-					    "off-page reference in item %lu on "
-					    "page at addr %lu extends past the "
-					    "end of the file",
-					    (u_long)item_num, (u_long)addr);
-					goto err_set;
+				if (hdr->type == WT_PAGE_ROW_LEAF) {
+					off = WT_ITEM_BYTE_OFF(item);
+					WT_ERR(__wt_bt_verify_level(
+					    toc, off->addr, off->size, vs));
 				}
-				WT_ERR(__wt_bt_verify_level(
-				    toc, off->addr, off->size, vs));
 				break;
-			case WT_ITEM_KEY:
-			case WT_ITEM_DATA:
 			default:
 				break;
 			}
