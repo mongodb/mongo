@@ -17,7 +17,11 @@
 
 #pragma once
 
+#include "util.h"
+
 namespace mongo {
+
+    using namespace std;
 
     class BSONArrayBuilder;
     class BSONElement;
@@ -89,5 +93,6 @@ enum BSONType {
        opaque to the database.
     */
     enum BinDataType { Function=1, ByteArray=2, bdtUUID = 3, MD5Type=5, bdtCustom=128 };
-    
-};
+ 
+}
+

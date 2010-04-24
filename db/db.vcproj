@@ -954,6 +954,30 @@
 					</FileConfiguration>
 				</File>
 			</Filter>
+			<Filter
+				Name="old_repl"
+				>
+				<File
+					RelativePath=".\oplog.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\repl.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\repl.h"
+					>
+				</File>
+				<File
+					RelativePath=".\repl_block.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\replpair.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="storage related"
@@ -1655,30 +1679,6 @@
 			</File>
 			<File
 				RelativePath=".\repl\rs_config.h"
-				>
-			</File>
-		</Filter>
-		<Filter
-			Name="old_repl"
-			>
-			<File
-				RelativePath=".\oplog.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\repl.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\repl.h"
-				>
-			</File>
-			<File
-				RelativePath=".\repl_block.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\replpair.h"
 				>
 			</File>
 		</Filter>

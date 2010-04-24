@@ -45,6 +45,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other source files", "other source files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bsondemo", "..\bson\bsondemo\bsondemo.vcproj", "{C9DB5EB7-81AA-4185-BAA1-DA035654402F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -63,6 +65,10 @@ Global
 		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Debug|Win32.Build.0 = Debug|Win32
 		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.ActiveCfg = Release|Win32
 		{215B2D68-0A70-4D10-8E75-B33010C62A91}.Release|Win32.Build.0 = Release|Win32
+		{C9DB5EB7-81AA-4185-BAA1-DA035654402F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C9DB5EB7-81AA-4185-BAA1-DA035654402F}.Debug|Win32.Build.0 = Debug|Win32
+		{C9DB5EB7-81AA-4185-BAA1-DA035654402F}.Release|Win32.ActiveCfg = Release|Win32
+		{C9DB5EB7-81AA-4185-BAA1-DA035654402F}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

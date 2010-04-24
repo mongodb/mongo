@@ -129,7 +129,7 @@ namespace mongo {
                     "<th colspan=2>Inserts</th>"
                     "<th colspan=2>Updates</th>"
                     "<th colspan=2>Removes</th>";
-                ss << "</tr>";
+                ss << "</tr>\n";
                 
                 display( ss , (double) delta->elapsed() , "GLOBAL" , delta->globalUsageDiff() );
                 
@@ -171,7 +171,7 @@ namespace mongo {
             display( ss , elapsed , data.update );
             display( ss , elapsed , data.remove );
             
-            ss << "</tr>";
+            ss << "</tr>\n";
         }
 
         void tablecell( stringstream& ss , bool b ){
@@ -253,7 +253,7 @@ namespace mongo {
                     tablecell( ss , co.getProgressMeter().toString() );
 
 
-                    ss << "</tr>";
+                    ss << "</tr>\n";
                 }
             }
             ss << "</table>\n";
@@ -425,7 +425,9 @@ namespace mongo {
 
             responseCode = 200;
             stringstream ss;
-            ss << "<html><head><title>";
+            ss << "<html><head>"
+                //"<link rel=\"stylesheet\" type=\"text/css\" href=\"?.css\">"
+                "<title>";
 
             string dbname;
             {
@@ -473,7 +475,7 @@ namespace mongo {
             }
             
 
-            ss << "</pre></body></html>";
+            ss << "</pre>\n</body></html>\n";
             responseMsg = ss.str();
 
             // we want to return SavedContext from before the authentication was performed

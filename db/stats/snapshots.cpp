@@ -95,7 +95,7 @@ namespace mongo {
             ss << "<tr>"
                << "<td>" << ( d.elapsed() / 1000 ) << "</td>"
                << "<td>" << (unsigned)(100*d.percentWriteLocked()) << "%</td>"
-               << "</tr>"
+               << "</tr>\n"
                 ;
         }
         
