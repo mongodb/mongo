@@ -161,13 +161,13 @@ namespace mongo {
                             long fd = open(name.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
                             if ( fd <= 0 ) {
                                 stringstream ss;
-                                ss << "couldn't open " << name << ' ' << errnoWithDescription;
+                                ss << "couldn't open " << name << ' ' << errnoWithDescription();
                                 massert( 10439 ,  ss.str(), fd <= 0 );
                             }
 
 #if defined(POSIX_FADV_DONTNEED)
                             if( posix_fadvise(fd, 0, size, POSIX_FADV_DONTNEED) ) { 
-                                log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription << endl;
+                                log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription() << endl;
                             }
 #endif
   
