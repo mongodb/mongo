@@ -100,6 +100,8 @@ namespace mongo {
         Date_t asDateT() { return asTimeT() * (long long)1000; }
         
     };
+#pragma pack()
+
     ostream& operator<<( ostream &s, const OID &o );
 
     /** Formatting mode for generating JSON from BSON.
@@ -119,6 +121,9 @@ namespace mongo {
     /* l and r MUST have same type when called: check that first. */
     int compareElementValues(const BSONElement& l, const BSONElement& r);
 
-#pragma pack()
+    inline ostream& operator<<( ostream &s, const OID &o ) {
+        s << o.str();
+        return s;
+    }
 
 }

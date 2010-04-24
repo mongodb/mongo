@@ -1,5 +1,7 @@
-/* NOTE: this file is not ready to use yet.  Work in progress.
+/* NOTE: This file is not quite ready to use yet.  Work in progress.
          include ../db/jsobj.h for now.
+
+         This file, however, pulls in much less code.
 */
 
 /** @file bson.h 
@@ -37,7 +39,6 @@
 #include <sstream>
 
 namespace mongo {
-
 #if !defined(assert) 
     inline void assert(bool expr) {
         if(!expr) std::cout << "assertion failure in bson library" << std::endl;
@@ -51,14 +52,8 @@ namespace mongo {
         if(!expr) std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
     }
 #endif
-
 }
 
-/*
-#include "../bson/util/builder.h"
-#include "boost/utility.hpp"
-#include <set>
-*/
 #include "../bson/bsontypes.h"
 #include "../bson/oid.h"
 #include "../bson/bsonelement.h"
@@ -67,6 +62,15 @@ namespace mongo {
 #include "../bson/bsonobjbuilder.h"
 #include "../bson/bsonobjiterator.h"
 #include "../bson/bsoninlines.h"
-/*
-#include "../bson/ordering.h"
-*/
+
+namespace mongo { 
+
+    inline unsigned getRandomNumber() {
+#if defined(_WIN32)
+        return rand();
+#else
+        return random(); 
+#endif
+    }
+
+}

@@ -492,4 +492,12 @@ private:
         }
     }    
 
+    inline BSONElement::BSONElement() {
+        static char z = 0;
+        data = &z;
+        fieldNameSize_ = 0;
+        totalSize = 1;
+    }
+
+
 }

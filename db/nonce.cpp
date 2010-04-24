@@ -67,6 +67,7 @@ namespace mongo {
 #endif
         return n;
     }
+    unsigned getRandomNumber() { return (unsigned) security.getNonce(); }
     
 	bool Security::_initialized;
     Security security;

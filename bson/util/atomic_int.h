@@ -22,8 +22,7 @@
 #  include <windows.h>
 #endif
 
-namespace mongo{
-
+namespace mongo {
 
     struct AtomicUInt{
         AtomicUInt() : x(0) {}

@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../util/sock.h"
-#include "../util/atomic_int.h"
+#include "../bson/util/atomic_int.h"
 
 namespace mongo {
 

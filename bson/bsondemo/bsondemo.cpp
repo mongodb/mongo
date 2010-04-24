@@ -18,8 +18,23 @@
 #include "../bson.h"
 #include <iostream>
 
+using namespace std;
+using namespace mongo;
+
 int main()
 {
     std::cout << "hello" << std::endl;
+
+    BSONObj empty;
+    cout << empty.toString() << endl;
+
+    BSONObj x = BSONObjBuilder().append("name", "joe").append("age", 33.7).obj();
+    cout << x.toString() << endl;
+    cout << x["name"].String() << ' ' << x["age"].Number() << ' ' << x.isEmpty() << endl;
+
+    BSONObj y = BSON( "x" << "asdf" << "y" << true << "subobj" << BSON( "z" << 3 ) );
+    cout << y.toString() << endl;
+    cout << y.getFieldDotted("subobj.z").Number() << endl;
+ 
 	return 0;
 }
