@@ -25,7 +25,7 @@
 #if BOOST_VERSION >= 103500
 #include <boost/thread/shared_mutex.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 #else
 #error need boost >= 1.35 for windows
 #endif

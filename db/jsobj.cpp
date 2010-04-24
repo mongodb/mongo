@@ -32,7 +32,7 @@
 #include <boost/static_assert.hpp>
 #include <boost/any.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 // make sure our assumptions are valid
 BOOST_STATIC_ASSERT( sizeof(int) == 4 );

@@ -20,7 +20,7 @@
 #include <boost/program_options.hpp>
 
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 #include "framework.h"
 #include "../util/file_allocator.h"

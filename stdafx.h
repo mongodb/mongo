@@ -125,7 +125,7 @@ namespace mongo {
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 namespace mongo {
     using namespace boost::filesystem;

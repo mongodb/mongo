@@ -165,9 +165,6 @@ namespace mongo {
 #define MONGO_uassert(msgid, msg,_Expression) (void)( (!!(_Expression)) || (mongo::uasserted(msgid, msg), 0) )
 #define uassert MONGO_uassert
 
-#define MONGO_xassert MONGO_assert
-#define xassert MONGO_xassert
-
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
 #define wassert MONGO_wassert

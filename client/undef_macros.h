@@ -31,7 +31,6 @@
 #undef massert
 #undef uassert
 #undef wassert
-#undef xassert
 #undef ASSERT_ID_DUPKEY
 #undef ASSERT_STREAM_GOOD
 #undef BOOST_CHECK_EXCEPTION

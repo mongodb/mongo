@@ -31,7 +31,6 @@
 #define massert MONGO_massert
 #define uassert MONGO_uassert
 #define wassert MONGO_wassert
-#define xassert MONGO_xassert
 #define ASSERT_ID_DUPKEY MONGO_ASSERT_ID_DUPKEY
 #define ASSERT_STREAM_GOOD MONGO_ASSERT_STREAM_GOOD
 #define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION

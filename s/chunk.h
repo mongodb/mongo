@@ -29,7 +29,7 @@
 #include "shardkey.h"
 #include <boost/utility.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 namespace mongo {
 

@@ -108,7 +108,7 @@ namespace mongo {
 #define PRINTFL MONGO_PRINTFL
 
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
     struct WrappingInt {
         WrappingInt() {
