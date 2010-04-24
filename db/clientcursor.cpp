@@ -129,7 +129,7 @@ namespace mongo {
 
         while ( 1 ) {
             toAdvance.push_back(j->second);
-            WIN assert( j->first == dl );
+            DEV assert( j->first == dl );
             ++j;
             if ( j == stop )
                 break;

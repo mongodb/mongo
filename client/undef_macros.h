@@ -45,7 +45,6 @@
 #undef ctime
 
 // util/debug_util.h
-#undef WIN
 #undef DEV
 #undef DEBUGGING
 #undef SOMETIMES

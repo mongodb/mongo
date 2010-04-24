@@ -39,23 +39,12 @@ namespace mongo {
         char string[400];
     } *OWS;
 
-// for now, running on win32 means development not production --
-// use this to log things just there.
-#if defined(_WIN32)
-# define MONGO_WIN if( 1 )
-#else
-# define MONGO_WIN if( 0 )
-#endif
-#define WIN MONGO_WIN
-
-
 #if defined(_DEBUG)
 # define MONGO_DEV if( 1 )
 #else
 # define MONGO_DEV if( 0 )
 #endif
 #define DEV MONGO_DEV
-
 
 #define MONGO_DEBUGGING if( 0 )
 #define DEBUGGING MONGO_DEBUGGING
