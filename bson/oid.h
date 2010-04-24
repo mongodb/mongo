@@ -82,6 +82,8 @@ namespace mongo {
             */
             return s.str();
         }
+
+        static OID gen() { OID o; o.init(); return o; }
         
         /**
            sets the contents to a new oid / randomized value

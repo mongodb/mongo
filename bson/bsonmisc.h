@@ -80,7 +80,7 @@ namespace mongo {
        Example:
          cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
-    extern struct IDLabeler { } GENOID;
+    extern struct GENOIDLabeler { } GENOID;
 
     /* Utility class to add a Date element with the current time
        Example: 

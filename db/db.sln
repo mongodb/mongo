@@ -43,6 +43,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88
 		..\shell\utils.h = ..\shell\utils.h
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other source files", "other source files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -64,5 +66,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4082881B-EB00-486F-906C-843B8EC06E18} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
+		{407B4B88-3451-433C-B74F-31B31FEB5791} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
+		{2B262D59-9DC7-4BF1-A431-1BD4966899A5} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
+		{2F760952-C71B-4865-998F-AABAE96D1373} = {12B11474-2D74-48C3-BB3D-F03249BEA88F}
 	EndGlobalSection
 EndGlobal

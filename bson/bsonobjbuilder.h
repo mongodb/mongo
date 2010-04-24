@@ -206,7 +206,10 @@ namespace mongo {
          */
         bool appendAsNumber( const string& fieldName , const string& data );
 
-        /** Append a BSON Object ID (OID type). */
+        /** Append a BSON Object ID (OID type). 
+            @deprecated Generally, it is preferred to use the append append(name, oid) 
+            method for this.
+        */
         BSONObjBuilder& appendOID(const char *fieldName, OID *oid = 0 , bool generateIfBlank = false ) {
             b.append((char) jstOID);
             b.append(fieldName);
@@ -222,10 +225,27 @@ namespace mongo {
             }
             return *this;
         }
+
+        /** 
+        Append a BSON Object ID. 
+        @param fieldName Field name, e.g., "_id".
+        @returns the builder object
+        */
         BSONObjBuilder& append( const char *fieldName, OID oid ) {
-            appendOID( fieldName, &oid );
+            b.append((char) jstOID);
+            b.append(fieldName);
+            b.append( (void *) &oid, 12 );
             return *this;
         }
+
+        /**
+        Generate and assign an object id for the _id field.
+        _id should be the first element in the object for good performance.
+        */
+        BSONObjBuilder& genOID() {
+            return append("_id", OID::gen());
+        }
+
         /** Append a time_t date.
             @param dt a C-style 32 bit date value, that is
             the number of seconds since January 1, 1970, 00:00:00 GMT
@@ -304,36 +324,41 @@ namespace mongo {
         BSONObjBuilder& appendMinKey( const char *fieldName ) {
             b.append( (char) MinKey );
             b.append( fieldName );
-        return *this; }
+            return *this; }
         // Append an element that is greater than all other keys.
         BSONObjBuilder& appendMaxKey( const char *fieldName ) {
             b.append( (char) MaxKey );
             b.append( fieldName );
-        return *this; }
+            return *this; }
         
         // Append a Timestamp field -- will be updated to next OpTime on db insert.
         BSONObjBuilder& appendTimestamp( const char *fieldName ) {
             b.append( (char) Timestamp );
             b.append( fieldName );
             b.append( (unsigned long long) 0 );
-        return *this; }
+            return *this; }
 
         BSONObjBuilder& appendTimestamp( const char *fieldName , unsigned long long val ) {
             b.append( (char) Timestamp );
             b.append( fieldName );
             b.append( val );
-        return *this; }
+            return *this; }
 
         /**
-         * @param time - in millis (but stored in seconds)
-         */
+        Timestamps are a special BSON datatype that is used internally for replication.
+        Append a timestamp element to the object being ebuilt.
+        @param time - in millis (but stored in seconds)
+        */
         BSONObjBuilder& appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
             OpTime t( (unsigned) (time / 1000) , inc );
             appendTimestamp( fieldName , t.asDate() );
             return *this; 
         }
         
-        /* Deprecated (but supported) */
+        /*
+        Append an element of the deprecated DBRef type.
+        @deprecated 
+        */
         BSONObjBuilder& appendDBRef( const char *fieldName, const char *ns, const OID &oid ) {
             b.append( (char) DBRef );
             b.append( fieldName );
@@ -363,7 +388,9 @@ namespace mongo {
         }
         
         /**
-           @param len the length of data
+        Append a BSON bindata bytearray element.
+        @param data a byte array
+        @param len the length of data
         */
         BSONObjBuilder& appendBinDataArray( const char * fieldName , const char * data , int len ){
             b.append( (char) BinData );
@@ -372,7 +399,7 @@ namespace mongo {
             b.append( (char)0x2 );
             b.append( len );
             b.append( (void *) data, len );            
-        return *this; }
+            return *this; }
 
         /** Append to the BSON object a field of type CodeWScope.  This is a javascript code 
             fragment accompanied by some scope that goes with it.
@@ -464,8 +491,6 @@ namespace mongo {
 
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
-    private:
-        static const string numStrs[100]; // cache of 0 to 99 inclusive
     public:
         static string numStr( int i ) {
             if (i>=0 && i<100)
@@ -483,12 +508,7 @@ namespace mongo {
         }
 
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilder& operator<<( IDLabeler ) {
-            OID oid;
-            oid.init();
-            appendOID("_id", &oid);
-            return *this;
-        }
+        BSONObjBuilder& operator<<( GENOIDLabeler ) { return genOID(); }
 
         // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )
         struct ForceExplicitString {
@@ -536,6 +556,8 @@ namespace mongo {
         int offset_;
         BSONObjBuilderValueStream s_;
         BSONSizeTracker * _tracker;
+
+        static const string numStrs[100]; // cache of 0 to 99 inclusive
     };
 
     class BSONArrayBuilder : boost::noncopyable {

@@ -50,7 +50,7 @@ namespace mongo {
         return s;
     }
 
-    IDLabeler GENOID;
+    GENOIDLabeler GENOID;
 
     DateNowLabeler DATENOW;
 

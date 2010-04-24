@@ -25,9 +25,7 @@
 namespace mongo { 
 
     BSONObj ReplSetConfig::bson() const { 
-        BSONObjBuilder b;
-        b.append("_id", _id).append("version", version);
-        return b.obj();
+        return BSONObjBuilder().append("_id", _id).append("version", version).obj();
     }
 
     static inline void mchk(bool expr) {
