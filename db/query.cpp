@@ -20,7 +20,7 @@
 #include "query.h"
 #include "pdfile.h"
 #include "jsobjmanipulator.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"

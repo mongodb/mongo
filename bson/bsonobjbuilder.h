@@ -22,7 +22,14 @@
 
 #pragma once
 
+#include <limits>
+
 namespace mongo {
+
+#if defined(_WIN32)
+// warning: 'this' : used in base member initializer list
+#pragma warning( disable : 4355 )
+#endif
 
     /** Utility for creating a BSONObj.
         See also the BSON() and BSON_ARRAY() macros.
@@ -349,11 +356,7 @@ namespace mongo {
         Append a timestamp element to the object being ebuilt.
         @param time - in millis (but stored in seconds)
         */
-        BSONObjBuilder& appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc ){
-            OpTime t( (unsigned) (time / 1000) , inc );
-            appendTimestamp( fieldName , t.asDate() );
-            return *this; 
-        }
+        BSONObjBuilder& appendTimestamp( const char *fieldName , unsigned long long time , unsigned int inc );
         
         /*
         Append an element of the deprecated DBRef type.

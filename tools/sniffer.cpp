@@ -34,7 +34,7 @@
 #undef max
 #endif
 
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "../util/message.h"
 #include "../util/mmap.h"
 #include "../db/dbmessage.h"

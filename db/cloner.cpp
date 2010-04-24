@@ -19,7 +19,7 @@
 #include "stdafx.h"
 #include "pdfile.h"
 #include "../client/dbclient.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "jsobj.h"
 #include "query.h"
 #include "commands.h"

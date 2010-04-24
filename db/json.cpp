@@ -18,7 +18,7 @@
 
 #include "stdafx.h"
 #include "json.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "../util/base64.h"
 #include "../util/hex.h"
 

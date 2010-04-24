@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include "../stdafx.h"
 #include <string.h>
+#include <stdio.h>
+#include <boost/shared_ptr.hpp>
 
 namespace mongo {
 
@@ -29,7 +30,7 @@ namespace mongo {
         BufBuilder(int initsize = 512) : size(initsize) {
             if ( size > 0 ) {
                 data = (char *) malloc(size);
-                assert(data);
+                assert(data != 0);
             } else {
                 data = 0;
             }
@@ -134,6 +135,10 @@ namespace mongo {
 
         friend class StringBuilder;
     };
+
+#if defined(_WIN32)
+#pragma warning( disable : 4996 )
+#endif
 
     class StringBuilder {
     public:

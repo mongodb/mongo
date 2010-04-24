@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <boost/utility.hpp>
+
 namespace mongo {
 
     int getGtLtOp(const BSONElement& e);

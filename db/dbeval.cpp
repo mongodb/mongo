@@ -21,7 +21,7 @@
 #include "query.h"
 #include "pdfile.h"
 #include "jsobj.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"

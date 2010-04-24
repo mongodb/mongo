@@ -18,7 +18,7 @@
 #include "stdafx.h"
 #include "../db/pdfile.h"
 #include "dbclient.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
 #include "../db/instance.h"

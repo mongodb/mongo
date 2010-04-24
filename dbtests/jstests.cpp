@@ -531,7 +531,12 @@ namespace JSTests {
             ASSERT( s->exec( "printjson( a ); b = {b:a.a}", "foo", false, true, false ) );
             out = s->getObject( "b" );
             ASSERT_EQUALS( mongo::NumberLong, out.firstElement().type() );
-            ASSERT_EQUALS( val, out.firstElement().numberLong() );
+            if( val != out.firstElement().numberLong() ) {
+                cout << val << endl;
+                cout << out.firstElement().numberLong() << endl;
+                cout << out.toString() << endl;
+                ASSERT_EQUALS( val, out.firstElement().numberLong() );
+            }
             
             ASSERT( s->exec( "c = {c:a.a.toString()}", "foo", false, true, false ) );
             out = s->getObject( "c" );

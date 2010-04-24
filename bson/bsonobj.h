@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <set>
+#include "util/builder.h"
+
 namespace mongo {
 
     typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
@@ -211,17 +214,7 @@ namespace mongo {
             return objsize() <= 5;
         }
 
-        void dump() const {
-            out() << hex;
-            const char *p = objdata();
-            for ( int i = 0; i < objsize(); i++ ) {
-                out() << i << '\t' << ( 0xff & ( (unsigned) *p ) );
-                if ( *p >= 'A' && *p <= 'z' )
-                    out() << '\t' << *p;
-                out() << endl;
-                p++;
-            }
-        }
+        void dump() const;
 
         /** Alternative output format */
         string hexDump() const;
@@ -361,7 +354,7 @@ private:
                 }
                 catch ( ... ){}
                 string s = ss.str();
-                massert( 10334 ,  s , 0 );
+                massert( 10334 , s , 0 );
             }
         }
 #pragma pack(1)

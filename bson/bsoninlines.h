@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <map>
+
 namespace mongo {
 
     inline BSONObj BSONElement::embeddedObjectUserCheck() const {
@@ -116,12 +118,6 @@ namespace mongo {
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) { 
         _builder->appendAs( e , _fieldName );
-        _fieldName = 0;
-        return *_builder;
-    }
-
-    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(DateNowLabeler& id){
-        _builder->appendDate(_fieldName, jsTime());
         _fieldName = 0;
         return *_builder;
     }

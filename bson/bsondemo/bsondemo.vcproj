@@ -222,10 +222,18 @@
 				RelativePath="..\ordering.h"
 				>
 			</File>
-			<File
-				RelativePath="..\util.h"
+			<Filter
+				Name="util"
 				>
-			</File>
+				<File
+					RelativePath="..\util\builder.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\misc.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 	</Files>
 	<Globals>

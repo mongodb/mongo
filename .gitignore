@@ -28,12 +28,15 @@
 *.pdb
 *.manifest
 *.gch
+*.vcproj.*
 *#
 .#*
 shell/mongo.cpp
 shell/mongo-server.cpp
 
-db/Debug
+*/Debug/
+*/*/Debug/
+*/Release/
 db/.gdb*
 db/makefile.local
 config.log

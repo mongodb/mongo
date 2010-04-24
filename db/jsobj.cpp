@@ -1243,6 +1243,18 @@ namespace mongo {
         return true;
     }
 
+    void BSONObj::dump() const {
+        out() << hex;
+        const char *p = objdata();
+        for ( int i = 0; i < objsize(); i++ ) {
+            out() << i << '\t' << ( 0xff & ( (unsigned) *p ) );
+            if ( *p >= 'A' && *p <= 'z' )
+                out() << '\t' << *p;
+            out() << endl;
+            p++;
+        }
+    }
+
     string BSONObj::hexDump() const {
         stringstream ss;
         const char *d = objdata();
