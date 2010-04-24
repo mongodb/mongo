@@ -19,6 +19,12 @@
 
 #include <vector>
 
+namespace bson {
+    typedef mongo::BSONElement be;
+    typedef mongo::BSONObj bo;
+    typedef mongo::BSONObjBuilder bob;
+}
+
 namespace mongo {
 
     class OpTime;

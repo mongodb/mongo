@@ -82,7 +82,7 @@ private:
     bool _ok;
     void from(BSONObj);
     void clear();
-    BSONObj bson() const;
+    BSONObj asBson() const;
 };
 
 }

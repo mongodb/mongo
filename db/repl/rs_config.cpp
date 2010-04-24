@@ -22,10 +22,20 @@
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
 
+using namespace bson;
+
 namespace mongo { 
 
-    BSONObj ReplSetConfig::bson() const { 
-        return BSONObjBuilder().append("_id", _id).append("version", version).obj();
+    bo ReplSetConfig::asBson() const { 
+        bob b;
+        b.append("_id", _id).append("version", version);
+        if( !healthOptions.isDefault() ) {
+            b << "settings" << 
+                (bob() << "connRetries" << healthOptions.connRetries << 
+                          "heartbeatSleep" << healthOptions.heartbeatSleepMillis / 1000 << 
+                          "heartbeatTimeout" << healthOptions.heartbeatTimeoutMillis / 1000).obj();
+        }
+        return b.obj();
     }
 
     static inline void mchk(bool expr) {

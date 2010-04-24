@@ -19,20 +19,20 @@
 #include <iostream>
 
 using namespace std;
-using namespace mongo;
+using namespace bson;
 
 int main()
 {
     std::cout << "hello" << std::endl;
 
-    BSONObj empty;
+    bo empty;
     cout << empty.toString() << endl;
 
-    BSONObj x = BSONObjBuilder().append("name", "joe").append("age", 33.7).obj();
+    bo x = bob().append("name", "joe").append("age", 33.7).obj();
     cout << x.toString() << endl;
     cout << x["name"].String() << ' ' << x["age"].Number() << ' ' << x.isEmpty() << endl;
 
-    BSONObj y = BSON( "x" << "asdf" << "y" << true << "subobj" << BSON( "z" << 3 ) );
+    bo y = BSON( "x" << "asdf" << "y" << true << "subobj" << BSON( "z" << 3 ) );
     cout << y.toString() << endl;
     cout << y.getFieldDotted("subobj.z").Number() << endl;
  
