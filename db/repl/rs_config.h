@@ -42,7 +42,7 @@ Additionally an object in this collection holds global configuration settings fo
  { _id : <logical_set_name>, settings:
    { [heartbeatSleep : <seconds>]
      [, heartbeatTimeout : <seconds>]
-     [, connRetries : <n>]
+     [, heartbeatConnRetries  : <n>]
      [, getLastErrorDefaults: <defaults>]
    }
  }
@@ -60,7 +60,8 @@ public:
     bool ok() const { return _ok; }
 
     struct Member {
-        Member() : votes(1), priority(1.0), arbiterOnly(false) { }
+        Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
+        int _id;              /* ordinal */
         HostAndPort h;
         double priority;      /* 0 means can never be primary */
         bool arbiterOnly;
@@ -70,7 +71,7 @@ public:
     vector<Member> members;
     string _id;
     int version;
-    HealthOptions healthOptions;
+    HealthOptions ho;
     string md5;
 
     // true if could connect, and there is no cfg object there at all

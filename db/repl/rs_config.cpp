@@ -29,11 +29,11 @@ namespace mongo {
     bo ReplSetConfig::asBson() const { 
         bob b;
         b.append("_id", _id).append("version", version);
-        if( !healthOptions.isDefault() ) {
+        if( !ho.isDefault() ) {
             b << "settings" << 
-                (bob() << "connRetries" << healthOptions.connRetries << 
-                          "heartbeatSleep" << healthOptions.heartbeatSleepMillis / 1000 << 
-                          "heartbeatTimeout" << healthOptions.heartbeatTimeoutMillis / 1000).obj();
+                (bob() << "heartbeatConnRetries " << ho.heartbeatConnRetries  << 
+                          "heartbeatSleep" << ho.heartbeatSleepMillis / 1000 << 
+                          "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000).obj();
         }
         return b.obj();
     }
@@ -42,7 +42,8 @@ namespace mongo {
         uassert(13126, "bad Member config", expr);
     }
 
-    void ReplSetConfig::Member::check() const {
+    void ReplSetConfig::Member::check() const{ 
+        mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
     }
@@ -62,16 +63,17 @@ namespace mongo {
 
         if( o["settings"].ok() ) {
             BSONObj settings = o["settings"].Obj();
-            if( settings["connRetries"].ok() )
-                healthOptions.connRetries = settings["connRetries"].numberInt();
+            if( settings["heartbeatConnRetries "].ok() )
+                ho.heartbeatConnRetries  = settings["heartbeatConnRetries "].numberInt();
             if( settings["heartbeatSleep"].ok() )
-                healthOptions.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].Number() * 1000);
+                ho.heartbeatSleepMillis = (unsigned) (settings["heartbeatSleep"].Number() * 1000);
             if( settings["heartbeatTimeout"].ok() )
-                healthOptions.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
-            healthOptions.check();
+                ho.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
+            ho.check();
         }
 
         set<string> hosts;
+        set<int> ords;
         vector<BSONElement> members = o["members"].Array();
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
@@ -87,8 +89,9 @@ namespace mongo {
             catch(...) { 
                 uassert(13107, "bad local.system.replset config", false);
             }
-            uassert(13108, "bad local.system.replset config dups?", hosts.count(m.h.toString()) == 0);
+            uassert(13108, "bad local.system.replset config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
+            ords.insert(m._id);
         }
         uassert(13117, "bad local.system.replset config", !_id.empty());
     }

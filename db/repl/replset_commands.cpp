@@ -30,7 +30,10 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         CmdReplSetInitiate() : Command("replSetInitiate") { }
-        virtual void help(stringstream& h) const { h << "Initiate/christen a replica set."; }
+        virtual void help(stringstream& h) const { 
+            h << "Initiate/christen a replica set."; 
+            h << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+        }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";
@@ -70,6 +73,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Report status of a replica set from the POV of this server\n";
             help << "{ replSetGetStatus : 1 }";
+            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
 
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
@@ -90,5 +94,35 @@ namespace mongo {
             return true;
         }
     } cmdReplSetGetStatus;
+
+    class CmdReplSetFreeze : public Command {
+    public:
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool logTheOp() { return false; }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream &help ) const {
+            help << "Enable / disable failover for the set - locks current primary as primary even if issues occur.\nFor use during system maintenance.\n";
+            help << "{ replSetFreeze : <bool> }";
+            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+        }
+
+        CmdReplSetFreeze() : Command("replSetFreeze", true) { }
+        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !replSet ) { 
+                errmsg = "not running with --replSet";
+                return false;
+            }
+            if( theReplSet == 0 ) {
+                result.append("startupStatus", ReplSet::startupStatus);
+                errmsg = ReplSet::startupStatusMsg.empty() ? 
+                    errmsg = "replset unknown error 1" : ReplSet::startupStatusMsg;
+                return false;
+            }
+
+            errmsg = "not yet implemented"; /*TODO*/
+            return false;
+        }
+    } cmdReplSetFreeze;
 
 }
