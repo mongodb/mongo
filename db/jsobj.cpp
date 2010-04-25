@@ -93,6 +93,10 @@ namespace mongo {
     }
 
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
+        BSONType t = type();
+        if ( t == Undefined )
+            return "";
+
         stringstream s;
         if ( includeFieldNames )
             s << '"' << escape( fieldName() ) << "\" : ";
