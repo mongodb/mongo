@@ -120,18 +120,6 @@ __wt_bt_debug_page(WT_TOC *toc, WT_PAGE *page, char *ofile, FILE *fp)
 		fprintf(fp, "\tfirst-free %#lx, space avail %lu\n",
 		    (u_long)page->first_free, (u_long)page->space_avail);
 	}
-	if (hdr->prntaddr == WT_ADDR_INVALID)
-		fprintf(fp, "\tprntaddr (none), ");
-	else
-		fprintf(fp, "\tprntaddr %lu, ", (u_long)hdr->prntaddr);
-	if (hdr->prevaddr == WT_ADDR_INVALID)
-		fprintf(fp, "prevaddr (none), ");
-	else
-		fprintf(fp, "prevaddr %lu, ", (u_long)hdr->prevaddr);
-	if (hdr->nextaddr == WT_ADDR_INVALID)
-		fprintf(fp, "nextaddr (none)");
-	else
-		fprintf(fp, "nextaddr %lu", (u_long)hdr->nextaddr);
 	fprintf(fp, "\n");
 
 	switch (hdr->type) {

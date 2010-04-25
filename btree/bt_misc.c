@@ -91,29 +91,6 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 }
 
 /*
- * __wt_bt_off_first --
- *	In a couple of places in the code, we're trying to walk down the
- *	internal pages from the root, and we need to get the WT_OFF
- *	information for the first key/WT_OFF pair on the page.
- */
-void
-__wt_bt_off_first(WT_PAGE *page, u_int32_t *addrp, u_int32_t *sizep)
-{
-	WT_ITEM *item;
-	WT_OFF *off;
-
-	if (page->hdr->type == WT_PAGE_COL_INT)
-		off = (WT_OFF *)WT_PAGE_BYTE(page);
-	else {
-		item = (WT_ITEM *)WT_PAGE_BYTE(page);
-		item = WT_ITEM_NEXT(item);
-		off = WT_ITEM_BYTE_OFF(item);
-	}
-	*addrp = off->addr;
-	*sizep = off->size;
-}
-
-/*
  * __wt_bt_set_ff_and_sa_from_p --
  *	Set the page's first-free and space-available values from an
  *	address positioned one past the last used byte on the page.

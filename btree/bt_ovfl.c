@@ -53,8 +53,6 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	hdr->type = WT_PAGE_OVFL;
 	hdr->level = WT_LLEAF;
 	hdr->u.datalen = dbt->size;
-	hdr->prntaddr =
-	    page->hdr->prevaddr = page->hdr->nextaddr = WT_ADDR_INVALID;
 
 	/* Return the page address to the caller. */
 	*addrp = page->addr;

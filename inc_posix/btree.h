@@ -251,26 +251,13 @@ struct __wt_page_hdr {
 		u_int32_t datalen;	/* 16-19: overflow data length */
 		u_int32_t entries;	/* 16-19: number of items on page */
 	} u;
-
-	/*
-	 * Parent, forward and reverse page links.  Pages are linked at their
-	 * level: all the main btree leaf pages are linked, each set of offpage
-	 * duplicate leaf pages are linked, and each level of internal pages
-	 * are linked.
-	 */
-	u_int32_t prntaddr;		/* 20-23: parent page */
-	u_int32_t prntsize;		/* 24-27: parent page size */
-	u_int32_t prevaddr;		/* 28-31: previous page */
-	u_int32_t prevsize;		/* 32-35: previous page size */
-	u_int32_t nextaddr;		/* 36-39: next page */
-	u_int32_t nextsize;		/* 40-43: next page size */
 };
 /*
  * WT_PAGE_HDR_SIZE is the expected structure size --  we check at startup to
  * ensure the compiler hasn't inserted padding (which would break the world).
  * The size must be a multiple of a 4-byte boundary.
  */
-#define	WT_PAGE_HDR_SIZE		44
+#define	WT_PAGE_HDR_SIZE		20
 
 /*
  * WT_PAGE_BYTE is the first usable data byte on the page.

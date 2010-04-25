@@ -74,7 +74,7 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 	DBT *key, *data;
 	ENV *env;
 	IDB *idb;
-	WT_PAGE *page, *next;
+	WT_PAGE *page;
 	WT_STACK stack;
 	u_int64_t insert_cnt;
 	u_int32_t len;
@@ -154,27 +154,16 @@ __wt_bt_bulk_fix(WT_TOC *toc,
 		 * one.
 		 */
 		if (len > page->space_avail) {
-			WT_ERR(__wt_bt_page_alloc(toc,
-			    WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &next));
-			next->hdr->prevaddr = page->addr;
-			next->hdr->prevsize = page->size;
-			page->hdr->nextaddr = next->addr;
-			page->hdr->nextsize = next->size;
-
 			/*
-			 * If we've finished with a page, promote its first key
-			 * to its parent and write it.   The promotion function
-			 * sets the page's parent address, which is the same for
-			 * the newly allocated page.
+			 * We've finished with the page: promote its first key
+			 * to its parent and discard it, then switch to the new
+			 * page.
 			 */
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
-			next->hdr->prntaddr = page->hdr->prntaddr;
-			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
-
-			/* Switch to the next page. */
-			page = next;
+			WT_ERR(__wt_bt_page_alloc(toc,
+			    WT_PAGE_COL_FIX, WT_LLEAF, db->leafmin, &page));
 		}
 
 		++page->records;
@@ -440,10 +429,6 @@ skip_read:	/*
 		    WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
 			WT_ERR(__wt_bt_page_alloc(
 			    toc, type, WT_LLEAF, db->leafmin, &next));
-			next->hdr->prevaddr = page->addr;
-			next->hdr->prevsize = page->size;
-			page->hdr->nextaddr = next->addr;
-			page->hdr->nextsize = next->size;
 
 			/*
 			 * If in the middle of loading a set of duplicates, but
@@ -513,18 +498,13 @@ skip_read:	/*
 			}
 
 			/*
-			 * If we've finished with a page, promote its first key
-			 * to its parent and write it.   The promotion function
-			 * sets the page's parent address, which is the same for
-			 * the newly allocated page.
+			 * We've finished with the page: promote its first key
+			 * to its parent and discard it, then switch to the new
+			 * page.
 			 */
 			WT_ERR(__wt_bt_promote(
 			    toc, page, page->records, &stack, 0, NULL));
-			next->hdr->prntaddr = page->hdr->prntaddr;
-			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, WT_DISCARD);
-
-			/* Switch to the next page. */
 			page = next;
 		}
 
@@ -662,7 +642,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	WT_ITEM data_item;
 	WT_OFF off;
 	WT_OVFL data_local;
-	WT_PAGE *next, *page;
+	WT_PAGE *page;
 	WT_STACK stack;
 	u_int32_t len, root_addr;
 	u_int8_t *p;
@@ -766,30 +746,19 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 		 * page.
 		 */
 		if (WT_ITEM_SPACE_REQ(data->size) > page->space_avail) {
-			WT_RET(__wt_bt_page_alloc(toc,
-			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &next));
-			next->hdr->prevaddr = page->addr;
-			next->hdr->prevsize = page->size;
-			page->hdr->nextaddr = next->addr;
-			page->hdr->nextsize = next->size;
-
 			/*
-			 * If we have finished with a page, promote its first
-			 * key to its parent.  The promotion function sets the
-			 * page's parent information, which is the same for
-			 * the newly allocated page.
+			 * We've finished with the page: promote its first key
+			 * to its parent and discard it, then switch to the new
+			 * page.
 			 *
 			 * If we promoted a key, we might have split, and so
 			 * there may be a new offpage duplicates root page.
 			 */
 			WT_RET(__wt_bt_promote(toc,
 			    page, page->records, &stack, 0, &root_addr));
-			next->hdr->prntaddr = page->hdr->prntaddr;
-			next->hdr->prntsize = page->hdr->prntsize;
 			__wt_bt_page_out(toc, &page, 0);
-
-			/* Switch to the next page. */
-			page = next;
+			WT_RET(__wt_bt_page_alloc(toc,
+			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
 		}
 
 		++dup_count;			/* Total duplicate count */
@@ -1045,35 +1014,20 @@ split:		switch (page->hdr->type) {
 		 */
 		else {
 			/*
-			 * Link the new parent page into the level's page
-			 * chain.
-			 */
-			next->hdr->prevaddr = parent->addr;
-			next->hdr->prevsize = parent->size;
-			parent->hdr->nextaddr = next->addr;
-			parent->hdr->nextsize = next->size;
-
-			/*
 			 * Case #3 -- it's a root split, so we have to promote
-			 * a key from both of the parent pages.  First, promote
-			 * the key from the existing parent page.
+			 * a key from both of the parent pages: promote the key
+			 * from the existing parent page.
 			 */
 			if (stack->page[level + 1] == NULL)
 				WT_ERR(__wt_bt_promote(toc, parent,
 				    incr, stack, level + 1, dup_root_addrp));
 
-			next->hdr->prntaddr = parent->hdr->prntaddr;
-			next->hdr->prntsize = parent->hdr->prntsize;
-
 			/* Discard the old parent page, we have a new one. */
 			__wt_bt_page_out(toc, &parent, 0);
-
 			need_promotion = 1;
 		}
 
-		/* There's a new parent page, update the page's parent ref. */
-		page->hdr->prntaddr = next->addr;
-		page->hdr->prntsize = next->size;
+		/* There's a new parent page, reset the stack. */
 		stack->page[level] = parent = next;
 		next = NULL;
 	}

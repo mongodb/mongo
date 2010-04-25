@@ -40,7 +40,6 @@ __wt_bt_page_alloc(
 	hdr = page->hdr;
 	hdr->type = (u_int8_t)type;
 	hdr->level = (u_int8_t)level;
-	hdr->prntaddr = hdr->prevaddr = hdr->nextaddr = WT_ADDR_INVALID;
 
 	*pagep = page;
 	return (0);
