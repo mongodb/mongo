@@ -1088,7 +1088,7 @@ Default( mongod )
 # tools
 allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
 normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" ]
-env.Alias( "tools" , [ "mongo" + x for x in normalTools ] )
+env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
     env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
 
@@ -1114,6 +1114,8 @@ clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpCl
 
 # testing
 test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+if windows:
+    testEnv.Alias( "test" , "test.exe" )
 perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
 clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
 
