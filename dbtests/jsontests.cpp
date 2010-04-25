@@ -333,7 +333,7 @@ namespace JsonTests {
                 ASSERT_EQUALS( "{ \"x\" : function(){ return 1; } }" , o.jsonString() );
             }
         };
-
+        
         class TimestampTests {
         public:
             void run(){
@@ -344,7 +344,39 @@ namespace JsonTests {
             }
         };
 
+        class AllTypes {
+        public:
+            void run(){
+                OID oid;
+                oid.init();
 
+                BSONObjBuilder b;
+                b.appendMinKey( "a" );
+                b.append( "b" , 5.5 );
+                b.append( "c" , "abc" );
+                b.append( "e" , BSON( "x" << 1 ) );
+                b.append( "f" , BSON_ARRAY( 1 << 2 << 3 ) );
+                b.appendBinData( "g" , 5 , bdtCustom , (const char*)this );
+                b.appendUndefined( "h" );
+                b.append( "i" , oid );
+                b.appendBool( "j" , 1 );
+                b.appendDate( "k" , 123 );
+                b.appendNull( "l" );
+                b.appendRegex( "m" , "a" );
+                b.appendDBRef( "n" , "foo" , oid );
+                b.appendCode( "o" , "function(){}" );
+                b.appendSymbol( "p" , "foo" );
+                //b.appendCodeWScope( "q" , "function(){}" , BSON("x" << 1 ) );
+                b.append( "r" , (int)5 );
+                b.appendTimestamp( "s" , 123123123123123LL );
+                b.append( "t" , 12321312312LL );
+                b.appendMaxKey( "u" );
+                
+                BSONObj o = b.obj();
+                cout << o.jsonString() << endl;
+            }
+        };
+        
     } // namespace JsonStringTests
 
     namespace FromJsonTests {
@@ -1059,7 +1091,8 @@ namespace JsonTests {
             add< JsonStringTests::RegexManyOptions >();
             add< JsonStringTests::CodeTests >();
             add< JsonStringTests::TimestampTests >();
-
+            add< JsonStringTests::AllTypes >();
+            
             add< FromJsonTests::Empty >();
             add< FromJsonTests::EmptyWithSpace >();
             add< FromJsonTests::SingleString >();

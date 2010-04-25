@@ -241,6 +241,14 @@ namespace mongo {
             s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
             break;
 
+        case MinKey:
+            s << "{ \"$minKey\" : 1 }";
+            break;
+
+        case MaxKey:
+            s << "{ \"$maxKey\" : 1 }";
+            break;
+
         default:
             stringstream ss;
             ss << "Cannot create a properly formatted JSON string with "
