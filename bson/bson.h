@@ -38,18 +38,32 @@
 #include <iostream>
 #include <sstream>
 
+namespace bson { 
+    class assertion : public std::exception { 
+    public:
+        virtual const char* what() const throw() { return "BsonAssertion"; }
+    };
+}
+
 namespace mongo {
 #if !defined(assert) 
     inline void assert(bool expr) {
-        if(!expr) std::cout << "assertion failure in bson library" << std::endl;
+        if(!expr) { 
+            std::cout << "assertion failure in bson library" << std::endl;
+            throw bson::assertion();
+        }
     }
 #endif
 #if !defined(uassert)
     inline void uassert(unsigned msgid, const char *msg, bool expr) {
-        if(!expr) std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
+        if( !expr )
+            throw bson::assertion();
     }
     inline void massert(unsigned msgid, std::string msg, bool expr) { 
-        if(!expr) std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
+        if(!expr) { 
+            std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
+            throw bson::assertion();
+        }
     }
 #endif
 }

@@ -170,8 +170,8 @@ namespace mongo {
     }
 
     inline BSONObjIterator BSONObjBuilder::iterator() const {
-        const char * s = b.buf() + offset_;
-        const char * e = b.buf() + b.len();
+        const char * s = _b.buf() + _offset;
+        const char * e = _b.buf() + _b.len();
         return BSONObjIterator( s , e );
     }
     
@@ -489,4 +489,74 @@ namespace mongo {
         _objdata = p;
     }
 
+    inline BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
+
+    inline BSONElement BSONElement::operator[] (const string& field) const { 
+        BSONObj o = Obj();
+        return o[field];
+    }
+
+    inline void BSONObj::elems(vector<BSONElement> &v) const {
+        BSONObjIterator i(*this);
+        while( i.more() )
+            v.push_back(i.next());
+    }
+
+    inline void BSONObj::elems(list<BSONElement> &v) const { 
+        BSONObjIterator i(*this);
+        while( i.more() )
+            v.push_back(i.next());
+    }
+
+    template <class T>
+    void BSONObj::Vals(vector<T>& v) const { 
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            T t;
+            i.next().Val(t);
+            v.push_back(t);
+        }
+    }
+    template <class T>
+    void BSONObj::Vals(list<T>& v) const { 
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            T t;
+            i.next().Val(t);
+            v.push_back(t);
+        }
+    }
+
+    template <class T>
+    void BSONObj::vals(vector<T>& v) const { 
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            try {
+                T t;
+                i.next().Val(t);
+                v.push_back(t);
+            } catch(...) { }
+        }
+    }
+    template <class T>
+    void BSONObj::vals(list<T>& v) const { 
+        BSONObjIterator i(*this);
+        while( i.more() ) {
+            try {
+                T t;
+                i.next().Val(t);
+                v.push_back(t);
+            } catch(...) { }
+        }
+    }
+
+    inline ostream& operator<<( ostream &s, const BSONObj &o ) {
+        return s << o.toString();
+    }
+
+    inline ostream& operator<<( ostream &s, const BSONElement &e ) {
+        return s << e.toString();
+    }
+
+    inline void BSONElement::Val(BSONObj& v) const { v = Obj(); }
 }

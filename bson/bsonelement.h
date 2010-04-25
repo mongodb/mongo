@@ -62,6 +62,18 @@ public:
     void Null()                 const { chk(isNull()); }
     void OK()                   const { chk(ok()); }
 
+    /** populate v with the value of the element.  If type does not match, throw exception. 
+        useful in templates -- see also BSONObj::Vals().
+        */
+    void Val(Date_t& v)         const { v = Date(); }
+    void Val(long long& v)      const { v = Long(); }
+    void Val(bool& v)           const { v = Bool(); }
+    void Val(BSONObj& v)        const;
+    void Val(mongo::OID& v)     const { v = OID(); }
+    void Val(int& v)            const { v = Int(); }
+    void Val(double& v)         const { v = Double(); }
+    void Val(string& v)         const { v = String(); }
+
     /** Use ok() to check if a value is assigned:
           if( myObj["foo"].ok() ) ...
     */
@@ -73,6 +85,11 @@ public:
 
     /** Returns the type of the element */
     BSONType type() const { return (BSONType) *data; }
+
+    /** retrieve a field within this element 
+        throws exception if *this is not an embedded object
+    */
+    BSONElement operator[] (const string& field) const;
         
     /** returns the tyoe of the element fixed for the main type
         the main purpose is numbers.  any numeric type will return NumberDouble

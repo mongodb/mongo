@@ -1000,14 +1000,6 @@ namespace mongo {
         return ss.str();
     }
 
-    ostream& operator<<( ostream &s, const BSONObj &o ) {
-        return s << o.toString();
-    }
-
-    ostream& operator<<( ostream &s, const BSONElement &e ) {
-        return s << e.toString();
-    }
-
     void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base){
         BSONObjIterator it(obj);
         while (it.more()){
@@ -1471,8 +1463,6 @@ namespace mongo {
         qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
         _cur = 0;
     }
-
-    BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
 
     /** transform a BSON array into a vector of BSONElements.
         we match array # positions with their vector position, and ignore 

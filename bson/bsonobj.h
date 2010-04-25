@@ -18,6 +18,8 @@
 #pragma once
 
 #include <set>
+#include <list>
+#include <vector>
 #include "util/builder.h"
 
 namespace mongo {
@@ -324,6 +326,25 @@ namespace mongo {
             opWITHIN = 0x14,
             opMAX_DISTANCE=0x15
         };               
+
+        /** add all elements of the object to the specified vector */
+        void elems(vector<BSONElement> &) const;
+        /** add all elements of the object to the specified list */
+        void elems(list<BSONElement> &) const;
+
+        /** add all values of the object to the specified vector.  If type mismatches, exception. */
+        template <class T>
+        void Vals(vector<T> &) const;
+        /** add all values of the object to the specified list.  If type mismatches, exception. */
+        template <class T>
+        void Vals(list<T> &) const;
+
+        /** add all values of the object to the specified vector.  If type mismatches, skip. */
+        template <class T>
+        void vals(vector<T> &) const;
+        /** add all values of the object to the specified list.  If type mismatches, skip. */
+        template <class T>
+        void vals(list<T> &) const;
 
 private:
         friend class BSONObjIterator;
