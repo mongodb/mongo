@@ -68,6 +68,7 @@ using mongo::BufBuilder;
 using mongo::DBClientConnection;
 using mongo::QueryResult;
 using mongo::MemoryMappedFile;
+using mongo::uassert;
 
 #define SNAP_LEN 65535
 

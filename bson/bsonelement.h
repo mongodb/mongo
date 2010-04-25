@@ -338,7 +338,7 @@ public:
         totalSize = -1;
     }
 
-    string BSONElement::_asCode() const;
+    string _asCode() const;
     OpTime _opTime() const;
 
 private:

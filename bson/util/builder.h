@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <string>
 #include <string.h>
 #include <stdio.h>
 #include <boost/shared_ptr.hpp>
@@ -99,7 +100,7 @@ namespace mongo {
             append((void*) str, strlen(str)+1);
         }
         
-        void append(const string &str) {
+        void append(const std::string &str) {
             append( (void *)str.c_str(), str.length() + 1 );
         }
 
@@ -191,7 +192,7 @@ namespace mongo {
             append( str );
             return *this;
         }
-        StringBuilder& operator<<( const string& s ){
+        StringBuilder& operator<<( const std::string& s ){
             append( s.c_str() );
             return *this;
         }
@@ -202,8 +203,8 @@ namespace mongo {
             _buf.reset( maxSize );
         }
         
-        string str(){
-            return string(_buf.data, _buf.l);
+        std::string str(){
+            return std::string(_buf.data, _buf.l);
         }
 
     private:
