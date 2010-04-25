@@ -21,17 +21,20 @@ typedef struct {
 
 	void (*f)(const char *, u_int64_t);	/* Progress callback */
 	u_int64_t fcnt;				/* Progress counter */
+
+	WT_PAGE *leaf;				/* Child page */
 } WT_VSTUFF;
 
 static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
-static int __wt_bt_verify_connections(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
-static int __wt_bt_verify_level(WT_TOC *, u_int32_t, u_int32_t, WT_VSTUFF *);
+static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW_INDX *, WT_PAGE *, int);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, WT_VSTUFF *);
 static int __wt_bt_verify_page_col_fix(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_col_int(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_desc(WT_TOC *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_bt_verify_tree(
+    WT_TOC *, WT_ROW_INDX *, u_int32_t, WT_OFF *, WT_VSTUFF *);
 
 /*
  * __wt_db_verify --
@@ -54,6 +57,7 @@ __wt_bt_verify(
 	DB *db;
 	ENV *env;
 	IDB *idb;
+	WT_OFF off;
 	WT_VSTUFF vstuff;
 	WT_PAGE *page;
 	int ret;
@@ -95,13 +99,17 @@ __wt_bt_verify(
 	WT_ERR(__wt_bt_verify_page(toc, page, &vstuff));
 	__wt_bt_page_out(toc, &page, 0);
 
-	WT_ERR(
-	    __wt_bt_verify_level(toc, idb->root_addr, idb->root_size, &vstuff));
+	WT_RECORDS(&off) = 0;
+	off.addr = idb->root_addr;
+	off.size = idb->root_size;
+	WT_ERR(__wt_bt_verify_tree(toc, NULL, WT_LNONE, &off, &vstuff));
 
 	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
 
 err:	if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
+	if (vstuff.leaf != NULL)
+		__wt_bt_page_out(toc, &vstuff.leaf, 0);
 
 	/* Wrap up reporting. */
 	if (vstuff.f != NULL)
@@ -113,385 +121,176 @@ err:	if (page != NULL)
 }
 
 /*
- * __wt_bt_verify_level --
- *	Verify a level of a tree.
+ * Callers pass us a page addr/size pair, and a reference to the internal node
+ * key that referenced that page (if any -- the root node doesn't have one).
+ *
+ * The plan is simple.  We recursively descend the tree, in depth-first fashion.
+ * First we verify each page, so we know it is correctly formed, and any keys
+ * it contains are correctly ordered.  After page verification, we check the
+ * connections within the tree.
+ *
+ * There are two connection checks: First, we compare the internal node key that
+ * lead to the current page against the first entry on the current page.  The
+ * internal node key must compare less than or equal to the first entry on the
+ * current page.  Second, we compare the largest key we've seen on any leaf page
+ * against the next internal node key we find.  This check is a little tricky:
+ * Every time we find a leaf page, we save it in the vs->leaf structure.  The
+ * next time we are about to indirect through an entry on an internal node, we
+ * compare the last entry on that saved page against the internal node entry's
+ * key.  In that comparison, the leaf page's key must be less than the internal
+ * node entry's key.
+ *
+ * Off-page duplicate trees are handled the same way (this function is called
+ * from the page verification routine when an off-page duplicate tree is found).
+ *
+ * __wt_bt_verify_tree --
+ *	Verify a subtree of the tree, recursively descending through the tree.
  */
 static int
-__wt_bt_verify_level(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_VSTUFF *vs)
+__wt_bt_verify_tree(WT_TOC *toc,
+    WT_ROW_INDX *parent_rip, u_int32_t level, WT_OFF *off, WT_VSTUFF *vs)
 {
 	DB *db;
-	DBT *page_dbt_ref, page_dbt, *prev_dbt_ref, prev_dbt;
-	ENV *env;
-	WT_PAGE *page, *prev;
+	WT_COL_INDX *page_cip;
+	WT_PAGE *page;
 	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *page_ip, *prev_ip;
-	u_int32_t addr_arg, size_arg;
-	int first, ret;
-	int (*func)(DB *, const DBT *, const DBT *);
+	WT_ROW_INDX *page_rip;
+	int ret;
 
 	db = toc->db;
-	env = toc->env;
-	addr_arg = WT_ADDR_INVALID;
+	page = NULL;
 	ret = 0;
 
-	WT_CLEAR(prev_dbt);
-	WT_CLEAR(page_dbt);
+	/* Read and verify the page. */
+	WT_RET(__wt_bt_page_in(toc, off->addr, off->size, 0, &page));
+	WT_ERR(__wt_bt_verify_page(toc, page, vs));
 
 	/*
-	 * Callers pass us an page addr/size pair.
-	 *
-	 * The plan is pretty simple.  We read through the levels of the tree,
-	 * from top to bottom (root level to leaf level), and from left to
-	 * right (smallest to greatest), verifying each page as we go.  First
-	 * we verify each page, so we know it is correctly formed, and any
-	 * keys it contains are correctly ordered.  After page verification,
-	 * we check its connections within the tree.
-	 *
-	 * Most connection checks are done in the __wt_bt_verify_connections
-	 * function, but one of them is done here.  The following comment
-	 * describes the entire process of connection checking.  Consider the
-	 * following tree:
-	 *
-	 *	P1 - I1
-	 *	P2
-	 *	P3
-	 *	|    |
-	 *	P4 - I2
-	 *	P5
-	 *	P6
-	 *	|    |
-	 *	P7 - I3
-	 *	P8
-	 *	P9
-	 *
-	 * After page verification, we know the pages are OK, and all we need
-	 * to do is confirm the tree itself is well formed.
-	 *
-	 * When walking each internal page level (I 1-3), we confirm the first
-	 * key on each page is greater than the last key on the previous page.
-	 * For example, we check that I2/K1 is greater than I1/K*, and I3/K1 is
-	 * greater than I2/K*.  This check is safe as we verify the pages in
-	 * list order, so before we check I2/K1 against I1/K*, we've verified
-	 * both I2 and I1.
-	 *
-	 * This check is the check done in this function, all other connection
-	 * checks are in __wt_bt_verify_connections().  The remainder of this
-	 * comment describes those checks.
-	 *
-	 * When walking internal or leaf page levels (I 1-3, and later P 1-9),
-	 * we confirm the first key on each page is greater than or equal to
-	 * its referencing key on the parent page.  In other words, somewhere
-	 * on I1 are keys referencing P 1-3.  When verifying P 1-3, we check
-	 * their parent key against the first key on P 1-3.  We also check that
-	 * the subsequent key in the parent level is greater than the last
-	 * key on the page.   So, in the example, key 2 in I1 references P2.
-	 * The check is that I1/K2 is less than the P2/K1, and I1/K3 is greater
-	 * than P2/K*.
-	 *
-	 * The boundary cases are where the parent key is the first or last
-	 * key on the page.
-	 *
-	 * If the key is the first key on the parent page, there are two cases:
-	 * First, the key may be the first key in the level (I1/K1 in the
-	 * example).  In this case, we confirm the page key is the first key
-	 * in its level (P1/K1 in the example).  Second, if the key is not the
-	 * first key in the level (I2/K1, or I3/K1 in the example).  In this
-	 * case, there is no work to be done -- the check we already did, that
-	 * the first key in each internal page sorts after the last key in the
-	 * previous internal page guarantees the referenced key in the page is
-	 * correct with respect to the previous page on the internal level.
-	 *
-	 * If the key is the last key on the parent page, there are two cases:
-	 * First, the key may be the last key in the level (I3/K* in the
-	 * example).  In this case, we confirm the page key is the last key
-	 * in its level (P9/K* in the example).  Second, if the key is not the
-	 * last key in the level (I1/K*, or I2/K* in the example).   In this
-	 * case, we check the referenced key in the page against the first key
-	 * in the subsequent page.  For example, P6/KN is compared against
-	 * I3/K1.
-	 *
-	 * All of the connection checks are safe because we only look at the
-	 * previous pages on the current level or pages in higher levels of
-	 * the tree.
-	 *
-	 * We do it this way because, while I don't mind random access in the
-	 * tree for the internal pages, I want to read the tree's leaf pages
-	 * contiguously.  As long as all of the internal pages for any single
-	 * level fit into the cache, we'll not move the disk heads except to
-	 * get the next page we're verifying.
+	 * The page is OK, instantiate its in-memory information if we don't
+	 * already have it.
 	 */
-	for (first = 1, page = prev = NULL;
-	    addr != WT_ADDR_INVALID;
-	    addr = hdr->nextaddr, size = hdr->nextsize) {
-		/* Discard any previous page and get the next page. */
-		if (prev != NULL)
-			__wt_bt_page_out(toc, &prev, 0);
-		prev = page;
-		page = NULL;
-		WT_ERR(__wt_bt_page_in(toc, addr, size, 0, &page));
+	if (page->u.indx == NULL)
+		WT_ERR(__wt_bt_page_inmem(db, page));
 
-		/* Verify the page. */
-		WT_ERR(__wt_bt_verify_page(toc, page, vs));
+	hdr = page->hdr;
 
-		hdr = page->hdr;
-		if (first) {
-			first = 0;
-
-			/*
-			 * If we're walking an internal level, we'll want to
-			 * descend to the first offpage in this level.  Save
-			 * away the address and level information for our next
-			 * iteration.
-			 */
-			switch (hdr->type) {
-			case WT_PAGE_COL_INT:
-			case WT_PAGE_DUP_INT:
-			case WT_PAGE_ROW_INT:
-				__wt_bt_off_first(page, &addr_arg, &size_arg);
-				break;
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_VAR:
-			case WT_PAGE_DUP_LEAF:
-			case WT_PAGE_ROW_LEAF:
-				break;
-			WT_ILLEGAL_FORMAT(db);
-			}
-
-			/*
-			 * Set the comparison function -- tucked away here
-			 * because we can't set it without knowing what the
-			 * page looks like, and we don't want to set it every
-			 * time through the loop.
-			 */
-			switch (hdr->type) {
-			case WT_PAGE_DUP_INT:
-			case WT_PAGE_DUP_LEAF:
-				func = db->btree_compare_dup;
-				break;
-			case WT_PAGE_ROW_INT:
-			case WT_PAGE_ROW_LEAF:
-				func = db->btree_compare;
-				break;
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_INT:
-			case WT_PAGE_COL_VAR:
-				func = NULL;
-				break;
-			WT_ILLEGAL_FORMAT(db);
-			}
-		}
-
-		/*
-		 * The page is OK, instantiate its in-memory information, if
-		 * we don't have it already.
-		 */
-		if (page->indx_count == 0)
-			WT_ERR(__wt_bt_page_inmem(db, page));
-
-		/* Verify its connections. */
-		WT_ERR(__wt_bt_verify_connections(toc, page, vs));
-
-		/*
-		 * If we have a previous page, and the tree has sorted items,
-		 * there's one more check, the last key of the previous page
-		 * against the first key of this page.
-		 *
-		 * The keys we're going to compare may need to be instantiated.
-		 */
-		if (func == NULL || prev == NULL)
-			continue;
-
-		prev_ip = prev->u.r_indx + (prev->indx_count - 1);
-		if (WT_KEY_PROCESS(prev_ip)) {
-			prev_dbt_ref = &prev_dbt;
-			WT_ERR(__wt_bt_key_process(toc, prev_ip, prev_dbt_ref));
-		} else
-			prev_dbt_ref = (DBT *)prev_ip;
-		page_ip = page->u.r_indx;
-		if (WT_KEY_PROCESS(page_ip)) {
-			page_dbt_ref = &page_dbt;
-			WT_ERR(__wt_bt_key_process(toc, page_ip, page_dbt_ref));
-		} else
-			page_dbt_ref = (DBT *)page_ip;
-		if (func(db, prev_dbt_ref, page_dbt_ref) >= 0) {
+	/*
+	 * Check the tree levels and records counts match up.
+	 *
+	 * If passed a level of WT_LNONE, this is the root page -- that means
+	 * we use its level to initialize expected values for the rest of the
+	 * tree, and there's no record count to check.
+	 */
+	if (level == WT_LNONE)
+		level = hdr->level;
+	else {
+		if (hdr->level != level) {
 			__wt_api_db_errx(db,
-			    "the first key on page at addr %lu does not sort "
-			    "after the last key on the previous page",
-			    (u_long)addr);
-			ret = WT_ERROR;
+			    "page at addr %lu has a tree level of %lu where "
+			    "the expected level was %lu",
+			    (u_long)off->addr,
+			    (u_long)hdr->level, (u_long)level);
+			goto err;
+		}
+		if (page->records != WT_RECORDS(off)) {
+			__wt_api_db_errx(db,
+			    "page at addr %lu has a record count of %llu where "
+			    "the expected record count was %llu",
+			    (u_long)off->addr, page->records, WT_RECORDS(off));
 			goto err;
 		}
 	}
 
-err:	if (prev != NULL)
-		__wt_bt_page_out(toc, &prev, 0);
+	/*
+	 * In row stores we're passed the parent page's key that references this
+	 * page: it must sort less than or equal to the first key on this page.
+	 */
+	if (parent_rip != NULL)
+		WT_ERR(__wt_bt_verify_cmp(toc, parent_rip, page, 1));
+
+	/*
+	 * Leaf pages need no further processing; in the case of row-store leaf
+	 * pages, we'll need them to check their last entry against the next
+	 * internal key in the tree; save a reference and return.
+	 */
+	switch (hdr->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		__wt_bt_page_out(toc, &page, 0);
+		return (0);
+	case WT_PAGE_DUP_LEAF:
+	case WT_PAGE_ROW_LEAF:
+		vs->leaf = page;
+		return (0);
+	default:
+		break;
+	}
+
+	/* For each entry in the internal page, verify the subtree. */
+	switch (hdr->type) {
+	u_int32_t i;
+	case WT_PAGE_COL_INT:
+		WT_INDX_FOREACH(page, page_cip, i)
+			WT_ERR(__wt_bt_verify_tree(toc, NULL,
+			    level - 1, (WT_OFF *)page_cip->page_data, vs));
+		break;
+	case WT_PAGE_DUP_INT:
+	case WT_PAGE_ROW_INT:
+		WT_INDX_FOREACH(page, page_rip, i) {
+			/*
+			 * At each off-page entry, we compare the current entry
+			 * against the largest key in the subtree rooted to the
+			 * immediate left of the current item; this key must
+			 * compare less than or equal to the current item.  The
+			 * trick here is we need the last leaf key, not the last
+			 * internal node key.  Discard the leaf node as soon as
+			 * we've used it in a comparison.
+			 */
+			if (vs->leaf != NULL) {
+				WT_ERR(__wt_bt_verify_cmp(
+				    toc, page_rip, vs->leaf, 0));
+				__wt_bt_page_out(toc, &vs->leaf, 0);
+			}
+
+			WT_ERR(
+			    __wt_bt_verify_tree(toc, page_rip, level - 1,
+			    WT_ITEM_BYTE_OFF(page_rip->page_data), vs));
+		}
+		break;
+	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	}
+
+	if (0) {
+err:		if (vs->leaf != NULL)
+			__wt_bt_page_out(toc, &vs->leaf, 0);
+	}
 	if (page != NULL)
 		__wt_bt_page_out(toc, &page, 0);
-
-	__wt_free(env, page_dbt.data, page_dbt.mem_size);
-	__wt_free(env, prev_dbt.data, prev_dbt.mem_size);
-
-	if (ret == 0 && addr_arg != WT_ADDR_INVALID)
-		ret = __wt_bt_verify_level(toc, addr_arg, size_arg, vs);
 
 	return (ret);
 }
 
 /*
- * __wt_bt_verify_connections --
- *	Verify the page is in the right place in the tree.
+ * __wt_bt_verify_cmp --
+ *	Compare a key on a parent page to a designated entry on a child page.
  */
 static int
-__wt_bt_verify_connections(WT_TOC *toc, WT_PAGE *child, WT_VSTUFF *vs)
+__wt_bt_verify_cmp(
+    WT_TOC *toc, WT_ROW_INDX *parent_rip, WT_PAGE *child, int first_entry)
 {
 	DB *db;
 	DBT *cd_ref, child_dbt, *pd_ref, parent_dbt;
 	ENV *env;
-	IDB *idb;
-	WT_COL_INDX *parent_cip;
-	WT_OFF *off;
-	WT_PAGE *parent;
-	WT_PAGE_HDR *hdr;
-	WT_ROW_INDX *child_rip, *parent_rip;
-	u_int32_t addr, frags, i, nextaddr, nextsize;
-	int (*func)(DB *, const DBT *, const DBT *);
-	int ret;
+	WT_ROW_INDX *child_rip;
+	int cmp, ret, (*func)(DB *, const DBT *, const DBT *);
 
 	db = toc->db;
 	env = toc->env;
-	idb = db->idb;
-	parent = NULL;
-	hdr = child->hdr;
-	addr = child->addr;
-	ret = 0;
-
 	WT_CLEAR(child_dbt);
 	WT_CLEAR(parent_dbt);
 
-	/*
-	 * This function implements most of the connection checking in the
-	 * tree, but not all of it -- see the comment at the beginning of
-	 * the __wt_bt_verify_level function for details.
-	 *
-	 * Root pages are special cases, they shouldn't point to anything.
-	 */
-	if (hdr->prntaddr == WT_ADDR_INVALID) {
-		if (hdr->prevaddr != WT_ADDR_INVALID ||
-		    hdr->nextaddr != WT_ADDR_INVALID) {
-			__wt_api_db_errx(db,
-			    "page at addr %lu has siblings, but no parent "
-			    "address",
-			    (u_long)addr);
-			return (WT_ERROR);
-		}
-
-		/*
-		 * Two types of pages can have no parents or siblings; in a
-		 * primary tree, the root page, and the root of an off-page
-		 * duplicate set.
-		 */
-		switch (hdr->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_ROW_INT:
-			if (idb->root_addr == addr)
-				return (0);
-			break;
-		case WT_PAGE_DUP_INT:
-			/*
-			 * XXX
-			 * We need to add checks that the duplicate tree is
-			 * referenced once (and only once), in the primary.
-			 */
-			return (0);
-		default:
-			break;
-		}
-		__wt_api_db_errx(db,
-		    "page at addr %lu is disconnected from the tree",
-		    (u_long)addr);
-		return (WT_ERROR);
-	}
-
-	/*
-	 * If it's not the root page, we need a copy of its parent page.
-	 *
-	 * First, check to make sure we've verified the parent page -- if we
-	 * haven't, there's a problem because we verified levels down the tree,
-	 * starting at the top.   Then, read the page in.  Since we've already
-	 * verified it, we can build the in-memory information.
-	 */
-	frags = WT_OFF_TO_ADDR(db, hdr->prntsize);
-	for (i = 0; i < frags; ++i)
-		if (!bit_test(vs->fragbits, hdr->prntaddr + i)) {
-			__wt_api_db_errx(db,
-			    "parent of page at addr %lu not found on internal "
-			    "page links",
-			    (u_long)addr);
-			return (WT_ERROR);
-		}
-	WT_RET(__wt_bt_page_in(toc, hdr->prntaddr, hdr->prntsize, 1, &parent));
-
-	/* Check that the tree levels match up. */
-	if (hdr->level + 1 != parent->hdr->level) {
-		__wt_api_db_errx(db,
-		    "parent's level of page at addr %lu is not one more than "
-		    "the page's level (parent level: %lu, child level %lu)",
-		    (u_long)addr,
-		    (u_long)parent->hdr->level, (u_long)hdr->level);
-		return (WT_ERROR);
-	}
-
-	/*
-	 * Search the parent for the reference to the child page, and set
-	 * off to reference the offpage structure.
-	 */
-	switch (parent->hdr->type) {
-	case WT_PAGE_COL_INT:
-		WT_INDX_FOREACH(parent, parent_cip, i)
-			if (WT_COL_OFF_ADDR(parent_cip) == addr)
-				break;
-		if (parent_cip == NULL)
-			goto noref;
-
-		off = (WT_OFF *)parent_cip->page_data;
-		break;
-	case WT_PAGE_DUP_INT:
-	case WT_PAGE_ROW_INT:
-		WT_INDX_FOREACH(parent, parent_rip, i)
-			if (WT_ROW_OFF_ADDR(parent_rip) == addr)
-				break;
-		if (parent_rip == NULL) {
-noref:			__wt_api_db_errx(db,
-			    "parent of page at addr %lu doesn't reference it",
-			    (u_long)addr);
-			goto err_set;
-		}
-
-		off = WT_ITEM_BYTE_OFF(parent_rip->page_data);
-		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
-	}
-
-	/* Check the child's record counts are correct. */
-	if (child->records != WT_RECORDS(off)) {
-		__wt_api_db_errx(db,
-		    "parent of page at addr %lu has incorrect record count "
-		    "(parent: %llu, child: %llu)",
-		    (u_long)addr, WT_RECORDS(off), child->records);
-		goto err_set;
-	}
-
-	/*
-	 * The only remaining work is to compare the sort order of the keys on
-	 * the parent and child pages.  If the pages aren't sorted (that is, if
-	 * it's a column-store), we're done.  Otherwise, choose a comparison
-	 * function.
-	 */
-	switch (hdr->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		goto done;
+	/* Set the comparison function. */
+	switch (child->hdr->type) {
 	case WT_PAGE_DUP_INT:
 	case WT_PAGE_DUP_LEAF:
 		func = db->btree_compare_dup;
@@ -500,126 +299,44 @@ noref:			__wt_api_db_errx(db,
 	case WT_PAGE_ROW_LEAF:
 		func = db->btree_compare;
 		break;
-	WT_ILLEGAL_FORMAT_ERR(db, ret);
+	WT_ILLEGAL_FORMAT(db);
 	}
 
-	/*
-	 * Confirm the parent's key is less than or equal to the first key
-	 * on the child.
-	 *
-	 * If the parent's key is the smallest key on the page, check the
-	 * parent's previous page addr.  If the previous page addr is not
-	 * set (in other words, the parent is the smallest page on its level),
-	 * confirm that's also the case for the child.
-	 */
-	if (parent_rip == parent->u.r_indx) {
-		if (((hdr->prevaddr == WT_ADDR_INVALID &&
-		    parent->hdr->prevaddr != WT_ADDR_INVALID) ||
-		    (hdr->prevaddr != WT_ADDR_INVALID &&
-		    parent->hdr->prevaddr == WT_ADDR_INVALID))) {
-			__wt_api_db_errx(db,
-			    "parent key of page at addr %lu is the smallest "
-			    "key in its level of the tree, but the child key "
-			    "is not the smallest key in its level",
-			    (u_long)addr);
-			goto err_set;
-		}
-	} else {
-		/* The two keys we're going to compare may be overflow keys. */
-		child_rip = child->u.r_indx;
-		if (WT_KEY_PROCESS(child_rip)) {
-			cd_ref = &child_dbt;
-			WT_ERR(__wt_bt_key_process(toc, child_rip, cd_ref));
-		} else
-			cd_ref = (DBT *)child_rip;
-		if (WT_KEY_PROCESS(parent_rip)) {
-			pd_ref = &parent_dbt;
-			WT_ERR(__wt_bt_key_process(toc, parent_rip, pd_ref));
-		} else
-			pd_ref = (DBT *)parent_rip;
-
-		/* Compare the parent's key against the child's key. */
-		if (func(db, cd_ref, pd_ref) < 0) {
-			__wt_api_db_errx(db,
-			    "the first key on page at addr %lu sorts before "
-			    "its reference key on its parent's page",
-			    (u_long)addr);
-			goto err_set;
-		}
-	}
-
-	/*
-	 * Confirm the key following the child's parent key is greater than the
-	 * last key on the child.  (In other words, find the parent's key that
-	 * references this child -- the key AFTER that follows that key on the
-	 * parent page should sort after the last key on the child page).
-	 *
-	 * If the parent's key is the largest key on the page, look at the
-	 * parent's next page addr.  If the parent's next page addr is set,
-	 * confirm the first key on the page following the parent is greater
-	 * than the last key on the child.  If the parent's next page addr
-	 * is not set (in other words, the parent is the largest page on its
-	 * level), confirm that's also the case for the child.
-	 */
-	if (parent_rip == (parent->u.r_indx + (parent->indx_count - 1))) {
-		nextaddr = parent->hdr->nextaddr;
-		nextsize = parent->hdr->nextsize;
-		if ((hdr->nextaddr == WT_ADDR_INVALID &&
-		    nextaddr != WT_ADDR_INVALID) ||
-		    (hdr->nextaddr != WT_ADDR_INVALID &&
-		    nextaddr == WT_ADDR_INVALID)) {
-			__wt_api_db_errx(db,
-			    "the parent key of the page at addr %lu is the "
-			    "largest in its level, but the page is not the "
-			    "largest in its level",
-			    (u_long)addr);
-			goto err_set;
-		}
-
-		/* Switch for the subsequent page at the parent level. */
-		__wt_bt_page_out(toc, &parent, 0);
-		if (nextaddr != WT_ADDR_INVALID) {
-			WT_RET(__wt_bt_page_in(
-			    toc, nextaddr, nextsize, 1, &parent));
-			parent_rip = parent->u.r_indx;
-		}
+	/* The two keys we're going to compare may be overflow keys. */
+	child_rip = first_entry ?
+	    child->u.r_indx : child->u.r_indx + (child->indx_count - 1);
+	if (WT_KEY_PROCESS(child_rip)) {
+		cd_ref = &child_dbt;
+		WT_RET(__wt_bt_key_process(toc, child_rip, cd_ref));
 	} else
-		++parent_rip;
+		cd_ref = (DBT *)child_rip;
+	if (WT_KEY_PROCESS(parent_rip)) {
+		pd_ref = &parent_dbt;
+		WT_RET(__wt_bt_key_process(toc, parent_rip, pd_ref));
+	} else
+		pd_ref = (DBT *)parent_rip;
 
-	if (parent != NULL) {
-		/* The two keys we're going to compare may be overflow keys. */
-		child_rip = child->u.r_indx + (child->indx_count - 1);
-		if (WT_KEY_PROCESS(child_rip)) {
-			cd_ref = &child_dbt;
-			WT_ERR(__wt_bt_key_process(toc, child_rip, cd_ref));
-		} else
-			cd_ref = (DBT *)child_rip;
-		if (WT_KEY_PROCESS(parent_rip)) {
-			pd_ref = &parent_dbt;
-			WT_ERR(__wt_bt_key_process(toc, parent_rip, pd_ref));
-		} else
-			pd_ref = (DBT *)parent_rip;
-		/* Compare the parent's key against the child's key. */
-		if (func(db, cd_ref, pd_ref) >= 0) {
-			__wt_api_db_errx(db,
-			    "the last key on the page at addr %lu sorts after "
-			    "a parent page's key for a subsequent page",
-			    (u_long)addr);
-			goto err_set;
-		}
+	/* Compare the parent's key against the child's key. */
+	cmp = func(db, cd_ref, pd_ref);
+
+	ret = 0;
+	if (first_entry && cmp < 0) {
+		__wt_api_db_errx(db,
+		    "the first key on page at addr %lu sorts before its "
+		    "reference key on its parent's page",
+		    (u_long)child->addr);
+		ret = WT_ERROR;
 	}
-
-	if (0) {
-err_set:	ret = WT_ERROR;
+	if (!first_entry && cmp >= 0) {
+		__wt_api_db_errx(db,
+		    "the last key on the page at addr %lu sorts after a parent "
+		    "page's key for the subsequent page",
+		    (u_long)child->addr);
+		ret = WT_ERROR;
 	}
-
-done:
-err:	if (parent != NULL)
-		__wt_bt_page_out(toc, &parent, 0);
 
 	__wt_free(env, child_dbt.data, child_dbt.mem_size);
 	__wt_free(env, parent_dbt.data, parent_dbt.mem_size);
-
 	return (ret);
 }
 
@@ -945,11 +662,10 @@ eof:					__wt_api_db_errx(db,
 				WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
 				break;
 			case WT_ITEM_OFF:
-				if (hdr->type == WT_PAGE_ROW_LEAF) {
-					off = WT_ITEM_BYTE_OFF(item);
-					WT_ERR(__wt_bt_verify_level(
-					    toc, off->addr, off->size, vs));
-				}
+				off = WT_ITEM_BYTE_OFF(item);
+				if (hdr->type == WT_PAGE_ROW_LEAF)
+					WT_ERR(__wt_bt_verify_tree(
+					    toc, NULL, WT_LNONE, off, vs));
 				break;
 			default:
 				break;
