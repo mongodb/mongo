@@ -40,12 +40,7 @@
 #define localtime MONGO_localtime
 #define ctime MONGO_ctime
 
-// util/log.h
-#define OUTPUT_ERRNOX MONGO_OUTPUT_ERRNOX
-#define OUTPUT_ERRNO MONGO_OUTPUT_ERRNO
-
 // util/debug_util.h
-#define WIN MONGO_WIN
 #define DEV MONGO_DEV
 #define DEBUGGING MONGO_DEBUGGING
 #define SOMETIMES MONGO_SOMETIMES
