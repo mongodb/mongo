@@ -7,6 +7,10 @@ var rt = new ReplTest( "basic1" );
 m = rt.start( true );
 s = rt.start( false );
 
+function block(){
+    am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } )
+}
+
 function hash( db ){
     var s = "";
     var a = db.getCollectionNames();
@@ -90,12 +94,37 @@ checkMR( am.mr );
 checkMR( as.mr );
 checkNumCollections( "MR2" );
 
-sleep( 3000 );
+block();
 checkNumCollections( "MR3" );
 
 var res = am.mr.mapReduce( m , r , { out : "xyz" } );
-sleep( 3000 );
+block();
+
 checkNumCollections( "MR4" );
+
+
+t = am.rpos;
+t.insert( { _id : 1 , a : [ { n : "a" , c : 1 } , { n : "b" , c : 1 } , { n : "c" , c : 1 } ] , b : [ 1 , 2 , 3 ] } )
+block();
+check( "after pos 1 " );
+
+t.update( { "a.n" : "b" } , { $inc : { "a.$.c" : 1 } } )
+block();
+check( "after pos 2 " );
+
+t.update( { "b" : 2 } , { $inc : { "b.$" : 1 } } )
+block();
+check( "after pos 3 " );
+
+t.update( { "b" : 3} , { $set : { "b.$" : 17 } } )
+block();
+check( "after pos 4 " );
+
+
+printjson( am.rpos.findOne() )
+printjson( as.rpos.findOne() )
+
+//am.getSisterDB( "local" ).getCollection( "oplog.$main" ).find().limit(10).sort( { $natural : -1 } ).forEach( printjson )
 
 rt.stop();
 

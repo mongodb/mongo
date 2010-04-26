@@ -327,7 +327,7 @@ namespace mongo {
         const Mod * m;
         BSONElement old;
         
-        const char * fixedName;
+        const char * fixedOpName;
         BSONElement * fixed;
         int pushStartSize;
         
@@ -337,7 +337,7 @@ namespace mongo {
         long long inclong;
         
         ModState(){
-            fixedName = 0;
+            fixedOpName = 0;
             fixed = 0;
             pushStartSize = -1;
             incType = EOO;
@@ -352,7 +352,7 @@ namespace mongo {
         }
         
         bool needOpLogRewrite() const {
-            if ( fixed || fixedName || incType )
+            if ( fixed || fixedOpName || incType )
                 return true;
             
             switch( op() ){
@@ -374,13 +374,13 @@ namespace mongo {
                 return;
             }
             
-            const char * name = fixedName ? fixedName : Mod::modNames[op()];
+            const char * name = fixedOpName ? fixedOpName : Mod::modNames[op()];
 
             BSONObjBuilder bb( b.subobjStart( name ) );
             if ( fixed )
                 bb.appendAs( *fixed , m->fieldName );
             else
-                bb.append( m->elt );
+                bb.appendAs( m->elt , m->fieldName );
             bb.done();
         }
 
@@ -470,7 +470,7 @@ namespace mongo {
                 break;
                 
             case Mod::INC:
-                ms.fixedName = "$set";
+                ms.fixedOpName = "$set";
             case Mod::SET: {
                 m._checkForAppending( m.elt );
                 b.appendAs( m.elt, m.shortFieldName );
