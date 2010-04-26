@@ -51,6 +51,7 @@ assert.eq( 4 , a.foo.getIndexKeys().length , "a index 3" );
 assert.eq( 4 , b.foo.getIndexKeys().length , "b index 3" );
 
 db.foo.ensureIndex( { num : 1 , bar : 1 } , true );
+s.sync();
 assert.eq( 5 , b.foo.getIndexKeys().length , "c index 3" );
 
 // ---- can't shard thing with unique indexes
