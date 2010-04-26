@@ -1,4 +1,4 @@
-t = db.tilde;
+t = db.update_arraymatch2;
 t.drop();
 
 t.insert( { } );
