@@ -1519,7 +1519,7 @@ if not noshell:
     installBinary( env , "mongo" )
 
 env.Alias( "all" , allBinaries )
-
+env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongos" ) ] )
 
 # NOTE: In some cases scons gets confused between installation targets and build
 # dependencies.  Here, we use InstallAs instead of Install to prevent such confusion
