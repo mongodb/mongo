@@ -818,19 +818,21 @@ namespace mongo {
     void DBClientCursor::dataReceived() {
         QueryResult *qr = (QueryResult *) m->data;
         resultFlags = qr->resultFlags();
-
+        
         if ( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) {
             // cursor id no longer valid at the server.
             assert( qr->cursorId == 0 );
             cursorId = 0; // 0 indicates no longer valid (dead)
-            throw UserException( 13127 , "getMore: cursor didn't exist on server, possible restart or timeout?" );
+            if ( ! ( opts & QueryOption_CursorTailable ) )
+                throw UserException( 13127 , "getMore: cursor didn't exist on server, possible restart or timeout?" );
         }
-
+        
         if ( cursorId == 0 || ! ( opts & QueryOption_CursorTailable ) ) {
             // only set initially: we don't want to kill it on end of data
             // if it's a tailable cursor
             cursorId = qr->cursorId;
         }
+
         nReturned = qr->nReturned;
         pos = 0;
         data = qr->data();
