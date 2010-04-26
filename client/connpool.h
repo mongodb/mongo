@@ -76,7 +76,7 @@ namespace mongo {
        clean up nicely.
     */
     class ScopedDbConnection : boost::noncopyable {
-        const string host;
+        const string _host;
         DBClientBase *_conn;
     public:
         /** get the associated connection object */
@@ -96,13 +96,20 @@ namespace mongo {
             uassert( 13102 ,  "did you call done already" , _conn );
             return _conn;
         }
-
-        /** throws UserException if can't connect */
-        ScopedDbConnection(const string& _host) :
-                host(_host), _conn( pool.get(_host) ) {
-            //cout << " for: " << _host << " got conn: " << _conn << endl;
+        
+        ScopedDbConnection()
+            : _host( "" ) , _conn(0 ){
         }
 
+        /** throws UserException if can't connect */
+        ScopedDbConnection(const string& host)
+            : _host(host), _conn( pool.get(host) ) {
+        }
+
+        ScopedDbConnection(const string& host, DBClientBase* conn )
+            : _host( host ) , _conn( conn ){
+        }
+        
         /** Force closure of the connection.  You should call this if you leave it in
             a bad state.  Destructor will do this too, but it is verbose.
         */
@@ -126,10 +133,12 @@ namespace mongo {
                 kill();
             else
             */
-                pool.release(host, _conn);
+            pool.release(_host, _conn);
             _conn = 0;
         }
         
+        ScopedDbConnection * steal();
+
         ~ScopedDbConnection();
 
     };

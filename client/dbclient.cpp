@@ -25,6 +25,7 @@
 #include "../util/md5.hpp"
 #include "../db/dbmessage.h"
 #include "../db/cmdline.h"
+#include "connpool.h"
 
 namespace mongo {
 
@@ -869,8 +870,16 @@ namespace mongo {
         return o;
     }
 
+    void DBClientCursor::attach( ScopedDbConnection * conn ){
+        assert( ! _scopedConn );
+        _scopedConn = conn->steal();
+    }
+
+
+
     DBClientCursor::~DBClientCursor() {
         DESTRUCTOR_GUARD (
+
             if ( cursorId && _ownCursor ) {
                 BufBuilder b;
                 b.append( (int)0 ); // reserved
@@ -879,9 +888,20 @@ namespace mongo {
 
                 Message m;
                 m.setData( dbKillCursors , b.buf() , b.len() );
-
+                
                 connector->sayPiggyBack( m );
             }
+
+            if ( _scopedConn ){
+                if ( moreInCurrentBatch() ){
+                    log() << "warning: cursor deleted, but moreInCurrentBatch and scoped conn." << endl;
+                }
+                else {
+                    _scopedConn->done();
+                }
+                delete _scopedConn;
+            }
+
         );
     }
 

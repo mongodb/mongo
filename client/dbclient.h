@@ -83,6 +83,7 @@ namespace mongo {
     };
 
     class BSONObj;
+    class ScopedDbConnection;
 
     /** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object. 
         Examples:
@@ -295,7 +296,8 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                _ownCursor( true ) {
+                _ownCursor( true ),
+                _scopedConn(0){
         }
         
         DBClientCursor( DBConnector *_connector, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -309,7 +311,8 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                _ownCursor( true ) {
+                _ownCursor( true ),
+                _scopedConn(0){
         }            
 
         virtual ~DBClientCursor();
@@ -320,6 +323,8 @@ namespace mongo {
             message when ~DBClientCursor() is called. This function overrides that.
         */
         void decouple() { _ownCursor = false; }
+        
+        void attach( ScopedDbConnection * conn );
         
     private:
         friend class DBClientBase;
@@ -344,6 +349,7 @@ namespace mongo {
         void dataReceived();
         void requestMore();
         bool _ownCursor; // see decouple()
+        ScopedDbConnection * _scopedConn;
     };
     
     /**

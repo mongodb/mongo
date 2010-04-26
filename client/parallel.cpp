@@ -69,6 +69,8 @@ namespace mongo {
         
         if ( cursor->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( _ns , "ClusteredCursor::query" );
+        
+        cursor->attach( &conn );
 
         conn.done();
         return cursor;

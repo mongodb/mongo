@@ -115,6 +115,13 @@ namespace mongo {
         }
     }
 
+    ScopedDbConnection * ScopedDbConnection::steal(){
+        assert( _conn );
+        ScopedDbConnection * n = new ScopedDbConnection( _host , _conn );
+        _conn = 0;
+        return n;
+    }
+    
     ScopedDbConnection::~ScopedDbConnection() {
         if ( _conn && ! _conn->isFailed() ) {
             /* see done() comments above for why we log this line */
