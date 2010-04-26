@@ -6,18 +6,7 @@
 # sys.path, containing something like the following:
 
 # makedist = {
-#     # ec2-api-tools needs the following two set in the process
-#     # environment.
-#     "EC2_HOME": "/path/to/ec2-api-tools",
-#     # The EC2 tools won't run at all unless this variable is set to a directory
-#     # relative to which a "bin/java" exists.
-#     "JAVA_HOME" : "/usr",
-#     # All the ec2-api-tools take these two as arguments.
-#     # Alternatively, you can set the environment variables EC2_PRIVATE_KEY and EC2_CERT
-#     # respectively, leave these two out of settings.py, and let the ec2 tools default.
-#     "ec2_pkey": "/path/to/pk-file.pem"
-#     "ec2_cert" : "/path/to/cert-file.pem"
-#     # This gets supplied to ec2-run-instances to rig up an ssh key for
+#     # This gets supplied to EC2 to rig up an ssh key for
 #     # the remote user.
 #     "ec2_sshkey" : "key-id",
 #     # And so we need to tell our ssh processes where to find the
@@ -55,6 +44,16 @@ import time
 import os.path
 import tempfile
 import string
+import settings
+
+from libcloud.types import Provider
+from libcloud.providers import get_driver
+from libcloud.drivers.ec2 import EC2NodeDriver, NodeImage
+from libcloud.base import Node, NodeImage, NodeSize, NodeState
+EC2 = get_driver(Provider.EC2)
+EC2Driver=EC2NodeDriver(settings.id, settings.key)
+
+
 
 # For the moment, we don't handle any of the errors we raise, so it
 # suffices to have a simple subclass of Exception that just
@@ -158,113 +157,57 @@ class EC2Instance (object):
 
         self.use_internal_name = True if "use_internal_name" in kwargs else False
 
-        # Authentication stuff defaults according to the conventions
-        # of the ec2-api-tools.
-        self.ec2_cert=kwargs["ec2_cert"]
-        self.ec2_pkey=kwargs["ec2_pkey"]
         self.ec2_sshkey=kwargs["ec2_sshkey"]
 
         # FIXME: this needs to be a commandline option
         self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
         self.terminate = False if "no_terminate" in kwargs else True
 
-    def parsedesc (self, hdl):
-        line1=hdl.readline()
-        splitline1=line1.split()
-        (_, reservation, unknown1, groupstr) = splitline1[:4]
-        groups = groupstr.split(',')
-        self.ec2_reservation = reservation
-        self.ec2_unknown1 = unknown1
-        self.ec2_groups = groups
-        # I haven't seen more than 4 data fields in one of these
-        # descriptions, but what do I know?
-        if len(splitline1)>4:
-            print >> sys.stderr, "more than 4 fields in description line 1\n%s\n" % line1
-            self.ec2_extras1 = splitline1[4:]
-        line2=hdl.readline()
-        splitline2=line2.split()
-        # The jerks make it tricky to parse line 2: the fields are
-        # dependent on the instance's state.
-        (_, instance, ami, status_or_hostname) = splitline2[:4]
-        self.ec2_instance = instance
-        if ami != self.ec2_ami:
-            print >> sys.stderr, "warning: AMI in description isn't AMI we invoked\nwe started %s, but got\n%s", (self.ec2_ami, line2)
-        # FIXME: are there other non-running statuses?
-        if status_or_hostname in ["pending", "terminated"]:
-            self.ec2_status = status_or_hostname
-            self.ec2_running = False
-            index = 4
-            self.ec2_storage = splitline2[index+8]
-        else:
-            self.ec2_running = True
-            index = 6
-            self.ec2_status = splitline2[5]
-            self.ec2_external_hostname = splitline2[3]
-            self.ec2_internal_hostname = splitline2[4]
-            self.ec2_external_ipaddr = splitline2[index+8]
-            self.ec2_internal_ipaddr = splitline2[index+9]
-            self.ec2_storage = splitline2[index+10]
-        (sshkey, unknown2, mtype, starttime, zone, unknown3, unknown4, monitoring) = splitline2[index:index+8]
-        # FIXME: potential disagreement with the supplied sshkey?
-        self.ec2_sshkey = sshkey
-        self.ec2_unknown2 = unknown2
-        # FIXME: potential disagreement with the supplied mtype?
-        self.ec2_mtype = mtype
-        self.ec2_starttime = starttime
-        self.ec2_zone = zone
-        self.ec2_unknown3 = unknown3
-        self.ec2_unknown4 = unknown4
-        self.ec2_monitoring = monitoring
-
     def start(self):
         "Fire up a fresh EC2 instance."
-        groups = reduce(lambda x, y : x+y, [["-g", i] for i in self.ec2_groups], [])
-        argv = ["ec2-run-instances",
-                self.ec2_ami, "-K", self.ec2_pkey,  "-C", self.ec2_cert,
-                "-k", self.ec2_sshkey, "-t", self.ec2_mtype] + groups
-        self.ec2_running = False
-        print "running %s" % argv
-        proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
-        try:
-            self.parsedesc(proc.stdout)
-            if self.ec2_instance == "":
-                raise SimpleError("instance id is empty")
-            else:
-                print "Instance id: %s" % self.ec2_instance
-        finally:
-            r = proc.wait()
-            if r != 0:
-                raise SimpleError("ec2-run-instances exited %d", r)
+        image=NodeImage(self.ec2_ami, self.ec2_ami, EC2)
+        size=NodeSize(self.ec2_mtype, self.ec2_mtype, None, None, None, None, EC2)
+        self.node = EC2Driver.create_node(image=image, name=self.ec2_ami, size=size, keyname=self.ec2_sshkey, securitygroup=self.ec2_groups)
+        print "Created node %s" % self.node.id
 
     def initwait(self):
-        # poll the instance description until we get a hostname.
-        # Note: it seems there can be a time interval after
-        # ec2-run-instance finishes during which EC2 will tell us that
-        # the instance ID doesn't exist.  This is sort of bad.
-        state = "pending"
-        numtries = 0
-        giveup = 5
-
-        while not self.ec2_running:
-            time.sleep(15) # arbitrary
-            argv = ["ec2-describe-instances", "-K", self.ec2_pkey, "-C", self.ec2_cert, self.ec2_instance]
-            proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
+        print "waiting for node to spin up"
+        # Wait for EC2 to tell us the node is running.
+        while 1:
+            n=[n for n in EC2Driver.list_nodes() if (n.id==self.node.id)][0]
+            if n.state == NodeState.PENDING: 
+                time.sleep(10)
+            else:
+                self.node = n
+                break
+        print "ok"
+        # Now wait for the node's sshd to be accepting connections.
+        print "waiting for ssh"
+        sshwait = True
+        if sshwait == False:
+            return
+        while sshwait:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                self.parsedesc(proc.stdout)
-            except Exception, e:
-                r = proc.wait()
-                if r < giveup:
-                    print sys.stderr, str(e)
-                    continue
-                else:
-                    raise SimpleError("ec2-describe-instances exited %d", r)
-                numtries+=1
+                try:
+                    s.connect((self.node.public_ip[0], 22))
+                    sshwait = False
+                    print "connected on port 22 (ssh)"
+                    time.sleep(15) # arbitrary timeout, in case the
+                                  # remote sshd is slow.
+                except socket.error, err:
+                    pass
+            finally:
+                s.close()
+                time.sleep(3) # arbitrary timeout
+        print "ok"
 
     def stop(self):
         if self.terminate:
-            LocalHost.runLocally(["ec2-terminate-instances", "-K", self.ec2_pkey, "-C", self.ec2_cert, self.ec2_instance])
+            print "Destroying node %s" % self.node.id
+            self.node.destroy()
         else:
-            print "Not terminating EC2 instance %s." % self.ec2_instance
+            print "Not terminating EC2 instance %s." % self.node.id
 
     def __enter__(self):
         self.start()
@@ -273,8 +216,9 @@ class EC2Instance (object):
     def __exit__(self, type, value, traceback):
         self.stop()
 
-    def getHostname(self):
-        return self.ec2_internal_hostname if self.use_internal_name else self.ec2_external_hostname
+    def getHostname(self): 
+        return self.node.public_ip[0] # FIXME private_ip?
+#        return self.ec2_internal_hostname if self.use_internal_name else self.ec2_external_hostname
         
 class SshConnectionConfigurator (BaseConfigurator):
     def __init__(self, **kwargs):
@@ -776,25 +720,12 @@ def main():
     try:
         import settings
         if "makedist" in dir ( settings ):
-            for key in ["EC2_HOME", "JAVA_HOME"]:
-                if key in settings.makedist:
-                    os.environ[key] = settings.makedist[key]
-            for key in ["ec2_pkey", "ec2_cert", "ec2_sshkey", "ssh_keyfile", "gpg_homedir" ]:
+            for key in ["ec2_sshkey", "ssh_keyfile", "gpg_homedir" ]:
                 if key not in kwargs and key in settings.makedist:
                     kwargs[key] = settings.makedist[key]
     except Exception, err:
         print "No settings: %s.  Continuing anyway..." % err
         pass
-
-    # Ensure that PATH contains $EC2_HOME/bin
-    vars = ["EC2_HOME", "JAVA_HOME"]
-    for var in vars:
-        if os.getenv(var) == None:
-            raise SimpleError("Environment variable %s is unset; did you create a settings.py?", var)
-
-    if len([True for x in os.environ["PATH"].split(":") if x.find(os.environ["EC2_HOME"]) > -1]) == 0:
-        os.environ["PATH"]=os.environ["EC2_HOME"]+"/bin:"+os.environ["PATH"]
-
 
     kwargs["distro_name"]    = distro_name
     kwargs["distro_version"] = distro_version
@@ -908,8 +839,7 @@ Options:"""
             print "%-20s\t%s." % ("%4s--%s%s:" % ("-%s, " % t[0] if t[0] else "", t[1], ("="+t[4]) if t[4] else ""), t[3])
         print """
 Mandatory arguments to long options are also mandatory for short
-options.  Some EC2 arguments default to (and override) environment
-variables; see the ec2-api-tools documentation."""
+options."""
         sys.exit(0)
 
     if "usage" in kwargs:
