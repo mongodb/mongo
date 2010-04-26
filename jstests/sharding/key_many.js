@@ -85,6 +85,12 @@ for ( var i=0; i<types.length; i++ ){
     
     assert.eq( 6 , c.find().sort( makeObjectDotted( 1 ) ).count() , curT.name + " total count with count()" );
 
+    var stats = c.stats();
+    assert.eq( 6 , stats.count , curT.name + " total count with stats()" );
+    var count = 0;
+    for (shard in stats.shards) count += stats.shards[shard].count;
+    assert.eq( 6 , count , curT.name + " total count with stats() sum" );
+
     assert.eq( curT.values , c.find().sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
     assert.eq( curT.values , c.find(makeObjectDotted({$in: curT.values})).sort( makeObjectDotted( 1 ) ).toArray().map( getKey ) , curT.name + " sort 1" );
     assert.eq( curT.values.reverse() , c.find().sort( makeObjectDotted( -1 ) ).toArray().map( getKey ) , curT.name + " sort 2" );
