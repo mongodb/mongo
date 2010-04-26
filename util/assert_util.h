@@ -209,6 +209,8 @@ namespace mongo {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
     }
 
+    string demangleName( const type_info& typeinfo );
+
 } // namespace mongo
 
 #define BOOST_CHECK_EXCEPTION MONGO_BOOST_CHECK_EXCEPTION

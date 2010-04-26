@@ -22,6 +22,8 @@
 #include "message.h"
 #include "message_server.h"
 
+#include "../db/cmdline.h"
+
 namespace mongo {
 
     namespace pms {
@@ -35,14 +37,19 @@ namespace mongo {
             assert( grab );
             auto_ptr<MessagingPort> p( grab );
             grab = 0;
-            
+        
+            string otherSide;
+    
             Message m;
             try {
+                otherSide = p->farEnd.toString();
+
                 while ( 1 ){
                     m.reset();
 
                     if ( ! p->recv(m) ) {
-                        log() << "end connection " << p->farEnd.toString() << endl;
+                        if( !cmdLine.quiet )
+                            log() << "end connection " << otherSide << endl;
                         p->shutdown();
                         break;
                     }
@@ -50,9 +57,13 @@ namespace mongo {
                     handler->process( m , p.get() );
                 }
             }
+            catch ( const SocketException& se ){
+                log() << "unclean socket shutdown from: " << otherSide << endl;
+            }
             catch ( const std::exception& e ){
-                problem() << "uncaught exception (" << e.what() << ") in PortMessageServer::threadRun, closing connection" << endl;
-            }catch ( ... ){
+                problem() << "uncaught exception (" << e.what() << ")(" << demangleName( typeid(e) ) <<") in PortMessageServer::threadRun, closing connection" << endl;
+            }
+            catch ( ... ){
                 problem() << "uncaught exception in PortMessageServer::threadRun, closing connection" << endl;
             }            
             

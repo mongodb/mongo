@@ -45,8 +45,6 @@ namespace mongo {
 
         class Result;
 
-        string demangleName( const type_info& typeinfo );
-
         class TestCase {
         public:
             virtual ~TestCase(){}
