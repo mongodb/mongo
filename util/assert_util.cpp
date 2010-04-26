@@ -20,6 +20,11 @@
 #include "assert.h"
 #include "file.h"
 
+#ifndef _WIN32
+#include <cxxabi.h>
+#include <sys/file.h>
+#endif
+
 namespace mongo {
 
     AssertionCount assertionCount;
@@ -213,6 +218,24 @@ namespace mongo {
         ss << errnoWithDescription();
         return ss.str();
     }
+
+
+    string demangleName( const type_info& typeinfo ){
+#ifdef _WIN32
+        return typeinfo.name();
+#else
+        int status;
+        
+        char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
+        if ( ! niceName )
+            return typeinfo.name();
+        
+        string s = niceName;
+        free(niceName);
+        return s;
+#endif
+    }
+
 
 }
 

@@ -329,22 +329,6 @@ namespace mongo {
             assert(0);
         }
 
-        string demangleName( const type_info& typeinfo ){
-#ifdef _WIN32
-            return typeinfo.name();
-#else
-            int status;
-
-            char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
-            if ( ! niceName )
-                return typeinfo.name();
-
-            string s = niceName;
-            free(niceName);
-            return s;
-#endif
-        }
-
         MyAssertionException * MyAsserts::getBase(){
             MyAssertionException * e = new MyAssertionException();
             e->ss << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";

@@ -426,7 +426,7 @@ namespace mongo {
             // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
                 m.m->incrementMe( m.old );
-                m.fixedName = "$set";
+                m.fixedOpName = "$set";
                 m.fixed = &(m.old);
                 break;
             case Mod::SET:
@@ -814,11 +814,13 @@ namespace mongo {
                 const BSONObj& onDisk = loc.obj();
 
                 ModSet * useMods = mods.get();
+                bool forceRewrite = false;
 
                 auto_ptr<ModSet> mymodset;
                 if ( u->getMatchDetails().elemMatchKey && mods->hasDynamicArray() ){
                     useMods = mods->fixDynamicArray( u->getMatchDetails().elemMatchKey );
                     mymodset.reset( useMods );
+                    forceRewrite = true;
                 }
 
                      
@@ -855,7 +857,7 @@ namespace mongo {
                         pattern = patternBuilder.obj();                        
                     }
                     
-                    if ( mss->needOpLogRewrite() ){
+                    if ( forceRewrite || mss->needOpLogRewrite() ){
                         DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
                         logOp("u", ns, mss->getOpLogRewrite() , &pattern );
                     }
