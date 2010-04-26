@@ -78,7 +78,7 @@ namespace mongo {
         }
     }
 
-    static void callback(const Namespace& k, NamespaceDetails& v) { 
+    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) { 
         v.onLoad(k);
     }
 
@@ -130,7 +130,21 @@ namespace mongo {
 
         ht = new HashTable<Namespace,NamespaceDetails,MMF::Pointer>(p, len, "namespace index");
         if( checkNsFilesOnLoad )
-            ht->iterAll(callback);
+            ht->iterAll(namespaceOnLoadCallback);
+    }
+    
+    static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
+        list<string> * l = (list<string>*)extra;
+        if ( ! k.hasDollarSign() )
+            l->push_back( (string)k );
+    }
+
+    void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
+        assert( onlyCollections ); // TODO: need to implement this
+        //                                  need boost::bind or something to make this less ugly
+        
+        if ( ht )
+            ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {

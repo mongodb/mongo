@@ -1147,12 +1147,12 @@ namespace mongo {
             help << " example: { dbstats:1 } ";
         }
         bool run(const char *dbname_c, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string dbname = dbname_c;
-            if ( dbname.find( "." ) != string::npos )
-                dbname = dbname.substr( 0 , dbname.find( "." ) );
+            string dbname = nsToDatabase( dbname_c );
 
-            DBDirectClient client;
-            const list<string> collections = client.getCollectionNames(dbname);
+            list<string> collections;
+            Database* d = cc().database();
+            if ( d )
+                d->namespaceIndex.getNamespaces( collections );
 
             long long ncollections = 0;
             long long objects = 0;
@@ -1167,8 +1167,9 @@ namespace mongo {
 
                 NamespaceDetails * nsd = nsdetails( ns.c_str() );
                 if ( ! nsd ){
-                    // should this assert here?
-                    continue;
+                    errmsg = "missing ns: ";
+                    errmsg += ns;
+                    return false;
                 }
 
                 ncollections += 1;
@@ -1676,7 +1677,10 @@ namespace mongo {
         virtual bool run(const char * badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string dbname = nsToDatabase( badns );
             
-            list<string> colls = _db.getCollectionNames( dbname );
+            list<string> colls;
+            Database* db = cc().database();
+            if ( db )
+                db->namespaceIndex.getNamespaces( colls );
             colls.sort();
             
             result.appendNumber( "numCollections" , (long long)colls.size() );
@@ -1751,7 +1755,6 @@ namespace mongo {
             return 1;
         }
 
-        DBDirectClient _db;
     } dbhashCmd;
     
     class PingCommand : public Command {
