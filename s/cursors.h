@@ -18,7 +18,7 @@
 
 #pragma once 
 
-#include "../stdafx.h"
+#include "../pch.h"
 
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"

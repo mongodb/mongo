@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
 #include "shardkey.h"

@@ -202,7 +202,7 @@
 			Name="Header Files"
 			>
 			<File
-				RelativePath="..\..\stdafx.h"
+				RelativePath="..\..\pch.h"
 				>
 			</File>
 			<File

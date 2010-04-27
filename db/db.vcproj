@@ -1345,7 +1345,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\stdafx.h"
+					RelativePath="..\pch.h"
 					>
 				</File>
 				<File

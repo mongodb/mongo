@@ -15,7 +15,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 
 #if defined(USESM)
 #include "..\scripting\engine_spidermonkey.cpp"

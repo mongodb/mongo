@@ -19,7 +19,7 @@
    tools for wokring in parallel/sharded/clustered environment
  */
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "dbclient.h"
 #include "redef_macros.h"
 

@@ -47,7 +47,7 @@
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderThrough="stdafx.h"
+				PrecompiledHeaderThrough="pch.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
 				DisableSpecificWarnings="4355;4800"
@@ -279,7 +279,7 @@
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderThrough="stdafx.h"
+				PrecompiledHeaderThrough="pch.h"
 				WarningLevel="3"
 				DebugInformationFormat="4"
 				DisableSpecificWarnings="4355;4800"
@@ -659,7 +659,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\stdafx.h"
+					RelativePath="..\pch.h"
 					>
 				</File>
 			</Filter>

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../../stdafx.h"
+#include "../../pch.h"
 #include "../jsobj.h"
 #include "../../util/message.h"
 #include "../../util/processinfo.h"

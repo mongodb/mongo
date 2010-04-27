@@ -156,7 +156,7 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath="..\..\stdafx.h"
+				RelativePath="..\..\pch.h"
 				>
 			</File>
 			<File

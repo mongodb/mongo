@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../client/dbclient.h"
 #include "../db/dbhelpers.h"
 #include "../db/cmdline.h"
