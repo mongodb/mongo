@@ -839,7 +839,8 @@ namespace mongo {
                 else {
                     BSONObj newObj = mss->createNewFromMods();
                     uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= ( 4 * 1024 * 1024 ) );
-                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                    bool changedId;
+                    DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug, changedId);
                     if ( newLoc != loc || modsIsIndexed ) {
                         // object moved, need to make sure we don' get again
                         seenObjects.insert( newLoc );
@@ -877,9 +878,16 @@ namespace mongo {
 
             BSONElementManipulator::lookForTimestamps( updateobj );
             checkNoMods( updateobj );
-            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug);
-            if ( logop )
-                logOp("u", ns, updateobj, &pattern );
+            bool changedId = false;
+            theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, changedId);
+            if ( logop ) {
+                if ( !changedId ) {
+                    logOp("u", ns, updateobj, &pattern );
+                } else {
+                    logOp("d", ns, pattern );
+                    logOp("i", ns, updateobj );                    
+                }
+            }
             return UpdateResult( 1 , 0 , 1 );
         }
         
