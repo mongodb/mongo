@@ -554,7 +554,7 @@ elif "win32" == os.sys.platform:
 
     def find_boost():
         for x in ('', ' (x86)'):	
-            boostDir = "C:/Program Files/boost/latest"
+            boostDir = "C:/Program Files" + x + "/boost/latest"
             if os.path.exists( boostDir ):
                 return boostDir
             for bv in reversed( range(33,50) ):

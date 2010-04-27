@@ -170,7 +170,6 @@ namespace mongo {
                 BSONObj cmd = BSON( "replSetHeartbeat" << "preloadconfig?" );
                 BSONObj info;
                 bool ok = conn.runCommand("admin", cmd, info);
-                cout << h.toString() << " " << ok << " " << info.toString() << endl;
                 if( !info["rs"].trueValue() ) { 
                     stringstream ss;
                     ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
