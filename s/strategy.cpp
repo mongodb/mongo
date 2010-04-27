@@ -200,8 +200,8 @@ namespace mongo {
             return;
         }
         
-        log(1) << "     setShardVersion failed: " << result << endl;
-        massert( 10429 ,  "setShardVersion failed!" , 0 );
+        log() << "     setShardVersion failed: " << result << endl;
+        massert( 10429 , (string)"setShardVersion failed! " + result.jsonString() , 0 );
     }
     
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ){
