@@ -119,8 +119,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\latest\&quot;"
-				PreprocessorDefinitions="USE_ASIO;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PCRE_STATIC"
+				AdditionalIncludeDirectories="..\..\js\src;&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\latest\&quot;"
+				PreprocessorDefinitions="MONGO_EXPOSE_MACROS;USE_ASIO;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PCRE_STATIC"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="2"
@@ -563,6 +563,14 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\db\nonce.cpp"
@@ -680,6 +688,14 @@
 						UsePrecompiledHeader="0"
 					/>
 				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\..\boostw\boost_1_34_1\boost\version.hpp"
@@ -707,12 +723,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_compile.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -731,12 +763,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_dfa_exec.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -755,12 +803,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_fullinfo.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -779,12 +843,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_globals.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -803,12 +883,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_maketables.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -827,12 +923,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_ord2utf8.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -851,12 +963,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_scanner.cc"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -875,12 +1003,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_study.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -899,12 +1043,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_try_flipped.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -923,12 +1083,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_valid_utf8.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
@@ -947,6 +1123,14 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcre_xclass.c"
@@ -959,12 +1143,28 @@
 							UsePrecompiledHeader="0"
 						/>
 					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\pcre-7.4\pcreposix.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"
