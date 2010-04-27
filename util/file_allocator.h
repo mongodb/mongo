@@ -107,12 +107,20 @@ namespace mongo {
         }
         
         static void ensureLength( int fd , long size ){
+
 #if defined(_WIN32)
             // we don't zero on windows
             // TODO : we should to avoid fragmentation
-#elif defined(__linux__) && ! defined(__sunos__)
-            posix_fallocate(fd,0,size);
 #else
+
+#if defined(__linux__) && ! defined(__sunos__)
+            int ret = posix_fallocate(fd,0,size);
+            if ( ret == 0 )
+                return;
+            
+            log() << "posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
+#endif
+            
             off_t filelen = lseek(fd, 0, SEEK_END);
             if ( filelen < size ) {
                 massert( 10440 ,  "failure creating new datafile", filelen == 0 );
@@ -136,7 +144,7 @@ namespace mongo {
                     massert( 10443 , errnoWithPrefix("write failed" ), written > 0 );
                     left -= written;
                 }
-            }                            
+            }
 #endif
         }
         
