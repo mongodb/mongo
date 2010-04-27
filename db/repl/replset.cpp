@@ -160,8 +160,8 @@ namespace mongo {
             }
             theReplSet = new ReplSet(cmdLine.replSet);
         }
-        catch(...) { 
-            log() << "Caught exception in repl set management thread" << endl;
+        catch(std::exception& e) { 
+            log() << "replSet Caught exception in management thread: " << e.what() << endl;
             if( theReplSet ) 
                 theReplSet->fatal = true;
         }
