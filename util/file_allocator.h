@@ -110,7 +110,7 @@ namespace mongo {
 #if defined(_WIN32)
             // we don't zero on windows
             // TODO : we should to avoid fragmentation
-#elif defined(__linux__)
+#elif defined(__linux__) && ! defined(__sunos__)
             posix_fallocate(fd,0,size);
 #else
             off_t filelen = lseek(fd, 0, SEEK_END);
