@@ -578,6 +578,16 @@ namespace mongo {
         }
         
         void run(){
+            {
+                Shard s( "config" , "localhost" );
+                s.setAddress( "localhost" , true );
+            }
+
+            {
+                Shard s( "myserver" , "localhost" );
+                s.setAddress( "localhost" , true );
+            }
+            
             a();
             b();
         }
