@@ -106,6 +106,37 @@ namespace mongo {
 #endif
         }
         
+        static void ensureLength( int fd , long size ){
+#if defined(__linux__)
+            posix_fallocate(fd,0,size);
+#else
+            off_t filelen = lseek(fd, 0, SEEK_END);
+            if ( filelen < size ) {
+                massert( 10440 ,  "failure creating new datafile", filelen == 0 );
+                // Check for end of disk.
+                massert( 10441 ,  "Unable to allocate file of desired size",
+                         size - 1 == lseek(fd, size - 1, SEEK_SET) );
+                massert( 10442 ,  "Unable to allocate file of desired size",
+                         1 == write(fd, "", 1) );
+                lseek(fd, 0, SEEK_SET);
+                
+                long z = 256 * 1024;
+                char buf[z];
+                memset(buf, 0, z);
+                long left = size;
+                while ( left > 0 ) {
+                    long towrite = left;
+                    if ( towrite > z )
+                        towrite = z;
+                    
+                    int written = write( fd , buf , towrite );
+                    massert( 10443 , errnoWithPrefix("write failed" ), written > 0 );
+                    left -= written;
+                }
+            }                            
+#endif
+        }
+        
     private:
 #if !defined(_WIN32)
         void checkFailure() {
@@ -170,33 +201,17 @@ namespace mongo {
                                 log() << "warning: posix_fadvise fails " << name << ' ' << errnoWithDescription() << endl;
                             }
 #endif
-  
+                            
+                            Timer t;
+                            
                             /* make sure the file is the full desired length */
-                            off_t filelen = lseek(fd, 0, SEEK_END);
-                            if ( filelen < size ) {
-                                massert( 10440 ,  "failure creating new datafile", filelen == 0 );
-                                // Check for end of disk.
-                                massert( 10441 ,  "Unable to allocate file of desired size",
-                                        size - 1 == lseek(fd, size - 1, SEEK_SET) );
-                                massert( 10442 ,  "Unable to allocate file of desired size",
-                                        1 == write(fd, "", 1) );
-                                lseek(fd, 0, SEEK_SET);
-                                Timer t;
-                                long z = 256 * 1024;
-                                char buf[z];
-                                memset(buf, 0, z);
-                                long left = size;
-                                while ( left > 0 ) {
-                                    long towrite = left;
-                                    if ( towrite > z )
-                                        towrite = z;
-                                    
-                                    int written = write( fd , buf , towrite );
-                                    massert( 10443 , errnoWithPrefix("write failed" ), written > 0 );
-                                    left -= written;
-                                }
-                                log() << "done allocating datafile " << name << ", size: " << size/1024/1024 << "MB, took " << ((double)t.millis())/1000.0 << " secs" << endl;
-                            }                            
+                            ensureLength( fd , size );
+
+                            log() << "done allocating datafile " << name << ", " 
+                                  << "size: " << size/1024/1024 << "MB, "
+                                  << " took " << ((double)t.millis())/1000.0 << " secs" 
+                                  << endl;
+
                             close( fd );
                             
                         } catch ( ... ) {
