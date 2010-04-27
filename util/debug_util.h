@@ -19,7 +19,7 @@
 
 #ifndef _WIN32
 #include <signal.h>
-#endif // ndef _WIN32
+#endif
 
 namespace mongo {
 

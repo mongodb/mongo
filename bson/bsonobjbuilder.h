@@ -623,7 +623,7 @@ namespace mongo {
         void fill( const char *name ) {
             char *r;
             int n = strtol( name, &r, 10 );
-            uassert( 13048, "can't append to array using string field name", !*r );
+            uassert( 13048, (string)"can't append to array using string field name [" + name + "]" , !*r );
             while( _i < n )
                 append( nullElt() );
         }

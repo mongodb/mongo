@@ -1401,6 +1401,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\debug_util.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\file.h"
 				>
 			</File>
