@@ -401,7 +401,7 @@ namespace ReplTests {
                 
                 deleteAll( ns() );
                 insert( o_ );
-                insert( u_ );
+                insert( u_ ); // simulate non snapshot replication, then op application
                 applyAllOperations();
                 ASSERT_EQUALS( 1, count() );
                 checkOne( u_ );
