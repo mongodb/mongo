@@ -75,7 +75,7 @@ namespace mongo {
 
     void ReplSetConfig::check() const { 
         uassert(13132,
-            "nonmatching repl set name in _id field -- check command line",
+            "nonmatching repl set name in _id field; check --replSet command line",
             startsWith(cmdLine.replSet, _id + '/'));
         uassert(13133, 
                 "replSet config value is not valid",
@@ -111,25 +111,37 @@ namespace mongo {
             members = o["members"].Array();
         }
         catch(...) {
-            uasserted(13131, "error parsing replSet configuration object 'members' field");
+            uasserted(13131, "replSet error parsing (or missing) 'members' field in config object");
         }
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
             Member m;
             try {
-                m._id = (int) mobj["_id"].Number();
-                string s = mobj["host"].String();
-                m.h = HostAndPort::fromString(s);
+                try { 
+                    m._id = (int) mobj["_id"].Number();
+                } catch(...) { throw "_id must be numeric"; }
+                string s;
+                try {
+                    s = mobj["host"].String();
+                    m.h = HostAndPort::fromString(s);
+                }
+                catch(...) { throw "bad or missing host field?"; }
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
                 try { m.priority = mobj["priority"].Number(); } catch(...) { }
                 try { m.votes = (unsigned) mobj["votes"].Number(); } catch(...) { }
                 m.check();
             }
+            catch( const char * p ) { 
+                log() << "replSet cfg parsing exception for members[" << i << "] " << p << endl;
+                stringstream ss;
+                ss << "replSet members[" << i << "] " << p;
+                uassert(13107, ss.str(), false);
+            }
             catch(DBException& e) { 
                 log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << endl;
                 stringstream ss;
                 ss << "replSet members[" << i << "] bad config object";
-                uassert(13107, ss.str(), false);
+                uassert(13135, ss.str(), false);
             }
             uassert(13108, "bad local.system.replset config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
@@ -180,6 +192,8 @@ namespace mongo {
             version = -3;
 
             c = conn.query("local.system.replset");
+            if( c.get() == 0 )
+                return;
             if( !c->more() ) {
                 version = -2; /* -2 is a sentinel - see ReplSetConfig::empty() */
                 return;
