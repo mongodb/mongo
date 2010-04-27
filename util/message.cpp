@@ -523,9 +523,14 @@ namespace mongo {
         piggyBackData->append( toSend );
     }
 
-    unsigned MessagingPort::remotePort(){
+    unsigned MessagingPort::remotePort() const {
         return farEnd.getPort();
     }
+
+    HostAndPort MessagingPort::remote() const {
+        return farEnd;
+    }
+
 
     MSGID NextMsgId;
     bool usingClientIds = 0;

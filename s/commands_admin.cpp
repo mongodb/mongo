@@ -713,6 +713,29 @@ namespace mongo {
             }
         } ismaster;
 
+        class CmdWhatsMyUri : public Command {
+        public:
+            CmdWhatsMyUri() : Command("whatsmyuri") { }
+            virtual bool logTheOp() {
+                return false; // the modification will be logged directly
+            }
+            virtual bool slaveOk() const {
+                return true;
+            }
+            virtual LockType locktype() const { return NONE; } 
+            virtual bool requiresAuth() {
+                return false;
+            }
+            virtual void help( stringstream &help ) const {
+                help << "{whatsmyuri:1}";
+            }        
+            virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                result << "you" << ClientInfo::get()->getRemote();
+                return true;
+            }
+        } cmdWhatsMyUri;
+        
+
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; } 

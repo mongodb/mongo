@@ -26,8 +26,12 @@ namespace mongo {
       */
     struct HostAndPort { 
         HostAndPort() : _port(-1) { }
-
+        
         HostAndPort(string h, int p = -1) : _host(h), _port(p) { }
+
+        HostAndPort(const SockAddr& sock ) 
+            : _host( sock.getAddr() ) , _port( sock.getPort() ){
+        }
 
         static HostAndPort me() { 
             return HostAndPort("localhost", cmdLine.port);
