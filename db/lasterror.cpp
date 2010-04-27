@@ -44,7 +44,7 @@ namespace mongo {
             b.append( "code" , code );
         if ( updatedExisting != NotUpdate )
             b.appendBool( "updatedExisting", updatedExisting == True );
-        b.append( "n", nObjects );
+        b.appendNumber( "n", nObjects );
     }
 
     void LastErrorHolder::setID( int id ){
