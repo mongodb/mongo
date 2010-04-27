@@ -73,6 +73,17 @@ namespace mongo {
         _ok = false;
     }
 
+    void ReplSetConfig::check() const { 
+        uassert(13132,
+            "nonmatching repl set name in _id field -- check command line",
+            startsWith(cmdLine.replSet, _id + '/'));
+        uassert(13133, 
+                "replSet config value is not valid",
+                members.size() >= 1 && members.size() <= 64 && 
+                version > 0);
+
+    }
+
     void ReplSetConfig::from(BSONObj o) {
         md5 = o.md5();
         _id = o["_id"].String();
@@ -100,7 +111,7 @@ namespace mongo {
             members = o["members"].Array();
         }
         catch(...) {
-            uasserted(13130, "error parsing replSet configuration object 'members' field");
+            uasserted(13131, "error parsing replSet configuration object 'members' field");
         }
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();

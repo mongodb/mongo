@@ -357,6 +357,7 @@ namespace mongo {
         if ( strlen(str) < l ) return false;
         return strncmp(str, prefix, l) == 0;
     }
+    inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
 
     inline bool endsWith(const char *p, const char *suffix) {
         size_t a = strlen(p);

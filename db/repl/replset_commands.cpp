@@ -63,6 +63,8 @@ namespace mongo {
 
             log() << newConfig.toString() << endl;
 
+            newConfig.check();
+
             errmsg = "not yet implemented";
             return false;
         }
