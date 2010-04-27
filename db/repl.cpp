@@ -351,7 +351,7 @@ namespace mongo {
             help << "{ isMaster : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
-        CmdIsMasterOld() : Command("isMaster", true, "ismaster") { }
+        CmdIsMaster() : Command("isMaster", true, "ismaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
 			   authenticated.
