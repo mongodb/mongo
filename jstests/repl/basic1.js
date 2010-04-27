@@ -9,6 +9,7 @@ s = rt.start( false );
 
 function block(){
     am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } )
+    sleep(3000); // 1.4 branch doesn't support w
 }
 
 function hash( db ){
