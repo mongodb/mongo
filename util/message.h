@@ -19,6 +19,7 @@
 
 #include "../util/sock.h"
 #include "../bson/util/atomic_int.h"
+#include "hostandport.h"
 
 namespace mongo {
 
@@ -54,7 +55,8 @@ namespace mongo {
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
         virtual void reply(Message& received, Message& response) = 0;
         
-        virtual unsigned remotePort() = 0 ;
+        virtual HostAndPort remote() const = 0;
+        virtual unsigned remotePort() const = 0;
     };
 
     class MessagingPort : public AbstractMessagingPort {
@@ -83,7 +85,8 @@ namespace mongo {
 
         void piggyBack( Message& toSend , int responseTo = -1 );
 
-        virtual unsigned remotePort();
+        virtual unsigned remotePort() const;
+        virtual HostAndPort remote() const;
 
         // send len or throw SocketException
         void send( const char * data , int len, const char *context );

@@ -108,16 +108,20 @@ namespace mongo {
         ClientInfo( int clientId );
         ~ClientInfo();
         
+        string getRemote() const { return _remote; }
+
         void addShard( const string& shard );
         set<string> * getPrev() const { return _prev; };
         
-        void newRequest();
+        void newRequest( AbstractMessagingPort* p = 0 );
         void disconnect();
-
+        
         static ClientInfo * get( int clientId = 0 , bool create = true );
         
     private:
         int _id;
+        string _remote;
+
         set<string> _a;
         set<string> _b;
         set<string> * _cur;

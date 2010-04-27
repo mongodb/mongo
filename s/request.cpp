@@ -43,7 +43,7 @@ namespace mongo {
         
         _clientId = p ? p->remotePort() << 16 : 0;
         _clientInfo = ClientInfo::get( _clientId );
-        _clientInfo->newRequest();
+        _clientInfo->newRequest( p );
         
         reset();
     }
@@ -144,7 +144,19 @@ namespace mongo {
         _cur->insert( shard );
     }
     
-    void ClientInfo::newRequest(){
+    void ClientInfo::newRequest( AbstractMessagingPort* p ){
+
+        if ( p ){
+            string r = p->remote().toString();
+            if ( _remote == "" )
+                _remote = r;
+            else if ( _remote != r ){
+                stringstream ss;
+                ss << "remotes don't match old [" << _remote << "] new [" << r << "]";
+                throw UserException( 13134 , ss.str() );
+            }
+        }
+        
         _lastAccess = (int) time(0);
         
         set<string> * temp = _cur;
