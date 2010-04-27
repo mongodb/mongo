@@ -1,4 +1,4 @@
-// stdafx.cpp : source file that includes just the standard includes
+// pch.cpp : helper for using precompiled headers
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -28,7 +28,6 @@
 #else
 // unknown compiler
 #endif 
-
 
 namespace mongo {
 

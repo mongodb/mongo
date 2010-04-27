@@ -1050,6 +1050,14 @@
 			<File
 				RelativePath="..\pch.cpp"
 				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"
+					/>
+				</FileConfiguration>
 			</File>
 			<Filter
 				Name="cpp"
@@ -1313,6 +1321,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\pch.h"
+					>
+				</File>
+				<File
 					RelativePath=".\pdfile.h"
 					>
 				</File>
@@ -1342,10 +1354,6 @@
 				</File>
 				<File
 					RelativePath=".\security.h"
-					>
-				</File>
-				<File
-					RelativePath="..\pch.h"
 					>
 				</File>
 				<File
