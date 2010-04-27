@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../client/connpool.h"
 
 namespace mongo {

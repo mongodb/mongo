@@ -378,6 +378,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\shard.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\shardkey.cpp"
 				>
 			</File>

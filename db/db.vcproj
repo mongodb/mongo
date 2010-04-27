@@ -49,6 +49,7 @@
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
+				PrecompiledHeaderThrough="pch.h"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="false"
 				DebugInformationFormat="4"
@@ -128,7 +129,7 @@
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="2"
-				PrecompiledHeaderThrough="stdafx.h"
+				PrecompiledHeaderThrough="pch.h"
 				WarningLevel="3"
 				DebugInformationFormat="3"
 				DisableSpecificWarnings="4355;4800"
@@ -1035,6 +1036,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\client\syncclusterconnection.h"
+				>
+			</File>
+			<File
 				RelativePath="..\client\undef_macros.h"
 				>
 			</File>
@@ -1042,6 +1047,10 @@
 		<Filter
 			Name="db"
 			>
+			<File
+				RelativePath="..\pch.cpp"
+				>
+			</File>
 			<Filter
 				Name="cpp"
 				Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
@@ -1200,42 +1209,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\stdafx.cpp"
-					>
-					<FileConfiguration
-						Name="Debug|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="release_nojni|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug Recstore|Win32"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="1"
-						/>
-					</FileConfiguration>
-				</File>
-				<File
 					RelativePath=".\tests.cpp"
 					>
 				</File>
@@ -1309,6 +1282,10 @@
 				</File>
 				<File
 					RelativePath=".\index.h"
+					>
+				</File>
+				<File
+					RelativePath=".\indexkey.h"
 					>
 				</File>
 				<File
@@ -1658,7 +1635,23 @@
 				>
 			</File>
 			<File
+				RelativePath="..\scripting\engine.h"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\engine_java.h"
+				>
+			</File>
+			<File
 				RelativePath="..\scripting\engine_spidermonkey.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\engine_spidermonkey.h"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\engine_v8.h"
 				>
 			</File>
 			<File
@@ -1691,6 +1684,18 @@
 			</File>
 			<File
 				RelativePath="..\scripting\utils.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\v8_db.h"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\v8_utils.h"
+				>
+			</File>
+			<File
+				RelativePath="..\scripting\v8_wrapper.h"
 				>
 			</File>
 		</Filter>

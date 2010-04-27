@@ -18,7 +18,7 @@
 
 // _ todo: reconnect?
 
-#include "stdafx.h"
+#include "pch.h"
 #include "connpool.h"
 #include "../db/commands.h"
 #include "syncclusterconnection.h"

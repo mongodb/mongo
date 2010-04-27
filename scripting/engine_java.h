@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 
 #include <jni.h>
 #include <boost/thread/tss.hpp>

@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../db/cmdline.h"
 #include "../db/jsobj.h"
 

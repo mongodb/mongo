@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "jsobj.h"
 #include "namespace.h"
 #include "curop.h"

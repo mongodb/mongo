@@ -18,7 +18,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "message.h"
 #include <time.h>
 #include "../util/goodies.h"

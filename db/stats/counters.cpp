@@ -16,7 +16,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../jsobj.h"
 #include "counters.h"
 

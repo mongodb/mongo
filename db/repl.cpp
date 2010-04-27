@@ -31,7 +31,7 @@
    local.pair.sync       - { initialsynccomplete: 1 }
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"

@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "engine_spidermonkey.h"
 
 #include "../client/dbclient.h"

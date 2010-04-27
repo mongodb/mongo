@@ -20,7 +20,7 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "db.h"
 #include "client.h"
 #include "curop.h"

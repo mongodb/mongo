@@ -17,7 +17,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "jsobj.h"
 #include "commands.h"
 #include "client.h"

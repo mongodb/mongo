@@ -17,7 +17,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "jsobj.h"
 #include "nonce.h"
 #include "../bson/util/atomic_int.h"

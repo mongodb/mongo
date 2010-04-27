@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../util/mmap.h"
 #include "diskloc.h"
 #include "jsobjmanipulator.h"

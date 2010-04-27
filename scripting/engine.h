@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../db/jsobj.h"
 
 extern const char * jsconcatcode; // TODO: change name to mongoJSCode

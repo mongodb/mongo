@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../db/pdfile.h"
 #include "dbclient.h"
 #include "../bson/util/builder.h"

@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "assert_util.h"
 #include "assert.h"
 #include "file.h"

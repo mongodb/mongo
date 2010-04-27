@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/message.h"

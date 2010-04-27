@@ -24,7 +24,7 @@ _ coalesce deleted
 _ disallow system* manipulations from the database.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "pdfile.h"
 #include "db.h"
 #include "../util/mmap.h"

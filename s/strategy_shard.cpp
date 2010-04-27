@@ -16,7 +16,7 @@
 
 // strategy_sharded.cpp
 
-#include "stdafx.h"
+#include "pch.h"
 #include "request.h"
 #include "chunk.h"
 #include "cursors.h"

@@ -21,7 +21,7 @@
   simple portable regression system
  */
 
-#include "../stdafx.h"
+#include "../pch.h"
 
 #define ASSERT_EXCEPTION(a,b)                                       \
     try {                                                           \

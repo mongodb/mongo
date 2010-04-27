@@ -25,7 +25,7 @@
    _ secondary indexes
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../util/message.h"
 #include "../util/processinfo.h"
 

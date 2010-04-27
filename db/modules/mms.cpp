@@ -16,7 +16,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../db.h"
 #include "../instance.h"
 #include "../module.h"

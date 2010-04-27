@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../client/dbclient.h"
 #include "../util/mmap.h"
 #include "tool.h"

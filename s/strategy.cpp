@@ -16,7 +16,7 @@
 
 // stragegy.cpp
 
-#include "stdafx.h"
+#include "pch.h"
 #include "request.h"
 #include "../util/background.h"
 #include "../client/connpool.h"

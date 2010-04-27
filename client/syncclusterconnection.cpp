@@ -16,7 +16,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "syncclusterconnection.h"
 #include "../db/dbmessage.h"
 

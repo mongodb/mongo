@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "goodies.h"
 #include "unittest.h"
 #include "file_allocator.h"

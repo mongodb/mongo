@@ -19,7 +19,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../util/miniwebserver.h"
 #include "../util/web/html.h"
 #include "../util/md5.hpp"

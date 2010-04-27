@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "diskloc.h"
 #include "jsobj.h"
 #include "indexkey.h"

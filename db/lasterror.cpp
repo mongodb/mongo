@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 
 #include "../util/unittest.h"
 #include "../util/message.h"

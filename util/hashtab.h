@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include <map>
 
 namespace mongo {

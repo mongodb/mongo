@@ -16,7 +16,7 @@
 
 // strategy_simple.cpp
 
-#include "stdafx.h"
+#include "pch.h"
 #include "request.h"
 #include "../client/connpool.h"
 #include "../db/commands.h"

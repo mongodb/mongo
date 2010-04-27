@@ -22,7 +22,7 @@
 */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "jsobj.h"
 #include "pdfile.h"
 #include "namespace.h"

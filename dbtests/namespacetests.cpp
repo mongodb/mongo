@@ -18,7 +18,7 @@
  */
 
 // Where IndexDetails defined.
-#include "stdafx.h"
+#include "pch.h"
 #include "../db/namespace.h"
 
 #include "../db/db.h"

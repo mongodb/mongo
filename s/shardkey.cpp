@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "chunk.h"
 #include "../db/jsobj.h"
 #include "../util/unittest.h"

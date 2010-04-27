@@ -16,7 +16,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "base64.h"
 
 namespace mongo {

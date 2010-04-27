@@ -17,10 +17,10 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../db/instance.h"
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../scripting/engine.h"
 
 #include "dbtests.h"

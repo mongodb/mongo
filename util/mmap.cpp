@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "mmap.h"
 #include "processinfo.h"
 #include "locks.h"

@@ -16,7 +16,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "pdfile.h"
 #include "reccache.h"
 #include "rec.h"

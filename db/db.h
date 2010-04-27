@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "../util/message.h"
 #include "boost/version.hpp"
 #include "concurrency.h"

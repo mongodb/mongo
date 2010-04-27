@@ -16,7 +16,7 @@
  */
 
 
-#include "stdafx.h"
+#include "pch.h"
 #include "parallel.h"
 #include "connpool.h"
 #include "../db/queryutil.h"

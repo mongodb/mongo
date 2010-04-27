@@ -359,7 +359,7 @@ if GetOption( "extralib" ) is not None:
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "stdafx.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
+commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp" ]
@@ -594,7 +594,7 @@ elif "win32" == os.sys.platform:
     env.Append( CPPFLAGS=" /wd4355 /wd4800 " ) #some warnings we don't like
     env.Append( CPPDEFINES=["WIN32","_CONSOLE","_CRT_SECURE_NO_WARNINGS","HAVE_CONFIG_H","PCRE_STATIC","_UNICODE","UNICODE","SUPPORT_UCP","SUPPORT_UTF8,PSAPI_VERSION=1" ] )
 
-    #env.Append( CPPFLAGS='  /Yu"stdafx.h" ' ) # this would be for pre-compiled headers, could play with it later
+    #env.Append( CPPFLAGS='  /Yu"pch.h" ' ) # this would be for pre-compiled headers, could play with it later
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
@@ -698,9 +698,9 @@ if nix:
     # pre-compiled headers
     if False and 'Gch' in dir( env ):
         print( "using precompiled headers" )
-        env['Gch'] = env.Gch( [ "stdafx.h" ] )[0]
-        #Depends( "stdafx.o" , "stdafx.h.gch" )
-        #SideEffect( "dummyGCHSideEffect" , "stdafx.h.gch" )
+        env['Gch'] = env.Gch( [ "pch.h" ] )[0]
+        #Depends( "pch.o" , "pch.h.gch" )
+        #SideEffect( "dummyGCHSideEffect" , "pch.h.gch" )
 
 if usev8:
     env.Append( CPPPATH=["../v8/include/"] )
@@ -774,7 +774,7 @@ def setupBuildInfoFile( outFile ):
     version = getGitVersion()
     sysInfo = getSysInfo()
     contents = '\n'.join([
-        '#include "stdafx.h"',
+        '#include "pch.h"',
         '#include <iostream>',
         '#include <boost/version.hpp>',
         'namespace mongo { const char * gitVersion(){ return "' + version + '"; } }',
@@ -1443,7 +1443,7 @@ def getSystemInstallName():
     return n
 
 def getCodeVersion():
-    fullSource = open( "stdafx.cpp" , "r" ).read()
+    fullSource = open( "pch.cpp" , "r" ).read()
     allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
     if len(allMatches) != 1:
         print( "can't find version # in code" )

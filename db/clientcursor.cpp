@@ -22,7 +22,7 @@
    Cursor -- and its derived classes -- are our internal cursors.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "query.h"
 #include "introspect.h"
 #include <time.h>

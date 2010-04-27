@@ -19,7 +19,7 @@
    unit test & such
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "../util/mmap.h"
 
 namespace mongo {

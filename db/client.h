@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "../stdafx.h"
+#include "../pch.h"
 #include "security.h"
 #include "namespace.h"
 #include "lasterror.h"
