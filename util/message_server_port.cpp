@@ -57,7 +57,7 @@ namespace mongo {
                     handler->process( m , p.get() );
                 }
             }
-            catch ( const SocketException& se ){
+            catch ( const SocketException& ){
                 log() << "unclean socket shutdown from: " << otherSide << endl;
             }
             catch ( const std::exception& e ){
