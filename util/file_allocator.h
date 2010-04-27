@@ -113,7 +113,7 @@ namespace mongo {
             // TODO : we should to avoid fragmentation
 #else
 
-#if defined(__linux__) && ! defined(__sunos__)
+#if defined(__linux__) 
             int ret = posix_fallocate(fd,0,size);
             if ( ret == 0 )
                 return;
