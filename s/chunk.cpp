@@ -200,7 +200,7 @@ namespace mongo {
                                             );
         
         if ( ! worked ){
-            errmsg = (string)"movechunk.start failed: " + startRes.toString();
+            errmsg = (string)"movechunk.start failed: " + startRes.jsonString();
             fromconn.done();
             return false;
         }
