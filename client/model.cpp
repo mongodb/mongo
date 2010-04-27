@@ -57,6 +57,31 @@ namespace mongo {
         BSONObjBuilder b;
         serialize( b );
         
+        BSONElement myId;
+        {
+            BSONObjIterator i = b.iterator();
+            while ( i.more() ){
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName() , "_id" ) == 0 ){
+                    myId = e;
+                    break;
+                }
+            }
+        }
+
+        if ( myId.type() ){
+            if ( _id.isEmpty() ){
+                _id = myId.wrap();
+            }
+            else if ( myId.woCompare( _id.firstElement() ) ){
+                stringstream ss;
+                ss << "_id from serialize and stored differ: ";
+                ss << "[" << myId << "] != ";
+                ss << "[" << _id.firstElement() << "]";
+                throw UserException( 13121 , ss.str() );
+            }
+        }
+
         if ( _id.isEmpty() ){
             OID oid;
             oid.init();
@@ -69,18 +94,22 @@ namespace mongo {
             log(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
-            BSONElement id = _id["_id"];
-            b.append( id );
+            if ( myId.eoo() ){
+                myId = _id["_id"];
+                b.append( myId );
+            }
+            
+            assert( ! myId.eoo() );
 
             BSONObjBuilder qb;
-            qb.append( id );
+            qb.append( myId );
             
             BSONObj q = qb.obj();
             BSONObj o = b.obj();
 
-            log(4) << "updated old model" << getNS() << "  " << q << " " << o << endl;
+            log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
-            conn->update( getNS() , q , o );
+            conn->update( getNS() , q , o , true );
             
         }
         
@@ -92,6 +121,18 @@ namespace mongo {
 
         if ( safe && errmsg.size() )
             throw UserException( 9003 , (string)"error on Model::save: " + errmsg );
+    }
+
+    BSONObj Model::toObject(){
+        BSONObjBuilder b;
+        serialize( b );
+        return b.obj();
+    }
+
+    void Model::append( const char * name , BSONObjBuilder& b ){
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        serialize( bb );
+        bb.done();
     }
 
 } // namespace mongo

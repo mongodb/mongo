@@ -19,6 +19,7 @@
 
 #include <stack>
 #include "dbclient.h"
+#include "redef_macros.h"
 
 namespace mongo {
 
@@ -74,8 +75,8 @@ namespace mongo {
     /** Use to get a connection from the pool.  On exceptions things
        clean up nicely.
     */
-    class ScopedDbConnection {
-        const string host;
+    class ScopedDbConnection : boost::noncopyable {
+        const string _host;
         DBClientBase *_conn;
     public:
         /** get the associated connection object */
@@ -83,19 +84,32 @@ namespace mongo {
             uassert( 11004 ,  "did you call done already" , _conn );
             return _conn; 
         }
-
+        
         /** get the associated connection object */
         DBClientBase& conn() {
             uassert( 11005 ,  "did you call done already" , _conn );
             return *_conn;
         }
 
-        /** throws UserException if can't connect */
-        ScopedDbConnection(const string& _host) :
-                host(_host), _conn( pool.get(_host) ) {
-            //cout << " for: " << _host << " got conn: " << _conn << endl;
+        /** get the associated connection object */
+        DBClientBase* get() {
+            uassert( 13102 ,  "did you call done already" , _conn );
+            return _conn;
+        }
+        
+        ScopedDbConnection()
+            : _host( "" ) , _conn(0 ){
         }
 
+        /** throws UserException if can't connect */
+        ScopedDbConnection(const string& host)
+            : _host(host), _conn( pool.get(host) ) {
+        }
+
+        ScopedDbConnection(const string& host, DBClientBase* conn )
+            : _host( host ) , _conn( conn ){
+        }
+        
         /** Force closure of the connection.  You should call this if you leave it in
             a bad state.  Destructor will do this too, but it is verbose.
         */
@@ -119,12 +133,16 @@ namespace mongo {
                 kill();
             else
             */
-                pool.release(host, _conn);
+            pool.release(_host, _conn);
             _conn = 0;
         }
         
+        ScopedDbConnection * steal();
+
         ~ScopedDbConnection();
 
     };
 
 } // namespace mongo
+
+#include "undef_macros.h"

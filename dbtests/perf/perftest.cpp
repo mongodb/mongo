@@ -42,7 +42,7 @@ DBClientBase *client_;
 // (ie allocation) work for another test.
 template< class T >
 string testDb( T *t = 0 ) {
-    string name = mongo::regression::demangleName( typeid( T ) );
+    string name = mongo::demangleName( typeid( T ) );
     // Make filesystem safe.
     for( string::iterator i = name.begin(); i != name.end(); ++i )
         if ( *i == ':' )

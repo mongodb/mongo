@@ -108,6 +108,9 @@ namespace mongo {
             const char *p = strstr(buf, "$extra");
             return p && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
         }
+        bool hasDollarSign() const {
+            return strstr( buf , "$" ) > 0;
+        }
 
         void kill() {
             buf[0] = 0x7f;
@@ -661,6 +664,8 @@ namespace mongo {
         bool allocated() const {
             return ht != 0;
         }
+
+        void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
 
     private:
         boost::filesystem::path path() const;

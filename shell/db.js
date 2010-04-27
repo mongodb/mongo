@@ -259,7 +259,7 @@ DB.prototype.help = function() {
     print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.copyDatabase(fromdb, todb, fromhost)");
     print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-    print("\tdb.currentOp() displays the current operation in the db" );
+    print("\tdb.currentOp() displays the current operation in the db");
     print("\tdb.dropDatabase()");
     print("\tdb.eval(func, args) run code server-side");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
@@ -273,9 +273,9 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingLevel()");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSisterDB(name) get the db at the same server as this onew");
-    print("\tdb.killOp(opid) kills the current operation in the db" );
-    print("\tdb.listCommands() lists all the db commands" );
-    print("\tdb.printCollectionStats()" );
+    print("\tdb.killOp(opid) kills the current operation in the db");
+    print("\tdb.listCommands() lists all the db commands");
+    print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
     print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.printShardingStatus()");
@@ -287,7 +287,10 @@ DB.prototype.help = function() {
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
-    print("\tdb.version() current version of the server" );
+    print("\tdb.version() current version of the server");
+    print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
+
+    return __magicNoPrint;
 }
 
 DB.prototype.printCollectionStats = function(){

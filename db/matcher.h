@@ -146,8 +146,13 @@ namespace mongo {
         bool keyMatch() const { return !all && !haveSize && !hasArray && !haveNeg && _orMatchers.size() == 0; }
 
         bool atomic() const { return _atomic; }
-
+        
         bool hasType( BSONObj::MatchType type ) const;
+
+        string toString() const {
+            return jsobj.toString();
+        }
+
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.

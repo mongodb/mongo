@@ -18,7 +18,7 @@
  */
 
 #include "stdafx.h"
-#include "../util/atomic_int.h"
+#include "../bson/util/atomic_int.h"
 #include "../util/mvar.h"
 #include "../util/thread_pool.h"
 #include <boost/thread.hpp>

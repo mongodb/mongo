@@ -18,6 +18,7 @@
 #pragma once
 
 #include "dbclient.h"
+#include "redef_macros.h"
 
 namespace mongo {
 
@@ -40,7 +41,9 @@ namespace mongo {
         virtual const char * getNS() = 0;
         virtual void serialize(BSONObjBuilder& to) = 0;
         virtual void unserialize(const BSONObj& from) = 0;
-
+        virtual BSONObj toObject();
+        virtual void append( const char * name , BSONObjBuilder& b );
+        
         virtual string modelServer() = 0;
         
         /** Load a single object. 
@@ -55,3 +58,5 @@ namespace mongo {
     };
 
 } // namespace mongo
+
+#include "undef_macros.h"

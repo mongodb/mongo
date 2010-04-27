@@ -31,9 +31,9 @@ namespace mongo {
 	int AuthenticationInfo::warned = 0;
 
     void AuthenticationInfo::print(){
-        cout << "AuthenticationInfo: " << this << "\n";
+        cout << "AuthenticationInfo: " << this << '\n';
         for ( map<string,Auth>::iterator i=m.begin(); i!=m.end(); i++ ){
-            cout << "\t" << i->first << "\t" << i->second.level << "\n";
+            cout << "\t" << i->first << "\t" << i->second.level << '\n';
         }
         cout << "END" << endl;
     }

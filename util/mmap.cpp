@@ -18,6 +18,7 @@
 #include "stdafx.h"
 #include "mmap.h"
 #include "processinfo.h"
+#include "locks.h"
 
 namespace mongo {
 
@@ -55,10 +56,10 @@ namespace mongo {
     */
 
     static set<MongoFile*> mmfiles;
-    static mongo::mutex mmmutex;
+    static RWLock mmmutex;
 
     void MongoFile::destroyed() {
-        scoped_lock lk( mmmutex );
+        rwlock lk( mmmutex , true );
         mmfiles.erase(this);
     }
 
@@ -71,7 +72,7 @@ namespace mongo {
         }
         ++closingAllFiles;
 
-        scoped_lock lk( mmmutex );
+        rwlock lk( mmmutex , true );
 
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
@@ -85,7 +86,7 @@ namespace mongo {
     /*static*/ long long MongoFile::totalMappedLength(){
         unsigned long long total = 0;
         
-        scoped_lock lk( mmmutex );
+        rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             total += (*i)->length();
 
@@ -95,7 +96,7 @@ namespace mongo {
     /*static*/ int MongoFile::flushAll( bool sync ){
         int num = 0;
 
-        scoped_lock lk( mmmutex );
+        rwlock lk( mmmutex , false );
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ){
             num++;
             MongoFile * mmf = *i;
@@ -108,7 +109,7 @@ namespace mongo {
     }
 
     void MongoFile::created(){
-        scoped_lock lk( mmmutex );
+        rwlock lk( mmmutex , true );
         mmfiles.insert(this);
     }
 

@@ -20,6 +20,11 @@
 #include "assert.h"
 #include "file.h"
 
+#ifndef _WIN32
+#include <cxxabi.h>
+#include <sys/file.h>
+#endif
+
 namespace mongo {
 
     AssertionCount assertionCount;
@@ -77,10 +82,8 @@ namespace mongo {
     int uacount = 0;
     void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
-        if ( ++uacount < 100 )
+        DEV if ( ++uacount < 100 )
             log() << "User Exception " << msgid << ":" << msg << endl;
-        else
-            RARELY log() << "User Exception " << msg << endl;
         lastAssert[3].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msgid,msg);
         throw UserException(msgid, msg);
@@ -92,7 +95,15 @@ namespace mongo {
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msgid,msg && *msg ? msg : "massert failure");
         breakpoint();
-        printStackTrace(); // TEMP?? should we get rid of this?  TODO
+        printStackTrace();
+        throw MsgAssertionException(msgid, msg);
+    }
+
+    void msgassertedNoTrace(int msgid, const char *msg) {
+        assertionCount.condrollover( ++assertionCount.warning );
+        log() << "Assertion: " << msgid << ":" << msg << endl;
+        lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
+        raiseError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
     }
 
@@ -100,10 +111,9 @@ namespace mongo {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here
-        ss << msg << " stream invalie: " << OUTPUT_ERRNO;
+        ss << msg << " stream invalid: " << errnoWithDescription();
         throw UserException( code , ss.str() );
     }
-    
     
     mongo::mutex *Assertion::_mutex = new mongo::mutex();
 
@@ -143,6 +153,7 @@ namespace mongo {
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
+            fclose( test );
             
             _path = lp;
             _enabled = 1;
@@ -200,13 +211,31 @@ namespace mongo {
         loggingManager.rotate();
     }
 
-    string errnostring( const char * prefix ){
+    string errnoWithPrefix( const char * prefix ){
         stringstream ss;
         if ( prefix )
             ss << prefix << ": ";
-        ss << OUTPUT_ERRNO;
+        ss << errnoWithDescription();
         return ss.str();
     }
+
+
+    string demangleName( const type_info& typeinfo ){
+#ifdef _WIN32
+        return typeinfo.name();
+#else
+        int status;
+        
+        char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
+        if ( ! niceName )
+            return typeinfo.name();
+        
+        string s = niceName;
+        free(niceName);
+        return s;
+#endif
+    }
+
 
 }
 

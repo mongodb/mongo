@@ -125,7 +125,7 @@ namespace mongo {
     inline bool UDPConnection::init(const SockAddr& myAddr) {
         sock = socket(myAddr.getType(), SOCK_DGRAM, IPPROTO_UDP);
         if ( sock == INVALID_SOCKET ) {
-            out() << "invalid socket? " << OUTPUT_ERRNO << endl;
+            out() << "invalid socket? " << errnoWithDescription() << endl;
             return false;
         }
         if ( ::bind(sock, myAddr.raw(), myAddr.addressSize) != 0 ) {
@@ -153,7 +153,7 @@ namespace mongo {
         if ( c.init(me) ) {
             char buf[256];
             out() << "sendto: ";
-            out() << c.sendto(buf, sizeof(buf), dest) << " " << OUTPUT_ERRNO << endl;
+            out() << c.sendto(buf, sizeof(buf), dest) << " " << errnoWithDescription() << endl;
         }
         out() << "end\n";
     }
@@ -166,7 +166,7 @@ namespace mongo {
         if ( c.init(me) ) {
             char buf[256];
             out() << "recvfrom: ";
-            out() << c.recvfrom(buf, sizeof(buf), sender) << " " << OUTPUT_ERRNO << endl;
+            out() << c.recvfrom(buf, sizeof(buf), sender) << " " << errnoWithDescription() << endl;
         }
         out() << "end listentest\n";
     }
@@ -179,8 +179,8 @@ namespace mongo {
             WinsockInit() {
                 WSADATA d;
                 if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
-                    out() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
-                    problem() << "ERROR: wsastartup failed " << OUTPUT_ERRNO << endl;
+                    out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
+                    problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                     dbexit( EXIT_NTSERVICE_ERROR );
                 }
             }

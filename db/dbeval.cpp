@@ -21,7 +21,7 @@
 #include "query.h"
 #include "pdfile.h"
 #include "jsobj.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"
@@ -108,16 +108,19 @@ namespace mongo {
 
     class CmdEval : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
+        }
+        virtual void help( stringstream &help ) const {
+            help << "Evaluate javascript at the server.\n" "http://www.mongodb.org/display/DOCS/Server-side+Code+Execution";
         }
         // We need at least read only access to run db.eval - auth for eval'd writes will be checked
         // as they are requested.
         virtual bool requiresAuth() {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
-        CmdEval() : Command("$eval") { }
+        virtual LockType locktype() const { return WRITE; }
+        CmdEval() : Command("eval", false, "$eval") { }
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(cc().database()->name.c_str()));

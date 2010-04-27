@@ -26,6 +26,7 @@
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
+#include "balance.h"
 
 namespace mongo {
 
@@ -72,6 +73,11 @@ namespace mongo {
         virtual ~ShardedMessageHandler(){}
         virtual void process( Message& m , AbstractMessagingPort* p ){
             Request r( m , p );
+
+            lastError.setID( r.getClientId() );
+            LastError * le = lastError.get( true );
+            lastError.startRequest( m );
+            
             if ( logLevel > 5 ){
                 log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
             }
@@ -80,10 +86,12 @@ namespace mongo {
                 r.process();
             }
             catch ( DBException& e ){
+                le->raiseError( e.getCode() , e.what() );
+
                 m.data->id = r.id();
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){
-                    BSONObj err = BSON( "$err" << e.what() );
+                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
                     replyToQuery( QueryResult::ResultFlag_ErrSet, p , m , err );
                 }
             }
@@ -106,6 +114,8 @@ namespace mongo {
     }
 
     void start() {
+        balancer.go();
+
         log() << "waiting for connections on port " << cmdLine.port << endl;
         //DbGridListener l(port);
         //l.listen();
@@ -146,8 +156,9 @@ int main(int argc, char* argv[], char *envp[] ) {
     options.add_options()
         ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
         ( "test" , "just run unit tests" )
+        ( "upgrade" , "upgrade meta data version" )
         ;
-
+    
 
     // parse options
     po::variables_map params;
@@ -222,9 +233,14 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 8;
     }
     
-    int configError = configServer.checkConfigVersion();
+    int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
     if ( configError ){
-        cout << "config server error: " << configError << endl;
+        if ( configError > 0 ){
+            cout << "upgrade success!" << endl;
+        }
+        else {
+            cout << "config server error: " << configError << endl;
+        }
         return configError;
     }
     configServer.reloadSettings();

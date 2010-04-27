@@ -19,7 +19,7 @@
 #include "stdafx.h"
 #include "pdfile.h"
 #include "../client/dbclient.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "jsobj.h"
 #include "query.h"
 #include "commands.h"
@@ -413,13 +413,13 @@ namespace mongo {
     */
     class CmdClone : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "clone this database from an instance of the db on another host\n";
-            help << "example: { clone : \"host13\" }";
+            help << "{ clone : \"host13\" }";
         }
         CmdClone() : Command("clone") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -436,10 +436,10 @@ namespace mongo {
     
     class CmdCloneCollection : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
@@ -480,10 +480,10 @@ namespace mongo {
 
     class CmdStartCloneCollection : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         CmdStartCloneCollection() : Command("startCloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { startCloneCollection: <collection ns>, from: <hostname>, query: <query> }";
@@ -534,10 +534,10 @@ namespace mongo {
     
     class CmdFinishCloneCollection : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         CmdFinishCloneCollection() : Command("finishCloneCollection") { }
         virtual void help( stringstream &help ) const {
             help << " example: { finishCloneCollection: <finishToken> }";
@@ -584,13 +584,13 @@ namespace mongo {
     class CmdCopyDbGetNonce : public Command {
     public:
         CmdCopyDbGetNonce() : Command("copydbgetnonce") { }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
@@ -625,13 +625,13 @@ namespace mongo {
     class CmdCopyDb : public Command {
     public:
         CmdCopyDb() : Command("copydb") { }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>]}";
@@ -675,13 +675,13 @@ namespace mongo {
     class CmdRenameCollection : public Command {
     public:
         CmdRenameCollection() : Command( "renameCollection" ) {}
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         virtual bool logTheOp() {
             return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
         }

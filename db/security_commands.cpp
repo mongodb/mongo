@@ -52,10 +52,11 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype(){ return NONE; }
+        void help(stringstream& h) const { h << "internal"; }
+        virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             nonce *n = new nonce(security.getNonce());
@@ -72,10 +73,11 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype(){ return NONE; }
+        void help(stringstream& h) const { h << "de-authenticate"; }
+        virtual LockType locktype() const { return NONE; }
         CmdLogout() : Command("logout") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // database->name is the one we are logging out...
@@ -91,10 +93,11 @@ namespace mongo {
         virtual bool logTheOp() {
             return false;
         }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; } // TODO: make this READ
+        virtual LockType locktype() const { return WRITE; } // TODO: make this READ
+        virtual void help(stringstream& ss) const { ss << "internal"; }
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log(1) << " authenticate: " << cmdObj << endl;

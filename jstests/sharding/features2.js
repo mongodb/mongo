@@ -51,9 +51,9 @@ assert.eq( 0 , db.foo.count() , "D7" );
 
 // --- _id key ---
 
-db.foo2.insert( { _id : new ObjectId() } );
-db.foo2.insert( { _id : new ObjectId() } );
-db.foo2.insert( { _id : new ObjectId() } );
+db.foo2.save( { _id : new ObjectId() } );
+db.foo2.save( { _id : new ObjectId() } );
+db.foo2.save( { _id : new ObjectId() } );
 
 assert.eq( 1 , s.onNumShards( "foo2" ) , "F1" );
 
@@ -110,5 +110,14 @@ s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 } );
 assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );
+
+// count
+
+db.countaa.save({"regex" : /foo/i})
+db.countaa.save({"regex" : /foo/i})
+db.countaa.save({"regex" : /foo/i})
+assert.eq( 3 , db.countaa.count() , "counta1" );
+assert.eq( 3 , db.countaa.find().itcount() , "counta1" );
+
 
 s.stop();

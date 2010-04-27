@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    RWLock chunkSplitLock;
+
     // -------  Shard --------
 
     int Chunk::MaxChunkSize = 1024 * 1204 * 200;
@@ -59,7 +61,7 @@ namespace mongo {
         }
         
         if ( sort ){
-            ScopedDbConnection conn( getShard() );
+            ShardConnection conn( getShard() );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
@@ -83,7 +85,7 @@ namespace mongo {
                 return _manager->getShardKey().extractKey( end );
         }
         
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         BSONObj result;
         if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
                                                  << "keyPattern" << _manager->getShardKey().key()
@@ -121,9 +123,13 @@ namespace mongo {
     
     Chunk * Chunk::split( const BSONObj& m ){
         uassert( 10165 ,  "can't split as shard that doesn't have a manager" , _manager );
-        
-        log(1) << " before split on: "  << m << "\n"
+
+        log(1) << " before split on: "  << m << '\n'
                << "\t self  : " << toString() << endl;
+        
+        BSONObjBuilder detail(256);
+        appendShortVersion( "before" , detail );
+        
 
         uassert( 10166 ,  "locking namespace on server failed" , lockNamespaceOnServer( getShard() , _ns ) );
         uassert( 13003 ,  "can't split chunk. does it have only one distinct value?" ,
@@ -138,24 +144,36 @@ namespace mongo {
         s->_markModified();
         _markModified();
         
-        _manager->_chunks.push_back( s );
-        _manager->_chunkMap[s->getMax()] = s;
-        
-        setMax(m.getOwned());
-        _manager->_chunkMap[_max] = this;
+        {
+            rwlock lk( _manager->_lock , true );
+            _manager->_chunks.push_back( s );
+            _manager->_chunkMap[s->getMax()] = s;
+            
+            setMax(m.getOwned());
+            _manager->_chunkMap[_max] = this;
+        }
         
         log(1) << " after split:\n" 
-               << "\t left : " << toString() << "\n" 
+               << "\t left : " << toString() << '\n' 
                << "\t right: "<< s->toString() << endl;
         
+        appendShortVersion( "left" , detail );
+        s->appendShortVersion( "right" , detail );
         
         _manager->save();
         
+        configServer.logChange( "split" , _ns , detail.obj() );
+
         return s;
     }
 
     bool Chunk::moveAndCommit( const string& to , string& errmsg ){
         uassert( 10167 ,  "can't move shard to its current location!" , to != getShard() );
+        
+        BSONObjBuilder detail;
+        detail.append( "from" , _shard );
+        detail.append( "to" , to );
+        appendShortVersion( "chunk" , detail );
 
         log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard << " -> " << to << endl;
         
@@ -169,7 +187,7 @@ namespace mongo {
             filter = b.obj();
         }
         
-        ScopedDbConnection fromconn( from );
+        ShardConnection fromconn( from );
 
         BSONObj startRes;
         bool worked = fromconn->runCommand( "admin" ,
@@ -229,6 +247,9 @@ namespace mongo {
         }
         
         fromconn.done();
+        
+        configServer.logChange( "migrate" , _ns , detail.obj() );
+        
         return true;
     }
     
@@ -238,7 +259,12 @@ namespace mongo {
         if ( _dataWritten < MaxChunkSize / 5 )
             return false;
         
-        log(1) << "\t want to split chunk : " << this << endl;
+        if ( ! chunkSplitLock.lock_try(0) )
+            return false;
+        
+        rwlock lk( chunkSplitLock , 1 , true );
+
+        log(1) << "\t splitIfShould : " << this << endl;
 
         _dataWritten = 0;
         
@@ -293,7 +319,7 @@ namespace mongo {
     }
 
     long Chunk::getPhysicalSize() const{
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         
         BSONObj result;
         uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
@@ -308,7 +334,7 @@ namespace mongo {
 
     
     long Chunk::countObjects( const BSONObj& filter ) const{
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         
         BSONObj f = getFilter();
         if ( ! filter.isEmpty() )
@@ -319,6 +345,13 @@ namespace mongo {
         
         conn.done();
         return (long)n;
+    }
+
+    void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
+        BSONObjBuilder bb( b.subobjStart( name ) );
+        bb.append( "min" , _min );
+        bb.append( "max" , _max );
+        bb.done();
     }
     
     bool Chunk::operator==( const Chunk& s ) const{
@@ -333,6 +366,9 @@ namespace mongo {
     }
     
     void Chunk::serialize(BSONObjBuilder& to){
+        
+        to.append( "_id" , genID( _ns , _min ) );
+
         if ( _lastmod )
             to.appendTimestamp( "lastmod" , _lastmod );
         else 
@@ -342,6 +378,19 @@ namespace mongo {
         to << "min" << _min;
         to << "max" << _max;
         to << "shard" << _shard;
+    }
+
+    string Chunk::genID( const string& ns , const BSONObj& o ){
+        StringBuilder buf( ns.size() + o.objsize() + 16 );
+        buf << ns << "-";
+
+        BSONObjIterator i(o);
+        while ( i.more() ){
+            BSONElement e = i.next();
+            buf << e.fieldName() << "_" << e.toString( false );
+        }
+
+        return buf.str();
     }
     
     void Chunk::unserialize(const BSONObj& from){
@@ -395,7 +444,7 @@ namespace mongo {
     }
     
     void Chunk::ensureIndex(){
-        ScopedDbConnection conn( getShard() );
+        ShardConnection conn( getShard() );
         conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
         conn.done();
     }
@@ -419,7 +468,7 @@ namespace mongo {
         _config( config ) , _ns( ns ) , _key( pattern ) , _unique( unique ){
         Chunk temp(0);
         
-        ScopedDbConnection conn( temp.modelServer() );
+        ShardConnection conn( temp.modelServer() );
         auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  ns ) );
         while ( cursor->more() ){
             BSONObj d = cursor->next();
@@ -465,6 +514,8 @@ namespace mongo {
     }
 
     Chunk& ChunkManager::findChunk( const BSONObj & obj ){
+        rwlock lk( _lock , false ); 
+
         BSONObj key = _key.extractKey(obj);
         ChunkMap::iterator it = _chunkMap.upper_bound(key);
         if (it != _chunkMap.end()){
@@ -479,7 +530,8 @@ namespace mongo {
     }
 
     Chunk* ChunkManager::findChunkOnServer( const string& server ) const {
-
+        rwlock lk( _lock , false ); 
+ 
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
             if ( c->getShard() == server )
@@ -489,7 +541,9 @@ namespace mongo {
         return 0;
     }
 
-    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::_getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+        rwlock lk( _lock , false ); 
+
         FieldRangeSet ranges(_ns.c_str(), query, false);
         BSONObjIterator fields(_key.key());
         BSONElement field = fields.next();
@@ -504,8 +558,7 @@ namespace mongo {
             chunks.push_back(&findChunk(BSON(field.fieldName() << range.min())));
             return 1;
         } else if (!range.nontrivial()) {
-            chunks = _chunks;
-            return chunks.size();
+            return -1; // all chunks
         } else {
             set<Chunk*, ChunkCmp> chunkSet;
 
@@ -536,13 +589,45 @@ namespace mongo {
         }
     }
 
+    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+        int ret = _getChunksForQuery(chunks, query);
+
+        if (ret == -1){
+            chunks = _chunks;
+            return chunks.size();
+        }
+
+        return ret;
+    }
+
+    int ChunkManager::getShardsForQuery( set<string>& shards , const BSONObj& query ){
+        vector<Chunk*> chunks;
+        int ret = _getChunksForQuery(chunks, query);
+
+        if (ret == -1){
+            getAllServers(shards);
+        } else {
+            for ( vector<Chunk*>::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
+                Chunk* c = *it;
+                shards.insert(c->getShard());
+            }
+        }
+
+        return shards.size();
+    }
+
     void ChunkManager::getAllServers( set<string>& allServers ){
+        rwlock lk( _lock , false ); 
+        
+        // TODO: cache this
         for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
             allServers.insert( (*i)->getShard() );
         }        
     }
     
     void ChunkManager::ensureIndex(){
+        rwlock lk( _lock , false ); 
+ 
         set<string> seen;
         
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
@@ -555,6 +640,8 @@ namespace mongo {
     }
     
     void ChunkManager::drop(){
+        rwlock lk( _lock , true ); 
+        
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
         map<string,ShardChunkVersion> seen;
@@ -585,7 +672,7 @@ namespace mongo {
         // delete data from mongod
         for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
             string shard = i->first;
-            ScopedDbConnection conn( shard );
+            ShardConnection conn( shard );
             conn->dropCollection( _ns );
             conn.done();
         }
@@ -599,13 +686,13 @@ namespace mongo {
         
         // remove chunk data
         Chunk temp(0);
-        ScopedDbConnection conn( temp.modelServer() );
+        ShardConnection conn( temp.modelServer() );
         conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
         for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ScopedDbConnection conn( i->first );
+            ShardConnection conn( i->first );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );
@@ -617,6 +704,8 @@ namespace mongo {
     }
     
     void ChunkManager::save(){
+        rwlock lk( _lock , false ); 
+        
         ShardChunkVersion a = getVersion();
         
         set<string> withRealChunks;
@@ -637,6 +726,8 @@ namespace mongo {
     }
     
     ShardChunkVersion ChunkManager::getVersion( const string& server ) const{
+        rwlock lk( _lock , false ); 
+
         // TODO: cache or something?
         
         ShardChunkVersion max = 0;
@@ -654,8 +745,10 @@ namespace mongo {
     }
 
     ShardChunkVersion ChunkManager::getVersion() const{
+        rwlock lk( _lock , false ); 
+        
         ShardChunkVersion max = 0;
-
+        
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
             if ( c->_lastmod > max )
@@ -666,11 +759,13 @@ namespace mongo {
     }
 
     string ChunkManager::toString() const {
+        rwlock lk( _lock , false );         
+
         stringstream ss;
-        ss << "ChunkManager: " << _ns << " key:" << _key.toString() << "\n";
+        ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             const Chunk* c = *i;
-            ss << "\t" << c->toString() << "\n";
+            ss << "\t" << c->toString() << '\n';
         }
         return ss.str();
     }

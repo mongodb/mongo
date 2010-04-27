@@ -30,6 +30,7 @@
 #include "clientcursor.h"
 #include "pdfile.h"
 #include "stats/counters.h"
+#include "repl/replset.h"
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -70,6 +71,7 @@ namespace mongo {
 
     void setupSignals();
     void closeAllSockets();
+    void startReplSets();
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
     void setRecCacheSize(unsigned MB);
@@ -91,29 +93,6 @@ namespace mongo {
     } mystartupdbcpp;
 
     QueryResult* emptyMoreResult(long long);
-
-    void testTheDb() {
-        OpDebug debug;
-        Client::Context ctx("sys.unittest.pdfile");
-
-        /* this is not validly formatted, if you query this namespace bad things will happen */
-        theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
-        theDataFileMgr.insert("sys.unittest.pdfile", (void *) "hello worldx", 13);
-
-        BSONObj j1((const char *) &js1);
-        deleteObjects("sys.unittest.delete", j1, false);
-        theDataFileMgr.insert("sys.unittest.delete", &js1, sizeof(js1));
-        deleteObjects("sys.unittest.delete", j1, false);
-        updateObjects("sys.unittest.delete", j1, j1, true,false,true,debug);
-        updateObjects("sys.unittest.delete", j1, j1, false,false,true,debug);
-
-        auto_ptr<Cursor> c = theDataFileMgr.findAll("sys.unittest.pdfile");
-        while ( c->ok() ) {
-            c->_current();
-            c->advance();
-        }
-        out() << endl;
-    }
 
     MessagingPort *connGrab = 0;
     void connThread();
@@ -465,7 +444,7 @@ namespace mongo {
 #endif
 
         {
-            const char * foo = strstr( versionString , "." ) + 1;
+            const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ){
                 cout << "****\n" 
@@ -485,7 +464,7 @@ namespace mongo {
 
     Timer startupSrandTimer;
 
-    void _initAndListen(int listenPort, const char *appserverLoc = null) {
+    void _initAndListen(int listenPort, const char *appserverLoc = NULL) {
 
 #if !defined(_WIN32)
         pid_t pid = 0;
@@ -552,13 +531,20 @@ namespace mongo {
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
         snapshotThread.go();
+        clientCursorMonitor.go();
+
+        if( !cmdLine.replSet.empty() ) {
+            replSet = true;
+            boost::thread t(startReplSets);
+        }
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
         while( 1 )
             sleepsecs( 100 );
     }
-    void initAndListen(int listenPort, const char *appserverLoc = null) {
+    void initAndListen(int listenPort, const char *appserverLoc = NULL) {
         try { _initAndListen(listenPort, appserverLoc); }
         catch ( std::exception &e ) {
             problem() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
@@ -860,7 +846,7 @@ int main(int argc, char* argv[], char *envp[] )
         }
         if (params.count("replSet")) {
             /* seed list of hosts for the repl set */
-            cmdLine.source = params["replSet"].as<string>().c_str();
+            cmdLine.replSet = params["replSet"].as<string>().c_str();
         }
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();
@@ -1150,4 +1136,3 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 
 #include "recstore.h"
 #include "reccache.h"
-

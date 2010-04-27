@@ -181,7 +181,11 @@ ShardingTest.prototype.getDB = function( name ){
 }
 
 ShardingTest.prototype.getServerName = function( dbname ){
-    return this.config.databases.findOne( { name : dbname } ).primary;
+    var x = this.config.databases.findOne( { _id : dbname } );
+    if ( x )
+        return x.primary;
+    this.config.databases.find().forEach( printjson );
+    throw "couldn't find dbname: " + dbname + " total: " + this.config.databases.count();
 }
 
 ShardingTest.prototype.getServer = function( dbname ){
@@ -262,6 +266,8 @@ ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
 }
 
 printShardingStatus = function( configDB ){
+    if (configDB === undefined)
+        configDB = db.getSisterDB('config')
     
     var version = configDB.getCollection( "version" ).findOne();
     if ( version == null ){
@@ -290,7 +296,7 @@ printShardingStatus = function( configDB ){
         
             output( "\t\tmy chunks" );
             
-            configDB.chunks.find( { "ns" : new RegExp( "^" + z.name ) } ).sort( { ns : 1 } ).forEach( 
+            configDB.chunks.find( { "ns" : new RegExp( "^" + z.name ) } ).sort( { ns : 1 , min : 1 } ).forEach( 
                 function(z){
                     output( "\t\t\t" + z.ns + " " + tojson( z.min ) + " -->> " + tojson( z.max ) + 
                            " on : " + z.shard + " " + tojson( z.lastmod ) );

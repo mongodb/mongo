@@ -27,13 +27,18 @@
 
 #include "stdafx.h"
 #include "../util/message.h"
-#include "../db/dbmessage.h"
+#include "../util/processinfo.h"
+
 #include "../client/connpool.h"
+
+#include "../db/dbmessage.h"
 #include "../db/commands.h"
+#include "../db/stats/counters.h"
 
 #include "config.h"
 #include "chunk.h"
 #include "strategy.h"
+#include "stats.h"
 
 namespace mongo {
 
@@ -48,15 +53,15 @@ namespace mongo {
             GridAdminCmd( const char * n ) : Command( n ){
                 dbgridCommands.insert( n );
             }
-            virtual bool slaveOk(){
+            virtual bool slaveOk() const {
                 return true;
             }
-            virtual bool adminOnly() {
+            virtual bool adminOnly() const {
                 return true;
             }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
         };
 
         // --------------- misc commands ----------------------
@@ -73,6 +78,77 @@ namespace mongo {
                 return true;
             }
         } netstat;
+        
+        class ServerStatusCmd : public Command {
+        public:
+            ServerStatusCmd() : Command( "serverStatus" , true ){
+                _started = time(0);
+            }
+            
+            virtual bool slaveOk() const { return true; }
+            virtual LockType locktype() const { return NONE; } 
+            
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+                result.append("uptime",(double) (time(0)-_started));
+                result.appendDate( "localTime" , jsTime() );
+
+                {
+                    BSONObjBuilder t( result.subobjStart( "mem" ) );
+                    
+                    ProcessInfo p;
+                    if ( p.supported() ){
+                        t.appendNumber( "resident" , p.getResidentSize() );
+                        t.appendNumber( "virtual" , p.getVirtualMemorySize() );
+                        t.appendBool( "supported" , true );
+                    }
+                    else {
+                        result.append( "note" , "not all mem info support on this platform" );
+                        t.appendBool( "supported" , false );
+                    }
+                    
+                    t.done();
+                }
+
+                {
+                    BSONObjBuilder bb( result.subobjStart( "connections" ) );
+                    bb.append( "current" , connTicketHolder.used() );
+                    bb.append( "available" , connTicketHolder.available() );
+                    bb.done();
+                }
+                
+                {
+                    BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
+                    bb.append("note", "fields vary by platform");
+                    ProcessInfo p;
+                    p.getExtraInfo(bb);
+                    bb.done();
+                }
+                
+                result.append( "opcounters" , globalOpCounters.getObj() );
+                {
+                    BSONObjBuilder bb( result.subobjStart( "ops" ) );
+                    bb.append( "sharded" , opsSharded.getObj() );
+                    bb.append( "notSharded" , opsNonSharded.getObj() );
+                    bb.done();
+                }
+
+                result.append( "shardCursorType" , shardedCursorTypes.getObj() );
+                
+                {
+                    BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
+                    asserts.append( "regular" , assertionCount.regular );
+                    asserts.append( "warning" , assertionCount.warning );
+                    asserts.append( "msg" , assertionCount.msg );
+                    asserts.append( "user" , assertionCount.user );
+                    asserts.append( "rollovers" , assertionCount.rollovers );
+                    asserts.done();
+                }
+
+                return 1;
+            }
+
+            time_t _started;
+        } cmdServerStatus;
 
         class ListGridCommands : public GridAdminCmd {
         public:
@@ -97,7 +173,7 @@ namespace mongo {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
+                ShardConnection conn( configServer.getPrimary() );
 
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
 
@@ -148,7 +224,7 @@ namespace mongo {
                     return false;
                 }
 
-                if ( to == config->getPrimary() ){
+                if ( config->getPrimary() == to ){
                     errmsg = "thats already the primary";
                     return false;
                 }
@@ -158,14 +234,14 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );
+                ShardConnection conn( configServer.getPrimary() );
 
                 log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
 
                 // TODO LOCKING: this is not safe with multiple mongos
 
 
-                ScopedDbConnection toconn( to );
+                ShardConnection toconn( to );
 
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
@@ -179,7 +255,7 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection fromconn( config->getPrimary() );
+                ShardConnection fromconn( config->getPrimary() );
 
                 config->setPrimary( to );
                 config->save( true );
@@ -268,13 +344,19 @@ namespace mongo {
                     return false;
                 }
                 
+                ShardKeyPattern proposedKey( key );
                 {
-                    ScopedDbConnection conn( config->getPrimary() );
+                    ShardConnection conn( config->getPrimary() );
                     BSONObjBuilder b; 
                     b.append( "ns" , ns ); 
                     b.appendBool( "unique" , true ); 
-                    if ( conn->count( config->getName() + ".system.indexes" , b.obj() ) ){
-                        errmsg = "can't shard collection with unique indexes";
+                    
+                    auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
+                    while ( cursor->more() ){
+                        BSONObj idx = cursor->next();
+                        if ( proposedKey.uniqueAllowd( idx["key"].embeddedObjectUserCheck() ) )
+                            continue;
+                        errmsg = (string)"can't shard collection with unique index on: " + idx.toString();
                         conn.done();
                         return false;
                     }
@@ -478,7 +560,7 @@ namespace mongo {
                 help << "list all shards of the system";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
+                ShardConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.shards" , BSONObj() );
@@ -502,7 +584,7 @@ namespace mongo {
                 help << "add a new shard to the system";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ScopedDbConnection conn( configServer.getPrimary() );
+                ShardConnection conn( configServer.getPrimary() );
                 
                 
                 string host = cmdObj["addshard"].valuestrsafe();
@@ -522,25 +604,37 @@ namespace mongo {
                     ss << host << ":" << CmdLine::ShardServerPort;
                     host = ss.str();
                 }
+                
+                string name = "";
+                if ( cmdObj["name"].type() == String )
+                    name = cmdObj["name"].valuestrsafe();
+                
+                if ( name.size() == 0 ){
+                    stringstream ss;
+                    ss << "shard";
+                    ss << conn->count( "config.shards" );
+                    name = ss.str();
+                }
 
                 BSONObj shard;
                 {
                     BSONObjBuilder b;
+                    b.append( "_id" , name );
                     b.append( "host" , host );
                     if ( cmdObj["maxSize"].isNumber() )
                         b.append( cmdObj["maxSize"] );
                     shard = b.obj();
                 }
 
-                BSONObj old = conn->findOne( "config.shards" , shard );
+                BSONObj old = conn->findOne( "config.shards" , BSON( "host" << host ) );
                 if ( ! old.isEmpty() ){
-                    result.append( "msg" , "already exists" );
+                    result.append( "msg" , "host already used" );
                     conn.done();
                     return false;
                 }
-
+                
                 try {
-                    ScopedDbConnection newShardConn( host );
+                    ShardConnection newShardConn( host );
                     newShardConn->getLastError();
                     newShardConn.done();
                 }
@@ -552,15 +646,19 @@ namespace mongo {
                     return false;
                 }
                 
-                
-
+                log() << "going to add shard: " << shard << endl;
                 conn->insert( "config.shards" , shard );
+                errmsg = conn->getLastError();
+                if ( errmsg.size() ){
+                    log() << "error adding shard: " << shard << " err: " << errmsg << endl;
+                    return false;
+                }
                 result.append( "added" , shard["host"].valuestrsafe() );
                 conn.done();
                 return true;
             }
         } addServer;
-
+        
         class RemoveShardCmd : public GridAdminCmd {
         public:
             RemoveShardCmd() : GridAdminCmd("removeshard") { }
@@ -573,7 +671,7 @@ namespace mongo {
                     return 0;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );
+                ShardConnection conn( configServer.getPrimary() );
 
                 BSONObj server = BSON( "host" << cmdObj["removeshard"].valuestrsafe() );
                 conn->remove( "config.shards" , server );
@@ -588,8 +686,8 @@ namespace mongo {
 
         class IsDbGridCmd : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
-            virtual bool slaveOk() {
+            virtual LockType locktype() const { return NONE; } 
+            virtual bool slaveOk() const {
                 return true;
             }
             IsDbGridCmd() : Command("isdbgrid") { }
@@ -602,9 +700,9 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {
@@ -620,9 +718,9 @@ namespace mongo {
 
         class CmdShardingGetPrevError : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {
@@ -637,9 +735,9 @@ namespace mongo {
 
         class CmdShardingGetLastError : public Command {
         public:
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             virtual bool requiresAuth() { return false; }
-            virtual bool slaveOk() {
+            virtual bool slaveOk() const {
                 return true;
             }
             virtual void help( stringstream& help ) const {
@@ -647,6 +745,15 @@ namespace mongo {
             }
             CmdShardingGetLastError() : Command("getlasterror") { }
             virtual bool run(const char *nsraw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+                {
+                    LastError * le = lastError.get();
+                    assert( le );
+                    if ( le->msg.size() ){
+                        le->appendSelf( result );
+                        return true;
+                    }
+                }
+                
                 string dbName = nsraw;
                 dbName = dbName.substr( 0 , dbName.size() - 5 );
                 
@@ -663,7 +770,7 @@ namespace mongo {
                 if ( shards->size() == 1 ){
                     string theShard = *(shards->begin() );
                     result.append( "theshard" , theShard.c_str() );
-                    ScopedDbConnection conn( theShard );
+                    ShardConnection conn( theShard );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     result.appendElements( res );
@@ -674,7 +781,7 @@ namespace mongo {
                 vector<string> errors;
                 for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
                     string theShard = *i;
-                    ScopedDbConnection conn( theShard );
+                    ShardConnection conn( theShard );
                     string temp = conn->getLastError();
                     if ( temp.size() )
                         errors.push_back( temp );

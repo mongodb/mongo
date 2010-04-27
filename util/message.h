@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../util/sock.h"
-#include "../util/atomic_int.h"
+#include "../bson/util/atomic_int.h"
 
 namespace mongo {
 
@@ -31,7 +31,7 @@ namespace mongo {
 
     class Listener {
     public:
-        Listener(const string &ip, int p, bool logConnect=true ) : _ip(ip), _port(p), _logConnect(logConnect) { }
+        Listener(const string &ip, int p, bool logConnect=true ) : _port(p), _ip(ip), _logConnect(logConnect) { }
         virtual ~Listener() {}
         void initAndListen(); // never returns unless error (start a thread)
 
@@ -41,9 +41,10 @@ namespace mongo {
             assert(!"You must overwrite one of the accepted methods");
         }
 
+        const int _port;
+
     private:
         string _ip;
-        int _port;
         bool _logConnect;
     };
 
@@ -63,7 +64,7 @@ namespace mongo {
         // in some cases the timeout will actually be 2x this value - eg we do a partial send,
         // then the timeout fires, then we try to send again, then the timeout fires again with
         // no data sent, then we detect that the other side is down
-        MessagingPort(int timeout = 0);
+        MessagingPort(int timeout = 0, int logLevel = 0 );
 
         virtual ~MessagingPort();
 
@@ -96,6 +97,7 @@ namespace mongo {
     public:
         SockAddr farEnd;
         int _timeout;
+        int _logLevel; // passed to log() when logging errors
 
         friend class PiggyBackData;
     };
@@ -244,4 +246,7 @@ namespace mongo {
 
     void setClientId( int id );
     int getClientId();
+
+    extern TicketHolder connTicketHolder;
+
 } // namespace mongo

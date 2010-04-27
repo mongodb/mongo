@@ -148,9 +148,10 @@ namespace mongo {
     class CmdGetCmdLineOpts : Command{
         public:
         CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
-        virtual LockType locktype() { return NONE; }
-        virtual bool adminOnly() { return true; }
-        virtual bool slaveOk() { return true; }
+        void help(stringstream& h) const { h << "get argv"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool slaveOk() const { return true; }
 
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             result.append("argv", argvArray);

@@ -45,6 +45,8 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
+    const int MaxExtentSize = 0x7ff00000;
+
     map<string, unsigned> BackgroundOperation::dbsInProg;
     set<string> BackgroundOperation::nsInProg;
 
@@ -359,7 +361,7 @@ namespace mongo {
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
         massert( 10357 ,  "shutdown in progress", !goingAway );
-        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= 0x7ff00000 );
+        massert( 10358 ,  "bad new extent size", approxSize >= 0 && approxSize <= MaxExtentSize );
         massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header ); // null if file open failed
         int ExtentSize = approxSize <= header->unusedLength ? approxSize : header->unusedLength;
         DiskLoc loc;
@@ -899,13 +901,14 @@ namespace mongo {
                 }
                 assert( !dl.isNull() );
                 BSONObj idxKey = idx.info.obj().getObjectField("key");
+                Ordering ordering = Ordering::make(idxKey);
                 keyUpdates += changes[x].added.size();
                 for ( unsigned i = 0; i < changes[x].added.size(); i++ ) {
                     try {
                         /* we did the dupCheck() above.  so we don't have to worry about it here. */
                         idx.head.btree()->bt_insert(
                                                     idx.head,
-                                                    dl, *changes[x].added[i], idxKey, /*dupsAllowed*/true, idx);
+                                                    dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
                     }
                     catch (AssertionException&) {
                         ss << " exception update index ";
@@ -924,11 +927,19 @@ namespace mongo {
     }
 
     int followupExtentSize(int len, int lastExtentLen) {
+        assert( len < MaxExtentSize );
         int x = initialExtentSize(len);
         int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
         int sz = y > x ? y : x;
+
+        if ( sz < lastExtentLen )
+            sz = lastExtentLen;
+        else if ( sz > MaxExtentSize )
+            sz = MaxExtentSize;
+        
         sz = ((int)sz) & 0xffffff00;
         assert( sz > len );
+        
         return sz;
     }
 
@@ -938,6 +949,7 @@ namespace mongo {
         BSONObjSetDefaultOrder keys;
         idx.getKeysFromObject(obj, keys);
         BSONObj order = idx.keyPattern();
+        Ordering ordering = Ordering::make(order);
         int n = 0;
         for ( BSONObjSetDefaultOrder::iterator i=keys.begin(); i != keys.end(); i++ ) {
             if( ++n == 2 ) { 
@@ -946,7 +958,7 @@ namespace mongo {
             assert( !recordLoc.isNull() );
             try {
                 idx.head.btree()->bt_insert(idx.head, recordLoc,
-                                            *i, order, dupsAllowed, idx);
+                                            *i, ordering, dupsAllowed, idx);
             }
             catch (AssertionException& e) {
                 if( e.code == 10287 && idxNo == d->nIndexes ) { 

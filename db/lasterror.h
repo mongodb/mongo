@@ -19,7 +19,7 @@
 
 #include <boost/thread/tss.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 namespace mongo {
     class BSONObjBuilder;

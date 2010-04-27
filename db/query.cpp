@@ -20,14 +20,14 @@
 #include "query.h"
 #include "pdfile.h"
 #include "jsobjmanipulator.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"
 #include "../util/lruishmap.h"
 #include "json.h"
 #include "repl.h"
-#include "replset.h"
+#include "replpair.h"
 #include "scanandorder.h"
 #include "security.h"
 #include "curop.h"
@@ -660,10 +660,16 @@ namespace mongo {
         BSONObj snapshotHint;
         
         if( logLevel >= 2 )
-            log() << "runQuery: " << ns << jsobj << endl;
+            log() << "query: " << ns << jsobj << endl;
         
         long long nscanned = 0;
-        ss << ns << " ntoreturn:" << pq.getNumToReturn();
+        ss << ns;
+        {
+            // only insert if nonzero. 
+            int n =  pq.getNumToReturn();
+            if( n ) 
+                ss << " ntoreturn:" << n;
+        }
         curop.setQuery(jsobj);
         
         BSONObjBuilder cmdResBuf;
@@ -701,11 +707,8 @@ namespace mongo {
         mongolock lk(false); // read lock
         Client::Context ctx( ns , dbpath , &lk );
 
-        /* we allow queries to SimpleSlave's -- but not to the slave (nonmaster) member of a replica pair 
-           so that queries to a pair are realtime consistent as much as possible.  use setSlaveOk() to 
-           query the nonmaster member of a replica pair.
-        */
-        uassert( 10107 , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
+        replVerifyReadsOk(pq);
+        //uassert( ?? , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
 
         BSONElement hint = useHints ? pq.getHint() : BSONElement();
         bool explain = pq.isExplain();
@@ -755,7 +758,6 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
             
-
         if ( ! explain && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 

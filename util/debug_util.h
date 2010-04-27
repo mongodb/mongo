@@ -39,31 +39,32 @@ namespace mongo {
         char string[400];
     } *OWS;
 
-// for now, running on win32 means development not production --
-// use this to log things just there.
-#if defined(_WIN32)
-#define WIN if( 1 )
-#else
-#define WIN if( 0 )
-#endif
-
 #if defined(_DEBUG)
-#define DEV if( 1 )
+# define MONGO_DEV if( 1 )
 #else
-#define DEV if( 0 )
+# define MONGO_DEV if( 0 )
 #endif
+#define DEV MONGO_DEV
 
-#define DEBUGGING if( 0 )
+#define MONGO_DEBUGGING if( 0 )
+#define DEBUGGING MONGO_DEBUGGING
 
 // The following declare one unique counter per enclosing function.
 // NOTE The implementation double-increments on a match, but we don't really care.
-#define SOMETIMES( occasion, howOften ) for( static unsigned occasion = 0; ++occasion % howOften == 0; )
-#define OCCASIONALLY SOMETIMES( occasionally, 16 )
-#define RARELY SOMETIMES( rarely, 128 )
-#define ONCE for( static bool undone = true; undone; undone = false ) 
+#define MONGO_SOMETIMES( occasion, howOften ) for( static unsigned occasion = 0; ++occasion % howOften == 0; )
+#define SOMETIMES MONGO_SOMETIMES
+
+#define MONGO_OCCASIONALLY SOMETIMES( occasionally, 16 )
+#define OCCASIONALLY MONGO_OCCASIONALLY
+
+#define MONGO_RARELY SOMETIMES( rarely, 128 )
+#define RARELY MONGO_RARELY
+
+#define MONGO_ONCE for( static bool undone = true; undone; undone = false ) 
+#define ONCE MONGO_ONCE
 
 #if defined(_WIN32)
-#define strcasecmp _stricmp
+    inline int strcasecmp(const char* s1, const char* s2) {return _stricmp(s1, s2);}
 #endif
 
     // Sets SIGTRAP handler to launch GDB

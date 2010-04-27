@@ -38,10 +38,9 @@ namespace mongo {
     public:
         BasicDriverHelper( const char * name ) : Command( name ){}
         
-        virtual LockType locktype(){ return NONE; }
-        virtual bool slaveOk(){ return true; }
-        virtual bool slaveOverrideOk(){ return true; }
-        
+        virtual LockType locktype() const { return NONE; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOverrideOk(){ return true; }        
     };
 
     class ObjectIdTest : public BasicDriverHelper {

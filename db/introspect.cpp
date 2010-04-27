@@ -18,7 +18,7 @@
 
 #include "stdafx.h"
 #include "introspect.h"
-#include "../util/builder.h"
+#include "../bson/util/builder.h"
 #include "../util/goodies.h"
 #include "pdfile.h"
 #include "jsobj.h"

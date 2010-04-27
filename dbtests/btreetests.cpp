@@ -76,7 +76,7 @@ namespace BtreeTests {
             bt()->dumpTree( dl(), order() );
         }
         void insert( BSONObj &key ) {
-            bt()->bt_insert( dl(), recordLoc(), key, order(), true, id(), true );
+            bt()->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
         }
         void unindex( BSONObj &key ) {
             bt()->unindex( dl(), id(), key, recordLoc() );
@@ -93,7 +93,7 @@ namespace BtreeTests {
             int pos;
             bool found;
             DiskLoc location =
-                bt()->locate( id(), dl(), key, order(), pos, found, recordLoc(), direction );
+                bt()->locate( id(), dl(), key, Ordering::make(order()), pos, found, recordLoc(), direction );
             ASSERT_EQUALS( expectedFound, found );
             ASSERT( location == expectedLocation );
             ASSERT_EQUALS( expectedPos, pos );

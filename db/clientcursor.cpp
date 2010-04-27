@@ -129,7 +129,7 @@ namespace mongo {
 
         while ( 1 ) {
             toAdvance.push_back(j->second);
-            WIN assert( j->first == dl );
+            DEV assert( j->first == dl );
             ++j;
             if ( j == stop )
                 break;
@@ -269,7 +269,7 @@ namespace mongo {
         
         BSONElement e = last.obj()["ts"];
         if ( e.type() == Date || e.type() == Timestamp )
-            _slaveReadTill = e.optime();
+            _slaveReadTill = e._opTime();
     }
     
     void ClientCursor::updateSlaveLocation( CurOp& curop ){
@@ -284,12 +284,12 @@ namespace mongo {
     // Alternatively, make this command admin-only?
     class CmdCursorInfo : public Command {
     public:
-        CmdCursorInfo() : Command( "cursorInfo" ) {}
-        virtual bool slaveOk() { return true; }
+        CmdCursorInfo() : Command( "cursorInfo", true ) {}
+        virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }";
         }
-        virtual LockType locktype(){ return NONE; }
+        virtual LockType locktype() const { return NONE; }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             recursive_scoped_lock lock(ClientCursor::ccmutex);
             result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
@@ -297,5 +297,23 @@ namespace mongo {
             return true;
         }
     } cmdCursorInfo;
+    
+    void ClientCursorMonitor::run(){
+        Client::initThread("clientcursormon");
+        Client& client = cc();
+        
+        unsigned old = curTimeMillis();
+
+        while ( ! inShutdown() ){
+            unsigned now = curTimeMillis();
+            ClientCursor::idleTimeReport( now - old );
+            old = now;
+            sleepsecs(4);
+        }
+
+        client.shutdown();
+    }
+
+    ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo

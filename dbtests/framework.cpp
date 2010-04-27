@@ -20,7 +20,7 @@
 #include <boost/program_options.hpp>
 
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 #include "framework.h"
 #include "../util/file_allocator.h"
@@ -53,7 +53,7 @@ namespace mongo {
                 ss << result;
 
                 for ( list<string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ){
-                    ss << "\t" << *i << "\n";
+                    ss << "\t" << *i << '\n';
                 }
                 
                 return ss.str();
@@ -327,22 +327,6 @@ namespace mongo {
 
         void fail( const char * exp , const char * file , unsigned line ){
             assert(0);
-        }
-
-        string demangleName( const type_info& typeinfo ){
-#ifdef _WIN32
-            return typeinfo.name();
-#else
-            int status;
-
-            char * niceName = abi::__cxa_demangle(typeinfo.name(), 0, 0, &status);
-            if ( ! niceName )
-                return typeinfo.name();
-
-            string s = niceName;
-            free(niceName);
-            return s;
-#endif
         }
 
         MyAssertionException * MyAsserts::getBase(){

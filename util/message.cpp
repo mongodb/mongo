@@ -94,7 +94,7 @@ namespace mongo {
 
             int sock = ::socket(me.getType(), SOCK_STREAM, 0);
             if ( sock == INVALID_SOCKET ) {
-                log() << "ERROR: listen(): invalid socket? " << OUTPUT_ERRNO << endl;
+                log() << "ERROR: listen(): invalid socket? " << errnoWithDescription() << endl;
                 return;
             }
 
@@ -113,7 +113,7 @@ namespace mongo {
             
             if ( ::bind(sock, me.raw(), me.addressSize) != 0 ) {
                 int x = errno;
-                log() << "listen(): bind() failed " << OUTPUT_ERRNOX(x) << " for socket: " << me.toString() << endl;
+                log() << "listen(): bind() failed " << errnoWithDescription(x) << " for socket: " << me.toString() << endl;
                 if ( x == EADDRINUSE )
                     log() << "  addr already in use" << endl;
                 closesocket(sock);
@@ -121,7 +121,7 @@ namespace mongo {
             }
 
             if ( ::listen(sock, 128) != 0 ) {
-                log() << "listen(): listen() failed " << OUTPUT_ERRNO << endl;
+                log() << "listen(): listen() failed " << errnoWithDescription() << endl;
                 closesocket(sock);
                 return;
             }
@@ -149,7 +149,7 @@ namespace mongo {
             }
             else if (ret < 0){
                 if ( ! inShutdown() )
-                    log() << "select() failure: ret=" << ret << " " << OUTPUT_ERRNO << endl;
+                    log() << "select() failure: ret=" << ret << " " << errnoWithDescription() << endl;
                 return;
             }
 
@@ -167,9 +167,9 @@ namespace mongo {
                     } if ( x == 0 && inShutdown() ){
                         return;   // socket closed
                     }
-                    log() << "Listener: accept() returns " << s << " " << OUTPUT_ERRNOX(x) << endl;
+                    log() << "Listener: accept() returns " << s << " " << errnoWithDescription(x) << endl;
                     continue;
-                }
+                } 
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
                 if ( _logConnect && ! cmdLine.quiet ) 
@@ -259,10 +259,12 @@ namespace mongo {
     }
 
     MessagingPort::MessagingPort(int _sock, const SockAddr& _far) : sock(_sock), piggyBackData(0), farEnd(_far), _timeout() {
+        _logLevel = 0;
         ports.insert(this);
     }
 
-    MessagingPort::MessagingPort( int timeout ) {
+    MessagingPort::MessagingPort( int timeout, int ll ) {
+        _logLevel = ll;
         ports.insert(this);
         sock = -1;
         piggyBackData = 0;
@@ -299,7 +301,7 @@ namespace mongo {
 
         sock = socket(farEnd.getType(), SOCK_STREAM, 0);
         if ( sock == INVALID_SOCKET ) {
-            log() << "ERROR: connect(): invalid socket? " << OUTPUT_ERRNO << endl;
+            log(_logLevel) << "ERROR: connect(): invalid socket? " << errnoWithDescription() << endl;
             return false;
         }
 
@@ -359,7 +361,7 @@ namespace mongo {
                 
                 if ( len == 542393671 ){
                     // an http GET
-                    log() << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
+                    log(_logLevel) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
                     string msg = "You are trying to access MongoDB on the native driver port. For http diagnostic access, add 1000 to the port number\n";
                     stringstream ss;
                     ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
@@ -367,7 +369,7 @@ namespace mongo {
                     send( s.c_str(), s.size(), "http" );
                     return false;
                 }
-                log() << "bad recv() len: " << len << '\n';
+                log(_logLevel) << "bad recv() len: " << len << '\n';
                 return false;
             }
             
@@ -456,11 +458,11 @@ namespace mongo {
             int ret = ::send( sock , data , len , portSendFlags );
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
-                    log() << "MessagingPort " << context << " send() " << OUTPUT_ERRNO << ' ' << farEnd.toString() << endl;
+                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
                     throw SocketException();                    
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
-                        log() << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
                         throw SocketException();                        
                     }
                 }
@@ -476,22 +478,22 @@ namespace mongo {
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
             if ( ret == 0 ) {
-                DEV out() << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
+                log(3) << "MessagingPort recv() conn closed? " << farEnd.toString() << endl;
                 throw SocketException();
             }
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {                
-                    log() << "MessagingPort recv() " << OUTPUT_ERRNO << " " << farEnd.toString()<<endl;
+                    log(_logLevel) << "MessagingPort recv() " << errnoWithDescription() << " " << farEnd.toString()<<endl;
                     throw SocketException();
                 } else {
                     if ( !serverAlive( farEnd.toString() ) ) {
-                        log() << "MessagingPort recv() remote dead " << farEnd.toString() << endl;
+                        log(_logLevel) << "MessagingPort recv() remote dead " << farEnd.toString() << endl;
                         throw SocketException();                        
                     }
                 }
             } else {
                 if ( len <= 4 && ret != len )
-                    log() << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
+                    log(_logLevel) << "MessagingPort recv() got " << ret << " bytes wanted len=" << len << endl;
                 assert( ret <= len );
                 len -= ret;
                 buf += ret;

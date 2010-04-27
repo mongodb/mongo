@@ -34,6 +34,8 @@
 
 #include "../util/queue.h"
 
+#include "shard.h"
+
 using namespace std;
 
 namespace mongo {
@@ -61,7 +63,7 @@ namespace mongo {
             return e._numberLong();
 
         
-        errmsg = "version is not a numberic type";
+        errmsg = "version is not a numeric type";
         return 0;
     }
 
@@ -69,18 +71,19 @@ namespace mongo {
     public:
         MongodShardCommand( const char * n ) : Command( n ){
         }
-        virtual bool slaveOk(){
+        virtual bool slaveOk() const {
             return false;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
     };
     
     class WriteBackCommand : public MongodShardCommand {
     public:
-        virtual LockType locktype(){ return NONE; } 
+        virtual LockType locktype() const { return NONE; } 
         WriteBackCommand() : MongodShardCommand( "writebacklisten" ){}
+        void help(stringstream& h) const { h<<"internal"; }
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
             BSONElement e = cmdObj.firstElement();
@@ -113,7 +116,7 @@ namespace mongo {
             help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
         }
         
-        virtual LockType locktype(){ return WRITE; } // TODO: figure out how to make this not need to lock
+        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
  
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             
@@ -248,7 +251,7 @@ namespace mongo {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
         
-        virtual LockType locktype(){ return WRITE; } // TODO: figure out how to make this not need to lock
+        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
 
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string ns = cmdObj["getShardVersion"].valuestrsafe();
@@ -277,7 +280,7 @@ namespace mongo {
             help << "should not be calling this directly" << endl;
         }
 
-        virtual LockType locktype(){ return WRITE; } 
+        virtual LockType locktype() const { return WRITE; } 
         
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // so i have to start clone, tell caller its ok to make change
@@ -317,7 +320,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
                 
-                ScopedDbConnection conn( to );
+                ShardConnection conn( to );
                 ok = conn->runCommand( "admin" , 
                                             BSON( "startCloneCollection" << ns <<
                                                   "from" << from <<
@@ -348,7 +351,7 @@ namespace mongo {
             help << "should not be calling this directly" << endl;
         }
 
-        virtual LockType locktype(){ return WRITE; } 
+        virtual LockType locktype() const { return WRITE; } 
         
         bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // see MoveShardStartCommand::run
@@ -398,7 +401,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
                 
-                ScopedDbConnection conn( to );
+                ShardConnection conn( to );
                 ok = conn->runCommand( "admin" , 
                                        BSON( "finishCloneCollection" << finishToken ) ,
                                        res );

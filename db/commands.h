@@ -27,14 +27,15 @@ namespace mongo {
     class BufBuilder;
     class Client;
 
-// db "commands" (sent via db.$cmd.findOne(...))
-// subclass to make a command.
+    /** mongodb "commands" (sent via db.$cmd.findOne(...))
+        subclass to make a command.  define a singleton object for it.
+        */
     class Command {
     public:
         
         enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
 
-        string name;
+        const string name;
 
         /* run the given command
            implement this...
@@ -51,12 +52,14 @@ namespace mongo {
            if NONE, can't use Client::Context setup
                     use with caution
 		 */
-        virtual LockType locktype() = 0;
+        virtual LockType locktype() const = 0;
 
         /* Return true if only the admin ns has privileges to run this command. */
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return false;
         }
+
+        void htmlHelp(stringstream&) const;
 
         /* Like adminOnly, but even stricter: we must either be authenticated for admin db, 
            or, if running without auth, on the local interface.
@@ -68,7 +71,7 @@ namespace mongo {
         /* Return true if slaves of a replication pair are allowed to execute the command
            (the command directly from a client -- if fromRepl, always allowed).
         */
-        virtual bool slaveOk() = 0;
+        virtual bool slaveOk() const = 0;
         
         /* Return true if the client force a command to be run on a slave by
            turning on the 'slaveok' option in the command query.
@@ -93,7 +96,11 @@ namespace mongo {
         */
         virtual bool requiresAuth() { return true; }
 
-        Command(const char *_name);
+        /** @param webUI expose the command in the web ui as localhost:28017/<name> 
+            @param oldName an optional old, deprecated name for the command
+        */
+        Command(const char *_name, bool webUI = false, const char *oldName = 0);
+
         virtual ~Command() {}
 
     protected:
@@ -106,8 +113,12 @@ namespace mongo {
         }
 
         static map<string,Command*> * _commands;
+        static map<string,Command*> * _commandsByBestName;
+        static map<string,Command*> * _webCommands;
 
     public:
+        static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
+        static const map<string,Command*>* webCommands() { return _webCommands; }
         static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );

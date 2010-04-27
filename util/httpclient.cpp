@@ -19,7 +19,7 @@
 #include "httpclient.h"
 #include "sock.h"
 #include "message.h"
-#include "builder.h"
+#include "../bson/util/builder.h"
 
 namespace mongo {
 
@@ -116,13 +116,35 @@ namespace mongo {
         }
 
         if ( result ){
-            result->_code = rc;
-            result->_entireResponse = sb.str();
+            result->_init( rc , sb.str() );
         }
 
         return rc;
     }
 
+    void HttpClient::Result::_init( int code , string entire ){
+        _code = code;
+        _entireResponse = entire;
+
+        while ( true ){
+            size_t i = entire.find( '\n' );
+            if ( i == string::npos ){
+                // invalid
+                break;
+            }
+            
+            string h = entire.substr( 0 , i );
+            entire = entire.substr( i + 1 );
+            
+            if ( h.size() && h[h.size()-1] == '\r' )
+                h = h.substr( 0 , h.size() - 1 );
+
+            if ( h.size() == 0 )
+                break;
+        }
+        
+        _body = entire;
+    }
 
     
 }

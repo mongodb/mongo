@@ -221,6 +221,8 @@ namespace BasicTests {
         
     };
 
+/* [dm] this test doesn't apply anymore as ussert is no longer a macro
+
     class AssertTests {
     public:
 
@@ -236,7 +238,9 @@ namespace BasicTests {
         }
         void run(){
             uassert( -1 , foo() , 1 );
-            ASSERT_EQUALS( 0 , x );
+            if( x != 0 ) {
+                ASSERT_EQUALS( 0 , x );
+            }
             try {
                 uassert( -1 , foo() , 0 );
             }
@@ -244,6 +248,7 @@ namespace BasicTests {
             ASSERT_EQUALS( 1 , x );
         }
     };
+*/
 
     namespace ArrayTests {
         class basic1 {
@@ -348,7 +353,7 @@ namespace BasicTests {
             add< stringbuildertests::reset2 >();
 
             add< sleeptest >();
-            add< AssertTests >();
+//            add< AssertTests >();
             
             add< ArrayTests::basic1 >();
             add< LexNumCmp >();

@@ -20,7 +20,7 @@
 
 #include <boost/thread/tss.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 
 #include "nonce.h"
 #include "concurrency.h"

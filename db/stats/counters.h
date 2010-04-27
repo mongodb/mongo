@@ -15,6 +15,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
 
 #include "../../stdafx.h"
 #include "../jsobj.h"
@@ -118,4 +119,14 @@ namespace mongo {
     };
 
     extern FlushCounters globalFlushCounters;
+
+
+    class GenericCounter {
+    public:
+        void hit( const string& name , int count=0 );
+        BSONObj getObj();
+    private:
+        map<string,long long> _counts; // TODO: replace with thread safe map
+        mongo::mutex _mutex;
+    };
 }

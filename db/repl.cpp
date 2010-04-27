@@ -46,6 +46,7 @@
 #include "security.h"
 #include "cmdline.h"
 #include "repl_block.h"
+#include "repl/replset.h"
 
 namespace mongo {
     
@@ -74,7 +75,7 @@ namespace mongo {
     
 } // namespace mongo
 
-#include "replset.h"
+#include "replpair.h"
 
 namespace mongo {
 
@@ -132,17 +133,18 @@ namespace mongo {
 
     class CmdReplacePeer : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
-        CmdReplacePeer() : Command("replacepeer") { }
+        virtual LockType locktype() const { return WRITE; }
+        void help(stringstream&h) const { h << "replace a node in a replica pair"; }
+        CmdReplacePeer() : Command("replacePeer", false, "replacepeer") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( replPair == 0 ) {
                 errmsg = "not paired";
@@ -193,16 +195,17 @@ namespace mongo {
 
     class CmdForceDead : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;   
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual void help(stringstream& h) const { h << "internal"; }
+        virtual LockType locktype() const { return WRITE; }
         CmdForceDead() : Command("forcedead") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             replAllDead = "replication forced to stop by 'forcedead' command";
@@ -215,16 +218,17 @@ namespace mongo {
     /* operator requested resynchronization of replication (on the slave).  { resync : 1 } */
     class CmdResync : public Command {
     public:
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
         virtual bool logTheOp() {
             return false;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
+        void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj.getBoolField( "force" ) ) {
@@ -271,7 +275,7 @@ namespace mongo {
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ){
         
         if ( replAllDead ) {
-            result.append("ismaster", 0.0);
+            result.append("ismaster", 0);
             if( authed ) { 
                 if ( replPair )
                     result.append("remote", replPair->remote);
@@ -336,34 +340,55 @@ namespace mongo {
         }
     }
 
-    class CmdIsMaster : public Command {
+    class CmdIsMasterOld : public Command {
     public:
         virtual bool requiresAuth() { return false; }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype(){ return NONE; }
-        CmdIsMaster() : Command("ismaster") { }
+        virtual void help( stringstream &help ) const {
+            help << "Check if this server is primary\n";
+            help << "{ isMaster : 1 }";
+        }
+        virtual LockType locktype() const { return NONE; }
+        CmdIsMasterOld(const char * name="ismaster") : Command(name, name=="isMaster") { }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
 			   authenticated.
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
 			   one is not authenticated for admin db to be safe.
 			*/
+
+            if( replSet ) {
+                if( theReplSet == 0 ) { 
+                    result.append("ismaster", 0);
+                    result.append("ok", false);
+                    result.append("msg", "replSet still trying to initialize");
+                    result.append("info", ReplSet::startupStatusMsg);
+                    return true;
+                }
+                theReplSet->fillIsMaster(result);
+                return true;
+            }
             
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
             appendReplicationInfo( result , authed );
             return true;
         }
+    } cmdismasterold;
+    /** Camelcase preferred for everything in MongoDB.  But we support old form for legacy reasons above. */
+    class CmdIsMaster : public CmdIsMasterOld { 
+    public:
+        CmdIsMaster() : CmdIsMasterOld("isMaster") { }
     } cmdismaster;
 
     class CmdIsInitialSyncComplete : public Command {
     public:
         virtual bool requiresAuth() { return false; }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         CmdIsInitialSyncComplete() : Command( "isinitialsynccomplete" ) {}
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             result.appendBool( "initialsynccomplete", getInitialSyncCompleted() );
@@ -391,13 +416,13 @@ namespace mongo {
     class CmdNegotiateMaster : public Command {
     public:
         CmdNegotiateMaster() : Command("negotiatemaster") { }
-        virtual bool slaveOk() {
+        virtual bool slaveOk() const {
             return true;
         }
-        virtual bool adminOnly() {
+        virtual bool adminOnly() const {
             return true;
         }
-        virtual LockType locktype(){ return WRITE; }
+        virtual LockType locktype() const { return WRITE; }
         virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             if ( replPair == 0 ) {
                 massert( 10383 ,  "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
@@ -1708,9 +1733,9 @@ namespace mongo {
         }
     }
 
-    bool startReplSets();
     void startReplication() {
-        if( startReplSets() ) 
+        /* if we are going to be a replica set, we aren't doing other forms of replication. */
+        if( !cmdLine.replSet.empty() )
             return;
 
         /* this was just to see if anything locks for longer than it should -- we need to be careful

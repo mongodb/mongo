@@ -27,8 +27,18 @@
 #include "../client/dbclient.h"
 #include "../client/model.h"
 #include "shardkey.h"
+#include "shard.h"
 
 namespace mongo {
+
+    struct ShardNS {
+        static string database;
+        static string shard;
+        static string chunk;
+        static string mongos;
+        static string settings;
+    };
+
     
     class Grid;
     class ConfigServer;
@@ -76,13 +86,12 @@ namespace mongo {
         
         /**
          * @return the correct for shard for the ns
-         * if the namespace is sharded, will return an empty string
+         * if the namespace is sharded, will return NULL
          */
-        string getShard( const string& ns );
+        const Shard& getShard( const string& ns );
         
-        string getPrimary(){
-            if ( _primary.size() == 0 )
-                throw UserException( 8041 , (string)"no primary shard configured for db: " + _name );
+        const Shard& getPrimary(){
+            uassert( 8041 , (string)"no primary shard configured for db: " + _name , _primary.ok() );
             return _primary;
         }
         
@@ -116,7 +125,7 @@ namespace mongo {
         bool removeSharding( const string& ns );
 
         string _name; // e.g. "alleyinsider"
-        string _primary; // e.g. localhost , mongo.foo.com:9999
+        Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
         
         map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
@@ -162,11 +171,11 @@ namespace mongo {
 
         bool ok(){
             // TODO: check can connect
-            return _primary.size() > 0;
+            return _primary.ok();
         }
         
         virtual string modelServer(){
-            uassert( 10190 ,  "ConfigServer not setup" , _primary.size() );
+            uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
             return _primary;
         }
         
@@ -186,8 +195,15 @@ namespace mongo {
         /**
          * @return 0 = ok, otherwise error #
          */
-        int checkConfigVersion();
+        int checkConfigVersion( bool upgrade );
         
+        /**
+         * log a change to config.changes 
+         * @param what e.g. "split" , "migrate"
+         * @param msg any more info
+         */
+        void logChange( const string& what , const string& ns , const BSONObj& detail = BSONObj() );
+
         static int VERSION;
         
     private:

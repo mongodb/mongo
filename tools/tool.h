@@ -35,7 +35,8 @@ namespace mongo {
 
     class Tool {
     public:
-        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , string defaultCollection="");
+        Tool( string name , bool localDBAllowed=true, string defaultDB="test" , 
+              string defaultCollection="", bool usesstdout=true );
         virtual ~Tool();
 
         int main( int argc , char ** argv );
@@ -71,6 +72,8 @@ namespace mongo {
             }
             return _db + "." + _coll;
         }
+        
+        virtual void preSetup(){}
 
         virtual int run() = 0;
 
@@ -90,6 +93,9 @@ namespace mongo {
 
         string _username;
         string _password;
+        
+        bool _usesstdout;
+        bool _noconnection;
 
         void addFieldOptions();
         void needFields();
@@ -98,8 +104,10 @@ namespace mongo {
         BSONObj _fieldsObj;
 
         
-    private:
         string _host;
+
+    protected:
+
         mongo::DBClientBase * _conn;
         bool _paired;
 

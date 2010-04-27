@@ -153,7 +153,7 @@ namespace ClientTests {
             ASSERT( db.runCommand( "unittests", BSON( "collstats" << "clienttests.create" ), info ) );
         }
     };
-    
+
     class All : public Suite {
     public:
         All() : Suite( "client" ){

@@ -20,7 +20,7 @@
 
 #include "namespace.h"
 #include "client.h"
-#include "../util/atomic_int.h"
+#include "../bson/util/atomic_int.h"
 #include "db.h"
 
 namespace mongo { 

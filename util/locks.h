@@ -25,7 +25,7 @@
 #if BOOST_VERSION >= 103500
 #include <boost/thread/shared_mutex.hpp>
 #undef assert
-#define assert xassert
+#define assert MONGO_assert
 #else
 #error need boost >= 1.35 for windows
 #endif
@@ -65,6 +65,14 @@ namespace mongo {
             until += boost::posix_time::milliseconds(millis);
             return _m.timed_lock_shared( until );
         }
+
+        bool lock_try( int millis ){
+            boost::system_time until = get_system_time();
+            until += boost::posix_time::milliseconds(millis);
+            return _m.timed_lock( until );
+        }
+
+
     };
 #else
     class RWLock {
@@ -83,7 +91,9 @@ namespace mongo {
         }
         
         ~RWLock(){
-            check( pthread_rwlock_destroy( &_lock ) );
+            if ( ! __destroyingStatics ){
+                check( pthread_rwlock_destroy( &_lock ) );
+            }
         }
 
         void lock(){
@@ -100,23 +110,62 @@ namespace mongo {
         void unlock_shared(){
             check( pthread_rwlock_unlock( &_lock ) );
         }
-
+        
         bool lock_shared_try( int millis ){
-            while ( millis-- ){
-                int x = pthread_rwlock_tryrdlock( &_lock );
-                if ( x == 0 )
-                    return true;
+            return _try( millis , false );
+        }
 
+        bool lock_try( int millis ){
+            return _try( millis , true );
+        }
+
+        bool _try( int millis , bool write ){
+            while ( true ) {
+                int x = write ? 
+                    pthread_rwlock_trywrlock( &_lock ) : 
+                    pthread_rwlock_tryrdlock( &_lock );
+                
+                if ( x <= 0 )
+                    return true;
+                
+                if ( millis-- <= 0 )
+                    return false;
+                
                 if ( x == EBUSY ){
                     sleepmillis(1);
                     continue;
                 }
                 check(x);
-            }
+            } 
+            
             return false;
         }
+
     };
     
 
 #endif
+
+    struct rwlock {
+        rwlock( const RWLock& lock , bool write , bool alreadyHaveLock = false )
+            : _lock( (RWLock&)lock ) , _write( write ){
+
+            if ( ! alreadyHaveLock ){
+                if ( _write )
+                    _lock.lock();
+                else
+                    _lock.lock_shared();
+            }
+        }
+
+        ~rwlock(){
+            if ( _write )
+                _lock.unlock();
+            else
+                _lock.unlock_shared();
+        }
+        
+        RWLock& _lock;
+        bool _write;
+    };
 }

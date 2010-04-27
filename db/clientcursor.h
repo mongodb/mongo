@@ -28,6 +28,7 @@
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/message.h"
+#include "../util/background.h"
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
@@ -286,5 +287,11 @@ public:
         static void aboutToDelete(const DiskLoc& dl);
     };
 
+    class ClientCursorMonitor : public BackgroundJob {
+    public:
+        void run();
+    };
+
+    extern ClientCursorMonitor clientCursorMonitor;
     
 } // namespace mongo

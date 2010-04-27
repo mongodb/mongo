@@ -115,7 +115,6 @@ namespace mongo {
     };
     extern Nullstream nullstream;
     
-#define LOGIT { ss << x; return *this; }
 
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
@@ -134,20 +133,23 @@ namespace mongo {
             }
             ss.str("");
         }
-        Logstream& operator<<(const char *x) LOGIT
-        Logstream& operator<<(char *x) LOGIT
-        Logstream& operator<<(char x) LOGIT
-        Logstream& operator<<(int x) LOGIT
-        Logstream& operator<<(ExitCode x) LOGIT
-        Logstream& operator<<(long x) LOGIT
-        Logstream& operator<<(unsigned long x) LOGIT
-        Logstream& operator<<(unsigned x) LOGIT
-        Logstream& operator<<(double x) LOGIT
-        Logstream& operator<<(void *x) LOGIT
-        Logstream& operator<<(const void *x) LOGIT
-        Logstream& operator<<(long long x) LOGIT
-        Logstream& operator<<(unsigned long long x) LOGIT
-        Logstream& operator<<(bool x) LOGIT
+
+        /** note these are virtual */
+        Logstream& operator<<(const char *x) { ss << x; return *this; }
+        Logstream& operator<<(char *x)       { ss << x; return *this; }
+        Logstream& operator<<(char x)        { ss << x; return *this; }
+        Logstream& operator<<(int x)         { ss << x; return *this; }
+        Logstream& operator<<(ExitCode x)    { ss << x; return *this; }
+        Logstream& operator<<(long x)          { ss << x; return *this; }
+        Logstream& operator<<(unsigned long x) { ss << x; return *this; }
+        Logstream& operator<<(unsigned x)      { ss << x; return *this; }
+        Logstream& operator<<(double x)        { ss << x; return *this; }
+        Logstream& operator<<(void *x)         { ss << x; return *this; }
+        Logstream& operator<<(const void *x)   { ss << x; return *this; }
+        Logstream& operator<<(long long x)     { ss << x; return *this; }
+        Logstream& operator<<(unsigned long long x) { ss << x; return *this; }
+        Logstream& operator<<(bool x)               { ss << x; return *this; }
+
         Logstream& operator<<(const LazyString& x) {
             ss << x.val();
             return *this;
@@ -242,9 +244,15 @@ namespace mongo {
     void initLogging( const string& logpath , bool append );
     void rotateLogs( int signal = 0 );
 
-#define OUTPUT_ERRNOX(x) "errno:" << x << " " << strerror(x) 
-#define OUTPUT_ERRNO OUTPUT_ERRNOX(errno)
+    inline string errnoWithDescription(int x = errno) {
+        stringstream s;
+        s << "errno:" << x << ' ' << strerror(x);
+        return s.str();
+    }
 
-    string errnostring( const char * prefix = 0 );
+    /** output the error # and error message with prefix.  
+        handy for use as parm in uassert/massert.
+        */
+    string errnoWithPrefix( const char * prefix = 0 );
 
 } // namespace mongo

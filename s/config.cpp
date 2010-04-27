@@ -30,7 +30,14 @@
 
 namespace mongo {
 
-    int ConfigServer::VERSION = 2;
+    int ConfigServer::VERSION = 3;
+    Shard Shard::EMPTY;
+    
+    string ShardNS::database = "config.databases";
+    string ShardNS::chunk = "config.chunks";
+    string ShardNS::shard = "config.shards";
+    string ShardNS::mongos = "config.mongos";
+    string ShardNS::settings = "config.settings";
 
     /* --- DBConfig --- */
 
@@ -44,11 +51,11 @@ namespace mongo {
         return _sharded.find( ns ) != _sharded.end();
     }
 
-    string DBConfig::getShard( const string& ns ){
+    const Shard& DBConfig::getShard( const string& ns ){
         if ( isSharded( ns ) )
-            return "";
+            return Shard::EMPTY;
         
-        uassert( 10178 ,  "no primary!" , _primary.size() );
+        uassert( 10178 ,  "no primary!" , _primary.ok() );
         return _primary;
     }
     
@@ -111,7 +118,7 @@ namespace mongo {
     }
 
     void DBConfig::serialize(BSONObjBuilder& to){
-        to.append("name", _name);
+        to.append("_id", _name);
         to.appendBool("partitioned", _shardingEnabled );
         to.append("primary", _primary );
         
@@ -128,7 +135,7 @@ namespace mongo {
     }
     
     void DBConfig::unserialize(const BSONObj& from){
-        _name = from.getStringField("name");
+        _name = from.getStringField("_id");
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
 
         _shardingEnabled = from.getBoolField("partitioned");
@@ -162,7 +169,7 @@ namespace mongo {
     
     bool DBConfig::doload(){
         BSONObjBuilder b;
-        b.append("name", _name.c_str());
+        b.append("_id", _name.c_str());
         BSONObj q = b.done();
         return load(q);
     }
@@ -207,7 +214,7 @@ namespace mongo {
         
         // 4
         {
-            ScopedDbConnection conn( _primary );
+            ShardConnection conn( _primary );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -219,7 +226,7 @@ namespace mongo {
         // 5
         for ( set<string>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
             string s = *i;
-            ScopedDbConnection conn( s );
+            ShardConnection conn( s );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -263,7 +270,7 @@ namespace mongo {
     /* --- Grid --- */
     
     string Grid::pickShardForNewDB(){
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
         
@@ -283,7 +290,7 @@ namespace mongo {
     }
 
     bool Grid::knowAboutShard( string name ) const{
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
         return ! shard.isEmpty();
@@ -314,7 +321,7 @@ namespace mongo {
                     else
                         cc->_primary = pickShardForNewDB();
                     
-                    if ( cc->_primary.size() ){
+                    if ( cc->_primary.ok() ){
                         cc->save();
                         log() << "\t put [" << database << "] on: " << cc->_primary << endl;
                     }
@@ -341,7 +348,7 @@ namespace mongo {
     }
 
     unsigned long long Grid::getNextOpTime() const {
-        ScopedDbConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() );
         
         BSONObj result;
         massert( 10421 ,  "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
@@ -411,21 +418,21 @@ namespace mongo {
     
     bool ConfigServer::allUp( string& errmsg ){
         try {
-            ScopedDbConnection conn( _primary );
+            ShardConnection conn( _primary );
             conn->getLastError();
             conn.done();
             return true;
         }
         catch ( DBException& ){
             log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
-            errmsg = _primary + " seems down";
+            errmsg = (string)_primary + " seems down";
             return false;
         }
         
     }
     
     int ConfigServer::dbConfigVersion(){
-        ScopedDbConnection conn( _primary );
+        ShardConnection conn( _primary );
         int version = dbConfigVersion( conn.conn() );
         conn.done();
         return version;
@@ -440,7 +447,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count( "config.shard" ) || conn.count( "config.databases" ) ){
+            if ( conn.count( ShardNS::shard ) || conn.count( ShardNS::database ) ){
                 version = 1;
             }
         }
@@ -448,29 +455,11 @@ namespace mongo {
         return version;
     }
     
-    int ConfigServer::checkConfigVersion(){
-        int cur = dbConfigVersion();
-        if ( cur == VERSION )
-            return 0;
-        
-        if ( cur == 0 ){
-            ScopedDbConnection conn( _primary );
-            conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
-            pool.flush();
-            assert( VERSION == dbConfigVersion( conn.conn() ) );
-            conn.done();
-            return 0;
-        }
-
-        log() << "don't know how to upgrade " << cur << " to " << VERSION << endl;
-        return -8;
-    }
-
     void ConfigServer::reloadSettings(){
         set<string> got;
         
-        ScopedDbConnection conn( _primary );
-        auto_ptr<DBClientCursor> c = conn->query( "config.settings" , BSONObj() );
+        ShardConnection conn( _primary );
+        auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
         while ( c->more() ){
             BSONObj o = c->next();
             string name = o["_id"].valuestrsafe();
@@ -479,15 +468,23 @@ namespace mongo {
                 log(1) << "MaxChunkSize: " << o["value"] << endl;
                 Chunk::MaxChunkSize = o["value"].numberInt() * 1024 * 1024;
             }
+            else if ( name == "balancer" ){
+                // ones we ignore here
+            }
             else {
                 log() << "warning: unknown setting [" << name << "]" << endl;
             }
         }
 
         if ( ! got.count( "chunksize" ) ){
-            conn->insert( "config.settings" , BSON( "_id" << "chunksize"  <<
+            conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
                                                     "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
         }
+        
+        
+        // indexes
+        conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
+        conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
 
         conn.done();
     }
@@ -508,6 +505,29 @@ namespace mongo {
         return name;
     }
 
+    void ConfigServer::logChange( const string& what , const string& ns , const BSONObj& detail ){
+        static bool createdCapped = false;
+        static AtomicUInt num;
+        
+        ShardConnection conn( _primary );
+        
+        if ( ! createdCapped ){
+            conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+            createdCapped = true;
+        }
+     
+        stringstream id;
+        id << ourHostname << "-" << terseCurrentTime() << "-" << num++;
+
+        conn->insert( "config.changelog" , BSON( "_id" << id.str() << 
+                                                 "server" << ourHostname <<
+                                                 "time" << DATENOW <<
+                                                 "what" << what <<
+                                                 "ns" << ns << 
+                                                 "details" << detail ) );
+        conn.done();
+    }
+
     ConfigServer configServer;    
     Grid grid;
 
@@ -525,7 +545,7 @@ namespace mongo {
                 return;
             
             log() << "DBConfig serialization broken\n" 
-                  << "in  : " << o.toString()  << "\n"
+                  << "in  : " << o.toString()  << '\n'
                   << "out : " << out.toString() 
                   << endl;
             assert(0);
@@ -533,7 +553,7 @@ namespace mongo {
 
         void a(){
             BSONObjBuilder b;
-            b << "name" << "abc";
+            b << "_id" << "abc";
             b.appendBool( "partitioned" , true );
             b << "primary" << "myserver";
             
@@ -543,7 +563,7 @@ namespace mongo {
 
         void b(){
             BSONObjBuilder b;
-            b << "name" << "abc";
+            b << "_id" << "abc";
             b.appendBool( "partitioned" , true );
             b << "primary" << "myserver";
             

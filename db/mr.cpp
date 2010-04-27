@@ -155,10 +155,10 @@ namespace mongo {
                 }
              
                 { // code
-                    mapCode = cmdObj["map"].ascode();
-                    reduceCode = cmdObj["reduce"].ascode();
+                    mapCode = cmdObj["map"]._asCode();
+                    reduceCode = cmdObj["reduce"]._asCode();
                     if ( cmdObj["finalize"].type() ){
-                        finalizeCode = cmdObj["finalize"].ascode();
+                        finalizeCode = cmdObj["finalize"]._asCode();
                     }
                     checkCodeWScope( "map" , cmdObj );
                     checkCodeWScope( "reduce" , cmdObj );
@@ -407,13 +407,15 @@ namespace mongo {
 
         class MapReduceCommand : public Command {
         public:
-            MapReduceCommand() : Command("mapreduce"){}
-            virtual bool slaveOk() { return true; }
+            MapReduceCommand() : Command("mapReduce", false, "mapreduce"){}
+            virtual bool slaveOk() const { return true; }
         
             virtual void help( stringstream &help ) const {
-                help << "see http://www.mongodb.org/display/DOCS/MapReduce";
+                help << "Run a map/reduce operation on the server.\n";
+                help << "Note this is used for aggregation, not querying, in MongoDB.\n";
+                help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
-            virtual LockType locktype(){ return NONE; } 
+            virtual LockType locktype() const { return NONE; } 
             bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
@@ -618,9 +620,9 @@ namespace mongo {
         class MapReduceFinishCommand : public Command {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
-            virtual bool slaveOk() { return true; }
+            virtual bool slaveOk() const { return true; }
             
-            virtual LockType locktype(){ return WRITE; } 
+            virtual LockType locktype() const { return WRITE; } 
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cc().database()->name; // this has to come before dbtemprelease
                 dbtemprelease temprelease; // we don't touch the db directly

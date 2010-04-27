@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "../bson/util/misc.h"
+
 namespace mongo {
 
 #if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
@@ -101,15 +103,14 @@ namespace mongo {
     }
 
 // PRINT(2+2);  prints "2+2: 4"
-#define PRINT(x) cout << #x ": " << (x) << endl
+#define MONGO_PRINT(x) cout << #x ": " << (x) << endl
+#define PRINT MONGO_PRINT
 // PRINTFL; prints file:line
-#define PRINTFL cout << __FILE__ ":" << __LINE__ << endl
-
-#undef yassert
+#define MONGO_PRINTFL cout << __FILE__ ":" << __LINE__ << endl
+#define PRINTFL MONGO_PRINTFL
 
 #undef assert
-#define assert xassert
-#define yassert 1
+#define assert MONGO_assert
 
     struct WrappingInt {
         WrappingInt() {
@@ -141,16 +142,6 @@ namespace mongo {
 
 namespace mongo {
 
-    inline void time_t_to_String(time_t t, char *buf) {
-#if defined(_WIN32)
-        ctime_s(buf, 64, &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[24] = 0; // don't want the \n
-    }
-
-
     inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
 #if defined(_WIN32)
         if ( local )
@@ -165,12 +156,26 @@ namespace mongo {
 #endif
     }
 
+    inline string terseCurrentTime(){
+        struct tm t;
+        time_t_to_Struct( time(0) , &t );
+        stringstream ss;
+        ss << ( 1900 + t.tm_year ) << "-"
+           << t.tm_mon << "-"
+           << t.tm_mday << "-"
+           << t.tm_hour << "-"
+           << t.tm_min;
+        return ss.str();
+    }
 
-
-#define asctime _asctime_not_threadsafe_
-#define gmtime _gmtime_not_threadsafe_
-#define localtime _localtime_not_threadsafe_
-#define ctime _ctime_is_not_threadsafe_
+#define MONGO_asctime _asctime_not_threadsafe_
+#define asctime MONGO_asctime
+#define MONGO_gmtime _gmtime_not_threadsafe_
+#define gmtime MONGO_gmtime
+#define MONGO_localtime _localtime_not_threadsafe_
+#define localtime MONGO_localtime
+#define MONGO_ctime _ctime_is_not_threadsafe_
+#define ctime MONGO_ctime
 
 #if defined(_WIN32) || defined(__sunos__)
     inline void sleepsecs(int s) {
@@ -228,7 +233,7 @@ namespace mongo {
     }
 #endif
 
-// note this wraps
+    // note this wraps
     inline int tdiff(unsigned told, unsigned tnew) {
         return WrappingInt::diff(tnew, told);
     }
@@ -238,15 +243,6 @@ namespace mongo {
         unsigned t = xt.nsec / 1000000;
         return (xt.sec & 0xfffff) * 1000 + t;
     }
-
-    struct Date_t {
-        // TODO: make signed (and look for related TODO's)
-        unsigned long long millis;
-        Date_t(): millis(0) {}
-        Date_t(unsigned long long m): millis(m) {}
-        operator unsigned long long&() { return millis; }
-        operator const unsigned long long&() const { return millis; }
-    };
 
     inline Date_t jsTime() {
         boost::xtime xt;
@@ -647,6 +643,20 @@ namespace mongo {
 
     inline bool isNumber( char c ) {
         return c >= '0' && c <= '9';
+    }
+
+    inline unsigned stringToNum(const char *str) {
+        unsigned x = 0;
+        const char *p = str;
+        while( 1 ) {
+            if( !isNumber(*p) ) {
+                if( *p == 0 && p != str )
+                    break;
+                throw 0;
+            }
+            x = x * 10 + *p++ - '0';
+        }
+        return x;
     }
     
     // for convenience, '{' is greater than anything and stops number parsing

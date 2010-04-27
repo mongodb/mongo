@@ -143,7 +143,14 @@ namespace mongo {
         map< string, Type > fieldTypes_;
         BSONObj sort_;
     };
-    
+
+    // a BoundList contains intervals specified by inclusive start
+    // and end bounds.  The intervals should be nonoverlapping and occur in
+    // the specified direction of traversal.  For example, given a simple index {i:1}
+    // and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
+    // would be valid for index {i:-1} with direction -1.
+    typedef vector< pair< BSONObj, BSONObj > > BoundList;	
+
     // ranges of fields' value that may be determined from query -- used to
     // determine index limits
     class FieldRangeSet {
@@ -190,7 +197,12 @@ namespace mongo {
     class FieldMatcher {
     public:
 
-        FieldMatcher(bool include=false) : _include(include){}
+        FieldMatcher()
+            : _include(true)
+            , _special(false)
+            , _skip(0)
+            , _limit(-1)
+        {}
         
         void add( const BSONObj& o );
 
@@ -200,13 +212,19 @@ namespace mongo {
     private:
 
         void add( const string& field, bool include );
+        void add( const string& field, int skip, int limit );
         void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
 
         bool _include; // true if default at this level is to include
+        bool _special; // true if this level can't be skipped or included without recursing
         //TODO: benchmark vector<pair> vs map
         typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
         FieldMap _fields;
         BSONObj _source;
+
+        // used for $slice operator
+        int _skip;
+        int _limit;
     };
 
     /** returns a string that when used as a matcher, would match a super set of regex()

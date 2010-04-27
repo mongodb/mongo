@@ -8,11 +8,13 @@ coll = db.update1;
 
 coll.insert({_id:1, key:1});
 
-// these are upserts
+// these are both upserts
 coll.save({_id:2, key:2});
-coll.save({_id:3, key:3});
+coll.update({_id:3, key:3}, {$set: {foo: 'bar'}}, {upsert: true});
 
 assert.eq(coll.count(), 3, "count A")
+assert.eq(coll.findOne({_id:3}).key, 3 , "findOne 3 key A")
+assert.eq(coll.findOne({_id:3}).foo, 'bar' , "findOne 3 foo A")
 
 // update existing using save()
 coll.save({_id:1, key:1, other:1});
@@ -28,6 +30,12 @@ coll.find().forEach(function(x){
     assert.eq(x._id, x.other, "_id == other");
 });
 
+
+coll.update({_id:1, key:1}, {$set: {key:2}});
+err = db.getLastErrorObj();
+assert.eq(coll.findOne({_id:1}).key, 1, 'key unchanged');
+assert.eq(err.code, 13123, 'key error code 1');
+assert.eq(err.code, 13123, 'key error code 2');
 
 s.stop()
 

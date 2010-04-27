@@ -28,17 +28,17 @@ namespace mongo {
     {}
 
     string MiniWebServer::parseURL( const char * buf ) {
-        const char * urlStart = strstr( buf , " " );
+        const char * urlStart = strchr( buf , ' ' );
         if ( ! urlStart )
             return "/";
 
         urlStart++;
 
-        const char * end = strstr( urlStart , " " );
+        const char * end = strchr( urlStart , ' ' );
         if ( ! end ) {
-            end = strstr( urlStart , "\r" );
+            end = strchr( urlStart , '\r' );
             if ( ! end ) {
-                end = strstr( urlStart , "\n" );
+                end = strchr( urlStart , '\n' );
             }
         }
 
@@ -82,7 +82,7 @@ namespace mongo {
     }
 
     string MiniWebServer::parseMethod( const char * headers ) {
-        const char * end = strstr( headers , " " );
+        const char * end = strchr( headers , ' ' );
         if ( ! end )
             return "GET";
         return string( headers , (int)(end-headers) );
@@ -148,9 +148,13 @@ namespace mongo {
             ss << "Content-Type: text/html\r\n";
         }
         else {
-            for ( vector<string>::iterator i = headers.begin(); i != headers.end(); i++ )
+            for ( vector<string>::iterator i = headers.begin(); i != headers.end(); i++ ) {
+                assert( strncmp("Content-Length", i->c_str(), 14) );
                 ss << *i << "\r\n";
+            }
         }
+        ss << "Connection: close\r\n";
+        ss << "Content-Length: " << responseMsg.size() << "\r\n";
         ss << "\r\n";
         ss << responseMsg;
         string response = ss.str();
@@ -160,7 +164,7 @@ namespace mongo {
     }
     
     string MiniWebServer::getHeader( const char * req , string wanted ){
-        const char * headers = strstr( req , "\n" );
+        const char * headers = strchr( req , '\n' );
         if ( ! headers )
             return "";
         pcrecpp::StringPiece input( headers + 1 );

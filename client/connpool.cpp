@@ -115,6 +115,13 @@ namespace mongo {
         }
     }
 
+    ScopedDbConnection * ScopedDbConnection::steal(){
+        assert( _conn );
+        ScopedDbConnection * n = new ScopedDbConnection( _host , _conn );
+        _conn = 0;
+        return n;
+    }
+    
     ScopedDbConnection::~ScopedDbConnection() {
         if ( _conn && ! _conn->isFailed() ) {
             /* see done() comments above for why we log this line */
@@ -127,13 +134,14 @@ namespace mongo {
     class PoolFlushCmd : public Command {
     public:
         PoolFlushCmd() : Command( "connpoolsync" ){}
-        virtual LockType locktype(){ return NONE; }
+        virtual void help( stringstream &help ) const { help<<"internal"; }
+        virtual LockType locktype() const { return NONE; }
         virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.flush();
             result << "ok" << 1;
             return true;
         }
-        virtual bool slaveOk(){
+        virtual bool slaveOk() const {
             return true;
         }
 

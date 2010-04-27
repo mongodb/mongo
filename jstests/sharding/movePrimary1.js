@@ -19,9 +19,9 @@ to = s.getOther( from );
 assert.eq( 3 , from.getDB( "test1" ).foo.count() , "from doesn't have data before move" );
 assert.eq( 0 , to.getDB( "test1" ).foo.count() , "to has data before move" );
 
-assert.eq( s.config.databases.findOne( { name : "test1" } ).primary , from.name , "not in db correctly to start" );
+assert.eq( s.config.databases.findOne( { _id : "test1" } ).primary , from.name , "not in db correctly to start" );
 s.admin.runCommand( { moveprimary : "test1" , to : to.name } );
-assert.eq( s.config.databases.findOne( { name : "test1" } ).primary , to.name , "to in config db didn't change" );
+assert.eq( s.config.databases.findOne( { _id : "test1" } ).primary , to.name , "to in config db didn't change" );
 
 
 assert.eq( 0 , from.getDB( "test1" ).foo.count() , "from still has data after move" );

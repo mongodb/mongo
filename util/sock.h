@@ -231,7 +231,7 @@ namespace mongo {
         char buf[256];
         int ec = gethostname(buf, 127);
         if ( ec || *buf == 0 ) {
-            log() << "can't get this server's hostname " << OUTPUT_ERRNO << endl;
+            log() << "can't get this server's hostname " << errnoWithDescription() << endl;
             return "";
         }
         return buf;
@@ -274,5 +274,7 @@ namespace mongo {
         set<int>* _sockets;
         static ListeningSockets* _instance;
     };
+
+#undef SOCK_FAMILY_UNKNOWN_ERROR
 
 } // namespace mongo

@@ -97,7 +97,9 @@ namespace mongo {
         bool partOfShardKey(const string& key ) const {
             return patternfields.count( key ) > 0;
         }
-
+        
+        bool uniqueAllowd( const BSONObj& otherPattern ) const;
+        
         operator string() const {
             return pattern.toString();
         }

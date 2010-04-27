@@ -1,5 +1,6 @@
 
 __quiet = false;
+__magicNoPrint = { __magicNoPrint : 1111 }
 
 chatty = function(s){
     if ( ! __quiet )
@@ -723,6 +724,9 @@ shellPrintHelper = function( x ){
         return;
     }
     
+    if ( x == __magicNoPrint )
+        return;
+
     if ( x == null ){
         print( "null" );
         return;

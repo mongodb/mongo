@@ -1037,6 +1037,45 @@ namespace QueryTests {
         };
     };
 
+    namespace queryobjecttests {
+        class names1 {
+        public:
+            void run(){
+                ASSERT_EQUALS( BSON( "x" << 1 ) , QUERY( "query" << BSON( "x" << 1 ) ).getFilter() );
+                ASSERT_EQUALS( BSON( "x" << 1 ) , QUERY( "$query" << BSON( "x" << 1 ) ).getFilter() );
+            }
+            
+        };
+    }
+
+    class OrderingTest {
+    public:
+        void run(){
+            {
+                Ordering o = Ordering::make( BSON( "a" << 1 << "b" << -1 << "c" << 1 ) );
+                ASSERT_EQUALS( 1 , o.get(0) );
+                ASSERT_EQUALS( -1 , o.get(1) );
+                ASSERT_EQUALS( 1 , o.get(2) );
+                
+                ASSERT( ! o.descending( 1 ) );
+                ASSERT( o.descending( 1 << 1 ) );
+                ASSERT( ! o.descending( 1 << 2 ) );
+            }
+
+            {
+                Ordering o = Ordering::make( BSON( "a.d" << 1 << "a" << 1 << "e" << -1 ) );
+                ASSERT_EQUALS( 1 , o.get(0) );
+                ASSERT_EQUALS( 1 , o.get(1) );
+                ASSERT_EQUALS( -1 , o.get(2) );
+                
+                ASSERT( ! o.descending( 1 ) );
+                ASSERT( ! o.descending( 1 << 1 ) );
+                ASSERT(  o.descending( 1 << 2 ) );
+            }
+
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query" ) {
@@ -1085,8 +1124,12 @@ namespace QueryTests {
             add< HelperByIdTest >();
             add< FindingStart >();
             add< WhatsMyUri >();
-
+            
             add< parsedtests::basic1 >();
+            
+            add< queryobjecttests::names1 >();
+
+            add< OrderingTest >();
         }
     } myall;
     

@@ -28,7 +28,7 @@
 #include "security.h"
 #include "json.h"
 #include "reccache.h"
-#include "replset.h"
+#include "replpair.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"
@@ -40,6 +40,9 @@
 #include "background.h"
 
 namespace mongo {
+
+    inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.data, m.data->len); }
+    inline void opwrite(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len); }
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
@@ -54,7 +57,7 @@ namespace mongo {
 
     string bind_ip = "";
 
-    char *appsrvPath = null;
+    char *appsrvPath = NULL;
 
     DiagLog _diaglog;
 
@@ -172,12 +175,14 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ok = false;
             op.debug().str << " exception ";
-            LOGSOME problem() << " Caught Assertion in runQuery ns:" << q.ns << ' ' << e.toString() << '\n';
-            log() << "  ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
-            if ( q.query.valid() )
-                log() << "  query:" << q.query.toString() << endl;
-            else
-                log() << "  query object is not valid!" << endl;
+            LOGSOME problem() << " Caught Assertion in query ns:" << q.ns << ' ' << e.toString() << '\n';
+            if( q.ntoskip || q.ntoreturn )
+                log() << "   ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
+            if ( q.query.valid() ) {
+                if( !q.query.isEmpty() )
+                    log() << "   query:" << q.query.toString() << endl;
+            } else
+                log() << "   query object is not valid!" << endl;
 
             BSONObjBuilder err;
             err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
@@ -221,7 +226,7 @@ namespace mongo {
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
-                OPWRITE;
+                opwrite(m);
                 if( strstr(ns, ".$cmd.sys.") ) { 
                     if( strstr(ns, "$cmd.sys.inprog") ) {
                         inProgCmd(m, dbresponse);
@@ -239,14 +244,14 @@ namespace mongo {
 
             }
             else {
-                OPREAD;
+                opread(m);
             }
         }
         else if( op == dbGetMore ) {
-            OPREAD;
+            opread(m);
         }
         else {
-            OPWRITE;
+            opwrite(m);
         }
         
         globalOpCounters.gotOp( op , isCommand );
@@ -695,7 +700,7 @@ namespace mongo {
         if ( lockFile ){
             log() << "\t shutdown: removing fs lock..." << endl;
             if( ftruncate( lockFile , 0 ) ) 
-                log() << "\t couldn't remove fs lock " << OUTPUT_ERRNO << endl;
+                log() << "\t couldn't remove fs lock " << errnoWithDescription() << endl;
             flock( lockFile, LOCK_UN );
         }
 #endif
