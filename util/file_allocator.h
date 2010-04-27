@@ -107,7 +107,10 @@ namespace mongo {
         }
         
         static void ensureLength( int fd , long size ){
-#if defined(__linux__)
+#if defined(_WIN32)
+            // we don't zero on windows
+            // TODO : we should to avoid fragmentation
+#elif defined(__linux__)
             posix_fallocate(fd,0,size);
 #else
             off_t filelen = lseek(fd, 0, SEEK_END);
