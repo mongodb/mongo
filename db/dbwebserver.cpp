@@ -21,6 +21,7 @@
 
 #include "stdafx.h"
 #include "../util/miniwebserver.h"
+#include "../util/web/html.h"
 #include "../util/md5.hpp"
 #include "db.h"
 #include "repl.h"
@@ -37,6 +38,8 @@
 #define assert MONGO_assert
 
 namespace mongo {
+
+    using namespace mongoutils::html;
 
     extern string bind_ip;
     extern const char *replInfo;
@@ -97,7 +100,7 @@ namespace mongo {
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
-                ss << "<a title=\"see replSetGetStatus link top of page\">--replSet </a>" << cmdLine.replSet << '\n';
+                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine.replSet << '\n';
             }
             else {
                 ss << "\nmaster: " << replSettings.master << '\n';
@@ -117,10 +120,9 @@ namespace mongo {
             if ( delta.get() ){
                 ss << "\n<b>dbtop</b> (occurences|percent of elapsed)\n";
                 ss << "<table border=1 cellpadding=2 cellspacing=0>";
-                ss << "<tr align='left'>";
-                ss << "<th><a title=\"namespace\" href=\""
-                    "http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F"
-                    "\">NS</a></th>"
+                ss << "<tr align='left'><th>";
+                ss << a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "namespace") << 
+                    "NS</a></th>"
                     "<th colspan=2>total</th>"
                     "<th colspan=2>Reads</th>"
                     "<th colspan=2>Writes</th>"
@@ -189,13 +191,10 @@ namespace mongo {
             ss << mongodVersion() << '\n';
             ss << "git hash: " << gitVersion() << '\n';
             ss << "sys info: " << sysInfo() << '\n';
-            ss << "<a "
-                << "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\""
-                << "title=\"snapshot: was the db in the write lock when this page was generated?\">";
             ss << "uptime: " << time(0)-started << " seconds\n";
             if ( replAllDead )
                 ss << "<b>replication replAllDead=" << replAllDead << "</b>\n";
-            ss << "<a title=\"information on caught assertion exceptions\">";
+            ss << a("", "information on caught assertion exceptions");
             ss << "assertions:</a>\n";
             for ( int i = 0; i < 4; i++ ) {
                 if ( lastAssert[i].isSet() ) {
@@ -364,8 +363,9 @@ namespace mongo {
                     }              
                     headers.push_back( "Content-Type: text/html" );
                     stringstream ss;
-                    ss << "<html><title>Commands List</title><body><h1><a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a> List</h1>\n";
-                    ss << "<p><a href=\"/\">Back</a></p>\n";
+                    ss << "<html><title>Commands List</title><body>";
+                    ss << p(a("/", "", "Back"));
+                    ss << p("<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n");
                     const map<string, Command*> *m = Command::commandsByBestName();
                     ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
                     ss << "<table border=1 cellpadding=2 cellspacing=0>";
@@ -454,12 +454,15 @@ namespace mongo {
                 }
             }
             ss << '\n';
-            ss << "<a "
+            ss << "HTTP <a "
                 "title=\"click for documentation on this http interface\""
-                "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">HTTP</a> admin port:" << _port << "\n";
+                "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">admin port</a>:" << _port << "\n";
 
             doUnlockedStuff(ss);
 
+            ss << "<a "
+                  "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" " 
+                  "title=\"snapshot: was the db in the write lock when this page was generated?\">";
             ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
             {
                 Timer t;

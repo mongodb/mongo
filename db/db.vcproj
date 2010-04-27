@@ -1381,6 +1381,14 @@
 			Name="util"
 			>
 			<File
+				RelativePath="..\util\allocator.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\array.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\assert_util.cpp"
 				>
 			</File>
@@ -1393,7 +1401,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\background.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\base64.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\util\base64.h"
 				>
 			</File>
 			<File
@@ -1402,6 +1418,10 @@
 			</File>
 			<File
 				RelativePath="..\util\debug_util.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\embedded_builder.h"
 				>
 			</File>
 			<File
@@ -1421,11 +1441,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\httpclient.cpp"
+				RelativePath="..\util\hex.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\interlocked.h"
 				>
 			</File>
 			<File
 				RelativePath=".\lasterror.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\locks.h"
 				>
 			</File>
 			<File
@@ -1437,84 +1465,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\util\md5.c"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-						PrecompiledHeaderThrough=""
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="release_nojni|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug Recstore|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="0"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\util\md5.h"
-				>
-			</File>
-			<File
-				RelativePath="..\util\md5.hpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\md5main.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						UsePrecompiledHeader="2"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\util\message.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\message_server_port.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\miniwebserver.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\util\miniwebserver.h"
-				>
-			</File>
-			<File
 				RelativePath="..\util\mmap.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\util\mmap.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\mvar.h"
 				>
 			</File>
 			<File
@@ -1526,15 +1485,27 @@
 				>
 			</File>
 			<File
+				RelativePath="..\util\optime.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\processinfo.h"
+				>
+			</File>
+			<File
 				RelativePath="..\util\processinfo_win32.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\util\sock.cpp"
+				RelativePath="..\util\queue.h"
 				>
 			</File>
 			<File
-				RelativePath="..\util\sock.h"
+				RelativePath="..\util\ramstore.h"
+				>
+			</File>
+			<File
+				RelativePath="..\util\thread_pool.h"
 				>
 			</File>
 			<File
@@ -1554,6 +1525,119 @@
 				</File>
 				<File
 					RelativePath="..\util\concurrency\value.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="web"
+				>
+				<File
+					RelativePath="..\util\web\html.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\httpclient.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\httpclient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\miniwebserver.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\miniwebserver.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="md5"
+				>
+				<File
+					RelativePath="..\util\md5.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+							PrecompiledHeaderThrough=""
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="release_nojni|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug Recstore|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="0"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\util\md5.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\md5.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\md5main.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							UsePrecompiledHeader="2"
+						/>
+					</FileConfiguration>
+				</File>
+			</Filter>
+			<Filter
+				Name="net"
+				>
+				<File
+					RelativePath="..\util\message.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\message.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\message_server.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\message_server_port.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\sock.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\sock.h"
 					>
 				</File>
 			</Filter>
