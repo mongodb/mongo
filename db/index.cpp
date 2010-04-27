@@ -105,7 +105,7 @@ namespace mongo {
         }
     }
 
-    void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj) { 
+    void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &changedId) { 
         int z = d.nIndexesBeingBuilt();
         v.resize(z);
         NamespaceDetails::IndexIterator i = d.ii();
@@ -119,6 +119,9 @@ namespace mongo {
                 d.setIndexIsMultikey(i);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
+            if ( ch.removed.size() > 0 && ch.added.size() > 0 && idx.isIdIndex() ) {
+                changedId = true;
+            }
         }
     }
 

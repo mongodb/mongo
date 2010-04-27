@@ -841,7 +841,7 @@ namespace mongo {
         NamespaceDetails *d,
         NamespaceDetailsTransient *nsdt,
         Record *toupdate, const DiskLoc& dl,
-        const char *_buf, int _len, OpDebug& debug)
+        const char *_buf, int _len, OpDebug& debug, bool &changedId)
     {
         StringBuilder& ss = debug.str;
         dassert( toupdate == dl.rec() );
@@ -868,7 +868,7 @@ namespace mongo {
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
         vector<IndexChanges> changes;
-        getIndexChanges(changes, *d, objNew, objOld);
+        getIndexChanges(changes, *d, objNew, objOld, changedId);
         dupCheck(changes, *d, dl);
 
         if ( toupdate->netLength() < objNew.objsize() ) {

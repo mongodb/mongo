@@ -100,12 +100,13 @@ namespace mongo {
         static Extent* allocFromFreeList(const char *ns, int approxSize, bool capped = false);
 
         /** @return DiskLoc where item ends up */
+        // changedId should be initialized to false
         const DiskLoc updateRecord(
             const char *ns,
             NamespaceDetails *d,
             NamespaceDetailsTransient *nsdt,
             Record *toupdate, const DiskLoc& dl,
-            const char *buf, int len, OpDebug& debug);
+            const char *buf, int len, OpDebug& debug, bool &changedId);
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
         DiskLoc insert(const char *ns, BSONObj &o, bool god = false);
