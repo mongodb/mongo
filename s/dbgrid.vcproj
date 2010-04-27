@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..\js\src;&quot;..\pcre-7.4&quot;;&quot;C:\Program Files\boost\latest&quot;"
+				AdditionalIncludeDirectories="&quot;..\..\js\src&quot;;&quot;..\pcre-7.4&quot;;&quot;C:\Program Files\boost\latest&quot;"
 				PreprocessorDefinitions="MONGO_EXPOSE_MACROS;XP_WIN;OLDJS;STATIC_JS_API;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -119,8 +119,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="..\..\js\src;&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\latest\&quot;"
-				PreprocessorDefinitions="MONGO_EXPOSE_MACROS;USE_ASIO;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PCRE_STATIC"
+				AdditionalIncludeDirectories="..\..\js\src;&quot;..\pcre-7.4&quot;;&quot;c:\Program Files\boost\latest&quot;"
+				PreprocessorDefinitions="MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="2"
@@ -139,7 +139,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib"
+				AdditionalDependencies="ws2_32.lib Psapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;c:\Program Files\boost\latest\lib&quot;"
 				GenerateDebugInformation="true"
