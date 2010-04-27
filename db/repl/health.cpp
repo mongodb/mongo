@@ -44,7 +44,7 @@ namespace mongo {
                 return false;
             }
             if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
-                errmsg = "set names do not match";
+                errmsg = "repl set names do not match";
                 return false;
             }
             //result.append("set", theReplSet->getName());
