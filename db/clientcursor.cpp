@@ -233,7 +233,10 @@ namespace mongo {
             
         {
             dbtempreleasecond unlock;
-            sleepmicros( Client::recommendedYieldMicros() );
+            if ( unlock.unlocked() )
+                sleepmicros( Client::recommendedYieldMicros() );
+            else
+                log() << "ClientCursor::yield can't unlock b/c of recursive lock" << endl;
         }
 
         if ( ClientCursor::find( id , false ) == 0 ){

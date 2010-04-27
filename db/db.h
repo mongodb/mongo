@@ -189,7 +189,7 @@ namespace mongo {
             if ( _context ) _context->relocked();
         }
     };
-
+    
 
     /**
        only does a temp release if we're not nested and have a lock
@@ -212,6 +212,9 @@ namespace mongo {
             }
         }
         
+        bool unlocked(){
+            return real > 0;
+        }
     };
 
 } // namespace mongo

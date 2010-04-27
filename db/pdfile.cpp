@@ -1168,6 +1168,7 @@ namespace mongo {
 
         void prep(const char *ns, NamespaceDetails *d) {
             assertInWriteLock();
+            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , dbMutex.getState() == 1 );
             bgJobsInProgress.insert(d);
             d->backgroundIndexBuildInProgress = 1;
             d->nIndexes--;
