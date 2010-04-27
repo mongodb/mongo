@@ -196,15 +196,15 @@ namespace mongo {
                 ChunkManager * cm = conf->getChunkManager( fullns );
                 massert( 12594 ,  "how could chunk manager be null!" , cm );
 
-                set<string> servers;
-                cm->getAllServers(servers);
+                set<Shard> servers;
+                cm->getAllShards(servers);
                 
                 BSONObjBuilder shardStats;
                 long long count=0;
                 long long size=0;
                 long long storageSize=0;
                 int nindexes=0;
-                for ( set<string>::iterator i=servers.begin(); i!=servers.end(); i++ ){
+                for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
                     ShardConnection conn( *i );
                     BSONObj res;
                     if ( ! conn->runCommand( dbName , cmdObj , res ) ){
@@ -222,7 +222,7 @@ namespace mongo {
                     else
                         nindexes = res["nindexes"].numberInt();
 
-                    shardStats.append(*i, res);
+                    shardStats.append(i->getName(), res);
                 }
 
                 result.append("ns", fullns);
@@ -529,7 +529,7 @@ namespace mongo {
                 
                 for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     Chunk * c = *i;
-                    futures.push_back( Future::spawnCommand( c->getShard() , dbName , shardedCommand ) );
+                    futures.push_back( Future::spawnCommand( c->getShard().getConnString() , dbName , shardedCommand ) );
                 }
                 
                 BSONObjBuilder shardresults;

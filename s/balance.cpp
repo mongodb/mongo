@@ -150,7 +150,7 @@ namespace mongo {
         assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
         
         string errmsg;
-        if ( c.moveAndCommit( to , errmsg ) )
+        if ( c.moveAndCommit( Shard::make( to ) , errmsg ) )
             return;
 
         log() << "balancer: MOVE FAILED **** " << errmsg << "\n"

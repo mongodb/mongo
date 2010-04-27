@@ -39,7 +39,7 @@ namespace mongo {
         _dataWritten = 0;
     }
 
-    void Chunk::setShard( string s ){
+    void Chunk::setShard( const Shard& s ){
         _shard = s;
         _markModified();
     }
@@ -167,17 +167,17 @@ namespace mongo {
         return s;
     }
 
-    bool Chunk::moveAndCommit( const string& to , string& errmsg ){
-        uassert( 10167 ,  "can't move shard to its current location!" , to != getShard() );
+    bool Chunk::moveAndCommit( const Shard& to , string& errmsg ){
+        uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
         
         BSONObjBuilder detail;
-        detail.append( "from" , _shard );
-        detail.append( "to" , to );
+        detail.append( "from" , _shard.toString() );
+        detail.append( "to" , to.toString() );
         appendShortVersion( "chunk" , detail );
 
-        log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard << " -> " << to << endl;
+        log() << "moving chunk ns: " << _ns << " moving chunk: " << toString() << " " << _shard.toString() << " -> " << to.toString() << endl;
         
-        string from = _shard;
+        Shard from = _shard;
         ShardChunkVersion oldVersion = _manager->getVersion( from );
         
         BSONObj filter;
@@ -192,8 +192,8 @@ namespace mongo {
         BSONObj startRes;
         bool worked = fromconn->runCommand( "admin" ,
                                             BSON( "movechunk.start" << _ns << 
-                                                  "from" << from <<
-                                                  "to" << to <<
+                                                  "from" << from.getConnString() <<
+                                                  "to" << to.getConnString() <<
                                                   "filter" << filter
                                                   ) ,
                                             startRes
@@ -231,7 +231,7 @@ namespace mongo {
             
             BSONObjBuilder b;
             b << "movechunk.finish" << _ns;
-            b << "to" << to;
+            b << "to" << to.getConnString();
             b.appendTimestamp( "newVersion" , newVersion );
             b.append( startRes["finishToken"] );
         
@@ -302,14 +302,14 @@ namespace mongo {
         if ( ! toMove )
             return false;
         
-        string newLocation = grid.pickShardForNewDB();
-        if ( newLocation == getShard() ){
+        Shard newLocation = grid.pickShardForNewDB();
+        if ( getShard() == newLocation ){
             // if this is the best server, then we shouldn't do anything!
-            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation << " -> " << getShard() << endl;
+            log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() << " -> " << getShard().toString() << endl;
             return 0;
         }
 
-        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation << " #objcets: " << toMove->countObjects() << endl;
+        log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation.toString() << " #objcets: " << toMove->countObjects() << endl;
 
         string errmsg;
         massert( 10412 ,  (string)"moveAndCommit failed: " + errmsg , 
@@ -377,7 +377,7 @@ namespace mongo {
         to << "ns" << _ns;
         to << "min" << _min;
         to << "max" << _max;
-        to << "shard" << _shard;
+        to << "shard" << _shard.getName();
     }
 
     string Chunk::genID( const string& ns , const BSONObj& o ){
@@ -395,7 +395,7 @@ namespace mongo {
     
     void Chunk::unserialize(const BSONObj& from){
         _ns = from.getStringField( "ns" );
-        _shard = from.getStringField( "shard" );
+        _shard.reset( from.getStringField( "shard" ) );
         _lastmod = from.hasField( "lastmod" ) ? from["lastmod"]._numberLong() : 0;
 
         BSONElement e = from["minDotted"];
@@ -451,7 +451,7 @@ namespace mongo {
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "shard  ns:" << _ns << " shard: " << _shard << " min: " << _min << " max: " << _max;
+        ss << "shard  ns:" << _ns << " shard: " << _shard.toString() << " min: " << _min << " max: " << _max;
         return ss.str();
     }
     
@@ -529,12 +529,12 @@ namespace mongo {
         throw UserException( 8070 , ss.str() );
     }
 
-    Chunk* ChunkManager::findChunkOnServer( const string& server ) const {
+    Chunk* ChunkManager::findChunkOnServer( const Shard& shard ) const {
         rwlock lk( _lock , false ); 
  
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
-            if ( c->getShard() == server )
+            if ( c->getShard() == shard )
                 return c;
         }
 
@@ -600,13 +600,14 @@ namespace mongo {
         return ret;
     }
 
-    int ChunkManager::getShardsForQuery( set<string>& shards , const BSONObj& query ){
+    int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
         vector<Chunk*> chunks;
         int ret = _getChunksForQuery(chunks, query);
 
         if (ret == -1){
-            getAllServers(shards);
-        } else {
+            getAllShards(shards);
+        } 
+        else {
             for ( vector<Chunk*>::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
                 Chunk* c = *it;
                 shards.insert(c->getShard());
@@ -616,19 +617,19 @@ namespace mongo {
         return shards.size();
     }
 
-    void ChunkManager::getAllServers( set<string>& allServers ){
+    void ChunkManager::getAllShards( set<Shard>& all ){
         rwlock lk( _lock , false ); 
         
         // TODO: cache this
         for ( vector<Chunk*>::iterator i=_chunks.begin(); i != _chunks.end(); i++  ){
-            allServers.insert( (*i)->getShard() );
+            all.insert( (*i)->getShard() );
         }        
     }
     
     void ChunkManager::ensureIndex(){
         rwlock lk( _lock , false ); 
  
-        set<string> seen;
+        set<Shard> seen;
         
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk * c = *i;
@@ -644,7 +645,7 @@ namespace mongo {
         
         uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
         
-        map<string,ShardChunkVersion> seen;
+        map<Shard,ShardChunkVersion> seen;
         
         log(1) << "ChunkManager::drop : " << _ns << endl;
 
@@ -670,9 +671,8 @@ namespace mongo {
 
         
         // delete data from mongod
-        for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            string shard = i->first;
-            ShardConnection conn( shard );
+        for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+            ShardConnection conn( i->first );
             conn->dropCollection( _ns );
             conn.done();
         }
@@ -691,7 +691,7 @@ namespace mongo {
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
-        for ( map<string,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
+        for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
             ShardConnection conn( i->first );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
@@ -708,7 +708,7 @@ namespace mongo {
         
         ShardChunkVersion a = getVersion();
         
-        set<string> withRealChunks;
+        set<Shard> withRealChunks;
         
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
@@ -725,7 +725,7 @@ namespace mongo {
         ensureIndex(); // TODO: this is too aggressive - but not really sooo bad
     }
     
-    ShardChunkVersion ChunkManager::getVersion( const string& server ) const{
+    ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const{
         rwlock lk( _lock , false ); 
 
         // TODO: cache or something?
@@ -734,7 +734,7 @@ namespace mongo {
 
         for ( vector<Chunk*>::const_iterator i=_chunks.begin(); i!=_chunks.end(); i++ ){
             Chunk* c = *i;
-            if ( c->getShard() != server )
+            if ( c->getShard() != shard )
                 continue;
             
             if ( c->_lastmod > max )

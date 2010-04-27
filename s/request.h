@@ -69,9 +69,9 @@ namespace mongo {
         }
 
         // ---- remote location info -----
-
         
-        string singleServerName() const ;
+        
+        Shard primaryShard() const ;
         
         // ---- low level access ----
 

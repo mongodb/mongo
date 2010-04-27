@@ -27,8 +27,8 @@ namespace mongo {
 
     // ----- Strategy ------
 
-    void Strategy::doWrite( int op , Request& r , string server ){
-        ShardConnection dbcon( server );
+    void Strategy::doWrite( int op , Request& r , const Shard& shard ){
+        ShardConnection dbcon( shard );
         DBClientBase &_c = dbcon.conn();
         
         /* TODO FIX - do not case and call DBClientBase::say() */
@@ -38,9 +38,9 @@ namespace mongo {
         dbcon.done();
     }
 
-    void Strategy::doQuery( Request& r , string server ){
+    void Strategy::doQuery( Request& r , const Shard& shard ){
         try{
-            ShardConnection dbcon( server );
+            ShardConnection dbcon( shard );
             DBClientBase &c = dbcon.conn();
             
             checkShardVersion( c , r.getns() );
@@ -63,13 +63,14 @@ namespace mongo {
         catch ( AssertionException& e ) {
             BSONObjBuilder err;
             err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
+            err.append("code",e.getCode());
             BSONObj errObj = err.done();
             replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
         }
     }
     
-    void Strategy::insert( string server , const char * ns , const BSONObj& obj ){
-        ShardConnection dbcon( server );
+    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){
+        ShardConnection dbcon( shard );
         checkShardVersion( dbcon.conn() , ns );
         dbcon->insert( ns , obj );
         dbcon.done();
@@ -88,7 +89,7 @@ namespace mongo {
             int secsToSleep = 0;
             while ( 1 ){
                 try {
-                    ShardConnection conn( _addr );
+                    ScopedDbConnection conn( _addr );
                     
                     BSONObj result;
                     
@@ -172,7 +173,7 @@ namespace mongo {
         if ( conf->isSharded( ns ) ){
             ChunkManager * manager = conf->getChunkManager( ns , authoritative );
             officialSequenceNumber = manager->getSequenceNumber();
-            version = manager->getVersion( conn.getServerAddress() );
+            version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
@@ -219,8 +220,8 @@ namespace mongo {
         return conn.runCommand( "admin" , cmd , result );
     }
 
-    bool lockNamespaceOnServer( const string& server , const string& ns ){
-        ShardConnection conn( server );
+    bool lockNamespaceOnServer( const Shard& shard, const string& ns ){
+        ShardConnection conn( shard );
         bool res = lockNamespaceOnServer( conn.conn() , ns );
         conn.done();
         return res;

@@ -33,10 +33,10 @@ namespace mongo {
         virtual void writeOp( int op , Request& r ) = 0;
         
     protected:
-        void doWrite( int op , Request& r , string server );
-        void doQuery( Request& r , string server );
+        void doWrite( int op , Request& r , const Shard& shard );
+        void doQuery( Request& r , const Shard& shard );
         
-        void insert( string server , const char * ns , const BSONObj& obj );
+        void insert( const Shard& shard , const char * ns , const BSONObj& obj );
         
     };
 
@@ -45,7 +45,7 @@ namespace mongo {
 
     bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
 
-    bool lockNamespaceOnServer( const string& server , const string& ns );
+    bool lockNamespaceOnServer( const Shard& shard , const string& ns );
     bool lockNamespaceOnServer( DBClientBase& conn , const string& ns );
 
 }

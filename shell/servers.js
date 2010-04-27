@@ -190,13 +190,26 @@ ShardingTest.prototype.getServerName = function( dbname ){
 
 ShardingTest.prototype.getServer = function( dbname ){
     var name = this.getServerName( dbname );
+
+    var x = this.config.shards.findOne( { _id : name } );
+    if ( x )
+        name = x.host;
+
     for ( var i=0; i<this._connections.length; i++ ){
         var c = this._connections[i];
         if ( name == c.name )
             return c;
     }
+
     throw "can't find server for: " + dbname + " name:" + name;
 
+}
+
+ShardingTest.prototype.normalize = function( x ){
+    var z = this.config.shards.findOne( { host : x } );
+    if ( z )
+        return z._id;
+    return x;
 }
 
 ShardingTest.prototype.getOther = function( one ){
