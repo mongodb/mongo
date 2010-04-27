@@ -201,21 +201,43 @@ namespace BasicTests {
             sleepmillis( 1727 );
             ASSERT( t.millis() >= 1000 );
             ASSERT( t.millis() <= 2000 );
-
-            int total = 1200;
-            int ms = 2;
-            t.reset();
-            for ( int i=0; i<(total/ms); i++ ){
-                sleepmillis( ms );
-            }
+            
             {
-                int x = t.millis();
-                if ( x < 1000 || x > 2500 ){
-                    cout << "sleeptest x: " << x << endl;
-                    ASSERT( x >= 1000 );
-                    ASSERT( x <= 20000 );
+                int total = 1200;
+                int ms = 2;
+                t.reset();
+                for ( int i=0; i<(total/ms); i++ ){
+                    sleepmillis( ms );
+                }
+                {
+                    int x = t.millis();
+                    if ( x < 1000 || x > 2500 ){
+                        cout << "sleeptest x: " << x << endl;
+                        ASSERT( x >= 1000 );
+                        ASSERT( x <= 20000 );
+                    }
                 }
             }
+
+
+            {
+                int total = 1200;
+                int micros = 100;
+                t.reset();
+                int numSleeps = 1000*(total/micros);
+                for ( int i=0; i<numSleeps; i++ ){
+                    sleepmicros( micros );
+                }
+                {
+                    int x = t.millis();
+                    if ( x < 1000 || x > 2500 ){
+                        cout << "sleeptest x: " << x << endl;
+                        ASSERT( x >= 1000 );
+                        ASSERT( x <= 20000 );
+                    }
+                }
+            }
+
             
         }
         

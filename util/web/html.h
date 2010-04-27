@@ -9,7 +9,7 @@
    (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
 */
 
-#include <strstream>
+#include <sstream>
 
 namespace mongoutils {
 
