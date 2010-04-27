@@ -120,12 +120,33 @@ namespace mongo {
                 cout << "--fork has to be used with --logpath" << endl;
                 ::exit(-1);
             }
+            
+            cout.flush();
+            cerr.flush();
+
             pid_t c = fork();
             if ( c ){
-                cout << "forked process: " << c << endl;
-                ::exit(0);
+                _exit(0);
             }
+
+            chdir("/");
             setsid();
+            
+            pid_t c2 = fork();
+            if ( c2 ){
+                cout << "forked process: " << c2 << endl;
+                _exit(0);
+            }
+
+            // stdout handled in initLogging
+            //fclose(stdout);
+            //freopen("/dev/null", "w", stdout);
+
+            fclose(stderr);
+            freopen("/dev/null", "w", stderr);
+            fclose(stdin);
+            freopen("/dev/null", "r", stdin);
+
             setupSignals();
         }
 #endif
