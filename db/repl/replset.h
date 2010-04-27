@@ -34,7 +34,7 @@ namespace mongo {
     class ReplSet {
     public:
         bool isMaster(const char *client) { 
-//
+//zzz
             return false;
         }
         void fillIsMaster(BSONObjBuilder&);

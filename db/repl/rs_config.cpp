@@ -26,15 +26,35 @@ using namespace bson;
 
 namespace mongo { 
 
+    bo ReplSetConfig::Member::asBson() const { 
+        bob b;
+        b << "_id" << _id;
+        b.append("host", h.toString());
+        if( votes != 1 ) b << "votes" << votes;
+        if( priority != 1.0 ) b << "priority" << priority;
+        if( arbiterOnly ) b << "arbiterOnly" << true;
+        return b.obj();
+    }
+
     bo ReplSetConfig::asBson() const { 
         bob b;
         b.append("_id", _id).append("version", version);
-        if( !ho.isDefault() ) {
-            b << "settings" << 
-                (bob() << "heartbeatConnRetries " << ho.heartbeatConnRetries  << 
-                          "heartbeatSleep" << ho.heartbeatSleepMillis / 1000 << 
-                          "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000).obj();
+        if( !ho.isDefault() || !getLastErrorDefaults.isEmpty() ) {
+            bob settings;
+            if( !ho.isDefault() )
+                settings << "heartbeatConnRetries " << ho.heartbeatConnRetries  << 
+                             "heartbeatSleep" << ho.heartbeatSleepMillis / 1000 << 
+                             "heartbeatTimeout" << ho.heartbeatTimeoutMillis / 1000;
+            if( !getLastErrorDefaults.isEmpty() )
+                settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            b << "settings" << settings.obj();
         }
+
+        BSONArrayBuilder a;
+        for( unsigned i = 0; i < members.size(); i++ )
+            a.append( members[i].asBson() );
+        b.append("members", a.arr());
+
         return b.obj();
     }
 
@@ -70,28 +90,40 @@ namespace mongo {
             if( settings["heartbeatTimeout"].ok() )
                 ho.heartbeatTimeoutMillis = (unsigned) (settings["heartbeatTimeout"].Number() * 1000);
             ho.check();
+            try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj(); } catch(...) { }
         }
 
         set<string> hosts;
         set<int> ords;
-        vector<BSONElement> members = o["members"].Array();
+        vector<BSONElement> members;
+        try {
+            members = o["members"].Array();
+        }
+        catch(...) {
+            uasserted(13130, "error parsing replSet configuration object 'members' field");
+        }
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
             Member m;
-            string s = mobj["host"].String();
             try {
+                m._id = (int) mobj["_id"].Number();
+                string s = mobj["host"].String();
                 m.h = HostAndPort::fromString(s);
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");
                 try { m.priority = mobj["priority"].Number(); } catch(...) { }
                 try { m.votes = (unsigned) mobj["votes"].Number(); } catch(...) { }
                 m.check();
             }
-            catch(...) { 
-                uassert(13107, "bad local.system.replset config", false);
+            catch(DBException& e) { 
+                log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << endl;
+                stringstream ss;
+                ss << "replSet members[" << i << "] bad config object";
+                uassert(13107, ss.str(), false);
             }
             uassert(13108, "bad local.system.replset config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
             ords.insert(m._id);
+            this->members.push_back(m);
         }
         uassert(13117, "bad local.system.replset config", !_id.empty());
     }

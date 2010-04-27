@@ -23,11 +23,11 @@ namespace mongo {
     struct HealthOptions { 
         HealthOptions() { 
             heartbeatSleepMillis = 2000;
-            heartbeatTimeoutMillis = 10;
+            heartbeatTimeoutMillis = 10000;
             heartbeatConnRetries  = 3;
         }
         bool isDefault() const {
-            return heartbeatSleepMillis != 2000 || heartbeatTimeoutMillis != 10 || heartbeatConnRetries  != 3; 
+            return !( heartbeatSleepMillis != 2000 || heartbeatTimeoutMillis != 10000 || heartbeatConnRetries  != 3 ); 
         }
 
         // see http://www.mongodb.org/display/DOCS/Replica+Set+Internals

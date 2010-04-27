@@ -41,49 +41,56 @@ Additionally an object in this collection holds global configuration settings fo
 
  { _id : <logical_set_name>, settings:
    { [heartbeatSleep : <seconds>]
-     [, heartbeatTimeout : <seconds>]
-     [, heartbeatConnRetries  : <n>]
-     [, getLastErrorDefaults: <defaults>]
+	 [, heartbeatTimeout : <seconds>]
+	 [, heartbeatConnRetries  : <n>]
+	 [, getLastErrorDefaults: <defaults>]
    }
  }
 */
 
 class ReplSetConfig {
 public:
-    /* if something is misconfigured, throws an exception. 
-       if couldn't be queried or is just blank, ok() will be false.
-       */
-    ReplSetConfig(const HostAndPort& h);
+	/* if something is misconfigured, throws an exception. 
+	   if couldn't be queried or is just blank, ok() will be false.
+	   */
+	ReplSetConfig(const HostAndPort& h);
 
-    ReplSetConfig(BSONObj cfg);
+	ReplSetConfig(BSONObj cfg);
 
-    bool ok() const { return _ok; }
+	bool ok() const { return _ok; }
 
-    struct Member {
-        Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
-        int _id;              /* ordinal */
-        unsigned votes;       /* how many votes this node gets. default 1. */
-        HostAndPort h;
-        double priority;      /* 0 means can never be primary */
-        bool arbiterOnly;
-        void check() const;   /* check validity, assert if not. */
-    };
-    vector<Member> members;
-    string _id;
-    int version;
-    HealthOptions ho;
-    string md5;
+	struct Member {
+		Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
+		int _id;              /* ordinal */
+		unsigned votes;       /* how many votes this node gets. default 1. */
+		HostAndPort h;
+		double priority;      /* 0 means can never be primary */
+		bool arbiterOnly;
+		void check() const;   /* check validity, assert if not. */
+        BSONObj asBson() const;
+	};
+	vector<Member> members;
+	string _id;
+	int version;
+	HealthOptions ho;
+	string md5;
+    BSONObj getLastErrorDefaults;
 
-    // true if could connect, and there is no cfg object there at all
-    bool empty() { return version == -2; }
+	// true if could connect, and there is no cfg object there at all
+	bool empty() { return version == -2; }
 
-    /* TODO: add getLastErrorDefaults */
+	/* TODO: add getLastErrorDefaults */
+
+    string toString() const { return asBson().toString(); }
+
+    /*@ validate the settings. does not call check() on each member, you have to do that separately. */
+    void check() const;
 
 private:
-    bool _ok;
-    void from(BSONObj);
-    void clear();
-    BSONObj asBson() const;
+	bool _ok;
+	void from(BSONObj);
+	void clear();
+	BSONObj asBson() const;
 };
 
 }

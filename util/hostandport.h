@@ -44,7 +44,7 @@ namespace mongo {
                 return HostAndPort(string(p,colon-p),port);
             }
             // no port specified.
-            return HostAndPort(p, cmdLine.port);
+            return HostAndPort(p);
         }
 
         bool operator<(const HostAndPort& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
@@ -58,7 +58,7 @@ namespace mongo {
         string toString() const; 
 
         string host() const { return _host; }
-        int port() const { return _port; }
+        int port() const { return _port >= 0 ? _port : cmdLine.port; }
 
     private:
         // invariant (except full obj assignment):

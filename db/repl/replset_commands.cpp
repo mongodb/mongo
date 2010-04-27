@@ -54,9 +54,17 @@ namespace mongo {
                 return false;
             }
 
+            if( cmdObj["replSetInitiate"].type() != Object ) {
+                errmsg = "no configuration specified";
+                return false;
+            }
+
             ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
 
-            return true;
+            log() << newConfig.toString() << endl;
+
+            errmsg = "not yet implemented";
+            return false;
         }
     } cmdReplSetInitiate;
 
