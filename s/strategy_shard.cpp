@@ -48,13 +48,10 @@ namespace mongo {
             info->getChunksForQuery( shards , query.getFilter()  );
             
             set<ServerAndQuery> servers;
-            map<string,int> serverCounts;
             for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                 Chunk* c = *i;
                 //servers.insert( ServerAndQuery( c->getShard() , BSONObj() ) );
-                servers.insert( ServerAndQuery( c->getShard() , c->getFilter() ) );
-                int& num = serverCounts[(*i)->getShard()];
-                num++;
+                servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) );
             }
             
             if ( logLevel > 4 ){
@@ -82,7 +79,7 @@ namespace mongo {
                     set<ServerAndQuery> buckets;
                     for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
                         Chunk * s = *i;
-                        buckets.insert( ServerAndQuery( s->getShard() , s->getFilter() , s->getMin() ) );
+                        buckets.insert( ServerAndQuery( s->getShard().getConnString() , s->getFilter() , s->getMin() ) );
                     }
                     cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
                 }
@@ -152,7 +149,7 @@ namespace mongo {
                 }
                 
                 Chunk& c = manager->findChunk( o );
-                log(4) << "  server:" << c.getShard() << " " << o << endl;
+                log(4) << "  server:" << c.getShard().toString() << " " << o << endl;
                 insert( c.getShard() , r.getns() , o );
                 
                 c.splitIfShould( o.objsize() );
@@ -216,7 +213,7 @@ namespace mongo {
             if ( multi ){
                 vector<Chunk*> chunks;
                 manager->getChunksForQuery( chunks , chunkFinder );
-                set<string> seen;
+                set<Shard> seen;
                 for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
                     Chunk * c = *i;
                     if ( seen.count( c->getShard() ) )
@@ -252,7 +249,7 @@ namespace mongo {
             if ( justOne && ! pattern.hasField( "_id" ) )
                 throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
             
-            set<string> seen;
+            set<Shard> seen;
             for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
                 Chunk * c = *i;
                 if ( seen.count( c->getShard() ) )

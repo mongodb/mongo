@@ -55,7 +55,7 @@ namespace mongo {
                 }
 
                 lateAssert = true;
-                doQuery( r , r.singleServerName() );
+                doQuery( r , r.primaryShard() );
             }
             catch ( AssertionException& e ) {
                 if ( lateAssert ){
@@ -65,6 +65,7 @@ namespace mongo {
 
                 BSONObjBuilder err;
                 err.append("$err", string("mongos: ") + (e.msg.empty() ? "assertion during query" : e.msg));
+                err.append("code",e.getCode());
                 BSONObj errObj = err.done();
                 replyToQuery(QueryResult::ResultFlag_ErrSet, r.p() , r.m() , errObj);
                 return;
@@ -77,7 +78,7 @@ namespace mongo {
         
             log(3) << "single getmore: " << ns << endl;
 
-            ShardConnection dbcon( r.singleServerName() );
+            ShardConnection dbcon( r.primaryShard() );
             DBClientBase& _c = dbcon.conn();
 
             // TODO 
@@ -115,7 +116,7 @@ namespace mongo {
                             doWrite( op , r , cm->getChunk(i)->getShard() );
                     }
                     else {
-                        doWrite( op , r , r.singleServerName() );
+                        doWrite( op , r , r.primaryShard() );
                     }
                 }
             }
@@ -145,7 +146,7 @@ namespace mongo {
             }
             
             log(3) << "single write: " << ns << endl;
-            doWrite( op , r , r.singleServerName() );
+            doWrite( op , r , r.primaryShard() );
         }
 
         set<string> _commandsSafeToPass;

@@ -73,7 +73,7 @@ namespace mongo {
                 help << " shows status/reachability of servers in the cluster";
             }
             bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                result.append("configserver", configServer.getPrimary() );
+                result.append("configserver", configServer.getPrimary().getConnString() );
                 result.append("isdbgrid", 1);
                 return true;
             }
@@ -236,7 +236,7 @@ namespace mongo {
 
                 ShardConnection conn( configServer.getPrimary() );
 
-                log() << "moving " << dbname << " primary from: " << config->getPrimary() << " to: " << to << endl;
+                log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() << " to: " << to << endl;
 
                 // TODO LOCKING: this is not safe with multiple mongos
 
@@ -246,7 +246,7 @@ namespace mongo {
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
                 BSONObj cloneRes;
-                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary() ) , cloneRes );
+                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() ) , cloneRes );
                 toconn.done();
                 if ( ! worked ){
                     log() << "clone failed" << cloneRes << endl;
@@ -260,7 +260,7 @@ namespace mongo {
                 config->setPrimary( to );
                 config->save( true );
 
-                log() << " dropping " << dbname << " from old" << endl;
+                log() << "movePrimary:  dropping " << dbname << " from old" << endl;
 
                 fromconn->dropDatabase( dbname.c_str() );
                 fromconn.done();
@@ -522,25 +522,22 @@ namespace mongo {
                     return false;
                 }
 
-                string to = cmdObj["to"].valuestrsafe();
-                if ( ! to.size()  ){
+                string toString = cmdObj["to"].valuestrsafe();
+                if ( ! toString.size()  ){
                     errmsg = "you have to specify where you want to move the chunk";
                     return false;
                 }
                 
+                Shard to = Shard::make( toString );
+
                 log() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManager * info = config->getChunkManager( ns );
                 Chunk& c = info->findChunk( find );
-                string from = c.getShard();
+                const Shard& from = c.getShard();
 
                 if ( from == to ){
                     errmsg = "that chunk is already on that shard";
-                    return false;
-                }
-
-                if ( ! grid.knowAboutShard( to ) ){
-                    errmsg = "that shard isn't known to me";
                     return false;
                 }
 

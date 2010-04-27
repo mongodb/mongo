@@ -27,16 +27,37 @@ namespace mongo {
     
     class Shard {
     public:
-        Shard( const string& addr = "" )
-            : _addr( addr ){
+        Shard()
+            : _name(""),_addr(""){
+        }
+        Shard( const string& name , const string& addr )
+            : _name(name), _addr( addr ){
         }
 
         Shard( const Shard& other )
-            : _addr( other._addr ){
+            : _name( other._name ) , _addr( other._addr ){
         }
 
         Shard( const Shard* other )
-            : _addr( other->_addr ){
+            : _name( other->_name ) ,_addr( other->_addr ){
+        }
+        
+        static Shard make( const string& ident ){
+            Shard s;
+            s.reset( ident );
+            return s;
+        }
+        
+        /**
+         * @param ident either name or address
+         */
+        void reset( const string& ident );
+        
+        void setAddress( const string& addr , bool authoritative = false );
+
+        string getName() const {
+            assert( _name.size() );
+            return _name;
         }
         
         string getConnString() const {
@@ -45,33 +66,44 @@ namespace mongo {
         }
 
         string toString() const {
-            return _addr;
+            return _name + ":" + _addr;
         }
 
-        operator string() const {
-            return _addr;
-        }
-        
         bool operator==( const Shard& s ) const {
-            return _addr == s._addr;
+            bool n = _name == s._name;
+            bool a = _addr == s._addr;
+            
+            assert( n == a ); // names and address are 1 to 1
+            return n;
         }
+
+        bool operator!=( const Shard& s ) const {
+            bool n = _name == s._name;
+            bool a = _addr == s._addr;
+            return ! ( n && a );
+        }
+
 
         bool operator==( const string& s ) const {
-            return _addr == s;
-        }
-
-        Shard& operator=( const string& s ){
-            _addr = s;
-            return *this;
-        }
-
-        bool ok() const {
-            return _addr.size() > 0;
+            return _name == s || _addr == s;
         }
         
+        bool operator!=( const string& s ) const {
+            return _name != s && _addr != s;
+        }
+
+        bool operator<(const Shard& o) const {
+            return _name < o._name;
+        }
+        
+        bool ok() const {
+            return _addr.size() > 0 && _addr.size() > 0;
+        }
+
         static Shard EMPTY;
 
     private:
+        string _name;
         string _addr;
     };
 
@@ -85,6 +117,10 @@ namespace mongo {
             : _conn( s.getConnString() ){
         }
         
+        ShardConnection( const string& addr )
+            : _conn( addr ){
+        }
+
         void done(){
             _conn.done();
         }

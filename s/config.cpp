@@ -120,7 +120,7 @@ namespace mongo {
     void DBConfig::serialize(BSONObjBuilder& to){
         to.append("_id", _name);
         to.appendBool("partitioned", _shardingEnabled );
-        to.append("primary", _primary );
+        to.append("primary", _primary.getName() );
         
         if ( _sharded.size() > 0 ){
             BSONObjBuilder a;
@@ -139,7 +139,7 @@ namespace mongo {
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
 
         _shardingEnabled = from.getBoolField("partitioned");
-        _primary = from.getStringField("primary");
+        _primary.reset( from.getStringField("primary") );
         
         _sharded.clear();
         BSONObj sharded = from.getObjectField( "sharded" );
@@ -200,7 +200,7 @@ namespace mongo {
         }
         log(1) << "\t removed entry from config server for: " << _name << endl;
         
-        set<string> allServers;
+        set<Shard> allServers;
 
         // 3
         while ( true ){
@@ -224,9 +224,8 @@ namespace mongo {
         }
         
         // 5
-        for ( set<string>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
-            string s = *i;
-            ShardConnection conn( s );
+        for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
+            ShardConnection conn( *i );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -240,7 +239,7 @@ namespace mongo {
         return true;
     }
 
-    bool DBConfig::_dropShardedCollections( int& num, set<string>& allServers , string& errmsg ){
+    bool DBConfig::_dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg ){
         num = 0;
         set<string> seen;
         while ( true ){
@@ -257,7 +256,7 @@ namespace mongo {
             seen.insert( i->first );
             log(1) << "\t dropping sharded collection: " << i->first << endl;
 
-            i->second->getAllServers( allServers );
+            i->second->getAllShards( allServers );
             i->second->drop();
             
             num++;
@@ -269,7 +268,7 @@ namespace mongo {
     
     /* --- Grid --- */
     
-    string Grid::pickShardForNewDB(){
+    Shard Grid::pickShardForNewDB(){
         ShardConnection conn( configServer.getPrimary() );
         
         // TODO: this is temporary
@@ -284,9 +283,9 @@ namespace mongo {
         conn.done();
         
         if ( all.size() == 0 )
-            return "";
+            return Shard::EMPTY;
         
-        return all[ rand() % all.size() ];
+        return Shard::make( all[ rand() % all.size() ] );
     }
 
     bool Grid::knowAboutShard( string name ) const{
@@ -323,7 +322,7 @@ namespace mongo {
                     
                     if ( cc->_primary.ok() ){
                         cc->save();
-                        log() << "\t put [" << database << "] on: " << cc->_primary << endl;
+                        log() << "\t put [" << database << "] on: " << cc->_primary.toString() << endl;
                     }
                     else {
                         log() << "\t can't find a shard to put new db on" << endl;
@@ -361,7 +360,6 @@ namespace mongo {
 
     ConfigServer::ConfigServer() {
         _shardingEnabled = false;
-        _primary = "";
         _name = "grid";
     }
     
@@ -405,7 +403,7 @@ namespace mongo {
                 return false;
         }
         
-        _primary = fullString.str();
+        _primary.setAddress( fullString.str() , true );
         log(1) << " config string : " << fullString.str() << endl;
         
         return true;
@@ -424,8 +422,8 @@ namespace mongo {
             return true;
         }
         catch ( DBException& ){
-            log() << "ConfigServer::allUp : " << _primary << " seems down!" << endl;
-            errmsg = (string)_primary + " seems down";
+            log() << "ConfigServer::allUp : " << _primary.toString() << " seems down!" << endl;
+            errmsg = _primary.toString() + " seems down";
             return false;
         }
         

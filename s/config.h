@@ -63,7 +63,7 @@ namespace mongo {
     */
     class DBConfig : public Model {
     public:
-        DBConfig( string name = "" ) : _name( name ) , _primary("") , _shardingEnabled(false){ }
+        DBConfig( string name = "" ) : _name( name ) , _primary("config","") , _shardingEnabled(false){ }
         
         string getName(){ return _name; };
 
@@ -96,7 +96,7 @@ namespace mongo {
         }
         
         void setPrimary( string s ){
-            _primary = s;
+            _primary.reset( s );
         }
 
         bool reload();
@@ -115,7 +115,7 @@ namespace mongo {
         
     protected:
 
-        bool _dropShardedCollections( int& num, set<string>& allServers , string& errmsg );
+        bool _dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg );
         
         bool doload();
         
@@ -153,7 +153,7 @@ namespace mongo {
          */
         void removeDB( string db );
 
-        string pickShardForNewDB();
+        Shard pickShardForNewDB();
         
         bool knowAboutShard( string name ) const;
 
@@ -176,7 +176,7 @@ namespace mongo {
         
         virtual string modelServer(){
             uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
-            return _primary;
+            return _primary.getConnString();
         }
         
         /**

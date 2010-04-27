@@ -27,6 +27,7 @@
 #include "../client/dbclient.h"
 #include "../client/model.h"
 #include "shardkey.h"
+#include "shard.h"
 #include <boost/utility.hpp>
 #undef assert
 #define assert MONGO_assert
@@ -61,10 +62,10 @@ namespace mongo {
             _max = o;
         }
 
-        string getShard() const{
+        Shard getShard() const{
             return _shard;
         }
-        void setShard( string shard );
+        void setShard( const Shard& shard );
 
         bool contains( const BSONObj& obj ) const;
 
@@ -106,7 +107,7 @@ namespace mongo {
          */
         bool moveIfShould( Chunk * newShard = 0 );
 
-        bool moveAndCommit( const string& to , string& errmsg );
+        bool moveAndCommit( const Shard& to , string& errmsg );
 
         virtual const char * getNS(){ return "config.chunks"; }
         virtual void serialize(BSONObjBuilder& to);
@@ -135,7 +136,7 @@ namespace mongo {
         string _ns;
         BSONObj _min;
         BSONObj _max;
-        string _shard;
+        Shard _shard;
         ShardChunkVersion _lastmod;
 
         bool _modified;
@@ -173,7 +174,7 @@ namespace mongo {
         bool hasShardKey( const BSONObj& obj );
 
         Chunk& findChunk( const BSONObj& obj );
-        Chunk* findChunkOnServer( const string& server ) const;
+        Chunk* findChunkOnServer( const Shard& shard ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
         bool isUnique(){ return _unique; }
@@ -191,16 +192,16 @@ namespace mongo {
         /**
          * @return number of Shards added to the set
          */
-        int getShardsForQuery( set<string>& shards , const BSONObj& query );
+        int getShardsForQuery( set<Shard>& shards , const BSONObj& query );
 
-        void getAllServers( set<string>& allServers );
+        void getAllShards( set<Shard>& all );
 
         void save();
 
         string toString() const;
         operator string() const { return toString(); }
 
-        ShardChunkVersion getVersion( const string& server ) const;
+        ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
         /**
