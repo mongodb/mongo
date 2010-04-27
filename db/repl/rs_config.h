@@ -25,72 +25,55 @@
 
 namespace mongo { 
 
-/* 
-http://www.mongodb.org/display/DOCS/Replica+Set+Internals#ReplicaSetInternals-Configuration
+    /**
+    local.system.replset
 
-admin.replset
+    This collection has one object per server in the set.  
 
-This collection has one object per server in the set.  The objects have the form:
+    See "Replical Sets Configuration" on mongodb.org wiki for details on the format.
+    */
 
- { set : <logical_set_name>, host : <hostname[+port]>
-   [, priority: <priority>]
-   [, arbiterOnly : true]
- }
+    class ReplSetConfig {
+    public:
+        /* if something is misconfigured, throws an exception. 
+        if couldn't be queried or is just blank, ok() will be false.
+        */
+        ReplSetConfig(const HostAndPort& h);
 
-Additionally an object in this collection holds global configuration settings for the set:
+        ReplSetConfig(BSONObj cfg);
 
- { _id : <logical_set_name>, settings:
-   { [heartbeatSleep : <seconds>]
-	 [, heartbeatTimeout : <seconds>]
-	 [, heartbeatConnRetries  : <n>]
-	 [, getLastErrorDefaults: <defaults>]
-   }
- }
-*/
+        bool ok() const { return _ok; }
 
-class ReplSetConfig {
-public:
-	/* if something is misconfigured, throws an exception. 
-	   if couldn't be queried or is just blank, ok() will be false.
-	   */
-	ReplSetConfig(const HostAndPort& h);
+        struct Member {
+            Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
+            int _id;              /* ordinal */
+            unsigned votes;       /* how many votes this node gets. default 1. */
+            HostAndPort h;
+            double priority;      /* 0 means can never be primary */
+            bool arbiterOnly;
+            void check() const;   /* check validity, assert if not. */
+            BSONObj asBson() const;
+        };
+        vector<Member> members;
+        string _id;
+        int version;
+        HealthOptions ho;
+        string md5;
+        BSONObj getLastErrorDefaults;
 
-	ReplSetConfig(BSONObj cfg);
+        // true if could connect, and there is no cfg object there at all
+        bool empty() const { return version == -2; }
 
-	bool ok() const { return _ok; }
+        string toString() const { return asBson().toString(); }
 
-	struct Member {
-		Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
-		int _id;              /* ordinal */
-		unsigned votes;       /* how many votes this node gets. default 1. */
-		HostAndPort h;
-		double priority;      /* 0 means can never be primary */
-		bool arbiterOnly;
-		void check() const;   /* check validity, assert if not. */
+        /*@ validate the settings. does not call check() on each member, you have to do that separately. */
+        void check() const;
+
+    private:
+        bool _ok;
+        void from(BSONObj);
+        void clear();
         BSONObj asBson() const;
-	};
-	vector<Member> members;
-	string _id;
-	int version;
-	HealthOptions ho;
-	string md5;
-    BSONObj getLastErrorDefaults;
-
-	// true if could connect, and there is no cfg object there at all
-	bool empty() { return version == -2; }
-
-	/* TODO: add getLastErrorDefaults */
-
-    string toString() const { return asBson().toString(); }
-
-    /*@ validate the settings. does not call check() on each member, you have to do that separately. */
-    void check() const;
-
-private:
-	bool _ok;
-	void from(BSONObj);
-	void clear();
-	BSONObj asBson() const;
-};
+    };
 
 }
