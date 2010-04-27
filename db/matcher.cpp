@@ -255,12 +255,12 @@ namespace mongo {
     }
     
     void Matcher::parseOr( const BSONElement &e, bool subMatcher, vector< shared_ptr< Matcher > > &matchers ) {
-        uassert( 13090, "recursive $or not allowed", !subMatcher );
-        uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+        uassert( 13090, "recursive $or/$nor not allowed", !subMatcher );
+        uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
         while( j.more() ) {
             BSONElement f = j.next();
-            uassert( 13087, "$or match element must be an object", f.type() == Object );
+            uassert( 13087, "$or/$nor match element must be an object", f.type() == Object );
             // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
             matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), BSONObj(), true ) ) );
         }
