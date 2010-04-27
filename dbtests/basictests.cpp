@@ -219,7 +219,7 @@ namespace BasicTests {
                 }
             }
 
-
+#ifdef __linux__
             {
                 int total = 1200;
                 int micros = 100;
@@ -229,15 +229,15 @@ namespace BasicTests {
                     sleepmicros( micros );
                 }
                 {
-                    int x = t.millis();
-                    if ( x < 1000 || x > 2500 ){
-                        cout << "sleeptest x: " << x << endl;
-                        ASSERT( x >= 1000 );
-                        ASSERT( x <= 20000 );
+                    int y = t.millis();
+                    if ( y < 1000 || y > 2500 ){
+                        cout << "sleeptest y: " << y << endl;
+                        ASSERT( y >= 1000 );
+                        ASSERT( y <= 20000 );
                     }
                 }
             }
-
+#endif
             
         }
         
