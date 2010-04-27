@@ -540,6 +540,7 @@
 		93E7270A0F4B5B5B004F9B5D /* shardkey.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = shardkey.h; sourceTree = "<group>"; };
 		93E8A4381173E6480025F7F8 /* or1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or1.js; sourceTree = "<group>"; };
 		93E8A4D01174EEAF0025F7F8 /* or2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or2.js; sourceTree = "<group>"; };
+		93E8A53411752FCE0025F7F8 /* or3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = or3.js; sourceTree = "<group>"; };
 		93F0957010E165E50053380C /* basic.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = basic.js; sourceTree = "<group>"; };
 		93F095CC10E16FF70053380C /* shellfork.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = shellfork.js; sourceTree = "<group>"; };
 		C6859E8B029090EE04C91782 /* mongo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = mongo.1; sourceTree = "<group>"; };
@@ -781,6 +782,7 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				93E8A53411752FCE0025F7F8 /* or3.js */,
 				93E8A4D01174EEAF0025F7F8 /* or2.js */,
 				93E8A4381173E6480025F7F8 /* or1.js */,
 				930750A8114EFB9900272A70 /* update_addToSet.js */,

@@ -254,6 +254,32 @@ namespace mongo {
         return true;
     }
     
+    void Matcher::parseOr( const BSONElement &e, bool subMatcher, vector< shared_ptr< Matcher > > &matchers ) {
+        uassert( 13090, "recursive $or not allowed", !subMatcher );
+        uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+        BSONObjIterator j( e.embeddedObject() );
+        while( j.more() ) {
+            BSONElement f = j.next();
+            uassert( 13087, "$or match element must be an object", f.type() == Object );
+            // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
+            matchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), BSONObj(), true ) ) );
+        }
+    }
+
+    bool Matcher::parseOrNor( const BSONElement &e, bool subMatcher ) {
+        const char *ef = e.fieldName();
+        if ( ef[ 0 ] != '$' )
+            return false;
+        if ( ef[ 1 ] == 'o' && ef[ 2 ] == 'r' && ef[ 3 ] == 0 ) {
+            parseOr( e, subMatcher, _orMatchers );
+        } else if ( ef[ 1 ] == 'n' && ef[ 2 ] == 'o' && ef[ 3 ] == 'r' && ef[ 4 ] == 0 ) {
+            parseOr( e, subMatcher, _norMatchers );
+        } else {
+            return false;
+        }
+        return true;
+    }
+    
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &_jsobj, const BSONObj &constrainIndexKey, bool subMatcher) :
@@ -263,19 +289,9 @@ namespace mongo {
         while ( i.more() ) {
             BSONElement e = i.next();
             
-            const char *ef = e.fieldName();
-            if ( ef[1] == 'o' && ef[2] == 'r' && ef[3] == 0 ) {
-                uassert( 13090, "recursive $or not allowed", !subMatcher );
-                uassert( 13086, "$or must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
-                BSONObjIterator j( e.embeddedObject() );
-                while( j.more() ) {
-                    BSONElement f = j.next();
-                    uassert( 13087, "$or match element must be an object", f.type() == Object );
-                    // until SERVER-109 this is never a covered index match, so don't constrain index key for $or matchers
-                    _orMatchers.push_back( shared_ptr< Matcher >( new Matcher( f.embeddedObject(), BSONObj(), true ) ) );
-                }
-                break;
-            }            
+            if ( parseOrNor( e, subMatcher ) ) {
+                continue;
+            }
 
             if ( ( e.type() == CodeWScope || e.type() == Code || e.type() == String ) && strcmp(e.fieldName(), "$where")==0 ) {
                 // $where: function()...
@@ -331,7 +347,7 @@ namespace mongo {
                                     BSONObjIterator k( fe.embeddedObject() );
                                     uassert( 13030, "$not cannot be empty", k.more() );
                                     while( k.more() ) {
-                                        addOp( e, k.next(), true, regex, flags );
+                                        addOp( e, k.next(), true, regex, flags );   
                                     }
                                     break;
                                 }
@@ -739,6 +755,18 @@ namespace mongo {
             if ( !match ) {
                 return false;
             }
+        }
+        
+        if ( _norMatchers.size() > 0 ) {
+            for( vector< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+                i != _norMatchers.end(); ++i ) {
+                // SERVER-205 don't submit details - we don't want to track field
+                // matched within $nor, and at this point we've already loaded the
+                // whole document
+                if ( (*i)->matches( jsobj ) ) {
+                    return false;
+                }
+            }            
         }
                 
         if ( where ) {
