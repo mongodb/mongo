@@ -25,6 +25,8 @@ def pushrepo(repodir):
     olddebs=[t[0] for t in bucket.listdir(prefix='distros/') if t[0].endswith('.deb')]
     newdebs=[]
     for fn in files:
+        if len(fn) == 0:
+            continue
         tail = fn[len(repodir):]
         # Note: be very careful not to produce s3names containing
         # sequences of repeated slashes: s3 doesn't treat a////b as
