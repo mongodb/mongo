@@ -115,6 +115,11 @@ namespace mongo {
         
     protected:
 
+        /** 
+            lockless
+        */
+        bool _isSharded( const string& ns );
+
         bool _dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg );
         
         bool doload();
@@ -130,6 +135,8 @@ namespace mongo {
         
         map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
         map<string,ChunkManager*> _shards; // this will only have entries for things that have been looked at
+
+        mongo::mutex _lock; // TODO: change to r/w lock ??
 
         friend class Grid;
         friend class ChunkManager;
@@ -156,11 +163,11 @@ namespace mongo {
         Shard pickShardForNewDB();
         
         bool knowAboutShard( string name ) const;
-
+        
         unsigned long long getNextOpTime() const;
     private:
         map<string,DBConfig*> _databases;
-        mongo::mutex _lock; // TODO: change to r/w lock
+        mongo::mutex _lock; // TODO: change to r/w lock ??
     };
 
     class ConfigServer : public DBConfig {

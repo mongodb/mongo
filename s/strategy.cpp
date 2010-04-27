@@ -177,7 +177,7 @@ namespace mongo {
         }
 
         unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
-        if ( officialSequenceNumber == sequenceNumber )
+        if ( sequenceNumber == officialSequenceNumber )
             return;
         
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber << endl;

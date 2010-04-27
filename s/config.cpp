@@ -48,8 +48,16 @@ namespace mongo {
     bool DBConfig::isSharded( const string& ns ){
         if ( ! _shardingEnabled )
             return false;
+        scoped_lock lk( _lock );
+        return _isSharded( ns );
+    }
+
+    bool DBConfig::_isSharded( const string& ns ){
+        if ( ! _shardingEnabled )
+            return false;
         return _sharded.find( ns ) != _sharded.end();
     }
+
 
     const Shard& DBConfig::getShard( const string& ns ){
         if ( isSharded( ns ) )
@@ -67,11 +75,13 @@ namespace mongo {
         if ( ! _shardingEnabled )
             throw UserException( 8042 , "db doesn't have sharding enabled" );
         
+        scoped_lock lk( _lock );
+
         ChunkManager * info = _shards[ns];
         if ( info )
             return info;
         
-        if ( isSharded( ns ) )
+        if ( _isSharded( ns ) )
             throw UserException( 8043 , "already sharded" );
 
         log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
@@ -85,15 +95,15 @@ namespace mongo {
 
     bool DBConfig::removeSharding( const string& ns ){
         if ( ! _shardingEnabled ){
-            cout << "AAAA" << endl;
             return false;
         }
         
+        scoped_lock lk( _lock );
+
         ChunkManager * info = _shards[ns];
         map<string,CollectionInfo>::iterator i = _sharded.find( ns );
 
         if ( info == 0 && i == _sharded.end() ){
-            cout << "BBBB" << endl;
             return false;
         }
         uassert( 10179 ,  "_sharded but no info" , info );
@@ -105,19 +115,23 @@ namespace mongo {
     }
 
     ChunkManager* DBConfig::getChunkManager( const string& ns , bool reload ){
+        scoped_lock lk( _lock );
+
         ChunkManager* m = _shards[ns];
         if ( m && ! reload )
             return m;
 
-        uassert( 10181 ,  (string)"not sharded:" + ns , isSharded( ns ) );
+        uassert( 10181 ,  (string)"not sharded:" + ns , _isSharded( ns ) );
         if ( m && reload )
             log() << "reloading shard info for: " << ns << endl;
         m = new ChunkManager( this , ns , _sharded[ ns ].key , _sharded[ns].unique );
         _shards[ns] = m;
         return m;
     }
-
+    
     void DBConfig::serialize(BSONObjBuilder& to){
+        scoped_lock lk( _lock );
+
         to.append("_id", _name);
         to.appendBool("partitioned", _shardingEnabled );
         to.append("primary", _primary.getName() );
@@ -135,9 +149,11 @@ namespace mongo {
     }
     
     void DBConfig::unserialize(const BSONObj& from){
+        scoped_lock lk( _lock );
+
         _name = from.getStringField("_id");
         log(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-
+        
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
         
@@ -158,6 +174,8 @@ namespace mongo {
     
     void DBConfig::save( bool check ){
         Model::save( check );
+
+        scoped_lock lk( _lock );
         for ( map<string,ChunkManager*>::iterator i=_shards.begin(); i != _shards.end(); i++)
             i->second->save();
     }

@@ -224,7 +224,7 @@ namespace mongo {
                 conn.done();
             }
             catch ( std::exception& e ){
-                log() << "caught exception while doing mongos ping: " << e.what() << endl;
+                log() << "caught exception while doing balance: " << e.what() << endl;
                 continue;
             }
             
