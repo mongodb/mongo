@@ -43,5 +43,16 @@ assert( db.getLastError() , "se6" );
 
 assert.eq( 5 , db.foo2.count() , "se5" );
 
+
+// assert in mongos
+s.adminCommand( { shardcollection : "test.foo3" , key : { num : 1 } } );
+assert.isnull(db.getLastError() , "mongos 1" );
+
+db.foo3.insert({}); //this fails with no shard key error
+//assert(db.getLastError() , "mongos 2" );
+
+db.foo3.insert({num:1});
+//assert.isnull(db.getLastError() , "mongos 3" );
+
 // ----
 s.stop();
