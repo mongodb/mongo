@@ -98,27 +98,6 @@ namespace mongo {
         }
     } cmdResetError;
 
-    /* for diagnostic / testing purposes. */
-    class CmdSleep : public Command { 
-    public:
-        virtual LockType locktype() const { return READ; } 
-        virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void help( stringstream& help ) const {
-            help << "internal testing command.  Makes db block (in a read lock) for 100 seconds";
-        }
-        CmdSleep() : Command("sleep") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            sleepsecs(100);
-            return true;
-        }
-    } cmdSleep;
-
     class CmdGetLastError : public Command {
     public:
         virtual LockType locktype() const { return NONE; } 
@@ -449,28 +428,6 @@ namespace mongo {
         }
         time_t started;
     } cmdServerStatus;
-
-    /* just to check if the db has asserted */
-    class CmdAssertInfo : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual void help( stringstream& help ) const {
-            help << "check if any asserts have occurred on the server";
-        }
-        virtual LockType locktype() const { return WRITE; } 
-        CmdAssertInfo() : Command("assertInfo",true,"assertinfo") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.appendBool("dbasserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet());
-            result.appendBool("asserted", lastAssert[0].isSet() || lastAssert[1].isSet() || lastAssert[2].isSet() || lastAssert[3].isSet());
-            result.append("assert", lastAssert[AssertRegular].toString());
-            result.append("assertw", lastAssert[AssertW].toString());
-            result.append("assertmsg", lastAssert[AssertMsg].toString());
-            result.append("assertuser", lastAssert[AssertUser].toString());
-            return true;
-        }
-    } cmdAsserts;
 
     class CmdGetOpTime : public Command {
     public:
@@ -1209,23 +1166,6 @@ namespace mongo {
         }
     } cmdDBStats;
 
-    class CmdBuildInfo : public Command {
-    public:
-        CmdBuildInfo() : Command( "buildInfo", true, "buildinfo" ) {}
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; } 
-        virtual void help( stringstream &help ) const {
-            help << "get version #, etc.\n";
-            help << "{ buildinfo:1 }";
-        }
-        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
-            result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
-            return true;
-        }
-    } cmdBuildInfo;
-
     /* convertToCapped seems to use this */
     class CmdCloneCollectionAsCapped : public Command {
     public:
@@ -1769,19 +1709,6 @@ namespace mongo {
         }
 
     } dbhashCmd;
-    
-    class PingCommand : public Command {
-    public:
-        PingCommand() : Command( "ping" ){}
-        virtual bool slaveOk() const { return true; }
-        virtual void help( stringstream &help ) const { help << "a way to check that the server is alive. responds immediately even if server is in a db lock."; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
-        virtual bool run(const char * badns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-            // IMPORTANT: Don't put anything in here that might lock db - including authentication
-            return true;
-        }
-    } pingCmd;
     
     /** 
      * this handles

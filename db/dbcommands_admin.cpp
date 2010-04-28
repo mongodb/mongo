@@ -35,25 +35,6 @@
 
 namespace mongo {
 
-    class FeaturesCmd : public Command {
-    public:
-        FeaturesCmd() : Command( "features", true ){}
-        void help(stringstream& h) const { h << "return on build level feature settings"; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool readOnly(){ return true; }
-        virtual LockType locktype() const { return READ; } 
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            result.append( "readlock" , readLockSupported() );
-            if ( globalScriptEngine ){
-                BSONObjBuilder bb( result.subobjStart( "js" ) );
-                result.append( "utf8" , globalScriptEngine->utf8Ok() );
-                bb.done();
-            }
-            return true;
-        }
-        
-    } featuresCmd;
-
     class CleanCmd : public Command {
     public:
         CleanCmd() : Command( "clean" ){}
@@ -382,48 +363,7 @@ namespace mongo {
         
     } fsyncCmd;
     
-    class LogRotateCmd : public Command {
-    public:
-        LogRotateCmd() : Command( "logRotate" ){}
-        virtual LockType locktype() const { return NONE; } 
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            rotateLogs();
-            return 1;
-        }        
-        
-    } logRotateCmd;
-    
-    class ListCommandsCmd : public Command {
-    public:
-        virtual void help( stringstream &help ) const { help << "get a list of all db commands"; }
-        ListCommandsCmd() : Command( "listCommands", false ){}
-        virtual LockType locktype() const { return NONE; } 
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return false; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            BSONObjBuilder b( result.subobjStart( "commands" ) );
-            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ){
-                Command * c = i->second;
-                BSONObjBuilder temp( b.subobjStart( c->name.c_str() ) );
 
-                {
-                    stringstream help;
-                    c->help( help );
-                    temp.append( "help" , help.str() );
-                }
-                temp.append( "lockType" , c->locktype() );
-                temp.append( "slaveOk" , c->slaveOk() );
-                temp.append( "adminOnly" , c->adminOnly() );
-                temp.done();
-            }
-            b.done();
-
-            return 1;
-        }        
-
-    } listCommandsCmd;
 
 }
 
