@@ -93,7 +93,7 @@ namespace mongo {
         }
 
         void append(const void *src, size_t len) {
-            memcpy(grow(len), src, len);
+            memcpy(grow((int) len), src, len);
         }
 
         void append(const char *str) {
@@ -185,7 +185,7 @@ namespace mongo {
 #undef SBNUM
 
         void append( const char * str ){
-            int x = strlen( str );
+            int x = (int) strlen( str );
             memcpy( _buf.grow( x ) , str , x );
         }
         StringBuilder& operator<<( const char * str ){

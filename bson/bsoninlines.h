@@ -52,7 +52,7 @@ namespace mongo {
     }
 
     inline BSONObj BSONElement::wrap( const char * newName ) const {
-        BSONObjBuilder b(size()+6+strlen(newName));
+        BSONObjBuilder b(size()+6+(int)strlen(newName));
         b.appendAs(*this,newName);
         return b.obj();
     }
@@ -218,7 +218,7 @@ namespace mongo {
             BSONElement e = i.next( true );
             massert( 10328 ,  "Invalid element size", e.size() > 0 );
             massert( 10329 ,  "Element too large", e.size() < ( 1 << 30 ) );
-            int offset = e.rawdata() - this->objdata();
+            int offset = (int) (e.rawdata() - this->objdata());
             massert( 10330 ,  "Element extends past end of object",
                     e.size() + offset <= this->objsize() );
             e.validate();
@@ -329,12 +329,12 @@ namespace mongo {
         case RegEx:
         {
             const char *p = value();
-            int len1 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain );
+            size_t len1 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain );
             massert( 10318 ,  "Invalid regex string", len1 != -1 );
             p = p + len1 + 1;
-            int len2 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain - len1 - 1 );
-            massert( 10319 ,  "Invalid regex options string", len2 != -1 );
-            x = len1 + 1 + len2 + 1;
+            size_t len2 = ( maxLen == -1 ) ? strlen( p ) : strnlen( p, remain - len1 - 1 );
+            massert( 10319 ,  "Invalid regex options string", len2 != -1 );			
+            x = (int) (len1 + 1 + len2 + 1);
         }
         break;
         default: {

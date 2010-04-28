@@ -9,7 +9,7 @@ using namespace bson;
 
 int main()
 {
-	cout << sizeof(char *) << endl;
+	cout << "build bits: " << 8 * sizeof(char *) << endl;
 
     /* a bson object defaults on construction to { } */
     bo empty;

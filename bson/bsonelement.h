@@ -347,7 +347,7 @@ public:
             fieldNameSize_ = 0;
         else {
             if ( maxLen != -1 ) {
-                int size = strnlen( fieldName(), maxLen - 1 );
+                int size = (int) strnlen( fieldName(), maxLen - 1 );
                 massert( 10333 ,  "Invalid field name", size != -1 );
                 fieldNameSize_ = size + 1;
             }
