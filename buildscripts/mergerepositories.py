@@ -111,7 +111,7 @@ class centosNode(ec2node):
         
 def tryRackSpace():
     driver=get_driver(Provider.RACKSPACE)
-    conn = driver('tengen', '7d67202d37af58a7adb32cb1626452c4')
+    conn = driver(settings.rackspace_account, settings.rackspace_api_key)
     string='Fedora 11'
     images=filter(lambda x: (x.name.find(string) > -1), conn.list_images())
     sizes=conn.list_sizes()
