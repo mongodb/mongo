@@ -21,7 +21,7 @@
 #include "replset.h"
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
-#include "../db/dbhelpers.h"
+#include "../dbhelpers.h"
 
 using namespace bson;
 
