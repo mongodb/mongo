@@ -462,10 +462,12 @@ namespace mongo {
 
     // -------  ChunkManager --------
 
-    unsigned long long ChunkManager::NextSequenceNumber = 1;
+    AtomicUInt ChunkManager::NextSequenceNumber = 1;
 
     ChunkManager::ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique ) : 
-        _config( config ) , _ns( ns ) , _key( pattern ) , _unique( unique ){
+        _config( config ) , _ns( ns ) , 
+        _key( pattern ) , _unique( unique ) , 
+        _sequenceNumber(  ++NextSequenceNumber ) {
         Chunk temp(0);
         
         ShardConnection conn( temp.modelServer() );
@@ -498,7 +500,6 @@ namespace mongo {
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
         }
 
-        _sequenceNumber = ++NextSequenceNumber;
     }
     
     ChunkManager::~ChunkManager(){
