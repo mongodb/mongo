@@ -1017,7 +1017,7 @@ namespace mongo {
                 "\nnot: This command may take a while to run";
         }
         bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            const char *ns = jsobj.getStringField( "datasize" );
+            string ns = jsobj.firstElement().String();
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
@@ -1026,25 +1026,37 @@ namespace mongo {
             
             auto_ptr< Cursor > c;
             if ( min.isEmpty() && max.isEmpty() ) {
-                c = theDataFileMgr.findAll( ns );
-            } else if ( min.isEmpty() || max.isEmpty() ) {
+                c = theDataFileMgr.findAll( ns.c_str() );
+            } 
+            else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";
                 return false;
-            } else {
-                IndexDetails *idx = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
+            } 
+            else {
+                IndexDetails *idx = cmdIndexDetailsForRange( ns.c_str(), errmsg, min, max, keyPattern );
                 if ( idx == 0 )
                     return false;
-                NamespaceDetails *d = nsdetails(ns);
+                NamespaceDetails *d = nsdetails(ns.c_str());
                 c.reset( new BtreeCursor( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
+            
+            long long maxSize = jsobj["maxSize"].numberLong();
+            long long maxObjects = jsobj["maxObjects"].numberLong();
 
             Timer t;
             long long size = 0;
             long long numObjects = 0;
             while( c->ok() ) {
-                size += c->current().objsize();
-                c->advance();
+                size += c->currLoc().rec()->netLength();
                 numObjects++;
+                
+                if ( ( maxSize && size > maxSize ) || 
+                     ( maxObjects && numObjects > maxObjects ) ){
+                    result.appendBool( "maxReached" , true );
+                    break;
+                }
+
+                c->advance();
             }
             int ms = t.millis();
             if ( ms > cmdLine.slowMS ) {
@@ -1057,6 +1069,7 @@ namespace mongo {
 
             result.append( "size", (double)size );
             result.append( "numObjects" , (double)numObjects );
+            result.append( "millis" , ms );
             return true;
         }
     } cmdDatasize;

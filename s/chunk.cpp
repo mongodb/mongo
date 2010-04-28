@@ -322,11 +322,13 @@ namespace mongo {
         ShardConnection conn( getShard() );
         
         BSONObj result;
-        uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , BSON( "datasize" << _ns
-                                                                        << "keyPattern" << _manager->getShardKey().key() 
-                                                                        << "min" << getMin() 
-                                                                        << "max" << getMax() 
-                                                                        ) , result ) );
+        uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , 
+                                                                 BSON( "datasize" << _ns
+                                                                       << "keyPattern" << _manager->getShardKey().key() 
+                                                                       << "min" << getMin() 
+                                                                       << "max" << getMax() 
+                                                                       << "maxSize" << ( MaxChunkSize + 1 )
+                                                                       ) , result ) );
         
         conn.done();
         return (long)result["size"].number();
