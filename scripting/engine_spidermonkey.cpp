@@ -992,7 +992,7 @@ namespace mongo {
         try {
             val = c.toval( e );
         }
-        catch ( InvalidUTF8Exception& e ){
+        catch ( InvalidUTF8Exception& ) {
             JS_LeaveLocalRootScope( cx );
             JS_ReportError( cx , "invalid utf8" );
             return JS_FALSE;
