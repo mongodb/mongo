@@ -800,12 +800,8 @@ namespace mongo {
                         continue;
                 }
                 
-                if ( modsIsIndexed && multi ){
-                    c->noteLocation();
-                }
-
                 const BSONObj& onDisk = loc.obj();
-
+                
                 ModSet * useMods = mods.get();
                 bool forceRewrite = false;
 
@@ -818,6 +814,11 @@ namespace mongo {
 
                      
                 auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
+                
+                bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
+                
+                if ( indexHack )
+                    c->noteLocation();
                 
                 if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
                     mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
@@ -862,7 +863,7 @@ namespace mongo {
                 numModded++;
                 if ( ! multi )
                     break;
-                if ( multi && modsIsIndexed )
+                if ( indexHack )
                     c->checkLocation();
                 continue;
             } 
