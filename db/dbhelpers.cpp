@@ -192,7 +192,13 @@ namespace mongo {
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
-        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , true , debug );
+        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
+    }
+
+    void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
+        OpDebug debug;
+        Client::Context context(ns);
+        _updateObjects(/*god=*/true, ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , logTheOp , debug );
     }
 
     void Helpers::emptyCollection(const char *ns) {
@@ -241,7 +247,7 @@ namespace mongo {
         if ( val ) {
             try {
                 BSONObj k = obj;
-                theDataFileMgr.insert( name_.c_str(), k, false );
+                theDataFileMgr.insertWithObjMod( name_.c_str(), k, false );
             } catch ( DBException& ) {
                 // dup key - already in set
             }

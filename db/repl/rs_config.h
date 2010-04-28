@@ -66,8 +66,10 @@ namespace mongo {
 
         string toString() const { return asBson().toString(); }
 
-        /*@ validate the settings. does not call check() on each member, you have to do that separately. */
+        /** validate the settings. does not call check() on each member, you have to do that separately. */
         void check() const;
+
+        void save(); // to local db
 
     private:
         bool _ok;

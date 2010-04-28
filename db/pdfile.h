@@ -109,7 +109,13 @@ namespace mongo {
             const char *buf, int len, OpDebug& debug, bool &changedId);
         // The object o may be updated if modified on insert.                                
         void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
-        DiskLoc insert(const char *ns, BSONObj &o, bool god = false);
+
+        /** @param obj both and in and out param -- insert can sometimes modify an object (such as add _id). */
+        DiskLoc insertWithObjMod(const char *ns, BSONObj &o, bool god = false);
+
+        /** @param obj in value only for this version. */
+        void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
+
         DiskLoc insert(const char *ns, const void *buf, int len, bool god = false, const BSONElement &writeId = BSONElement(), bool mayAddIndex = true);
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false);
         static auto_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());

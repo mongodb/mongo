@@ -717,8 +717,7 @@ namespace mongo {
         MatchDetails _details;
     };
 
-    
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         int profile = cc().database()->profile;
         StringBuilder& ss = debug.str;
@@ -732,12 +731,6 @@ namespace mongo {
         NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
         /* end note */
         
-        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
-        if ( strstr(ns, ".system.") ) {
-            /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
-            uassert( 10156 , "cannot update system collection", legalClientSystemNS( ns , true ) );
-        }
-
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElement().fieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
@@ -904,7 +897,7 @@ namespace mongo {
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 if ( profile )
                     ss << " fastmodinsert ";
-                theDataFileMgr.insert(ns, newObj);
+                theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( profile )
                     ss << " fastmodinsert ";
                 if ( logop )
@@ -916,12 +909,21 @@ namespace mongo {
             if ( profile )
                 ss << " upsert ";
             BSONObj no = updateobj;
-            theDataFileMgr.insert(ns, no);
+            theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )
                 logOp( "i", ns, no );
             return UpdateResult( 0 , 0 , 1 );
         }
         return UpdateResult( 0 , 0 , 0 );
     }
-    
+ 
+    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
+        if ( strstr(ns, ".system.") ) {
+            /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
+            uassert( 10156 , "cannot update system collection", legalClientSystemNS( ns , true ) );
+        }
+        return _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
+    }
+   
 }

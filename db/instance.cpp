@@ -538,7 +538,7 @@ namespace mongo {
         while ( d.moreJSObjs() ) {
             BSONObj js = d.nextJsObj();
             uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);
-            theDataFileMgr.insert(ns, js, false);
+            theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
         }
     }

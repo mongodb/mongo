@@ -753,11 +753,11 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 1 );
                 BSONObj fourA = BSON( "a" << 4 );
                 BSONObj fourB = BSON( "a" << 4 );
-                theDataFileMgr.insert( ns(), one );
+                theDataFileMgr.insertWithObjMod( ns(), one );
                 ASSERT_EQUALS( 0, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                theDataFileMgr.insert( ns(), fourA );
+                theDataFileMgr.insertWithObjMod( ns(), fourA );
                 ASSERT_EQUALS( 1, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
-                theDataFileMgr.insert( ns(), fourB );
+                theDataFileMgr.insertWithObjMod( ns(), fourB );
                 ASSERT_EQUALS( 2, runCount( ns(), BSON( "query" << BSON( "a" << 4 ) ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSONObj() ), err ) );
                 ASSERT_EQUALS( 3, runCount( ns(), BSON( "query" << BSON( "a" << GT << 0 ) ), err ) );
@@ -975,7 +975,7 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 BSONObj one = BSON( "a" << 1 );
-                theDataFileMgr.insert( ns(), one );
+                theDataFileMgr.insertWithObjMod( ns(), one );
                 BSONObj result;
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result ) );
                 ASSERT_EXCEPTION( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ), AssertionException );                
@@ -990,10 +990,10 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 for( int i = 0; i < 200; ++i ) {
                     BSONObj two = BSON( "a" << 2 );
-                    theDataFileMgr.insert( ns(), two );
+                    theDataFileMgr.insertWithObjMod( ns(), two );
                 }
                 BSONObj one = BSON( "a" << 1 );
-                theDataFileMgr.insert( ns(), one );
+                theDataFileMgr.insertWithObjMod( ns(), one );
                 deleteObjects( ns(), BSON( "a" << 1 ), false );
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) ) == 0 );
                 ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ) ).pattern() ) );
@@ -1007,9 +1007,9 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "_id" << 3 << "a" << 1 );
                 BSONObj two = BSON( "_id" << 2 << "a" << 1 );
                 BSONObj three = BSON( "_id" << 1 << "a" << -1 );
-                theDataFileMgr.insert( ns(), one );
-                theDataFileMgr.insert( ns(), two );
-                theDataFileMgr.insert( ns(), three );
+                theDataFileMgr.insertWithObjMod( ns(), one );
+                theDataFileMgr.insertWithObjMod( ns(), two );
+                theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true );
                 for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
                     ASSERT( 3 != c->current().getIntField( "_id" ) );
@@ -1023,9 +1023,9 @@ namespace QueryOptimizerTests {
                 BSONObj one = BSON( "a" << 2 << "_id" << 0 );
                 BSONObj two = BSON( "a" << 1 << "_id" << 1 );
                 BSONObj three = BSON( "a" << 0 << "_id" << 2 );
-                theDataFileMgr.insert( ns(), one );
-                theDataFileMgr.insert( ns(), two );
-                theDataFileMgr.insert( ns(), three );
+                theDataFileMgr.insertWithObjMod( ns(), one );
+                theDataFileMgr.insertWithObjMod( ns(), two );
+                theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true );
                 for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
                     ASSERT( 2 != c->current().getIntField( "_id" ) );
@@ -1039,7 +1039,7 @@ namespace QueryOptimizerTests {
                 for( int i = 0; i < 100; ++i ) {
                     for( int j = 0; j < 2; ++j ) {
                         BSONObj temp = BSON( "a" << 100 - i - 1 << "b" << i );
-                        theDataFileMgr.insert( ns(), temp );
+                        theDataFileMgr.insertWithObjMod( ns(), temp );
                     }
                 }
                 Message m;
@@ -1071,7 +1071,7 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 for( int i = 0; i < 10; ++i ) {
                     BSONObj temp = BSON( "a" << i );
-                    theDataFileMgr.insert( ns(), temp );
+                    theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1}}" );
                 BSONElement hintElt = hint.firstElement();
@@ -1104,7 +1104,7 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
                 for( int i = 0; i < 10; ++i ) {
                     BSONObj temp = BSON( "a" << 5 << "b" << i );
-                    theDataFileMgr.insert( ns(), temp );
+                    theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 BSONElement hintElt = hint.firstElement();
@@ -1125,7 +1125,7 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ), false, "a_1_b_1" );
                 for( int i = 0; i < 10; ++i ) {
                     BSONObj temp = BSON( "a" << 5 << "b" << i );
-                    theDataFileMgr.insert( ns(), temp );
+                    theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1,b:1}}" );
                 BSONElement hintElt = hint.firstElement();

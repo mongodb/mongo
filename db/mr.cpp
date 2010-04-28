@@ -290,7 +290,7 @@ namespace mongo {
                 if ( setup.replicate )
                     theDataFileMgr.insertAndLog( setup.tempLong.c_str() , res , false );
                 else
-                    theDataFileMgr.insert( setup.tempLong.c_str() , res , false );
+                    theDataFileMgr.insertWithObjMod( setup.tempLong.c_str() , res , false );
             }
 
             
@@ -383,7 +383,7 @@ namespace mongo {
 
         private:
             void write( BSONObj& o ){
-                theDataFileMgr.insert( _state.setup.incLong.c_str() , o , true );
+                theDataFileMgr.insertWithObjMod( _state.setup.incLong.c_str() , o , true );
             }
             
             MRState& _state;

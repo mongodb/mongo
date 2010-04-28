@@ -21,10 +21,17 @@
 #include "replset.h"
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
+#include "../db/dbhelpers.h"
 
 using namespace bson;
 
 namespace mongo { 
+
+    void ReplSetConfig::save() { 
+        check();
+        BSONObj o = asBson();
+        Helpers::putSingletonGod("local.system.replset", o, false/*logOp=false; local db so would work regardless...*/);
+    }
 
     bo ReplSetConfig::Member::asBson() const { 
         bob b;

@@ -92,6 +92,7 @@ namespace mongo {
         */
         static bool getSingleton(const char *ns, BSONObj& result);
         static void putSingleton(const char *ns, BSONObj obj);
+        static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
 
 
         /* Remove all objects from a collection.

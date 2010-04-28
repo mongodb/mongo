@@ -63,10 +63,10 @@ namespace mongo {
 
             log() << newConfig.toString() << endl;
 
-            newConfig.check();
+            newConfig.save();
 
-            errmsg = "not yet implemented";
-            return false;
+            errmsg = "replsets are not yet implemented.  coming soon.";
+            return true;
         }
     } cmdReplSetInitiate;
 

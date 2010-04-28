@@ -296,7 +296,7 @@ namespace PdfileTests {
                 b.appendTimestamp( "a" );
                 BSONObj o = b.done();
                 ASSERT( 0 == o.getField( "a" ).date() );
-                theDataFileMgr.insert( ns(), o );
+                theDataFileMgr.insertWithObjMod( ns(), o );
                 ASSERT( 0 != o.getField( "a" ).date() );
             }
         };
