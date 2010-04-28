@@ -26,11 +26,9 @@
 #include "../pch.h"
 #include "../client/dbclient.h"
 #include "../client/model.h"
+#include "../bson/util/atomic_int.h"
 #include "shardkey.h"
 #include "shard.h"
-#include <boost/utility.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 
@@ -230,7 +228,7 @@ namespace mongo {
         RWLock _lock;
 
         friend class Chunk;
-        static unsigned long long NextSequenceNumber;
+        static AtomicUInt NextSequenceNumber;
 
         /**
          * @return number of Chunk matching the query or -1 for all chunks.
