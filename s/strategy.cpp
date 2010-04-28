@@ -76,7 +76,7 @@ namespace mongo {
         dbcon.done();
     }
 
-    map<DBClientBase*,unsigned long long> checkShardVersionLastSequence;
+    map< pair<DBClientBase*,string> ,unsigned long long> checkShardVersionLastSequence;
 
     class WriteBackListener : public BackgroundJob {
     protected:
@@ -177,7 +177,7 @@ namespace mongo {
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
 
-        unsigned long long & sequenceNumber = checkShardVersionLastSequence[ &conn ];        
+        unsigned long long & sequenceNumber = checkShardVersionLastSequence[ make_pair(&conn,ns) ];        
         if ( sequenceNumber == officialSequenceNumber )
             return;
         
