@@ -149,7 +149,9 @@ namespace mongo {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
                 
-                BSONObj filter = cmdObj["query"].embeddedObject();
+                BSONObj filter;
+                if ( cmdObj["query"].isABSONObj() )
+                    filter = cmdObj["query"].Obj();
                 
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
