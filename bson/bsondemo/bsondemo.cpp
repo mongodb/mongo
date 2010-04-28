@@ -9,6 +9,8 @@ using namespace bson;
 
 int main()
 {
+	cout << sizeof(char *) << endl;
+
     /* a bson object defaults on construction to { } */
     bo empty;
     cout << "empty: " << empty << endl;
