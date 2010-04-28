@@ -50,11 +50,19 @@ namespace mongo {
             string getDBName( string ns ){
                 return ns.substr( 0 , ns.size() - 5 );
             } 
-            
+
             bool passthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+                return _passthrough(conf->getName(), conf, cmdObj, result);
+            }
+            bool adminPassthrough( DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
+                return _passthrough("admin", conf, cmdObj, result);
+            }
+            
+        private:
+            bool _passthrough(const string& db,  DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
                 ShardConnection conn( conf->getPrimary() );
                 BSONObj res;
-                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
+                bool ok = conn->runCommand( db , cmdObj , res );
                 result.appendElements( res );
                 conn.done();
                 return ok;
@@ -139,6 +147,31 @@ namespace mongo {
                 return true;
             }
         } dropDBCmd;
+
+        class RenameCollectionCmd : public PublicGridCommand {
+        public:
+            RenameCollectionCmd() : PublicGridCommand( "renameCollection" ){}
+            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                string fullnsFrom = cmdObj.firstElement().valuestrsafe();
+                string dbNameFrom = nsToDatabase( fullnsFrom.c_str() );
+                DBConfig * confFrom = grid.getDBConfig( dbNameFrom , false );
+
+                string fullnsTo = cmdObj["to"].valuestrsafe();
+                string dbNameTo = nsToDatabase( fullnsTo.c_str() );
+                DBConfig * confTo = grid.getDBConfig( dbNameTo , false );
+
+                uassert(13140, "Don't recognize source or target DB", confFrom && confTo);
+                uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
+                uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
+
+                const Shard& shardTo = confTo->getShard(fullnsTo);
+                const Shard& shardFrom = confFrom->getShard(fullnsFrom);
+
+                uassert(13137, "Source and destination collections must be on same shard", shardFrom == shardTo);
+
+                return adminPassthrough( confFrom , cmdObj , result );
+            }
+        } renameCollectionCmd;
 
         class CountCmd : public PublicGridCommand {
         public:
