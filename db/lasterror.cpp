@@ -132,7 +132,7 @@ namespace mongo {
         status.time = time(0);
         status.lerr = le;
     }
-
+    
     void prepareErrForNewRequest( Message &m, LastError * err ) {
         // a killCursors message shouldn't affect last error
         if ( m.data->operation() == dbKillCursors ) {
@@ -143,11 +143,15 @@ namespace mongo {
         }        
     }
     
-    void LastErrorHolder::startRequest( Message& m ) {
-        int id = m.data->id & 0xFFFF0000;
-        setID( id );
+    LastError * LastErrorHolder::startRequest( Message& m , int clientId ) {
+
+        if ( clientId == 0 )
+            clientId = m.data->id & 0xFFFF0000;
+        setID( clientId );
+
         LastError * le = _get( true );
         prepareErrForNewRequest( m, le );
+        return le;
     }
 
     void LastErrorHolder::startRequest( Message& m , LastError * connectionOwned ) {

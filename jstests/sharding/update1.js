@@ -38,7 +38,7 @@ assert.eq(err.code, 13123, 'key error code 1');
 assert.eq(err.code, 13123, 'key error code 2');
 
 coll.update({_id:1, key:1}, {$set: {foo:2}});
-//assert.isnull(db.getLastError(), 'getLastError reset');
+assert.isnull(db.getLastError(), 'getLastError reset');
 
 s.stop()
 

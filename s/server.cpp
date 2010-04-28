@@ -75,10 +75,8 @@ namespace mongo {
             assert( p );
             Request r( m , p );
 
-            lastError.setID( r.getClientId() );
-            LastError * le = lastError.get( true );
+            LastError * le = lastError.startRequest( m , r.getClientId() );
             assert( le );
-            lastError.startRequest( m );
             
             if ( logLevel > 5 ){
                 log(5) << "client id: " << hex << r.getClientId() << "\t" << r.getns() << "\t" << dec << r.op() << endl;
@@ -89,7 +87,7 @@ namespace mongo {
             }
             catch ( DBException& e ){
                 le->raiseError( e.getCode() , e.what() );
-
+                
                 m.data->id = r.id();
                 log() << "UserException: " << e.what() << endl;
                 if ( r.expectResponse() ){

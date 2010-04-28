@@ -77,7 +77,6 @@ namespace mongo {
     }
     
     void Request::process( int attempt ){
-
         log(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.data->id) << " attempt: " << attempt << endl;
 
         int op = _m.data->operation();
@@ -92,7 +91,7 @@ namespace mongo {
             s = SHARDED;
             counter = &opsSharded;
         }
-        
+
         bool iscmd = false;
         if ( op == dbQuery ) {
             iscmd = isCommand();

@@ -87,7 +87,7 @@ namespace mongo {
         
         /** when db receives a message/request, call this */
         void startRequest( Message& m , LastError * connectionOwned );
-        void startRequest( Message& m );
+        LastError * startRequest( Message& m , int clientId = 0 );
         
         // used to disable lastError reporting while processing a killCursors message
         // disable causes get() to return 0.
