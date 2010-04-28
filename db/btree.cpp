@@ -183,7 +183,7 @@ namespace mongo {
     }
 
     inline int BucketBasics::totalDataSize() const {
-        return Size() - (data-(char*)this);
+        return (int) (Size() - (data-(char*)this));
     }
 
     void BucketBasics::init() {

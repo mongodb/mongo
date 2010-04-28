@@ -516,7 +516,7 @@ namespace mongo {
 
     JSBool object_id_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval){    
         Convertor c(cx);
-        return *rval = c.getProperty( obj , "str" );
+        return (JSBool) (*rval = c.getProperty( obj , "str" ));
     }
 
     JSFunctionSpec object_id_functions[] = {

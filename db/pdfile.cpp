@@ -464,7 +464,7 @@ namespace mongo {
         lastRecord.Null();
 
         DiskLoc emptyLoc = myLoc;
-        emptyLoc.inc( (_extentData-(char*)this) );
+        emptyLoc.inc( (int) (_extentData-(char*)this) );
 
         int delRecLength = length - (_extentData - (char *) this);
         //DeletedRecord *empty1 = (DeletedRecord *) extentData;
@@ -492,7 +492,7 @@ namespace mongo {
         lastRecord.Null();
 
         DiskLoc emptyLoc = myLoc;
-        emptyLoc.inc( (_extentData-(char*)this) );
+        emptyLoc.inc( (int) (_extentData-(char*)this) );
 
         int l = _length - (_extentData - (char *) this);
         //DeletedRecord *empty1 = (DeletedRecord *) extentData;

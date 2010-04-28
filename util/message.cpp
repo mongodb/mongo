@@ -92,10 +92,9 @@ namespace mongo {
         for (vector<SockAddr>::iterator it=mine.begin(), end=mine.end(); it != end; ++it){
             SockAddr& me = *it;
 
-            int sock = ::socket(me.getType(), SOCK_STREAM, 0);
+            SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
             if ( sock == INVALID_SOCKET ) {
                 log() << "ERROR: listen(): invalid socket? " << errnoWithDescription() << endl;
-                return;
             }
 
             if (me.getType() == AF_UNIX){

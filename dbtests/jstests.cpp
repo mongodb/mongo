@@ -671,9 +671,9 @@ namespace JSTests {
             {
                 char crap[5];
 
-                crap[0] = 128;
+                crap[0] = (char) 128;
                 crap[1] = 17;
-                crap[2] = 128;
+                crap[2] = (char) 128;
                 crap[3] = 17;
                 crap[4] = 0;
                 
