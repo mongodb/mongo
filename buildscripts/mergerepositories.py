@@ -47,17 +47,17 @@ class ec2node(object):
         print "waiting for node to spin up"
         # Wait for EC2 to tell us the node is running.
         while 1:
-            ## XXX: it seems as if existing nodes' states don't get
-            ## updated, so we poll EC2 until we get a RUNNING node
-            ## with the desired id.
-
-            #EC2Driver.list_nodes()
-            #print self.node
-            #if self.node.state == NodeState.PENDING:
-            #    time.sleep(10)
-            #else:
-            #    break
-            n=[n for n in EC2Driver.list_nodes() if (n.id==self.node.id)][0]
+            n=None
+            # EC2 sometimes takes a while to report a node.
+            for i in range(6):
+                nodes = [n for n in EC2Driver.list_nodes() if (n.id==self.node.id)]
+                if len(nodes)>0:
+                    n=nodes[0]
+                    break
+                else:
+                    time.sleep(10)
+            if not n:
+                raise Exception("couldn't find node with id %s" % self.node.id)
             if n.state == NodeState.PENDING: 
                 time.sleep(10)
             else:
