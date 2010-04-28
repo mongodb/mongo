@@ -527,6 +527,11 @@ namespace mongo {
             if( 0 ) { 
                 cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
             }
+            
+            if ( _pq.getMaxScan() && _nscanned >= _pq.getMaxScan() ){
+                finish();
+                return;
+            }
 
             _nscanned++;
             if ( !_matcher->matches(_c->currKey(), _c->currLoc() , &_details ) ) {

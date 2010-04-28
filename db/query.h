@@ -181,7 +181,8 @@ namespace mongo {
         const BSONObj& getMax() const { return _max; }
         const BSONObj& getOrder() const { return _order; }
         const BSONElement& getHint() const { return _hint; }
-
+        int getMaxScan() const { return _maxScan; }
+        
         bool couldBeCommand() const {
             /* we assume you are using findOne() for running a cmd... */
             return _ntoreturn == 1 && strstr( _ns , ".$cmd" );
@@ -243,6 +244,7 @@ namespace mongo {
             _explain = false;
             _snapshot = false;
             _returnKey = false;
+            _maxScan = 0;
         }
 
         void _initTop( const BSONObj& top ){
@@ -272,6 +274,9 @@ namespace mongo {
                     _hint = e;
                 else if ( strcmp( "$returnKey" , name ) == 0 )
                     _returnKey = e.trueValue();
+                else if ( strcmp( "$maxScan" , name ) == 0 )
+                    _maxScan = e.numberInt();
+                
 
             }
 
@@ -310,8 +315,9 @@ namespace mongo {
         BSONObj _max;
         BSONElement _hint;
         BSONObj _order;
+        int _maxScan;
     };
-
+    
 
 } // namespace mongo
 
