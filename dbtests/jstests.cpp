@@ -657,6 +657,36 @@ namespace JSTests {
         }        
         static const char *ns() { return "unittest.jstests.longutf8string"; }
     };
+
+    class InvalidUTF8Check {
+    public:
+        void run(){
+            if( !globalScriptEngine->utf8Ok() )
+                return;
+
+            auto_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
+
+            BSONObj b;
+            {
+                char crap[5];
+
+                crap[0] = 128;
+                crap[1] = 17;
+                crap[2] = 128;
+                crap[3] = 17;
+                crap[4] = 0;
+                
+                BSONObjBuilder bb;
+                bb.append( "x" , crap );
+                b = bb.obj();
+            }
+            
+            cout << "ELIOT: " << b.jsonString() << endl;
+            s->setThis( &b );
+            ASSERT( s->invoke( "x=this.x.length;" , BSONObj() ) );
+        }
+    };
     
     class CodeTests {
     public:
@@ -862,7 +892,7 @@ namespace JSTests {
             add< ResetScope >();
             add< FalseTests >();
             add< SimpleFunctions >();
-
+            
             add< ObjectMapping >();
             add< ObjectDecoding >();
             add< JSOIDTests >();
@@ -872,10 +902,8 @@ namespace JSTests {
             add< SpecialDBTypes >();
             add< TypeConservation >();
             add< NumberLong >();
-
+            
             add< WeirdObjects >();
-            add< Utf8Check >();
-            add< LongUtf8String >();
             add< CodeTests >();
             add< DBRefTest >();
             add< InformalDBRef >();
@@ -884,6 +912,10 @@ namespace JSTests {
             add< VarTests >();
             
             add< Speed1 >();
+
+            add< InvalidUTF8Check >();
+            add< Utf8Check >();
+            add< LongUtf8String >();
         }
     } myall;
     

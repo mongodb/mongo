@@ -38,6 +38,12 @@
     }
 
 namespace mongo {
+    
+    class InvalidUTF8Exception : public UserException {
+    public:
+        InvalidUTF8Exception() : UserException( 9006 , "invalid utf8" ){
+        }
+    };
 
     string trim( string s ){
         while ( s.size() && isspace( s[0] ) )
@@ -501,7 +507,7 @@ namespace mongo {
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
                     cout << "\t why: " << toString( v ) << endl;
-                throw UserException( 9006 , "invalid utf8" );
+                throw InvalidUTF8Exception();
             }
 
             assert( s );
@@ -982,7 +988,15 @@ namespace mongo {
             return JS_TRUE;
         }
 
-        jsval val = c.toval( e );
+        jsval val;
+        try {
+            val = c.toval( e );
+        }
+        catch ( InvalidUTF8Exception& e ){
+            JS_LeaveLocalRootScope( cx );
+            JS_ReportError( cx , "invalid utf8" );
+            return JS_FALSE;
+        }
 
         assert( ! holder->_inResolve );
         holder->_inResolve = true;
