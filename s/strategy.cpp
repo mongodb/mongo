@@ -170,8 +170,9 @@ namespace mongo {
         ShardChunkVersion version = 0;
         unsigned long long officialSequenceNumber = 0;
 
+        ChunkManager * manager = 0;
         if ( conf->isSharded( ns ) ){
-            ChunkManager * manager = conf->getChunkManager( ns , authoritative );
+            manager = conf->getChunkManager( ns , authoritative );
             officialSequenceNumber = manager->getSequenceNumber();
             version = manager->getVersion( Shard::make( conn.getServerAddress() ) );
         }
@@ -180,7 +181,10 @@ namespace mongo {
         if ( sequenceNumber == officialSequenceNumber )
             return;
         
-        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber << endl;
+        log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
+               << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
+               << " version: " << version << " manager: " << manager
+               << endl;
 
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
