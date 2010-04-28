@@ -72,10 +72,12 @@ namespace mongo {
     public:
         virtual ~ShardedMessageHandler(){}
         virtual void process( Message& m , AbstractMessagingPort* p ){
+            assert( p );
             Request r( m , p );
 
             lastError.setID( r.getClientId() );
             LastError * le = lastError.get( true );
+            assert( le );
             lastError.startRequest( m );
             
             if ( logLevel > 5 ){
