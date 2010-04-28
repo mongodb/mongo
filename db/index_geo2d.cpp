@@ -417,7 +417,7 @@ namespace mongo {
             uassert( 13068 , "geo field only has 1 element" , i.more() );
             BSONElement y = i.next();
             
-            uassert( 13026 , "geo values have to be numbers" , x.isNumber() && y.isNumber() );
+            uassert( 13026 , "geo values have to be numbers" , o , x.isNumber() && y.isNumber() );
 
             return _hash( x.number() , y.number() );
         }

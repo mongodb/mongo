@@ -165,6 +165,17 @@ namespace mongo {
     inline void uassert(unsigned msgid, string msg, bool expr) {
         if( !expr ) uasserted(msgid, msg.c_str());
     }
+
+    template<class T>
+    inline void uassert(unsigned msgid, string msg, const T&t , bool expr) {
+        if( !expr ){
+            stringstream ss;
+            ss << msg << " " << t.toString();
+            uasserted(msgid, ss.str());
+        }
+    }
+
+
     inline void uassert(unsigned msgid, const char * msg, bool expr) {
         if( !expr ) uasserted(msgid, msg);
     }
