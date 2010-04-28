@@ -109,6 +109,16 @@ namespace mongo {
         
         if ( shards.size() == 0 )
             return;
+        
+        {
+            list<Shard> all;
+            Shard::getAllShards( all );
+            for ( list<Shard>::iterator i=all.begin(); i!=all.end(); ++i ){
+                // this just makes sure there is an entry in the map for every shard
+                Shard s = *i;
+                shards[s.getName()].size();
+            }
+        }
 
         pair<string,unsigned> min("",9999999);
         pair<string,unsigned> max("",0);
