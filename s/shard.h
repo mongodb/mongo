@@ -69,6 +69,10 @@ namespace mongo {
             return _name + ":" + _addr;
         }
 
+        friend ostream& operator << (ostream& out, const Shard& s) {
+            return (out << s.toString());
+        }
+
         bool operator==( const Shard& s ) const {
             bool n = _name == s._name;
             bool a = _addr == s._addr;
