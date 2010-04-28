@@ -99,6 +99,13 @@ namespace mongo {
         bool ok() const {
             return _addr.size() > 0 && _addr.size() > 0;
         }
+        
+        BSONObj runCommand( const string& db , const string& simple ){
+            return runCommand( db , BSON( simple << 1 ) );
+        }
+        BSONObj runCommand( const string& db , const BSONObj& cmd );
+
+        static void getAllShards( list<Shard>& all );
 
         static Shard EMPTY;
 

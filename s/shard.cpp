@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "shard.h"
 #include "config.h"
+#include <set>
 
 namespace mongo {
     
@@ -72,6 +73,18 @@ namespace mongo {
                 _lookup[addr] = s;
         }
 
+        void getAllShards( list<Shard>& all ){
+            scoped_lock lk( _mutex );
+            std::set<string> seen;
+            for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ){
+                Shard s = i->second;
+                if ( seen.count( s.getName() ) )
+                    continue;
+                seen.insert( s.getName() );
+                all.push_back( s );
+            }
+        }
+
     private:
         map<string,Shard> _lookup;
         mongo::mutex _mutex;
@@ -90,5 +103,24 @@ namespace mongo {
         uassert( 13128 , (string)"can't find shard for: " + ident , s.ok() );
         _name = s._name;
         _addr = s._addr;
+    }
+    
+    void Shard::getAllShards( list<Shard>& all ){
+        staticShardInfo.getAllShards( all );
+    }
+
+    
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ){
+        ShardConnection conn( this );
+        BSONObj res;
+        bool ok = conn->runCommand( db , cmd , res );
+        if ( ! ok ){
+            stringstream ss;
+            ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
+            throw UserException( 13136 , ss.str() );
+        }
+        res = res.getOwned();
+        conn.done();
+        return res;
     }
 }

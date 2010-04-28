@@ -825,5 +825,71 @@ namespace mongo {
         } cmdGetLastError;
         
     }
+    
+    class CmdListDatabases : public Command {
+    public:
+        CmdListDatabases() : Command("listDatabases") {}
+
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOverrideOk() { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual LockType locktype() const { return NONE; } 
+        virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
+        
+        bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+            list<Shard> shards;
+            Shard::getAllShards( shards );
+            
+            map<string,long long> sizes;
+            map< string,shared_ptr<BSONObjBuilder> > dbShardInfo;
+
+            for ( list<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
+                Shard s = *i;
+                BSONObj x = s.runCommand( "admin" , "listDatabases" );
+                cout << s.toString() << "\t" << x.jsonString() << endl;
+                BSONObjIterator j( x["databases"].Obj() );
+                while ( j.more() ){
+                    BSONObj theDB = j.next().Obj();
+                    
+                    string name = theDB["name"].String();
+                    long long size = theDB["sizeOnDisk"].numberLong();
+
+                    long long& totalSize = sizes[name];
+                    if ( size == 1 ){
+                        if ( totalSize <= 1 )
+                            totalSize = 1;
+                    }
+                    else
+                        totalSize += size;
+                    
+                    shared_ptr<BSONObjBuilder>& bb = dbShardInfo[name];
+                    if ( ! bb.get() )
+                        bb.reset( new BSONObjBuilder() );
+                    bb->appendNumber( s.getName() , size );
+                }
+                
+            }
+            
+            BSONArrayBuilder bb( result.subarrayStart( "databases" ) );
+            for ( map<string,long long>::iterator i=sizes.begin(); i!=sizes.end(); ++i ){
+                string name = i->first;
+                long long size = i->second;
+
+                BSONObjBuilder temp;
+                temp.append( "name" , name );
+                temp.appendNumber( "size" , size );
+                temp.appendBool( "empty" , size == 1 );
+                temp.append( "shards" , dbShardInfo[name]->obj() );
+                
+                bb.append( temp.obj() );
+            }
+            bb.done();
+
+            return 1;
+        }
+
+    } cmdListDatabases;
+
 
 } // namespace mongo
