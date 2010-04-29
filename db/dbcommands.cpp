@@ -889,8 +889,10 @@ namespace mongo {
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , q );
             int n = 0;
             while ( cursor->more() ){
-                BSONObj c = cursor->next();
-                int myn = c.getIntField( "n" );
+                BSONObj c = cursor->nextSafe();
+                BSONElement ne = c["n"];
+                assert(ne.isNumber());
+                int myn = ne.numberInt();
                 if ( n != myn ){
                     log() << "should have chunk: " << n << " have:" << myn << endl;
                     uassert( 10040 ,  "chunks out of order" , n == myn );
