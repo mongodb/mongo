@@ -29,6 +29,7 @@
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
+#include "../db/query.h"
 
 #include "../client/connpool.h"
 
@@ -418,11 +419,13 @@ namespace mongo {
             // wait until cursors are clean
             cout << "WARNING: deleting data before ensuring no more cursors TODO" << endl;
             
-            dbtemprelease unlock;
-
-            DBDirectClient client;
-            BSONObj removeFilter = finishToken.getObjectField( "query" );
-            client.remove( ns , removeFilter );
+            {
+                BSONObj removeFilter = finishToken.getObjectField( "query" );
+                Client::Context ctx(ns);
+                long long num = deleteObjects( ns.c_str() , removeFilter , false , true );
+                log() << "movechunk.finish deleted: " << num << endl;
+                result.appendNumber( "numDeleted" , num );
+            }
 
             return true;
         }
