@@ -1006,6 +1006,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\client\dbclientcursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\client\model.cpp"
 				>
 			</File>
