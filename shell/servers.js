@@ -309,7 +309,7 @@ printShardingStatus = function( configDB ){
         
             output( "\t\tmy chunks" );
             
-            configDB.chunks.find( { "ns" : new RegExp( "^" + z.name ) } ).sort( { ns : 1 , min : 1 } ).forEach( 
+            configDB.chunks.find( { "ns" : new RegExp( "^" + z._id ) } ).sort( { ns : 1 , min : 1 } ).forEach( 
                 function(z){
                     output( "\t\t\t" + z.ns + " " + tojson( z.min ) + " -->> " + tojson( z.max ) + 
                            " on : " + z.shard + " " + tojson( z.lastmod ) );
