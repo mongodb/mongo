@@ -188,7 +188,9 @@ def __main__():
              ("ubuntu", "9.4"),
              ("ubuntu", "8.10"),
              ("debian", "5.0"),
-             ("centos", "5.4"),)
+             ("centos", "5.4"),
+             ("fedora", "11"),
+             ("fedora", "12"))
     arches = ("x86", "x86_64")
 #    mongos = branches.split(',')
     # Run a makedist for each distro/version/architecture tuple above.
@@ -199,6 +201,9 @@ def __main__():
     procs = []
     count = 0
     for ((distro, distro_version), arch, spec) in gen([dists, arches, [branches]]):
+        # FIXME: now x86 fedoras on RackSpace circa 04/10.
+        if distro == "fedora" and arch == "x86":
+            continue
         count+=1
         opts = makedistopts
         if distro in ["debian", "ubuntu"]:
@@ -258,9 +263,9 @@ def __main__():
         if r != 0:
             raise Exception("mergerepositories.py exited %d" % r)
         print repodir
-    pushrepo(repodir)
-    shutil.rmtree(outputroot)
-    shutil.rmtree(repodir)
+#    pushrepo(repodir)
+#    shutil.rmtree(outputroot)
+#    shutil.rmtree(repodir)
 
     return 0
 

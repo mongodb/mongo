@@ -39,18 +39,13 @@ def tryEC2():
             node.destroy()
 
 
-# I don't think libcloud's Nodes implement __enter__ and __exit__, and
-# I like the with statement for ensuring that we don't leak nodes when
-# we don't have to.
-class ec2node(object):
+class node(object):
     def initWait(self):
-        print "waiting for node to spin up"
-        # Wait for EC2 to tell us the node is running.
         while 1:
             n=None
             # EC2 sometimes takes a while to report a node.
             for i in range(6):
-                nodes = [n for n in EC2Driver.list_nodes() if (n.id==self.node.id)]
+                nodes = [n for n in self.list_nodes() if (n.id==self.node.id)]
                 if len(nodes)>0:
                     n=nodes[0]
                     break
@@ -77,7 +72,7 @@ class ec2node(object):
                     sshwait = False
                     print "connected on port 22 (ssh)"
                     time.sleep(15) # arbitrary timeout, in case the
-                                  # remote sshd is slow.
+                    # remote sshd is slow.
                 except socket.error, err:
                     pass
             finally:
@@ -85,13 +80,19 @@ class ec2node(object):
                 time.sleep(3) # arbitrary timeout
         print "ok"
 
-
     def __enter__(self):
         return self
         
     def __exit__(self, arg0, arg1, arg2):
         print "shutting down node %s" % self.node
         self.node.destroy()
+
+# I don't think libcloud's Nodes implement __enter__ and __exit__, and
+# I like the with statement for ensuring that we don't leak nodes when
+# we don't have to.
+class ec2node(node):
+    def list_nodes(self):
+        return EC2Driver.list_nodes()
 
 class ubuntuNode(ec2node):
     def __init__(self):
@@ -107,28 +108,25 @@ class centosNode(ec2node):
 
         self.node = EC2Driver.create_node(image=image, name="ubuntu-test", size=size, securitygroup=['default', 'dist-slave', 'buildbot-slave'], keyname='kp1')
 
+class rackspaceNode(node):
+    def list_nodes(self):
+        self.conn.list_nodes()
 
-        
-def tryRackSpace():
-    driver=get_driver(Provider.RACKSPACE)
-    conn = driver(settings.rackspace_account, settings.rackspace_api_key)
-    string='Fedora 11'
-    images=filter(lambda x: (x.name.find(string) > -1), conn.list_images())
-    sizes=conn.list_sizes()
-    sizes.sort(cmp=lambda x,y: int(x.ram)<int(y.ram))
-    node = None
-    if len(images) != 1:
-        raise "too many images with \"%s\" in the name" % string
-    try:
+class fedora11Node(rackspaceNode):
+    def __init__(self):
+        driver = get_driver(Provider.RACKSPACE)
+        self.conn = driver(settings.rackspace_account, settings.rackspace_api_key)
+        string='Fedora 11'
+        images=filter(lambda x: (x.name.find(string) > -1), self.conn.list_images())
+        sizes=self.conn.list_sizes()
+        sizes.sort(cmp=lambda x,y: int(x.ram)<int(y.ram))
+        node = None
+        if len(images) != 1:
+            raise "too many images with \"%s\" in the name" % string
         image = images[0]
-        node = conn.create_node(image=image, name=string, size=sizes[0])
-        print node
-        print node.extras['password']
-        while node.state == NodeState.PENDING: 
-            time.sleep(10)
-    finally:
-        if node:
-            node.destroy()
+        self.node = self.conn.create_node(image=image, name=string, size=sizes[0])
+        print self.node
+        self.password = self.node.extra['password']
 
 class Err(Exception):
     pass
