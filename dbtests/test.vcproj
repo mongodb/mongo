@@ -1300,6 +1300,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\client\dbclientcursor.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\client\model.h"
 				>
 			</File>
@@ -1307,22 +1311,6 @@
 				RelativePath="..\client\syncclusterconnection.cpp"
 				>
 			</File>
-			<Filter
-				Name="btree related"
-				>
-				<File
-					RelativePath="..\db\btree.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\db\btree.h"
-					>
-				</File>
-				<File
-					RelativePath="..\db\btreecursor.cpp"
-					>
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
 			Name="db"
@@ -1948,6 +1936,22 @@
 			</File>
 			<File
 				RelativePath="..\db\repl\rs_config.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="btree related"
+			>
+			<File
+				RelativePath="..\db\btree.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\db\btree.h"
+				>
+			</File>
+			<File
+				RelativePath="..\db\btreecursor.cpp"
 				>
 			</File>
 		</Filter>
