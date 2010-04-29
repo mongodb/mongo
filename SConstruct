@@ -553,10 +553,6 @@ elif "win32" == os.sys.platform:
 	env['ENV'] = dict(os.environ)
 
     def find_boost():
-        if os.path.exists( "C:/boost" ):
-	        return "C:/boost"
-        if os.path.exists( "/boost" ):
-	        return "/boost"
         for x in ('', ' (x86)'):	
             boostDir = "C:/Program Files" + x + "/boost/latest"
             if os.path.exists( boostDir ):
@@ -566,6 +562,10 @@ elif "win32" == os.sys.platform:
 		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
 		            if os.path.exists( boostDir ):
 		                return boostDir
+        if os.path.exists( "C:/boost" ):
+	        return "C:/boost"
+        if os.path.exists( "/boost" ):
+	        return "/boost"
         return None
 
     boostDir = find_boost()
