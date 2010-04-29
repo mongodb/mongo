@@ -1,11 +1,29 @@
 // shard6.js
 
-s = new ShardingTest( "shard6" , 2 , 0 , 1 );
+summary = "";
+
+s = new ShardingTest( "shard6" , 2 , 0 , 2 );
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.data" , key : { num : 1 } } );
 
 db = s.getDB( "test" );
+
+function poolStats( where ){
+    var total = 0;
+    var msg = "poolStats " + where + " ";
+    var x = db.runCommand( "connPoolStats" ).hosts
+    for ( var h in x ){
+        var z = x[h];
+        msg += z.created + " ";
+        total += z.created
+    }
+    print( "****\n" + msg + "\n*****" )
+    summary += msg + "\n";
+    return total
+}
+
+poolStats( "at start" )
 
 // we want a lot of data, so lets make a 50k string to cheat :)
 bigString = "";
@@ -18,7 +36,9 @@ for ( ; num<100; num++ ){
     db.data.save( { num : num , bigString : bigString } );
 }
 
-assert.eq( 100 , db.data.find().toArray().length );
+assert.eq( 100 , db.data.find().toArray().length , "basic find after setup" );
+
+connBefore = poolStats( "setup done" )
 
 // limit
 
@@ -27,7 +47,10 @@ assert.eq( 1 , db.data.find().limit(1).itcount() , "limit test 2" );
 for ( var i=1; i<10; i++ ){
     assert.eq( i , db.data.find().limit(i).itcount() , "limit test 3a : " + i );
     assert.eq( i , db.data.find().skip(i).limit(i).itcount() , "limit test 3b : " + i );
+    poolStats( "after loop : " + i );
 }
+
+assert.eq( connBefore , poolStats( "limit test done"  ) , "limit test conns" );
 
 function assertOrder( start , num ){
     var a = db.data.find().skip(start).limit(num).sort( { num : 1 } ).map( function(z){ return z.num; } );
@@ -40,12 +63,34 @@ function assertOrder( start , num ){
 assertOrder( 0 , 10 );
 assertOrder( 5 , 10 );
 
-assert.eq( 5 , db.data.find().skip( num - 5 ).itcount() , "skip 1 " );
-assert.eq( 5 , db.data.find().skip( num - 5 ).sort( { num : 1 } ).itcount() , "skip 2 " );
-assert.eq( 5 , db.data.find().skip( num - 5 ).sort( { _id : 1 } ).itcount() , "skip 3 " );
-assert.eq( 0 , db.data.find().skip( num + 5 ).sort( { num : 1 } ).itcount() , "skip 4 " );
-assert.eq( 0 , db.data.find().skip( num + 5 ).sort( { _id : 1 } ).itcount() , "skip 5 " );
+poolStats( "after checking order" )
 
+function doItCount( skip , sort , batchSize ){
+    var c = db.data.find();
+    if ( skip )
+        c.skip( skip )
+    if ( sort )
+        c.sort( sort );
+    if ( batchSize )
+        c.batchSize( batchSize )
+    return c.itcount();
+    
+}
+
+function checkItCount( batchSize ){
+    assert.eq( 5 , doItCount( num - 5 , null , batchSize ) , "skip 1 " + batchSize );
+    assert.eq( 5 , doItCount( num - 5 , { num : 1 } , batchSize ) , "skip 2 " + batchSize );
+    assert.eq( 5 , doItCount( num - 5 , { _id : 1 } , batchSize ) , "skip 3 " + batchSize );
+    assert.eq( 0 , doItCount( num + 5 , { num : 1 } , batchSize ) , "skip 4 " + batchSize );
+    assert.eq( 0 , doItCount( num + 5 , { _id : 1 } , batchSize ) , "skip 5 " + batchSize );
+}
+
+poolStats( "before checking itcount" )
+
+checkItCount( 0 )
+checkItCount( 2 )
+
+poolStats( "after checking itcount" )
 
 // --- test save support ---
 
@@ -54,4 +99,7 @@ o.x = 16;
 db.data.save( o );
 assert.eq( 16 , db.data.findOne( { _id : o._id } ).x , "x1 - did save fail?" );
 
+poolStats( "at end" )
+
+print( summary )
 s.stop();

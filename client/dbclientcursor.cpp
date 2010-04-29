@@ -66,14 +66,29 @@ namespace mongo {
         b.append(ns.c_str());
         b.append(nextBatchSize());
         b.append(cursorId);
-
+        
         Message toSend;
         toSend.setData(dbGetMore, b.buf(), b.len());
         auto_ptr<Message> response(new Message());
-        connector->call( toSend, *response );
+        
+        if ( connector ){
+            connector->call( toSend, *response );
+            m = response;
+            dataReceived();
+        }
+        else {
+            assert( _scopedHost.size() );
+            ScopedDbConnection conn( _scopedHost );
+            conn->call( toSend , *response );
+            connector = conn.get();
+            m = response;
+            dataReceived();
+            connector = 0;
+            conn.done();
+        }
+        
 
-        m = response;
-        dataReceived();
+
     }
 
     void DBClientCursor::dataReceived() {
@@ -136,8 +151,11 @@ namespace mongo {
     }
 
     void DBClientCursor::attach( ScopedDbConnection * conn ){
-        assert( ! _scopedConn );
-        _scopedConn = conn->steal();
+        assert( _scopedHost.size() == 0 );
+        assert( connector == conn->get() );
+        _scopedHost = conn->getHost();
+        conn->done();
+        connector = 0;
     }
 
 
@@ -154,17 +172,15 @@ namespace mongo {
                 Message m;
                 m.setData( dbKillCursors , b.buf() , b.len() );
                 
-                connector->sayPiggyBack( m );
-            }
-
-            if ( _scopedConn ){
-                if ( moreInCurrentBatch() ){
-                    log() << "warning: cursor deleted, but moreInCurrentBatch and scoped conn." << endl;
+                if ( connector ){
+                    connector->sayPiggyBack( m );
                 }
                 else {
-                    _scopedConn->done();
+                    assert( _scopedHost.size() );
+                    ScopedDbConnection conn( _scopedHost );
+                    conn->sayPiggyBack( m );
+                    conn.done();
                 }
-                delete _scopedConn;
             }
 
         );

@@ -112,8 +112,7 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                _ownCursor( true ),
-                _scopedConn(0){
+                _ownCursor( true ){
         }
         
         DBClientCursor( DBConnector *_connector, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -127,8 +126,7 @@ namespace mongo {
                 nReturned(),
                 pos(),
                 data(),
-                _ownCursor( true ),
-                _scopedConn(0){
+                _ownCursor( true ){
         }            
 
         virtual ~DBClientCursor();
@@ -165,7 +163,7 @@ namespace mongo {
         void dataReceived();
         void requestMore();
         bool _ownCursor; // see decouple()
-        ScopedDbConnection * _scopedConn;
+        string _scopedHost;
     };
     
     
