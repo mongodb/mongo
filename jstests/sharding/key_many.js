@@ -1,6 +1,7 @@
 // key_many.js
 
 // values have to be sorted
+// you must have exactly 6 values in each array
 types =  [
     { name : "string" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield: "k" } ,
     { name : "double" , values : [ 1.2 , 3.5 , 4.5 , 4.6 , 6.7 , 9.9 ] , keyfield : "a" } ,
@@ -9,8 +10,8 @@ types =  [
     { name : "embedded" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b" } ,
     { name : "embedded 2" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield : "a.b.c" } ,
     { name : "object" , values : [ {a:1, b:1.2}, {a:1, b:3.5}, {a:1, b:4.5}, {a:2, b:1.2}, {a:2, b:3.5}, {a:2, b:4.5} ] , keyfield : "o" } ,
-    //{ name : "oid" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "_id" } , // SERVER-1065
-    //{ name : "oid" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "o" } , // SERVER-1065
+    { name : "oid_id" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "_id" } ,
+    { name : "oid_other" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "o" } ,
     ]
 
 s = new ShardingTest( "key_many" , 2 );
