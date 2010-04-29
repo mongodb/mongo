@@ -191,7 +191,7 @@ namespace mongo {
             // success!
             log(1) << "      setShardVersion success!" << endl;
             sequenceNumber = officialSequenceNumber;
-            assert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
+            dassert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
             return;
         }
 
