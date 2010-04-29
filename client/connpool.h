@@ -24,7 +24,10 @@
 namespace mongo {
 
     struct PoolForHost {
+        PoolForHost()
+            : created(0){}
         std::stack<DBClientBase*> pool;
+        long long created;
     };
     
     class DBConnectionHook {
@@ -52,8 +55,8 @@ namespace mongo {
         }
     */
     class DBConnectionPool {
-        mongo::mutex poolMutex;
-        map<string,PoolForHost*> pools; // servername -> pool
+        mongo::mutex _mutex;
+        map<string,PoolForHost*> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
         
         void onCreate( DBClientBase * conn );
@@ -64,12 +67,13 @@ namespace mongo {
         void release(const string& host, DBClientBase *c) {
             if ( c->isFailed() )
                 return;
-            scoped_lock L(poolMutex);
-            pools[host]->pool.push(c);
+            scoped_lock L(_mutex);
+            _pools[host]->pool.push(c);
         }
         void addHook( DBConnectionHook * hook );
+        void appendInfo( BSONObjBuilder& b );
     };
-
+    
     extern DBConnectionPool pool;
 
     /** Use to get a connection from the pool.  On exceptions things

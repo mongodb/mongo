@@ -28,9 +28,9 @@ namespace mongo {
     DBConnectionPool pool;
     
     DBClientBase* DBConnectionPool::get(const string& host) {
-        scoped_lock L(poolMutex);
+        scoped_lock L(_mutex);
         
-        PoolForHost *&p = pools[host];
+        PoolForHost *&p = _pools[host];
         if ( p == 0 )
             p = new PoolForHost();
         if ( p->pool.empty() ) {
@@ -65,6 +65,7 @@ namespace mongo {
                 uassert( 13071 , (string)"invalid hostname [" + host + "]" , 0 );
                 c = 0; // prevents compiler warning
             }
+            p->created++;
             return c;
         }
         DBClientBase *c = p->pool.top();
@@ -74,8 +75,8 @@ namespace mongo {
     }
 
     void DBConnectionPool::flush(){
-        scoped_lock L(poolMutex);
-        for ( map<string,PoolForHost*>::iterator i = pools.begin(); i != pools.end(); i++ ){
+        scoped_lock L(_mutex);
+        for ( map<string,PoolForHost*>::iterator i = _pools.begin(); i != _pools.end(); i++ ){
             PoolForHost* p = i->second;
 
             vector<DBClientBase*> all;
@@ -115,6 +116,19 @@ namespace mongo {
         }
     }
 
+    void DBConnectionPool::appendInfo( BSONObjBuilder& b ){
+        scoped_lock lk( _mutex );
+        BSONObjBuilder bb( b.subobjStart( "hosts" ) );
+        for ( map<string,PoolForHost*>::iterator i=_pools.begin(); i!=_pools.end(); ++i ){
+            string s = i->first;
+            BSONObjBuilder temp( bb.subobjStart( s.c_str() ) );
+            temp.append( "available" , (int)(i->second->pool.size()) );
+            temp.appendNumber( "created" , i->second->created );
+            temp.done();
+        }
+        bb.done();
+    }
+
     ScopedDbConnection * ScopedDbConnection::steal(){
         assert( _conn );
         ScopedDbConnection * n = new ScopedDbConnection( _host , _conn );
@@ -133,12 +147,11 @@ namespace mongo {
 
     class PoolFlushCmd : public Command {
     public:
-        PoolFlushCmd() : Command( "connpoolsync" ){}
+        PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ){}
         virtual void help( stringstream &help ) const { help<<"internal"; }
         virtual LockType locktype() const { return NONE; }
         virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.flush();
-            result << "ok" << 1;
             return true;
         }
         virtual bool slaveOk() const {
@@ -146,5 +159,21 @@ namespace mongo {
         }
 
     } poolFlushCmd;
+
+    class PoolStats : public Command {
+    public:
+        PoolStats() : Command( "connPoolStats" ){}
+        virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
+            pool.appendInfo( result );
+            return true;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+    } poolStatsCmd;
+
 
 } // namespace mongo
