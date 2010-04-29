@@ -249,6 +249,7 @@
     <Library Include="..\..\js\src\js.lib" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
