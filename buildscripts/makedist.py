@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-# makedist.py: make a distro package (on an EC2 instance)
+# makedist.py: make a distro package (on an EC2 (or sometimes
+# RackSpace) instance)
 
 # For ease of use, put a file called settings.py someplace in your
 # sys.path, containing something like the following:
@@ -855,11 +856,12 @@ def processArguments():
 
 MONGO-VERSION-SPEC has the syntax
 Commit(:Pkg-Name-Suffix(:Pkg-Version)).  If Commit starts with an 'r',
-build from a tagged release; if Commit starts with a 'v', build from
-the HEAD of a version branch; otherwise, build whatever git commit is
-identified by Commit.  Pkg-Name-Suffix gets appended to the package
-name, and defaults to "-stable" and "-unstable" if Commit looks like
-it designates a stable or unstable release/branch, respectively.
+build from a tagged release; if Commit starts with an 'n', package up
+a nightly build; if Commit starts with a 'v', build from the HEAD of a
+version branch; otherwise, build whatever git commit is identified by
+Commit.  Pkg-Name-Suffix gets appended to the package name, and
+defaults to "-stable" and "-unstable" if Commit looks like it
+designates a stable or unstable release/branch, respectively.
 Pkg-Version is used as the package version, and defaults to YYYYMMDD.
 Examples:
 
@@ -904,4 +906,5 @@ if __name__ == "__main__":
 
 # Examples:
 
-# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot
+# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot,v1.4:-stable,v1.5:-unstable
+# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 nlatest:-snapshot,n1.4.2:-stable,n1.5.0:-unstable
