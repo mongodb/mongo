@@ -553,6 +553,10 @@ elif "win32" == os.sys.platform:
 	env['ENV'] = dict(os.environ)
 
     def find_boost():
+        if os.path.exists( "C:/boost" ):
+	        return "C:/boost"
+        if os.path.exists( "/boost" ):
+	        return "/boost"
         for x in ('', ' (x86)'):	
             boostDir = "C:/Program Files" + x + "/boost/latest"
             if os.path.exists( boostDir ):
@@ -598,7 +602,7 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Oi /FD /MT /Gy /nologo /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /Oi /FD /nologo /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
         #env.Append( CPPFLAGS= " /GL " ) # TODO: this has caused some linking problems
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )

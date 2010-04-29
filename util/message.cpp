@@ -87,7 +87,7 @@ namespace mongo {
     void Listener::initAndListen() {
         vector<SockAddr> mine = ipToAddrs(_ip.c_str(), _port);
         vector<int> socks;
-        int maxfd = 0; // needed for select()
+        SOCKET maxfd = 0; // needed for select()
 
         for (vector<SockAddr>::iterator it=mine.begin(), end=mine.end(); it != end; ++it){
             SockAddr& me = *it;
