@@ -69,6 +69,7 @@ namespace mongo {
 
         string toString() const;
         operator string() const { return toString(); }
+        friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
 
         bool operator==(const Chunk& s) const;
         
