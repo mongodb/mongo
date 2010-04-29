@@ -1,6 +1,6 @@
 # -*- mode: python; -*-
-# build file for 10gen db
-# this request scons
+# build file for MongoDB
+# this requires scons
 # you can get from http://www.scons.org
 # then just type scons
 
