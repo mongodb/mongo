@@ -102,18 +102,20 @@ namespace mongo {
         }
         
         ScopedDbConnection()
-            : _host( "" ) , _conn(0 ){
+            : _host( "" ) , _conn(0) {
         }
 
         /** throws UserException if can't connect */
         ScopedDbConnection(const string& host)
             : _host(host), _conn( pool.get(host) ) {
         }
-
+        
         ScopedDbConnection(const string& host, DBClientBase* conn )
             : _host( host ) , _conn( conn ){
         }
         
+        string getHost() const { return _host; }
+
         /** Force closure of the connection.  You should call this if you leave it in
             a bad state.  Destructor will do this too, but it is verbose.
         */
