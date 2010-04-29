@@ -51,10 +51,6 @@ from libcloud.providers import get_driver
 from libcloud.drivers.ec2 import EC2NodeDriver, NodeImage
 from libcloud.base import Node, NodeImage, NodeSize, NodeState
 from libcloud.ssh import ParamikoSSHClient
-EC2 = get_driver(Provider.EC2)
-EC2Driver=EC2NodeDriver(settings.id, settings.key)
-
-
 
 # For the moment, we don't handle any of the errors we raise, so it
 # suffices to have a simple subclass of Exception that just
@@ -142,35 +138,21 @@ class EC2InstanceConfigurator(BaseConfigurator):
                                  (("centos", "5.4", "x86_64"), "ami-ccb35ea5"),
                                  (("fedora", "8", "x86_64"), "ami-2547a34c"),
                                  (("fedora", "8", "x86"), "ami-5647a33f"))),
+                               ("rackspace_imgname",
+                                ((("fedora", "11", "x86_64"), "Fedora 11"),
+                                 (("fedora", "12", "x86_64"), "Fedora 12"))),
                                ("ec2_mtype",
                                 ((("*", "*", "x86"), "m1.small"),
                                  (("*", "*", "x86_64"), "m1.large"))),
                                ]
     
-
-class EC2Instance (object):
+class nodeWrapper(object):
     def __init__(self, configurator, **kwargs):
-        # Stuff we need to start an instance: AMI name, key and cert
-        # files.  AMI and mtype default to configuration in this file,
-        # but can be overridden.
-        self.ec2_ami   = configurator.findOrDefault(kwargs, "ec2_ami")
-        self.ec2_mtype = configurator.findOrDefault(kwargs, "ec2_mtype")
-
-        self.use_internal_name = True if "use_internal_name" in kwargs else False
-
-        self.ec2_sshkey=kwargs["ec2_sshkey"]
-
-        # FIXME: this needs to be a commandline option
-        self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
         self.terminate = False if "no_terminate" in kwargs else True
 
-    def start(self):
-        "Fire up a fresh EC2 instance."
-        image=NodeImage(self.ec2_ami, self.ec2_ami, EC2)
-        size=NodeSize(self.ec2_mtype, self.ec2_mtype, None, None, None, None, EC2)
-        self.node = EC2Driver.create_node(image=image, name=self.ec2_ami, size=size, keyname=self.ec2_sshkey, securitygroup=self.ec2_groups)
-        print "Created node %s" % self.node.id
-
+    def getHostname(self): 
+        return self.node.public_ip[0] # FIXME private_ip?
+    
     def initwait(self):
         print "waiting for node to spin up"
         # Wait for EC2 to tell us the node is running.
@@ -178,7 +160,7 @@ class EC2Instance (object):
             n=None
             # EC2 sometimes takes a while to report a node.
             for i in range(6):
-                nodes = [n for n in EC2Driver.list_nodes() if (n.id==self.node.id)]
+                nodes = [n for n in self.list_nodes() if (n.id==self.node.id)]
                 if len(nodes)>0:
                     n=nodes[0]
                     break
@@ -213,6 +195,17 @@ class EC2Instance (object):
                 time.sleep(3) # arbitrary timeout
         print "ok"
 
+    def __enter__(self):
+        self.start()
+        # Note: we don't do an initwait() in __enter__ because if an
+        # exception is raised during __enter__, __exit__ doesn't get
+        # run (and by inspection RackSpace doesn't let you kill a node
+        # that hasn't finished booting yet).
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.stop()
+
     def stop(self):
         if self.terminate:
             print "Destroying node %s" % self.node.id
@@ -220,19 +213,35 @@ class EC2Instance (object):
         else:
             print "Not terminating EC2 instance %s." % self.node.id
 
-    def __enter__(self):
-        self.start()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.stop()
-
     def setup(self):
         pass
+
+class EC2Instance (nodeWrapper):
+    def __init__(self, configurator, **kwargs):
+        super(EC2Instance, self).__init__(configurator, **kwargs)
+        # Stuff we need to start an instance: AMI name, key and cert
+        # files.  AMI and mtype default to configuration in this file,
+        # but can be overridden.
+        self.ec2_ami   = configurator.findOrDefault(kwargs, "ec2_ami")
+        self.ec2_mtype = configurator.findOrDefault(kwargs, "ec2_mtype")
+        self.use_internal_name = True if "use_internal_name" in kwargs else False
+        self.ec2_sshkey=kwargs["ec2_sshkey"]
+
+        # FIXME: this needs to be a commandline option
+        self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
+
+
+    def start(self):
+        "Fire up a fresh EC2 instance."
+        EC2 = get_driver(Provider.EC2)
+        self.driver = EC2NodeDriver(settings.id, settings.key)
+        image = NodeImage(self.ec2_ami, self.ec2_ami, EC2)
+        size = NodeSize(self.ec2_mtype, self.ec2_mtype, None, None, None, None, EC2)
+        self.node = self.driver.create_node(image=image, name=self.ec2_ami, size=size, keyname=self.ec2_sshkey, securitygroup=self.ec2_groups)
+        print "Created node %s" % self.node.id
     
-    def getHostname(self): 
-        return self.node.public_ip[0] # FIXME private_ip?
-#        return self.ec2_internal_hostname if self.use_internal_name else self.ec2_external_hostname
+    def list_nodes(self):
+        return self.driver.list_nodes()
         
 class SshConnectionConfigurator (BaseConfigurator):
     def __init__(self, **kwargs):
@@ -260,28 +269,7 @@ class SshConnection (object):
         # Gets set to False when we think we can ssh in.
         self.sshwait = True
 
-    def sshWait(self):
-        "Poll until somebody's listening on port 22"
-
-        if self.sshwait == False:
-            return
-        while self.sshwait:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                try:
-                    s.connect((self.ssh_host, 22))
-                    self.sshwait = False
-                    print "connected on port 22 (ssh)"
-                    time.sleep(15) # arbitrary timeout, in case the
-                                  # remote sshd is slow.
-                except socket.error, err:
-                    pass
-            finally:
-                s.close()
-                time.sleep(3) # arbitrary timeout
-
     def initSsh(self):
-        self.sshWait()
         ctlpath="/tmp/ec2-ssh-%s-%s-%s" % (self.ssh_host, self.ssh_login, os.getpid())
         argv = ["ssh", "-o", "StrictHostKeyChecking no",
                 "-M", "-o", "ControlPath %s" % ctlpath,
@@ -309,7 +297,6 @@ class SshConnection (object):
                          self.ssh_host] + argv)
 
     def sendFiles(self, files):
-        self.sshWait()
         for (localfile, remotefile) in files:
             LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
                              "-o", "ControlMaster auto",
@@ -320,7 +307,6 @@ class SshConnection (object):
                              ("" if remotefile is None else remotefile) ])
 
     def recvFiles(self, files):
-        self.sshWait()
         for (remotefile, localfile) in files:
             LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
                              "-o", "ControlMaster auto",
@@ -703,8 +689,12 @@ class Configurator(SshConnectionConfigurator, EC2InstanceConfigurator, ScriptFil
     def __init__(self, **kwargs):
         super(Configurator, self).__init__(**kwargs)
 
-class rackspaceNode(object):
+class rackspaceInstance(nodeWrapper):
     def __init__(self, configurator, **kwargs):
+        super(rackspaceInstance, self).__init__(configurator, **kwargs)
+        self.imgname=configurator.default('rackspace_imgname')
+
+    def start(self):
         driver = get_driver(Provider.RACKSPACE)
         self.conn = driver(settings.rackspace_account, settings.rackspace_api_key)
         name=self.imgname+'-'+str(os.getpid())
@@ -712,56 +702,23 @@ class rackspaceNode(object):
         sizes=self.conn.list_sizes()
         sizes.sort(cmp=lambda x,y: int(x.ram)<int(y.ram))
         node = None
-        if len(images) != 1:
+        if len(images) > 1:
             raise Exception("too many images with \"%s\" in the name" % self.imgname)
+        if len(images) < 1:
+            raise Exception("too few images with \"%s\" in the name" % self.imgname)
         image = images[0]
         self.node = self.conn.create_node(image=image, name=name, size=sizes[0])
-        print self.node
+        # Note: the password is available only in the response to the
+        # create_node request, not in subsequent list_nodes()
+        # requests; so although the node objects we get back from
+        # list_nodes() are usuable for most things, we must hold onto
+        # the initial password.
         self.password = self.node.extra['password']
+        print self.node
 
-    def initwait(self):
-        while 1:
-            n=None
-            # EC2 sometimes takes a while to report a node.
-            for i in range(6):
-                nodes = [n for n in self.conn.list_nodes() if (n.id==self.node.id)]
-                if len(nodes)>0:
-                    n=nodes[0]
-                    break
-                else:
-                    time.sleep(10)
-            if not n:
-                raise Exception("couldn't find node with id %s" % self.node.id)
-            if n.state == NodeState.PENDING: 
-                time.sleep(10)
-            else:
-                self.node = n
-                break
-        print "ok"
-        # Now wait for the node's sshd to be accepting connections.
-        print "waiting for ssh"
-        sshwait = True
-        if sshwait == False:
-            return
-        while sshwait:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                try:
-                    s.connect((self.node.public_ip[0], 22))
-                    sshwait = False
-                    print "connected on port 22 (ssh)"
-                    time.sleep(15) # arbitrary timeout, in case the
-                    # remote sshd is slow.
-                except socket.error, err:
-                    pass
-            finally:
-                s.close()
-                time.sleep(3) # arbitrary timeout
-        print "ok"
+    def list_nodes(self):
+        return self.conn.list_nodes()
         
-    def getHostname(self):
-        return self.node.public_ip[0]
-
     def setup(self):
         self.putSshKey()
 
@@ -772,24 +729,6 @@ class rackspaceNode(object):
         print "putting ssh public key"
         ssh.put(".ssh/authorized_keys", contents=open(keyfile+'.pub').read(), chmod=0600)
         print "ok"
-        
-    def __enter__(self):
-        return self
-        
-    def __exit__(self, arg0, arg1, arg2):
-        if arg1:
-            print ">>>>>>>>"
-            print arg1
-            print arg2
-            print "<<<<<<<<"
-        print "shutting down node %s" % self.node
-        self.node.destroy()
-
-class fedoraNode(rackspaceNode):
-    def __init__(self, configurator, **kwargs):
-        self.imgname='Fedora '+kwargs['distro_version']
-        super(fedoraNode, self).__init__(configurator, **kwargs)
-
 
 def parse_mongo_version_spec (spec):
     foo = spec.split(":")
@@ -858,7 +797,7 @@ def main():
             time.sleep(10)
         # FIXME: it's not the best to have two different pathways for
         # the different hosting services, but...
-        with EC2Instance(configurator, **kwargs) if kwargs['distro_name'] != 'fedora' else fedoraNode(configurator, **kwargs) as host:
+        with EC2Instance(configurator, **kwargs) if kwargs['distro_name'] != 'fedora' else rackspaceInstance(configurator, **kwargs) as host:
             host.initwait()
             host.setup()
             kwargs["ssh_host"] = host.getHostname()
