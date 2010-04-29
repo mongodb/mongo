@@ -185,12 +185,13 @@ namespace mongo {
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
                << " version: " << version << " manager: " << manager
                << endl;
-
+        
         BSONObj result;
         if ( setShardVersion( conn , ns , version , authoritative , result ) ){
             // success!
             log(1) << "      setShardVersion success!" << endl;
             sequenceNumber = officialSequenceNumber;
+            dassert( sequenceNumber == checkShardVersionLastSequence[ make_pair(&conn,ns) ] );
             return;
         }
 

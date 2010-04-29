@@ -24,7 +24,10 @@
 namespace mongo {
 
     struct PoolForHost {
+        PoolForHost()
+            : created(0){}
         std::stack<DBClientBase*> pool;
+        long long created;
     };
     
     class DBConnectionHook {
@@ -52,8 +55,8 @@ namespace mongo {
         }
     */
     class DBConnectionPool {
-        mongo::mutex poolMutex;
-        map<string,PoolForHost*> pools; // servername -> pool
+        mongo::mutex _mutex;
+        map<string,PoolForHost*> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
         
         void onCreate( DBClientBase * conn );
@@ -64,12 +67,13 @@ namespace mongo {
         void release(const string& host, DBClientBase *c) {
             if ( c->isFailed() )
                 return;
-            scoped_lock L(poolMutex);
-            pools[host]->pool.push(c);
+            scoped_lock L(_mutex);
+            _pools[host]->pool.push(c);
         }
         void addHook( DBConnectionHook * hook );
+        void appendInfo( BSONObjBuilder& b );
     };
-
+    
     extern DBConnectionPool pool;
 
     /** Use to get a connection from the pool.  On exceptions things
@@ -98,18 +102,20 @@ namespace mongo {
         }
         
         ScopedDbConnection()
-            : _host( "" ) , _conn(0 ){
+            : _host( "" ) , _conn(0) {
         }
 
         /** throws UserException if can't connect */
         ScopedDbConnection(const string& host)
             : _host(host), _conn( pool.get(host) ) {
         }
-
+        
         ScopedDbConnection(const string& host, DBClientBase* conn )
             : _host( host ) , _conn( conn ){
         }
         
+        string getHost() const { return _host; }
+
         /** Force closure of the connection.  You should call this if you leave it in
             a bad state.  Destructor will do this too, but it is verbose.
         */

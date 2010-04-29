@@ -72,12 +72,14 @@ namespace mongo {
             if ( setAddr )
                 _lookup[addr] = s;
         }
-
+        
         void getAllShards( list<Shard>& all ){
             scoped_lock lk( _mutex );
             std::set<string> seen;
             for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ){
                 Shard s = i->second;
+                if ( s.getName() == "config" )
+                    continue;
                 if ( seen.count( s.getName() ) )
                     continue;
                 seen.insert( s.getName() );
