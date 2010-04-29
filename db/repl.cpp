@@ -890,12 +890,17 @@ namespace mongo {
             else if ( *opType == 'n' ) {
                 // no op
             }
-            else {
+            else if ( *opType == 'c' ){
                 BufBuilder bb;
                 BSONObjBuilder ob;
-                assert( *opType == 'c' );
                 _runCommands(ns, o, bb, ob, true, 0);
             }
+            else {
+                stringstream ss;
+                ss << "unknown opType [" << opType << "]";
+                throw MsgAssertionException( 13141 , ss.str() );
+            }
+            
         }
         catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;

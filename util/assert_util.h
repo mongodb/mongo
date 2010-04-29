@@ -137,6 +137,10 @@ namespace mongo {
             code = c;
             msg = m;
         }
+        MsgAssertionException(int c, const string& m) {
+            code = c;
+            msg = m;
+        }
         virtual bool severe() {
             return false;
         }
