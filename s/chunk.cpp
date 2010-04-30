@@ -470,23 +470,8 @@ namespace mongo {
         _config( config ) , _ns( ns ) , 
         _key( pattern ) , _unique( unique ) , 
         _sequenceNumber(  ++NextSequenceNumber ) {
-        Chunk temp(0);
         
-        ShardConnection conn( temp.modelServer() );
-        auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  ns ) );
-        while ( cursor->more() ){
-            BSONObj d = cursor->next();
-            if ( d["isMaxMarker"].trueValue() ){
-                continue;
-            }
-
-            Chunk * c = new Chunk( this );
-            c->unserialize( d );
-            _chunks.push_back( c );
-            _chunkMap[c->getMax()] = c;
-            c->_id = d["_id"].wrap().getOwned();
-        }
-        conn.done();
+        _load();
         
         if ( _chunks.size() == 0 ){
             Chunk * c = new Chunk( this );
@@ -511,31 +496,70 @@ namespace mongo {
         _chunks.clear();
         _chunkMap.clear();
     }
+    
+    void ChunkManager::_reload(){
+        rwlock lk( _lock , true );
+        _chunks.clear();
+        _chunkMap.clear();
+        _load();
+    }
+
+    void ChunkManager::_load(){
+        Chunk temp(0);
+        
+        ShardConnection conn( temp.modelServer() );
+
+        auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  _ns ) );
+        while ( cursor->more() ){
+            BSONObj d = cursor->next();
+            if ( d["isMaxMarker"].trueValue() ){
+                continue;
+            }
+            
+            Chunk * c = new Chunk( this );
+            c->unserialize( d );
+            _chunks.push_back( c );
+            _chunkMap[c->getMax()] = c;
+            c->_id = d["_id"].wrap().getOwned();
+        }
+        conn.done();
+    }
+
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
         return _key.hasShardKey( obj );
     }
 
-    Chunk& ChunkManager::findChunk( const BSONObj & obj ){
-        rwlock lk( _lock , false ); 
-
+    Chunk& ChunkManager::findChunk( const BSONObj & obj , bool retry ){
         BSONObj key = _key.extractKey(obj);
-        ChunkMap::iterator it = _chunkMap.upper_bound(key);
-        if (it != _chunkMap.end()){
-            Chunk* c = it->second;
-            if ( c->contains( obj ) ){
-                return *c;
-            }else{
-                PRINT(it->first);
-                PRINT(*c);
-                PRINT(key);
-                massert(13141, "Chunk map pointed to incorrect chunk", false);
+        
+        {
+            rwlock lk( _lock , false ); 
+            
+            ChunkMap::iterator it = _chunkMap.upper_bound(key);
+            if (it != _chunkMap.end()){
+                Chunk* c = it->second;
+                if ( c->contains( obj ) ){
+                    return *c;
+                }
+                else{
+                    PRINT(it->first);
+                    PRINT(*c);
+                    PRINT(key);
+                    massert(13141, "Chunk map pointed to incorrect chunk", false);
+                }
             }
         }
 
-        stringstream ss;
-        ss << "couldn't find a chunk which should be impossible  extracted: " << key;
-        throw UserException( 8070 , ss.str() );
+        if ( retry ){
+            stringstream ss;
+            ss << "couldn't find a chunk aftry retry which should be impossible extracted: " << key;
+            throw UserException( 8070 , ss.str() );
+        }
+        
+        log() << "ChunkManager: couldn't find chunk for: " << key << " going to retry" << endl;
+        _reload();
+        return findChunk( obj , true );
     }
 
     Chunk* ChunkManager::findChunkOnServer( const Shard& shard ) const {
