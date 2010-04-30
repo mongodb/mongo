@@ -26,6 +26,7 @@
 #include "../db/dbmessage.h"
 #include "../db/cmdline.h"
 #include "connpool.h"
+#include "../s/util.h"
 
 namespace mongo {
 
@@ -442,6 +443,9 @@ namespace mongo {
             this->query(ns, query, 1, 0, fieldsToReturn, queryOptions);
 
         uassert( 10276 ,  "DBClientBase::findOne: transport error", c.get() );
+
+        if ( c->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) )
+            throw StaleConfigException( ns , "findOne has stale config" );
 
         if ( !c->more() )
             return BSONObj();
