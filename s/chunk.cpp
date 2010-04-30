@@ -534,20 +534,27 @@ namespace mongo {
         BSONObj key = _key.extractKey(obj);
         
         {
-            rwlock lk( _lock , false ); 
+            BSONObj foo;
+            Chunk * c = 0;
+            {
+                rwlock lk( _lock , false ); 
+                ChunkMap::iterator it = _chunkMap.upper_bound(key);
+                if (it != _chunkMap.end()){
+                    foo = it->first;
+                    c = it->second;
+                }
+            }
             
-            ChunkMap::iterator it = _chunkMap.upper_bound(key);
-            if (it != _chunkMap.end()){
-                Chunk* c = it->second;
-                if ( c->contains( obj ) ){
+            if ( c ){
+                if ( c->contains( obj ) )
                     return *c;
-                }
-                else{
-                    PRINT(it->first);
-                    PRINT(*c);
-                    PRINT(key);
-                    massert(13141, "Chunk map pointed to incorrect chunk", false);
-                }
+                
+                PRINT(foo);
+                PRINT(*c);
+                PRINT(key);
+                
+                _reload();
+                massert(13141, "Chunk map pointed to incorrect chunk", false);
             }
         }
 
