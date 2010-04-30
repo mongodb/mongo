@@ -17,10 +17,11 @@ def s3bucket():
 
 def s3cp (bucket, filename, s3name):
     defaultacl="public-read"
+    print "putting %s to %s" % (filename, s3name)
     bucket.put(s3name, open(filename, "rb").read(), acl=defaultacl)
 
 def pushrepo(repodir):
-    files=subprocess.Popen(['find', repodir, '-name', 'Packages*', '-o', '-name', '*.deb', '-o', '-name', 'Release*'], stdout=subprocess.PIPE).communicate()[0][:-1].split('\n')
+    files=subprocess.Popen(['find', repodir, '-type', 'f'], stdout=subprocess.PIPE).communicate()[0][:-1].split('\n')
     bucket=s3bucket()
     olddebs=[t[0] for t in bucket.listdir(prefix='distros/') if t[0].endswith('.deb')]
     newdebs=[]
@@ -263,9 +264,9 @@ def __main__():
         if r != 0:
             raise Exception("mergerepositories.py exited %d" % r)
         print repodir
-#    pushrepo(repodir)
-#    shutil.rmtree(outputroot)
-#    shutil.rmtree(repodir)
+    pushrepo(repodir)
+    shutil.rmtree(outputroot)
+    shutil.rmtree(repodir)
 
     return 0
 
