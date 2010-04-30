@@ -500,7 +500,10 @@ namespace mongo {
         }
 
         int op = m.data->operation();
-        if ( op < 2000 || op >= 3000 )
+        if ( op < 2000 
+             || op >= 3000 
+             || op == dbGetMore  // cursors are weird
+             )
             return false;
 
         
