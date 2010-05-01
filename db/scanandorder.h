@@ -54,14 +54,13 @@ namespace mongo {
         if ( filter ) {
             BSONObjBuilder b( bb );
             BSONObjIterator i( js );
-            bool gotId = false;
             while ( i.more() ){
                 BSONElement e = i.next();
                 const char * fname = e.fieldName();
                 
                 if ( strcmp( fname , "_id" ) == 0 ){
-                    b.append( e );
-                    gotId = true;
+                    if (filter->includeID())
+                        b.append( e );
                 } else {
                     filter->append( b , e );
                 }

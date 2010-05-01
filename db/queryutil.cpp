@@ -698,19 +698,22 @@ namespace mongo {
                     uassert(13097, string("Unsupported projection option: ") + obj.firstElement().fieldName(), false);
                 }
 
-                continue;
-            }
+            } else if (!strcmp(e.fieldName(), "_id") && !e.trueValue()){
+                _includeID = false;
 
-            add (e.fieldName(), e.trueValue());
+            } else {
 
-            // validate input
-            if (true_false == -1){
-                true_false = e.trueValue();
-                _include = !e.trueValue();
-            }
-            else{
-                uassert( 10053 , "You cannot currently mix including and excluding fields. Contact us if this is an issue." , 
-                         (bool)true_false == e.trueValue() );
+                add (e.fieldName(), e.trueValue());
+
+                // validate input
+                if (true_false == -1){
+                    true_false = e.trueValue();
+                    _include = !e.trueValue();
+                }
+                else{
+                    uassert( 10053 , "You cannot currently mix including and excluding fields. Contact us if this is an issue." , 
+                             (bool)true_false == e.trueValue() );
+                }
             }
         }
     }
