@@ -17,10 +17,11 @@ def s3bucket():
 
 def s3cp (bucket, filename, s3name):
     defaultacl="public-read"
+    print "putting %s to %s" % (filename, s3name)
     bucket.put(s3name, open(filename, "rb").read(), acl=defaultacl)
 
 def pushrepo(repodir):
-    files=subprocess.Popen(['find', repodir, '-name', 'Packages*', '-o', '-name', '*.deb', '-o', '-name', 'Release*'], stdout=subprocess.PIPE).communicate()[0][:-1].split('\n')
+    files=subprocess.Popen(['find', repodir, '-type', 'f'], stdout=subprocess.PIPE).communicate()[0][:-1].split('\n')
     bucket=s3bucket()
     olddebs=[t[0] for t in bucket.listdir(prefix='distros/') if t[0].endswith('.deb')]
     newdebs=[]
@@ -188,7 +189,9 @@ def __main__():
              ("ubuntu", "9.4"),
              ("ubuntu", "8.10"),
              ("debian", "5.0"),
-             ("centos", "5.4"),)
+             ("centos", "5.4"),
+             ("fedora", "11"),
+             ("fedora", "12"))
     arches = ("x86", "x86_64")
 #    mongos = branches.split(',')
     # Run a makedist for each distro/version/architecture tuple above.
@@ -199,6 +202,9 @@ def __main__():
     procs = []
     count = 0
     for ((distro, distro_version), arch, spec) in gen([dists, arches, [branches]]):
+        # FIXME: now x86 fedoras on RackSpace circa 04/10.
+        if distro == "fedora" and arch == "x86":
+            continue
         count+=1
         opts = makedistopts
         if distro in ["debian", "ubuntu"]:

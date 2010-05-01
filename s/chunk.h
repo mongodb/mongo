@@ -69,6 +69,7 @@ namespace mongo {
 
         string toString() const;
         operator string() const { return toString(); }
+        friend ostream& operator << (ostream& out, const Chunk& c){ return (out << c.toString()); }
 
         bool operator==(const Chunk& s) const;
         
@@ -171,7 +172,7 @@ namespace mongo {
         Chunk* getChunk( int i ){ rwlock lk( _lock , false ); return _chunks[i]; }
         bool hasShardKey( const BSONObj& obj );
 
-        Chunk& findChunk( const BSONObj& obj );
+        Chunk& findChunk( const BSONObj& obj , bool retry = false );
         Chunk* findChunkOnServer( const Shard& shard ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
@@ -212,6 +213,10 @@ namespace mongo {
         void drop();
         
     private:
+        
+        void _reload();
+        void _load();
+        
         DBConfig * _config;
         string _ns;
         ShardKeyPattern _key;

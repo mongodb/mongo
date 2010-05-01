@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-# makedist.py: make a distro package (on an EC2 instance)
+# makedist.py: make a distro package (on an EC2 (or sometimes
+# RackSpace) instance)
 
 # For ease of use, put a file called settings.py someplace in your
 # sys.path, containing something like the following:
@@ -50,10 +51,7 @@ from libcloud.types import Provider
 from libcloud.providers import get_driver
 from libcloud.drivers.ec2 import EC2NodeDriver, NodeImage
 from libcloud.base import Node, NodeImage, NodeSize, NodeState
-EC2 = get_driver(Provider.EC2)
-EC2Driver=EC2NodeDriver(settings.id, settings.key)
-
-
+from libcloud.ssh import ParamikoSSHClient
 
 # For the moment, we don't handle any of the errors we raise, so it
 # suffices to have a simple subclass of Exception that just
@@ -141,35 +139,21 @@ class EC2InstanceConfigurator(BaseConfigurator):
                                  (("centos", "5.4", "x86_64"), "ami-ccb35ea5"),
                                  (("fedora", "8", "x86_64"), "ami-2547a34c"),
                                  (("fedora", "8", "x86"), "ami-5647a33f"))),
+                               ("rackspace_imgname",
+                                ((("fedora", "11", "x86_64"), "Fedora 11"),
+                                 (("fedora", "12", "x86_64"), "Fedora 12"))),
                                ("ec2_mtype",
                                 ((("*", "*", "x86"), "m1.small"),
                                  (("*", "*", "x86_64"), "m1.large"))),
                                ]
     
-
-class EC2Instance (object):
+class nodeWrapper(object):
     def __init__(self, configurator, **kwargs):
-        # Stuff we need to start an instance: AMI name, key and cert
-        # files.  AMI and mtype default to configuration in this file,
-        # but can be overridden.
-        self.ec2_ami   = configurator.findOrDefault(kwargs, "ec2_ami")
-        self.ec2_mtype = configurator.findOrDefault(kwargs, "ec2_mtype")
-
-        self.use_internal_name = True if "use_internal_name" in kwargs else False
-
-        self.ec2_sshkey=kwargs["ec2_sshkey"]
-
-        # FIXME: this needs to be a commandline option
-        self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
         self.terminate = False if "no_terminate" in kwargs else True
 
-    def start(self):
-        "Fire up a fresh EC2 instance."
-        image=NodeImage(self.ec2_ami, self.ec2_ami, EC2)
-        size=NodeSize(self.ec2_mtype, self.ec2_mtype, None, None, None, None, EC2)
-        self.node = EC2Driver.create_node(image=image, name=self.ec2_ami, size=size, keyname=self.ec2_sshkey, securitygroup=self.ec2_groups)
-        print "Created node %s" % self.node.id
-
+    def getHostname(self): 
+        return self.node.public_ip[0] # FIXME private_ip?
+    
     def initwait(self):
         print "waiting for node to spin up"
         # Wait for EC2 to tell us the node is running.
@@ -177,7 +161,7 @@ class EC2Instance (object):
             n=None
             # EC2 sometimes takes a while to report a node.
             for i in range(6):
-                nodes = [n for n in EC2Driver.list_nodes() if (n.id==self.node.id)]
+                nodes = [n for n in self.list_nodes() if (n.id==self.node.id)]
                 if len(nodes)>0:
                     n=nodes[0]
                     break
@@ -212,6 +196,17 @@ class EC2Instance (object):
                 time.sleep(3) # arbitrary timeout
         print "ok"
 
+    def __enter__(self):
+        self.start()
+        # Note: we don't do an initwait() in __enter__ because if an
+        # exception is raised during __enter__, __exit__ doesn't get
+        # run (and by inspection RackSpace doesn't let you kill a node
+        # that hasn't finished booting yet).
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.stop()
+
     def stop(self):
         if self.terminate:
             print "Destroying node %s" % self.node.id
@@ -219,16 +214,35 @@ class EC2Instance (object):
         else:
             print "Not terminating EC2 instance %s." % self.node.id
 
-    def __enter__(self):
-        self.start()
-        return self
+    def setup(self):
+        pass
 
-    def __exit__(self, type, value, traceback):
-        self.stop()
+class EC2Instance (nodeWrapper):
+    def __init__(self, configurator, **kwargs):
+        super(EC2Instance, self).__init__(configurator, **kwargs)
+        # Stuff we need to start an instance: AMI name, key and cert
+        # files.  AMI and mtype default to configuration in this file,
+        # but can be overridden.
+        self.ec2_ami   = configurator.findOrDefault(kwargs, "ec2_ami")
+        self.ec2_mtype = configurator.findOrDefault(kwargs, "ec2_mtype")
+        self.use_internal_name = True if "use_internal_name" in kwargs else False
+        self.ec2_sshkey=kwargs["ec2_sshkey"]
 
-    def getHostname(self): 
-        return self.node.public_ip[0] # FIXME private_ip?
-#        return self.ec2_internal_hostname if self.use_internal_name else self.ec2_external_hostname
+        # FIXME: this needs to be a commandline option
+        self.ec2_groups = ["default", "buildbot-slave", "dist-slave"]
+
+
+    def start(self):
+        "Fire up a fresh EC2 instance."
+        EC2 = get_driver(Provider.EC2)
+        self.driver = EC2NodeDriver(settings.id, settings.key)
+        image = NodeImage(self.ec2_ami, self.ec2_ami, EC2)
+        size = NodeSize(self.ec2_mtype, self.ec2_mtype, None, None, None, None, EC2)
+        self.node = self.driver.create_node(image=image, name=self.ec2_ami, size=size, keyname=self.ec2_sshkey, securitygroup=self.ec2_groups)
+        print "Created node %s" % self.node.id
+    
+    def list_nodes(self):
+        return self.driver.list_nodes()
         
 class SshConnectionConfigurator (BaseConfigurator):
     def __init__(self, **kwargs):
@@ -242,7 +256,7 @@ class SshConnectionConfigurator (BaseConfigurator):
                                  (("ubuntu", "9.4", "*"), "root"),
                                  (("ubuntu", "8.10", "*"), "root"),
                                  (("ubuntu", "8.4", "*"), "ubuntu"),
-                                 (("fedora", "8", "*"), "root"),
+                                 (("fedora", "*", "*"), "root"),
                                  (("centos", "*", "*"), "root"))),
                                ]
 
@@ -256,28 +270,7 @@ class SshConnection (object):
         # Gets set to False when we think we can ssh in.
         self.sshwait = True
 
-    def sshWait(self):
-        "Poll until somebody's listening on port 22"
-
-        if self.sshwait == False:
-            return
-        while self.sshwait:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                try:
-                    s.connect((self.ssh_host, 22))
-                    self.sshwait = False
-                    print "connected on port 22 (ssh)"
-                    time.sleep(15) # arbitrary timeout, in case the
-                                  # remote sshd is slow.
-                except socket.error, err:
-                    pass
-            finally:
-                s.close()
-                time.sleep(3) # arbitrary timeout
-
     def initSsh(self):
-        self.sshWait()
         ctlpath="/tmp/ec2-ssh-%s-%s-%s" % (self.ssh_host, self.ssh_login, os.getpid())
         argv = ["ssh", "-o", "StrictHostKeyChecking no",
                 "-M", "-o", "ControlPath %s" % ctlpath,
@@ -305,7 +298,6 @@ class SshConnection (object):
                          self.ssh_host] + argv)
 
     def sendFiles(self, files):
-        self.sshWait()
         for (localfile, remotefile) in files:
             LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
                              "-o", "ControlMaster auto",
@@ -316,7 +308,6 @@ class SshConnection (object):
                              ("" if remotefile is None else remotefile) ])
 
     def recvFiles(self, files):
-        self.sshWait()
         for (remotefile, localfile) in files:
             LocalHost.runLocally(["scp", "-o", "StrictHostKeyChecking no",
                              "-o", "ControlMaster auto",
@@ -416,10 +407,10 @@ rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/{distro_arch}/epel-release
 yum -y install {pkg_prereq_str}
 """
     rpm_build_commands="""
-for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p /usr/src/redhat/$d; done
-cp -v "{pkg_name}{pkg_name_suffix}-{pkg_version}/rpm/mongo.spec" /usr/src/redhat/SPECS/{pkg_name}{pkg_name_suffix}.spec
-tar -cpzf /usr/src/redhat/SOURCES/"{pkg_name}{pkg_name_suffix}-{pkg_version}".tar.gz "{pkg_name}{pkg_name_suffix}-{pkg_version}"
-rpmbuild -ba /usr/src/redhat/SPECS/{pkg_name}{pkg_name_suffix}.spec
+for d in BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS; do mkdir -p {rpmbuild_dir}/$d; done
+cp -v "{pkg_name}{pkg_name_suffix}-{pkg_version}/rpm/mongo.spec" {rpmbuild_dir}/SPECS/{pkg_name}{pkg_name_suffix}.spec
+tar -cpzf {rpmbuild_dir}/SOURCES/"{pkg_name}{pkg_name_suffix}-{pkg_version}".tar.gz "{pkg_name}{pkg_name_suffix}-{pkg_version}"
+rpmbuild -ba --target={distro_arch} {rpmbuild_dir}/SPECS/{pkg_name}{pkg_name_suffix}.spec
 # FIXME: should install the rpms, check if mongod is running.
 """ 
     # FIXME: this is clean, but adds 40 minutes or so to the build process.
@@ -495,8 +486,8 @@ git clone git://github.com/mongodb/mongo.git
         self.configuration += [("pkg_product_dir",
                                 ((("ubuntu", "*", "*"), self.deb_productdir),
                                  (("debian", "*", "*"), self.deb_productdir),
-                                 (("fedora", "*", "*"), self.rpm_productdir),
-                                 (("centos", "*", "*"), self.rpm_productdir))),
+                                 (("fedora", "*", "*"), "~/rpmbuild/RPMS"),
+                                 (("centos", "*", "*"), "/usr/src/redhat/RPMS"))),
                                ("pkg_prereqs",
                                 ((("ubuntu", "9.4", "*"),
                                   self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
@@ -510,7 +501,7 @@ git clone git://github.com/mongodb/mongo.git
                                   self.unversioned_deb_boost_prereqs + self.old_versioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
                                  (("debian", "5.0", "*"),
                                   self.versioned_deb_boost_prereqs + self.unversioned_deb_xulrunner_prereqs + self.common_deb_prereqs),
-                                 (("fedora", "8", "*"),
+                                 (("fedora", "*", "*"),
                                   self.fedora_prereqs),
                                  (("centos", "5.4", "*"),
                                   self.centos_preqres))),
@@ -572,6 +563,11 @@ git clone git://github.com/mongodb/mongo.git
                                # FIXME: there should be a command-line argument for this.
                                ("pkg_name_conflicts",
                                 ((("*", "*", "*"),  ["", "-stable", "-unstable", "-snapshot", "-oldstable"]),
+                                 )),
+                               ("rpmbuild_dir",
+                                ((("fedora", "*", "*"), "~/rpmbuild"),
+                                 (("centos", "*", "*"), "/usr/src/redhat"),
+                                 (("*", "*","*"), ''),
                                  )),
                                 ]
 
@@ -668,8 +664,8 @@ class ScriptFile(object):
                              # suppose this works elsewhere
                              pkg_name_conflicts = ", ".join([self.pkg_name+conflict for conflict in pkg_name_conflicts]),
                              mongo_arch=self.mongo_arch,
-                             mongo_pub_version=mongo_pub_version
-                             )
+                             mongo_pub_version=mongo_pub_version,
+                             rpmbuild_dir=self.configurator.default('rpmbuild_dir'))
             script+='rm -rf mongo'
         return script
 
@@ -693,7 +689,48 @@ class ScriptFile(object):
 class Configurator(SshConnectionConfigurator, EC2InstanceConfigurator, ScriptFileConfigurator, BaseHostConfigurator):
     def __init__(self, **kwargs):
         super(Configurator, self).__init__(**kwargs)
+
+class rackspaceInstance(nodeWrapper):
+    def __init__(self, configurator, **kwargs):
+        super(rackspaceInstance, self).__init__(configurator, **kwargs)
+        self.imgname=configurator.default('rackspace_imgname')
 
+    def start(self):
+        driver = get_driver(Provider.RACKSPACE)
+        self.conn = driver(settings.rackspace_account, settings.rackspace_api_key)
+        name=self.imgname+'-'+str(os.getpid())
+        images=filter(lambda x: (x.name.find(self.imgname) > -1), self.conn.list_images())
+        sizes=self.conn.list_sizes()
+        sizes.sort(cmp=lambda x,y: int(x.ram)<int(y.ram))
+        node = None
+        if len(images) > 1:
+            raise Exception("too many images with \"%s\" in the name" % self.imgname)
+        if len(images) < 1:
+            raise Exception("too few images with \"%s\" in the name" % self.imgname)
+        image = images[0]
+        self.node = self.conn.create_node(image=image, name=name, size=sizes[0])
+        # Note: the password is available only in the response to the
+        # create_node request, not in subsequent list_nodes()
+        # requests; so although the node objects we get back from
+        # list_nodes() are usuable for most things, we must hold onto
+        # the initial password.
+        self.password = self.node.extra['password']
+        print self.node
+
+    def list_nodes(self):
+        return self.conn.list_nodes()
+        
+    def setup(self):
+        self.putSshKey()
+
+    def putSshKey(self):
+        keyfile=settings.makedist['ssh_keyfile']
+        ssh = ParamikoSSHClient(hostname = self.node.public_ip[0], password = self.password)
+        ssh.connect()
+        print "putting ssh public key"
+        ssh.put(".ssh/authorized_keys", contents=open(keyfile+'.pub').read(), chmod=0600)
+        print "ok"
+
 def parse_mongo_version_spec (spec):
     foo = spec.split(":")
     mongo_version = foo[0] # this can be a commit id, a
@@ -759,9 +796,12 @@ def main():
             print """# Going to run the following on a fresh AMI:"""
             print f.read()
             time.sleep(10)
-        with EC2Instance(configurator, **kwargs) as ec2:
-            ec2.initwait()
-            kwargs["ssh_host"] = ec2.getHostname()
+        # FIXME: it's not the best to have two different pathways for
+        # the different hosting services, but...
+        with EC2Instance(configurator, **kwargs) if kwargs['distro_name'] != 'fedora' else rackspaceInstance(configurator, **kwargs) as host:
+            host.initwait()
+            host.setup()
+            kwargs["ssh_host"] = host.getHostname()
             with SshConnection(configurator, **kwargs) as ssh:
                 ssh.runRemotely(["uname -a; ls /"])
                 ssh.runRemotely(["mkdir", "pkg"])
@@ -816,11 +856,12 @@ def processArguments():
 
 MONGO-VERSION-SPEC has the syntax
 Commit(:Pkg-Name-Suffix(:Pkg-Version)).  If Commit starts with an 'r',
-build from a tagged release; if Commit starts with a 'v', build from
-the HEAD of a version branch; otherwise, build whatever git commit is
-identified by Commit.  Pkg-Name-Suffix gets appended to the package
-name, and defaults to "-stable" and "-unstable" if Commit looks like
-it designates a stable or unstable release/branch, respectively.
+build from a tagged release; if Commit starts with an 'n', package up
+a nightly build; if Commit starts with a 'v', build from the HEAD of a
+version branch; otherwise, build whatever git commit is identified by
+Commit.  Pkg-Name-Suffix gets appended to the package name, and
+defaults to "-stable" and "-unstable" if Commit looks like it
+designates a stable or unstable release/branch, respectively.
 Pkg-Version is used as the package version, and defaults to YYYYMMDD.
 Examples:
 
@@ -865,4 +906,5 @@ if __name__ == "__main__":
 
 # Examples:
 
-# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot
+# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 HEAD:-snapshot,v1.4:-stable,v1.5:-unstable
+# ./makedist.py /tmp/ubuntu ubuntu 8.10 x86_64 nlatest:-snapshot,n1.4.2:-stable,n1.5.0:-unstable

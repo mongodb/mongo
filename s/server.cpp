@@ -157,6 +157,7 @@ int main(int argc, char* argv[], char *envp[] ) {
         ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
         ( "test" , "just run unit tests" )
         ( "upgrade" , "upgrade meta data version" )
+        ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
         ;
     
 
@@ -175,6 +176,9 @@ int main(int argc, char* argv[], char *envp[] ) {
         return 0;
     }
 
+    if ( params.count( "chunkSize" ) ){
+        Chunk::MaxChunkSize = params["chunkSize"].as<int>() * 1024 * 1024;
+    }
 
     if ( params.count( "test" ) ){
         logLevel = 5;

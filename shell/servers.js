@@ -304,17 +304,20 @@ printShardingStatus = function( configDB ){
 
     output( "  databases:" );
     configDB.databases.find().sort( { name : 1 } ).forEach( 
-        function(z){
-            output( "\t" + tojson(z,"",true) );
+        function(db){
+            output( "\t" + tojson(db,"",true) );
         
-            output( "\t\tmy chunks" );
-            
-            configDB.chunks.find( { "ns" : new RegExp( "^" + z.name ) } ).sort( { ns : 1 , min : 1 } ).forEach( 
-                function(z){
-                    output( "\t\t\t" + z.ns + " " + tojson( z.min ) + " -->> " + tojson( z.max ) + 
-                           " on : " + z.shard + " " + tojson( z.lastmod ) );
+            if (db.partitioned){
+                for (ns in db.sharded){
+                    output("\t\t" + ns + " chunks:");
+                    configDB.chunks.find( { "ns" : ns } ).sort( { min : 1 } ).forEach( 
+                        function(chunk){
+                            output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                   " on : " + chunk.shard + " " + tojson( chunk.lastmod ) );
+                        }
+                    );
                 }
-            );
+            }
         }
     );
     

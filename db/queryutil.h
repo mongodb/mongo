@@ -196,10 +196,10 @@ namespace mongo {
      */
     class FieldMatcher {
     public:
-
         FieldMatcher()
             : _include(true)
             , _special(false)
+            , _includeID(true)
             , _skip(0)
             , _limit(-1)
         {}
@@ -209,6 +209,7 @@ namespace mongo {
         void append( BSONObjBuilder& b , const BSONElement& e ) const;
 
         BSONObj getSpec() const;
+        bool includeID() { return _includeID; }
     private:
 
         void add( const string& field, bool include );
@@ -221,6 +222,7 @@ namespace mongo {
         typedef map<string, boost::shared_ptr<FieldMatcher> > FieldMap;
         FieldMap _fields;
         BSONObj _source;
+        bool _includeID;
 
         // used for $slice operator
         int _skip;

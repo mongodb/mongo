@@ -58,7 +58,7 @@ namespace mongo {
             if( strcmp(e.fieldName(), "$err") == 0 ) { 
                 if( logLevel >= 5 )
                     log() << "nextSafe() error " << o.toString() << endl;
-                uassert(13106, "nextSafe() returns $err", false);
+                uassert(13106, "nextSafe() returns: " + o.toString(), false);
             }
             return o;
         }

@@ -140,14 +140,14 @@ public:
             }
 
             conn().getLastError();
-            cout << "done!";
+            cout << "done!" << endl;
             return 0;
         }
 
         if ( cmd == "delete" ){
             g.removeFile(filename);
             conn().getLastError();
-            cout << "done!";
+            cout << "done!" << endl;
             return 0;
         }
 

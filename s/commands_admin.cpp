@@ -504,6 +504,7 @@ namespace mongo {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
             bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                Timer t;
                 string ns = cmdObj["movechunk"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
@@ -540,10 +541,11 @@ namespace mongo {
                     errmsg = "that chunk is already on that shard";
                     return false;
                 }
-
+                
                 if ( ! c.moveAndCommit( to , errmsg ) )
                     return false;
 
+                result.append( "millis" , t.millis() );
                 return true;
             }
         } moveChunkCmd;
