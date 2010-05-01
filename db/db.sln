@@ -37,13 +37,16 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88-3451-433C-B74F-31B31FEB5791}"
 	ProjectSection(SolutionItems) = preProject
 		..\shell\dbshell.cpp = ..\shell\dbshell.cpp
-		..\shell\mongo.cpp = ..\shell\mongo.cpp
 		..\shell\mongo_vstudio.cpp = ..\shell\mongo_vstudio.cpp
 		..\shell\utils.cpp = ..\shell\utils.cpp
 		..\shell\utils.h = ..\shell\utils.h
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other source files", "other source files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
+	ProjectSection(SolutionItems) = preProject
+		..\buildscripts\buildboost.bat = ..\buildscripts\buildboost.bat
+		..\SConstruct = ..\SConstruct
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bsondemo", "..\bson\bsondemo\bsondemo.vcproj", "{C9DB5EB7-81AA-4185-BAA1-DA035654402F}"
 EndProject
