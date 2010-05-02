@@ -602,10 +602,15 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Oi /FD /nologo /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
-        #env.Append( CPPFLAGS= " /GL " ) # TODO: this has caused some linking problems
+        env.Append( CPPFLAGS= " /O2 /FD /nologo /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
+        # TODO: this has caused some linking problems :
+        env.Append( CPPFLAGS= " /GL " ) 
+        env.Append( LINKFLAGS=" /LTCG " )
     else:
         env.Append( CPPDEFINES=[ "_DEBUG" ] )
+        # /Od disable optimization
+        # /ZI debug info w/edit & continue 
+        # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
         env.Append( CPPFLAGS=" /Od /Gm /RTC1 /MDd /ZI " )
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /incremental:yes /debug " )
