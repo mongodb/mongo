@@ -547,6 +547,7 @@ elif "win32" == os.sys.platform:
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
 	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
+            print( "found visual studio at " + pathdir )
 	    break
     else:
 	#use current environment
@@ -602,7 +603,7 @@ elif "win32" == os.sys.platform:
 
     if release:
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /FD /nologo /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
+        env.Append( CPPFLAGS= " /O2 /FD /MT /Gy /Zi /TP /errorReport:prompt /Gm " )
         # TODO: this has caused some linking problems :
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
@@ -615,13 +616,18 @@ elif "win32" == os.sys.platform:
         env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
         env.Append( LINKFLAGS=" /incremental:yes /debug " )
 
-    env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+    if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
+        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
+    elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
+        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_32" ] )
+    else:
+        env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+
     if force64:
         env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT " )
     else:
         env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
-
 
     def pcreFilter(x):
         name = x.name
@@ -787,7 +793,7 @@ def setupBuildInfoFile( outFile ):
         '#include <iostream>',
         '#include <boost/version.hpp>',
         'namespace mongo { const char * gitVersion(){ return "' + version + '"; } }',
-        'namespace mongo { const char * sysInfo(){ return "' + sysInfo + ' BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; } }',
+        'namespace mongo { string sysInfo(){ return "' + sysInfo + ' BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; } }',
         ])
 
     contents += '\n';

@@ -147,7 +147,7 @@ namespace mongo {
 namespace mongo {
 
     const char * gitVersion();
-    const char * sysInfo();
+    string sysInfo();
     string mongodVersion();
     
     void printGitVersion();

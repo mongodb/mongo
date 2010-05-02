@@ -29,6 +29,9 @@
 *.manifest
 *.gch
 *.vcproj.*
+*.vcxproj.*
+*.*sdf
+*.psess
 *#
 .#*
 shell/mongo.cpp
@@ -37,6 +40,7 @@ shell/mongo-server.cpp
 */Debug/
 */*/Debug/
 */Release/
+*/*/Release/
 db/.gdb*
 db/makefile.local
 config.log
