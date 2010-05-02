@@ -45,6 +45,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other source files", "other source files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
 	ProjectSection(SolutionItems) = preProject
 		..\buildscripts\buildboost.bat = ..\buildscripts\buildboost.bat
+		..\buildscripts\buildboost64.bat = ..\buildscripts\buildboost64.bat
 		..\SConstruct = ..\SConstruct
 	EndProjectSection
 EndProject

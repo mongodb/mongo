@@ -14,23 +14,26 @@ BUILDING
       
   see docs/building.md
 
-
 RUNNING
 
-  ./mongod
+  To see command line options invoke:
 
-  runs the database.  Use 
+    $ ./mongod --help
 
-  ./mongod --help
+  To run a single server database:
 
-  to see command line options.
+    $ mkdir /data/db
+    $ ./mongod
+    $
+    $ # mongo shell connects to localhost and test database by default:
+    $ ./mongo 
+    > help
 
 NOTES
 
   Mongo uses memory mapped files.  If built as a 32 bit executable, you will
   not be able to work with large (multi-gigabyte) databases.  However, 32 bit
   builds work fine with small development databases.
-
 
 LICENSING
 

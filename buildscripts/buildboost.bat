@@ -8,8 +8,8 @@ echo .
 echo Note: you will want boost v1.42 or higher with VS2010.
 echo .
 echo We assume you have bjam.  To build bjam:
-echo cd tools\jam\src
-echo build.bat
+echo   cd tools\jam\src
+echo   build.bat
 echo .
 
 cd \boost
@@ -30,7 +30,7 @@ echo About to try to move libs from /boost/stage/lib to /boost/lib/
 pause
 cls
 rem bjam makes extra copies without the ver #; we kill those:
-del stage\lib\*-mt.lib
+del stage\lib\*s.lib
 move stage\lib\* lib\
 
 echo .
@@ -48,7 +48,7 @@ echo About to try to move libs from /boost/stage/lib to /boost/lib/
 pause
 cls
 rem bjam makes extra copies without the ver #; we kill those:
-del stage\lib\*s.lib
+del stage\lib\*-gd.lib
 move stage\lib\* lib\
 
 echo Done - try running "dir \boost\lib\"
