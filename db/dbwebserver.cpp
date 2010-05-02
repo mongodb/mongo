@@ -207,11 +207,9 @@ namespace mongo {
                 }
             }
 
-            ss << "\nClients:\n";
-            ss << "<table border=1 cellpadding=2 cellspacing=0>";
+            ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'>"
-               << "<th>Thread</th>" 
-             
+               << "<th>Client</th>" 
                << "<th>OpId</th>" 
                << "<th>Active</th>" 
                << "<th>LockType</th>"
