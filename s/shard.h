@@ -24,7 +24,8 @@
 namespace mongo {
 
     class ShardConnection;
-    
+    class ShardStatus;
+
     class Shard {
     public:
         Shard()
@@ -108,14 +109,29 @@ namespace mongo {
             return runCommand( db , BSON( simple << 1 ) );
         }
         BSONObj runCommand( const string& db , const BSONObj& cmd );
-
-        static void getAllShards( list<Shard>& all );
+        
+        ShardStatus getStatus() const;
+        
+        static void getAllShards( vector<Shard>& all );
+        
+        /**
+         * picks a Shard for more load
+         */
+        static Shard pick();
+        
+        static void reloadShardInfo();
 
         static Shard EMPTY;
 
     private:
         string _name;
         string _addr;
+    };
+
+    class ShardStatus {
+    private:
+        long long _mapped;
+        double _writeLock;
     };
 
     class ShardConnection {

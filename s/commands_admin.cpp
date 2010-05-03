@@ -654,6 +654,9 @@ namespace mongo {
                 }
                 result.append( "added" , shard["host"].valuestrsafe() );
                 conn.done();
+                
+                Shard::reloadShardInfo();
+                    
                 return true;
             }
         } addServer;
@@ -840,13 +843,13 @@ namespace mongo {
         virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
         
         bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            list<Shard> shards;
+            vector<Shard> shards;
             Shard::getAllShards( shards );
             
             map<string,long long> sizes;
             map< string,shared_ptr<BSONObjBuilder> > dbShardInfo;
 
-            for ( list<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
+            for ( vector<Shard>::iterator i=shards.begin(); i!=shards.end(); i++ ){
                 Shard s = *i;
                 BSONObj x = s.runCommand( "admin" , "listDatabases" );
                 cout << s.toString() << "\t" << x.jsonString() << endl;

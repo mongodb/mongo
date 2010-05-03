@@ -286,26 +286,6 @@ namespace mongo {
     
     /* --- Grid --- */
     
-    Shard Grid::pickShardForNewDB(){
-        ShardConnection conn( configServer.getPrimary() );
-        
-        // TODO: this is temporary
-        
-        vector<string> all;
-        auto_ptr<DBClientCursor> c = conn->query( "config.shards" , Query() );
-        while ( c->more() ){
-            BSONObj s = c->next();
-            all.push_back( s["host"].valuestrsafe() );
-            // look at s["maxSize"] if exists
-        }
-        conn.done();
-        
-        if ( all.size() == 0 )
-            return Shard::EMPTY;
-        
-        return Shard::make( all[ rand() % all.size() ] );
-    }
-
     bool Grid::knowAboutShard( string name ) const{
         ShardConnection conn( configServer.getPrimary() );
         BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
@@ -336,7 +316,7 @@ namespace mongo {
                     if ( database == "admin" )
                         cc->_primary = configServer.getPrimary();
                     else
-                        cc->_primary = pickShardForNewDB();
+                        cc->_primary = Shard::pick();
                     
                     if ( cc->_primary.ok() ){
                         cc->save();
