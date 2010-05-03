@@ -105,12 +105,12 @@ namespace mongo {
             return _addr.size() > 0 && _addr.size() > 0;
         }
         
-        BSONObj runCommand( const string& db , const string& simple ){
+        BSONObj runCommand( const string& db , const string& simple ) const {
             return runCommand( db , BSON( simple << 1 ) );
         }
-        BSONObj runCommand( const string& db , const BSONObj& cmd );
+        BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
         
-        ShardStatus getStatus() const;
+        ShardStatus getStatus() const ;
         
         static void getAllShards( vector<Shard>& all );
         
@@ -129,7 +129,31 @@ namespace mongo {
     };
 
     class ShardStatus {
+    public:
+        
+        ShardStatus( const Shard& shard , const BSONObj& obj );
+
+        friend ostream& operator << (ostream& out, const ShardStatus& s) {
+            out << (string)s;
+            return out;
+        }
+
+        operator string() const {
+            stringstream ss;
+            ss << "shard: " << _shard << " mapped: " << _mapped << " writeLock: " << _writeLock; 
+            return ss.str();
+        }
+
+        bool operator<( const ShardStatus& other ) const{
+            return _mapped < other._mapped;
+        }
+        
+        Shard shard() const {
+            return _shard;
+        }
+
     private:
+        Shard _shard;
         long long _mapped;
         double _writeLock;
     };

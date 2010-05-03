@@ -118,7 +118,7 @@ namespace mongo {
     }
 
     
-    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ){
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
         ShardConnection conn( this );
         BSONObj res;
         bool ok = conn->runCommand( db , cmd , res );
@@ -130,6 +130,10 @@ namespace mongo {
         res = res.getOwned();
         conn.done();
         return res;
+    }
+    
+    ShardStatus Shard::getStatus() const {
+        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
     }
     
     void Shard::reloadShardInfo(){
@@ -145,7 +149,22 @@ namespace mongo {
             if ( all.size() == 0 )
                 return EMPTY;
         }
-        Shard temp = all[rand()%all.size()];
-        return temp;
+        
+        ShardStatus best = all[0].getStatus();
+        
+        for ( size_t i=1; i<all.size(); i++ ){
+            ShardStatus t = all[i].getStatus();
+            if ( t < best )
+                best = t;
+        }
+
+        log(1) << "picking shard: " << best << endl;
+        return best.shard();
+    }
+
+    ShardStatus::ShardStatus( const Shard& shard , const BSONObj& obj )
+        : _shard( shard ) {
+        _mapped = obj.getFieldDotted( "mem.mapped" ).numberLong();
+        _writeLock = 0; // TOOD
     }
 }
