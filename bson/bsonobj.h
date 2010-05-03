@@ -368,7 +368,7 @@ private:
             _objdata = data;
             if ( ! isValid() ){
                 stringstream ss;
-                ss << "Invalid BSONObj spec size: " << objsize();
+                ss << "Invalid BSONObj spec size: " << objsize() << " (" << hex << objsize() << dec << ")";
                 try {
                     BSONElement e = firstElement();
                     ss << " first element:" << e.toString() << " ";
