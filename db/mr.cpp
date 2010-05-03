@@ -622,10 +622,8 @@ namespace mongo {
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
             virtual bool slaveOk() const { return true; }
             
-            virtual LockType locktype() const { return WRITE; } 
+            virtual LockType locktype() const { return NONE; } 
             bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                dbtemprelease temprelease; // we don't touch the db directly
-
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
                 MRSetup mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
