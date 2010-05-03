@@ -813,11 +813,9 @@ namespace mongo {
 
     string ReplSource::resyncDrop( const char *db, const char *requester ) {
         log() << "resync: dropping database " << db << endl;
-        string dummyns = string( db ) + ".";
-        Client::Context ctx(dummyns);
-        assert( cc().database()->name == db );
-        dropDatabase(dummyns.c_str());
-        return dummyns;
+        Client::Context ctx(db);
+        dropDatabase(db);
+        return db;
     }
     
     /* grab initial copy of a database from the master */
