@@ -366,7 +366,7 @@ namespace JsonTests {
                 b.appendDBRef( "n" , "foo" , oid );
                 b.appendCode( "o" , "function(){}" );
                 b.appendSymbol( "p" , "foo" );
-                //b.appendCodeWScope( "q" , "function(){}" , BSON("x" << 1 ) );
+                b.appendCodeWScope( "q" , "function(){}" , BSON("x" << 1 ) );
                 b.append( "r" , (int)5 );
                 b.appendTimestamp( "s" , 123123123123123LL );
                 b.append( "t" , 12321312312LL );

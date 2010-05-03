@@ -233,10 +233,20 @@ namespace mongo {
             }
             break;
 
+        case CodeWScope: {
+            BSONObj scope = codeWScopeObject();
+            if ( ! scope.isEmpty() ){
+                s << "{ \"$code\" : " << _asCode() << " , "
+                  << " \"$scope\" : " << scope.jsonString() << " }";
+                break;
+            }
+        }
+
+
         case Code:
             s << _asCode();
             break;
-
+            
         case Timestamp:
             s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
             break;
