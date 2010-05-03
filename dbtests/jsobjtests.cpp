@@ -311,7 +311,7 @@ namespace JsobjTests {
                     ASSERT(obj.valid());
                     ASSERT(obj.hasField("a"));
                     ASSERT(obj.hasField("b"));
-                    ASSERT(obj.objdata() != tmp.objdata());
+                    ASSERT_NOT_EQUALS(obj.objdata() , tmp.objdata());
                 }
             }
         };
