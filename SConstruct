@@ -480,10 +480,13 @@ if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
 
 def findVersion( root , choices ):
-    for c in choices:
-        if ( os.path.exists( root + c ) ):
-            return root + c
-    raise "can't find a version of [" + root + "] choices: " + choices
+    if not isinstance(root, list):
+        root = [root]
+    for r in root:
+        for c in choices:
+            if ( os.path.exists( r + c ) ):
+                return r + c
+    raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
 
 def choosePathExist( choices , default=None):
     for c in choices:
@@ -610,8 +613,8 @@ elif "win32" == os.sys.platform:
         env.Append( LIBPATH=[ javaHome + "/Lib" ] )
         javaLibs += [ "jvm" ];
 
-    winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" ,
-                              [ "v6.0" , "v6.0a" , "v6.1" ] )
+    winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
+                              [ "v6.0" , "v6.0a" , "v6.1", "v7.0A" ] )
 
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
