@@ -99,7 +99,13 @@ namespace mongo {
 
             if (me.getType() == AF_UNIX){
 #if !defined(_WIN32)
-                unlink(me.getAddr().c_str());
+                if (unlink(me.getAddr().c_str()) == -1){
+                    int x = errno;
+                    if (x != ENOENT){
+                        log() << "couldn't unlink socket file " << me << errnoWithDescription(x) << " skipping" << endl;
+                        continue;
+                    }
+                }
 #endif
             }else if (me.getType() == AF_INET6){
                 // IPv6 can also accept IPv4 connections as mapped addresses (::ffff:127.0.0.1)
