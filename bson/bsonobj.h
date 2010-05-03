@@ -301,7 +301,7 @@ namespace mongo {
         /** @return an md5 value for this object. */
         string md5() const;
         
-        bool operator==( const BSONObj& other ){
+        bool operator==( const BSONObj& other ) const{
             return woCompare( other ) == 0;
         }
 
