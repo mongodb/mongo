@@ -41,6 +41,7 @@ namespace mongo {
             }
             if( theReplSet ) {
                 errmsg = "already initialized";
+                result.append("info", "try querying local.system.replset");
                 return false;
             }            
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
@@ -51,6 +52,7 @@ namespace mongo {
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = "all seed hosts must be reachable to initiate set";
+                result.append("info", cmdLine.replSet);
                 return false;
             }
 

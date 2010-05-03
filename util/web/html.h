@@ -17,6 +17,12 @@ namespace mongoutils {
 
         using namespace std;
 
+        const char *_end = "</body></html>";
+
+        inline string start(string title) { 
+            return string("<html><head><title>") + title + "</title></head><body>";
+        }
+
         inline string p(string contentHtml) {
             stringstream ss;
             ss << "<p>" << contentHtml << "</p>\n";

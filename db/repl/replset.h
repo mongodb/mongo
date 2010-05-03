@@ -26,6 +26,7 @@ namespace mongo {
 
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
+    class ReplSetConfig;
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -34,7 +35,7 @@ namespace mongo {
     class ReplSet {
     public:
         bool isMaster(const char *client) { 
-//zzz
+            //zzz
             return false;
         }
         void fillIsMaster(BSONObjBuilder&);
@@ -67,11 +68,14 @@ namespace mongo {
             throws exception if a problem.
         */
         void loadConfig();
+        void finishLoadingConfig(vector<ReplSetConfig>& v);
+        void setFrom(ReplSetConfig& c);
 
 //        void addMemberIfMissing(const HostAndPort& p);
 
         struct MemberInfo : public List1<MemberInfo>::Base {
-            MemberInfo(string h, int p) : _port(p), _host(h) {
+            MemberInfo(HostAndPort h, int ord) : 
+                _port(h.port()), _host(h.host()), _id(ord) { 
                 _dead = false;
                 _lastHeartbeat = 0;
                 _upSince = 0;
@@ -92,6 +96,7 @@ namespace mongo {
             bool _dead;
             const int _port;
             const string _host;
+            const int _id; // ordinal
             double _health;
             time_t _lastHeartbeat;
             time_t _upSince;

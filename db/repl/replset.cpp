@@ -86,6 +86,33 @@ namespace mongo {
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
     string ReplSet::startupStatusMsg;
 
+    void ReplSet::setFrom(ReplSetConfig& c) { 
+        assert( c.ok() );
+        assert( _name.empty() || _name == c._id );
+        _name = c._id;
+        assert( !_name.empty() );
+
+        for( vector<ReplSetConfig::Member>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
+            const ReplSetConfig::Member& m = *i;
+            MemberInfo *mi = new MemberInfo(m.h, m._id);
+            _members.push(mi);
+        }
+    }
+
+    void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
+        int v = -1;
+        ReplSetConfig *highest = 0;
+        for( vector<ReplSetConfig>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) { 
+            ReplSetConfig& cfg = *i;
+            if( cfg.ok() && cfg.version > v ) { 
+                highest = &cfg;
+                v = cfg.version;
+            }
+        }
+        assert( highest );
+        setFrom(*highest);
+    }
+
     void ReplSet::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
@@ -123,6 +150,7 @@ namespace mongo {
                     sleepsecs(60);
                     continue;
                 }
+                finishLoadingConfig(configs);
             }
             catch(AssertionException&) { 
                 startupStatus = BADCONFIG;
@@ -150,6 +178,7 @@ namespace mongo {
     }*/
 
     /* called at initialization */
+
     void startReplSets() {
         mongo::lastError.reset( new LastError() );
         try { 

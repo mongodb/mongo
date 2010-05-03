@@ -256,6 +256,28 @@ namespace mongo {
             ss << "</table>\n";
         }
         
+        string _replSet() { 
+            stringstream s;
+            s << start("Replica Set Status");
+            s << p("See also <a href=\"/replSetGetStatus?text\">replSetGetStatus</a>.");
+
+            if( theReplSet == 0 ) { 
+                s << p("Replica set not initialized or configured.");
+            }
+            else {
+                try { 
+                    BSONObjBuilder b;
+                    theReplSet->summarizeStatus(b);
+                    BSONObj o = b.obj();
+
+                }
+                catch(...) { s << "error?"; }
+            }
+            s << _end;
+
+            return s.str();
+        }
+
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
             
             if ( from.isLocalHost() )
@@ -352,7 +374,13 @@ namespace mongo {
                     return;
                 }
 
-                if( url.find("/_commands") == 0 ) {
+                if( startsWith(url, "/_replSet") ) {
+                    responseMsg = _replSet();
+                    responseCode = 200;
+                    return;
+                }
+
+                if( startsWith(url, "/_commands") ) {
                     if ( ! allowed( rq , headers, from ) ){
                         responseCode = 401;
                         headers.push_back( "Content-Type: text/plain" );
@@ -434,6 +462,7 @@ namespace mongo {
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
             ss << "<a href=\"/_commands\">List all commands</a>\n";
+            ss << "<a href=\"/_replSetcommands\">List all commands</a>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
             {
