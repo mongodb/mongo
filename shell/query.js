@@ -17,6 +17,7 @@ if ( typeof DBQuery == "undefined" ){
         this._cursor = null;
         this._numReturned = 0;
         this._special = false;
+        this._prettyShell = false;
     }
     print( "DBQuery probably won't have array access " );
 }
@@ -30,6 +31,7 @@ DBQuery.prototype.help = function(){
     print( "\t.size() - total # of objects cursor would return skip,limit effect this" )
     print( "\t.explain()" )
     print( "\t.forEach( func )" )
+    print( "\t.print() - output to console in full pretty format" )
     print( "\t.map( func )" )
     
 }
@@ -227,11 +229,16 @@ DBQuery.prototype.snapshot = function(){
     return this;
 }
 
+DBQuery.prototype.pretty = function(){
+    this._prettyShell = true;
+    return this;
+}
+
 DBQuery.prototype.shellPrint = function(){
     try {
         var n = 0;
         while ( this.hasNext() && n < DBQuery.shellBatchSize ){
-            var s = tojson( this.next() , "" , true );
+            var s = this._prettyShell ? tojson( this.next() ) : tojson( this.next() , "" , true );
             print( s );
             n++;
         }
