@@ -228,6 +228,20 @@ AddOption( "--boost-version",
            action="store",
            help="boost version for linking(1_38)" )
 
+AddOption( "--cpppath",
+           dest="cpppath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="Include path if you have headers in a nonstandard directory" )
+
+AddOption( "--libpath",
+           dest="libpath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="Library path if you have libraries in a nonstandard directory" )
+
 # 
 # to use CPUPROFILE=/tmp/profile
 # to view pprof -gv mongod /tmp/profile
@@ -308,6 +322,12 @@ if GetOption( "cxx" ) is not None:
     env["CC"] = GetOption( "cxx" )
     env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
+
+if GetOption( "libpath" ) is not None:
+    env["LIBPATH"] = [GetOption( "libpath" )]
+
+if GetOption( "cpppath" ) is not None:
+    env["CPPPATH"] = [GetOption( "cpppath" )]
 
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
