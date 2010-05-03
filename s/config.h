@@ -159,8 +159,6 @@ namespace mongo {
          * on next getDBConfig call will fetch from db
          */
         void removeDB( string db );
-
-        Shard pickShardForNewDB();
         
         bool knowAboutShard( string name ) const;
         

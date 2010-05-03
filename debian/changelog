@@ -1,3 +1,9 @@
+mongodb (1.5.1) unstable; urgency=low
+
+  * sharding lots of changes
+
+ -- Richard Kreuter <richard@10gen.com>  Wed, 22 3 May 2010 16:56:28 -0500
+
 mongodb (1.5.0) unstable; urgency=low
 
   * replication w & real-time

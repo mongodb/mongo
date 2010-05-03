@@ -111,9 +111,9 @@ namespace mongo {
             return;
         
         {
-            list<Shard> all;
+            vector<Shard> all;
             Shard::getAllShards( all );
-            for ( list<Shard>::iterator i=all.begin(); i!=all.end(); ++i ){
+            for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ){
                 // this just makes sure there is an entry in the map for every shard
                 Shard s = *i;
                 shards[s.getName()].size();

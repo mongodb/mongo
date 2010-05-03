@@ -24,7 +24,8 @@
 namespace mongo {
 
     class ShardConnection;
-    
+    class ShardStatus;
+
     class Shard {
     public:
         Shard()
@@ -104,18 +105,57 @@ namespace mongo {
             return _addr.size() > 0 && _addr.size() > 0;
         }
         
-        BSONObj runCommand( const string& db , const string& simple ){
+        BSONObj runCommand( const string& db , const string& simple ) const {
             return runCommand( db , BSON( simple << 1 ) );
         }
-        BSONObj runCommand( const string& db , const BSONObj& cmd );
-
-        static void getAllShards( list<Shard>& all );
+        BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
+        
+        ShardStatus getStatus() const ;
+        
+        static void getAllShards( vector<Shard>& all );
+        
+        /**
+         * picks a Shard for more load
+         */
+        static Shard pick();
+        
+        static void reloadShardInfo();
 
         static Shard EMPTY;
 
     private:
         string _name;
         string _addr;
+    };
+
+    class ShardStatus {
+    public:
+        
+        ShardStatus( const Shard& shard , const BSONObj& obj );
+
+        friend ostream& operator << (ostream& out, const ShardStatus& s) {
+            out << (string)s;
+            return out;
+        }
+
+        operator string() const {
+            stringstream ss;
+            ss << "shard: " << _shard << " mapped: " << _mapped << " writeLock: " << _writeLock; 
+            return ss.str();
+        }
+
+        bool operator<( const ShardStatus& other ) const{
+            return _mapped < other._mapped;
+        }
+        
+        Shard shard() const {
+            return _shard;
+        }
+
+    private:
+        Shard _shard;
+        long long _mapped;
+        double _writeLock;
     };
 
     class ShardConnection {

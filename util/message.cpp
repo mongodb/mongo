@@ -147,8 +147,15 @@ namespace mongo {
                 continue;
             }
             else if (ret < 0){
+                int x = errno;
+#ifdef EINTR
+                if ( x == EINTR ){
+                    log() << "select() signal caught, continuing" << endl;
+                    continue;
+                }
+#endif
                 if ( ! inShutdown() )
-                    log() << "select() failure: ret=" << ret << " " << errnoWithDescription() << endl;
+                    log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
                 return;
             }
 

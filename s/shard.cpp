@@ -26,16 +26,8 @@ namespace mongo {
     class StaticShardInfo {
     public:
         
-        const Shard& find( const string& ident ){
-            {
-                scoped_lock lk( _mutex );
-                map<string,Shard>::iterator i = _lookup.find( ident );
-                if ( i != _lookup.end() )
-                    return i->second;
-            }
-            
-            // not in our maps, re-load all
-            
+        void reload(){
+
             list<BSONObj> all;
             {
                 ShardConnection conn( configServer.getPrimary() );
@@ -45,7 +37,6 @@ namespace mongo {
                 }
                 conn.done();
             }
-            
             
             scoped_lock lk( _mutex );
             
@@ -57,6 +48,21 @@ namespace mongo {
                 _lookup[name] = s;
                 _lookup[host] = s;
             }
+
+        }
+        
+        const Shard& find( const string& ident ){
+            {
+                scoped_lock lk( _mutex );
+                map<string,Shard>::iterator i = _lookup.find( ident );
+                if ( i != _lookup.end() )
+                    return i->second;
+            }
+            
+            // not in our maps, re-load all
+            reload();
+
+            scoped_lock lk( _mutex );
             
             map<string,Shard>::iterator i = _lookup.find( ident );
             if ( i == _lookup.end() ) printStackTrace();
@@ -73,7 +79,7 @@ namespace mongo {
                 _lookup[addr] = s;
         }
         
-        void getAllShards( list<Shard>& all ){
+        void getAllShards( vector<Shard>& all ){
             scoped_lock lk( _mutex );
             std::set<string> seen;
             for ( map<string,Shard>::iterator i = _lookup.begin(); i!=_lookup.end(); ++i ){
@@ -107,12 +113,12 @@ namespace mongo {
         _addr = s._addr;
     }
     
-    void Shard::getAllShards( list<Shard>& all ){
+    void Shard::getAllShards( vector<Shard>& all ){
         staticShardInfo.getAllShards( all );
     }
 
     
-    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ){
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
         ShardConnection conn( this );
         BSONObj res;
         bool ok = conn->runCommand( db , cmd , res );
@@ -124,5 +130,41 @@ namespace mongo {
         res = res.getOwned();
         conn.done();
         return res;
+    }
+    
+    ShardStatus Shard::getStatus() const {
+        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
+    }
+    
+    void Shard::reloadShardInfo(){
+        staticShardInfo.reload();
+    }
+    
+    Shard Shard::pick(){
+        vector<Shard> all;
+        staticShardInfo.getAllShards( all );
+        if ( all.size() == 0 ){
+            staticShardInfo.reload();
+            staticShardInfo.getAllShards( all );
+            if ( all.size() == 0 )
+                return EMPTY;
+        }
+        
+        ShardStatus best = all[0].getStatus();
+        
+        for ( size_t i=1; i<all.size(); i++ ){
+            ShardStatus t = all[i].getStatus();
+            if ( t < best )
+                best = t;
+        }
+
+        log(1) << "picking shard: " << best << endl;
+        return best.shard();
+    }
+
+    ShardStatus::ShardStatus( const Shard& shard , const BSONObj& obj )
+        : _shard( shard ) {
+        _mapped = obj.getFieldDotted( "mem.mapped" ).numberLong();
+        _writeLock = 0; // TOOD
     }
 }

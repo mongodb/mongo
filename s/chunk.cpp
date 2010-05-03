@@ -302,7 +302,7 @@ namespace mongo {
         if ( ! toMove )
             return false;
         
-        Shard newLocation = grid.pickShardForNewDB();
+        Shard newLocation = Shard::pick();
         if ( getShard() == newLocation ){
             // if this is the best server, then we shouldn't do anything!
             log(1) << "not moving chunk: " << toString() << " b/c would move to same place  " << newLocation.toString() << " -> " << getShard().toString() << endl;
