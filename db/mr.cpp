@@ -416,13 +416,13 @@ namespace mongo {
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
             virtual LockType locktype() const { return NONE; } 
-            bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            bool run(const string& dbname , BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
                 Client& client = cc();
                 CurOp * op = client.curop();
 
-                MRSetup mr( nsToDatabase( dbname ) , cmd );
+                MRSetup mr( dbname , cmd );
 
                 log(1) << "mr ns: " << mr.ns << endl;
                 
@@ -623,8 +623,7 @@ namespace mongo {
             virtual bool slaveOk() const { return true; }
             
             virtual LockType locktype() const { return WRITE; } 
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cc().database()->name; // this has to come before dbtemprelease
+            bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 dbtemprelease temprelease; // we don't touch the db directly
 
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
@@ -663,7 +662,7 @@ namespace mongo {
                                                     Query().sort( sortKey ) );
                 
                 
-                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
+                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbname );
                 ScriptingFunction reduceFunction = s->createFunction( mr.reduceCode.c_str() );
                 ScriptingFunction finalizeFunction = 0;
                 if ( mr.finalizeCode.size() )

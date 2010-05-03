@@ -1546,8 +1546,8 @@ namespace mongo {
         bool slaveOk() const { return true; }
         void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
         bool slaveOverrideOk() { return true; }
-        bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( ! d ){
@@ -1647,8 +1647,8 @@ namespace mongo {
         virtual LockType locktype() const { return READ; } 
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() { return true; }
-        bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( ! d ){

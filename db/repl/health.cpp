@@ -33,7 +33,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help<<"internal"; }
         CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) {
                 errmsg = "not a replset member";
                 return false;

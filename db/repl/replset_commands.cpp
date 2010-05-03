@@ -34,7 +34,7 @@ namespace mongo {
             h << "Initiate/christen a replica set."; 
             h << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "server is not running with --replSet";
                 return false;
@@ -89,7 +89,7 @@ namespace mongo {
         }
 
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "not running with --replSet";
                 return false;
@@ -120,7 +120,7 @@ namespace mongo {
         }
 
         CmdReplSetFreeze() : Command("replSetFreeze", true) { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "not running with --replSet";
                 return false;

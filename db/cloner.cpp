@@ -422,14 +422,14 @@ namespace mongo {
             help << "{ clone : \"host13\" }";
         }
         CmdClone() : Command("clone") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
             /* replication note: we must logOp() not the command, but the cloned data -- if the slave
                were to clone it would get a different point-in-time and not match.
                */
-            return cloneFrom(from.c_str(), errmsg, cc().database()->name, 
+            return cloneFrom(from.c_str(), errmsg, dbname, 
                              /*logForReplication=*/!fromRepl, /*slaveok*/false, /*usereplauth*/false, /*snapshot*/true);
         }
     } cmdclone;
@@ -444,7 +444,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing from spec";
@@ -468,7 +468,7 @@ namespace mongo {
              */
             Client::Context ctx( collection );
             
-            log() << "cloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << " logSizeMb: " << logSizeMb << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
+            log() << "cloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << " logSizeMb: " << logSizeMb << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
             
             Cloner c;
             long long cursorId;
@@ -489,7 +489,7 @@ namespace mongo {
             help << " example: { startCloneCollection: <collection ns>, from: <hostname>, query: <query> }";
             help << ", returned object includes a finishToken field, the value of which may be passed to the finishCloneCollection command";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing from spec";
@@ -513,7 +513,7 @@ namespace mongo {
              */
             Client::Context ctx(collection);
             
-            log() << "startCloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
+            log() << "startCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
             Cloner c;
             long long cursorId;
@@ -542,7 +542,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { finishCloneCollection: <finishToken> }";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObj fromToken = cmdObj.getObjectField("finishCloneCollection");
             if ( fromToken.isEmpty() ) {
                 errmsg = "missing finishCloneCollection finishToken spec";
@@ -570,7 +570,7 @@ namespace mongo {
             
             Client::Context ctx( collection );
             
-            log() << "finishCloneCollection.  db:" << ns << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
+            log() << "finishCloneCollection.  db:" << dbname << " collection:" << collection << " from: " << fromhost << " query: " << query << endl;
             
             Cloner c;
             return c.finishCloneCollection( fromhost.c_str(), collection.c_str(), query, cursorId, errmsg );
@@ -595,7 +595,7 @@ namespace mongo {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
                 /* copy from self */
@@ -636,7 +636,7 @@ namespace mongo {
             help << "copy a database from another host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>]}";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
                 /* copy from self */
@@ -688,7 +688,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
             if ( source.empty() || target.empty() ) {

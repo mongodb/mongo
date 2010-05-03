@@ -174,7 +174,7 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return true; }
 
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+        virtual bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             result.append("argv", argvArray);
             return true;
         }

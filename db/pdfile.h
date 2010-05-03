@@ -40,8 +40,8 @@ namespace mongo {
     class Cursor;
     class OpDebug;
 
-    void dropDatabase(const char *ns);
-    bool repairDatabase(const char *ns, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
+    void dropDatabase(string db);
+    bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 
     /* low level - only drops this ns */
     void dropNS(const string& dropNs);

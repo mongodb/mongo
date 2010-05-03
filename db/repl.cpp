@@ -145,7 +145,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         void help(stringstream&h) const { h << "replace a node in a replica pair"; }
         CmdReplacePeer() : Command("replacePeer", false, "replacepeer") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( replPair == 0 ) {
                 errmsg = "not paired";
                 return false;
@@ -207,7 +207,7 @@ namespace mongo {
         virtual void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return WRITE; }
         CmdForceDead() : Command("forcedead") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             replAllDead = "replication forced to stop by 'forcedead' command";
             log() << "*********************************************************\n";
             log() << "received 'forcedead' command, replication forced to stop" << endl;
@@ -230,7 +230,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj.getBoolField( "force" ) ) {
                 if ( !waitForSyncToFinish( errmsg ) )
                     return false;
@@ -352,7 +352,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         CmdIsMaster() : Command("isMaster", true, "ismaster") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
 			/* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not 
 			   authenticated.
 			   we allow unauthenticated ismaster but we aren't as verbose informationally if 
@@ -385,7 +385,7 @@ namespace mongo {
         }
         virtual LockType locktype() const { return WRITE; }
         CmdIsInitialSyncComplete() : Command( "isinitialsynccomplete" ) {}
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        virtual bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             result.appendBool( "initialsynccomplete", getInitialSyncCompleted() );
             return true;
         }
@@ -418,7 +418,7 @@ namespace mongo {
             return true;
         }
         virtual LockType locktype() const { return WRITE; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
             if ( replPair == 0 ) {
                 massert( 10383 ,  "Another mongod instance believes incorrectly that this node is its peer", !cmdObj.getBoolField( "fromArbiter" ) );
                 // assume that we are an arbiter and should forward the request

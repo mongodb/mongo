@@ -1587,17 +1587,14 @@ namespace mongo {
 
 namespace mongo {
 
-    void dropDatabase(const char *ns) {
-        // ns is of the form "<dbname>.$cmd"
-        char db[256];
-        nsToDatabase(ns, db);
+    void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
         assert( cc().database()->name == db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(db);
+        BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());
 
-        closeDatabase( db );
-        _deleteDataFiles(db);
+        closeDatabase( db.c_str() );
+        _deleteDataFiles( db.c_str() );
     }
 
     typedef boost::filesystem::path Path;
@@ -1702,15 +1699,15 @@ namespace mongo {
 #endif
     }
 
-    bool repairDatabase( const char *ns, string &errmsg,
+    bool repairDatabase( string dbNameS , string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
+        dbNameS = nsToDatabase( dbNameS );
+        const char * dbName = dbNameS.c_str();
+
         stringstream ss;
         ss << "localhost:" << cmdLine.port;
         string localhost = ss.str();
-
-        // ns is of the form "<dbname>.$cmd"
-        char dbName[256];
-        nsToDatabase(ns, dbName);
+        
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
 

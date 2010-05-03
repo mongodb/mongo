@@ -198,7 +198,7 @@ namespace mongo {
             help << "examples: { logCollection: <collection ns>, start: 1 }, "
                  << "{ logCollection: <collection ns>, validateComplete: 1 }";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string logCollection = cmdObj.getStringField( "logCollection" );
             if ( logCollection.empty() ) {
                 errmsg = "missing logCollection spec";

@@ -55,6 +55,13 @@ namespace mongo {
         nsToDatabase(ns, buf);
         return buf;
     }
+    inline string nsToDatabase(const string& ns) {
+        size_t i = ns.find( '.' );
+        if ( i == string::npos )
+            return ns;
+        return ns.substr( 0 , i );
+    }
+
 
 	/* e.g.
 	   NamespaceString ns("acme.orders");

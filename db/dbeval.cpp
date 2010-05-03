@@ -121,10 +121,10 @@ namespace mongo {
         }
         virtual LockType locktype() const { return WRITE; }
         CmdEval() : Command("eval", false, "$eval") { }
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(cc().database()->name.c_str()));
-            return dbEval(ns, cmdObj, result, errmsg);
+            uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );
+            return dbEval(dbname.c_str(), cmdObj, result, errmsg);
         }
     } cmdeval;
 
