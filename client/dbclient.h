@@ -813,7 +813,7 @@ namespace mongo {
         
         bool isFailed() const {
             // TODO: this really should check isFailed on current master as well
-            return master > NotSetR;
+            return master < Left;
         }
     };
     
