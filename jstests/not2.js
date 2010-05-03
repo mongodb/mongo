@@ -126,6 +126,8 @@ indexed( {i:{$not:{$lt:"b"}}}, "b", {} );
 indexed( {i:{$lte:"b"}}, "", "b" );
 indexed( {i:{$not:{$lte:"b"}}}, "b", {} );
 
+indexed( {i:{$not:{$lte:"b",$gte:"f"}}}, "b", "f" );
+
 not( {i:{$not:{$all:["a"]}}} );
 not( {i:{$not:{$mod:[2,1]}}} );
 not( {i:{$not:{$type:2}}} );
