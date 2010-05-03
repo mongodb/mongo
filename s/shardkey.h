@@ -42,15 +42,15 @@ namespace mongo {
          */
         BSONObj globalMax() const { return gMax; }
 
-        bool isGlobalMin( const BSONObj& k ){
+        bool isGlobalMin( const BSONObj& k ) const{
             return k.woCompare( globalMin() ) == 0;
         }
 
-        bool isGlobalMax( const BSONObj& k ){
+        bool isGlobalMax( const BSONObj& k ) const{
             return k.woCompare( globalMax() ) == 0;
         }
         
-        bool isGlobal( const BSONObj& k ){
+        bool isGlobal( const BSONObj& k ) const{
             return isGlobalMin( k ) || isGlobalMax( k );
         }
 
@@ -59,20 +59,20 @@ namespace mongo {
            l == r 0
            l > r positive
          */
-        int compare( const BSONObj& l , const BSONObj& r );
+        int compare( const BSONObj& l , const BSONObj& r ) const;
         
         /**
            @return whether or not obj has all fields in this shard key pattern
 		   e.g. 
 		     ShardKey({num:1}).hasShardKey({ name:"joe", num:3 }) is true
          */
-        bool hasShardKey( const BSONObj& obj );
+        bool hasShardKey( const BSONObj& obj ) const;
         
         /**
            returns a query that filters results only for the range desired, i.e. returns 
              { "field" : { $gte: keyval(min), $lt: keyval(max) } }
         */
-        void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max );
+        void getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const;
         
         /**
            Returns if the given sort pattern can be ordered by the shard key pattern.
@@ -86,9 +86,9 @@ namespace mongo {
               < 0 if sort is descending
               > 1 if sort is ascending
          */
-        int canOrder( const BSONObj& sort );
+        int canOrder( const BSONObj& sort ) const;
 
-        BSONObj key() { return pattern; }
+        BSONObj key() const { return pattern; }
 
         string toString() const;
 
