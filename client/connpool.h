@@ -61,8 +61,10 @@ namespace mongo {
         void flush();
         DBClientBase *get(const string& host);
         void release(const string& host, DBClientBase *c) {
-            if ( c->isFailed() )
+            if ( c->isFailed() ){
+                delete c;
                 return;
+            }
             scoped_lock L(poolMutex);
             pools[host]->pool.push(c);
         }

@@ -115,9 +115,11 @@ namespace mongo {
     }
 
     ScopedDbConnection::~ScopedDbConnection() {
-        if ( _conn && ! _conn->isFailed() ) {
-            /* see done() comments above for why we log this line */
-            log() << "~ScopedDBConnection: _conn != null" << endl;
+        if ( _conn ){
+            if ( ! _conn->isFailed() ) {
+                /* see done() comments above for why we log this line */
+                log() << "~ScopedDBConnection: _conn != null" << endl;
+            }
             kill();
         }
     }
