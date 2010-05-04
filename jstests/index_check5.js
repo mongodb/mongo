@@ -14,4 +14,4 @@ t.save( { "name" : "Player2" ,
 
 assert.eq( 2 , t.find( { "scores.level": 2, "scores.score": {$gt:30} } ).itcount() , "A" );
 t.ensureIndex( { "scores.level" : 1 , "scores.score" : 1 } );
-assert.eq( 1 , t.find( { "scores.level": 2, "scores.score": {$gt:30} } ).itcount() , "B" );
+assert.eq( 2 , t.find( { "scores.level": 2, "scores.score": {$gt:30} } ).itcount() , "B" );
