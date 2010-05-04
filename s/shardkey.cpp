@@ -74,7 +74,7 @@ namespace mongo {
            it is fast.  so a bit more work to try to be semi-fast.
            */
 
-        for(set<string>::iterator it = patternfields.begin(); it != patternfields.end(); ++it){
+        for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it){
             if(obj.getFieldDotted(it->c_str()).eoo())
                 return false;
         }
