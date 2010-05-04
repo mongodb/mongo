@@ -61,7 +61,7 @@ namespace mongo {
         gMax = max.obj();
     }
 
-    int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) {
+    int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
         BSONObj L = extractKey(lObject);
         uassert( 10198 , "left object doesn't have shard key", !L.isEmpty());
         BSONObj R = extractKey(rObject);
@@ -69,7 +69,7 @@ namespace mongo {
         return L.woCompare(R);
     }
 
-    bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) {
+    bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) const {
         /* this is written s.t. if obj has lots of fields, if the shard key fields are early, 
            it is fast.  so a bit more work to try to be semi-fast.
            */
@@ -85,7 +85,7 @@ namespace mongo {
       returns a query that filters results only for the range desired, i.e. returns 
         { $gte : keyval(min), $lt : keyval(max) }
     */
-    void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ){
+    void ShardKeyPattern::getFilter( BSONObjBuilder& b , const BSONObj& min, const BSONObj& max ) const{
         massert( 10426 , "not done for compound patterns", patternfields.size() == 1);
         BSONObjBuilder temp;
         temp.appendAs( extractKey(min).firstElement(), "$gte" );
@@ -105,7 +105,7 @@ namespace mongo {
       < 0 if sort is descending
       > 1 if sort is ascending
     */
-    int ShardKeyPattern::canOrder( const BSONObj& sort ){
+    int ShardKeyPattern::canOrder( const BSONObj& sort ) const{
         // e.g.:
         //   sort { a : 1 , b : -1 }
         //   pattern { a : -1, b : 1, c : 1 }

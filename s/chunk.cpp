@@ -41,11 +41,19 @@ namespace mongo {
 
     void Chunk::setShard( const Shard& s ){
         _shard = s;
+        _manager->_migrationNotification(this);
         _markModified();
     }
     
     bool Chunk::contains( const BSONObj& obj ) const{
         return
+            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
+            _manager->getShardKey().compare( obj , getMax() ) < 0;
+    }
+
+    bool ChunkRange::contains(const BSONObj& obj) const {
+    // same as Chunk method
+        return 
             _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
@@ -495,6 +503,7 @@ namespace mongo {
         }
         _chunks.clear();
         _chunkMap.clear();
+        _chunkRanges.clear();
     }
     
     void ChunkManager::_reload(){
@@ -523,6 +532,8 @@ namespace mongo {
             c->_id = d["_id"].wrap().getOwned();
         }
         conn.done();
+
+        _chunkRanges.reloadAll(_chunkMap);
     }
 
 
@@ -708,6 +719,7 @@ namespace mongo {
         // wipe my meta-data
         _chunks.clear();
         _chunkMap.clear();
+        _chunkRanges.clear();
 
         
         // delete data from mongod
@@ -809,7 +821,153 @@ namespace mongo {
         }
         return ss.str();
     }
+
+    void ChunkManager::_migrationNotification(Chunk* c){
+        _chunkRanges.reloadRange(_chunkMap, c->getMin(), c->getMax());
+    }
+
     
+    inline bool allOfType(BSONType type, const BSONObj& o){
+        BSONObjIterator it(o);
+        while(it.more()){
+            if (it.next().type() != type)
+                return false;
+        }
+        return true;
+    }
+
+    void ChunkRangeManager::assertValid() const{
+        if (_ranges.empty())
+            return;
+
+        try {
+            // No Nulls
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it){
+                assert(it->second);
+            }
+            
+            // Check endpoints
+            assert(allOfType(MinKey, _ranges.begin()->second->getMin()));
+            assert(allOfType(MaxKey, prior(_ranges.end())->second->getMax()));
+
+            // Make sure there are no gaps or overlaps
+            for (ChunkRangeMap::const_iterator it=next(_ranges.begin()), end=_ranges.end(); it != end; ++it){
+                ChunkRangeMap::const_iterator last = prior(it);
+                assert(it->second->getMin() == last->second->getMax());
+            }
+
+            // Check Map keys
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it){
+                assert(it->first == it->second->getMax());
+            }
+
+            // Make sure we match the original chunks
+            const vector<Chunk*> chunks = _ranges.begin()->second->getManager()->_chunks;
+            for (vector<Chunk*>::const_iterator it=chunks.begin(), end=chunks.end(); it != end; ++it){
+                const Chunk* chunk = *it;
+
+                ChunkRangeMap::const_iterator min = _ranges.upper_bound(chunk->getMin());
+                ChunkRangeMap::const_iterator max = _ranges.lower_bound(chunk->getMax());
+
+                assert(min != _ranges.end());
+                assert(max != _ranges.end());
+                assert(min == max);
+                assert(min->second->getShard() == chunk->getShard());
+                assert(min->second->contains( chunk->getMin() ));
+                assert(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+            }
+            
+        } catch (...) {
+            cout << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
+                cout << it->first << ": " << *it->second << endl;
+
+            throw;
+        }
+    }
+
+    void ChunkRangeManager::reloadRange(const ChunkMap& chunks, const BSONObj& min, const BSONObj& max){
+        if (_ranges.empty()){
+            reloadAll(chunks);
+            return;
+        }
+        
+        ChunkRangeMap::iterator low  = _ranges.upper_bound(min);
+        ChunkRangeMap::iterator high = _ranges.lower_bound(max);
+        
+        assert(low != _ranges.end());
+        assert(high != _ranges.end());
+        assert(low->second);
+        assert(high->second);
+
+        ChunkMap::const_iterator begin = chunks.upper_bound(low->second->getMin());
+        ChunkMap::const_iterator end   = chunks.lower_bound(high->second->getMax());
+
+        assert(begin != chunks.end());
+        assert(end != chunks.end());
+
+        // C++ end iterators are one-past-last
+        ++high;
+        ++end;
+
+        // update ranges
+        _ranges.erase(low, high); // invalidates low
+        _insertRange(begin, end);
+
+        assert(!_ranges.empty());
+        DEV assertValid();
+
+        // merge low-end if possible
+        low = _ranges.upper_bound(min);
+        assert(low != _ranges.end());
+        if (low != _ranges.begin()){
+            shared_ptr<ChunkRange> a = prior(low)->second;
+            shared_ptr<ChunkRange> b = low->second;
+            if (a->getShard() == b->getShard()){
+                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
+                _ranges.erase(prior(low));
+                _ranges.erase(low); // invalidates low
+                _ranges[cr->getMax()] = cr;
+            }
+        }
+
+        DEV assertValid();
+
+        // merge high-end if possible
+        high = _ranges.lower_bound(max);
+        if (high != prior(_ranges.end())){
+            shared_ptr<ChunkRange> a = high->second;
+            shared_ptr<ChunkRange> b = next(high)->second;
+            if (a->getShard() == b->getShard()){
+                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
+                _ranges.erase(next(high));
+                _ranges.erase(high); //invalidates high
+                _ranges[cr->getMax()] = cr;
+            }
+        }
+
+        DEV assertValid();
+    }
+
+    void ChunkRangeManager::reloadAll(const ChunkMap& chunks){
+        _ranges.clear();
+        _insertRange(chunks.begin(), chunks.end());
+
+        DEV assertValid();
+    }
+
+    void ChunkRangeManager::_insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end){
+        while (begin != end){
+            ChunkMap::const_iterator first = begin;
+            Shard shard = first->second->getShard();
+            while (begin != end && (begin->second->getShard() == shard))
+                ++begin;
+
+            shared_ptr<ChunkRange> cr (new ChunkRange(first, begin));
+            _ranges[cr->getMax()] = cr;
+        }
+    }
     
     class ChunkObjUnitTest : public UnitTest {
     public:

@@ -33,10 +33,17 @@
 namespace mongo {
 
     class DBConfig;
+    class Chunk;
+    class ChunkRange;
     class ChunkManager;
+    class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
     typedef unsigned long long ShardChunkVersion;
+
+    // key is max for each Chunk or ChunkRange
+    typedef map<BSONObj,Chunk*,BSONObjCmp> ChunkMap;
+    typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
     
     /**
        config.chunks
@@ -124,6 +131,8 @@ namespace mongo {
         static int MaxChunkSize;
 
         static string genID( const string& ns , const BSONObj& min );
+
+        const ChunkManager* getManager() { return _manager; }
         
     private:
         
@@ -152,6 +161,74 @@ namespace mongo {
         friend class ShardObjUnitTest;
     };
 
+    class ChunkRange{
+    public:
+        const ChunkManager* getManager() const{ return _manager; }
+        Shard getShard() const{ return _shard; }
+
+        const BSONObj& getMin() const { return _min; }
+        const BSONObj& getMax() const { return _max; }
+
+        bool contains(const BSONObj& obj) const;
+
+        ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
+            : _manager(begin->second->getManager())
+            , _shard(begin->second->getShard())
+            , _min(begin->second->getMin())
+            , _max(prior(end)->second->getMax())
+        {
+            assert( begin != end );
+
+            DEV while (begin != end){
+                assert(begin->second->getManager() == _manager);
+                assert(begin->second->getShard() == _shard);
+                ++begin;
+            }
+        }
+
+        // Merge min and max (must be adjacent ranges)
+        ChunkRange(const ChunkRange& min, const ChunkRange& max)
+            : _manager(min.getManager())
+            , _shard(min.getShard())
+            , _min(min.getMin())
+            , _max(max.getMax())
+        {
+            assert(min.getShard() == max.getShard());
+            assert(min.getManager() == max.getManager());
+            assert(min.getMax() == max.getMin());
+        }
+
+        friend ostream& operator<<(ostream& out, const ChunkRange& cr){
+            return (out << "ChunkRange(min=" << cr._min << ", max=" << cr._max << ", shard=" << cr._shard <<")");
+        }
+
+    private:
+        const ChunkManager* _manager;
+        const Shard _shard;
+        const BSONObj _min;
+        const BSONObj _max;
+    };
+
+
+    class ChunkRangeManager {
+    public:
+        const ChunkRangeMap& ranges() const { return _ranges; }
+
+        void clear() { _ranges.clear(); }
+
+        void reloadAll(const ChunkMap& chunks);
+        void reloadRange(const ChunkMap& chunks, const BSONObj& min, const BSONObj& max);
+
+        // Slow operation -- wrap with DEV
+        void assertValid() const;
+
+    private:
+        // assumes nothing in this range exists in _ranges
+        void _insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
+
+        ChunkRangeMap _ranges;
+    };
+
     /* config.sharding
          { ns: 'alleyinsider.fs.chunks' , 
            key: { ts : 1 } ,
@@ -176,6 +253,7 @@ namespace mongo {
         Chunk* findChunkOnServer( const Shard& shard ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
+        const ShardKeyPattern& getShardKey() const {  return _key; }
         bool isUnique(){ return _unique; }
         
         /**
@@ -225,14 +303,18 @@ namespace mongo {
         vector<Chunk*> _chunks;
         map<string,unsigned long long> _maxMarkers;
 
-        typedef map<BSONObj,Chunk*,BSONObjCmp> ChunkMap;
-        ChunkMap _chunkMap; // max -> Chunk
+        ChunkMap _chunkMap;
+        ChunkRangeManager _chunkRanges;
 
         unsigned long long _sequenceNumber;
         
         RWLock _lock;
 
+        // This should only be called from Chunk after it has been migrated
+        void _migrationNotification(Chunk* c);
+
         friend class Chunk;
+        friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;
 
         /**
