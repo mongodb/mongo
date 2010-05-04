@@ -851,7 +851,7 @@ namespace mongo {
             assert(allOfType(MaxKey, prior(_ranges.end())->second->getMax()));
 
             // Make sure there are no gaps or overlaps
-            for (ChunkRangeMap::const_iterator it=next(_ranges.begin()), end=_ranges.end(); it != end; ++it){
+            for (ChunkRangeMap::const_iterator it=boost::next(_ranges.begin()), end=_ranges.end(); it != end; ++it){
                 ChunkRangeMap::const_iterator last = prior(it);
                 assert(it->second->getMin() == last->second->getMax());
             }
@@ -938,10 +938,10 @@ namespace mongo {
         high = _ranges.lower_bound(max);
         if (high != prior(_ranges.end())){
             shared_ptr<ChunkRange> a = high->second;
-            shared_ptr<ChunkRange> b = next(high)->second;
+            shared_ptr<ChunkRange> b = boost::next(high)->second;
             if (a->getShard() == b->getShard()){
                 shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
-                _ranges.erase(next(high));
+                _ranges.erase(boost::next(high));
                 _ranges.erase(high); //invalidates high
                 _ranges[cr->getMax()] = cr;
             }
