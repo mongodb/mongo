@@ -96,9 +96,10 @@ namespace mongo {
         case dbDelete:
             c.remove.inc( micros );
             break;
+        case dbKillCursors:
+            break;
         case opReply: 
         case dbMsg:
-        case dbKillCursors:
             log() << "unexpected op in Top::record: " << op << endl;
             break;
         default:
