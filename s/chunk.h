@@ -222,6 +222,9 @@ namespace mongo {
         // Slow operation -- wrap with DEV
         void assertValid() const;
 
+        ChunkRangeMap::const_iterator upper_bound(const BSONObj& o) const { return _ranges.upper_bound(o); }
+        ChunkRangeMap::const_iterator lower_bound(const BSONObj& o) const { return _ranges.lower_bound(o); }
+
     private:
         // assumes nothing in this range exists in _ranges
         void _insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end);
