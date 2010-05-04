@@ -180,10 +180,16 @@ namespace mongo {
             // x : [] - need to insert undefined
             BSONObjBuilder b(_sizeTracker);
             for( unsigned j = 0; j < fixed.size(); ++j ) {
-                if ( j == arrIdx )
+                if ( j == arrIdx ){
                     b.appendUndefined( "" );
-                else
-                    b.appendAs( fixed[ j ], "" );
+                }
+                else {
+                    BSONElement e = fixed[j];
+                    if ( e.eoo() )
+                        b.appendNull( "" );
+                    else
+                        b.appendAs( e , "" );
+                }
             }
             keys.insert( b.obj() );
         }
