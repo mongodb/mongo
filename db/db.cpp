@@ -130,9 +130,6 @@ namespace mongo {
     void webServerThread();
 
     void listen(int port) {
-        log() << mongodVersion() << endl;
-        printGitVersion();
-        printSysInfo();
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
         OurListener l(bind_ip, port);
@@ -479,6 +476,9 @@ namespace mongo {
               <<  " master = " << replSettings.master << " slave = " << (int) replSettings.slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
         DEV log() << " FULL DEBUG ENABLED " << endl;
         show_32_warning();
+        log() << mongodVersion() << endl;
+        printGitVersion();
+        printSysInfo();
 
         {
             stringstream ss;
