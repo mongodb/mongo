@@ -44,7 +44,7 @@ namespace mongo {
 
     void OpCounters::gotOp( int op , bool isCommand ){
         switch ( op ){
-        case dbInsert: gotInsert(); break;
+        case dbInsert: /*gotInsert();*/ break; // need to handle multi-insert
         case dbQuery: 
             if ( isCommand )
                 gotCommand();
