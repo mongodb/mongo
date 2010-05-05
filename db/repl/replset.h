@@ -63,6 +63,7 @@ namespace mongo {
 
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
+        void summarizeAsHtml(stringstream&) const;
 
     private:
         string _name;
@@ -96,6 +97,9 @@ namespace mongo {
             double health() const { return _health; }
             time_t upSince() const { return _upSince; }
             time_t lastHeartbeat() const { return _lastHeartbeat; }
+            const ReplSetConfig::MemberCfg& config() const { return *_config; }
+            bool up() const { return health() > 0; }
+            void summarizeAsHtml(stringstream& s) const;
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
 
@@ -111,8 +115,9 @@ namespace mongo {
             DiagStr _lastHeartbeatErrMsg;
         };
         Member *_self;
-        /* all members of the set EXCEPT SELF. */
+        /* all members of the set EXCEPT self. */
         List1<Member> _members;
+        Member* head() const { return _members.head(); }
 
         void startHealthThreads();
         friend class FeedbackThread;

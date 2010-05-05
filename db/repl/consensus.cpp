@@ -20,7 +20,16 @@
 namespace mongo { 
 
     bool ReplSet::aMajoritySeemsToBeUp() const {
-        return false;
+        Member *m = head();
+        unsigned vTot = 0;
+        unsigned vUp = 0;
+        do {
+            vTot += m->config().votes;
+            if( m->up() )
+                vTot += m->config().votes;
+            m = m->next();
+        } while( m );
+        return vUp * 2 > vTot;
     }
 
     void ReplSet::electSelf() { 

@@ -17,9 +17,9 @@ namespace mongoutils {
 
         using namespace std;
 
-        const char *_end = "</body></html>";
-        const char *_table = "</table>";
-        const char *_tr = "</tr>\n";
+        inline string _end() { return "</body></html>"; }
+        inline string _table() { return "</table>"; }
+        inline string _tr() { return "</tr>\n"; }
 
         inline string tr() { return "<tr>"; }
 

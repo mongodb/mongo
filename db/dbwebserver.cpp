@@ -267,41 +267,12 @@ namespace mongo {
                 else s << p("Replica set not yet initialized.");
             }
             else {
-                try { 
-                    BSONObjBuilder b;
-                    theReplSet->summarizeStatus(b);
-                    BSONObj o = b.obj();
-                    s << p( "Set: " + o["set"].String() );
-                    vector<BSONElement> mems = o["members"].Array();
-                    const char *h[] = {"Member", "Up", "Uptime", "lhb", "Status", 0};
-                    s << table(h);
-                    for( unsigned i = 0; i < mems.size(); i++ ) { 
-                        bo m = mems[i].Obj();
-                        s << tr();
-                        bool self = m["self"].ok();
-                        if( self )
-                            s << td(m["name"].String());
-                        else {
-                            HostAndPort h = HostAndPort::fromString(m["name"].String());
-                            {
-                                stringstream u;
-                                u << "http://" << h.host() << ':' << (h.port() + 1000) << '/';
-                                s << td( a(u.str(), "", m["name"].String()) );
-                            }
-                            s << td(m["health"].Number());
-                            s << td(m["uptime"].Number());
-                            s << td(m["lastHeartbeat"].Date().toString());
-                            if( m["errmsg"].ok() )
-                                s << td(m["errmsg"].String());
-                        }
-                        s << _tr;
-                    }
-                    s << _table;
+                try {
+                    theReplSet->summarizeAsHtml(s);
                 }
                 catch(...) { s << "error summarizing replset status"; }
             }
-            s << _end;
-
+            s << _end();
             return s.str();
         }
 

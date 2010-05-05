@@ -1,4 +1,6 @@
 // helpers for testing repl sets
+// run
+//   mongo --shell testing.js
 
 cfg = {
     _id: 'asdf',

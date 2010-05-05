@@ -21,8 +21,12 @@
 #include "../../client/dbclient.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
+#include "../../util/web/html.h"
+#include "../../util/goodies.h"
 
 namespace mongo { 
+
+    using namespace mongoutils::html;
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public Command {
@@ -101,6 +105,54 @@ namespace mongo {
             }
         }
     };
+
+    void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
+        s << tr();
+        {
+            stringstream u;
+            u << "http://" << _host << ':' << (_port + 1000) << "/_replSet";
+            s << td( a(u.str(), "", fullName()) );
+        }
+        s << td(health());
+        s << td(upSince());
+        {
+            stringstream h;
+            time_t hb = lastHeartbeat();
+            time_t now = time(0);
+            if( hb == 0 ) h << "never"; 
+            else {
+                if( now > hb ) h << now-hb; 
+                else h << 0;
+                h << " secs ago";
+            }
+            s << td(h.str());
+        }
+        s << td(config().votes);
+        s << td(_lastHeartbeatErrMsg.get());
+        s << _tr();
+    }
+
+    void ReplSet::summarizeAsHtml(stringstream& s) const { 
+        s << p( "Set: " + _name );
+        s << p( string("Majority up: ") + (aMajoritySeemsToBeUp()?"yes":"no") );
+        const char *h[] = {"Member", "Up", "Uptime", 
+            "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
+            "Votes", "Status", 0};
+        s << table(h);
+        s << tr() << td(_self->fullName()) <<
+            td("1") << 
+            td("") << 
+            td("") << 
+            td(ToString(_self->config().votes)) << 
+            td("self") << 
+            _tr();
+        Member *m = head();
+        while( m ) {
+            m->summarizeAsHtml(s);
+            m = m->next();
+        }
+        s << _table();
+    }
 
     void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 
         Member *m =_members.head();
