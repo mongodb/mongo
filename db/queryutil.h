@@ -214,7 +214,7 @@ namespace mongo {
 
         void add( const string& field, bool include );
         void add( const string& field, int skip, int limit );
-        void appendArray( BSONObjBuilder& b , const BSONObj& a ) const;
+        void appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested=false) const;
 
         bool _include; // true if default at this level is to include
         bool _special; // true if this level can't be skipped or included without recursing

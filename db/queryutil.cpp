@@ -760,9 +760,9 @@ namespace mongo {
     }
 
     //b will be the value part of an array-typed BSONElement
-    void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a ) const {
-        int skip = _skip;
-        int limit = _limit;
+    void FieldMatcher::appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested) const {
+        int skip  = nested ?  0 : _skip;
+        int limit = nested ? -1 : _limit;
 
         if (skip < 0){
             skip = max(0, skip + a.nFields());
@@ -785,7 +785,7 @@ namespace mongo {
             switch(e.type()){
                 case Array:{
                     BSONObjBuilder subb;
-                    appendArray(subb , e.embeddedObject());
+                    appendArray(subb , e.embeddedObject(), true);
                     b.appendArray(b.numStr(i++).c_str(), subb.obj());
                     break;
                 }
