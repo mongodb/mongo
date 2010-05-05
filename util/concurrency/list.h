@@ -23,11 +23,11 @@ namespace mongo {
 /* this class uses a mutex for writes, but not for reads. 
    we can get fancier later...
 
-        struct MemberInfo : public List1<MemberInfo>::Base {
+        struct Member : public List1<Member>::Base {
             const char *host;
             int port;
         };
-        List1<MemberInfo> _members;
+        List1<Member> _members;
         _members.head()->next();
 
 */

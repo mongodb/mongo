@@ -44,8 +44,8 @@ namespace mongo {
 
         bool ok() const { return _ok; }
 
-        struct Member {
-            Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
+        struct MemberCfg {
+            MemberCfg() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
             int _id;              /* ordinal */
             unsigned votes;       /* how many votes this node gets. default 1. */
             HostAndPort h;
@@ -54,7 +54,7 @@ namespace mongo {
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
         };
-        vector<Member> members;
+        vector<MemberCfg> members;
         string _id;
         int version;
         HealthOptions ho;

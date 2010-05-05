@@ -1,7 +1,7 @@
-/* NOTE: This file is not quite ready to use yet.  Work in progress.
-         include ../db/jsobj.h for now.
+/* NOTE: Standalone bson header for when not using MongoDB.  
+   See also: bsondemo.
 
-         This file, however, pulls in much less code.
+   MongoDB includes ../db/jsobj.h instead. This file, however, pulls in much less code / dependencies.
 */
 
 /** @file bson.h 

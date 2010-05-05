@@ -132,7 +132,7 @@ namespace mongo {
 
         static string genID( const string& ns , const BSONObj& min );
 
-        const ChunkManager* getManager() { return _manager; }
+        const ChunkManager* getManager() const { return _manager; }
         
     private:
         
@@ -169,7 +169,11 @@ namespace mongo {
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
 
+        // clones of Chunk methods
         bool contains(const BSONObj& obj) const;
+        void getFilter( BSONObjBuilder& b ) const;
+        BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
+        long countObjects( const BSONObj& filter = BSONObj() ) const;
 
         ChunkRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end)
             : _manager(begin->second->getManager())
@@ -244,7 +248,7 @@ namespace mongo {
         ChunkManager( DBConfig * config , string ns , ShardKeyPattern pattern , bool unique );
         virtual ~ChunkManager();
 
-        string getns(){
+        string getns() const {
             return _ns;
         }
         
@@ -267,7 +271,7 @@ namespace mongo {
         /**
          * @return number of Chunk added to the vector
          */
-        int getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
+        int getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query );
 
         /**
          * @return number of Shards added to the set
@@ -323,7 +327,7 @@ namespace mongo {
         /**
          * @return number of Chunk matching the query or -1 for all chunks.
          */
-        int _getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query );
+        int _getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query );
     };
 
     // like BSONObjCmp. for use as an STL comparison functor
@@ -334,8 +338,15 @@ namespace mongo {
         bool operator()( const Chunk &l, const Chunk &r ) const {
             return _cmp(l.getMin(), r.getMin());
         }
-
         bool operator()( const Chunk *l, const Chunk *r ) const {
+            return operator()(*l, *r);
+        }
+
+        // Also support ChunkRanges
+        bool operator()( const ChunkRange &l, const ChunkRange &r ) const {
+            return _cmp(l.getMin(), r.getMin());
+        }
+        bool operator()( const shared_ptr<ChunkRange> l, const shared_ptr<ChunkRange> r ) const {
             return operator()(*l, *r);
         }
     private:
