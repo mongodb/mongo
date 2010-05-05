@@ -32,6 +32,7 @@ namespace mongo {
     Balancer balancer;
 
     Balancer::Balancer(){
+        _balancedLastTime = 0;
     }
 
     bool Balancer::shouldIBalance( DBClientBase& conn ){
@@ -78,8 +79,10 @@ namespace mongo {
         return _myid == x["who"].String() && hack == x["x"].OID();
     }
     
-    void Balancer::balance( DBClientBase& conn ){
+    int Balancer::balance( DBClientBase& conn ){
         log(1) << "i'm going to do some balancing" << endl;
+        
+        int numBalanced = 0;
         
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
         while ( cursor->more() ){
@@ -89,12 +92,16 @@ namespace mongo {
                 BSONElement e = i.next();
                 BSONObj data = e.Obj().getOwned();
                 string ns = e.fieldName();
-                balance( conn , ns , data );
+                bool didAnything = balance( conn , ns , data );
+                if ( didAnything )
+                    numBalanced++;
             }
         }
+
+        return numBalanced;
     }
 
-    void Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data ){
+    bool Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data ){
         log(4) << "balancer: balance(" << ns << ")" << endl;
 
         map< string,vector<BSONObj> > shards;
@@ -108,7 +115,7 @@ namespace mongo {
         }
         
         if ( shards.size() == 0 )
-            return;
+            return false;
         
         {
             vector<Shard> all;
@@ -141,8 +148,8 @@ namespace mongo {
         log(6) << "min: " << min.first << "\t" << min.second << endl;
         log(6) << "max: " << max.first << "\t" << max.second << endl;
         
-        if ( ( max.second - min.second ) < 10 )
-            return;
+        if ( ( max.second - min.second ) < _balancedLastTime ? 2 : 8 )
+            return false;
 
         string from = max.first;
         string to = min.first;
@@ -160,11 +167,13 @@ namespace mongo {
         assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
         
         string errmsg;
-        if ( c.moveAndCommit( Shard::make( to ) , errmsg ) )
-            return;
+        if ( c.moveAndCommit( Shard::make( to ) , errmsg ) ){
+            return true;
+        }
 
         log() << "balancer: MOVE FAILED **** " << errmsg << "\n"
               << "  from: " << from << " to: " << to << " chunk: " << chunkToMove << endl;
+        return false;
     }
     
     BSONObj Balancer::pickChunk( vector<BSONObj>& from, vector<BSONObj>& to ){
@@ -221,17 +230,19 @@ namespace mongo {
         ping();
 
         while ( ! inShutdown() ){
-            sleepsecs( 30 );
+            sleepsecs( 15 );
             
             try {
                 ShardConnection conn( configServer.getPrimary() );
                 ping( conn.conn() );
                 
+                int numBalanced = 0;
                 if ( shouldIBalance( conn.conn() ) ){
-                    balance( conn.conn() );
+                    numBalanced = balance( conn.conn() );
                 }
                 
                 conn.done();
+                _balancedLastTime = numBalanced;
             }
             catch ( std::exception& e ){
                 log() << "caught exception while doing balance: " << e.what() << endl;
