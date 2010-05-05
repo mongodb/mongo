@@ -55,7 +55,7 @@ namespace mongo {
     /* poll every other set member to check its status */
     class FeedbackThread : public BackgroundJob {
     public:
-        ReplSet::MemberInfo *m;
+        ReplSet::Member *m;
 
     private:
         void down() {
@@ -103,7 +103,7 @@ namespace mongo {
     };
 
     void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 
-        MemberInfo *m =_members.head();
+        Member *m =_members.head();
         vector<BSONObj> v;
 
         // add self
@@ -128,7 +128,7 @@ namespace mongo {
     }
 
     void ReplSet::startHealthThreads() {
-        MemberInfo* m = _members.head();
+        Member* m = _members.head();
         while( m ) {
             FeedbackThread *f = new FeedbackThread();
             f->m = m;

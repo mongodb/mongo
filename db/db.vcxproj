@@ -438,6 +438,7 @@
     </ClCompile>
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
+    <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="reccache.cpp" />
     <ClCompile Include="storage.cpp" />
