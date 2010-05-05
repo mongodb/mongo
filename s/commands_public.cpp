@@ -187,12 +187,12 @@ namespace mongo {
                 ChunkManager * cm = conf->getChunkManager( fullns );
                 massert( 10419 ,  "how could chunk manager be null!" , cm );
                 
-                vector<Chunk*> chunks;
+                vector<shared_ptr<ChunkRange> > chunks;
                 cm->getChunksForQuery( chunks , filter );
                 
                 unsigned long long total = 0;
-                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    Chunk * c = *i;
+                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    shared_ptr<ChunkRange> c = *i;
                     total += c->countObjects( filter );
                 }
                 
@@ -279,7 +279,7 @@ namespace mongo {
                 ChunkManager * cm = conf->getChunkManager( fullns );
                 massert( 13002 ,  "how could chunk manager be null!" , cm );
                 
-                vector<Chunk*> chunks;
+                vector<shared_ptr<ChunkRange> > chunks;
                 cm->getChunksForQuery( chunks , filter );
 
                 BSONObj sort = cmdObj.getObjectField("sort");
@@ -311,8 +311,8 @@ namespace mongo {
                     std::sort(chunks.begin(), chunks.end(), ChunkCmp(sort));
                 }
 
-                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    Chunk * c = *i;
+                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    shared_ptr<ChunkRange> c = *i;
 
                     ShardConnection conn( c->getShard() );
                     BSONObj res;
@@ -329,7 +329,7 @@ namespace mongo {
             }
 
         private:
-            BSONObj fixCmdObj(const BSONObj& cmdObj, const Chunk* chunk){
+            BSONObj fixCmdObj(const BSONObj& cmdObj, const shared_ptr<ChunkRange> chunk){
                 assert(chunk);
 
                 BSONObjBuilder b;
@@ -393,14 +393,14 @@ namespace mongo {
                 ChunkManager * cm = conf->getChunkManager( fullns );
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
                 
-                vector<Chunk*> chunks;
+                vector<shared_ptr<ChunkRange> > chunks;
                 cm->getChunksForQuery( chunks , BSONObj() );
                 
                 set<BSONObj,BSONObjCmp> all;
                 int size = 32;
                 
-                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    Chunk * c = *i;
+                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    shared_ptr<ChunkRange> c = *i;
 
                     ShardConnection conn( c->getShard() );
                     BSONObj res;
@@ -531,7 +531,7 @@ namespace mongo {
                     q = cmdObj["query"].embeddedObjectUserCheck();
                 }
                 
-                vector<Chunk*> chunks;
+                vector<shared_ptr<ChunkRange> > chunks;
                 cm->getChunksForQuery( chunks , q );
                 
                 const string shardedOutputCollection = getTmpName( collection );
@@ -544,8 +544,8 @@ namespace mongo {
                 
                 list< shared_ptr<Future::CommandResult> > futures;
                 
-                for ( vector<Chunk*>::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
-                    Chunk * c = *i;
+                for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
+                    shared_ptr<ChunkRange> c = *i;
                     futures.push_back( Future::spawnCommand( c->getShard().getConnString() , dbName , shardedCommand ) );
                 }
                 

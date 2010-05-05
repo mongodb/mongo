@@ -44,12 +44,12 @@ namespace mongo {
             
             Query query( q.query );
 
-            vector<Chunk*> shards;
+            vector<shared_ptr<ChunkRange> > shards;
             info->getChunksForQuery( shards , query.getFilter()  );
             
             set<ServerAndQuery> servers;
-            for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                Chunk* c = *i;
+            for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
+                shared_ptr<ChunkRange> c = *i;
                 //servers.insert( ServerAndQuery( c->getShard() , BSONObj() ) );
                 servers.insert( ServerAndQuery( c->getShard().getConnString() , c->getFilter() ) );
             }
@@ -77,8 +77,8 @@ namespace mongo {
                 if ( shardKeyOrder ){
                     // 2. sort on shard key, can do in serial intelligently
                     set<ServerAndQuery> buckets;
-                    for ( vector<Chunk*>::iterator i = shards.begin(); i != shards.end(); i++ ){
-                        Chunk * s = *i;
+                    for ( vector<shared_ptr<ChunkRange> >::iterator i = shards.begin(); i != shards.end(); i++ ){
+                        shared_ptr<ChunkRange> s = *i;
                         buckets.insert( ServerAndQuery( s->getShard().getConnString() , s->getFilter() , s->getMin() ) );
                     }
                     cursor = new SerialServerClusteredCursor( buckets , q , shardKeyOrder );
@@ -211,11 +211,11 @@ namespace mongo {
             }
             
             if ( multi ){
-                vector<Chunk*> chunks;
+                vector<shared_ptr<ChunkRange> > chunks;
                 manager->getChunksForQuery( chunks , chunkFinder );
                 set<Shard> seen;
-                for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
-                    Chunk * c = *i;
+                for ( vector<shared_ptr<ChunkRange> >::iterator i=chunks.begin(); i!=chunks.end(); i++){
+                    shared_ptr<ChunkRange> c = *i;
                     if ( seen.count( c->getShard() ) )
                         continue;
                     doWrite( dbUpdate , r , c->getShard() );
@@ -238,7 +238,7 @@ namespace mongo {
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
 
-            vector<Chunk*> chunks;
+            vector<shared_ptr<ChunkRange> > chunks;
             manager->getChunksForQuery( chunks , pattern );
             cout << "delete : " << pattern << " \t " << chunks.size() << " justOne: " << justOne << endl;
             if ( chunks.size() == 1 ){
@@ -250,8 +250,8 @@ namespace mongo {
                 throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
             
             set<Shard> seen;
-            for ( vector<Chunk*>::iterator i=chunks.begin(); i!=chunks.end(); i++){
-                Chunk * c = *i;
+            for ( vector<shared_ptr<ChunkRange> >::iterator i=chunks.begin(); i!=chunks.end(); i++){
+                shared_ptr<ChunkRange> c = *i;
                 if ( seen.count( c->getShard() ) )
                     continue;
                 seen.insert( c->getShard() );
