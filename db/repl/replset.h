@@ -57,6 +57,9 @@ namespace mongo {
         */
         ReplSet(string cfgString);
 
+        /* call after constructing to start - returns fairly quickly after launching its threads */
+        void go() { startHealthThreads(); }
+
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
 

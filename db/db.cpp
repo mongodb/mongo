@@ -560,7 +560,7 @@ namespace mongo {
             dbexit( EXIT_UNCAUGHT );
         }
         catch(...) {
-            log() << " exception in initAndListen, terminating" << endl;
+            log() << "exception in initAndListen, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
     }

@@ -548,6 +548,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct" />
+    <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />

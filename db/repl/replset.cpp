@@ -79,8 +79,6 @@ namespace mongo {
         //    addMemberIfMissing(*i);
 
         loadConfig();
-
-        startHealthThreads();
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
@@ -92,11 +90,17 @@ namespace mongo {
         _name = c._id;
         assert( !_name.empty() );
 
+        int me=0;
         for( vector<ReplSetConfig::Member>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
             const ReplSetConfig::Member& m = *i;
-            MemberInfo *mi = new MemberInfo(m.h, m._id);
-            _members.push(mi);
+            if( m.h.isSelf() ) {
+                me++;
+            } else {
+                MemberInfo *mi = new MemberInfo(m.h, m._id);
+                _members.push(mi);
+            }
         }
+        assert( me == 1 );
     }
 
     void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
@@ -187,7 +191,7 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
-            theReplSet = new ReplSet(cmdLine.replSet);
+            (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
             log() << "replSet Caught exception in management thread: " << e.what() << endl;

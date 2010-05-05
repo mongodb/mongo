@@ -18,6 +18,33 @@ namespace mongoutils {
         using namespace std;
 
         const char *_end = "</body></html>";
+        const char *_table = "</table>";
+        const char *_tr = "</tr>\n";
+
+        inline string tr() { return "<tr>"; }
+
+        inline string td(double x) { 
+            stringstream ss;
+            ss << "<td>" << x << "</td>";
+            return ss.str();
+        }
+        inline string td(string x) { 
+            return "<td>" + x + "</td>";
+        }
+
+        inline string table(const char *headers[] = 0) { 
+            stringstream ss;
+            ss << "<table border=1 cellpadding=2 cellspacing=0>\n";
+            if( headers ) { 
+                ss << "<tr>";
+                while( *headers ) { 
+                    ss << "<th>" << *headers << "</th>";
+                    headers++;
+                }
+                ss << "</tr>\n";
+            }
+            return ss.str();
+        }
 
         inline string start(string title) { 
             return string("<html><head><title>") + title + "</title></head><body>";
