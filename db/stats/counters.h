@@ -33,12 +33,13 @@ namespace mongo {
         
         OpCounters();
 
-        int * getInsert(){ return _insert; }
-        int * getQuery(){ return _query; }
-        int * getUpdate(){ return _update; }
-        int * getDelete(){ return _delete; }
-        int * getGetMore(){ return _getmore; }
-        int * getCommand(){ return _command; }
+
+        AtomicUInt * getInsert(){ return _insert; }
+        AtomicUInt * getQuery(){ return _query; }
+        AtomicUInt * getUpdate(){ return _update; }
+        AtomicUInt * getDelete(){ return _delete; }
+        AtomicUInt * getGetMore(){ return _getmore; }
+        AtomicUInt * getCommand(){ return _command; }
         
         void gotInsert(){ _insert[0]++; }
         void gotQuery(){ _query[0]++; }
@@ -52,12 +53,12 @@ namespace mongo {
         BSONObj& getObj(){ return _obj; }
     private:
         BSONObj _obj;
-        int * _insert;
-        int * _query;
-        int * _update;
-        int * _delete;
-        int * _getmore;
-        int * _command;
+        AtomicUInt * _insert;
+        AtomicUInt * _query;
+        AtomicUInt * _update;
+        AtomicUInt * _delete;
+        AtomicUInt * _getmore;
+        AtomicUInt * _command;
     };
     
     extern OpCounters globalOpCounters;
