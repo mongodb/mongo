@@ -513,17 +513,17 @@ DB.prototype.getCollectionNames = function(){
 
     var nsLength = this._name.length + 1;
     
-    this.getCollection( "system.namespaces" ).find().sort({name:1}).forEach(
-        function(z){
-            var name = z.name;
-            
-            if ( name.indexOf( "$" ) >= 0 && name != "local.oplog.$main" )
-                return;
-            
-            all.push( name.substring( nsLength ) );
-        }
-    );
-    return all;
+    var c = this.getCollection( "system.namespaces" ).find();
+    while ( c.hasNext() ){
+        var name = c.next().name;
+        
+        if ( name.indexOf( "$" ) >= 0 && name.indexOf( ".oplog.$" ) < 0 )
+            continue;
+        
+        all.push( name.substring( nsLength ) );
+    }
+    
+    return all.sort();
 }
 
 DB.prototype.tojson = function(){
