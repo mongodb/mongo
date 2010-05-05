@@ -18,7 +18,6 @@
 #include "../cmdline.h"
 #include "../../util/sock.h"
 #include "replset.h"
-#include "rs_config.h"
 
 namespace mongo { 
 
@@ -38,7 +37,7 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : fatal(false) {
+    ReplSet::ReplSet(string cfgString) : fatal(false), _self(0) {
 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
@@ -79,8 +78,6 @@ namespace mongo {
         //    addMemberIfMissing(*i);
 
         loadConfig();
-
-        startHealthThreads();
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
@@ -92,11 +89,19 @@ namespace mongo {
         _name = c._id;
         assert( !_name.empty() );
 
-        for( vector<ReplSetConfig::Member>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
-            const ReplSetConfig::Member& m = *i;
-            MemberInfo *mi = new MemberInfo(m.h, m._id);
-            _members.push(mi);
+        int me=0;
+        for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
+            const ReplSetConfig::MemberCfg& m = *i;
+            if( m.h.isSelf() ) {
+                me++;
+                assert( _self == 0 );
+                _self = new Member(m.h, m._id, new ReplSetConfig::MemberCfg(m));
+            } else {
+                Member *mi = new Member(m.h, m._id, new ReplSetConfig::MemberCfg(m));
+                _members.push(mi);
+            }
         }
+        assert( me == 1 );
     }
 
     void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
@@ -166,19 +171,7 @@ namespace mongo {
         startupStatus = FINISHME;
     }
 
-    /*void ReplSet::addMemberIfMissing(const HostAndPort& h) { 
-        MemberInfo *m = _members.head();
-        while( m ) {
-            if( h.host() == m->host && h.port() == m->port )
-                return;
-            m = m->next();
-        }
-        MemberInfo *nm = new MemberInfo(h.host(), h.port());
-        _members.push(nm);
-    }*/
-
-    /* called at initialization */
-
+    /* called at startup */
     void startReplSets() {
         mongo::lastError.reset( new LastError() );
         try { 
@@ -187,7 +180,7 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
-            theReplSet = new ReplSet(cmdLine.replSet);
+            (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
             log() << "replSet Caught exception in management thread: " << e.what() << endl;

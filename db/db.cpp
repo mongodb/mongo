@@ -444,9 +444,9 @@ namespace mongo {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ){
-                cout << "****\n" 
-                     << "WARNING: This is development version of MongoDB.  Not recommended for production.\n" 
-                     << "****" << endl;
+                log() << "****\n";
+                log() << "WARNING: This is development version of MongoDB.  Not recommended for production.\n";
+                log() << "****" << endl;
             }
                 
         }
@@ -472,9 +472,14 @@ namespace mongo {
 
         bool is32bit = sizeof(int*) == 4;
 
-        log() << "Mongo DB : starting : pid = " << pid << " port = " << cmdLine.port << " dbpath = " << dbpath
-              <<  " master = " << replSettings.master << " slave = " << (int) replSettings.slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
-        DEV log() << " FULL DEBUG ENABLED " << endl;
+        {
+            Nullstream& l = log();
+            l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
+            if( replSettings.master ) l << " master=" << replSettings.master;
+            if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
+            l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
+        }
+        DEV log() << "_DEBUG build (which is slower)" << endl;
         show_32_warning();
         log() << mongodVersion() << endl;
         printGitVersion();
@@ -555,7 +560,7 @@ namespace mongo {
             dbexit( EXIT_UNCAUGHT );
         }
         catch(...) {
-            log() << " exception in initAndListen, terminating" << endl;
+            log() << "exception in initAndListen, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
     }
@@ -707,13 +712,10 @@ int main(int argc, char* argv[], char *envp[] )
         }
     }
 
-    DEV out() << "DEV is defined (using _DEBUG), which is slower...\n";
-
     UnitTest::runTests();
 
-    if (argc == 1) {
+    if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
-    }
 
     {
         bool installService = false;

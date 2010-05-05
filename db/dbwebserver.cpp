@@ -31,7 +31,6 @@
 #include "stats/snapshots.h"
 #include "background.h"
 #include "commands.h"
-
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
@@ -40,6 +39,7 @@
 namespace mongo {
 
     using namespace mongoutils::html;
+    using namespace bson;
 
     extern string bind_ip;
     extern const char *replInfo;
@@ -256,25 +256,23 @@ namespace mongo {
             ss << "</table>\n";
         }
         
+        /* /_replSet show replica set status in html format */
         string _replSet() { 
             stringstream s;
-            s << start("Replica Set Status");
+            s << start("Replica Set Status " + getHostName());
             s << p("See also <a href=\"/replSetGetStatus?text\">replSetGetStatus</a>.");
 
             if( theReplSet == 0 ) { 
-                s << p("Replica set not initialized or configured.");
+                if( cmdLine.replSet.empty() ) s << p("Not using --replSet");
+                else s << p("Replica set not yet initialized.");
             }
             else {
-                try { 
-                    BSONObjBuilder b;
-                    theReplSet->summarizeStatus(b);
-                    BSONObj o = b.obj();
-
+                try {
+                    theReplSet->summarizeAsHtml(s);
                 }
-                catch(...) { s << "error?"; }
+                catch(...) { s << "error summarizing replset status"; }
             }
-            s << _end;
-
+            s << _end();
             return s.str();
         }
 
@@ -462,7 +460,7 @@ namespace mongo {
             }
             ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
             ss << "<a href=\"/_commands\">List all commands</a>\n";
-            ss << "<a href=\"/_replSetcommands\">List all commands</a>\n";
+            ss << "<a href=\"/_replSet\">Replica set status</a>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
             {

@@ -18,9 +18,17 @@
 
 #pragma once
 
+#include <sstream>
 #include "../bson/util/misc.h"
 
 namespace mongo {
+
+    template<class T>
+    inline string ToString(const T& t) { 
+        stringstream s;
+        s << t;
+        return s.str();
+    }
 
 #if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
 

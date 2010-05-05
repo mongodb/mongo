@@ -21,12 +21,12 @@
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/hostandport.h"
+#include "rs_config.h"
 
 namespace mongo {
 
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
-    class ReplSetConfig;
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
@@ -36,6 +36,7 @@ namespace mongo {
     public:
         bool isMaster(const char *client) { 
             //zzz
+            /* todo replset */
             return false;
         }
         void fillIsMaster(BSONObjBuilder&);
@@ -57,8 +58,12 @@ namespace mongo {
         */
         ReplSet(string cfgString);
 
+        /* call after constructing to start - returns fairly quickly after launching its threads */
+        void go() { startHealthThreads(); }
+
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
+        void summarizeAsHtml(stringstream&) const;
 
     private:
         string _name;
@@ -71,10 +76,12 @@ namespace mongo {
         void finishLoadingConfig(vector<ReplSetConfig>& v);
         void setFrom(ReplSetConfig& c);
 
-//        void addMemberIfMissing(const HostAndPort& p);
+        bool aMajoritySeemsToBeUp() const;
+        void electSelf();
 
-        struct MemberInfo : public List1<MemberInfo>::Base {
-            MemberInfo(HostAndPort h, int ord) : 
+        struct Member : public List1<Member>::Base {
+            Member(HostAndPort h, int ord, ReplSetConfig::MemberCfg *c) : 
+                _config(c), 
                 _port(h.port()), _host(h.host()), _id(ord) { 
                 _dead = false;
                 _lastHeartbeat = 0;
@@ -90,9 +97,13 @@ namespace mongo {
             double health() const { return _health; }
             time_t upSince() const { return _upSince; }
             time_t lastHeartbeat() const { return _lastHeartbeat; }
+            const ReplSetConfig::MemberCfg& config() const { return *_config; }
+            bool up() const { return health() > 0; }
+            void summarizeAsHtml(stringstream& s) const;
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
 
+            const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             bool _dead;
             const int _port;
             const string _host;
@@ -103,8 +114,10 @@ namespace mongo {
         public:
             DiagStr _lastHeartbeatErrMsg;
         };
-        /* all members of the set EXCEPT SELF. */
-        List1<MemberInfo> _members;
+        Member *_self;
+        /* all members of the set EXCEPT self. */
+        List1<Member> _members;
+        Member* head() const { return _members.head(); }
 
         void startHealthThreads();
         friend class FeedbackThread;

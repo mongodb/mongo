@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-#include "rs_config.h"
 #include "replset.h"
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
@@ -33,7 +32,7 @@ namespace mongo {
         Helpers::putSingletonGod("local.system.replset", o, false/*logOp=false; local db so would work regardless...*/);
     }
 
-    bo ReplSetConfig::Member::asBson() const { 
+    bo ReplSetConfig::MemberCfg::asBson() const { 
         bob b;
         b << "_id" << _id;
         b.append("host", h.toString());
@@ -69,7 +68,7 @@ namespace mongo {
         uassert(13126, "bad Member config", expr);
     }
 
-    void ReplSetConfig::Member::check() const{ 
+    void ReplSetConfig::MemberCfg::check() const{ 
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
@@ -122,7 +121,7 @@ namespace mongo {
         }
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
-            Member m;
+            MemberCfg m;
             try {
                 try { 
                     m._id = (int) mobj["_id"].Number();

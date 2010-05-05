@@ -342,20 +342,24 @@ namespace mongo {
         return (long)result["size"].number();
     }
 
-    
-    long Chunk::countObjects( const BSONObj& filter ) const{
-        ShardConnection conn( getShard() );
+
+    template <typename ChunkType>
+    inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
+        ShardConnection conn( chunk->getShard() );
         
-        BSONObj f = getFilter();
+        BSONObj f = chunk->getFilter();
         if ( ! filter.isEmpty() )
             f = ClusteredCursor::concatQuery( f , filter );
 
         BSONObj result;
-        unsigned long long n = conn->count( _ns , f );
+        unsigned long long n = conn->count( chunk->getManager()->getns() , f );
         
         conn.done();
         return (long)n;
     }
+    
+    long Chunk::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
+    long ChunkRange::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
         BSONObjBuilder bb( b.subobjStart( name ) );
@@ -372,7 +376,10 @@ namespace mongo {
     }
 
     void Chunk::getFilter( BSONObjBuilder& b ) const{
-        _manager->_key.getFilter( b , _min , _max );
+        _manager->getShardKey().getFilter( b , _min , _max );
+    }
+    void ChunkRange::getFilter( BSONObjBuilder& b ) const{
+        _manager->getShardKey().getFilter( b , _min , _max );
     }
     
     void Chunk::serialize(BSONObjBuilder& to){
@@ -491,7 +498,8 @@ namespace mongo {
             
             _chunks.push_back( c );
             _chunkMap[c->getMax()] = c;
-            
+            _chunkRanges.reloadAll(_chunkMap);
+
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
         }
 
@@ -592,7 +600,7 @@ namespace mongo {
         return 0;
     }
 
-    int ChunkManager::_getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::_getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
         FieldRangeSet ranges(_ns.c_str(), query, false);
@@ -606,12 +614,12 @@ namespace mongo {
             return 0;
 
         } else if (range.equality()) {
-            chunks.push_back(&findChunk(BSON(field.fieldName() << range.min())));
+            chunks.push_back( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second );
             return 1;
         } else if (!range.nontrivial()) {
             return -1; // all chunks
         } else {
-            set<Chunk*, ChunkCmp> chunkSet;
+            set<shared_ptr<ChunkRange>, ChunkCmp> chunkSet;
 
             for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
                  it != end;
@@ -621,16 +629,17 @@ namespace mongo {
                 assert(fi.valid());
                 BSONObj minObj = BSON(field.fieldName() << fi.lower_.bound_);
                 BSONObj maxObj = BSON(field.fieldName() << fi.upper_.bound_);
-                ChunkMap::iterator min = (fi.lower_.inclusive_ ? _chunkMap.upper_bound(minObj) : _chunkMap.lower_bound(minObj));
-                ChunkMap::iterator max = (fi.upper_.inclusive_ ? _chunkMap.upper_bound(maxObj) : _chunkMap.lower_bound(maxObj));
+                ChunkRangeMap::const_iterator min, max;
+                min = (fi.lower_.inclusive_ ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
+                max = (fi.upper_.inclusive_ ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
 
-                assert(min != _chunkMap.end());
+                assert(min != _chunkRanges.ranges().end());
 
                 // make max non-inclusive like end iterators
-                if(max != _chunkMap.end())
+                if(max != _chunkRanges.ranges().end())
                     ++max;
 
-                for (ChunkMap::iterator it=min; it != max; ++it){
+                for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
                     chunkSet.insert(it->second);
                 }
             }
@@ -640,27 +649,28 @@ namespace mongo {
         }
     }
 
-    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
         int ret = _getChunksForQuery(chunks, query);
 
         if (ret == -1){
-            chunks = _chunks;
-            return chunks.size();
+            for (ChunkRangeMap::const_iterator it=_chunkRanges.ranges().begin(), end=_chunkRanges.ranges().end(); it != end; ++it){
+                chunks.push_back(it->second);
+            }
         }
-
-        return ret;
+        return chunks.size();
+        //return ret;
     }
 
     int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
-        vector<Chunk*> chunks;
+        vector<shared_ptr<ChunkRange> > chunks;
         int ret = _getChunksForQuery(chunks, query);
 
         if (ret == -1){
             getAllShards(shards);
         } 
         else {
-            for ( vector<Chunk*>::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
-                Chunk* c = *it;
+            for ( vector<shared_ptr<ChunkRange> >::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
+                shared_ptr<ChunkRange> c = *it;
                 shards.insert(c->getShard());
             }
         }
