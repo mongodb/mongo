@@ -1567,7 +1567,7 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "db/" , "client/" ]:
+for id in [ "", "util/", "db/" , "client/" , "bson/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
@@ -1668,16 +1668,18 @@ def s3dist( env , target , source ):
     s3push( distFile , "mongodb" )
 
 env.Append( TARFLAGS=" -z " )
-if windows:
-    distFile = installDir + ".zip"
-    env.Zip( distFile , installDir )
-else:
-    distFile = installDir + ".tgz"
-    env.Tar( distFile , installDir )
 
-env.Alias( "dist" , distFile )
-env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
-env.AlwaysBuild( "s3dist" )
+if installDir[-1] != "/":
+    if windows:
+        distFile = installDir + ".zip"
+        env.Zip( distFile , installDir )
+    else:
+        distFile = installDir + ".tgz"
+        env.Tar( distFile , installDir )
+
+    env.Alias( "dist" , distFile )
+    env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
+    env.AlwaysBuild( "s3dist" )
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)
