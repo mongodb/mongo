@@ -54,6 +54,34 @@ namespace mongo {
         if ( !_shutdown ) 
             cout << "ERROR: Client::shutdown not called: " << _desc << endl;
     }
+    
+    void Client::dropTempCollectionsInDB( const string db ) {
+	list<string>::iterator i = _tempCollections.begin();
+	while ( i!=_tempCollections.end() ) {
+	    string ns = *i;
+	    if ( ns.compare( 0, db.length(), db ) == 0 ) {
+		try {
+		    string err;
+		    BSONObjBuilder b;
+		    dropCollection( ns, err, b );
+		    i = _tempCollections.erase(i);
+		    ++i;
+		}
+                catch ( ... ){
+                    log() << "error dropping temp collection: " << ns << endl;
+                }
+	    } else {
+		++i;
+	    }
+	}
+    }
+
+    void Client::dropAllTempCollectionsInDB(const string db) {
+	for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
+	    Client* cli = *i;
+	    cli->dropTempCollectionsInDB(db);
+	}
+    }
 
     bool Client::shutdown(){
         _shutdown = true;
