@@ -188,9 +188,6 @@ namespace mongo {
             _tempCollections.push_back( ns );
         }
         
-	void dropTempCollectionsInDB(const string db);
-	void dropAllTempCollectionsInDB(const string db);
-
         void setLastOp( const OpTime& op ){
             _lastOp = op;
         }
