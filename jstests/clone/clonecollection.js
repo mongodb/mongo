@@ -70,18 +70,18 @@ t = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_to
 for( i = 0; i < 1000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 1000, f.a.find().count() );
+assert.eq( 1000, f.a.find().count() , "A1" );
 
 assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a" ) );
-assert.eq( 1000, t.a.find().count() );
+assert.eq( 1000, t.a.find().count() , "A2" );
 
 t.a.drop();
 
 assert.commandWorked( t.cloneCollection( "localhost:" + ports[ 0 ], "a", { i: { $gte: 10, $lt: 20 } } ) );
-assert.eq( 10, t.a.find().count() );
+assert.eq( 10, t.a.find().count() , "A3" );
 
 t.a.drop();
-assert.eq( 0, t.system.indexes.find().count() );
+assert.eq( 0, t.system.indexes.find().count() , "prep 2");
 
 f.a.ensureIndex( { i: 1 } );
 assert.eq( 2, f.system.indexes.find().count(), "expected index missing" );
@@ -91,7 +91,7 @@ if ( t.system.indexes.find().count() != 2 ) {
 }
 assert.eq( 2, t.system.indexes.find().count(), "expected index missing" );
 // Verify index works
-assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().indexBounds[0][0].i );
+assert.eq( 50, t.a.find( { i: 50 } ).hint( { i: 1 } ).explain().indexBounds[0][0].i , "verify 1" );
 assert.eq( 1, t.a.find( { i: 50 } ).hint( { i: 1 } ).toArray().length, "match length did not match expected" );
 
 // Check that capped-ness is preserved on clone
@@ -123,11 +123,12 @@ assert.eq( 100001, f.a.count() );
 ret = finishstartclone();
 finishclone( ret );
 
-assert.eq( 100000, t.a.find().count() );
-assert.eq( 1, t.a.find( { i: 200000 } ).count(), "CA" );
-assert.eq( 0, t.a.find( { i: -1 } ).count() );
-assert.eq( 0, t.a.find( { i: 0 } ).count() );
-assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count(), "CB" );
+
+assert.eq( 100000, t.a.find().count() , "D1" );
+assert.eq( 1, t.a.find( { i: 200000 } ).count() , "D2" );
+assert.eq( 0, t.a.find( { i: -1 } ).count() , "D3" );
+assert.eq( 0, t.a.find( { i: 0 } ).count() , "D4" );
+assert.eq( 1, t.a.find( { i: 99998, x: "y" } ).count() , "D5" );
 
 
 // Now test oplog running out of space -- specify small size clone oplog for test.
@@ -137,7 +138,7 @@ t.a.drop();
 for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 200000, f.a.count() );
+assert.eq( 200000, f.a.count() , "E1" );
 
 startstartclone( ", logSizeMb:1" );
 ret = finishstartclone();
@@ -156,7 +157,7 @@ t.a.drop();
 for( i = 0; i < 200000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 200000, f.a.count() );
+assert.eq( 200000, f.a.count() , "F1" );
 
 startstartclone();
 ret = finishstartclone();
@@ -164,10 +165,10 @@ ret = finishstartclone();
 for( i = 200000; i < 250000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 250000, f.a.count() );
+assert.eq( 250000, f.a.count() , "F2" );
 
 finishclone( ret );
-assert.eq( 250000, t.a.find().count() );
+assert.eq( 250000, t.a.find().count() , "F3" );
     
 // Test startCloneCollection and finishCloneCollection commands.
 f.a.drop();
@@ -176,7 +177,7 @@ t.a.drop();
 for( i = 0; i < 100000; ++i ) {
     f.a.save( { i: i } );
 }
-assert.eq( 100000, f.a.count() );
+assert.eq( 100000, f.a.count() , "G1" );
 
 startstartclone();
 
@@ -185,9 +186,9 @@ f.a.save( { i: -1 } );
 assert.eq( 100001, f.a.count() );
 
 ret = finishstartclone();
-assert.eq( 100001, t.a.find().count() );
+assert.eq( 100001, t.a.find().count() , "G2" );
 
 f.a.save( { i: -2 } );
-assert.eq( 100002, f.a.find().count() );
+assert.eq( 100002, f.a.find().count() , "G3" );
 finishclone( ret );
-assert.eq( 100002, t.a.find().count() );
+assert.eq( 100002, t.a.find().count() , "G4" );
