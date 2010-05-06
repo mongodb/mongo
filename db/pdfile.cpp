@@ -1593,6 +1593,9 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());
 
+        Client * c = currentClient.get();
+        c->dropAllTempCollectionsInDB(db);
+
         closeDatabase( db.c_str() );
         _deleteDataFiles( db.c_str() );
     }
