@@ -83,13 +83,13 @@ namespace mongo {
         assert( op > dbMsg );
         
         Strategy * s = SINGLE;
-        OpCounters * counter = &opsNonSharded;
+        _counter = &opsNonSharded;
         
         _d.markSet();
         
         if ( _chunkManager ){
             s = SHARDED;
-            counter = &opsSharded;
+            _counter = &opsSharded;
         }
 
         bool iscmd = false;
@@ -117,12 +117,17 @@ namespace mongo {
         }
 
         globalOpCounters.gotOp( op , iscmd );
-        counter->gotOp( op , iscmd );
+        _counter->gotOp( op , iscmd );
     }
     
     bool Request::isCommand() const {
         int x = _d.getQueryNToReturn();
         return ( x == 1 || x == -1 ) && strstr( getns() , ".$cmd" );
+    }
+
+    void Request::gotInsert(){
+        globalOpCounters.gotInsert();
+        _counter->gotInsert();
     }
     
     ClientInfo::ClientInfo( int clientId ) : _id( clientId ){

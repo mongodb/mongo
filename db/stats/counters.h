@@ -33,7 +33,6 @@ namespace mongo {
         
         OpCounters();
 
-
         AtomicUInt * getInsert(){ return _insert; }
         AtomicUInt * getQuery(){ return _query; }
         AtomicUInt * getUpdate(){ return _update; }

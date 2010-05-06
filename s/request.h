@@ -25,7 +25,9 @@
 #include "util.h"
 
 namespace mongo {
+
     
+    class OpCounters;
     class ClientInfo;
     
     class Request : boost::noncopyable {
@@ -84,6 +86,8 @@ namespace mongo {
         AbstractMessagingPort* p() const { return _p; }
 
         void process( int attempt = 0 );
+
+        void gotInsert();
         
     private:
         
@@ -99,6 +103,8 @@ namespace mongo {
         
         int _clientId;
         ClientInfo * _clientInfo;
+
+        OpCounters* _counter;
     };
 
     typedef map<int,ClientInfo*> ClientCache;
