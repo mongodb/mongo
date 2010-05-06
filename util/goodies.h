@@ -192,24 +192,24 @@ namespace mongo {
         xt.sec += s;
         boost::thread::sleep(xt);
     }
-    inline void sleepmillis(int s) {
+    inline void sleepmillis(long long s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
-        xt.sec += ( s / 1000 );
-        xt.nsec += ( s % 1000 ) * 1000000;
+        xt.sec += (int)( s / 1000 );
+        xt.nsec += (int)(( s % 1000 ) * 1000000);
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
         }        
         boost::thread::sleep(xt);
     }
-    inline void sleepmicros(int s) {
+    inline void sleepmicros(long long s) {
         if ( s <= 0 )
             return;
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
-        xt.sec += ( s / 1000000 );
-        xt.nsec += ( s % 1000000 ) * 1000;
+        xt.sec += (int)( s / 1000000 );
+        xt.nsec += (int)(( s % 1000000 ) * 1000);
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
@@ -225,7 +225,7 @@ namespace mongo {
             cout << "nanosleep failed" << endl;
         }
     }
-    inline void sleepmicros(int s) {
+    inline void sleepmicros(long long s) {
         if ( s <= 0 )
             return;
         struct timespec t;
@@ -236,7 +236,7 @@ namespace mongo {
             cout << "nanosleep failed" << endl;
         }
     }
-    inline void sleepmillis(int s) {
+    inline void sleepmillis(long long s) {
         sleepmicros( s * 1000 );
     }
 #endif

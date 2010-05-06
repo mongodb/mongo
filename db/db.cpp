@@ -415,7 +415,7 @@ namespace mongo {
                     continue;
                 }
 
-                sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
+                sleepmillis( std::max(0.0, (_sleepsecs * 1000) - time_flushing) );
                 
                 if ( inShutdown() ){
                     // occasional issue trying to flush during shutdown when sleep interrupted
