@@ -79,6 +79,7 @@ namespace mongo {
         bool aMajoritySeemsToBeUp() const;
         void electSelf();
 
+    public:
         struct Member : public List1<Member>::Base {
             Member(HostAndPort h, int ord, ReplSetConfig::MemberCfg *c) : 
                 _config(c), 
@@ -114,6 +115,8 @@ namespace mongo {
         public:
             DiagStr _lastHeartbeatErrMsg;
         };
+
+    private:
         Member *_self;
         /* all members of the set EXCEPT self. */
         List1<Member> _members;
