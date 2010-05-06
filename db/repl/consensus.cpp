@@ -16,8 +16,18 @@
 
 #include "pch.h"
 #include "replset.h"
+#include "connections.h"
+#include "../../util/background.h"
 
 namespace mongo { 
+
+    class E : public BackgroundJob { 
+        void run() { 
+            log() << "not done" << endl;
+        }
+    public:
+        ReplSet::Member *_m;
+    };
 
     bool ReplSet::aMajoritySeemsToBeUp() const {
         Member *m = head();
@@ -32,8 +42,18 @@ namespace mongo {
         return vUp * 2 > vTot;
     }
 
-    void ReplSet::electSelf() { 
-
+    typedef shared_ptr<E> eptr;
+    void ReplSet::electSelf() {
+        list<BackgroundJob*> _jobs;
+        list<eptr> jobs;
+        for( Member *m = head(); m; m=m->next() ) { 
+            eptr e( new E() );
+            e->_m = m;
+            jobs.push_back(e);
+            _jobs.push_back(e.get());
+            e->go();
+        }
+        BackgroundJob::wait(_jobs);
     }
 
 }
