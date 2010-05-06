@@ -249,7 +249,7 @@ namespace mongo {
     struct readlocktryassert : public readlocktry { 
         readlocktryassert(const string& ns, int tryms) : 
           readlocktry(ns,tryms) { 
-              uassert(10000, "timeout getting readlock", got());
+              uassert(13142, "timeout getting readlock", got());
         }
     };
 
