@@ -83,17 +83,21 @@ namespace mongo {
 
         static auto_ptr<CursorIterator> find( const char *ns , BSONObj query = BSONObj() , bool requireIndex = false );
 
-        /* Get/put the first object from a collection.  Generally only useful if the collection
-           only ever has a single object -- which is a "singleton collection".
+        /** Get/put the first object from a collection.  Generally only useful if the collection
+            only ever has a single object -- which is a "singleton collection".
 
-		   You do not need to set the database before calling.
-		   
-		   Returns: true if object exists.
+            You do not need to set the database before calling.
+
+            @return true if object exists.
         */
         static bool getSingleton(const char *ns, BSONObj& result);
         static void putSingleton(const char *ns, BSONObj obj);
         static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
 
+        /** You do not need to set the database before calling.
+            @return true if collection is empty.
+        */
+        static bool isEmpty(const char *ns);
 
         /* Remove all objects from a collection.
         You do not need to set the database before calling.

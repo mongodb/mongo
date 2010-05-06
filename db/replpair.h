@@ -118,16 +118,16 @@ namespace mongo {
             return false;
         }
 
-		if( ! replSettings.slave ) 
-			return true;
+        if( ! replSettings.slave ) 
+            return true;
 
         if ( replAllDead )
             return false;
 
         if ( replPair ) {
-			if( replPair->state == ReplPair::State_Master )
-				return true;
-		}
+            if( replPair->state == ReplPair::State_Master )
+                return true;
+        }
         else { 
             if( replSettings.master ) {
                 // if running with --master --slave, allow.  note that master is also true 
@@ -162,9 +162,9 @@ namespace mongo {
     */
     inline void replVerifyReadsOk(ParsedQuery& pq) {
         if( replSet ) 
-            notMasterUnless(isMaster());
+            notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk));
         else
-            notMasterUnless(isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
+            notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
     }
 
     inline bool isMasterNs( const char *ns ) {
