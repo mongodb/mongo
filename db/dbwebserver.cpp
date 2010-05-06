@@ -307,20 +307,21 @@ namespace mongo {
                     string ha1 = user["pwd"].str();
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
                     
-                    string r = ha1 + ":" + parms["nonce"];
+                    stringstream r;
+                    r << ha1 << ':' << parms["nonce"];
                     if ( parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size() ){
-                        r += ":";
-                        r += parms["nc"];
-                        r += ":";
-                        r += parms["cnonce"];
-                        r += ":";
-                        r += parms["qop"];
+                        r << ':';
+                        r << parms["nc"];
+                        r << ':';
+                        r << parms["cnonce"];
+                        r << ':';
+                        r << parms["qop"];
                     }
-                    r += ":";
-                    r += ha2;
-                    r = md5simpledigest( r );
+                    r << ':';
+                    r << ha2;
+                    string r1 = md5simpledigest( r.str() );
                     
-                    if ( r == parms["response"] )
+                    if ( r1 == parms["response"] )
                         return true;
                 }
 
