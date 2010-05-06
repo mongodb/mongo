@@ -562,6 +562,7 @@
     <ClInclude Include="reccache.h" />
     <ClInclude Include="reci.h" />
     <ClInclude Include="recstore.h" />
+    <ClInclude Include="repl\connections.h" />
     <ClInclude Include="storage.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />

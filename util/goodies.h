@@ -291,6 +291,9 @@ namespace mongo {
     // destroying them.
     class mutex : boost::noncopyable {
     public:
+        void __lock() { _m->lock(); }
+        void __unlock() { _m->unlock(); }
+
         mutex() { _m = new boost::mutex(); }
         ~mutex() {
             if( !__destroyingStatics ) {
