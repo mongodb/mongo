@@ -450,7 +450,7 @@ namespace mongo {
         if ( !c->more() )
             return BSONObj();
 
-        return c->next().copy();
+        return c->nextSafe().copy();
     }
 
     bool DBClientConnection::connect(const string &_serverAddress, string& errmsg) {

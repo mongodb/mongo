@@ -23,6 +23,14 @@
 #include "../../util/concurrency/value.h"
 #include "../../util/web/html.h"
 #include "../../util/goodies.h"
+#include "../helpers/dblogger.h"
+#include "connections.h"
+
+namespace mongo {
+    /* decls for connections.h */
+    ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
+    mutex ScopedConn::mapMutex;
+}
 
 namespace mongo { 
 
@@ -73,16 +81,16 @@ namespace mongo {
     public:
         void run() { 
             mongo::lastError.reset( new LastError() );
-            DBClientConnection conn(true, 0, 10);
-            conn._logLevel = 2;
-            string err;
-            conn.connect(m->fullName(), err);
 
             BSONObj cmd = BSON( "replSetHeartbeat" << theReplSet->getName() );
             while( 1 ) {
                 try { 
                     BSONObj info;
-                    bool ok = conn.runCommand("admin", cmd, info);
+                    bool ok;
+                    {
+                        ScopedConn conn(m->fullName());
+                        ok = conn->runCommand("admin", cmd, info);
+                    }
                     m->_lastHeartbeat = time(0);
                     if( ok ) {
                         if( m->_upSince == 0 ) {
@@ -133,8 +141,11 @@ namespace mongo {
     }
 
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
-        s << p( "Set: " + _name );
-        s << p( string("Majority up: ") + (aMajoritySeemsToBeUp()?"yes":"no") );
+        s << table(0, false);
+        s << tr("Set name:", _name);
+        s << tr("Majority up:", aMajoritySeemsToBeUp()?"yes":"no" );
+        s << _table();
+
         const char *h[] = {"Member", "Up", "Uptime", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "Status", 0};

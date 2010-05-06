@@ -173,6 +173,12 @@ namespace mongo {
         return true;
     }
 
+    bool Helpers::isEmpty(const char *ns) {
+        Client::Context context(ns);
+        auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
+        return !c->ok();
+    }
+
     /* Get the first object from a collection.  Generally only useful if the collection
        only ever has a single object -- which is a "singleton collection.
 
