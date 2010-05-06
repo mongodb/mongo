@@ -22,7 +22,11 @@ namespace mongoutils {
         inline string _tr() { return "</tr>\n"; }
 
         inline string tr() { return "<tr>"; }
-
+        inline string tr(string a, string b) { 
+            stringstream ss;
+            ss << "<tr><td>" << a << "</td><td>" << b << "</td></tr>\n";
+            return ss.str();
+        }
         inline string td(double x) { 
             stringstream ss;
             ss << "<td>" << x << "</td>";
@@ -32,9 +36,11 @@ namespace mongoutils {
             return "<td>" + x + "</td>";
         }
 
-        inline string table(const char *headers[] = 0) { 
+        inline string table(const char *headers[] = 0, bool border = true) { 
             stringstream ss;
-            ss << "<table border=1 cellpadding=2 cellspacing=0>\n";
+            ss << "<table " 
+                << (border?"border=1 ":"")
+                << "cellpadding=2 cellspacing=0>\n";
             if( headers ) { 
                 ss << "<tr>";
                 while( *headers ) { 
@@ -47,12 +53,31 @@ namespace mongoutils {
         }
 
         inline string start(string title) { 
-            return string("<html><head><title>") + title + "</title></head><body>";
+            stringstream ss;
+            ss << "<html><head>\n<title>";
+            ss << title;
+            ss << "</title>\n";
+
+            ss << "<style type=\"text/css\" media=\"screen\">"
+                "body { font-family: helvetica, arial, san-serif }\n"
+                "table { border-collapse:collapse; border-color:#999; margin-top:.5em }\n"
+                "th { background-color:#bbb; color:#000 }\n"
+                "td,th { padding:.25em }\n"
+                "</style>\n";
+
+            ss << "</head>\n<body>\n";
+            return ss.str();
         }
 
         inline string p(string contentHtml) {
             stringstream ss;
             ss << "<p>" << contentHtml << "</p>\n";
+            return ss.str();
+        }
+
+        inline string h2(string contentHtml) {
+            stringstream ss;
+            ss << "<h2>" << contentHtml << "</h2>\n";
             return ss.str();
         }
 

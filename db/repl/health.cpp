@@ -23,6 +23,7 @@
 #include "../../util/concurrency/value.h"
 #include "../../util/web/html.h"
 #include "../../util/goodies.h"
+#include "../helpers/dblogger.h"
 
 namespace mongo { 
 
@@ -133,8 +134,11 @@ namespace mongo {
     }
 
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
-        s << p( "Set: " + _name );
-        s << p( string("Majority up: ") + (aMajoritySeemsToBeUp()?"yes":"no") );
+        s << table(0, false);
+        s << tr("Set:", _name);
+        s << tr("Majority up:", aMajoritySeemsToBeUp()?"yes":"no" );
+        s << _table();
+
         const char *h[] = {"Member", "Up", "Uptime", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "Status", 0};

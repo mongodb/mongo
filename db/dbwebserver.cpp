@@ -260,7 +260,8 @@ namespace mongo {
         string _replSet() { 
             stringstream s;
             s << start("Replica Set Status " + getHostName());
-            s << p("See also <a href=\"/replSetGetStatus?text\">replSetGetStatus</a>.");
+            s << p( a("/", "back", "Home") );
+            s << p( "See also " + a("/replSetGetStatus?text", "", "replSetGetStatus") + '.' );
 
             if( theReplSet == 0 ) { 
                 if( cmdLine.replSet.empty() ) s << p("Not using --replSet");
@@ -387,15 +388,8 @@ namespace mongo {
                     }              
                     headers.push_back( "Content-Type: text/html" );
                     stringstream ss;
-                    ss << "<html><head><title>Commands List</title>"
-						"<style type=\"text/css\" media=\"screen\">"
-						"body { font-family: helvetica, arial, san-serif }\n"
-						"table { border-collapse:collapse; border-color:#999; margin-top:.5em }\n"
-						"th { background-color:#bbb; color:#000 }\n"
-						"td,th { padding:.25em }\n"
-						"</style>\n"
-						"</head>\n<body>";
-                    ss << p(a("/", "", "Back"));
+                    ss << start("Commands List");
+                    ss << p(a("/", "back", "Home"));
                     ss << p("<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n");
                     const map<string, Command*> *m = Command::commandsByBestName();
                     ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
@@ -452,21 +446,16 @@ namespace mongo {
                 return;
             }
 
-
             responseCode = 200;
             stringstream ss;
-            ss << "<html><head>"
-                //"<link rel=\"stylesheet\" type=\"text/css\" href=\"?.css\">"
-                "<title>";
-
             string dbname;
             {
                 stringstream z;
                 z << "mongod " << getHostName() << ":" << mongo::cmdLine.port;
                 dbname = z.str();
             }
-            ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
-            ss << "<a href=\"/_commands\">List all commands</a>\n";
+            ss << start(dbname) << h2(dbname);
+            ss << "<a href=\"/_commands\">List all commands</a> | \n";
             ss << "<a href=\"/_replSet\">Replica set status</a>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
