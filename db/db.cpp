@@ -429,6 +429,8 @@ namespace mongo {
     class DataFileSync : public BackgroundJob {
     public:
         void run(){
+            if ( _sleepsecs > 2100 )
+                _sleepsecs = 2100;
             log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ){
