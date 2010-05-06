@@ -118,6 +118,7 @@ namespace mongo {
                     else {
                         doWrite( op , r , r.primaryShard() );
                     }
+                    r.gotInsert();
                 }
             }
             else if ( op == dbUpdate ){
@@ -147,6 +148,7 @@ namespace mongo {
             
             log(3) << "single write: " << ns << endl;
             doWrite( op , r , r.primaryShard() );
+            r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
         }
 
         set<string> _commandsSafeToPass;

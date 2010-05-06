@@ -540,6 +540,7 @@ namespace mongo {
             uassert( 10059 , "object to insert too large", js.objsize() <= MaxBSONObjectSize);
             theDataFileMgr.insertWithObjMod(ns, js, false);
             logOp("i", ns, js);
+            globalOpCounters.gotInsert();
         }
     }
 
