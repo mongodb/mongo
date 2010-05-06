@@ -387,7 +387,14 @@ namespace mongo {
                     }              
                     headers.push_back( "Content-Type: text/html" );
                     stringstream ss;
-                    ss << "<html><title>Commands List</title><body>";
+                    ss << "<html><head><title>Commands List</title>"
+						"<style type=\"text/css\" media=\"screen\">"
+						"body { font-family: helvetica, arial, san-serif }\n"
+						"table { border-collapse:collapse; border-color:#999; margin-top:.5em }\n"
+						"th { background-color:#bbb; color:#000 }\n"
+						"td,th { padding:.25em }\n"
+						"</style>\n"
+						"</head>\n<body>";
                     ss << p(a("/", "", "Back"));
                     ss << p("<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n");
                     const map<string, Command*> *m = Command::commandsByBestName();
