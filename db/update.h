@@ -100,12 +100,13 @@ namespace mongo {
             }
         }
         
-        bool isIndexed( const set<string>& idxKeys ) const {
+        static bool isIndexed( const string& fullName , const set<string>& idxKeys ){
+            const char * fieldName = fullName.c_str();
             // check if there is an index key that is a parent of mod
             for( const char *dot = strchr( fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
                 if ( idxKeys.count( string( fieldName, dot - fieldName ) ) )
                     return true;
-            string fullName = fieldName;
+
             // check if there is an index key equal to mod
             if ( idxKeys.count(fullName) )
                 return true;
@@ -113,6 +114,49 @@ namespace mongo {
             set< string >::const_iterator j = idxKeys.upper_bound( fullName );
             if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
                 return true;
+
+            return false;
+        }
+        
+        bool isIndexed( const set<string>& idxKeys ) const {
+            string fullName = fieldName;
+            
+            if ( isIndexed( fullName , idxKeys ) )
+                return true;
+            
+            if ( strstr( fieldName , "." ) ){
+                // check for a.0.1
+                StringBuilder buf( fullName.size() + 1 );
+                for ( size_t i=0; i<fullName.size(); i++ ){
+                    char c = fullName[i];
+                    buf << c;
+
+                    if ( c != '.' )
+                        continue;
+
+                    if ( ! isdigit( fullName[i+1] ) )
+                        continue;
+                    
+                    bool possible = true;
+                    size_t j=i+2;
+                    for ( ; j<fullName.size(); j++ ){
+                        char d = fullName[j];
+                        if ( d == '.' )
+                            break;
+                        if ( isdigit( d ) )
+                            continue;
+                        possible = false;
+                        break;
+                    }
+                    
+                    if ( possible )
+                        i = j;
+                }
+                string x = buf.str();
+                if ( isIndexed( x , idxKeys ) )
+                    return true;
+            }
+
             return false;
         }
         
