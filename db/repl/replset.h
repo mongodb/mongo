@@ -89,19 +89,14 @@ namespace mongo {
     public:
         struct Member : public List1<Member>::Base {
             Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
-                _config(c), 
-                _port(h.port()), _host(h.host()), _id(ord) { 
+                _config(c), _h(h), 
+                _id(ord) { 
                 _dead = false;
                 _lastHeartbeat = 0;
                 _upSince = 0;
                 _health = -1.0;
             }
-            string fullName() const {
-                if( _port < 0 ) return _host;
-                stringstream ss;
-                ss << _host << ':' << _port;
-                return ss.str();
-            }
+            string fullName() const { return _h.toString(); }
             double health() const { return _health; }
             time_t upSince() const { return _upSince; }
             time_t lastHeartbeat() const { return _lastHeartbeat; }
@@ -113,8 +108,7 @@ namespace mongo {
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             bool _dead;
         public:
-            const int _port;
-            const string _host;
+            const HostAndPort _h;
             const int _id; // ordinal
         private:
             double _health;

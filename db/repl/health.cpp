@@ -122,7 +122,7 @@ namespace mongo {
         s << tr();
         {
             stringstream u;
-            u << "http://" << _host << ':' << (_port + 1000) << "/_replSet";
+            u << "http://" << _h.host() << ':' << (_h.port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
         s << td(health());
@@ -191,8 +191,9 @@ namespace mongo {
     void fillRsLog(stringstream& s) {
         s << "<br><pre>\n";
         vector<const char *> v = _rsLog.get();
-        for( unsigned i = 0; i < v.size(); i++ )
-            s << v[i];
+        for( unsigned i = 0; i < v.size(); i++ ) {
+            s << red( v[i], strstr(v[i], "replSet warning") );
+        }
         s << "</pre>\n";
     }
 

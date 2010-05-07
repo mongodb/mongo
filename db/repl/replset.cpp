@@ -47,7 +47,7 @@ namespace mongo {
         _name = string(p, slash-p);
         log() << "replSet " << cfgString << rsLog;
 
-        set<HostAndPort> temp;
+        set<HostAndPort> seedSet;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
         p = slash + 1;
         while( 1 ) {
@@ -62,8 +62,8 @@ namespace mongo {
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);
                 }
-                uassert(13096, "bad --replSet config string - dups?", temp.count(m) == 0 );
-                temp.insert(m);
+                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
+                seedSet.insert(m);
                 uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() )
                     log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
@@ -80,6 +80,13 @@ namespace mongo {
         //    addMemberIfMissing(*i);
 
         loadConfig();
+
+        for( Member *m = head(); m; m = m->next() )
+            seedSet.erase(m->_h);
+        for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
+            log() << "replSet warning: seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+        }
+    
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
