@@ -137,7 +137,9 @@ public:
 #endif
 
     void open(const char *filename, bool readOnly=false ) {
-        fd = ::open(filename, O_CREAT | ( readOnly ? 0 : O_RDWR ) | O_NOATIME, S_IRUSR | S_IWUSR);
+        fd = ::open(filename, 
+                    O_CREAT | ( readOnly ? 0 : ( O_RDWR | O_NOATIME ) ) ,
+                    S_IRUSR | S_IWUSR);
         if ( fd <= 0 ) {
             out() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
             return;
