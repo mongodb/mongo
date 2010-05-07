@@ -1384,6 +1384,7 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
+            assert( obuf );
             BSONObj io((const char *) obuf);
             if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();
@@ -1486,6 +1487,8 @@ namespace mongo {
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
+            uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
+
             BSONObj info = loc.obj();
             bool background = info["background"].trueValue();
 

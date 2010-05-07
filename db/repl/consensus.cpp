@@ -31,7 +31,6 @@ namespace mongo {
         return vUp * 2 > vTot;
     }
 
-    void ReplSet::Consensus::electSelf() {
         class E : public BackgroundJob { 
             void run() { 
                 log() << "not done" << endl;
@@ -47,6 +46,7 @@ namespace mongo {
         };
         typedef shared_ptr<E> eptr;
 
+    void ReplSet::Consensus::electSelf() {
         list<eptr> jobs;
         list<BackgroundJob*> _jobs;
         for( Member *m = rs.head(); m; m=m->next() ) if( m->up() ) {
