@@ -76,8 +76,12 @@ namespace mongo {
         void finishLoadingConfig(vector<ReplSetConfig>& v);
         void setFrom(ReplSetConfig& c);
 
-        bool aMajoritySeemsToBeUp() const;
-        void electSelf();
+        struct Consensus {
+            ReplSet &rs;
+            Consensus(ReplSet *t) : rs(*t) { }
+            bool aMajoritySeemsToBeUp() const;
+            void electSelf();
+        } elect;
 
     public:
         struct Member : public List1<Member>::Base {

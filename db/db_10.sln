@@ -36,7 +36,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shell", "shell", "{407B4B88
 		..\shell\utils.h = ..\shell\utils.h
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other source files", "other source files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "other files", "other files", "{12B11474-2D74-48C3-BB3D-F03249BEA88F}"
+	ProjectSection(SolutionItems) = preProject
+		..\SConstruct = ..\SConstruct
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongod", "db.vcxproj", "{215B2D68-0A70-4D10-8E75-B31010C62A91}"
 EndProject
