@@ -25,7 +25,7 @@ namespace mongo {
         bool _inited;
     public:
         const string _ns;
-        DBLogger(string ns) : _ns(ns), _inited(false) { }
+        DBLogger(string ns) : _inited(false), _ns(ns){ }
     };
 
 }
