@@ -16,13 +16,9 @@ static void __wt_drain_evict(ENV *);
 static void __wt_drain_hazard_check(ENV *);
 static int  __wt_drain_hazard_compare(const void *a, const void *b);
 static void __wt_drain_set(ENV *);
-static int  __wt_drain_sync(ENV *, int *);
-static int  __wt_drain_trickle(ENV *, int *);
-static void __wt_drain_write(
-		ENV *, void (*)(const char *, u_int64_t), const char *);
+static void __wt_drain_write(WT_TOC *, void (*)(const char *, u_int64_t));
 
 #ifdef HAVE_DIAGNOSTIC
-static void __wt_drain_validate(ENV *);
 static void __wt_drain_hazard_validate(ENV *, WT_CACHE_ENTRY *);
 #endif
 
@@ -103,118 +99,17 @@ __wt_drain_hazard_compare(const void *a, const void *b)
 }
 
 /*
- * __wt_workq_cache_sync_server --
- *	Called to check on the cache drain server thread when a sync
- *	is scheduled.
- */
-void
-__wt_workq_cache_sync_server(ENV *env)
-{
-	WT_CACHE *cache;
-
-	cache = env->ienv->cache;
-
-	/* Wake the cache drain thread if it's sleeping and it needs to run. */
-	if (cache->drain_sleeping) {
-		WT_VERBOSE(env, WT_VERB_SERVERS,
-		    (env, "workQ waking cache drain server"));
-
-		__wt_unlock(env, cache->mtx_drain);
-		cache->drain_sleeping = 0;
-	}
-}
-
-/*
- * __wt_cache_drain --
- *	Server thread to drain the cache.
- */
-void *
-__wt_cache_drain(void *arg)
-{
-	ENV *env;
-	IENV *ienv;
-	WT_CACHE *cache;
-	int didwork, ret;
-
-	env = arg;
-	ienv = env->ienv;
-	cache = ienv->cache;
-	ret = 0;
-
-	/*
-	 * Allocate memory for a copy of the hazard references -- it's a fixed
-	 * size so doesn't need run-time adjustments.
-	 */
-	cache->hazard_elem = env->toc_size * env->hazard_size;
-	WT_ERR(__wt_calloc(
-	    env, cache->hazard_elem, sizeof(WT_PAGE *), &cache->hazard));
-	cache->hazard_len = cache->hazard_elem * sizeof(WT_PAGE *);
-
-	while (F_ISSET(ienv, WT_SERVER_RUN)) {
-		/* Check for a sync, then running out of resources. */
-		didwork = 0;
-
-		/*
-		 * Lock the hash buckets, they can't grow while the cache drain
-		 * server has them pinned (that is, has references to pages in
-		 * the bucket).  The problem is copying buckets with a state of
-		 * WT_DRAIN -- the drain server ends up referencing the wrong
-		 * page at some point.
-		 *
-		 * This looks bad because we're blocking any read that has to
-		 * grow the hash bucket element array for the duration of this
-		 * operation (which includes writing lots of blocks, that is,
-		 * it's a really bad lock to hold.  But... readers are only
-		 * blocked if they have to grow the hash bucket element array,
-		 * which never shrinks, so the block should only happen a few
-		 * times when the engine first starts running, and once the
-		 * hash bucket elements reach the right size, no more readers
-		 * should be blocked.
-		 */
-		__wt_lock(env, cache->mtx_hb);
-
-		WT_ERR(__wt_drain_sync(env, &didwork));
-		WT_ERR(__wt_drain_trickle(env, &didwork));
-
-#ifdef HAVE_DIAGNOSTIC
-		__wt_drain_validate(env);
-#endif
-		__wt_unlock(env, cache->mtx_hb);
-
-		/*
-		 * No memory flush needed, the drain_sleeping field is declared
-		 * volatile.
-		 */
-		if (!didwork) {
-			WT_VERBOSE(env, WT_VERB_SERVERS,
-			    (env, "cache drain server sleeping"));
-			cache->drain_sleeping = 1;
-			__wt_lock(env, cache->mtx_drain);
-		}
-	}
-
-err:	if (cache->drain != NULL)
-		__wt_free(env, cache->drain, cache->drain_len);
-	if (cache->hazard != NULL)
-		__wt_free(env, cache->hazard, cache->hazard_len);
-	if (ret != 0)
-		__wt_api_env_err(env, ret, "cache server failure");
-
-	return (NULL);
-}
-
-/*
  * __wt_drain_sync --
  *	Flush all of the pages for any specified sync calls.
  */
-static int
+int
 __wt_drain_sync(ENV *env, int *didworkp)
 {
+	DB *db;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, **drain;
 	WT_SYNC_REQ *sr, *sr_end;
 	WT_TOC *toc;
-	DB *db;
 	u_int32_t drain_elem, i, j;
 	void (*f)(const char *, u_int64_t);
 
@@ -259,7 +154,7 @@ __wt_drain_sync(ENV *env, int *didworkp)
 		 * while other threads are modifying them -- that's OK, sync
 		 * offers no guarantees in the face of other writers.
 		 */
-		if (e->db != db || e->write_gen == e->page->write_gen)
+		if (e->db != db || !e->page->modified)
 			continue;
 
 		/*
@@ -288,9 +183,9 @@ __wt_drain_sync(ENV *env, int *didworkp)
 		WT_VERBOSE(env, WT_VERB_CACHE, (env,
 		    "cache flushing file %s, %lu of %llu total cache pages",
 		    db->idb->name, (u_long)drain_elem,
-		    (u_quad)WT_CACHE_PAGES_INUSE(cache)));
+		    (u_quad)WT_STAT(cache->stats, CACHE_PAGES_INUSE)));
 
-		__wt_drain_write(env, f, toc->name);
+		__wt_drain_write(toc, f);
 
 		cache->drain_elem = 0;
 		*didworkp = 1;
@@ -306,37 +201,23 @@ __wt_drain_sync(ENV *env, int *didworkp)
  * __wt_drain_trickle --
  *	Select a group of pages to trickle out.
  */
-static int
-__wt_drain_trickle(ENV *env, int *didworkp)
+int
+__wt_drain_trickle(WT_TOC *toc, int *didworkp)
 {
+	ENV *env;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, **drain;
-	u_int64_t bytes_inuse, bytes_max, cache_pages;
+	u_int64_t cache_pages;
 	u_int32_t i, review_cnt;
 
+	env = toc->env;
 	cache = env->ienv->cache;
-
-	/*
-	 * Check if we need to run.  We check the cache lockout flag because it
-	 * implies being more aggressive about cleaning than only comparing the
-	 * in-use bytes vs. the max bytes.
-	 */
-	bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
-	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
-	if (cache->read_lockout == 0 && bytes_inuse <= bytes_max)
-		return (0);
-
-	WT_VERBOSE(env, WT_VERB_SERVERS, (env,
-	    "cache drain server running: read lockout %sset, "
-	    "bytes inuse > max (%llu > %llu), ",
-	    cache->read_lockout ? "" : "not ",
-	    (u_quad)bytes_inuse, (u_quad)bytes_max));
 
 	/*
 	 * Review 2% of the pages in the cache, but not less than 20 pages and
 	 * not more than 100 pages.
 	 */
-	cache_pages = WT_CACHE_PAGES_INUSE(cache);
+	cache_pages = WT_STAT(cache->stats, CACHE_PAGES_INUSE);
 	if (cache_pages <= 20)
 		review_cnt = cache_pages;
 	else {
@@ -413,7 +294,7 @@ __wt_drain_trickle(ENV *env, int *didworkp)
 	 */
 	__wt_drain_set(env);
 	__wt_drain_hazard_check(env);
-	__wt_drain_write(env, NULL, NULL);
+	__wt_drain_write(toc, NULL);
 	__wt_drain_evict(env);
 
 	cache->drain_elem = 0;
@@ -427,8 +308,9 @@ __wt_drain_trickle(ENV *env, int *didworkp)
  *	Write any modified pages.
  */
 static void
-__wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
+__wt_drain_write(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
+	ENV *env;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e, **drain;
 	WT_PAGE *page;
@@ -436,6 +318,7 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 	u_int64_t fcnt;
 	u_int32_t drain_elem;
 
+	env = toc->env;
 	cache = env->ienv->cache;
 	stats = cache->stats;
 
@@ -459,40 +342,42 @@ __wt_drain_write(ENV *env, void (*f)(const char *, u_int64_t), const char *name)
 		 * we track for progress.
 		 */
 		if (f != NULL && ++fcnt % 10 == 0)
-			f(name, fcnt);
+			f(toc->name, fcnt);
+
+		page = e->page;
+		if (!page->modified) {
+			WT_STAT_INCR(stats, CACHE_EVICT_UNMODIFIED);
+			continue;
+		}
+
+		WT_VERBOSE(env, WT_VERB_CACHE, (env,
+		    "cache writing element/page/addr %p/%p/%lu",
+		    e, e->page, (u_long)e->addr));
 
 		/*
-		 * The page is still being read and/or written by other threads,
-		 * for all we know.  Copy the page's write generation to the
-		 * WT_CACHE_ENTRY and write the page.   If (1) the workQ updates
-		 * the page's write generation number before allowing page
-		 * modification, (2) we copy the page's write generation number
-		 * before we write the page to the backing store, (3) no thread
-		 * is currently accessing the page, and (4) the page's write
-		 * generation is the same as our copy, then the page is clean.
+		 * Clear the page's modified value and write the page (the page
+		 * can be modified while we write it).
 		 */
-		page = e->page;
-		if (e->write_gen != page->write_gen) {
-			WT_VERBOSE(env, WT_VERB_CACHE, (env,
-			    "cache writing element/page/addr %p/%p/%lu",
-			    e, e->page, (u_long)e->addr));
+		page->modified = 0;
+		WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
 
-			e->write_gen = page->write_gen;
-			WT_STAT_INCR(stats, CACHE_EVICT_MODIFIED);
+		/*
+		 * We're using our WT_TOC handle, it needs to reference the
+		 * correct DB handle.
+		 */
+		toc->db = e->db;
 
-			/*
-			 * If something bad happens, we can't discard the page,
-			 * clear our reference.
-			 */
-			if (__wt_bt_page_reconcile(e->db, page))
-				(*drain) = NULL;
-		} else
-			WT_STAT_INCR(stats, CACHE_EVICT);
+		/*
+		 * If something bad happens when we try and write the page so
+		 * that we can't discard the page, clear our reference.
+		 */
+		if (__wt_bt_rec_page(toc, page))
+			(*drain) = NULL;
 	}
 
 	/* Wrap up reporting. */
 	if (f != NULL)
-		f(name, fcnt);
+		f(toc->name, fcnt);
 }
 
 /*
@@ -628,8 +513,7 @@ __wt_drain_evict(ENV *env)
 		 * will catch illegal references sooner rather than later.
 		 */
 		page = e->page;
-		WT_CACHE_ENTRY_SET(
-		    e, NULL, NULL, WT_ADDR_INVALID, 0, 0, WT_EMPTY);
+		WT_CACHE_ENTRY_SET(e, NULL, NULL, WT_ADDR_INVALID, 0, WT_EMPTY);
 
 		/* Free the memory. */
 		WT_CACHE_PAGE_OUT(cache, page->size);
@@ -661,37 +545,5 @@ __wt_drain_hazard_validate(ENV *env, WT_CACHE_ENTRY *e)
 				    (u_long)e->page, (u_long)e->addr);
 				__wt_abort(env);
 			}
-}
-
-/*
- * __wt_drain_validate --
- *	Check the cache for consistency.
- */
-static void
-__wt_drain_validate(ENV *env)
-{
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e;
-	uint32_t i, j;
-
-	cache = env->ienv->cache;
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
-		switch (e->state) {
-		case WT_DRAIN:
-			__wt_api_env_errx(env,
-			    "element/page/addr %p/%p/%lu: state == WT_DRAIN",
-			    e, e->page, (u_long)e->addr);
-			__wt_abort(env);
-			break;
-		case WT_OK:
-			if (e->addr == e->page->addr)
-				break;
-			__wt_api_env_errx(env,
-			    "element/page %p/%p: e->addr != page->addr "
-			    "(%lu != %lu)",
-			    e, e->page, (u_long)e->addr, (u_long)e->page->addr);
-			__wt_abort(env);
-			/* NOTREACHED */
-		}
 }
 #endif

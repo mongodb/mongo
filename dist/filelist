@@ -30,6 +30,7 @@ cache/c_drain.c
 cache/c_init.c
 cache/c_io.c
 cache/c_page.c
+cache/c_server.c
 cache/c_sync.c
 db/db_err.c
 db/db_getset.c

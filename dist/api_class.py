@@ -574,7 +574,8 @@ flags['wiredtiger_env_init'] = [
 # Internal routine flag declarations
 ###################################################
 flags['bt_page_out'] = [
-	'DISCARD' ]
+	'DISCARD',
+	'MODIFIED' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
 

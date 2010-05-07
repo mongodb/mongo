@@ -9,6 +9,8 @@
 
 #include "wt_internal.h"
 
+static int __wt_cache_in_serial_func(WT_TOC *);
+
 /*
  * __wt_page_alloc --
  *	Allocate bytes from a file.
@@ -107,6 +109,51 @@ retry:	/* Search the cache for the page. */
 }
 
 /*
+ * __wt_cache_in_serial_func --
+ *	Read/allocation serialization function called when a page-in requires
+ *	allocation or a read.
+ */
+static int
+__wt_cache_in_serial_func(WT_TOC *toc)
+{
+	ENV *env;
+	IENV *ienv;
+	WT_CACHE *cache;
+	WT_PAGE **pagep;
+	WT_READ_REQ *rr, *rr_end;
+	u_int32_t addr, size;
+
+	__wt_cache_in_unpack(toc, addr, size, pagep);
+
+	env = toc->env;
+	ienv = env->ienv;
+	cache = ienv->cache;
+
+	/* Find an empty slot and enter the read request. */
+	rr = cache->read_request;
+	rr_end =
+	    rr + sizeof(cache->read_request) / sizeof(cache->read_request[0]);
+	for (; rr < rr_end; ++rr)
+		if (rr->toc == NULL) {
+			/*
+			 * Fill in the arguments, flush memory, then the WT_TOC
+			 * field that turns the slot on.
+			 */
+			rr->addr = addr;
+			rr->size = size;
+			rr->entry = NULL;
+			rr->pagep = pagep;
+			WT_MEMORY_FLUSH;
+			rr->toc = toc;
+			WT_MEMORY_FLUSH;
+			return (0);
+		}
+	__wt_api_env_errx(env, "cache server read request table full");
+	return (WT_RESTART);
+}
+
+
+/*
  * __wt_page_read --
  *	Read a database page (same as read, but verify the checksum).
  */
@@ -134,6 +181,7 @@ __wt_page_read(DB *db, WT_PAGE *page)
 		    (u_long)page->addr, (u_long)page->size, (u_quad)offset);
 		return (WT_ERROR);
 	}
+
 	return (0);
 }
 
@@ -154,6 +202,7 @@ __wt_page_write(DB *db, WT_PAGE *page)
 	hdr = page->hdr;
 	hdr->checksum = 0;
 	hdr->checksum = __wt_cksum(hdr, page->size);
+
 	return (__wt_write(
 	    env, fh, WT_ADDR_TO_OFF(db, page->addr), page->size, hdr));
 }

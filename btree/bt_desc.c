@@ -88,8 +88,7 @@ __wt_bt_desc_write_root(WT_TOC *toc, u_int32_t root_addr, u_int32_t root_size)
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
 	desc->root_addr = idb->root_addr = root_addr;
 	desc->root_size = idb->root_size = root_size;
-	WT_PAGE_MODIFY(page);
-	__wt_bt_page_out(toc, &page, 0);
+	__wt_bt_page_out(toc, &page, WT_MODIFIED);
 	return (0);
 }
 
@@ -113,7 +112,7 @@ __wt_bt_desc_write(WT_TOC *toc)
 	/* If the file size is 0, allocate a new page. */
 	if (fh->file_size == 0)
 		WT_RET(__wt_bt_page_alloc(
-		    toc, WT_PAGE_DESCRIPT, WT_LNONE, 512, &page));
+		    toc, WT_PAGE_DESCRIPT, WT_LDESC, 512, &page));
 	else
 		WT_RET(__wt_bt_page_in(toc, 0, 512, 0, &page));
 
@@ -142,8 +141,7 @@ __wt_bt_desc_write(WT_TOC *toc)
 	 * I'm not currently serializing updates to this page, and I'm pretty
 	 * sure that's a bug -- review this when we start working btree splits.
 	 */
-	WT_PAGE_MODIFY(page);
-	__wt_bt_page_out(toc, &page, 0);
+	__wt_bt_page_out(toc, &page, WT_MODIFIED);
 
 	return (0);
 }

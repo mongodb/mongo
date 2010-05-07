@@ -23,9 +23,6 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 
 	WT_RET(__wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, size), &page));
 
-	/* Verify the page. */
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
-
 	*pagep = page;
 	return (0);
 }
@@ -60,7 +57,7 @@ __wt_bt_ovfl_write(WT_TOC *toc, DBT *dbt, u_int32_t *addrp)
 	/* Copy the record into place. */
 	memcpy(WT_PAGE_BYTE(page), dbt->data, dbt->size);
 
-	__wt_bt_page_out(toc, &page, 0);
+	__wt_bt_page_out(toc, &page, WT_MODIFIED);
 	return (0);
 }
 

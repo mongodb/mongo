@@ -163,7 +163,7 @@ struct __idb {
 struct __ienv {
 	WT_MTX *mtx;			/* Global mutex */
 
-	pthread_t cache_drain_tid;	/* Cache drian thread ID */
+	pthread_t cache_server_tid;	/* Cache drian thread ID */
 	pthread_t cache_io_tid;		/* Cache I/O thread ID */
 	pthread_t workq_tid;		/* workQ thread ID */
 

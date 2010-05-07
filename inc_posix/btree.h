@@ -176,15 +176,18 @@ struct __wt_page {
 	u_int32_t indx_count;		/* Entry count */
 
 	/*
-	 * The page write generation is set in two ways: First, if the page is
-	 * taken from the cache, it has to be done by the workQ because the
-	 * workQ is responsible for serialization between readers and writers.
-	 * Second, if a page is allocated, it's only available to a single
-	 * thread of control by definition, so we set as the page is allocated.
+	 * The page modified flag is not a bit-flag because it's not locked and
+	 * we don't want to lose an update because of a read-modify-write cycle.
+	 * Any thread of control holding a hazard reference can set the modify
+	 * flag (and we don't care if they race, since it's an atomic update);
+	 * only the cache drain server clears the modify flag (after checking
+	 * that no thread of control holds a hazard reference).
+	 *
+	 * There is no need to flush memory or declare the field volatile, as
+	 * threads marking the page dirty must hold a hazard reference, and
+	 * clearing the hazard reference will flush memory, including this set.
 	 */
-#define	WT_PAGE_MODIFY(p)						\
-	(++(p)->write_gen)
-	u_int32_t volatile write_gen;	/* Write generation */
+	u_int32_t modified;		/* Page needs to be written */
 
 	u_int32_t flags;
 };
@@ -241,7 +244,7 @@ struct __wt_page_hdr {
 	 * Leaf pages are level 1, each higher level of the tree increases by 1.
 	 * The maximum tree level is 255, larger than any practical fan-out.
 	 */
-#define	WT_LNONE	0
+#define	WT_LDESC	0
 #define	WT_LLEAF	1
 	u_int8_t level;			/* 13: tree level */
 

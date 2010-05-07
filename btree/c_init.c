@@ -29,9 +29,8 @@ __wt_cache_create(ENV *env)
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_CACHE), &ienv->cache));
 	cache = ienv->cache;
 
-	WT_ERR(__wt_mtx_alloc(env, "cache drain", 1, &cache->mtx_drain));
+	WT_ERR(__wt_mtx_alloc(env, "cache server", 1, &cache->mtx_server));
 	WT_ERR(__wt_mtx_alloc(env, "cache I/O", 1, &cache->mtx_io));
-	WT_ERR(__wt_mtx_alloc(env, "cache hash bucket", 0, &cache->mtx_hb));
 
 	/*
 	 * Initialize the cache hash buckets.
@@ -89,8 +88,6 @@ __wt_cache_stats(ENV *env)
 	cache = env->ienv->cache;
 	stats = cache->stats;
 
-	WT_STAT_SET(stats, CACHE_BYTES_INUSE, WT_CACHE_BYTES_INUSE(cache));
-	WT_STAT_SET(stats, CACHE_PAGES_INUSE, WT_CACHE_PAGES_INUSE(cache));
 	WT_STAT_SET(stats, CACHE_HASH_BUCKETS, cache->hb_size);
 }
 
@@ -135,16 +132,15 @@ __wt_cache_destroy(ENV *env)
 	}
 
 	/* Discard and destroy mutexes. */
-	if (cache->mtx_drain != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_drain);
+	if (cache->mtx_server != NULL)
+		(void)__wt_mtx_destroy(env, cache->mtx_server);
 	if (cache->mtx_io != NULL)
 		__wt_mtx_destroy(env, cache->mtx_io);
-	if (cache->mtx_hb != NULL)
-		__wt_mtx_destroy(env, cache->mtx_hb);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->stats, 0);
 	__wt_free(env, cache->hb, cache->hb_size * sizeof(WT_CACHE_HB));
+	__wt_free(env, cache->recbuf, cache->recbuf_size);
 	__wt_free(env, ienv->cache, sizeof(WT_CACHE));
 
 	return (ret);
@@ -167,7 +163,8 @@ __wt_cache_dump(ENV *env)
 	cache = ienv->cache;
 
 	__wt_msg(env,
-	    "cache dump (%llu pages): ==========", WT_CACHE_PAGES_INUSE(cache));
+	    "cache dump (%llu pages): ==========",
+	    WT_STAT(cache->stats, CACHE_PAGES_INUSE));
 
 	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
 		switch (e->state) {

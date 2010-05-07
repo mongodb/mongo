@@ -23,6 +23,8 @@ struct __wt_read_req {
 	WT_TOC	  *toc;			/* Requesting thread */
 	u_int32_t  addr;		/* Address */
 	u_int32_t  size;		/* Bytes */
+	WT_CACHE_ENTRY			/* Cache slot */
+		  *entry;
 	WT_PAGE  **pagep;		/* Returned page */
 };
 
@@ -43,13 +45,13 @@ struct __wt_cache {
 
 	/*
 	 * The cache drain thread sets/clears the drain_sleeping flag when
-	 * it's blocked on the mtx_drain mutex.  The I/O thread checks the
+	 * it's blocked on the mtx_server mutex.  The I/O thread checks the
 	 * drain_sleeping value and wakes the cache drain thread as necessary.
 	 * The drain_sleeping flag is declared volatile so the I/O thread
 	 * doesn't cache a value.
 	 */
-	WT_MTX *mtx_drain;		/* Cache drain server mutex */
-	u_int volatile drain_sleeping;	/* Cache drain server is sleeping */
+	WT_MTX *mtx_server;		/* Cache server mutex */
+	u_int volatile server_sleeping;	/* Cache server is sleeping */
 
 	/*
 	 * The I/O thread sets/clears the io_sleeping flag when it's blocked on
@@ -58,25 +60,7 @@ struct __wt_cache {
 	 * volatile so the workQ thread doesn't cache a value.
 	 */
 	WT_MTX *mtx_io;			/* Cache I/O server mutex */
-	u_int	io_sleeping;		/* Cache drain server is sleeping */
-
-	/*
-	 * The I/O thread and the cache drain thread have a serialization
-	 * problem: the I/O thread may need to grow the entries in a hash
-	 * bucket, and the cache drain thread may be discarding pages from
-	 * that bucket.  The mtx_hb mutex is used to serialize their access.
-	 * Growing the hash bucket entries is a rare action, so we use a
-	 * global mutex.
-	 */
-	WT_MTX *mtx_hb;
-
-	/*
-	 * The workQ thread sets/clears the read_lockout flag when the cache is
-	 * sufficiently full that no I/O should be done and the cache requires
-	 * draining.   The read_lockout flag is declared volatile so the cache
-	 * drain and I/O threads don't cache a value.
-	 */
-	u_int volatile read_lockout;	/* Reads locked out for now */
+	u_int volatile io_sleeping;	/* Cache I/O server is sleeping */
 
 	/* Each in-memory page is in a hash bucket based on its file offset. */
 #define	WT_HASH(cache, addr)	((addr) % (cache)->hb_size)
@@ -87,43 +71,18 @@ struct __wt_cache {
 	WT_READ_REQ read_request[20];	/* Cache read requests:
 					   slot available if toc is NULL. */
 
-	WT_SYNC_REQ sync_request[20];	/* Cache read requests:
+	WT_SYNC_REQ sync_request[20];	/* Cache sync requests:
 					   slot available if toc is NULL. */
-	/*
-	 * Different threads read (write) pages to (from) the cache, so we can
-	 * never know exactly how much memory is in-use at any partcular time.
-	 * However, even though the values don't have to be exact, they can't
-	 * be garbage -- we track what comes in and what goes out and calculate
-	 * the difference as needed.
-	 */
+
 #define	WT_CACHE_PAGE_IN(c, bytes) do {					\
-	++(c)->stat_pages_in;						\
-	(c)->stat_bytes_in += bytes;					\
+	WT_STAT_INCR(cache->stats, CACHE_PAGES_INUSE);			\
+	WT_STAT_INCRV(cache->stats, CACHE_BYTES_INUSE, bytes);		\
 } while (0);
 #define	WT_CACHE_PAGE_OUT(c, bytes) do {				\
-	++(c)->stat_pages_out;						\
-	(c)->stat_bytes_out += bytes;					\
+	WT_STAT_DECR(cache->stats, CACHE_PAGES_INUSE);			\
+	WT_STAT_DECRV(cache->stats, CACHE_BYTES_INUSE, bytes);		\
 } while (0);
 
-#define	WT_CACHE_PAGES_INUSE(c)		/* Pages read/discarded */	\
-	((c)->stat_pages_in > (c)->stat_pages_out ?			\
-	    (c)->stat_pages_in - (c)->stat_pages_out : 0)
-
-	u_int64_t stat_pages_in;
-	u_int64_t stat_pages_out;
-
-#define	WT_CACHE_BYTES_INUSE(c)		/* Bytes read/discarded */	\
-	((c)->stat_bytes_in > (c)->stat_bytes_out ?			\
-	    (c)->stat_bytes_in - (c)->stat_bytes_out : 0)
-
-	u_int64_t stat_bytes_in;
-	u_int64_t stat_bytes_out;
-
-	/*
-	 * The cache drain server has two memory chunks it uses: the first is
-	 * a list of pages to drain, the second is a copy of the hazard refs
-	 * compared against pages being drained.
-	 */
 	WT_CACHE_ENTRY **drain;		/* List of entries being drained */
 	u_int32_t drain_elem;		/* Number of entries in the list */
 	u_int32_t drain_len;		/* Bytes in the list */
@@ -133,6 +92,9 @@ struct __wt_cache {
 	u_int32_t hazard_len;		/* Bytes in the list */
 
 	u_int32_t bucket_cnt;		/* Drain review: last hash bucket */
+
+	u_int8_t *recbuf;		/* Reconcilation buffer */
+	u_int32_t recbuf_size;
 
 	WT_STATS *stats;		/* Cache statistics */
 };
@@ -190,13 +152,12 @@ struct __wt_cache_hb {
  * state turns on the entry for both the cache drain server thread as well as
  * any readers.
  */
-#define	WT_CACHE_ENTRY_SET(e,						\
-    _db, _page, _addr, _read_gen, _write_gen, _state) do {		\
+#define	WT_CACHE_ENTRY_SET(e, _db, _page, _addr, _read_gen, _state) do {\
 	(e)->db = _db;							\
 	(e)->page = _page;						\
 	(e)->addr = _addr;						\
 	(e)->read_gen = _read_gen;					\
-	(e)->write_gen = _write_gen;					\
+	(e)->write_gen = 0;						\
 	WT_MEMORY_FLUSH;						\
 	(e)->state = _state;						\
 } while (0);
@@ -221,8 +182,9 @@ struct __wt_cache_entry {
 	 * ensure we don't miss an explicit flush.
 	 */
 #define	WT_EMPTY	0		/* Nothing here, available for re-use */
-#define	WT_OK		1		/* In-use, valid data */
-#define	WT_DRAIN	2		/* Requested by cache drain server */
+#define	WT_DRAIN	1		/* Draining (requested) */
+#define	WT_OK		2		/* In-use, valid data */
+#define	WT_READ		3		/* Reading */
 	u_int32_t volatile state;	/* State */
 };
 

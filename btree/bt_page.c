@@ -60,9 +60,6 @@ __wt_bt_page_in(
 
 	WT_RET((__wt_page_in(toc, addr, size, &page)));
 
-	/* Verify the page. */
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
-
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
 		WT_RET((__wt_bt_page_inmem(db, page)));
@@ -84,19 +81,22 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 	    toc->env, "__wt_bt_page_out", flags, WT_APIMASK_BT_PAGE_OUT);
 
 	/*
-	 * This function exists to help in debugging: First, clear the caller's
-	 * reference so we don't accidentally use a page after discarding our
-	 * reference.  Second, verify the page if we're running in diagnostic
-	 * mode.
+	 * Clear the caller's reference so we don't accidentally use a page
+	 * after discarding our reference, and to make it easy to decide if
+	 * a page is in-use after our return.
 	 */
 	page = *pagep;
 	*pagep = NULL;
 
-	WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
-
 	/* The caller may have decided the page isn't worth keeping around. */
 	if (LF_ISSET(WT_DISCARD))
 		F_SET(page, WT_DISCARD);
+
+	/* The caller may have dirtied the page. */
+	if (LF_ISSET(WT_MODIFIED)) {
+		page->modified = 1;
+		WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
+	}
 
 	/*
 	 * Clearing the hazard reference technically belongs in the cache layer,

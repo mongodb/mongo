@@ -35,9 +35,10 @@ __wt_env_open(ENV *env, const char *home, mode_t mode)
 	F_SET(ienv, WT_WORKQ_RUN | WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
 
-	WT_ERR(
-	    __wt_thread_create(&ienv->cache_drain_tid, __wt_cache_drain, env));
-	WT_ERR(__wt_thread_create(&ienv->cache_io_tid, __wt_cache_io, env));
+	WT_ERR(__wt_thread_create(
+	    &ienv->cache_server_tid, __wt_cache_server, env));
+	WT_ERR(__wt_thread_create(
+	    &ienv->cache_io_tid, __wt_cache_read_server, env));
 	WT_ERR(__wt_thread_create(&ienv->workq_tid, __wt_workq_srvr, env));
 
 	return (0);
@@ -91,8 +92,8 @@ __wt_env_close(ENV *env)
 	/* Close down and wait for server threads. */
 	F_CLR(ienv, WT_SERVER_RUN);
 	WT_MEMORY_FLUSH;
-	__wt_unlock(env, ienv->cache->mtx_drain);
-	__wt_thread_join(ienv->cache_drain_tid);
+	__wt_unlock(env, ienv->cache->mtx_server);
+	__wt_thread_join(ienv->cache_server_tid);
 	__wt_unlock(env, ienv->cache->mtx_io);
 	__wt_thread_join(ienv->cache_io_tid);
 

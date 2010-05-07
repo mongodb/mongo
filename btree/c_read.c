@@ -10,111 +10,14 @@
 #include "wt_internal.h"
 
 static int __wt_cache_hb_entry_grow(WT_TOC *, WT_CACHE_HB *, WT_CACHE_ENTRY **);
-static int __wt_cache_read(WT_TOC *, WT_READ_REQ *);
+static int __wt_cache_read(WT_READ_REQ *);
 
 /*
- * __wt_workq_cache_read_server --
- *	Called to check on the cache read/drain server threads when a read
- *	is scheduled.
- */
-void
-__wt_workq_cache_read_server(ENV *env)
-{
-	IENV *ienv;
-	WT_CACHE *cache;
-	u_int64_t bytes_inuse, bytes_max;
-
-	ienv = env->ienv;
-	cache = ienv->cache;
-
-	bytes_inuse = WT_CACHE_BYTES_INUSE(cache);
-	bytes_max = WT_STAT(cache->stats, CACHE_BYTES_MAX);
-
-	/*
-	 * If we're 10% over the maximum cache, shut out page allocations until
-	 * we drain to at least 5% under the maximum cache.
-	 */
-	if (cache->read_lockout) {
-		if (bytes_inuse <= bytes_max - (bytes_max / 20))
-			cache->read_lockout = 0;
-	} else {
-		if (bytes_inuse > bytes_max + (bytes_max / 10)) {
-			cache->read_lockout = 1;
-			WT_STAT_INCR(cache->stats, CACHE_READ_LOCKOUT);
-		}
-	}
-
-	/* Wake the cache drain thread if it's sleeping and it needs to run. */
-	if (cache->drain_sleeping &&
-	    (bytes_inuse > bytes_max || cache->read_lockout)) {
-		WT_VERBOSE(env, WT_VERB_SERVERS,
-		    (env, "workQ waking cache drain server: read lockout "
-		    "%sset, bytes-inuse %llu of bytes-max %llu",
-		    cache->read_lockout ? "" : "not ",
-		    (u_quad)bytes_inuse, (u_quad)bytes_max));
-
-		__wt_unlock(env, cache->mtx_drain);
-		cache->drain_sleeping = 0;
-	}
-
-	/* A read is scheduled -- wake the I/O thread if it's sleeping. */
-	if (!cache->read_lockout && cache->io_sleeping) {
-		WT_VERBOSE(env, WT_VERB_SERVERS,
-		    (env, "workQ waking cache I/O server"));
-
-		__wt_unlock(env, cache->mtx_io);
-		cache->io_sleeping = 0;
-	}
-}
-
-/*
- * __wt_cache_in_serial_func --
- *	Ask the I/O thread to read a page into the cache.
- */
-int
-__wt_cache_in_serial_func(WT_TOC *toc)
-{
-	ENV *env;
-	IENV *ienv;
-	WT_CACHE *cache;
-	WT_PAGE **pagep;
-	WT_READ_REQ *rr, *rr_end;
-	u_int32_t addr, size;
-
-	__wt_cache_in_unpack(toc, addr, size, pagep);
-
-	env = toc->env;
-	ienv = env->ienv;
-	cache = ienv->cache;
-
-	/* Find an empty slot and enter the read request. */
-	rr = cache->read_request;
-	rr_end =
-	    rr + sizeof(cache->read_request) / sizeof(cache->read_request[0]);
-	for (; rr < rr_end; ++rr)
-		if (rr->toc == NULL) {
-			/*
-			 * Fill in the arguments, flush memory, then the WT_TOC
-			 * field that turns the slot on.
-			 */
-			rr->addr = addr;
-			rr->size = size;
-			rr->pagep = pagep;
-			WT_MEMORY_FLUSH;
-			rr->toc = toc;
-			WT_MEMORY_FLUSH;
-			return (0);
-		}
-	__wt_api_env_errx(env, "cache server read request table full");
-	return (WT_RESTART);
-}
-
-/*
- * __wt_cache_io --
- *	Server thread to do cache I/O.
+ * __wt_cache_read_server --
+ *	Thread to do database reads.
  */
 void *
-__wt_cache_io(void *arg)
+__wt_cache_read_server(void *arg)
 {
 	ENV *env;
 	IENV *ienv;
@@ -133,7 +36,7 @@ __wt_cache_io(void *arg)
 
 	while (F_ISSET(ienv, WT_SERVER_RUN)) {
 		/*
-		 * No need for an explicit memory flush, the io_sleeping flag
+		 * Go to sleep; no memory flush needed, the io_sleeping field
 		 * is declared volatile.
 		 */
 		WT_VERBOSE(env,
@@ -142,34 +45,102 @@ __wt_cache_io(void *arg)
 		__wt_lock(env, cache->mtx_io);
 
 		/*
-		 * Look for work (unless reads are locked out for now).  If we
-		 * find a requested read, perform it, flush the result, clear
-		 * the request slot, and wake up the requesting thread.   If we
-		 * don't find any work, go back to sleep.  Strictly speaking,
-		 * the request slot clear doesn't need to be flushed, but we
-		 * have to flush, might as well include it.
+		 * Walk the read-request queue, looking for reads (defined by
+		 * a valid WT_TOC handle, a reference to a cache slot, and a
+		 * state marked WT_READ).  It's an accumulated set of things:
+		 * the original calling thread set the WT_TOC handle when it
+		 * scheduled the read, and the cache server thread filled in
+		 * the WT_CACHE_ENTRY slot, and set the slot's state field,
+		 * when it figured out a read was necessary.
+		 *
+		 * If we find a read request, perform it, flush the result and
+		 * clear the request slot, then wake up the requesting thread.
+		 * The request slot clear doesn't need to be flushed, but we
+		 * have to flush the read result, might as well include it.
+		 *
+		 * If we don't find any work, go back to sleep.
 		 */
 		do {
 			didwork = 0;
-			for (rr = cache->read_request; rr < rr_end; ++rr)
-				if ((toc = rr->toc) != NULL) {
-					toc->wq_ret = __wt_cache_read(toc, rr);
-					rr->toc = NULL;
-					WT_MEMORY_FLUSH;
-					__wt_unlock(env, toc->mtx);
-					didwork = 1;
-				}
-		} while (cache->read_lockout == 0 && didwork == 1);
+			for (rr = cache->read_request; rr < rr_end; ++rr) {
+				if (rr->toc == NULL ||
+				    rr->entry == NULL ||
+				    rr->entry->state != WT_READ)
+					continue;
+				toc = rr->toc;
+				if ((toc->wq_ret = __wt_page_read(
+				    toc->db, rr->entry->page)) == 0)
+					rr->entry->state = WT_OK;
+				else
+					rr->entry->state = WT_EMPTY;
+				rr->toc = NULL;
+				WT_MEMORY_FLUSH;
+				__wt_unlock(env, toc->mtx);
+				didwork = 1;
+			}
+		} while (didwork);
 	}
 	return (NULL);
 }
 
 /*
- * __wt_cache_read --
- *	Read or allocate a new page for the cache.
+ * __wt_cache_server_read --
+ *	Function to check for reads and schedule the I/O thread.
  */
+int
+__wt_cache_server_read(void *arg, int *didworkp)
+{
+	ENV *env;
+	IENV *ienv;
+	WT_CACHE *cache;
+	WT_READ_REQ *rr, *rr_end;
+	WT_TOC *toc;
+
+	env = arg;
+	ienv = env->ienv;
+	cache = ienv->cache;
+
+	rr = cache->read_request;
+	rr_end =
+	    rr + sizeof(cache->read_request) / sizeof(cache->read_request[0]);
+
+	/*
+	 * For every read request, create the cache infrastructure necessary to
+	 * instantiate the page.   If it's an allocation, we did all the work
+	 * that's necessary, wake the calling thread; if it's a read, wake the
+	 * read thread if it's asleep and let it do the work.
+	 */
+	for (rr = cache->read_request; rr < rr_end; ++rr) {
+		/*
+		 * If rr->toc is NULL, there's no entry to review.
+		 * If rr->entry is set, the entry is waiting on the read thread.
+		 */
+		if (rr->toc == NULL || rr->entry != NULL)
+			continue;
+		*didworkp = 1;
+
+		/*
+		 * If an error occurred or the page was successfully allocated
+		 * and that's all we need to do, return the value, clear the
+		 * slot, wake the calling thread and we're done.
+		 */
+		toc = rr->toc;
+		if ((toc->wq_ret =
+		    __wt_cache_read(rr)) != 0 || rr->entry->state == WT_OK) {
+			rr->toc = NULL;
+			WT_MEMORY_FLUSH;
+			__wt_unlock(env, toc->mtx);
+		}
+	}
+	return (0);
+}
+
+/*
+* __wt_cache_read --
+*	Read or allocate a new page for the cache.
+*/
 static int
-__wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
+__wt_cache_read(WT_READ_REQ *rr)
 {
 	DB *db;
 	ENV *env;
@@ -180,9 +151,11 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	WT_CACHE_HB *hb;
 	WT_FH *fh;
 	WT_PAGE *page;
+	WT_TOC *toc;
 	u_int32_t addr, size, i;
 	int newpage, ret;
 
+	toc = rr->toc;
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
@@ -190,7 +163,6 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	cache = ienv->cache;
 	fh = idb->fh;
 
-	*rr->pagep = NULL;
 	addr = rr->addr;
 	size = rr->size;
 	newpage = addr == WT_ADDR_INVALID ? 1 : 0;
@@ -248,9 +220,6 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	}
 	page->addr = addr;
 	page->size = size;
-	page->write_gen = newpage ? 1 : 0;
-	if (!newpage)
-		WT_ERR(__wt_page_read(db, page));
 
 	/*
 	 * If we found an empty slot in our original walk of the hash bucket,
@@ -268,8 +237,6 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 			WT_ERR(__wt_cache_hb_entry_grow(toc, hb, &empty));
 	}
 
-	WT_CACHE_PAGE_IN(cache, size);
-
 	/*
 	 * Get a hazard reference before we mark the entry OK: the cache drain
 	 * server shouldn't pick a new page with a high read-generation, but
@@ -277,14 +244,34 @@ __wt_cache_read(WT_TOC *toc, WT_READ_REQ *rr)
 	 */
 	__wt_hazard_set(toc, page);
 
-	WT_CACHE_ENTRY_SET(empty, db, page, addr, ++ienv->read_gen, 0, WT_OK);
+	/*
+	 * Fill in the cache entry and the caller's page value.  Our callers
+	 * use them to figure out what happened (WT_OK/WT_READ means the page
+	 * was allocated and we're done vs. not-yet-read, and the penultimate
+	 * caller, the Btree thread of control, wants the page reference).
+	 */
+	rr->entry = empty;
+	*rr->pagep = page;
+
+	WT_CACHE_ENTRY_SET(
+	    empty, db, page, addr, ++ienv->read_gen, newpage ? WT_OK : WT_READ);
+
+	/*
+	 * Wake the read thread if it's sleeping and it needs to run; no memory
+	 * flush needed, the io_sleeping field is declared volatile.
+	 */
+	if (!newpage && cache->io_sleeping) {
+		WT_VERBOSE(env,
+		    WT_VERB_SERVERS, (env, "waking cache I/O server"));
+		cache->io_sleeping = 0;
+		__wt_unlock(env, cache->mtx_io);
+	}
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "cache %s element/page/addr %p/%p/%lu",
 	    newpage ? "allocated" : "read", empty, empty->page, (u_long)addr));
 
-	/* Return the page to the caller. */
-	*rr->pagep = page;
+	WT_CACHE_PAGE_IN(cache, size);
 
 	return (0);
 
@@ -313,13 +300,6 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 
 #define	WT_CACHE_ENTRY_GROW	20
 	entries = hb->entry_size + WT_CACHE_ENTRY_GROW;
-
-	/*
-	 * Lock the hash buckets, we can't copy them while the cache drain
-	 * server has them pinned (that is, has references to pages in the
-	 * bucket).
-	 */
-	__wt_lock(env, cache->mtx_hb);
 
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 	    "cache hash bucket %lu grows to %lu entries",
@@ -353,8 +333,6 @@ __wt_cache_hb_entry_grow(WT_TOC *toc, WT_CACHE_HB *hb, WT_CACHE_ENTRY **emptyp)
 	hb->entry = new;
 	hb->entry_size = entries;
 	WT_MEMORY_FLUSH;
-
-	__wt_unlock(env, cache->mtx_hb);
 
 	return (0);
 }

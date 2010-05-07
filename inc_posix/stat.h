@@ -18,8 +18,14 @@ struct __wt_stats {
 
 #define	WT_STAT(stats, def)						\
 	(stats)[WT_STAT_ ## def].v
+#define	WT_STAT_DECR(stats, def) do {					\
+	--(stats)[WT_STAT_ ## def].v;					\
+} while (0)
 #define	WT_STAT_INCR(stats, def) do {					\
 	++(stats)[WT_STAT_ ## def].v;					\
+} while (0)
+#define	WT_STAT_DECRV(stats, def, value) do {				\
+	(stats)[WT_STAT_ ## def].v -= (value);				\
 } while (0)
 #define	WT_STAT_INCRV(stats, def, value) do {				\
 	(stats)[WT_STAT_ ## def].v += (value);				\
@@ -39,16 +45,15 @@ struct __wt_stats {
 #define	WT_STAT_CACHE_ALLOC			    0
 #define	WT_STAT_CACHE_BYTES_INUSE		    1
 #define	WT_STAT_CACHE_BYTES_MAX			    2
-#define	WT_STAT_CACHE_EVICT			    3
-#define	WT_STAT_CACHE_EVICT_HAZARD		    4
-#define	WT_STAT_CACHE_EVICT_MODIFIED		    5
+#define	WT_STAT_CACHE_EVICT_HAZARD		    3
+#define	WT_STAT_CACHE_EVICT_MODIFIED		    4
+#define	WT_STAT_CACHE_EVICT_UNMODIFIED		    5
 #define	WT_STAT_CACHE_HASH_BUCKETS		    6
 #define	WT_STAT_CACHE_HIT			    7
 #define	WT_STAT_CACHE_MAX_BUCKET_ENTRIES	    8
 #define	WT_STAT_CACHE_MISS			    9
 #define	WT_STAT_CACHE_PAGES_INUSE		   10
-#define	WT_STAT_CACHE_READ_LOCKOUT		   11
-#define	WT_STAT_CACHE_READ_RESTARTS		   12
+#define	WT_STAT_CACHE_READ_RESTARTS		   11
 
 /*
  * Statistics entries for DB/IDB database.

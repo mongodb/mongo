@@ -21,7 +21,7 @@ __wt_workq_srvr(void *arg)
 	WT_FLIST *fp;
 	WT_TOC **tp, *toc;
 	u_int32_t low_gen;
-	int chk_read, chk_sync, nowork;
+	int chk_cache, nowork;
 
 	env = (ENV *)arg;
 	ienv = env->ienv;
@@ -32,7 +32,7 @@ __wt_workq_srvr(void *arg)
 		WT_STAT_INCR(ienv->stats, WORKQ_PASSES);
 
 		low_gen = UINT32_MAX;
-		chk_read = chk_sync = 0;
+		chk_cache = 0;
 		nowork = 1;
 		for (tp = ienv->toc; (toc = *tp) != NULL; ++tp) {
 			if (toc->gen < low_gen)
@@ -78,12 +78,11 @@ __wt_workq_srvr(void *arg)
 				}
 
 				nowork = 0;
+				chk_cache = 1;
 				break;
 			case WT_WORKQ_READ_SCHED:
-				chk_read = 1;
-				break;
 			case WT_WORKQ_SYNC_SCHED:
-				chk_sync = 1;
+				chk_cache = 1;
 				break;
 			}
 		}
@@ -93,13 +92,9 @@ __wt_workq_srvr(void *arg)
 		    (low_gen == UINT32_MAX || low_gen > fp->gen))
 			__wt_workq_flist(env);
 
-		/* If a read was scheduled, check on the cache servers. */
-		if (chk_read)
-			__wt_workq_cache_read_server(env);
-
-		/* If a sync is scheduled, check on the cache servers. */
-		if (chk_sync)
-			__wt_workq_cache_sync_server(env);
+		/* If a read or sync is scheduled, check on the cache server. */
+		if (chk_cache)
+			__wt_workq_cache_server(env);
 
 		/*
 		 * If we didn't find work, yield the processor.  If we

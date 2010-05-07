@@ -25,13 +25,13 @@ typedef struct {
 	WT_PAGE *leaf;				/* Child page */
 } WT_VSTUFF;
 
-static int __wt_bt_verify_addfrag(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
+static int __wt_bt_verify_addfrag(DB *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_checkfrag(DB *, WT_VSTUFF *);
 static int __wt_bt_verify_cmp(WT_TOC *, WT_ROW_INDX *, WT_PAGE *, int);
 static int __wt_bt_verify_ovfl(WT_TOC *, WT_OVFL *, WT_VSTUFF *);
-static int __wt_bt_verify_page_col_fix(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_page_col_int(WT_TOC *, WT_PAGE *);
-static int __wt_bt_verify_page_desc(WT_TOC *, WT_PAGE *);
+static int __wt_bt_verify_page_col_fix(DB *, WT_PAGE *);
+static int __wt_bt_verify_page_col_int(DB *, WT_PAGE *);
+static int __wt_bt_verify_page_desc(DB *, WT_PAGE *);
 static int __wt_bt_verify_page_item(WT_TOC *, WT_PAGE *, WT_VSTUFF *);
 static int __wt_bt_verify_tree(
     WT_TOC *, WT_ROW_INDX *, u_int32_t, WT_OFF *, WT_VSTUFF *);
@@ -102,7 +102,7 @@ __wt_bt_verify(
 	WT_RECORDS(&off) = 0;
 	off.addr = idb->root_addr;
 	off.size = idb->root_size;
-	WT_ERR(__wt_bt_verify_tree(toc, NULL, WT_LNONE, &off, &vstuff));
+	WT_ERR(__wt_bt_verify_tree(toc, NULL, WT_LDESC, &off, &vstuff));
 
 	WT_ERR(__wt_bt_verify_checkfrag(db, &vstuff));
 
@@ -177,11 +177,12 @@ __wt_bt_verify_tree(WT_TOC *toc,
 	/*
 	 * Check the tree levels and records counts match up.
 	 *
-	 * If passed a level of WT_LNONE, this is the root page -- that means
-	 * we use its level to initialize expected values for the rest of the
-	 * tree, and there's no record count to check.
+	 * If passed a level of WT_LDESC, that is, the only level that can't
+	 * possibly be a valid database page level, this is the root page of
+	 * the tree, so we use this page's level to initialize expected values
+	 * for the rest of the tree, and there's no record count to check.
 	 */
-	if (level == WT_LNONE)
+	if (level == WT_LDESC)
 		level = hdr->level;
 	else {
 		if (hdr->level != level) {
@@ -353,8 +354,8 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	u_int32_t addr;
 
 	vs = vs_arg;
-
 	db = toc->db;
+
 	hdr = page->hdr;
 	addr = page->addr;
 
@@ -364,7 +365,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 
 	/* Update frags list. */
 	if (vs != NULL && vs->fragbits != NULL)
-		WT_RET(__wt_bt_verify_addfrag(toc, page, vs));
+		WT_RET(__wt_bt_verify_addfrag(db, page, vs));
 
 	/*
 	 * FUTURE:
@@ -401,7 +402,7 @@ __wt_bt_verify_page(WT_TOC *toc, WT_PAGE *page, void *vs_arg)
 	/* Check the page level. */
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
-		if (hdr->level != WT_LNONE)
+		if (hdr->level != WT_LDESC)
 			goto err_level;
 		break;
 	case WT_PAGE_COL_FIX:
@@ -442,7 +443,7 @@ err_level:		__wt_api_db_errx(db,
 	/* Verify the items on the page. */
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
-		WT_RET(__wt_bt_verify_page_desc(toc, page));
+		WT_RET(__wt_bt_verify_page_desc(db, page));
 		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_INT:
@@ -452,10 +453,10 @@ err_level:		__wt_api_db_errx(db,
 		WT_RET(__wt_bt_verify_page_item(toc, page, vs));
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__wt_bt_verify_page_col_int(toc, page));
+		WT_RET(__wt_bt_verify_page_col_int(db, page));
 		break;
 	case WT_PAGE_COL_FIX:
-		WT_RET(__wt_bt_verify_page_col_fix(toc, page));
+		WT_RET(__wt_bt_verify_page_col_fix(db, page));
 		break;
 	case WT_PAGE_OVFL:
 		break;
@@ -636,7 +637,7 @@ eop:			__wt_api_db_errx(db,
 			off = WT_ITEM_BYTE_OFF(item);
 			if (WT_ADDR_TO_OFF(db, off->addr) +
 			    off->size > idb->fh->file_size) {
-eof:					__wt_api_db_errx(db,
+eof:				__wt_api_db_errx(db,
 				    "off-page reference in item %lu on "
 				    "page at addr %lu extends past the "
 				    "end of the file",
@@ -648,50 +649,64 @@ eof:					__wt_api_db_errx(db,
 			break;
 		}
 
+		/* Verify overflow references. */
+		switch (item_type) {
+		case WT_ITEM_KEY_OVFL:
+		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_DUP_OVFL:
+			ovflp = WT_ITEM_BYTE_OVFL(item);
+			WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
+			break;
+		default:
+			break;
+		}
+
 		/*
-		 * When walking the whole file, verify overflow references, as
-		 * well as off-page duplicate trees (any off-page reference on
+		 * If we're verifying the entire tree, verify any off-page
+		 * duplicate trees (that's any off-page references found on
 		 * a row-store leaf page).
 		 */
-		if (vs != NULL)
+		if (vs != NULL && hdr->type == WT_PAGE_ROW_LEAF)
 			switch (item_type) {
-			case WT_ITEM_KEY_OVFL:
-			case WT_ITEM_DATA_OVFL:
-			case WT_ITEM_DUP_OVFL:
-				ovflp = WT_ITEM_BYTE_OVFL(item);
-				WT_ERR(__wt_bt_verify_ovfl(toc, ovflp, vs));
-				break;
 			case WT_ITEM_OFF:
 				off = WT_ITEM_BYTE_OFF(item);
-				if (hdr->type == WT_PAGE_ROW_LEAF)
-					WT_ERR(__wt_bt_verify_tree(
-					    toc, NULL, WT_LNONE, off, vs));
+				WT_ERR(__wt_bt_verify_tree(
+				    toc, NULL, WT_LDESC, off, vs));
 				break;
 			default:
 				break;
 			}
 
-		/* Some items aren't sorted on the page, so we're done. */
-		if (item_type == WT_ITEM_DATA ||
-		    item_type == WT_ITEM_DATA_OVFL || item_type == WT_ITEM_OFF)
-			continue;
-
-		/* Get a DBT that represents this item. */
-		current->indx = item_num;
+		/*
+		 * Check the page item sort order.  If the page doesn't contain
+		 * sorted items (or, if the item is an off-page item and we're
+		 * not verifying the entire tree), continue walking the page
+		 * items.   Otherwise, get a DBT that represents the item and
+		 * compare it with the last item.
+		 */
 		switch (item_type) {
+		case WT_ITEM_DATA:
+		case WT_ITEM_DATA_OVFL:
+		case WT_ITEM_OFF:
+			/*
+			 * These items aren't sorted on the page-- we're done.
+			 */
+			continue;
 		case WT_ITEM_KEY:
 		case WT_ITEM_DUP:
+			current->indx = item_num;
 			current->item = &current->item_std;
 			current->item->data = WT_ITEM_BYTE(item);
 			current->item->size = item_len;
 			break;
 		case WT_ITEM_KEY_OVFL:
 		case WT_ITEM_DUP_OVFL:
+			current->indx = item_num;
 			current->item = &current->item_ovfl;
 			WT_ERR(__wt_bt_ovfl_to_dbt(toc, (WT_OVFL *)
 			    WT_ITEM_BYTE(item), current->item));
 			break;
-		default:	/* No other values are possible. */
+		default:
 			break;
 		}
 
@@ -761,16 +776,14 @@ err:	__wt_free(env, _a.item_ovfl.data, _a.item_ovfl.mem_size);
  *	Walk a WT_PAGE_COL_INT page and verify it.
  */
 static int
-__wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
+__wt_bt_verify_page_col_int(DB *db, WT_PAGE *page)
 {
-	DB *db;
 	IDB *idb;
 	WT_OFF *off;
 	WT_PAGE_HDR *hdr;
 	u_int8_t *end;
 	u_int32_t addr, i, entry_num;
 
-	db = toc->db;
 	idb = db->idb;
 	hdr = page->hdr;
 	end = (u_int8_t *)hdr + page->size;
@@ -808,15 +821,13 @@ __wt_bt_verify_page_col_int(WT_TOC *toc, WT_PAGE *page)
  *	Walk a WT_PAGE_COL_FIX page and verify it.
  */
 static int
-__wt_bt_verify_page_col_fix(WT_TOC *toc, WT_PAGE *page)
+__wt_bt_verify_page_col_fix(DB *db, WT_PAGE *page)
 {
-	DB *db;
 	IDB *idb;
 	u_int len;
 	u_int32_t addr, i, entry_num;
 	u_int8_t *end, *p;
 
-	db = toc->db;
 	idb = db->idb;
 	end = (u_int8_t *)page->hdr + page->size;
 	addr = page->addr;
@@ -867,15 +878,13 @@ eop:				__wt_api_db_errx(db,
  *	Verify the database description on page 0.
  */
 static int
-__wt_bt_verify_page_desc(WT_TOC *toc, WT_PAGE *page)
+__wt_bt_verify_page_desc(DB *db, WT_PAGE *page)
 {
-	DB *db;
 	WT_PAGE_DESC *desc;
 	u_int i;
 	u_int8_t *p;
 	int ret;
 
-	db = toc->db;
 	ret = 0;
 
 	desc = (WT_PAGE_DESC *)WT_PAGE_BYTE(page);
@@ -974,12 +983,9 @@ __wt_bt_verify_ovfl(WT_TOC *toc, WT_OVFL *ovflp, WT_VSTUFF *vs)
  *	verified this chunk of the file.
  */
 static int
-__wt_bt_verify_addfrag(WT_TOC *toc, WT_PAGE *page, WT_VSTUFF *vs)
+__wt_bt_verify_addfrag(DB *db, WT_PAGE *page, WT_VSTUFF *vs)
 {
-	DB *db;
 	u_int32_t addr, frags, i;
-
-	db = toc->db;
 
 	addr = page->addr;
 	frags = WT_OFF_TO_ADDR(db, page->size);

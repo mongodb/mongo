@@ -44,7 +44,7 @@ __wt_db_col_del(WT_TOC *toc, u_int64_t recno)
 	__wt_bt_del_serial(toc, page, new, ret);
 
 err:	if (page != NULL && page != idb->root_page)
-		__wt_bt_page_out(toc, &page, 0);
+		__wt_bt_page_out(toc, &page, ret == 0 ? WT_MODIFIED : 0);
 
 	return (ret);
 }
