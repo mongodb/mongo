@@ -96,12 +96,10 @@ main(int argc, char *argv[])
 		if (g.dump && wts_dump())	/* Optional dump */
 			goto err;
 
-		track("flushing & re-opening WT", 0);
-		wts_teardown();			/* Re-open the WT database */
-		wts_setup(1, log);
+		/* XXX: can't get dups, don't have cursor ops yet. */
+		if (g.c_duplicates_pct != 0)
+			goto skip_ops;
 
-	/* XXX: can't get dups, don't have cursor ops yet. */
-	if (g.c_duplicates_pct == 0) {
 		switch (g.c_database_type) {	/* Scan through some records */
 		case ROW:
 			if (wts_read_row_scan())
@@ -114,13 +112,15 @@ main(int argc, char *argv[])
 			break;
 		}
 
+		track("flushing & re-opening WT", 0);
+		wts_teardown();			/* Re-open the WT database */
+		wts_setup(1, log);
+
 		if (wts_ops())			/* Random operations */
 			goto err;
-	}
 
-		if (g.stats && wts_stats())	/* Optional statistics */
+skip_ops:	if (g.stats && wts_stats())	/* Optional statistics */
 			goto err;
-
 						/* Close the databases */
 		track("shutting down BDB", 0);
 		bdb_teardown();	
