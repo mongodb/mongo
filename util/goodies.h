@@ -451,7 +451,7 @@ namespace mongo {
         boost::thread_specific_ptr<T> _val;
     };
 
-    class ProgressMeter {
+    class ProgressMeter : boost::noncopyable {
     public:
         ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
             reset( total , secondsBetween , checkInterval );
@@ -518,6 +518,10 @@ namespace mongo {
             buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
             return buf.str();
         }
+
+        bool operator==( const ProgressMeter& other ) const {
+            return this == &other;
+        }
     private:
 
         bool _active;
@@ -529,6 +533,36 @@ namespace mongo {
         long long _done;
         long long _hits;
         int _lastTime;
+    };
+
+    class ProgressMeterHolder : boost::noncopyable {
+    public:
+        ProgressMeterHolder( ProgressMeter& pm )
+            : _pm( pm ){
+        }
+        
+        ~ProgressMeterHolder(){
+            _pm.finished();
+        }
+
+        ProgressMeter* operator->(){
+            return &_pm;
+        }
+
+        bool hit( int n = 1 ){
+            return _pm.hit( n );
+        }
+
+        void finished(){
+            _pm.finished();
+        }
+        
+        bool operator==( const ProgressMeter& other ){
+            return _pm == other;
+        }
+        
+    private:
+        ProgressMeter& _pm;
     };
 
     class TicketHolder {

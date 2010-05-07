@@ -251,7 +251,7 @@ namespace mongo {
 
             if ( progressMeterTotal ){
                 if ( _progressMeter.isActive() ){
-                    cout << "about to assert, old _message: " << _message << endl;
+                    cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
                     assert( ! _progressMeter.isActive() );
                 }
                 _progressMeter.reset( progressMeterTotal , secondsBetween );
@@ -266,7 +266,7 @@ namespace mongo {
         }
         
         string getMessage() const { return _message; }
-        ProgressMeter getProgressMeter() { return _progressMeter; }
+        ProgressMeter& getProgressMeter() { return _progressMeter; }
 
         friend class Client;
     };

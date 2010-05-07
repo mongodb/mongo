@@ -446,7 +446,7 @@ namespace mongo {
                     MRTL * mrtl = new MRTL( state );
                     _tlmr.reset( mrtl );
 
-                    ProgressMeter & pm = op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) );
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) ) );
                     long long mapTime = 0;
                     {
                         readlock lock( mr.ns );
@@ -531,7 +531,7 @@ namespace mongo {
                         BSONObj prev;
                         BSONList all;
                         
-                        pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
+                        assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) ) );
 
                         auto_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.incLong.c_str() ) );
@@ -544,7 +544,7 @@ namespace mongo {
                             
                             if ( o.woSortOrder( prev , sortKey ) == 0 ){
                                 all.push_back( o );
-                                if ( pm.hits() % 1000 == 0 ){
+                                if ( pm->hits() % 1000 == 0 ){
                                     if ( ! cursor->yield() ){
                                         cursor.release();
                                         break;

@@ -45,6 +45,17 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
+    bool inDBRepair = false;
+    struct doingRepair {
+        doingRepair(){
+            assert( ! inDBRepair );
+            inDBRepair = true;
+        }
+        ~doingRepair(){
+            inDBRepair = false;
+        }
+    };
+
     const int MaxExtentSize = 0x7ff00000;
 
     map<string, unsigned> BackgroundOperation::dbsInProg;
@@ -1009,7 +1020,7 @@ namespace mongo {
         log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique();
-        bool dropDups = idx.dropDups();
+        bool dropDups = idx.dropDups() || inDBRepair;
         BSONObj order = idx.keyPattern();
 
         idx.head.Null();
@@ -1022,7 +1033,7 @@ namespace mongo {
         BSONObjExternalSorter sorter(order);
         sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
-        ProgressMeter & pm = op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 );
+        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 ) );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1061,7 +1072,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            pm = op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 );
+            assert( pm == op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 ) );
             while( i->more() ) { 
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
@@ -1219,7 +1230,7 @@ namespace mongo {
         }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
-        if( !background ) {
+        if( inDBRepair || !background ) {
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
@@ -1497,7 +1508,7 @@ namespace mongo {
             idx.info = loc;
             try {
                 buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
-            } catch( DBException& ) {
+            } catch( DBException& e ) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
                 LastError *le = lastError.get();
                 int savecode = 0;
@@ -1505,6 +1516,10 @@ namespace mongo {
                 if ( le ) {
                     savecode = le->code;
                     saveerrmsg = le->msg;
+                }
+                else {
+                    savecode = e.getCode();
+                    saveerrmsg = e.what();
                 }
 
                 // roll back this index
@@ -1515,7 +1530,7 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
-
+                
                 assert( le && !saveerrmsg.empty() );
                 raiseError(savecode,saveerrmsg.c_str());
                 throw;
@@ -1707,6 +1722,7 @@ namespace mongo {
 
     bool repairDatabase( string dbNameS , string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
+        doingRepair dr;
         dbNameS = nsToDatabase( dbNameS );
         const char * dbName = dbNameS.c_str();
 
