@@ -445,7 +445,7 @@ namespace mongo {
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ){
                 log() << "****\n";
-                log() << "WARNING: This is development version of MongoDB.  Not recommended for production.\n";
+                log() << "WARNING: This is development a version (" << versionString << ") of MongoDB.  Not recommended for production.\n";
                 log() << "****" << endl;
             }
                 
