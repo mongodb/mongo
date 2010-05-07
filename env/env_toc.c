@@ -182,7 +182,7 @@ __wt_toc_dump(ENV *env)
 		else
 			__wt_mb_add(&mb, "%p", toc->wq_func);
 
-		__wt_mb_add(&mb, "state: %s", __wt_toc_print_state(toc));
+		__wt_mb_add(&mb, " state: %s", __wt_toc_print_state(toc));
 
 		__wt_mb_add(&mb, "\n\thazard: ");
 		for (hp = toc->hazard;
