@@ -562,10 +562,10 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    auto_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
+    shared_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
         NamespaceDetails * d = nsdetails( ns );
         if ( ! d )
-            return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
 
         DiskLoc loc = d->firstExtent;
         Extent *e = getExtent(loc);
@@ -590,10 +590,10 @@ namespace mongo {
         }
 
         if ( d->capped ) 
-            return auto_ptr< Cursor >( new ForwardCappedCursor( d , startLoc ) );
+            return shared_ptr<Cursor>( new ForwardCappedCursor( d , startLoc ) );
         
         if ( !startLoc.isNull() )
-            return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
+            return shared_ptr<Cursor>(new BasicCursor( startLoc ));                
         
         while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
             /* todo: if extent is empty, free it for reuse elsewhere.
@@ -604,13 +604,13 @@ namespace mongo {
             // it might be nice to free the whole extent here!  but have to clean up free recs then.
             e = e->getNextExtent();
         }
-        return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
+        return shared_ptr<Cursor>(new BasicCursor( e->firstRecord ));
     }
 
     /* get a table scan cursor, but can be forward or reverse direction.
        order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
     */
-    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
+    shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
         BSONElement el = order.getField("$natural"); // e.g., { $natural : -1 }
 
         if ( el.number() >= 0 )
@@ -620,19 +620,19 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         
         if ( !d )
-            return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
         
         if ( !d->capped ) {
             if ( !startLoc.isNull() )
-                return auto_ptr<Cursor>(new ReverseCursor( startLoc ));                
+                return shared_ptr<Cursor>(new ReverseCursor( startLoc ));                
             Extent *e = d->lastExtent.ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
                 OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
                 e = e->getPrevExtent();
             }
-            return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
+            return shared_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
         } else {
-            return auto_ptr< Cursor >( new ReverseCappedCursor( d, startLoc ) );
+            return shared_ptr<Cursor>( new ReverseCappedCursor( d, startLoc ) );
         }
     }
 
@@ -1029,7 +1029,7 @@ namespace mongo {
 
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
-        auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+        shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
         sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
@@ -1126,7 +1126,7 @@ namespace mongo {
             unsigned long long n = 0;
             auto_ptr<ClientCursor> cc;
             {
-                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
             CursorId id = cc->cursorid;

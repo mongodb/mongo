@@ -452,7 +452,7 @@ namespace mongo {
                         readlock lock( mr.ns );
                         Client::Context ctx( mr.ns );
                         
-                        auto_ptr<Cursor> temp = QueryPlanSet(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = QueryPlanSet(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.ns.c_str() ) );
 
                         if ( ! mr.filter.isEmpty() )
@@ -533,7 +533,7 @@ namespace mongo {
                         
                         assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) ) );
 
-                        auto_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.incLong.c_str() ) );
                         
                         while ( cursor->ok() ){

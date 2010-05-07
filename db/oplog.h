@@ -62,7 +62,7 @@ namespace mongo {
         _findingStartCursor( 0 )
         { init(); }
         bool done() const { return !_findingStart; }
-        auto_ptr< Cursor > cRelease() { return _c; }
+        shared_ptr<Cursor> cRelease() { return _c; }
         void next() {
             if ( !_findingStartCursor || !_findingStartCursor->c->ok() ) {
                 _findingStart = false;
@@ -130,7 +130,7 @@ namespace mongo {
         auto_ptr< CoveredIndexMatcher > _matcher;
         Timer _findingStartTimer;
         ClientCursor * _findingStartCursor;
-        auto_ptr< Cursor > _c;
+        shared_ptr<Cursor> _c;
         DiskLoc startLoc( const DiskLoc &rec ) {
             Extent *e = rec.rec()->myExtent( rec );
             if ( e->myLoc != _qp.nsd()->capExtent )
@@ -152,7 +152,7 @@ namespace mongo {
             return DiskLoc(); // reached beginning of collection
         }
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() ) {
-            auto_ptr<Cursor> c = _qp.newCursor( startLoc );
+            shared_ptr<Cursor> c = _qp.newCursor( startLoc );
             _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns());
         }
         void destroyClientCursor() {
@@ -174,7 +174,7 @@ namespace mongo {
         void init() {
             // Use a ClientCursor here so we can release db mutex while scanning
             // oplog (can take quite a while with large oplogs).
-            auto_ptr<Cursor> c = _qp.newReverseCursor();
+            shared_ptr<Cursor> c = _qp.newReverseCursor();
             _findingStartCursor = new ClientCursor(QueryOption_NoCursorTimeout, c, _qp.ns());
             _findingStartTimer.reset();
             _findingStartMode = Initial;

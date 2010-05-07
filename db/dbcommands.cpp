@@ -982,7 +982,7 @@ namespace mongo {
 
             Client::Context ctx( ns );
             
-            auto_ptr< Cursor > c;
+            shared_ptr<Cursor> c;
             if ( min.isEmpty() && max.isEmpty() ) {
                 c = theDataFileMgr.findAll( ns.c_str() );
             } 
@@ -1195,7 +1195,7 @@ namespace mongo {
 
             CursorId id;
             {
-                auto_ptr< Cursor > c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
+                shared_ptr<Cursor> c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
                 ClientCursor *cc = new ClientCursor(0, c, fromNs.c_str());
                 cc->matcher.reset( new CoveredIndexMatcher( BSONObj(), fromjson( "{$natural:1}" ) ) );
                 id = cc->cursorid;
@@ -1333,7 +1333,7 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            shared_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
                 matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
@@ -1468,7 +1468,7 @@ namespace mongo {
             BSONObj query = getQuery( cmdObj );
             
             BSONElementSet values;
-            auto_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            shared_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
                 matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
@@ -1631,7 +1631,7 @@ namespace mongo {
                 if ( c.find( ".system.profil" ) != string::npos )
                     continue;
                 
-                auto_ptr<Cursor> cursor;
+                shared_ptr<Cursor> cursor;
 
                 NamespaceDetails * nsd = nsdetails( c.c_str() );
                 

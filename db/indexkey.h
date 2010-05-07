@@ -44,7 +44,7 @@ namespace mongo {
         virtual ~IndexType();
 
         virtual void getKeys( const BSONObj &obj, BSONObjSetDefaultOrder &keys ) const = 0;
-        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
+        virtual shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
         
         /** optional op : changes query to match what's in the index */
         virtual BSONObj fixKey( const BSONObj& in ) { return in; }

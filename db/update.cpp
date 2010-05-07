@@ -682,7 +682,7 @@ namespace mongo {
         UpdateOp() : _nscanned() {}
         virtual void init() {
             BSONObj pattern = qp().query();
-            _c.reset( qp().newCursor().release() );
+            _c = qp().newCursor();
             if ( ! _c->ok() )
                 setComplete();
             else

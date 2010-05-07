@@ -176,7 +176,7 @@ namespace mongo {
             unhelpful_ = true;
     }
     
-    auto_ptr< Cursor > QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
+    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
 
         if ( _type )
             return _type->newCursor( fbs_.query() , order_ , numWanted );
@@ -184,7 +184,7 @@ namespace mongo {
         if ( !fbs_.matchPossible() ){
             if ( fbs_.nNontrivialRanges() )
                 checkTableScanAllowed( fbs_.ns() );
-            return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
         if ( !index_ ){
             if ( fbs_.nNontrivialRanges() )
@@ -196,15 +196,15 @@ namespace mongo {
         
         if ( indexBounds_.size() < 2 ) {
             // we are sure to spec endKeyInclusive_
-            return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_[ 0 ].first, indexBounds_[ 0 ].second, endKeyInclusive_, direction_ >= 0 ? 1 : -1 ) );
         } else {
-            return auto_ptr< Cursor >( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
+            return shared_ptr<Cursor>( new BtreeCursor( d, idxNo, *index_, indexBounds_, direction_ >= 0 ? 1 : -1 ) );
         }
     }
     
-    auto_ptr< Cursor > QueryPlan::newReverseCursor() const {
+    shared_ptr<Cursor> QueryPlan::newReverseCursor() const {
         if ( !fbs_.matchPossible() )
-            return auto_ptr< Cursor >( new BasicCursor( DiskLoc() ) );
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         if ( !index_ ) {
             int orderSpec = order_.getIntField( "$natural" );
             if ( orderSpec == INT_MIN )
@@ -212,7 +212,7 @@ namespace mongo {
             return findTableScan( fbs_.ns(), BSON( "$natural" << -orderSpec ) );
         }
         massert( 10364 ,  "newReverseCursor() not implemented for indexed plans", false );
-        return auto_ptr< Cursor >( 0 );
+        return shared_ptr<Cursor>();
     }
     
     BSONObj QueryPlan::indexKey() const {
@@ -441,7 +441,7 @@ namespace mongo {
     BSONObj QueryPlanSet::explain() const {
         vector< BSONObj > arr;
         for( PlanSet::const_iterator i = plans_.begin(); i != plans_.end(); ++i ) {
-            auto_ptr< Cursor > c = (*i)->newCursor();
+            shared_ptr<Cursor> c = (*i)->newCursor();
             BSONObjBuilder explain;
             explain.append( "cursor", c->toString() );
             explain.appendArray( "indexBounds", c->prettyIndexBounds() );

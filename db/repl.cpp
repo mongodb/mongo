@@ -301,7 +301,7 @@ namespace mongo {
             
             readlock lk( "local.sources" );
             Client::Context ctx( "local.sources" );
-            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ){
                 BSONObj s = c->current();
@@ -659,7 +659,7 @@ namespace mongo {
             // --source <host> specified.
             // check that no items are in sources other than that
             // add if missing
-            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
                 n++;
@@ -703,7 +703,7 @@ namespace mongo {
             }
             // check that no items are in sources other than that
             // add if missing
-            auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+            shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
                 n++;
@@ -725,7 +725,7 @@ namespace mongo {
             }
         }
 
-        auto_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+        shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
         while ( c->ok() ) {
             ReplSource tmp(c->current());
             if ( replPair && tmp.hostName == replPair->remote && tmp.sourceName() == "main" ) {
@@ -1072,7 +1072,7 @@ namespace mongo {
     
     OpTime ReplSource::nextLastSavedLocalTs() const {
         Client::Context ctx( "local.oplog.$main" );
-        auto_ptr< Cursor > c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+        shared_ptr<Cursor> c = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         if ( c->ok() )
             return OpTime( c->current().getField( "ts" ).date() );        
         return OpTime();
@@ -1100,7 +1100,7 @@ namespace mongo {
     
     bool ReplSource::updateSetsWithLocalOps( OpTime &localLogTail, bool mayUnlock ) {
         Client::Context ctx( "local.oplog.$main" );
-        auto_ptr< Cursor > localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
+        shared_ptr<Cursor> localLog = findTableScan( "local.oplog.$main", BSON( "$natural" << -1 ) );
         OpTime newTail;
         for( ; localLog->ok(); localLog->advance() ) {
             BSONObj op = localLog->current();

@@ -43,6 +43,7 @@ namespace mongo {
 
     class Tee { 
     public:
+        virtual ~Tee(){}
         virtual void write(const string& str) = 0;
     };
 
