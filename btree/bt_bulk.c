@@ -208,7 +208,7 @@ err:	if (stack.page != NULL) {
 		__wt_free(env, stack.page, stack.size * sizeof(WT_PAGE *));
 	}
 	if (page != NULL)
-		__wt_bt_page_out(toc, &page, 0);
+		__wt_bt_page_out(toc, &page, WT_DISCARD);
 
 	return (ret);
 }
@@ -610,7 +610,7 @@ skip_read:	/*
 		f(toc->name, insert_cnt);
 
 err:	if (page != NULL)
-		__wt_bt_page_out(toc, &page, 0);
+		__wt_bt_page_out(toc, &page, WT_DISCARD);
 	if (stack.page != NULL) {
 		u_int i;
 		for (i = 0; stack.page[i] != NULL; ++i)
@@ -756,7 +756,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 			 */
 			WT_RET(__wt_bt_promote(toc,
 			    page, page->records, &stack, 0, &root_addr));
-			__wt_bt_page_out(toc, &page, 0);
+			__wt_bt_page_out(toc, &page, WT_DISCARD);
 			WT_RET(__wt_bt_page_alloc(toc,
 			    WT_PAGE_DUP_LEAF, WT_LLEAF, db->leafmin, &page));
 		}
@@ -784,7 +784,7 @@ __wt_bt_dup_offpage(WT_TOC *toc, WT_PAGE *leaf_page,
 	if ((tret = __wt_bt_promote(toc, page, page->records,
 	    &stack, 0, &root_addr)) != 0 && (ret == 0 || ret == 1))
 		ret = tret;
-	__wt_bt_page_out(toc, &page, 0);
+	__wt_bt_page_out(toc, &page, WT_DISCARD);
 
 	/*
 	 * Replace the caller's duplicate set with a WT_OFF structure, and
