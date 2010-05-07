@@ -137,10 +137,14 @@ int main( int argc, const char **argv ) {
         assert( conn.getLastError() == "" );
 
         // nonexistent index test
-        assert( conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}")).hasElement("$err") );
-        assert( conn.getLastError() == "bad hint" );
-        conn.resetError();
-        assert( conn.getLastError() == "" );
+        bool asserted = false;
+        try {
+            conn.findOne(ns, Query("{name:\"eliot\"}").hint("{foo:1}"));
+        }
+        catch ( ... ){
+            asserted = true;
+        }
+        assert( asserted );
 
         //existing index
         assert( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );
