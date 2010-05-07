@@ -63,7 +63,7 @@ namespace mongo {
 
             ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
 
-            log() << newConfig.toString() << endl;
+            log() << newConfig.toString() << rsLog;
 
             newConfig.save();
 

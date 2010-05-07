@@ -44,7 +44,7 @@ namespace mongo {
     class E : public BackgroundJob { 
         void run() { 
             ok = 0;
-            log() << "not done" << endl;
+            log() << "not done" << rsLog;
             try { 
                 ScopedConn c(m->fullName());
                 if( c->runCommand("admin", electCmd, result) )

@@ -41,8 +41,16 @@ namespace mongo {
         const T& t_;
     };
 
+    class Tee { 
+    public:
+        virtual void write(const string& str) = 0;
+    };
+
     class Nullstream {
     public:
+        virtual Nullstream& operator<< (Tee* tee) { 
+            return *this;
+        }
         virtual ~Nullstream() {}
         virtual Nullstream& operator<<(const char *) {
             return *this;
@@ -111,15 +119,10 @@ namespace mongo {
         virtual Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
             return *this;
         }
-        virtual void flush(){}
+        virtual void flush(Tee *t = 0) {}
     };
     extern Nullstream nullstream;
     
-    class Tee { 
-    public:
-        virtual void write(const string& str) = 0;
-    };
-
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
@@ -160,9 +163,9 @@ namespace mongo {
             ss << x.val();
             return *this;
         }
-        Logstream& operator<< (Tee& tee) { 
+        Nullstream& operator<< (Tee* tee) { 
             ss << '\n';
-            flush(&tee);
+            flush(tee);
             return *this;
         }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {

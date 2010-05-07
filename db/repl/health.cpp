@@ -21,8 +21,9 @@
 #include "../../client/dbclient.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
-#include "../../util/web/html.h"
+#include "../../util/mongoutils/html.h"
 #include "../../util/goodies.h"
+#include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
 
@@ -35,6 +36,9 @@ namespace mongo {
 namespace mongo { 
 
     using namespace mongoutils::html;
+
+    static RamLog _rsLog;
+    Tee *rsLog = &_rsLog;
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public Command {
@@ -74,7 +78,7 @@ namespace mongo {
             m->_health = 0.0;
             if( m->_upSince ) {
                 m->_upSince = 0;
-                log() << "replSet " << m->fullName() << " is now down" << endl;
+                log() << "replSet " << m->fullName() << " is now down" << rsLog;
             }
         }
 
@@ -94,7 +98,7 @@ namespace mongo {
                     m->_lastHeartbeat = time(0);
                     if( ok ) {
                         if( m->_upSince == 0 ) {
-                            log() << "replSet " << m->fullName() << " is now up" << endl;
+                            log() << "replSet " << m->fullName() << " is now up" << rsLog;
                             m->_upSince = m->_lastHeartbeat;
                         }
                         m->_health = 1.0;
@@ -182,6 +186,14 @@ namespace mongo {
             m = m->next();
         }
         s << _table();
+    }
+
+    void fillRsLog(stringstream& s) {
+        s << "<br><pre>\n";
+        vector<const char *> v = _rsLog.get();
+        for( unsigned i = 0; i < v.size(); i++ )
+            s << v[i];
+        s << "</pre>\n";
     }
 
     void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 

@@ -138,13 +138,13 @@ namespace mongo {
                 m.check();
             }
             catch( const char * p ) { 
-                log() << "replSet cfg parsing exception for members[" << i << "] " << p << endl;
+                log() << "replSet cfg parsing exception for members[" << i << "] " << p << rsLog;
                 stringstream ss;
                 ss << "replSet members[" << i << "] " << p;
                 uassert(13107, ss.str(), false);
             }
             catch(DBException& e) { 
-                log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << endl;
+                log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << rsLog;
                 stringstream ss;
                 ss << "replSet members[" << i << "] bad config object";
                 uassert(13135, ss.str(), false);
@@ -173,7 +173,7 @@ namespace mongo {
         clear();
         int level = 2;
         DEV level = 0;
-        log(0) << "replSet load config from: " << h.toString() << endl;
+        log(0) << "replSet load config from: " << h.toString() << rsLog;
 
         auto_ptr<DBClientCursor> c;
         try {
@@ -207,7 +207,7 @@ namespace mongo {
             version = -1;
         }
         catch( UserException& e) { 
-            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << endl;
+            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
@@ -215,7 +215,7 @@ namespace mongo {
         uassert(13109, "multiple rows in local.system.replset not supported", !c->more());
         from(o);
         _ok = true;
-        log(level) << "replSet load ok" << endl;
+        log(level) << "replSet load ok" << rsLog;
     }
 
 }

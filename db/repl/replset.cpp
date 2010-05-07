@@ -25,6 +25,7 @@ namespace mongo {
     ReplSet *theReplSet = 0;
 
     void ReplSet::fillIsMaster(BSONObjBuilder& b) {
+        log() << "hellO" << rsLog;
         b.append("ismaster", 0);
         b.append("ok", false);
         b.append("msg", "not yet implemented");
@@ -44,7 +45,7 @@ namespace mongo {
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
         _name = string(p, slash-p);
-        log() << "replSet " << cfgString << endl;
+        log() << "replSet " << cfgString << rsLog;
 
         set<HostAndPort> temp;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
@@ -65,7 +66,7 @@ namespace mongo {
                 temp.insert(m);
                 uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() )
-                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << endl;
+                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 else
                     seeds->push_back(m);
                 if( *comma == 0 )
@@ -146,13 +147,13 @@ namespace mongo {
                         startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
                         log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)\n";
                         log() << "replSet have you ran replSetInitiate yet?\n";
-                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get admin.system.replset config from self or any seed (EMPTYUNREACHABLE)";
                         log() << "replSet can't get admin.system.replset config from self or any seed.\n";
-                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
 
                     sleepsecs(60);
@@ -164,7 +165,7 @@ namespace mongo {
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations\n";
-                log() << "replSet replication will not start" << endl;
+                log() << "replSet replication will not start" << rsLog;
                 fatal();
                 throw;
             }
@@ -186,7 +187,7 @@ namespace mongo {
             (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
-            log() << "replSet Caught exception in management thread: " << e.what() << endl;
+            log() << "replSet Caught exception in management thread: " << e.what() << rsLog;
             if( theReplSet ) 
                 theReplSet->fatal();
         }

@@ -21,7 +21,7 @@
 
 #include "pch.h"
 #include "../util/miniwebserver.h"
-#include "../util/web/html.h"
+#include "../util/mongoutils/html.h"
 #include "../util/md5.hpp"
 #include "db.h"
 #include "repl.h"
@@ -41,6 +41,7 @@ namespace mongo {
     using namespace mongoutils::html;
     using namespace bson;
 
+    extern void fillRsLog(stringstream&);
     extern string bind_ip;
     extern const char *replInfo;
 
@@ -270,8 +271,9 @@ namespace mongo {
                 try {
                     theReplSet->summarizeAsHtml(s);
                 }
-                catch(...) { s << "error summarizing replset status"; }
+                catch(...) { s << "error summarizing replset status\n"; }
             }
+            fillRsLog(s);
             s << _end();
             return s.str();
         }

@@ -28,6 +28,8 @@ namespace mongo {
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
 
+    extern Tee *rsLog;
+
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
@@ -142,7 +144,7 @@ namespace mongo {
         friend class FeedbackThread;
 
     public:
-        void fatal() { _myState = FATAL; log() << "replSet fatal error, stopping replication" << endl; }
+        void fatal() { _myState = FATAL; log() << "replSet fatal error, stopping replication" << rsLog; }
 
     };
 
