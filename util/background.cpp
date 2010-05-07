@@ -66,6 +66,11 @@ namespace mongo {
         return true;
     }
 
+    void BackgroundJob::go(list<BackgroundJob*>& L) {
+        for( list<BackgroundJob*>::iterator i = L.begin(); i != L.end(); i++ )
+            (*i)->go();
+    }
+
     /* wait for several jobs to finish. */
     void BackgroundJob::wait(list<BackgroundJob*>& L, unsigned maxsleep) {
         unsigned ms = 0;

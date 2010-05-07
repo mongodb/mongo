@@ -140,9 +140,28 @@ namespace mongo {
         s << _tr();
     }
 
+    string ReplSet::stateAsHtml(State s) { 
+        if( s == STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
+        if( s == PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
+        if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
+        if( s == RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
+        if( s == FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "FATAL");
+        return "???";
+    }
+
+    string ReplSet::stateAsStr(State s) { 
+        if( s == STARTUP ) return "STARTUP";
+        if( s == PRIMARY ) return "PRIMARY";
+        if( s == SECONDARY ) return "SECONDARY";
+        if( s == RECOVERING ) return "RECOVERING";
+        if( s == FATAL ) return "FATAL";
+        return "???";
+    }
+
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
+        s << tr("My state:", stateAsHtml(_myState));
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
@@ -187,6 +206,7 @@ namespace mongo {
         }
         b.append("set", getName());
         b.appendDate("date", time(0));
+        b.append("myState", _myState);
         b.append("members", v);
     }
 

@@ -77,6 +77,9 @@ namespace mongo {
         // note you can call wait() more than once if the first call times out.
         bool wait(int msMax = 0, unsigned maxSleepInterval=1000);
 
+        /* start several */
+        static void go(list<BackgroundJob*>&);
+
         /* wait for several jobs to finish. */
         static void wait(list<BackgroundJob*>&, unsigned maxSleepInterval=1000);
 

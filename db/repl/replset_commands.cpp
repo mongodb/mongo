@@ -67,6 +67,8 @@ namespace mongo {
 
             newConfig.save();
 
+            /* todo replset elect */
+
             errmsg = "replsets are not yet implemented.  coming soon.";
             return true;
         }

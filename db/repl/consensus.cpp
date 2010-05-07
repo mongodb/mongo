@@ -62,7 +62,7 @@ namespace mongo {
 
     static const int VETO = -10000;
 
-    void ReplSet::Consensus::electSelf() {
+    bool ReplSet::Consensus::electSelf() {
         ReplSet::Member& me = *rs._self;
         electCmd = BSON(
                "replSetElect" << 1 <<
@@ -77,9 +77,9 @@ namespace mongo {
             E *e = new E();
             e->m = m;
             jobs.push_back(eptr(e)); _jobs.push_back(e);
-            e->go();
         }
 
+        BackgroundJob::go(_jobs);
         BackgroundJob::wait(_jobs,5);
 
         int tally = me.config().votes; // me votes yes.
@@ -88,6 +88,10 @@ namespace mongo {
                 int v = (*i)->result["vote"].Int();
             }
         }
+        if( tally*2 > totalVotes() ) {
+            return true;
+        } 
+        return false;
     }
 
 }

@@ -43,9 +43,8 @@ namespace mongo {
 
         static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, FINISHME=5 } startupStatus;
         static string startupStatusMsg;
-        bool fatal;
 
-        bool ok() const { return !fatal; }
+        bool ok() const { return _myState != FATAL; }
 
         /* @return replica set's logical name */
         string getName() const { return _name; }
@@ -82,7 +81,7 @@ namespace mongo {
             Consensus(ReplSet *t) : rs(*t) { }
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
-            void electSelf();
+            bool electSelf();
         } elect;
 
     public:
@@ -124,6 +123,16 @@ namespace mongo {
         };
 
     private:
+        enum State {
+            STARTUP,
+            PRIMARY,
+            SECONDARY,
+            RECOVERING,
+            FATAL
+        } _myState;
+        static string stateAsStr(State state);
+        static string stateAsHtml(State state);
+
         Member *_self;
         /* all members of the set EXCEPT self. */
         List1<Member> _members;
@@ -131,6 +140,10 @@ namespace mongo {
 
         void startHealthThreads();
         friend class FeedbackThread;
+
+    public:
+        void fatal() { _myState = FATAL; log() << "replSet fatal error, stopping replication" << endl; }
+
     };
 
 }

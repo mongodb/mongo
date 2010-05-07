@@ -37,7 +37,8 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : fatal(false), _self(0), elect(this) {
+    ReplSet::ReplSet(string cfgString) : _self(0), elect(this) {
+        _myState = STARTUP;
 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
@@ -164,7 +165,7 @@ namespace mongo {
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations\n";
                 log() << "replSet replication will not start" << endl;
-                fatal = true;
+                fatal();
                 throw;
             }
             break;
@@ -187,7 +188,7 @@ namespace mongo {
         catch(std::exception& e) { 
             log() << "replSet Caught exception in management thread: " << e.what() << endl;
             if( theReplSet ) 
-                theReplSet->fatal = true;
+                theReplSet->fatal();
         }
     }
 
