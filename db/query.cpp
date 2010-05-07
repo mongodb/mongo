@@ -90,13 +90,13 @@ namespace mongo {
         virtual QueryOp *clone() const {
             return new DeleteOp( justOne_, bestCount_ );
         }
-        auto_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+        shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
     private:
         bool justOne_;
         int count_;
         int &bestCount_;
         long long _nscanned;
-        auto_ptr< Cursor > c_;
+        shared_ptr<Cursor> c_;
         auto_ptr< CoveredIndexMatcher > _matcher;
     };
     
@@ -130,7 +130,7 @@ namespace mongo {
         int best = 0;
         DeleteOp original( justOne, best );
         shared_ptr< DeleteOp > bestOp = s.runOp( original );
-        auto_ptr< Cursor > creal = bestOp->newCursor();
+        shared_ptr<Cursor> creal = bestOp->newCursor();
         
         if( !creal->ok() )
             return nDeleted;
@@ -428,7 +428,7 @@ namespace mongo {
         long long count_;
         long long skip_;
         long long limit_;
-        auto_ptr< Cursor > c_;
+        shared_ptr<Cursor> c_;
         BSONObj query_;
         BtreeCursor *bc_;
         auto_ptr< CoveredIndexMatcher > _matcher;
@@ -624,7 +624,7 @@ namespace mongo {
 
         BufBuilder &builder() { return _buf; }
         bool scanAndOrderRequired() const { return _inMemSort; }
-        auto_ptr< Cursor > cursor() { return _c; }
+        shared_ptr<Cursor> cursor() { return _c; }
         auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
         int n() const { return _n; }
         long long nscanned() const { return _nscanned; }
@@ -645,7 +645,7 @@ namespace mongo {
         bool _inMemSort;
         auto_ptr< ScanAndOrder > _so;
         
-        auto_ptr< Cursor > _c;
+        shared_ptr<Cursor> _c;
 
         auto_ptr< CoveredIndexMatcher > _matcher;
 
@@ -810,7 +810,7 @@ namespace mongo {
         nscanned = dqo.nscanned();
         if ( dqo.scanAndOrderRequired() )
             ss << " scanAndOrder ";
-        auto_ptr<Cursor> cursor = dqo.cursor();
+        shared_ptr<Cursor> cursor = dqo.cursor();
         log( 5 ) << "   used cursor: " << cursor.get() << endl;
         if ( dqo.saveClientCursor() ) {
             // the clientcursor now owns the Cursor* and 'c' is released:

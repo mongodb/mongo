@@ -33,14 +33,14 @@ namespace mongo {
 
     class CursorIterator {
     public:
-        CursorIterator( auto_ptr<Cursor> c , BSONObj filter = BSONObj() );
+        CursorIterator( shared_ptr<Cursor> c , BSONObj filter = BSONObj() );
         BSONObj next();
         bool hasNext();
 
     private:
         void _advance();
 
-        auto_ptr<Cursor> _cursor;
+        shared_ptr<Cursor> _cursor;
         auto_ptr<CoveredIndexMatcher> _matcher;
         BSONObj _o;
     };

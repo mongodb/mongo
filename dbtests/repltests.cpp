@@ -89,7 +89,7 @@ namespace ReplTests {
             int count = 0;
             dblock lk;
             Client::Context ctx( ns() );
-            auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() );
+            shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
             for(; c->ok(); c->advance(), ++count ) {
 //                cout << "obj: " << c->current().toString() << endl;
             }
@@ -99,7 +99,7 @@ namespace ReplTests {
             dblock lk;
             Client::Context ctx( cllNS() );
             int count = 0;
-            for( auto_ptr< Cursor > c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
+            for( shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
                 ++count;
             return count;
         }
@@ -114,7 +114,7 @@ namespace ReplTests {
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
-                for( auto_ptr< Cursor > c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
+                for( shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
                     ops.push_back( c->current() );
             }
             {
@@ -126,7 +126,7 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             dblock lk;
             Client::Context ctx( ns );
-            auto_ptr< Cursor > c = theDataFileMgr.findAll( ns );
+            shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
             out() << "all for " << ns << endl;
             for(; c->ok(); c->advance() ) {
@@ -137,7 +137,7 @@ namespace ReplTests {
         static void deleteAll( const char *ns ) {
             dblock lk;
             Client::Context ctx( ns );
-            auto_ptr< Cursor > c = theDataFileMgr.findAll( ns );
+            shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
             for(; c->ok(); c->advance() ) {
                 toDelete.push_back( c->currLoc() );
