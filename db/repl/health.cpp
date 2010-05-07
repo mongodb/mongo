@@ -143,7 +143,7 @@ namespace mongo {
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
-        s << tr("Majority up:", aMajoritySeemsToBeUp()?"yes":"no" );
+        s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
         const char *h[] = {"Member", "Up", "Uptime", 

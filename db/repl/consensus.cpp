@@ -21,39 +21,41 @@
 
 namespace mongo { 
 
-    class E : public BackgroundJob { 
-        void run() { 
-            log() << "not done" << endl;
-        }
-    public:
-        ReplSet::Member *_m;
-    };
-
-    bool ReplSet::aMajoritySeemsToBeUp() const {
-        Member *m = head();
-        unsigned vTot = 0;
-        unsigned vUp = 0;
-        do {
+    bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
+        Member *m =rs.head();
+        unsigned vTot = 0, vUp = 0;
+        for( Member *m = rs.head(); m; m=m->next() ) { 
             vTot += m->config().votes;
-            if( m->up() )
-                vTot += m->config().votes;
-            m = m->next();
-        } while( m );
+            vUp += m->up() ? m->config().votes : 0;
+        }
         return vUp * 2 > vTot;
     }
 
-    typedef shared_ptr<E> eptr;
-    void ReplSet::electSelf() {
-        list<BackgroundJob*> _jobs;
+    void ReplSet::Consensus::electSelf() {
+        class E : public BackgroundJob { 
+            void run() { 
+                log() << "not done" << endl;
+                try { 
+                    ScopedConn c(m->fullName());
+                    //c.runCommand(
+                }
+                catch(DBException&) { 
+                }
+            }
+        public:
+            ReplSet::Member *m;
+        };
+        typedef shared_ptr<E> eptr;
+
         list<eptr> jobs;
-        for( Member *m = head(); m; m=m->next() ) { 
-            eptr e( new E() );
-            e->_m = m;
-            jobs.push_back(e);
-            _jobs.push_back(e.get());
+        list<BackgroundJob*> _jobs;
+        for( Member *m = rs.head(); m; m=m->next() ) if( m->up() ) {
+            E *e = new E();
+            e->m = m;
+            jobs.push_back(eptr(e)); _jobs.push_back(e);
             e->go();
         }
-        BackgroundJob::wait(_jobs);
+        BackgroundJob::wait(_jobs,5);
     }
 
 }

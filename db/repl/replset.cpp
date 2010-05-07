@@ -37,7 +37,7 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : fatal(false), _self(0) {
+    ReplSet::ReplSet(string cfgString) : fatal(false), _self(0), elect(this) {
 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
