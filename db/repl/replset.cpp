@@ -84,20 +84,22 @@ namespace mongo {
     string ReplSet::startupStatusMsg;
 
     void ReplSet::setFrom(ReplSetConfig& c) { 
-        assert( c.ok() );
-        assert( _name.empty() || _name == c._id );
-        _name = c._id;
+        _cfg.reset( new ReplSetConfig(c) );
+        assert( _cfg->ok() );
+        assert( _name.empty() || _name == _cfg->_id );
+        _name = _cfg->_id;
         assert( !_name.empty() );
 
+        assert( _members.head() == 0 );
         int me=0;
-        for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) { 
+        for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
             const ReplSetConfig::MemberCfg& m = *i;
             if( m.h.isSelf() ) {
                 me++;
                 assert( _self == 0 );
-                _self = new Member(m.h, m._id, new ReplSetConfig::MemberCfg(m));
+                _self = new Member(m.h, m._id, &m);
             } else {
-                Member *mi = new Member(m.h, m._id, new ReplSetConfig::MemberCfg(m));
+                Member *mi = new Member(m.h, m._id, &m);
                 _members.push(mi);
             }
         }

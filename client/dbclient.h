@@ -251,33 +251,33 @@ namespace mongo {
 
         DBClientWithCommands() : _logLevel(0) { }
 
-		/** helper function.  run a simple command where the command expression is simply
-			  { command : 1 }
+        /** helper function.  run a simple command where the command expression is simply
+              { command : 1 }
             @param info -- where to put result object.  may be null if caller doesn't need that info
             @param command -- command name
-			@return true if the command returned "ok".
-		*/
+            @return true if the command returned "ok".
+         */
         bool simpleCommand(const string &dbname, BSONObj *info, const string &command);
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
             commands have prebuilt helper functions -- see below.  If a helper is not available you can
-			directly call runCommand.
+            directly call runCommand.
 
             @param dbname database name.  Use "admin" for global administrative commands.
 			@param cmd  the command object to execute.  For example, { ismaster : 1 }
 			@param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
 			       set.
             @param options see enum QueryOptions - normally not needed to run a command
-			@return true if the command returned "ok".
+            @return true if the command returned "ok".
         */
         virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
         /** Authorize access to a particular database.
-			Authentication is separate for each database on the server -- you may authenticate for any 
-			number of databases on a single connection.
-			The "admin" database is special and once authenticated provides access to all databases on the 
-			server.
-			@param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
+            Authentication is separate for each database on the server -- you may authenticate for any 
+            number of databases on a single connection.
+            The "admin" database is special and once authenticated provides access to all databases on the 
+            server.
+            @param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
             @return true if successful
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
@@ -826,5 +826,4 @@ namespace mongo {
 } // namespace mongo
 
 #include "dbclientcursor.h"
-
 #include "undef_macros.h"

@@ -68,6 +68,7 @@ namespace mongo {
     private:
         string _name;
         const vector<HostAndPort> *_seeds;
+        auto_ptr<ReplSetConfig> _cfg;
 
         /** load our configuration from admin.replset.  try seed machines too. 
             throws exception if a problem.
@@ -79,13 +80,14 @@ namespace mongo {
         struct Consensus {
             ReplSet &rs;
             Consensus(ReplSet *t) : rs(*t) { }
+            int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
             void electSelf();
         } elect;
 
     public:
         struct Member : public List1<Member>::Base {
-            Member(HostAndPort h, int ord, ReplSetConfig::MemberCfg *c) : 
+            Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
                 _config(c), 
                 _port(h.port()), _host(h.host()), _id(ord) { 
                 _dead = false;
@@ -107,12 +109,13 @@ namespace mongo {
             void summarizeAsHtml(stringstream& s) const;
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
-
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             bool _dead;
+        public:
             const int _port;
             const string _host;
             const int _id; // ordinal
+        private:
             double _health;
             time_t _lastHeartbeat;
             time_t _upSince;

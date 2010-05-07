@@ -21,32 +21,56 @@
 
 namespace mongo { 
 
-    bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
+    int ReplSet::Consensus::totalVotes() const { 
         Member *m =rs.head();
-        unsigned vTot = 0, vUp = 0;
+        int vTot = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) { 
             vTot += m->config().votes;
-            vUp += m->up() ? m->config().votes : 0;
         }
-        return vUp * 2 > vTot;
+        return vTot;
     }
 
-        class E : public BackgroundJob { 
-            void run() { 
-                log() << "not done" << endl;
-                try { 
-                    ScopedConn c(m->fullName());
-                    //c.runCommand(
-                }
-                catch(DBException&) { 
-                }
+    bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
+        Member *m =rs.head();
+        int vUp = rs._self->config().votes;
+        for( Member *m = rs.head(); m; m=m->next() ) { 
+            vUp += m->up() ? m->config().votes : 0;
+        }
+        return vUp * 2 > totalVotes();
+    }
+
+    static BSONObj electCmd;
+    
+    class E : public BackgroundJob { 
+        void run() { 
+            ok = 0;
+            log() << "not done" << endl;
+            try { 
+                ScopedConn c(m->fullName());
+                if( c->runCommand("admin", electCmd, result) )
+                    ok++;
             }
-        public:
-            ReplSet::Member *m;
-        };
-        typedef shared_ptr<E> eptr;
+            catch(DBException&) { 
+            }
+        }
+    public:
+        BSONObj result;
+        int ok;
+        ReplSet::Member *m;
+    };
+    typedef shared_ptr<E> eptr;
+
+    static const int VETO = -10000;
 
     void ReplSet::Consensus::electSelf() {
+        ReplSet::Member& me = *rs._self;
+        electCmd = BSON(
+               "replSetElect" << 1 <<
+               "set" << rs.getName() << 
+               "who" << me.fullName() << 
+               "whoid" << me._id << 
+               "cfgver" << rs._cfg->version
+            );
         list<eptr> jobs;
         list<BackgroundJob*> _jobs;
         for( Member *m = rs.head(); m; m=m->next() ) if( m->up() ) {
@@ -55,7 +79,15 @@ namespace mongo {
             jobs.push_back(eptr(e)); _jobs.push_back(e);
             e->go();
         }
+
         BackgroundJob::wait(_jobs,5);
+
+        int tally = me.config().votes; // me votes yes.
+        for( list<eptr>::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
+            if( (*i)->ok ) {
+                int v = (*i)->result["vote"].Int();
+            }
+        }
     }
 
 }
