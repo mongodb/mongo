@@ -230,7 +230,7 @@ namespace mongo {
 
     void Tool::addFieldOptions(){
         add_options()
-            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f name,age" )
+            ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
             ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
             ;
     }

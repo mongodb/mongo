@@ -175,14 +175,14 @@ AddOption( "--extrapath",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
 
 AddOption( "--extrapathdyn",
            dest="extrapathdyn",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
+           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
 
 
 AddOption( "--extralib",
@@ -190,21 +190,21 @@ AddOption( "--extralib",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of libraries  (--extralib js_static,readline" )
+           help="comma separated list of libraries  (--extralib js_static,readline" )
 
 AddOption( "--staticlib",
            dest="staticlib",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
+           help="comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
 
 AddOption( "--staticlibpath",
            dest="staticlibpath",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of dirs to search for staticlib arguments" )
+           help="comma separated list of dirs to search for staticlib arguments" )
 
 AddOption( "--cxx",
            dest="cxx",

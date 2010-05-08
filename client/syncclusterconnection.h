@@ -29,9 +29,9 @@ namespace mongo {
     class SyncClusterConnection : public DBClientBase {
     public:
         /**
-         * @param commaSeperated should be 3 hosts comma seperated
+         * @param commaSeparated should be 3 hosts comma separated
          */
-        SyncClusterConnection( string commaSeperated );
+        SyncClusterConnection( string commaSeparated );
         SyncClusterConnection( string a , string b , string c );
         ~SyncClusterConnection();
         
