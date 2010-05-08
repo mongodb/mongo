@@ -20,6 +20,9 @@
 
 namespace mongo {
 
+    /* throws */
+    bool requestHeartbeat(string setname, string memberFullName, BSONObj& result);
+
     struct HealthOptions { 
         HealthOptions() { 
             heartbeatSleepMillis = 2000;

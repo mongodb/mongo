@@ -291,8 +291,9 @@ namespace mongo {
     // destroying them.
     class mutex : boost::noncopyable {
     public:
+        /* old boost doesn't support lock()...
         void __lock() { _m->lock(); }
-        void __unlock() { _m->unlock(); }
+        void __unlock() { _m->unlock(); }*/
 
         mutex() { _m = new boost::mutex(); }
         ~mutex() {
