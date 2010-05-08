@@ -79,6 +79,7 @@ namespace mongo {
             jobs.push_back(eptr(e)); _jobs.push_back(e);
         }
 
+        time_t start = time(0);
         BackgroundJob::go(_jobs);
         BackgroundJob::wait(_jobs,5);
 
@@ -89,6 +90,11 @@ namespace mongo {
             }
         }
         if( tally*2 > totalVotes() ) {
+            if( time(0) - start > 30 ) {
+                // defensive; should never happen as we have timeouts on connection and operation for our conn
+                log() << "replSet too much time passed during election, ignoring result" << rsLog;
+                return false;
+            }
             return true;
         } 
         return false;
