@@ -764,11 +764,22 @@ namespace mongo {
         auto_ptr<ClientCursor> cc;
 
         int numModded = 0;
-        unsigned long long nScanned = 0;
+        long long nscanned = 0;
         while ( c->ok() ) {
-            nScanned++;
+            nscanned++;
+
             if ( numModded > 0 && ! u->curMatches() ){
                 c->advance();
+                
+                if ( nscanned % 256 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
+                    if ( cc.get() == 0 )
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                    if ( ! cc->yield() ){
+                        cc.release();
+                        break;
+                    }
+                }
+
                 continue;
             }
             Record *r = c->_current();
@@ -800,7 +811,7 @@ namespace mongo {
             }
             
             if ( profile )
-                ss << " nscanned:" << u->nscanned();
+                ss << " nscanned:" << nscanned;
             
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                regular ones at the moment. */
@@ -878,7 +889,7 @@ namespace mongo {
                 if ( indexHack )
                     c->checkLocation();
 
-                if ( nScanned % 64 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
+                if ( nscanned % 64 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
                     if ( cc.get() == 0 )
                         cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
                     if ( ! cc->yield() ){
@@ -912,7 +923,7 @@ namespace mongo {
 
         
         if ( profile )
-            ss << " nscanned:" << u->nscanned();
+            ss << " nscanned:" << nscanned;
         
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {
