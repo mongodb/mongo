@@ -703,13 +703,20 @@ namespace mongo {
         bool curMatches(){
             return _matcher->matches(_c->currKey(), _c->currLoc() , &_details );
         }
+
+        CoveredIndexMatcher* getMatcher(){
+            return _matcher.get();
+        }
+
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *clone() const {
             return new UpdateOp();
         }
+        
         shared_ptr< Cursor > c() { return _c; }
         long long nscanned() const { return _nscanned; }
         MatchDetails& getMatchDetails(){ return _details; }
+
     private:
         shared_ptr< Cursor > _c;
         long long _nscanned;
@@ -752,9 +759,14 @@ namespace mongo {
         UpdateOp original;
         shared_ptr< UpdateOp > u = qps.runOp( original );
         massert( 10401 ,  u->exceptionMessage(), u->complete() );
+        
         shared_ptr< Cursor > c = u->c();
+        auto_ptr<ClientCursor> cc;
+
         int numModded = 0;
+        unsigned long long nScanned = 0;
         while ( c->ok() ) {
+            nScanned++;
             if ( numModded > 0 && ! u->curMatches() ){
                 c->advance();
                 continue;
@@ -865,6 +877,16 @@ namespace mongo {
                     break;
                 if ( indexHack )
                     c->checkLocation();
+
+                if ( nScanned % 64 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
+                    if ( cc.get() == 0 )
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                    if ( ! cc->yield() ){
+                        cc.release();
+                        break;
+                    }
+                }
+                
                 continue;
             } 
             

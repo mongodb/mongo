@@ -722,3 +722,11 @@ SyncCCTest.prototype.tempStart = function( num ){
     num = num || 0;
     this._connections[num] = startMongodTest( 30000 + num , this._testName + num , true );
 }
+
+
+function startParallelShell( jsCode ){
+    var x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode );
+    return function(){
+        waitProgram( x );
+    };
+}
