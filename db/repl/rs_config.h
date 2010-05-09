@@ -26,12 +26,14 @@
 namespace mongo { 
 
     /**
-    local.system.replset
+    " + rsConfigNs + "
 
     This collection has one object per server in the set.  
 
     See "Replical Sets Configuration" on mongodb.org wiki for details on the format.
     */
+
+    const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
     public:

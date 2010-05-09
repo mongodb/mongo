@@ -210,6 +210,13 @@ namespace mongo {
         return -1;
     }
 
+    static string clean(const vector<const char *>& v, int i, string line="") { 
+        if( line.empty() ) line = v[i];
+        if( i > 0 && strncmp(v[i], v[i-1], 11) == 0 )
+            return string("           ") + line.substr(11);
+        return v[i];
+    }
+
     void fillRsLog(stringstream& s) {
         bool first = true;
         s << "<br><pre>\n";
@@ -218,7 +225,7 @@ namespace mongo {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
-                s << red( v[i], strstr(v[i], "replSet warning") );
+                s << red( clean(v,i), strstr(v[i], "replSet warning") );
             } else {
                 stringstream x;
                 x << string(v[i], 0, 20);
@@ -226,8 +233,10 @@ namespace mongo {
                 int last = i+nr-1;
                 for( ; r < i ; r++ ) x << '.';
                 if( 1 ) { 
-                    stringstream r; r << "repeat last " << nr << " lines; ends " << string(v[last]+4,0,19);
-                    first = false; s << a("", r.str(), x.str());
+                    stringstream r; 
+                    if( nr == 1 ) r << "repeat last line";
+                    else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
+                    first = false; s << a("", r.str(), clean(v,i,x.str()));
                 }
                 else s << x.str();
                 s << '\n';

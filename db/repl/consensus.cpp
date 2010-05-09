@@ -22,11 +22,14 @@
 namespace mongo { 
 
     int ReplSet::Consensus::totalVotes() const { 
+        static int complain = 0;
         Member *m =rs.head();
         int vTot = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) { 
             vTot += m->config().votes;
         }
+        if( vTot % 2 == 0 && vTot && complain++ == 0 )
+            log() << "replSet warning: total number of votes is even - considering giving one member an extra vote" << rsLog;
         return vTot;
     }
 

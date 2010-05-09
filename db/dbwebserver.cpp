@@ -275,6 +275,7 @@ namespace mongo {
                 }
                 catch(...) { s << "error summarizing replset status\n"; }
             }
+            s << p("Recent replset log activity:");
             fillRsLog(s);
             s << _end();
             return s.str();

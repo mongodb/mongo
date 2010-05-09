@@ -63,7 +63,7 @@ namespace mongo {
             }
             if( theReplSet ) {
                 errmsg = "already initialized";
-                result.append("info", "try querying local.system.replset");
+                result.append("info", "try querying " + rsConfigNs + "");
                 return false;
             }            
             if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {

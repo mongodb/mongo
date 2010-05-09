@@ -132,7 +132,7 @@ namespace mongo {
     void ReplSet::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
-            startupStatusMsg = "loading admin.system.replset config (LOADINGCONFIG)";
+            startupStatusMsg = "loading " + rsConfigNs + " config (LOADINGCONFIG)";
             try {
                 vector<ReplSetConfig> configs;
                 configs.push_back( ReplSetConfig(HostAndPort::me()) );
@@ -151,15 +151,15 @@ namespace mongo {
 
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)" << rsLog;
+                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (uninitialized?)";
+                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         log() << "replSet have you ran replSetInitiate yet?" << rsLog;
                         log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg = "can't currently get admin.system.replset config from self or any seed (EMPTYUNREACHABLE)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed." << rsLog;
+                        startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
+                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
                         log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
 

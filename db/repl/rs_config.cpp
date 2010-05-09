@@ -29,7 +29,7 @@ namespace mongo {
     void ReplSetConfig::save() { 
         check();
         BSONObj o = asBson();
-        Helpers::putSingletonGod("local.system.replset", o, false/*logOp=false; local db so would work regardless...*/);
+        Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const { 
@@ -95,7 +95,7 @@ namespace mongo {
         _id = o["_id"].String();
         if( o["version"].ok() ) {
             version = o["version"].numberInt();
-            uassert(13115, "bad local.system.replset config: version", version > 0);
+            uassert(13115, "bad " + rsConfigNs + " config: version", version > 0);
         }
 
         if( o["settings"].ok() ) {
@@ -149,16 +149,16 @@ namespace mongo {
                 ss << "replSet members[" << i << "] bad config object";
                 uassert(13135, ss.str(), false);
             }
-            uassert(13108, "bad local.system.replset config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
+            uassert(13108, "bad " + rsConfigNs + " config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
             ords.insert(m._id);
             this->members.push_back(m);
         }
-        uassert(13117, "bad local.system.replset config", !_id.empty());
+        uassert(13117, "bad " + rsConfigNs + " config", !_id.empty());
     }
 
     static inline void configAssert(bool expr) {
-        uassert(13122, "bad local.system.replset config", expr);
+        uassert(13122, "bad " + rsConfigNs + " config", expr);
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg) { 
@@ -197,7 +197,7 @@ namespace mongo {
 
             version = -3;
 
-            c = conn.query("local.system.replset");
+            c = conn.query(rsConfigNs);
             if( c.get() == 0 )
                 return;
             if( !c->more() ) {
@@ -212,7 +212,7 @@ namespace mongo {
         }
 
         BSONObj o = c->nextSafe();
-        uassert(13109, "multiple rows in local.system.replset not supported", !c->more());
+        uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
         _ok = true;
         log(level) << "replSet load ok" << rsLog;
