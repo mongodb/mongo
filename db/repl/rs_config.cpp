@@ -21,6 +21,7 @@
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
 #include "../dbhelpers.h"
+#include "connections.h"
 
 using namespace bson;
 
@@ -177,17 +178,17 @@ namespace mongo {
 
         auto_ptr<DBClientCursor> c;
         try {
-            DBClientConnection conn(false, 0, 20);
-            conn._logLevel = 2;
-            string err;
-            conn.connect(h.toString());
+            ScopedConn conn(h.toString());
             version = -4;
 
             {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                BSONObj cmd = BSON( "replSetHeartbeat" << "preloadconfig?" );
+                size_t sl = cmdLine.replSet.find('/');
+                assert( sl != string::npos );
+                string setname = cmdLine.replSet.substr(0, sl);
+                BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 BSONObj info;
-                bool ok = conn.runCommand("admin", cmd, info);
+                bool ok = conn->runCommand("admin", cmd, info);
                 if( !info["rs"].trueValue() ) { 
                     stringstream ss;
                     ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
@@ -197,7 +198,7 @@ namespace mongo {
 
             version = -3;
 
-            c = conn.query(rsConfigNs);
+            c = conn->query(rsConfigNs);
             if( c.get() == 0 )
                 return;
             if( !c->more() ) {

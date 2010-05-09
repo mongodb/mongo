@@ -34,8 +34,16 @@ namespace mongo {
     static void checkAllMembersUpAndPreInit(const ReplSetConfig& cfg) {
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             BSONObj res;
-            if( !requestHeartbeat(cfg._id, i->h.toString(), res) )
-                uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
+            {
+                bool ok = false;
+                try { ok = requestHeartbeat(cfg._id, i->h.toString(), res); }
+                catch(...) { }
+                if( !ok ) {
+                    if( !res.isEmpty() )
+                        log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
+                    uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
+                }
+            }
             if( res.getBoolField("mismatch") )
                 uasserted(13145, "set names do not match with: " + i->h.toString());
             if( *res.getStringField("set") )
@@ -83,19 +91,25 @@ namespace mongo {
                 return false;
             }
 
-            ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
+            try {
+                ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
 
-            log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
+                log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-            checkAllMembersUpAndPreInit(newConfig);
+                checkAllMembersUpAndPreInit(newConfig);
 
-            log() << "replSet replSetInitiate all members seem up" << rsLog;
+                log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-            log() << newConfig.toString() << rsLog;
+                log() << newConfig.toString() << rsLog;
 
-            MemoryMappedFile::flushAll(true);
-            newConfig.save();
-            MemoryMappedFile::flushAll(true);
+                MemoryMappedFile::flushAll(true);
+                newConfig.save();
+                MemoryMappedFile::flushAll(true);
+            }
+            catch( DBException& e ) { 
+                log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
+                throw;
+            }
 
             log() << "replSet replSetInitiate Config now saved locally.  Should come online in about a minute." << rsLog;
             result.append("info", "Config now saved locally.  Should come online in about a minute.");

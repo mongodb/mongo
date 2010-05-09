@@ -1781,9 +1781,9 @@ namespace mongo {
                 return false;
             }
         }
-        catch ( AssertionException& e ){
+        catch ( DBException& e ){
             stringstream ss;
-            ss << "assertion: " << e.what();
+            ss << "exception: " << e.what();
             result.append( "errmsg" , ss.str() );
             result.append( "code" , e.getCode() );
             return false;

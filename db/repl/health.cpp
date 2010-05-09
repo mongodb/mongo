@@ -57,6 +57,8 @@ namespace mongo {
             result.append("rs", true);
             if( !startsWith(cmdLine.replSet, cmdObj.getStringField("replSetHeartbeat")+'/' ) ) {
                 errmsg = "repl set names do not match";
+                cout << cmdLine.replSet << endl;
+                cout << cmdObj.getStringField("replSetHeartbeat") << endl;
                 result.append("mismatch", true);
                 return false;
             }
@@ -75,7 +77,7 @@ namespace mongo {
         }
     } cmdReplSetHeartbeat;
 
-    /* throws */
+    /* throws dbexception */
     bool requestHeartbeat(string setName, string memberFullName, BSONObj& result) { 
         BSONObj cmd = BSON( "replSetHeartbeat" << setName );
         ScopedConn conn(memberFullName);
@@ -219,7 +221,7 @@ namespace mongo {
 
     void fillRsLog(stringstream& s) {
         bool first = true;
-        s << "<br><pre>\n";
+        s << "<pre>\n";
         vector<const char *> v = _rsLog.get();
         for( int i = 0; i < v.size(); i++ ) {
             assert( strlen(v[i]) > 20 );

@@ -168,7 +168,7 @@ namespace mongo {
                 }
                 finishLoadingConfig(configs);
             }
-            catch(AssertionException&) { 
+            catch(DBException&) { 
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
                 log() << "replSet error loading configurations\n";

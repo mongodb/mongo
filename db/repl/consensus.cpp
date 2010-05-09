@@ -54,6 +54,7 @@ namespace mongo {
                     ok++;
             }
             catch(DBException&) { 
+                DEV log() << "replSet dev caught dbexception on electCmd" << rsLog;
             }
         }
     public:
