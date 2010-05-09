@@ -46,6 +46,7 @@ namespace mongo {
         ~ScopedConn();
         DBClientConnection* operator->();
     private:
+        auto_ptr<scoped_lock> connLock;
         static mutex mapMutex;
         struct X { 
             mutex z;
@@ -66,11 +67,11 @@ namespace mongo {
             if( x == 0 ) {
                 x = _map[hostport] = new X();
                 first = true;
-                x->z.__lock();
+                connLock.reset( new scoped_lock(x->z) );
             }
         }
         if( !first ) { 
-            x->z.__lock();
+            connLock.reset( new scoped_lock(x->z) );
             return;
         }
 
@@ -80,7 +81,7 @@ namespace mongo {
     }
 
     inline ScopedConn::~ScopedConn() { 
-        x->z.__unlock();
+        // conLock releases...
     }
 
     inline DBClientConnection* ScopedConn::operator->() { 

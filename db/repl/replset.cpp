@@ -152,14 +152,14 @@ namespace mongo {
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
                         startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)\n";
-                        log() << "replSet have you ran replSetInitiate yet?\n";
+                        log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)" << rsLog;
+                        log() << "replSet have you ran replSetInitiate yet?" << rsLog;
                         log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get admin.system.replset config from self or any seed (EMPTYUNREACHABLE)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed.\n";
+                        log() << "replSet can't get admin.system.replset config from self or any seed." << rsLog;
                         log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
 

@@ -27,31 +27,27 @@ namespace mongo {
             C = 256
         };
         char lines[N][C];
-        unsigned h, t;
+        unsigned h, n;
 
     public:
         RamLog() { 
-            h = 0; t = 1; 
+            h = 0; n = 0;
             for( int i = 0; i < N; i++ )
                 lines[i][C-1] = 0;
         }
         virtual void write(const string& str) {
-            char *p = lines[t];
+            char *p = lines[(h+n)%N];
             if( str.size() < C )
                 strcpy(p, str.c_str());
             else
                 memcpy(p, str.c_str(), C-1);
-            t = (t+1) % N;
-            if( h == t )
-                h = (h+1) % N;
+            if( n < N ) n++;
+            else h = (h+1) % N;
         }
         vector<const char *> get() const {
             vector<const char *> v;
-            unsigned x = h;
-            while( x != t ) {
-                v.push_back(lines[x]);
-                x = (x+1) % N;
-            }
+            for( unsigned i = h; i != (h+n)%N; i=(i+1)%N )
+                v.push_back(lines[i]);
             return v;
         }
     };

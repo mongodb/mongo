@@ -264,8 +264,10 @@ namespace mongo {
             s << p( "See also " + a("/replSetGetStatus?text", "", "replSetGetStatus") + '.' );
 
             if( theReplSet == 0 ) { 
-                if( cmdLine.replSet.empty() ) s << p("Not using --replSet");
-                else s << p("Replica set not yet initialized.");
+                if( cmdLine.replSet.empty() ) 
+                    s << p("Not using --replSet");
+                else 
+                    s << p("Not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initialized") + '.');
             }
             else {
                 try {
@@ -457,6 +459,7 @@ namespace mongo {
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
+                    ss << a("", "These read-only context-less commands can be executed from the web interface.  Results are json format, unless ?text is appended in which case the result is output as text for easier human viewing", "Commands") << ": ";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
                         stringstream h;
                         i->second->help(h);

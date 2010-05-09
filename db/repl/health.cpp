@@ -55,18 +55,32 @@ namespace mongo {
                 return false;
             }
             result.append("rs", true);
+            if( !startsWith(cmdLine.replSet, cmdObj.getStringField("replSetHeartbeat")+'/' ) ) {
+                errmsg = "repl set names do not match";
+                result.append("mismatch", true);
+                return false;
+            }
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;
             }
             if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
-                errmsg = "repl set names do not match";
+                errmsg = "repl set names do not match (2)";
+                result.append("mismatch", true);
                 return false;
             }
-            //result.append("set", theReplSet->getName());
+            /* todo: send our state*/
+            result.append("set", theReplSet->getName());
             return true;
         }
     } cmdReplSetHeartbeat;
+
+    /* throws */
+    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result) { 
+        BSONObj cmd = BSON( "replSetHeartbeat" << setName );
+        ScopedConn conn(memberFullName);
+        return conn->runCommand("admin", cmd, result);
+    }
 
     /* poll every other set member to check its status */
     class FeedbackThread : public BackgroundJob {
@@ -85,17 +99,11 @@ namespace mongo {
     public:
         void run() { 
             mongo::lastError.reset( new LastError() );
-
-            BSONObj cmd = BSON( "replSetHeartbeat" << theReplSet->getName() );
             while( 1 ) {
                 try { 
                     BSONObj info;
-                    bool ok;
-                    {
-                        ScopedConn conn(m->fullName());
-                        ok = conn->runCommand("admin", cmd, info);
-                    }
-                    m->_lastHeartbeat = time(0);
+                    bool ok = requestHeartbeat(theReplSet->getName(), m->fullName(), info);
+                    m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
                     if( ok ) {
                         if( m->_upSince == 0 ) {
                             log() << "replSet " << m->fullName() << " is now up" << rsLog;
@@ -188,11 +196,43 @@ namespace mongo {
         s << _table();
     }
 
+    static int repeats(const vector<const char *>& v, int i) { 
+        for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
+            if( strcmp(v[i]+20,v[j]+20) == 0 ) {
+                for( int x = 1; ; x++ ) {
+                    if( j+x == i ) return j;
+                    if( i+x>=v.size() ) return -1;
+                    if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
+                }
+                return -1;
+            }
+        }
+        return -1;
+    }
+
     void fillRsLog(stringstream& s) {
+        bool first = true;
         s << "<br><pre>\n";
         vector<const char *> v = _rsLog.get();
-        for( unsigned i = 0; i < v.size(); i++ ) {
-            s << red( v[i], strstr(v[i], "replSet warning") );
+        for( int i = 0; i < v.size(); i++ ) {
+            assert( strlen(v[i]) > 20 );
+            int r = repeats(v, i);
+            if( r < 0 ) {
+                s << red( v[i], strstr(v[i], "replSet warning") );
+            } else {
+                stringstream x;
+                x << string(v[i], 0, 20);
+                int nr = (i-r);
+                int last = i+nr-1;
+                for( ; r < i ; r++ ) x << '.';
+                if( 1 ) { 
+                    stringstream r; r << "repeat last " << nr << " lines; ends " << string(v[last]+4,0,19);
+                    first = false; s << a("", r.str(), x.str());
+                }
+                else s << x.str();
+                s << '\n';
+                i = last;
+            }
         }
         s << "</pre>\n";
     }
