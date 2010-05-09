@@ -1363,6 +1363,10 @@
 			Name="replsets"
 			>
 			<File
+				RelativePath="..\db\repl\consensus.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\db\repl\health.cpp"
 				>
 			</File>
@@ -1376,6 +1380,10 @@
 			</File>
 			<File
 				RelativePath="..\db\repl\rs_config.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\db\repl\rs_mod.cpp"
 				>
 			</File>
 		</Filter>

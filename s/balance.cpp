@@ -148,7 +148,7 @@ namespace mongo {
         log(6) << "min: " << min.first << "\t" << min.second << endl;
         log(6) << "max: " << max.first << "\t" << max.second << endl;
         
-        if ( ( max.second - min.second ) < _balancedLastTime ? 2 : 8 )
+        if( (int) ( max.second - min.second ) < _balancedLastTime ? 2 : 8 )
             return false;
 
         string from = max.first;

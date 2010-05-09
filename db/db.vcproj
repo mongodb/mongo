@@ -1755,6 +1755,14 @@
 			Name="replsets"
 			>
 			<File
+				RelativePath=".\repl\connections.h"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\consensus.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\repl\health.cpp"
 				>
 			</File>
@@ -1784,6 +1792,10 @@
 			</File>
 			<File
 				RelativePath=".\repl\rs_config.h"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\rs_mod.cpp"
 				>
 			</File>
 		</Filter>
