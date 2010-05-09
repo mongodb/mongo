@@ -27,7 +27,7 @@ while ( true ){
     timeUpdate();
     time = timeUpdate();
     print( N + "\t" + time );
-    if ( time > 600 )
+    if ( time > 2000 )
         break;
     
     N *= 2;
