@@ -180,6 +180,7 @@ int main( int argc, const char **argv ) {
         }
 
         BSONObj found = conn.findOne( tsns , mongo::BSONObj() );
+        cout << "old: " << out << "\nnew: " << found << endl;
         assert( ( oldTime < found["ts"].timestampTime() ) ||
                ( oldInc + 1 == found["ts"].timestampInc() ) );
 
