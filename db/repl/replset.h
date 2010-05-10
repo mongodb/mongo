@@ -138,7 +138,7 @@ namespace mongo {
         friend class FeedbackThread;
 
     public:
-        void fatal() { _myState = FATAL; log() << "replSet fatal error, stopping replication" << rsLog; }
+        void fatal() { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
 
     };
 

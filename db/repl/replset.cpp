@@ -168,10 +168,10 @@ namespace mongo {
                 }
                 finishLoadingConfig(configs);
             }
-            catch(DBException&) { 
+            catch(DBException& e) { 
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
-                log() << "replSet error loading configurations\n";
+                log() << "replSet error loading configurations " << e.toString() << rsLog;
                 log() << "replSet replication will not start" << rsLog;
                 fatal();
                 throw;

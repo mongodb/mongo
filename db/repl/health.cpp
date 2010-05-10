@@ -219,6 +219,15 @@ namespace mongo {
         return v[i];
     }
 
+    static bool isWarning(const char *line) {
+        const char *p = strstr(line, "replSet ");
+        if( p ) { 
+            p += 8;
+            return startsWith(p, "warning") || startsWith(p, "error");
+        }
+        return false;
+    }
+
     void fillRsLog(stringstream& s) {
         bool first = true;
         s << "<pre>\n";
@@ -227,7 +236,7 @@ namespace mongo {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
-                s << red( clean(v,i), strstr(v[i], "replSet warning") );
+                s << red( clean(v,i), isWarning(v[i]) );
             } else {
                 stringstream x;
                 x << string(v[i], 0, 20);
