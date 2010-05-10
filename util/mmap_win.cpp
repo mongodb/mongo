@@ -46,13 +46,14 @@ namespace mongo {
         buf << s;
         return buf.str();
     }
-
+    
     unsigned mapped = 0;
 
-    void* MemoryMappedFile::map(const char *_filename, long &length, int options) {
+    void* MemoryMappedFile::map(const char *filenameIn, long &length, int options) {
+        _filename = filenameIn;
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
-        strncpy(filename, _filename, 255);
+        strncpy(filename, filenameIn, 255);
         filename[255] = 0;
         { 
             size_t len = strlen( filename );
@@ -107,13 +108,13 @@ namespace mongo {
         bool success = FlushViewOfFile(view, 0); // 0 means whole mapping
         if (!success){
             int err = GetLastError();
-            out() << "FlushViewOfFile failed " << err << endl;
+            out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;
         }
 
         success = FlushFileBuffers(fd);
         if (!success){
             int err = GetLastError();
-            out() << "FlushFileBuffers failed " << err << endl;
+            out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
         }
     }
 } 

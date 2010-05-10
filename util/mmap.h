@@ -113,6 +113,7 @@ namespace mongo {
         HANDLE maphandle;
         void *view;
         long len;
+        string _filename;
     };
 
     void printMemInfo( const char * where );    
