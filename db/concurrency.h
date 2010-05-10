@@ -204,8 +204,8 @@ namespace mongo {
 
     extern MongoMutex &dbMutex;
 
-	void dbunlocking_write();
-	void dbunlocking_read();
+    void dbunlocking_write();
+    void dbunlocking_read();
 
     struct writelock {
         writelock(const string& ns) {
@@ -241,12 +241,21 @@ namespace mongo {
                 dbMutex.unlock_shared();
             }
         }
-        bool got(){
-            return _got;
-        }
+        bool got() const { return _got; }
+    private:
         bool _got;
     };
-    
+
+    struct readlocktryassert : public readlocktry { 
+        readlocktryassert(const string& ns, int tryms) : 
+          readlocktry(ns,tryms) { 
+              uassert(13142, "timeout getting readlock", got());
+        }
+    };
+
+    /** assure we have at least a read lock - they key with this being
+        if you have a write lock, that's ok too.
+    */
     struct atleastreadlock {
         atleastreadlock( const string& ns ){
             _prev = dbMutex.getState();
@@ -257,7 +266,7 @@ namespace mongo {
             if ( _prev == 0 )
                 dbMutex.unlock_shared();
         }
-
+    private:
         int _prev;
     };
 
@@ -286,11 +295,9 @@ namespace mongo {
         void releaseAndWriteLock();
     };
     
-	/* use writelock and readlock instead */
+    /* use writelock and readlock instead */
     struct dblock : public writelock {
         dblock() : writelock("") { }
-        ~dblock() { 
-        }
     };
 
     // eliminate

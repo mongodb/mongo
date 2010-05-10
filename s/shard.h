@@ -35,6 +35,10 @@ namespace mongo {
             : _name(name), _addr( addr ){
         }
 
+        Shard( const string& ident ){
+            reset( ident );
+        }
+
         Shard( const Shard& other )
             : _name( other._name ) , _addr( other._addr ){
         }

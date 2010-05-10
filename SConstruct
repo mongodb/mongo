@@ -175,14 +175,14 @@ AddOption( "--extrapath",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
 
 AddOption( "--extrapathdyn",
            dest="extrapathdyn",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
+           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" )
 
 
 AddOption( "--extralib",
@@ -190,21 +190,21 @@ AddOption( "--extralib",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of libraries  (--extralib js_static,readline" )
+           help="comma separated list of libraries  (--extralib js_static,readline" )
 
 AddOption( "--staticlib",
            dest="staticlib",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
+           help="comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." )
 
 AddOption( "--staticlibpath",
            dest="staticlibpath",
            type="string",
            nargs=1,
            action="store",
-           help="comma seperated list of dirs to search for staticlib arguments" )
+           help="comma separated list of dirs to search for staticlib arguments" )
 
 AddOption( "--cxx",
            dest="cxx",
@@ -227,6 +227,20 @@ AddOption( "--boost-version",
            nargs=1,
            action="store",
            help="boost version for linking(1_38)" )
+
+AddOption( "--cpppath",
+           dest="cpppath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="Include path if you have headers in a nonstandard directory" )
+
+AddOption( "--libpath",
+           dest="libpath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="Library path if you have libraries in a nonstandard directory" )
 
 # 
 # to use CPUPROFILE=/tmp/profile
@@ -309,6 +323,12 @@ if GetOption( "cxx" ) is not None:
     env["CXX"] = GetOption( "cxx" )
 env["LIBPATH"] = []
 
+if GetOption( "libpath" ) is not None:
+    env["LIBPATH"] = [GetOption( "libpath" )]
+
+if GetOption( "cpppath" ) is not None:
+    env["CPPPATH"] = [GetOption( "cpppath" )]
+
 if GetOption( "recstore" ) != None:
     env.Append( CPPDEFINES=[ "_RECSTORE" ] )
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
@@ -362,7 +382,7 @@ if GetOption( "extralib" ) is not None:
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
                  "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/debug_util.cpp",
-                 "util/thread_pool.cpp" ]
+                 "util/thread_pool.cpp", "util/password.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp" )
 commonFiles += [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
@@ -386,7 +406,7 @@ coreServerFiles = [ "util/message_server_port.cpp" , "util/message_server_asio.c
                     "client/parallel.cpp" ,  
                     "db/matcher.cpp" , "db/indexkey.cpp" , "db/dbcommands_generic.cpp" ]
 
-serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/replset.cpp db/repl/replset_commands.cpp db/repl/health.cpp db/repl/rs_config.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher_covered.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp db/cmdline.cpp" )
+serverOnlyFiles = Split( "db/query.cpp db/update.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/replset.cpp db/repl/consensus.cpp db/repl/rs_mod.cpp db/repl/replset_commands.cpp db/repl/health.cpp db/repl/rs_config.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/matcher_covered.cpp db/dbeval.cpp db/dbwebserver.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/cursor.cpp db/security_commands.cpp db/security.cpp util/miniwebserver.cpp db/storage.cpp db/reccache.cpp db/queryoptimizer.cpp db/extsort.cpp db/mr.cpp s/d_util.cpp db/cmdline.cpp" )
 
 serverOnlyFiles += [ "db/index.cpp" ] + Glob( "db/index_*.cpp" )
 
@@ -460,10 +480,13 @@ if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
 
 def findVersion( root , choices ):
-    for c in choices:
-        if ( os.path.exists( root + c ) ):
-            return root + c
-    raise "can't find a version of [" + root + "] choices: " + choices
+    if not isinstance(root, list):
+        root = [root]
+    for r in root:
+        for c in choices:
+            if ( os.path.exists( r + c ) ):
+                return r + c
+    raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
 
 def choosePathExist( choices , default=None):
     for c in choices:
@@ -590,8 +613,8 @@ elif "win32" == os.sys.platform:
         env.Append( LIBPATH=[ javaHome + "/Lib" ] )
         javaLibs += [ "jvm" ];
 
-    winSDKHome = findVersion( "C:/Program Files/Microsoft SDKs/Windows/" ,
-                              [ "v6.0" , "v6.0a" , "v6.1" ] )
+    winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
+                              [ "v6.0" , "v6.0a" , "v6.1", "v7.0A" ] )
 
     env.Append( CPPPATH=[ boostDir , "pcre-7.4" , winSDKHome + "/Include" ] )
 
@@ -1544,7 +1567,7 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "db/" , "client/" ]:
+for id in [ "", "util/", "db/" , "client/" , "bson/" ]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
@@ -1645,16 +1668,18 @@ def s3dist( env , target , source ):
     s3push( distFile , "mongodb" )
 
 env.Append( TARFLAGS=" -z " )
-if windows:
-    distFile = installDir + ".zip"
-    env.Zip( distFile , installDir )
-else:
-    distFile = installDir + ".tgz"
-    env.Tar( distFile , installDir )
 
-env.Alias( "dist" , distFile )
-env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
-env.AlwaysBuild( "s3dist" )
+if installDir[-1] != "/":
+    if windows:
+        distFile = installDir + ".zip"
+        env.Zip( distFile , installDir )
+    else:
+        distFile = installDir + ".tgz"
+        env.Tar( distFile , installDir )
+
+    env.Alias( "dist" , distFile )
+    env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
+    env.AlwaysBuild( "s3dist" )
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)

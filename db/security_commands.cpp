@@ -58,7 +58,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return NONE; }
         CmdGetNonce() : Command("getnonce") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string&, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             nonce *n = new nonce(security.getNonce());
             stringstream ss;
             ss << hex << *n;
@@ -79,10 +79,9 @@ namespace mongo {
         void help(stringstream& h) const { h << "de-authenticate"; }
         virtual LockType locktype() const { return NONE; }
         CmdLogout() : Command("logout") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            // database->name is the one we are logging out...
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            ai->logout(nsToDatabase(ns));
+            ai->logout(dbname);
             return true;
         }
     } cmdLogout;
@@ -99,7 +98,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; } // TODO: make this READ
         virtual void help(stringstream& ss) const { ss << "internal"; }
         CmdAuthenticate() : Command("authenticate") {}
-        bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log(1) << " authenticate: " << cmdObj << endl;
 
             string user = cmdObj.getStringField("user");
@@ -108,7 +107,7 @@ namespace mongo {
             
             if( user.empty() || key.empty() || received_nonce.empty() ) { 
                 log() << "field missing/wrong type in received authenticate command " 
-                    << cc().database()->name
+                    << dbname
                     << endl;               
                 errmsg = "auth fails";
                 sleepmillis(10);
@@ -136,7 +135,7 @@ namespace mongo {
             }
 
             static BSONObj userPattern = fromjson("{\"user\":1}");
-            string systemUsers = cc().database()->name + ".system.users";
+            string systemUsers = dbname + ".system.users";
             OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
 
             BSONObj userObj;
@@ -167,7 +166,7 @@ namespace mongo {
             string computed = digestToString( d );
             
             if ( key != computed ){
-                log() << "auth: key mismatch " << user << ", ns:" << ns << endl;
+                log() << "auth: key mismatch " << user << ", ns:" << dbname << endl;
                 errmsg = "auth fails";
                 return false;
             }

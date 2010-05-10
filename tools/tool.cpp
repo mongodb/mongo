@@ -24,6 +24,7 @@
 #include <pcrecpp.h>
 
 #include "util/file_allocator.h"
+#include "util/password.h"
 
 using namespace std;
 using namespace mongo;
@@ -47,7 +48,7 @@ namespace mongo {
             ("db,d",po::value<string>(), "database to use" )
             ("collection,c",po::value<string>(), "collection to use (some commands)" )
             ("username,u",po::value<string>(), "username" )
-            ("password,p",po::value<string>(), "password" )
+            ("password,p", new PasswordValue( &_password ), "password" )
             ("ipv6", "enable IPv6 support (disabled by default)")
             ;
         if ( localDBAllowed )
@@ -196,8 +197,10 @@ namespace mongo {
         if ( _params.count( "username" ) )
             _username = _params["username"].as<string>();
 
-        if ( _params.count( "password" ) )
-            _password = _params["password"].as<string>();
+        if ( _params.count( "password" )
+             && ( _password.empty() ) ) {
+            _password = askPassword();
+        }
 
         if (_params.count("ipv6"))
             enableIPv6();
@@ -227,7 +230,7 @@ namespace mongo {
 
     void Tool::addFieldOptions(){
         add_options()
-            ("fields,f" , po::value<string>() , "comma seperated list of field names e.g. -f name,age" )
+            ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
             ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
             ;
     }

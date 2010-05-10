@@ -152,7 +152,7 @@ namespace mongo {
         PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ){}
         virtual void help( stringstream &help ) const { help<<"internal"; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
+        virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.flush();
             return true;
         }
@@ -167,7 +167,7 @@ namespace mongo {
         PoolStats() : Command( "connPoolStats" ){}
         virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool run(const char*, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
+        virtual bool run(const string&, mongo::BSONObj&, std::string&, mongo::BSONObjBuilder& result, bool){
             pool.appendInfo( result );
             return true;
         }

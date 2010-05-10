@@ -44,8 +44,8 @@ namespace mongo {
         
         virtual void help(stringstream& h) const { h << "internal"; }
 
-        bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string dropns = cc().database()->name + "." + cmdObj.firstElement().valuestrsafe();
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string dropns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             
             if ( !cmdLine.quiet )
                 log() << "CMD: clean " << dropns << endl;
@@ -79,8 +79,8 @@ namespace mongo {
         virtual LockType locktype() const { return READ; } 
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] } */
         
-        bool run(const char *nsRaw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            string ns = cc().database()->name + "." + cmdObj.firstElement().valuestrsafe();
+        bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( !cmdLine.quiet )
                 log() << "CMD: validate " << ns << endl;
@@ -143,7 +143,7 @@ namespace mongo {
 
                 set<DiskLoc> recs;
                 if( scanData ) {
-                    auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                    shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                     int n = 0;
                     long long len = 0;
                     long long nlen = 0;
@@ -330,7 +330,7 @@ namespace mongo {
             return !x.empty();
         }*/
         virtual void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/fsync+Command"; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             /* async means do an fsync, but return immediately */
             bool sync = ! cmdObj["async"].trueValue();
             bool lock = cmdObj["lock"].trueValue();

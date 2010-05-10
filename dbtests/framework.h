@@ -34,6 +34,8 @@
 
 
 #define ASSERT_EQUALS(a,b) (mongo::regression::MyAsserts( #a , #b , __FILE__ , __LINE__ ) ).ae( (a) , (b) )
+#define ASSERT_NOT_EQUALS(a,b) (mongo::regression::MyAsserts( #a , #b , __FILE__ , __LINE__ ) ).nae( (a) , (b) )
+
 #define ASSERT(x) (void)( (!(!(x))) ? mongo::regression::assert_pass() : mongo::regression::assert_fail( #x , __FILE__ , __LINE__ ) )
 #define FAIL(x) mongo::regression::fail( #x , __FILE__ , __LINE__ )
 
@@ -164,6 +166,21 @@ namespace mongo {
                 throw e;
             }
             
+            template<typename A,typename B>
+            void nae( A a , B b ){
+                _gotAssert();
+                if ( a != b )
+                    return;
+                
+                printLocation();
+                    
+                MyAssertionException * e = getBase();
+                e->ss << a << " == " << b << endl;
+                log() << e->ss.str() << endl;
+                throw e;
+            }
+
+
             void printLocation();
             
         private:

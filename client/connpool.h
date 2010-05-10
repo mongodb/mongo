@@ -33,10 +33,8 @@ namespace mongo {
     class DBConnectionHook {
     public:
         virtual ~DBConnectionHook(){}
-
         virtual void onCreate( DBClientBase * conn ){}
         virtual void onHandedOut( DBClientBase * conn ){}
-
     };
 
     /** Database connection pool.

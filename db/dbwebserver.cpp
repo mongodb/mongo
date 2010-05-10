@@ -21,7 +21,7 @@
 
 #include "pch.h"
 #include "../util/miniwebserver.h"
-#include "../util/web/html.h"
+#include "../util/mongoutils/html.h"
 #include "../util/md5.hpp"
 #include "db.h"
 #include "repl.h"
@@ -31,7 +31,6 @@
 #include "stats/snapshots.h"
 #include "background.h"
 #include "commands.h"
-
 #include <pcrecpp.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #undef assert
@@ -40,7 +39,9 @@
 namespace mongo {
 
     using namespace mongoutils::html;
+    using namespace bson;
 
+    extern void fillRsLog(stringstream&);
     extern string bind_ip;
     extern const char *replInfo;
 
@@ -85,10 +86,9 @@ namespace mongo {
 
     class DbWebServer : public MiniWebServer {
     public:
-        DbWebServer(const string& ip, int port)
-            :MiniWebServer(ip, port)
-        {}
+        DbWebServer(const string& ip, int port) : MiniWebServer(ip, port) {}
 
+    private:
         // caller locks
         void doLockedStuff(stringstream& ss) {
             ss << "# databases: " << dbHolder.size() << '\n';
@@ -179,7 +179,6 @@ namespace mongo {
         void tablecell( stringstream& ss , bool b ){
             ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
         }
-        
 
         template< typename T> 
         void tablecell( stringstream& ss , const T& t ){
@@ -256,16 +255,44 @@ namespace mongo {
             ss << "</table>\n";
         }
         
-        bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ){
-            
+    private:
+        /* /_replSet show replica set status in html format */
+        string _replSet() { 
+            stringstream s;
+            s << start("Replica Set Status " + getHostName());
+            s << p( a("/", "back", "Home") );
+            s << p( "See also " + a("/replSetGetStatus?text", "", "replSetGetStatus") + '.' );
+
+            if( theReplSet == 0 ) { 
+                if( cmdLine.replSet.empty() ) 
+                    s << p("Not using --replSet");
+                else 
+                    s << p("Not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initialized") + '.');
+            }
+            else {
+                try {
+                    theReplSet->summarizeAsHtml(s);
+                }
+                catch(...) { s << "error summarizing replset status\n"; }
+            }
+            s << p("Recent replset log activity:");
+            fillRsLog(s);
+            s << _end();
+            return s.str();
+        }
+
+        bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() )
                 return true;
-            
+
+            {
+                readlocktryassert rl("admin.system.users", 10000);
+                if( Helpers::isEmpty("admin.system.users") )
+                    return true;
+            }
+
             Client::GodScope gs;
 
-            if ( db.findOne( "admin.system.users" , BSONObj() , 0 , QueryOption_SlaveOk ).isEmpty() )
-                return true;
-            
             string auth = getHeader( rq , "Authorization" );
 
             if ( auth.size() > 0 && auth.find( "Digest " ) == 0 ){
@@ -285,20 +312,21 @@ namespace mongo {
                     string ha1 = user["pwd"].str();
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
                     
-                    string r = ha1 + ":" + parms["nonce"];
+                    stringstream r;
+                    r << ha1 << ':' << parms["nonce"];
                     if ( parms["nc"].size() && parms["cnonce"].size() && parms["qop"].size() ){
-                        r += ":";
-                        r += parms["nc"];
-                        r += ":";
-                        r += parms["cnonce"];
-                        r += ":";
-                        r += parms["qop"];
+                        r << ':';
+                        r << parms["nc"];
+                        r << ':';
+                        r << parms["cnonce"];
+                        r << ':';
+                        r << parms["qop"];
                     }
-                    r += ":";
-                    r += ha2;
-                    r = md5simpledigest( r );
+                    r << ':';
+                    r << ha2;
+                    string r1 = md5simpledigest( r.str() );
                     
-                    if ( r == parms["response"] )
+                    if ( r1 == parms["response"] )
                         return true;
                 }
 
@@ -317,6 +345,21 @@ namespace mongo {
             return 0;
         }
 
+        string _commands() {
+            stringstream ss;
+            ss << start("Commands List");
+            ss << p( a("/", "back", "Home") );
+            ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
+            const map<string, Command*> *m = Command::commandsByBestName();
+            ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
+            ss << table();
+            ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
+            for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) 
+                i->second->htmlHelp(ss);
+            ss << _table() << _end();
+            return ss.str();
+        }
+
         virtual void doRequest(
             const char *rq, // the full request
             string url,
@@ -328,14 +371,15 @@ namespace mongo {
         )
         {
             if ( url.size() > 1 ) {
-                
+
+                if ( ! allowed( rq , headers, from ) ){
+                    responseCode = 401;
+                    headers.push_back( "Content-Type: text/plain" );
+                    responseMsg = "not allowed\n";
+                    return;
+                }              
+
                 if ( url.find( "/_status" ) == 0 ){
-                    if ( ! allowed( rq , headers, from ) ){
-                        responseCode = 401;
-                        headers.push_back( "Content-Type: text/plain" );
-                        responseMsg = "not allowed\n";
-                        return;
-                    }              
                     headers.push_back( "Content-Type: application/json" );
                     generateServerStatus( url , responseMsg );
                     responseCode = 200;
@@ -352,28 +396,14 @@ namespace mongo {
                     return;
                 }
 
-                if( url.find("/_commands") == 0 ) {
-                    if ( ! allowed( rq , headers, from ) ){
-                        responseCode = 401;
-                        headers.push_back( "Content-Type: text/plain" );
-                        responseMsg = "not allowed\n";
-                        return;
-                    }              
-                    headers.push_back( "Content-Type: text/html" );
-                    stringstream ss;
-                    ss << "<html><title>Commands List</title><body>";
-                    ss << p(a("/", "", "Back"));
-                    ss << p("<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n");
-                    const map<string, Command*> *m = Command::commandsByBestName();
-                    ss << "S:slave-only  N:no-lock  R:read-lock  W:write-lock  A:admin-only<br>\n";
-                    ss << "<table border=1 cellpadding=2 cellspacing=0>";
-                    ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
-                    for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
-                        i->second->htmlHelp(ss);
-                    }
-                    ss << "</table>";
-                    ss << "</body></html>";
-                    responseMsg = ss.str();
+                if( startsWith(url, "/_replSet") ) {
+                    responseMsg = _replSet();
+                    responseCode = 200;
+                    return;
+                }
+
+                if( startsWith(url, "/_commands") ) {
+                    responseMsg = _commands();
                     responseCode = 200;
                     return;
                 }
@@ -410,35 +440,27 @@ namespace mongo {
                     }
                 }
 
-                if ( ! allowed( rq , headers, from ) ){
-                    responseCode = 401;
-                    responseMsg = "not allowed\n";
-                    return;
-                }
                 handleRESTRequest( rq , url , responseMsg , responseCode , headers );
                 return;
             }
 
-
             responseCode = 200;
             stringstream ss;
-            ss << "<html><head>"
-                //"<link rel=\"stylesheet\" type=\"text/css\" href=\"?.css\">"
-                "<title>";
-
             string dbname;
             {
                 stringstream z;
                 z << "mongod " << getHostName() << ":" << mongo::cmdLine.port;
                 dbname = z.str();
             }
-            ss << dbname << "</title></head><body><h2>" << dbname << "</h2>\n";
-            ss << "<a href=\"/_commands\">List all commands</a>\n";
+            ss << start(dbname) << h2(dbname);
+            ss << "<a href=\"/_commands\">List all commands</a> | \n";
+            ss << "<a href=\"/_replSet\">Replica set status</a>\n";
             ss << "<pre>";
             //ss << "<a href=\"/_status\">_status</a>";
             {
                 const map<string, Command*> *m = Command::webCommands();
                 if( m ) {
+                    ss << a("", "These read-only context-less commands can be executed from the web interface.  Results are json format, unless ?text is appended in which case the result is output as text for easier human viewing", "Commands") << ": ";
                     for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) { 
                         stringstream h;
                         i->second->help(h);

@@ -27,7 +27,7 @@
 
 namespace mongo {
 
-    CursorIterator::CursorIterator( auto_ptr<Cursor> c , BSONObj filter )
+    CursorIterator::CursorIterator( shared_ptr<Cursor> c , BSONObj filter )
         : _cursor( c ){
             if ( ! filter.isEmpty() )
                 _matcher.reset( new CoveredIndexMatcher( filter , BSONObj() ) );
@@ -119,7 +119,7 @@ namespace mongo {
         BSONObj one() const { return one_; }
     private:
         bool requireIndex_;
-        auto_ptr< Cursor > c_;
+        shared_ptr<Cursor> c_;
         auto_ptr< CoveredIndexMatcher > matcher_;
         BSONObj one_;
     };
@@ -173,6 +173,12 @@ namespace mongo {
         return true;
     }
 
+    bool Helpers::isEmpty(const char *ns) {
+        Client::Context context(ns);
+        shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
+        return !c->ok();
+    }
+
     /* Get the first object from a collection.  Generally only useful if the collection
        only ever has a single object -- which is a "singleton collection.
 
@@ -181,7 +187,7 @@ namespace mongo {
     bool Helpers::getSingleton(const char *ns, BSONObj& result) {
         Client::Context context(ns);
 
-        auto_ptr<Cursor> c = DataFileMgr::findAll(ns);
+        shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
         if ( !c->ok() )
             return false;
 

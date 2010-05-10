@@ -32,16 +32,21 @@ namespace mongo {
 
     private:
         bool shouldIBalance( DBClientBase& conn );
-        void balance( DBClientBase& conn );
-        void balance( DBClientBase& conn , const string& ns , const BSONObj& data );
+
+        /**
+         * @return number of collections balanced
+         */
+        int balance( DBClientBase& conn );
+        bool balance( DBClientBase& conn , const string& ns , const BSONObj& data );
         
         void ping();
         void ping( DBClientBase& conn );
 
         BSONObj pickChunk( vector<BSONObj>& from, vector<BSONObj>& to );
-        
+
         string _myid;
         time_t _started;
+        int _balancedLastTime;
     };
     
     extern Balancer balancer;

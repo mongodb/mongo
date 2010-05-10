@@ -17,11 +17,11 @@
 */
 
 #include "pch.h"
-#include "rs_config.h"
 #include "replset.h"
 #include "../../client/dbclient.h"
 #include "../../util/hostandport.h"
 #include "../dbhelpers.h"
+#include "connections.h"
 
 using namespace bson;
 
@@ -30,10 +30,10 @@ namespace mongo {
     void ReplSetConfig::save() { 
         check();
         BSONObj o = asBson();
-        Helpers::putSingletonGod("local.system.replset", o, false/*logOp=false; local db so would work regardless...*/);
+        Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
     }
 
-    bo ReplSetConfig::Member::asBson() const { 
+    bo ReplSetConfig::MemberCfg::asBson() const { 
         bob b;
         b << "_id" << _id;
         b.append("host", h.toString());
@@ -69,7 +69,7 @@ namespace mongo {
         uassert(13126, "bad Member config", expr);
     }
 
-    void ReplSetConfig::Member::check() const{ 
+    void ReplSetConfig::MemberCfg::check() const{ 
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes >= 0 && votes <= 100);
@@ -96,7 +96,7 @@ namespace mongo {
         _id = o["_id"].String();
         if( o["version"].ok() ) {
             version = o["version"].numberInt();
-            uassert(13115, "bad local.system.replset config: version", version > 0);
+            uassert(13115, "bad " + rsConfigNs + " config: version", version > 0);
         }
 
         if( o["settings"].ok() ) {
@@ -122,7 +122,7 @@ namespace mongo {
         }
         for( unsigned i = 0; i < members.size(); i++ ) {
             BSONObj mobj = members[i].Obj();
-            Member m;
+            MemberCfg m;
             try {
                 try { 
                     m._id = (int) mobj["_id"].Number();
@@ -139,27 +139,27 @@ namespace mongo {
                 m.check();
             }
             catch( const char * p ) { 
-                log() << "replSet cfg parsing exception for members[" << i << "] " << p << endl;
+                log() << "replSet cfg parsing exception for members[" << i << "] " << p << rsLog;
                 stringstream ss;
                 ss << "replSet members[" << i << "] " << p;
                 uassert(13107, ss.str(), false);
             }
             catch(DBException& e) { 
-                log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << endl;
+                log() << "replSet cfg parsing exception for members[" << i << "] " << e.what() << rsLog;
                 stringstream ss;
                 ss << "replSet members[" << i << "] bad config object";
                 uassert(13135, ss.str(), false);
             }
-            uassert(13108, "bad local.system.replset config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
+            uassert(13108, "bad " + rsConfigNs + " config dups?", ords.count(m._id) == 0 && hosts.count(m.h.toString()) == 0);
             hosts.insert(m.h.toString());
             ords.insert(m._id);
             this->members.push_back(m);
         }
-        uassert(13117, "bad local.system.replset config", !_id.empty());
+        uassert(13117, "bad " + rsConfigNs + " config", !_id.empty());
     }
 
     static inline void configAssert(bool expr) {
-        uassert(13122, "bad local.system.replset config", expr);
+        uassert(13122, "bad " + rsConfigNs + " config", expr);
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg) { 
@@ -174,21 +174,21 @@ namespace mongo {
         clear();
         int level = 2;
         DEV level = 0;
-        log(0) << "replSet load config from: " << h.toString() << endl;
+        log(0) << "replSet load config from: " << h.toString() << rsLog;
 
         auto_ptr<DBClientCursor> c;
         try {
-            DBClientConnection conn(false, 0, 20);
-            conn._logLevel = 2;
-            string err;
-            conn.connect(h.toString());
+            ScopedConn conn(h.toString());
             version = -4;
 
             {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                BSONObj cmd = BSON( "replSetHeartbeat" << "preloadconfig?" );
+                size_t sl = cmdLine.replSet.find('/');
+                assert( sl != string::npos );
+                string setname = cmdLine.replSet.substr(0, sl);
+                BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 BSONObj info;
-                bool ok = conn.runCommand("admin", cmd, info);
+                bool ok = conn->runCommand("admin", cmd, info);
                 if( !info["rs"].trueValue() ) { 
                     stringstream ss;
                     ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
@@ -198,7 +198,7 @@ namespace mongo {
 
             version = -3;
 
-            c = conn.query("local.system.replset");
+            c = conn->query(rsConfigNs);
             if( c.get() == 0 )
                 return;
             if( !c->more() ) {
@@ -208,15 +208,15 @@ namespace mongo {
             version = -1;
         }
         catch( UserException& e) { 
-            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << endl;
+            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
         BSONObj o = c->nextSafe();
-        uassert(13109, "multiple rows in local.system.replset not supported", !c->more());
+        uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
         _ok = true;
-        log(level) << "replSet load ok" << endl;
+        log(level) << "replSet load ok" << rsLog;
     }
 
 }

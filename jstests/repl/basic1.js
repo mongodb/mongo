@@ -11,24 +11,6 @@ function block(){
     am.runCommand( { getlasterror : 1 , w : 2 , wtimeout : 3000 } )
 }
 
-function hash( db ){
-    var s = "";
-    var a = db.getCollectionNames();
-    a = a.sort();
-    a.forEach(
-        function(cn){
-            var c = db.getCollection( cn );
-            s += cn + "\t" + c.find().count() + "\n";
-            c.find().sort( { _id : 1 } ).forEach(
-                function(o){
-                    s += tojson( o , "" , true ) + "\n";
-                }
-            );
-        }
-    );
-    return s;
-}
-
 am = m.getDB( "foo" );
 as = s.getDB( "foo" );
 
@@ -36,13 +18,13 @@ function check( note ){
     var start = new Date();
     var x,y;
     while ( (new Date()).getTime() - start.getTime() < 30000 ){
-        x = hash( am );
-        y = hash( as );
-        if ( x == y )
+        x = am.runCommand( "dbhash" );
+        y = as.runCommand( "dbhash" );
+        if ( x.md5 == y.md5 )
             return;
         sleep( 200 );
     }
-    assert.eq( x , y , note );
+    assert.eq( x.md5 , y.md5 , note );
 }
 
 am.a.save( { x : 1 } );

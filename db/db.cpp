@@ -130,9 +130,6 @@ namespace mongo {
     void webServerThread();
 
     void listen(int port) {
-        log() << mongodVersion() << endl;
-        printGitVersion();
-        printSysInfo();
         //testTheDb();
         log() << "waiting for connections on port " << port << endl;
         OurListener l(bind_ip, port);
@@ -327,10 +324,11 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;
 
     void repairDatabases() {
+        LastError * le = lastError.get( true );
         Client::GodScope gs;
         log(1) << "enter repairDatabases" << endl;
         
-//        assert(checkNsFilesOnLoad);
+        //assert(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 
         dblock lk;
@@ -418,7 +416,7 @@ namespace mongo {
                     continue;
                 }
 
-                sleepmillis( (int)(std::max(0.0, (_sleepsecs * 1000) - time_flushing)) );
+                sleepmillis( (long long) std::max(0.0, (_sleepsecs * 1000) - time_flushing) );
                 
                 if ( inShutdown() ){
                     // occasional issue trying to flush during shutdown when sleep interrupted
@@ -447,9 +445,9 @@ namespace mongo {
             const char * foo = strchr( versionString , '.' ) + 1;
             int bar = atoi( foo );
             if ( ( 2 * ( bar / 2 ) ) != bar ){
-                cout << "****\n" 
-                     << "WARNING: This is development version of MongoDB.  Not recommended for production.\n" 
-                     << "****" << endl;
+                log() << "****\n";
+                log() << "WARNING: This is development a version (" << versionString << ") of MongoDB.  Not recommended for production.\n";
+                log() << "****" << endl;
             }
                 
         }
@@ -475,10 +473,18 @@ namespace mongo {
 
         bool is32bit = sizeof(int*) == 4;
 
-        log() << "Mongo DB : starting : pid = " << pid << " port = " << cmdLine.port << " dbpath = " << dbpath
-              <<  " master = " << replSettings.master << " slave = " << (int) replSettings.slave << "  " << ( is32bit ? "32" : "64" ) << "-bit " << endl;
-        DEV log() << " FULL DEBUG ENABLED " << endl;
+        {
+            Nullstream& l = log();
+            l << "MongoDB starting : pid=" << pid << " port=" << cmdLine.port << " dbpath=" << dbpath;
+            if( replSettings.master ) l << " master=" << replSettings.master;
+            if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
+            l << ( is32bit ? " 32" : " 64" ) << "-bit " << endl;
+        }
+        DEV log() << "_DEBUG build (which is slower)" << endl;
         show_32_warning();
+        log() << mongodVersion() << endl;
+        printGitVersion();
+        printSysInfo();
 
         {
             stringstream ss;
@@ -555,7 +561,7 @@ namespace mongo {
             dbexit( EXIT_UNCAUGHT );
         }
         catch(...) {
-            log() << " exception in initAndListen, terminating" << endl;
+            log() << "exception in initAndListen, terminating" << endl;
             dbexit( EXIT_UNCAUGHT );
         }
     }
@@ -707,13 +713,10 @@ int main(int argc, char* argv[], char *envp[] )
         }
     }
 
-    DEV out() << "DEV is defined (using _DEBUG), which is slower...\n";
-
     UnitTest::runTests();
 
-    if (argc == 1) {
+    if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
-    }
 
     {
         bool installService = false;

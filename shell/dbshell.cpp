@@ -30,6 +30,7 @@ jmp_buf jbuf;
 #include "../util/unittest.h"
 #include "../db/cmdline.h"
 #include "utils.h"
+#include "../util/password.h"
 
 using namespace std;
 using namespace boost::filesystem;
@@ -318,7 +319,8 @@ int _main(int argc, char* argv[]) {
         ("host", po::value<string>(&dbhost), "server to connect to")
         ("eval", po::value<string>(&script), "evaluate javascript")
         ("username,u", po::value<string>(&username), "username for authentication")
-        ("password,p", po::value<string>(&password), "password for authentication")
+        ("password,p", new mongo::PasswordValue(&password),
+         "password for authentication")
         ("help,h", "show this usage information")
         ("version", "show version information")
         ("ipv6", "enable IPv6 support (disabled by default)")
@@ -418,6 +420,11 @@ int _main(int argc, char* argv[]) {
         ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
         
         mongo::shellUtils::_dbConnect = ss.str();
+
+        if ( params.count( "password" )
+             && ( password.empty() ) ) {
+            password = mongo::askPassword();
+        }
 
         if ( username.size() && password.size() ){
             stringstream ss;

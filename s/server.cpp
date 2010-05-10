@@ -99,7 +99,7 @@ namespace mongo {
     };
 
     void sighandler(int sig){
-        dbexit(EXIT_CLEAN, (string("recieved signal ") + BSONObjBuilder::numStr(sig)).c_str());
+        dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
     }
     
     void setupSignals(){

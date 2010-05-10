@@ -52,3 +52,17 @@ assert.eq(out.title , undefined);
 out = t.findOne({}, {comments:{$slice:2}, 'comments.id':false});
 assert.eq(out.comments , [{text: 'a'}, {text: 'b'}]);
 assert.eq(out.title , 'foo');
+
+//nested arrays
+t.drop();
+t.insert({_id:1, a:[[1,1,1], [2,2,2], [3,3,3]], b:1, c:1});
+
+out = t.findOne({}, {a:{$slice:1}});
+assert.eq(out.a , [[1,1,1]], 'n 1');
+
+out = t.findOne({}, {a:{$slice:-1}});
+assert.eq(out.a , [[3,3,3]], 'n 2');
+
+out = t.findOne({}, {a:{$slice:[0,2]}});
+assert.eq(out.a , [[1,1,1],[2,2,2]], 'n 2');
+

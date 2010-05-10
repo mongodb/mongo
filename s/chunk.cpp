@@ -41,11 +41,19 @@ namespace mongo {
 
     void Chunk::setShard( const Shard& s ){
         _shard = s;
+        _manager->_migrationNotification(this);
         _markModified();
     }
     
     bool Chunk::contains( const BSONObj& obj ) const{
         return
+            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
+            _manager->getShardKey().compare( obj , getMax() ) < 0;
+    }
+
+    bool ChunkRange::contains(const BSONObj& obj) const {
+    // same as Chunk method
+        return 
             _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
@@ -334,20 +342,24 @@ namespace mongo {
         return (long)result["size"].number();
     }
 
-    
-    long Chunk::countObjects( const BSONObj& filter ) const{
-        ShardConnection conn( getShard() );
+
+    template <typename ChunkType>
+    inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
+        ShardConnection conn( chunk->getShard() );
         
-        BSONObj f = getFilter();
+        BSONObj f = chunk->getFilter();
         if ( ! filter.isEmpty() )
             f = ClusteredCursor::concatQuery( f , filter );
 
         BSONObj result;
-        unsigned long long n = conn->count( _ns , f );
+        unsigned long long n = conn->count( chunk->getManager()->getns() , f );
         
         conn.done();
         return (long)n;
     }
+    
+    long Chunk::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
+    long ChunkRange::countObjects( const BSONObj& filter ) const { return countObjectsHelper(this, filter); }
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ){
         BSONObjBuilder bb( b.subobjStart( name ) );
@@ -364,7 +376,10 @@ namespace mongo {
     }
 
     void Chunk::getFilter( BSONObjBuilder& b ) const{
-        _manager->_key.getFilter( b , _min , _max );
+        _manager->getShardKey().getFilter( b , _min , _max );
+    }
+    void ChunkRange::getFilter( BSONObjBuilder& b ) const{
+        _manager->getShardKey().getFilter( b , _min , _max );
     }
     
     void Chunk::serialize(BSONObjBuilder& to){
@@ -483,7 +498,8 @@ namespace mongo {
             
             _chunks.push_back( c );
             _chunkMap[c->getMax()] = c;
-            
+            _chunkRanges.reloadAll(_chunkMap);
+
             log() << "no chunks for:" << ns << " so creating first: " << c->toString() << endl;
         }
 
@@ -495,6 +511,7 @@ namespace mongo {
         }
         _chunks.clear();
         _chunkMap.clear();
+        _chunkRanges.clear();
     }
     
     void ChunkManager::_reload(){
@@ -523,6 +540,8 @@ namespace mongo {
             c->_id = d["_id"].wrap().getOwned();
         }
         conn.done();
+
+        _chunkRanges.reloadAll(_chunkMap);
     }
 
 
@@ -581,7 +600,7 @@ namespace mongo {
         return 0;
     }
 
-    int ChunkManager::_getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::_getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
         rwlock lk( _lock , false ); 
 
         FieldRangeSet ranges(_ns.c_str(), query, false);
@@ -595,12 +614,12 @@ namespace mongo {
             return 0;
 
         } else if (range.equality()) {
-            chunks.push_back(&findChunk(BSON(field.fieldName() << range.min())));
+            chunks.push_back( _chunkRanges.upper_bound(BSON(field.fieldName() << range.min()))->second );
             return 1;
         } else if (!range.nontrivial()) {
             return -1; // all chunks
         } else {
-            set<Chunk*, ChunkCmp> chunkSet;
+            set<shared_ptr<ChunkRange>, ChunkCmp> chunkSet;
 
             for (vector<FieldInterval>::const_iterator it=range.intervals().begin(), end=range.intervals().end();
                  it != end;
@@ -610,16 +629,17 @@ namespace mongo {
                 assert(fi.valid());
                 BSONObj minObj = BSON(field.fieldName() << fi.lower_.bound_);
                 BSONObj maxObj = BSON(field.fieldName() << fi.upper_.bound_);
-                ChunkMap::iterator min = (fi.lower_.inclusive_ ? _chunkMap.upper_bound(minObj) : _chunkMap.lower_bound(minObj));
-                ChunkMap::iterator max = (fi.upper_.inclusive_ ? _chunkMap.upper_bound(maxObj) : _chunkMap.lower_bound(maxObj));
+                ChunkRangeMap::const_iterator min, max;
+                min = (fi.lower_.inclusive_ ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
+                max = (fi.upper_.inclusive_ ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
 
-                assert(min != _chunkMap.end());
+                assert(min != _chunkRanges.ranges().end());
 
                 // make max non-inclusive like end iterators
-                if(max != _chunkMap.end())
+                if(max != _chunkRanges.ranges().end())
                     ++max;
 
-                for (ChunkMap::iterator it=min; it != max; ++it){
+                for (ChunkRangeMap::const_iterator it=min; it != max; ++it){
                     chunkSet.insert(it->second);
                 }
             }
@@ -629,27 +649,28 @@ namespace mongo {
         }
     }
 
-    int ChunkManager::getChunksForQuery( vector<Chunk*>& chunks , const BSONObj& query ){
+    int ChunkManager::getChunksForQuery( vector<shared_ptr<ChunkRange> >& chunks , const BSONObj& query ){
         int ret = _getChunksForQuery(chunks, query);
 
         if (ret == -1){
-            chunks = _chunks;
-            return chunks.size();
+            for (ChunkRangeMap::const_iterator it=_chunkRanges.ranges().begin(), end=_chunkRanges.ranges().end(); it != end; ++it){
+                chunks.push_back(it->second);
+            }
         }
-
-        return ret;
+        return chunks.size();
+        //return ret;
     }
 
     int ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ){
-        vector<Chunk*> chunks;
+        vector<shared_ptr<ChunkRange> > chunks;
         int ret = _getChunksForQuery(chunks, query);
 
         if (ret == -1){
             getAllShards(shards);
         } 
         else {
-            for ( vector<Chunk*>::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
-                Chunk* c = *it;
+            for ( vector<shared_ptr<ChunkRange> >::iterator it=chunks.begin(), end=chunks.end(); it != end; ++it ){
+                shared_ptr<ChunkRange> c = *it;
                 shards.insert(c->getShard());
             }
         }
@@ -708,6 +729,7 @@ namespace mongo {
         // wipe my meta-data
         _chunks.clear();
         _chunkMap.clear();
+        _chunkRanges.clear();
 
         
         // delete data from mongod
@@ -809,7 +831,153 @@ namespace mongo {
         }
         return ss.str();
     }
+
+    void ChunkManager::_migrationNotification(Chunk* c){
+        _chunkRanges.reloadRange(_chunkMap, c->getMin(), c->getMax());
+    }
+
     
+    inline bool allOfType(BSONType type, const BSONObj& o){
+        BSONObjIterator it(o);
+        while(it.more()){
+            if (it.next().type() != type)
+                return false;
+        }
+        return true;
+    }
+
+    void ChunkRangeManager::assertValid() const{
+        if (_ranges.empty())
+            return;
+
+        try {
+            // No Nulls
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it){
+                assert(it->second);
+            }
+            
+            // Check endpoints
+            assert(allOfType(MinKey, _ranges.begin()->second->getMin()));
+            assert(allOfType(MaxKey, prior(_ranges.end())->second->getMax()));
+
+            // Make sure there are no gaps or overlaps
+            for (ChunkRangeMap::const_iterator it=boost::next(_ranges.begin()), end=_ranges.end(); it != end; ++it){
+                ChunkRangeMap::const_iterator last = prior(it);
+                assert(it->second->getMin() == last->second->getMax());
+            }
+
+            // Check Map keys
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it){
+                assert(it->first == it->second->getMax());
+            }
+
+            // Make sure we match the original chunks
+            const vector<Chunk*> chunks = _ranges.begin()->second->getManager()->_chunks;
+            for (vector<Chunk*>::const_iterator it=chunks.begin(), end=chunks.end(); it != end; ++it){
+                const Chunk* chunk = *it;
+
+                ChunkRangeMap::const_iterator min = _ranges.upper_bound(chunk->getMin());
+                ChunkRangeMap::const_iterator max = _ranges.lower_bound(chunk->getMax());
+
+                assert(min != _ranges.end());
+                assert(max != _ranges.end());
+                assert(min == max);
+                assert(min->second->getShard() == chunk->getShard());
+                assert(min->second->contains( chunk->getMin() ));
+                assert(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+            }
+            
+        } catch (...) {
+            cout << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+
+            for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
+                cout << it->first << ": " << *it->second << endl;
+
+            throw;
+        }
+    }
+
+    void ChunkRangeManager::reloadRange(const ChunkMap& chunks, const BSONObj& min, const BSONObj& max){
+        if (_ranges.empty()){
+            reloadAll(chunks);
+            return;
+        }
+        
+        ChunkRangeMap::iterator low  = _ranges.upper_bound(min);
+        ChunkRangeMap::iterator high = _ranges.lower_bound(max);
+        
+        assert(low != _ranges.end());
+        assert(high != _ranges.end());
+        assert(low->second);
+        assert(high->second);
+
+        ChunkMap::const_iterator begin = chunks.upper_bound(low->second->getMin());
+        ChunkMap::const_iterator end   = chunks.lower_bound(high->second->getMax());
+
+        assert(begin != chunks.end());
+        assert(end != chunks.end());
+
+        // C++ end iterators are one-past-last
+        ++high;
+        ++end;
+
+        // update ranges
+        _ranges.erase(low, high); // invalidates low
+        _insertRange(begin, end);
+
+        assert(!_ranges.empty());
+        DEV assertValid();
+
+        // merge low-end if possible
+        low = _ranges.upper_bound(min);
+        assert(low != _ranges.end());
+        if (low != _ranges.begin()){
+            shared_ptr<ChunkRange> a = prior(low)->second;
+            shared_ptr<ChunkRange> b = low->second;
+            if (a->getShard() == b->getShard()){
+                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
+                _ranges.erase(prior(low));
+                _ranges.erase(low); // invalidates low
+                _ranges[cr->getMax()] = cr;
+            }
+        }
+
+        DEV assertValid();
+
+        // merge high-end if possible
+        high = _ranges.lower_bound(max);
+        if (high != prior(_ranges.end())){
+            shared_ptr<ChunkRange> a = high->second;
+            shared_ptr<ChunkRange> b = boost::next(high)->second;
+            if (a->getShard() == b->getShard()){
+                shared_ptr<ChunkRange> cr (new ChunkRange(*a, *b));
+                _ranges.erase(boost::next(high));
+                _ranges.erase(high); //invalidates high
+                _ranges[cr->getMax()] = cr;
+            }
+        }
+
+        DEV assertValid();
+    }
+
+    void ChunkRangeManager::reloadAll(const ChunkMap& chunks){
+        _ranges.clear();
+        _insertRange(chunks.begin(), chunks.end());
+
+        DEV assertValid();
+    }
+
+    void ChunkRangeManager::_insertRange(ChunkMap::const_iterator begin, const ChunkMap::const_iterator end){
+        while (begin != end){
+            ChunkMap::const_iterator first = begin;
+            Shard shard = first->second->getShard();
+            while (begin != end && (begin->second->getShard() == shard))
+                ++begin;
+
+            shared_ptr<ChunkRange> cr (new ChunkRange(first, begin));
+            _ranges[cr->getMax()] = cr;
+        }
+    }
     
     class ChunkObjUnitTest : public UnitTest {
     public:

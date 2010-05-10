@@ -16,62 +16,16 @@
 
 #include "pch.h"
 #include "../cmdline.h"
-#include "health.h"
 #include "../commands.h"
+#include "health.h"
 #include "replset.h"
 #include "rs_config.h"
 
 namespace mongo { 
 
-    class CmdReplSetInitiate : public Command { 
-    public:
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() { return false; }
-        CmdReplSetInitiate() : Command("replSetInitiate") { }
-        virtual void help(stringstream& h) const { 
-            h << "Initiate/christen a replica set."; 
-            h << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
-        }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !replSet ) { 
-                errmsg = "server is not running with --replSet";
-                return false;
-            }
-            if( theReplSet ) {
-                errmsg = "already initialized";
-                return false;
-            }            
-            if( ReplSet::startupStatus == ReplSet::BADCONFIG ) {
-                errmsg = "server already in BADCONFIG state (check logs); not initiating";
-                result.append("info", ReplSet::startupStatusMsg);
-                return false;
-            }
-            if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
-                result.append("startupStatus", ReplSet::startupStatus);
-                errmsg = "all seed hosts must be reachable to initiate set";
-                return false;
-            }
-
-            if( cmdObj["replSetInitiate"].type() != Object ) {
-                errmsg = "no configuration specified";
-                return false;
-            }
-
-            ReplSetConfig newConfig(cmdObj["replSetInitiate"].Obj());
-
-            log() << newConfig.toString() << endl;
-
-            newConfig.save();
-
-            errmsg = "replsets are not yet implemented.  coming soon.";
-            return true;
-        }
-    } cmdReplSetInitiate;
-
     /* commands in other files:
          replSetHeartbeat - health.cpp
+         replSetInitiate  - rs_mod.cpp
     */
 
     class CmdReplSetGetStatus : public Command {
@@ -87,7 +41,7 @@ namespace mongo {
         }
 
         CmdReplSetGetStatus() : Command("replSetGetStatus", true) { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "not running with --replSet";
                 return false;
@@ -118,7 +72,7 @@ namespace mongo {
         }
 
         CmdReplSetFreeze() : Command("replSetFreeze", true) { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) { 
                 errmsg = "not running with --replSet";
                 return false;

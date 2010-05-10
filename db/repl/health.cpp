@@ -21,8 +21,24 @@
 #include "../../client/dbclient.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
+#include "../../util/mongoutils/html.h"
+#include "../../util/goodies.h"
+#include "../../util/ramlog.h"
+#include "../helpers/dblogger.h"
+#include "connections.h"
+
+namespace mongo {
+    /* decls for connections.h */
+    ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
+    mutex ScopedConn::mapMutex;
+}
 
 namespace mongo { 
+
+    using namespace mongoutils::html;
+
+    static RamLog _rsLog;
+    Tee *rsLog = &_rsLog;
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public Command {
@@ -33,56 +49,66 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help<<"internal"; }
         CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !replSet ) {
                 errmsg = "not a replset member";
                 return false;
             }
             result.append("rs", true);
+            if( !startsWith(cmdLine.replSet, cmdObj.getStringField("replSetHeartbeat")+'/' ) ) {
+                errmsg = "repl set names do not match";
+                cout << cmdLine.replSet << endl;
+                cout << cmdObj.getStringField("replSetHeartbeat") << endl;
+                result.append("mismatch", true);
+                return false;
+            }
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;
             }
             if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
-                errmsg = "repl set names do not match";
+                errmsg = "repl set names do not match (2)";
+                result.append("mismatch", true);
                 return false;
             }
-            //result.append("set", theReplSet->getName());
+            /* todo: send our state*/
+            result.append("set", theReplSet->getName());
             return true;
         }
     } cmdReplSetHeartbeat;
 
+    /* throws dbexception */
+    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result) { 
+        BSONObj cmd = BSON( "replSetHeartbeat" << setName );
+        ScopedConn conn(memberFullName);
+        return conn->runCommand("admin", cmd, result);
+    }
+
     /* poll every other set member to check its status */
     class FeedbackThread : public BackgroundJob {
     public:
-        ReplSet::MemberInfo *m;
+        ReplSet::Member *m;
 
     private:
         void down() {
             m->_health = 0.0;
             if( m->_upSince ) {
                 m->_upSince = 0;
-                log() << "replSet " << m->fullName() << " is now down" << endl;
+                log() << "replSet " << m->fullName() << " is now down" << rsLog;
             }
         }
 
     public:
         void run() { 
             mongo::lastError.reset( new LastError() );
-            DBClientConnection conn(true, 0, 10);
-            conn._logLevel = 2;
-            string err;
-            conn.connect(m->fullName(), err);
-
-            BSONObj cmd = BSON( "replSetHeartbeat" << theReplSet->getName() );
             while( 1 ) {
                 try { 
                     BSONObj info;
-                    bool ok = conn.runCommand("admin", cmd, info);
-                    m->_lastHeartbeat = time(0);
+                    bool ok = requestHeartbeat(theReplSet->getName(), m->fullName(), info);
+                    m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
                     if( ok ) {
                         if( m->_upSince == 0 ) {
-                            log() << "replSet " << m->fullName() << " is now up" << endl;
+                            log() << "replSet " << m->fullName() << " is now up" << rsLog;
                             m->_upSince = m->_lastHeartbeat;
                         }
                         m->_health = 1.0;
@@ -102,8 +128,137 @@ namespace mongo {
         }
     };
 
+    void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
+        s << tr();
+        {
+            stringstream u;
+            u << "http://" << _h.host() << ':' << (_h.port() + 1000) << "/_replSet";
+            s << td( a(u.str(), "", fullName()) );
+        }
+        s << td(health());
+        s << td(upSince());
+        {
+            stringstream h;
+            time_t hb = lastHeartbeat();
+            time_t now = time(0);
+            if( hb == 0 ) h << "never"; 
+            else {
+                if( now > hb ) h << now-hb; 
+                else h << 0;
+                h << " secs ago";
+            }
+            s << td(h.str());
+        }
+        s << td(config().votes);
+        s << td(_lastHeartbeatErrMsg.get());
+        s << _tr();
+    }
+
+    string ReplSet::stateAsHtml(State s) { 
+        if( s == STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
+        if( s == PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
+        if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
+        if( s == RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
+        if( s == FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "FATAL");
+        return "???";
+    }
+
+    string ReplSet::stateAsStr(State s) { 
+        if( s == STARTUP ) return "STARTUP";
+        if( s == PRIMARY ) return "PRIMARY";
+        if( s == SECONDARY ) return "SECONDARY";
+        if( s == RECOVERING ) return "RECOVERING";
+        if( s == FATAL ) return "FATAL";
+        return "???";
+    }
+
+    void ReplSet::summarizeAsHtml(stringstream& s) const { 
+        s << table(0, false);
+        s << tr("Set name:", _name);
+        s << tr("My state:", stateAsHtml(_myState));
+        s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
+        s << _table();
+
+        const char *h[] = {"Member", "Up", "Uptime", 
+            "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
+            "Votes", "Status", 0};
+        s << table(h);
+        s << tr() << td(_self->fullName()) <<
+            td("1") << 
+            td("") << 
+            td("") << 
+            td(ToString(_self->config().votes)) << 
+            td("self") << 
+            _tr();
+        Member *m = head();
+        while( m ) {
+            m->summarizeAsHtml(s);
+            m = m->next();
+        }
+        s << _table();
+    }
+
+    static int repeats(const vector<const char *>& v, int i) { 
+        for( int j = i-1; j >= 0 && j+8 > i; j-- ) {
+            if( strcmp(v[i]+20,v[j]+20) == 0 ) {
+                for( int x = 1; ; x++ ) {
+                    if( j+x == i ) return j;
+                    if( i+x>=v.size() ) return -1;
+                    if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
+                }
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    static string clean(const vector<const char *>& v, int i, string line="") { 
+        if( line.empty() ) line = v[i];
+        if( i > 0 && strncmp(v[i], v[i-1], 11) == 0 )
+            return string("           ") + line.substr(11);
+        return v[i];
+    }
+
+    static bool isWarning(const char *line) {
+        const char *p = strstr(line, "replSet ");
+        if( p ) { 
+            p += 8;
+            return startsWith(p, "warning") || startsWith(p, "error");
+        }
+        return false;
+    }
+
+    void fillRsLog(stringstream& s) {
+        bool first = true;
+        s << "<pre>\n";
+        vector<const char *> v = _rsLog.get();
+        for( int i = 0; i < v.size(); i++ ) {
+            assert( strlen(v[i]) > 20 );
+            int r = repeats(v, i);
+            if( r < 0 ) {
+                s << red( clean(v,i), isWarning(v[i]) );
+            } else {
+                stringstream x;
+                x << string(v[i], 0, 20);
+                int nr = (i-r);
+                int last = i+nr-1;
+                for( ; r < i ; r++ ) x << '.';
+                if( 1 ) { 
+                    stringstream r; 
+                    if( nr == 1 ) r << "repeat last line";
+                    else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
+                    first = false; s << a("", r.str(), clean(v,i,x.str()));
+                }
+                else s << x.str();
+                s << '\n';
+                i = last;
+            }
+        }
+        s << "</pre>\n";
+    }
+
     void ReplSet::summarizeStatus(BSONObjBuilder& b) const { 
-        MemberInfo *m =_members.head();
+        Member *m =_members.head();
         vector<BSONObj> v;
 
         // add self
@@ -124,11 +279,12 @@ namespace mongo {
         }
         b.append("set", getName());
         b.appendDate("date", time(0));
+        b.append("myState", _myState);
         b.append("members", v);
     }
 
     void ReplSet::startHealthThreads() {
-        MemberInfo* m = _members.head();
+        Member* m = _members.head();
         while( m ) {
             FeedbackThread *f = new FeedbackThread();
             f->m = m;

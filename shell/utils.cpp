@@ -421,6 +421,16 @@ namespace mongo {
                 
 #endif
         }
+
+        BSONObj WaitProgram( const BSONObj& a ){
+            int pid = a.firstElement().numberInt();
+            BSONObj x = BSON( "" << wait_for_pid( pid ) );
+            shells.erase( pid );
+            return x;
+        }
+
+
+
         BSONObj StartMongoProgram( const BSONObj &a ) {
             _nokillop = true;
             ProgramRunner r( a );
@@ -506,7 +516,16 @@ namespace mongo {
                 }
             }
 #else
-            assert( 0 == kill( pid, sig ) );
+            int x = kill( pid, sig );
+            if ( x ){
+                if ( errno == ESRCH ){
+                }
+                else {
+                    cout << "killFailed: " << errnoWithDescription() << endl;
+                    assert( x == 0 );
+                }
+            }
+
 #endif
         }
             
@@ -661,6 +680,7 @@ namespace mongo {
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );        
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
+            scope.injectNative( "waitProgram" , WaitProgram );
 
             //can't access filesystem
             scope.injectNative( "removeFile" , removeFile );

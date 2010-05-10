@@ -96,9 +96,10 @@ namespace mongo {
         case dbDelete:
             c.remove.inc( micros );
             break;
+        case dbKillCursors:
+            break;
         case opReply: 
         case dbMsg:
-        case dbKillCursors:
             log() << "unexpected op in Top::record: " << op << endl;
             break;
         default:
@@ -155,7 +156,7 @@ namespace mongo {
         virtual LockType locktype() const { return READ; } 
         virtual void help( stringstream& help ) const { help << "usage by collection"; }
 
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );
                 Top::global.append( b );

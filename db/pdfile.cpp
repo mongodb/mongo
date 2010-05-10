@@ -45,6 +45,17 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
+    bool inDBRepair = false;
+    struct doingRepair {
+        doingRepair(){
+            assert( ! inDBRepair );
+            inDBRepair = true;
+        }
+        ~doingRepair(){
+            inDBRepair = false;
+        }
+    };
+
     const int MaxExtentSize = 0x7ff00000;
 
     map<string, unsigned> BackgroundOperation::dbsInProg;
@@ -551,10 +562,10 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    auto_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
+    shared_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
         NamespaceDetails * d = nsdetails( ns );
         if ( ! d )
-            return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
 
         DiskLoc loc = d->firstExtent;
         Extent *e = getExtent(loc);
@@ -579,10 +590,10 @@ namespace mongo {
         }
 
         if ( d->capped ) 
-            return auto_ptr< Cursor >( new ForwardCappedCursor( d , startLoc ) );
+            return shared_ptr<Cursor>( new ForwardCappedCursor( d , startLoc ) );
         
         if ( !startLoc.isNull() )
-            return auto_ptr<Cursor>(new BasicCursor( startLoc ));                
+            return shared_ptr<Cursor>(new BasicCursor( startLoc ));                
         
         while ( e->firstRecord.isNull() && !e->xnext.isNull() ) {
             /* todo: if extent is empty, free it for reuse elsewhere.
@@ -593,13 +604,13 @@ namespace mongo {
             // it might be nice to free the whole extent here!  but have to clean up free recs then.
             e = e->getNextExtent();
         }
-        return auto_ptr<Cursor>(new BasicCursor( e->firstRecord ));
+        return shared_ptr<Cursor>(new BasicCursor( e->firstRecord ));
     }
 
     /* get a table scan cursor, but can be forward or reverse direction.
        order.$natural - if set, > 0 means forward (asc), < 0 backward (desc).
     */
-    auto_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
+    shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc) {
         BSONElement el = order.getField("$natural"); // e.g., { $natural : -1 }
 
         if ( el.number() >= 0 )
@@ -609,19 +620,19 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         
         if ( !d )
-            return auto_ptr<Cursor>(new BasicCursor(DiskLoc()));
+            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
         
         if ( !d->capped ) {
             if ( !startLoc.isNull() )
-                return auto_ptr<Cursor>(new ReverseCursor( startLoc ));                
+                return shared_ptr<Cursor>(new ReverseCursor( startLoc ));                
             Extent *e = d->lastExtent.ext();
             while ( e->lastRecord.isNull() && !e->xprev.isNull() ) {
                 OCCASIONALLY out() << "  findTableScan: extent empty, skipping ahead" << endl;
                 e = e->getPrevExtent();
             }
-            return auto_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
+            return shared_ptr<Cursor>(new ReverseCursor( e->lastRecord ));
         } else {
-            return auto_ptr< Cursor >( new ReverseCappedCursor( d, startLoc ) );
+            return shared_ptr<Cursor>( new ReverseCappedCursor( d, startLoc ) );
         }
     }
 
@@ -1009,7 +1020,7 @@ namespace mongo {
         log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique();
-        bool dropDups = idx.dropDups();
+        bool dropDups = idx.dropDups() || inDBRepair;
         BSONObj order = idx.keyPattern();
 
         idx.head.Null();
@@ -1018,11 +1029,11 @@ namespace mongo {
 
         /* get and sort all the keys ----- */
         unsigned long long n = 0;
-        auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+        shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
         BSONObjExternalSorter sorter(order);
         sorter.hintNumObjects( d->nrecords );
         unsigned long long nkeys = 0;
-        ProgressMeter & pm = op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 );
+        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->nrecords , 10 ) );
         while ( c->ok() ) {
             BSONObj o = c->current();
             DiskLoc loc = c->currLoc();
@@ -1061,7 +1072,7 @@ namespace mongo {
             BtreeBuilder btBuilder(dupsAllowed, idx);
             BSONObj keyLast;
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-            pm = op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 );
+            assert( pm == op->setMessage( "index: (2/3) btree bottom up" , nkeys , 10 ) );
             while( i->more() ) { 
                 RARELY killCurrentOp.checkForInterrupt();
                 BSONObjExternalSorter::Data d = i->next();
@@ -1115,7 +1126,7 @@ namespace mongo {
             unsigned long long n = 0;
             auto_ptr<ClientCursor> cc;
             {
-                auto_ptr<Cursor> c = theDataFileMgr.findAll(ns);
+                shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
             CursorId id = cc->cursorid;
@@ -1219,7 +1230,7 @@ namespace mongo {
         }
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
-        if( !background ) {
+        if( inDBRepair || !background ) {
 			n = fastBuildIndex(ns.c_str(), d, idx, idxNo);
 			assert( !idx.head.isNull() );
 		}
@@ -1384,6 +1395,7 @@ namespace mongo {
 
         string tabletoidxns;
         if ( addIndex ) {
+            assert( obuf );
             BSONObj io((const char *) obuf);
             if( !prepareToBuildIndex(io, god, tabletoidxns, tableToIndex) )
                 return DiskLoc();
@@ -1486,6 +1498,8 @@ namespace mongo {
             NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
         
         if ( tableToIndex ) {
+            uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
+
             BSONObj info = loc.obj();
             bool background = info["background"].trueValue();
 
@@ -1494,7 +1508,7 @@ namespace mongo {
             idx.info = loc;
             try {
                 buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background);
-            } catch( DBException& ) {
+            } catch( DBException& e ) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
                 LastError *le = lastError.get();
                 int savecode = 0;
@@ -1502,6 +1516,10 @@ namespace mongo {
                 if ( le ) {
                     savecode = le->code;
                     saveerrmsg = le->msg;
+                }
+                else {
+                    savecode = e.getCode();
+                    saveerrmsg = e.what();
                 }
 
                 // roll back this index
@@ -1512,7 +1530,7 @@ namespace mongo {
                 if( !ok ) {
                     log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
                 }
-
+                
                 assert( le && !saveerrmsg.empty() );
                 raiseError(savecode,saveerrmsg.c_str());
                 throw;
@@ -1587,17 +1605,17 @@ namespace mongo {
 
 namespace mongo {
 
-    void dropDatabase(const char *ns) {
-        // ns is of the form "<dbname>.$cmd"
-        char db[256];
-        nsToDatabase(ns, db);
+    void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
         assert( cc().database()->name == db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(db);
+        BackgroundOperation::assertNoBgOpInProgForDb(db.c_str());
 
-        closeDatabase( db );
-        _deleteDataFiles(db);
+        Client * c = currentClient.get();
+        c->dropAllTempCollectionsInDB(db);
+
+        closeDatabase( db.c_str() );
+        _deleteDataFiles( db.c_str() );
     }
 
     typedef boost::filesystem::path Path;
@@ -1702,15 +1720,16 @@ namespace mongo {
 #endif
     }
 
-    bool repairDatabase( const char *ns, string &errmsg,
+    bool repairDatabase( string dbNameS , string &errmsg,
                          bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
+        doingRepair dr;
+        dbNameS = nsToDatabase( dbNameS );
+        const char * dbName = dbNameS.c_str();
+
         stringstream ss;
         ss << "localhost:" << cmdLine.port;
         string localhost = ss.str();
-
-        // ns is of the form "<dbname>.$cmd"
-        char dbName[256];
-        nsToDatabase(ns, dbName);
+        
         problem() << "repairDatabase " << dbName << endl;
         assert( cc().database()->name == dbName );
 

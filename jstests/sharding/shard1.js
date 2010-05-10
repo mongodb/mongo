@@ -8,7 +8,7 @@ db = s.getDB( "test" );
 db.foo.insert( { num : 1 , name : "eliot" } );
 db.foo.insert( { num : 2 , name : "sara" } );
 db.foo.insert( { num : -1 , name : "joe" } );
-assert.eq( 3 , db.foo.find().length() );
+assert.eq( 3 , db.foo.find().length() , "A" );
 
 shardCommand = { shardcollection : "test.foo" , key : { num : 1 } };
 
@@ -21,7 +21,7 @@ s.adminCommand( shardCommand );
 dbconfig = s.config.databases.findOne( { _id : "test" } );
 assert.eq( dbconfig.sharded["test.foo"] , { key : { num : 1 } , unique : false } , "Sharded content" );
 
-assert.eq( 1 , s.config.chunks.count() );
+assert.eq( 1 , s.config.chunks.count() , "num chunks A");
 si = s.config.chunks.findOne();
 assert( si );
 assert.eq( si.ns , "test.foo" );

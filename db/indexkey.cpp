@@ -130,6 +130,8 @@ namespace mongo {
             }
         }
 
+        bool insertArrayNull = false;
+
         if ( allFound ) {
             if ( arrElt.eoo() ) {
                 // no terminal array element to expand
@@ -154,26 +156,42 @@ namespace mongo {
                     }
                 }
                 else if ( fixed.size() > 1 ){
-                    // x : [] - need to insert undefined
-                    BSONObjBuilder b(_sizeTracker);
-                    for( unsigned j = 0; j < fixed.size(); ++j ) {
-                        if ( j == arrIdx )
-                            b.appendUndefined( "" );
-                        else
-                            b.appendAs( fixed[ j ], "" );
-                    }
-                    keys.insert( b.obj() );
+                    insertArrayNull = true;
                 }
             }
         } else {
             // nonterminal array element to expand, so recurse
             assert( !arrElt.eoo() );
             BSONObjIterator i( arrElt.embeddedObject() );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                if ( e.type() == Object )
-                    _getKeys( fieldNames, fixed, e.embeddedObject(), keys );
+            if ( i.more() ){
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.type() == Object ){
+                        _getKeys( fieldNames, fixed, e.embeddedObject(), keys );
+                    }
+                }
             }
+            else {
+                insertArrayNull = true;
+            }
+        }
+        
+        if ( insertArrayNull ) {
+            // x : [] - need to insert undefined
+            BSONObjBuilder b(_sizeTracker);
+            for( unsigned j = 0; j < fixed.size(); ++j ) {
+                if ( j == arrIdx ){
+                    b.appendUndefined( "" );
+                }
+                else {
+                    BSONElement e = fixed[j];
+                    if ( e.eoo() )
+                        b.appendNull( "" );
+                    else
+                        b.appendAs( e , "" );
+                }
+            }
+            keys.insert( b.obj() );
         }
     }
 

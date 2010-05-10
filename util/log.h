@@ -41,8 +41,17 @@ namespace mongo {
         const T& t_;
     };
 
+    class Tee { 
+    public:
+        virtual ~Tee(){}
+        virtual void write(const string& str) = 0;
+    };
+
     class Nullstream {
     public:
+        virtual Nullstream& operator<< (Tee* tee) { 
+            return *this;
+        }
         virtual ~Nullstream() {}
         virtual Nullstream& operator<<(const char *) {
             return *this;
@@ -111,11 +120,10 @@ namespace mongo {
         virtual Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
             return *this;
         }
-        virtual void flush(){}
+        virtual void flush(Tee *t = 0) {}
     };
     extern Nullstream nullstream;
     
-
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
@@ -124,11 +132,13 @@ namespace mongo {
         static int magicNumber(){
             return 1717;
         }
-        void flush() {
+        void flush(Tee *t = 0) {
             // this ensures things are sane
             if ( doneSetup == 1717 ){
                 scoped_lock lk(mutex);
-                cout << ss.str();
+                string s = ss.str();
+                if( t ) t->write(s);
+                cout << s;
                 cout.flush();
             }
             ss.str("");
@@ -154,9 +164,14 @@ namespace mongo {
             ss << x.val();
             return *this;
         }
+        Nullstream& operator<< (Tee* tee) { 
+            ss << '\n';
+            flush(tee);
+            return *this;
+        }
         Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
             ss << '\n';
-            flush();
+            flush(0);
             return *this;
         }
         Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
@@ -205,7 +220,7 @@ namespace mongo {
        at the specified level or higher. */
     inline void logflush(int level = 0) { 
         if( level > logLevel )
-            Logstream::get().flush();
+            Logstream::get().flush(0);
     }
 
     /* without prolog */
@@ -215,9 +230,13 @@ namespace mongo {
         return Logstream::get();
     }
 
-    inline Nullstream& log( int level = 0 ) {
+    inline Nullstream& log( int level ) {
         if ( level > logLevel )
             return nullstream;
+        return Logstream::get().prolog();
+    }
+
+    inline Nullstream& log() {
         return Logstream::get().prolog();
     }
 

@@ -416,13 +416,13 @@ namespace mongo {
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
             virtual LockType locktype() const { return NONE; } 
-            bool run(const char *dbname, BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+            bool run(const string& dbname , BSONObj& cmd, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
                 Timer t;
                 Client::GodScope cg;
                 Client& client = cc();
                 CurOp * op = client.curop();
 
-                MRSetup mr( nsToDatabase( dbname ) , cmd );
+                MRSetup mr( dbname , cmd );
 
                 log(1) << "mr ns: " << mr.ns << endl;
                 
@@ -446,13 +446,13 @@ namespace mongo {
                     MRTL * mrtl = new MRTL( state );
                     _tlmr.reset( mrtl );
 
-                    ProgressMeter & pm = op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) );
+                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , db.count( mr.ns , mr.filter ) ) );
                     long long mapTime = 0;
                     {
                         readlock lock( mr.ns );
                         Client::Context ctx( mr.ns );
                         
-                        auto_ptr<Cursor> temp = QueryPlanSet(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = QueryPlanSet(mr.ns.c_str() , mr.filter , BSONObj() ).getBestGuess()->newCursor();
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.ns.c_str() ) );
 
                         if ( ! mr.filter.isEmpty() )
@@ -531,9 +531,9 @@ namespace mongo {
                         BSONObj prev;
                         BSONList all;
                         
-                        pm = op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) );
+                        assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , db.count( mr.incLong ) ) );
 
-                        auto_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
+                        shared_ptr<Cursor> temp = QueryPlanSet(mr.incLong.c_str() , BSONObj() , sortKey ).getBestGuess()->newCursor();
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , mr.incLong.c_str() ) );
                         
                         while ( cursor->ok() ){
@@ -544,7 +544,7 @@ namespace mongo {
                             
                             if ( o.woSortOrder( prev , sortKey ) == 0 ){
                                 all.push_back( o );
-                                if ( pm.hits() % 1000 == 0 ){
+                                if ( pm->hits() % 1000 == 0 ){
                                     if ( ! cursor->yield() ){
                                         cursor.release();
                                         break;
@@ -622,11 +622,8 @@ namespace mongo {
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ){}
             virtual bool slaveOk() const { return true; }
             
-            virtual LockType locktype() const { return WRITE; } 
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                string dbname = cc().database()->name; // this has to come before dbtemprelease
-                dbtemprelease temprelease; // we don't touch the db directly
-
+            virtual LockType locktype() const { return NONE; } 
+            bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
 
                 MRSetup mr( dbname , cmdObj.firstElement().embeddedObjectUserCheck() , false );
@@ -663,7 +660,7 @@ namespace mongo {
                                                     Query().sort( sortKey ) );
                 
                 
-                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( ns );
+                auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbname );
                 ScriptingFunction reduceFunction = s->createFunction( mr.reduceCode.c_str() );
                 ScriptingFunction finalizeFunction = 0;
                 if ( mr.finalizeCode.size() )

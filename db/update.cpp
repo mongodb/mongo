@@ -682,7 +682,7 @@ namespace mongo {
         UpdateOp() : _nscanned() {}
         virtual void init() {
             BSONObj pattern = qp().query();
-            _c.reset( qp().newCursor().release() );
+            _c = qp().newCursor();
             if ( ! _c->ok() )
                 setComplete();
             else
@@ -703,13 +703,20 @@ namespace mongo {
         bool curMatches(){
             return _matcher->matches(_c->currKey(), _c->currLoc() , &_details );
         }
+
+        CoveredIndexMatcher* getMatcher(){
+            return _matcher.get();
+        }
+
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *clone() const {
             return new UpdateOp();
         }
+        
         shared_ptr< Cursor > c() { return _c; }
         long long nscanned() const { return _nscanned; }
         MatchDetails& getMatchDetails(){ return _details; }
+
     private:
         shared_ptr< Cursor > _c;
         long long _nscanned;
@@ -752,11 +759,27 @@ namespace mongo {
         UpdateOp original;
         shared_ptr< UpdateOp > u = qps.runOp( original );
         massert( 10401 ,  u->exceptionMessage(), u->complete() );
+        
         shared_ptr< Cursor > c = u->c();
+        auto_ptr<ClientCursor> cc;
+
         int numModded = 0;
+        long long nscanned = 0;
         while ( c->ok() ) {
+            nscanned++;
+
             if ( numModded > 0 && ! u->curMatches() ){
                 c->advance();
+                
+                if ( nscanned % 256 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
+                    if ( cc.get() == 0 )
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                    if ( ! cc->yield() ){
+                        cc.release();
+                        break;
+                    }
+                }
+
                 continue;
             }
             Record *r = c->_current();
@@ -788,7 +811,7 @@ namespace mongo {
             }
             
             if ( profile )
-                ss << " nscanned:" << u->nscanned();
+                ss << " nscanned:" << nscanned;
             
             /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                regular ones at the moment. */
@@ -865,6 +888,16 @@ namespace mongo {
                     break;
                 if ( indexHack )
                     c->checkLocation();
+
+                if ( nscanned % 64 == 0 && ! u->getMatcher()->docMatcher().atomic() ){
+                    if ( cc.get() == 0 )
+                        cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                    if ( ! cc->yield() ){
+                        cc.release();
+                        break;
+                    }
+                }
+                
                 continue;
             } 
             
@@ -890,7 +923,7 @@ namespace mongo {
 
         
         if ( profile )
-            ss << " nscanned:" << u->nscanned();
+            ss << " nscanned:" << nscanned;
         
         if ( upsert ) {
             if ( updateobj.firstElement().fieldName()[0] == '$' ) {

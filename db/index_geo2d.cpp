@@ -477,7 +477,7 @@ namespace mongo {
             return _spec->getDetails();
         }
 
-        virtual auto_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
+        virtual shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const;
 
         virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const {
             BSONElement e = query.getFieldDotted(_geo.c_str());
@@ -1468,7 +1468,7 @@ namespace mongo {
     };    
 
 
-    auto_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
+    shared_ptr<Cursor> Geo2dType::newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
         if ( numWanted < 0 )
             numWanted = numWanted * -1;
         else if ( numWanted == 0 )
@@ -1504,7 +1504,7 @@ namespace mongo {
                 }
                 shared_ptr<GeoSearch> s( new GeoSearch( this , _tohash(e) , numWanted , query , maxDistance ) );
                 s->exec();
-                auto_ptr<Cursor> c;
+                shared_ptr<Cursor> c;
                 c.reset( new GeoSearchCursor( s ) );
                 return c;   
             }
@@ -1515,13 +1515,13 @@ namespace mongo {
                 string type = e.fieldName();
                 if ( type == "$center" ){
                     uassert( 13059 , "$center has to take an object or array" , e.isABSONObj() );
-                    auto_ptr<Cursor> c;
+                    shared_ptr<Cursor> c;
                     c.reset( new GeoCircleBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;   
                 }
                 else if ( type == "$box" ){
                     uassert( 13065 , "$box has to take an object or array" , e.isABSONObj() );
-                    auto_ptr<Cursor> c;
+                    shared_ptr<Cursor> c;
                     c.reset( new GeoBoxBrowse( this , e.embeddedObjectUserCheck() , query ) );
                     return c;   
                 }
@@ -1546,8 +1546,8 @@ namespace mongo {
         bool slaveOk() const { return true; }
         void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
         bool slaveOverrideOk() { return true; }
-        bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( ! d ){
@@ -1647,8 +1647,8 @@ namespace mongo {
         virtual LockType locktype() const { return READ; } 
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() { return true; }
-        bool run(const char * stupidns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
-            string ns = nsToDatabase( stupidns ) + "." + cmdObj.firstElement().valuestr();
+        bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl){
+            string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( ! d ){

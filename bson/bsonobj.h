@@ -301,7 +301,7 @@ namespace mongo {
         /** @return an md5 value for this object. */
         string md5() const;
         
-        bool operator==( const BSONObj& other ){
+        bool operator==( const BSONObj& other ) const{
             return woCompare( other ) == 0;
         }
 
@@ -368,7 +368,7 @@ private:
             _objdata = data;
             if ( ! isValid() ){
                 stringstream ss;
-                ss << "Invalid BSONObj spec size: " << objsize();
+                ss << "Invalid BSONObj spec size: " << objsize() << " (" << hex << objsize() << dec << ")";
                 try {
                     BSONElement e = firstElement();
                     ss << " first element:" << e.toString() << " ";

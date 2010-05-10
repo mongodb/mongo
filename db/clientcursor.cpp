@@ -293,7 +293,7 @@ namespace mongo {
             help << " example: { cursorInfo : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
-        bool run(const char *dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
+        bool run(const string&, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
             recursive_scoped_lock lock(ClientCursor::ccmutex);
             result.append("byLocation_size", unsigned( ClientCursor::byLoc.size() ) );
             result.append("clientCursors_size", unsigned( ClientCursor::clientCursorsById.size() ) );

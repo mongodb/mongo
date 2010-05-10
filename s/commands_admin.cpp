@@ -72,7 +72,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " shows status/reachability of servers in the cluster";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 result.append("configserver", configServer.getPrimary().getConnString() );
                 result.append("isdbgrid", 1);
                 return true;
@@ -88,7 +88,7 @@ namespace mongo {
             virtual bool slaveOk() const { return true; }
             virtual LockType locktype() const { return NONE; } 
             
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
                 result.append("uptime",(double) (time(0)-_started));
                 result.appendDate( "localTime" , jsTime() );
 
@@ -153,7 +153,7 @@ namespace mongo {
         class ListGridCommands : public GridAdminCmd {
         public:
             ListGridCommands() : GridAdminCmd("gridcommands") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
                 BSONObjBuilder arr;
                 int num=0;
@@ -172,7 +172,7 @@ namespace mongo {
         class ListDatabaseCommand : public GridAdminCmd {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection conn( configServer.getPrimary() );
 
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
@@ -199,7 +199,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' } TODO: locking? ";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cmdObj["moveprimary"].valuestrsafe();
 
                 if ( dbname.size() == 0 ){
@@ -280,7 +280,7 @@ namespace mongo {
                     << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
                     << "  { enablesharding : \"<dbname>\" }\n";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string dbname = cmdObj["enablesharding"].valuestrsafe();
                 if ( dbname.size() == 0 ){
                     errmsg = "no db";
@@ -312,7 +312,7 @@ namespace mongo {
                     << "Shard a collection.  Requires key.  Optional unique. Sharding must already be enabled for the database.\n"
                     << "  { enablesharding : \"<dbname>\" }\n";
             }
-            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj["shardcollection"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
@@ -388,7 +388,7 @@ namespace mongo {
                 help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
             }
             
-            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj["getShardVersion"].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "need to speciy fully namespace";
@@ -426,7 +426,7 @@ namespace mongo {
 
             virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ) = 0;
 
-            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 string ns = cmdObj[_name.c_str()].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
@@ -503,7 +503,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
-            bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 Timer t;
                 string ns = cmdObj["movechunk"].valuestrsafe();
                 if ( ns.size() == 0 ){
@@ -558,7 +558,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "list all shards of the system";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
@@ -582,7 +582,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "add a new shard to the system";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection conn( configServer.getPrimary() );
                 
                 
@@ -667,7 +667,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "remove a shard to the system.\nshard must be empty or command will return an error.";
             }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 if ( 1 ){
                     errmsg = "removeshard not yet implemented";
                     return 0;
@@ -693,7 +693,7 @@ namespace mongo {
                 return true;
             }
             IsDbGridCmd() : Command("isdbgrid") { }
-            bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
                 result.append("hostname", ourHostname);
                 return true;
@@ -711,7 +711,7 @@ namespace mongo {
                 help << "test if this is master half of a replica pair";
             }
             CmdIsMaster() : Command("ismaster") { }
-            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("ismaster", 1.0 );
                 result.append("msg", "isdbgrid");
                 return true;
@@ -734,7 +734,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "{whatsmyuri:1}";
             }        
-            virtual bool run(const char *dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 result << "you" << ClientInfo::get()->getRemote();
                 return true;
             }
@@ -752,7 +752,7 @@ namespace mongo {
                 help << "get previous error (since last reseterror command)";
             }
             CmdShardingGetPrevError() : Command("getpreverror") { }
-            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported for sharded environments";
                 return false;
             }
@@ -769,7 +769,7 @@ namespace mongo {
                 help << "check for an error on the last command executed";
             }
             CmdShardingGetLastError() : Command("getlasterror") { }
-            virtual bool run(const char *nsraw, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(const string& dbName, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
                 {
                     assert( le );
@@ -778,9 +778,6 @@ namespace mongo {
                         return true;
                     }
                 }
-                
-                string dbName = nsraw;
-                dbName = dbName.substr( 0 , dbName.size() - 5 );
                 
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
@@ -842,7 +839,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; } 
         virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
         
-        bool run(const char *ns, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(const string& , BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector<Shard> shards;
             Shard::getAllShards( shards );
             

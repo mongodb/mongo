@@ -85,7 +85,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; } 
         WriteBackCommand() : MongodShardCommand( "writebacklisten" ){}
         void help(stringstream& h) const { h<<"internal"; }
-        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ){
@@ -119,7 +119,7 @@ namespace mongo {
         
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
  
-        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             
             bool authoritative = cmdObj.getBoolField( "authoritative" );
 
@@ -254,7 +254,7 @@ namespace mongo {
         
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
 
-        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ){
                 errmsg = "need to speciy fully namespace";
@@ -283,7 +283,7 @@ namespace mongo {
 
         virtual LockType locktype() const { return WRITE; } 
         
-        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // so i have to start clone, tell caller its ok to make change
             // at this point the caller locks me, and updates config db
             // then finish calls finish, and then deletes data when cursors are done
@@ -354,7 +354,7 @@ namespace mongo {
 
         virtual LockType locktype() const { return WRITE; } 
         
-        bool run(const char *cmdns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+        bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
             // see MoveShardStartCommand::run
             
             string ns = cmdObj["movechunk.finish"].valuestrsafe();

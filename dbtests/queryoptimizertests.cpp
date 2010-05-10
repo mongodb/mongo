@@ -1011,7 +1011,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), two );
                 theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true );
-                for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
+                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
                     ASSERT( 3 != c->current().getIntField( "_id" ) );
             }
         };
@@ -1027,7 +1027,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), two );
                 theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "a" << GTE << 0 << "_id" << GT << 0 ), true );
-                for( auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
+                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
                     ASSERT( 2 != c->current().getIntField( "_id" ) );
             }
         };
@@ -1077,7 +1077,7 @@ namespace QueryOptimizerTests {
                 BSONElement hintElt = hint.firstElement();
                 QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
                 QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
-                auto_ptr< Cursor > c = qp.newCursor();
+                boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
                     ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
@@ -1088,7 +1088,7 @@ namespace QueryOptimizerTests {
                 {
                     QueryPlanSet s( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ), &hintElt );
                     QueryPlan qp( nsd(), 1, s.fbs(), BSON( "a" << -1 ) );
-                    auto_ptr< Cursor > c = qp.newCursor();
+                    boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
                     for( int i = 0; i < 4; ++i, c->advance() ) {
                         ASSERT_EQUALS( expected[ i ], c->current().getField( "a" ).number() );
@@ -1110,7 +1110,7 @@ namespace QueryOptimizerTests {
                 BSONElement hintElt = hint.firstElement();
                 QueryPlanSet s( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
                 QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
-                auto_ptr< Cursor > c = qp.newCursor();
+                boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
                     ASSERT_EQUALS( expected[ i ], c->current().getField( "b" ).number() );
@@ -1131,7 +1131,7 @@ namespace QueryOptimizerTests {
                 BSONElement hintElt = hint.firstElement();
                 QueryPlanSet s( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj(), &hintElt );
                 QueryPlan qp( nsd(), 1, s.fbs(), BSONObj() );
-                auto_ptr< Cursor > c = qp.newCursor();
+                boost::shared_ptr<Cursor> c = qp.newCursor();
                 for( int i = 2; i < 10; ++i, c->advance() ) {
                     ASSERT_EQUALS( i, c->current().getField( "b" ).number() );
                 }

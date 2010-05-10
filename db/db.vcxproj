@@ -94,8 +94,8 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\js\src;..\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <PreprocessorDefinitions>_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -103,6 +103,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -118,7 +119,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\js\src;..\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -126,6 +127,8 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;4267;4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>No</MinimalRebuild>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -141,7 +144,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\js\src;..\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -149,6 +152,8 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>No</MinimalRebuild>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -158,6 +163,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -165,7 +171,7 @@
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\js\src;..\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_UNICODE;UNICODE;SUPPORT_UCP;SUPPORT_UTF8;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;PCRE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -173,6 +179,8 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4800;4267;4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>No</MinimalRebuild>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -185,9 +193,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\..\js\src\js.lib" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\dbclientcursor.cpp" />
@@ -433,6 +438,8 @@
     </ClCompile>
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
+    <ClCompile Include="repl\consensus.cpp" />
+    <ClCompile Include="repl\rs_mod.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="reccache.cpp" />
     <ClCompile Include="storage.cpp" />
@@ -543,17 +550,24 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct" />
+    <None Include="..\util\mongoutils\README" />
+    <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\pcre-7.4\config.h" />
     <ClInclude Include="..\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\util\mongoutils\circularstringlist.h" />
+    <ClInclude Include="..\util\mongoutils\html.h" />
+    <ClInclude Include="..\util\ramlog.h" />
+    <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
     <ClInclude Include="rec.h" />
     <ClInclude Include="reccache.h" />
     <ClInclude Include="reci.h" />
     <ClInclude Include="recstore.h" />
+    <ClInclude Include="repl\connections.h" />
     <ClInclude Include="storage.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
@@ -651,6 +665,32 @@
     <ClInclude Include="jsobj.h" />
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\js\js32d.lib">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\..\js\js32r.lib">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\..\js\js64d.lib">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\..\js\js64r.lib">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </Library>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

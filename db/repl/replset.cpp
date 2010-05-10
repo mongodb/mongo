@@ -18,7 +18,6 @@
 #include "../cmdline.h"
 #include "../../util/sock.h"
 #include "replset.h"
-#include "rs_config.h"
 
 namespace mongo { 
 
@@ -26,6 +25,7 @@ namespace mongo {
     ReplSet *theReplSet = 0;
 
     void ReplSet::fillIsMaster(BSONObjBuilder& b) {
+        log() << "hellO" << rsLog;
         b.append("ismaster", 0);
         b.append("ok", false);
         b.append("msg", "not yet implemented");
@@ -38,15 +38,16 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : fatal(false) {
+    ReplSet::ReplSet(string cfgString) : _self(0), elect(this) {
+        _myState = STARTUP;
 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
         _name = string(p, slash-p);
-        log() << "replSet " << cfgString << endl;
+        log() << "replSet " << cfgString << rsLog;
 
-        set<HostAndPort> temp;
+        set<HostAndPort> seedSet;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
         p = slash + 1;
         while( 1 ) {
@@ -61,11 +62,11 @@ namespace mongo {
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);
                 }
-                uassert(13096, "bad --replSet config string - dups?", temp.count(m) == 0 );
-                temp.insert(m);
+                uassert(13096, "bad --replSet config string - dups?", seedSet.count(m) == 0 );
+                seedSet.insert(m);
                 uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() )
-                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << endl;
+                    log() << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 else
                     seeds->push_back(m);
                 if( *comma == 0 )
@@ -80,16 +81,58 @@ namespace mongo {
 
         loadConfig();
 
-        startHealthThreads();
+        for( Member *m = head(); m; m = m->next() )
+            seedSet.erase(m->_h);
+        for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
+            log() << "replSet warning: seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+        }
+    
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
     string ReplSet::startupStatusMsg;
 
+    void ReplSet::setFrom(ReplSetConfig& c) { 
+        _cfg.reset( new ReplSetConfig(c) );
+        assert( _cfg->ok() );
+        assert( _name.empty() || _name == _cfg->_id );
+        _name = _cfg->_id;
+        assert( !_name.empty() );
+
+        assert( _members.head() == 0 );
+        int me=0;
+        for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) { 
+            const ReplSetConfig::MemberCfg& m = *i;
+            if( m.h.isSelf() ) {
+                me++;
+                assert( _self == 0 );
+                _self = new Member(m.h, m._id, &m);
+            } else {
+                Member *mi = new Member(m.h, m._id, &m);
+                _members.push(mi);
+            }
+        }
+        assert( me == 1 );
+    }
+
+    void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
+        int v = -1;
+        ReplSetConfig *highest = 0;
+        for( vector<ReplSetConfig>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) { 
+            ReplSetConfig& cfg = *i;
+            if( cfg.ok() && cfg.version > v ) { 
+                highest = &cfg;
+                v = cfg.version;
+            }
+        }
+        assert( highest );
+        setFrom(*highest);
+    }
+
     void ReplSet::loadConfig() {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
-            startupStatusMsg = "loading admin.system.replset config (LOADINGCONFIG)";
+            startupStatusMsg = "loading " + rsConfigNs + " config (LOADINGCONFIG)";
             try {
                 vector<ReplSetConfig> configs;
                 configs.push_back( ReplSetConfig(HostAndPort::me()) );
@@ -108,28 +151,29 @@ namespace mongo {
 
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg = "can't get admin.system.replset config from self or any seed (uninitialized?)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed (EMPTYCONFIG)\n";
-                        log() << "replSet have you ran replSetInitiate yet?\n";
-                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (uninitialized?)";
+                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
+                        log() << "replSet have you ran replSetInitiate yet?" << rsLog;
+                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg = "can't currently get admin.system.replset config from self or any seed (EMPTYUNREACHABLE)";
-                        log() << "replSet can't get admin.system.replset config from self or any seed.\n";
-                        log() << "replSet sleeping 1 minute and will try again." << endl;
+                        startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
+                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
+                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
                     }
 
                     sleepsecs(60);
                     continue;
                 }
+                finishLoadingConfig(configs);
             }
-            catch(AssertionException&) { 
+            catch(DBException& e) { 
                 startupStatus = BADCONFIG;
                 startupStatusMsg = "replSet error loading set config (BADCONFIG)";
-                log() << "replSet error loading configurations\n";
-                log() << "replSet replication will not start" << endl;
-                fatal = true;
+                log() << "replSet error loading configurations " << e.toString() << rsLog;
+                log() << "replSet replication will not start" << rsLog;
+                fatal();
                 throw;
             }
             break;
@@ -138,18 +182,7 @@ namespace mongo {
         startupStatus = FINISHME;
     }
 
-    /*void ReplSet::addMemberIfMissing(const HostAndPort& h) { 
-        MemberInfo *m = _members.head();
-        while( m ) {
-            if( h.host() == m->host && h.port() == m->port )
-                return;
-            m = m->next();
-        }
-        MemberInfo *nm = new MemberInfo(h.host(), h.port());
-        _members.push(nm);
-    }*/
-
-    /* called at initialization */
+    /* called at startup */
     void startReplSets() {
         mongo::lastError.reset( new LastError() );
         try { 
@@ -158,12 +191,12 @@ namespace mongo {
                 assert(!replSet);
                 return;
             }
-            theReplSet = new ReplSet(cmdLine.replSet);
+            (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
-            log() << "replSet Caught exception in management thread: " << e.what() << endl;
+            log() << "replSet Caught exception in management thread: " << e.what() << rsLog;
             if( theReplSet ) 
-                theReplSet->fatal = true;
+                theReplSet->fatal();
         }
     }
 

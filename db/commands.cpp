@@ -152,7 +152,7 @@ namespace mongo {
                 anObjBuilder.append( "help" , help.str() );
             }
             else {
-                ok = c->run(ns, jsobj, errmsg, anObjBuilder, false);
+                ok = c->run( nsToDatabase( ns ) , jsobj, errmsg, anObjBuilder, false);
             }
 
             BSONObj tmp = anObjBuilder.asTempObj();

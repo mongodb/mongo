@@ -103,13 +103,13 @@ namespace mongo {
         /*const*/ CursorId cursorid;
         string ns;
         auto_ptr<CoveredIndexMatcher> matcher;
-        auto_ptr<Cursor> c;
+        shared_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
         int _queryOptions;
         OpTime _slaveReadTill;
 
-        ClientCursor(int queryOptions, auto_ptr<Cursor>& _c, const char *_ns) :
+        ClientCursor(int queryOptions, shared_ptr<Cursor>& _c, const char *_ns) :
             _idleAgeMillis(0), _pinValue(0), 
             _doingDeletes(false), 
             ns(_ns), c(_c), 

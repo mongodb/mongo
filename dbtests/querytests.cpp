@@ -42,7 +42,7 @@ namespace QueryTests {
         }
         ~Base() {
             try {
-                auto_ptr< Cursor > c = theDataFileMgr.findAll( ns() );
+                boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
                 vector< DiskLoc > toDelete;
                 for(; c->ok(); c->advance() )
                     toDelete.push_back( c->currLoc() );

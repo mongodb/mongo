@@ -46,13 +46,13 @@ namespace PdfileTests {
                 ASSERT( userCreateNS( ns(), fromjson( spec.str() ), err, false ) );
                 prepare();
                 int j = 0;
-                for ( auto_ptr< Cursor > i = theDataFileMgr.findAll( ns() );
+                for ( boost::shared_ptr<Cursor> i = theDataFileMgr.findAll( ns() );
                         i->ok(); i->advance(), ++j )
                     ASSERT_EQUALS( j, i->current().firstElement().number() );
                 ASSERT_EQUALS( count(), j );
 
                 j = count() - 1;
-                for ( auto_ptr< Cursor > i =
+                for ( boost::shared_ptr<Cursor> i =
                             findTableScan( ns(), fromjson( "{\"$natural\":-1}" ) );
                         i->ok(); i->advance(), --j )
                     ASSERT_EQUALS( j, i->current().firstElement().number() );

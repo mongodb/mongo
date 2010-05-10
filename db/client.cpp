@@ -54,6 +54,37 @@ namespace mongo {
         if ( !_shutdown ) 
             cout << "ERROR: Client::shutdown not called: " << _desc << endl;
     }
+    
+    void Client::dropTempCollectionsInDB( const string db ) {
+	list<string>::iterator i = _tempCollections.begin();
+	while ( i!=_tempCollections.end() ) {
+	    string ns = *i;
+	    dblock l;
+	    Client::Context ctx( ns );
+	    if ( nsdetails( ns.c_str() ) &&
+		 ns.compare( 0, db.length(), db ) == 0 ) {
+		try {
+		    string err;
+		    BSONObjBuilder b;
+		    dropCollection( ns, err, b );
+		    i = _tempCollections.erase(i);
+		    ++i;
+		}
+		catch ( ... ){
+		    log() << "error dropping temp collection: " << ns << endl;
+		}
+	    } else {
+		++i;
+	    }
+	}
+    }
+
+    void Client::dropAllTempCollectionsInDB(const string db) {
+	for ( set<Client*>::iterator i = clients.begin(); i!=clients.end(); i++ ){
+	    Client* cli = *i;
+	    cli->dropTempCollectionsInDB(db);
+	}
+    }
 
     bool Client::shutdown(){
         _shutdown = true;
@@ -268,7 +299,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; } 
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();
             c.gotHandshake( cmdObj );
             return 1;

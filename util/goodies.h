@@ -18,9 +18,17 @@
 
 #pragma once
 
+#include <sstream>
 #include "../bson/util/misc.h"
 
 namespace mongo {
+
+    template<class T>
+    inline string ToString(const T& t) { 
+        stringstream s;
+        s << t;
+        return s.str();
+    }
 
 #if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__sun__)
 
@@ -184,24 +192,24 @@ namespace mongo {
         xt.sec += s;
         boost::thread::sleep(xt);
     }
-    inline void sleepmillis(int s) {
+    inline void sleepmillis(long long s) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
-        xt.sec += ( s / 1000 );
-        xt.nsec += ( s % 1000 ) * 1000000;
+        xt.sec += (int)( s / 1000 );
+        xt.nsec += (int)(( s % 1000 ) * 1000000);
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
         }        
         boost::thread::sleep(xt);
     }
-    inline void sleepmicros(int s) {
+    inline void sleepmicros(long long s) {
         if ( s <= 0 )
             return;
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
-        xt.sec += ( s / 1000000 );
-        xt.nsec += ( s % 1000000 ) * 1000;
+        xt.sec += (int)( s / 1000000 );
+        xt.nsec += (int)(( s % 1000000 ) * 1000);
         if ( xt.nsec >= 1000000000 ) {
             xt.nsec -= 1000000000;
             xt.sec++;
@@ -217,7 +225,7 @@ namespace mongo {
             cout << "nanosleep failed" << endl;
         }
     }
-    inline void sleepmicros(int s) {
+    inline void sleepmicros(long long s) {
         if ( s <= 0 )
             return;
         struct timespec t;
@@ -228,7 +236,7 @@ namespace mongo {
             cout << "nanosleep failed" << endl;
         }
     }
-    inline void sleepmillis(int s) {
+    inline void sleepmillis(long long s) {
         sleepmicros( s * 1000 );
     }
 #endif
@@ -283,6 +291,10 @@ namespace mongo {
     // destroying them.
     class mutex : boost::noncopyable {
     public:
+        /* old boost doesn't support lock()...
+        void __lock() { _m->lock(); }
+        void __unlock() { _m->unlock(); }*/
+
         mutex() { _m = new boost::mutex(); }
         ~mutex() {
             if( !__destroyingStatics ) {
@@ -440,7 +452,7 @@ namespace mongo {
         boost::thread_specific_ptr<T> _val;
     };
 
-    class ProgressMeter {
+    class ProgressMeter : boost::noncopyable {
     public:
         ProgressMeter( long long total , int secondsBetween = 3 , int checkInterval = 100 ){
             reset( total , secondsBetween , checkInterval );
@@ -507,6 +519,10 @@ namespace mongo {
             buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
             return buf.str();
         }
+
+        bool operator==( const ProgressMeter& other ) const {
+            return this == &other;
+        }
     private:
 
         bool _active;
@@ -518,6 +534,36 @@ namespace mongo {
         long long _done;
         long long _hits;
         int _lastTime;
+    };
+
+    class ProgressMeterHolder : boost::noncopyable {
+    public:
+        ProgressMeterHolder( ProgressMeter& pm )
+            : _pm( pm ){
+        }
+        
+        ~ProgressMeterHolder(){
+            _pm.finished();
+        }
+
+        ProgressMeter* operator->(){
+            return &_pm;
+        }
+
+        bool hit( int n = 1 ){
+            return _pm.hit( n );
+        }
+
+        void finished(){
+            _pm.finished();
+        }
+        
+        bool operator==( const ProgressMeter& other ){
+            return _pm == other;
+        }
+        
+    private:
+        ProgressMeter& _pm;
     };
 
     class TicketHolder {

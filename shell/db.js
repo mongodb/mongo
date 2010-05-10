@@ -513,17 +513,17 @@ DB.prototype.getCollectionNames = function(){
 
     var nsLength = this._name.length + 1;
     
-    this.getCollection( "system.namespaces" ).find().sort({name:1}).forEach(
-        function(z){
-            var name = z.name;
-            
-            if ( name.indexOf( "$" ) >= 0 && name != "local.oplog.$main" )
-                return;
-            
-            all.push( name.substring( nsLength ) );
-        }
-    );
-    return all;
+    var c = this.getCollection( "system.namespaces" ).find();
+    while ( c.hasNext() ){
+        var name = c.next().name;
+        
+        if ( name.indexOf( "$" ) >= 0 && name.indexOf( ".oplog.$" ) < 0 )
+            continue;
+        
+        all.push( name.substring( nsLength ) );
+    }
+    
+    return all.sort();
 }
 
 DB.prototype.tojson = function(){
@@ -626,13 +626,19 @@ DB.prototype.printReplicationInfo = function() {
 
 DB.prototype.printSlaveReplicationInfo = function() {
     function g(x) {
+        assert( x , "how could this be null (printSlaveReplicationInfo gx)" )
         print("source:   " + x.host);
-        var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
-        var now = new Date();
-        print("syncedTo: " + st.toString() );
-        var ago = (now-st)/1000;
-        var hrs = Math.round(ago/36)/100;
-        print("          = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+        if ( x.syncedTo ){
+            var st = new Date( DB.tsToSeconds( x.syncedTo ) * 1000 );
+            var now = new Date();
+            print("\t syncedTo: " + st.toString() );
+            var ago = (now-st)/1000;
+            var hrs = Math.round(ago/36)/100;
+            print("\t\t = " + Math.round(ago) + "secs ago (" + hrs + "hrs)"); 
+        }
+        else {
+            print( "\t doing initial sync" );
+        }
     }
     var L = this.getSisterDB("local");
     if( L.sources.count() == 0 ) { 

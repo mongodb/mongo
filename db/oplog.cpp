@@ -142,7 +142,20 @@ namespace mongo {
         const char * ns = "local.oplog.$main";
         Client::Context ctx(ns);
         
-        if ( nsdetails( ns ) ) {
+        NamespaceDetails * nsd = nsdetails( ns );
+        if ( nsd ) {
+            
+            if ( cmdLine.oplogSize != 0 ){
+                int o = (int)(nsd->storageSize() / ( 1024 * 1024 ) );
+                int n = (int)(cmdLine.oplogSize / ( 1024 * 1024 ) );
+                if ( n != o ){
+                    stringstream ss;
+                    ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ") see: http://dochub.mongodb.org/core/increase-oplog";
+                    log() << ss.str() << endl;
+                    throw UserException( 13257 , ss.str() );
+                }
+            }
+
             DBDirectClient c;
             BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
             if ( !lastOp.isEmpty() ) {
@@ -198,7 +211,7 @@ namespace mongo {
             help << "examples: { logCollection: <collection ns>, start: 1 }, "
                  << "{ logCollection: <collection ns>, validateComplete: 1 }";
         }
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string logCollection = cmdObj.getStringField( "logCollection" );
             if ( logCollection.empty() ) {
                 errmsg = "missing logCollection spec";

@@ -26,12 +26,14 @@
 namespace mongo { 
 
     /**
-    local.system.replset
+    " + rsConfigNs + "
 
     This collection has one object per server in the set.  
 
     See "Replical Sets Configuration" on mongodb.org wiki for details on the format.
     */
+
+    const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
     public:
@@ -44,8 +46,8 @@ namespace mongo {
 
         bool ok() const { return _ok; }
 
-        struct Member {
-            Member() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
+        struct MemberCfg {
+            MemberCfg() : _id(-1), votes(1), priority(1.0), arbiterOnly(false) { }
             int _id;              /* ordinal */
             unsigned votes;       /* how many votes this node gets. default 1. */
             HostAndPort h;
@@ -54,7 +56,7 @@ namespace mongo {
             void check() const;   /* check validity, assert if not. */
             BSONObj asBson() const;
         };
-        vector<Member> members;
+        vector<MemberCfg> members;
         string _id;
         int version;
         HealthOptions ho;

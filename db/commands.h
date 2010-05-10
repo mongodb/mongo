@@ -45,7 +45,7 @@ namespace mongo {
 
            return value is true if succeeded.  if false, set errmsg text.
         */
-        virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
+        virtual bool run(const string& db, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) = 0;
 
         /* 
 		   note: logTheTop() MUST be false if READ

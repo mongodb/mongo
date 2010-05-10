@@ -49,8 +49,8 @@ namespace mongo {
            requested sort order */
         bool unhelpful() const { return unhelpful_; }
         int direction() const { return direction_; }
-        auto_ptr< Cursor > newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
-        auto_ptr< Cursor > newReverseCursor() const;
+        shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
+        shared_ptr<Cursor> newReverseCursor() const;
         BSONObj indexKey() const;
         const char *ns() const { return fbs_.ns(); }
         NamespaceDetails *nsd() const { return d; }
