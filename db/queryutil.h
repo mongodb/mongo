@@ -187,6 +187,7 @@ namespace mongo {
         static FieldRange *trivialRange_;
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > ranges_;
+        vector< FieldRangeSet > _orSets;
         const char *ns_;
         BSONObj query_;
     };

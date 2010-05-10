@@ -507,6 +507,17 @@ namespace mongo {
 
             if ( strcmp( e.fieldName(), "$where" ) == 0 )
                 continue;
+            
+            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
+                massert( 13142, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );                                                                                         
+                BSONObjIterator j( e.embeddedObject() );                                                                                                                                                        
+                while( j.more() ) {                                                                                                                                                                             
+                    BSONElement f = j.next();                                                                                                                                                                   
+                    massert( 13143, "$or array must contain objects", f.type() == Object );                                                                                                                     
+                    _orSets.push_back( FieldRangeSet( ns, f.embeddedObject(), optimize ) );
+                }
+                continue;
+            }
 
             bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
             if ( equality && e.type() == Object ) {
