@@ -72,4 +72,5 @@ namespace mongo {
     
     extern CmdLine cmdLine;
     
+    void setupCoreSignals();
 }

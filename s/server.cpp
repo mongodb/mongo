@@ -103,14 +103,15 @@ namespace mongo {
     }
     
     void setupSignals(){
-        // needed for cmdLine, btu we do it in init()
+        signal(SIGTERM, sighandler);
+        signal(SIGINT, sighandler);
     }
 
     void init(){
         serverID.init();
         setupSIGTRAPforGDB();
-        signal(SIGTERM, sighandler);
-        signal(SIGINT, sighandler);
+        setupCoreSignals();
+        setupSignals();
     }
 
     void start() {
