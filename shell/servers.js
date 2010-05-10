@@ -725,7 +725,7 @@ SyncCCTest.prototype.tempStart = function( num ){
 
 
 function startParallelShell( jsCode ){
-    var x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode );
+    var x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode , db ? db.getMongo().host : null );
     return function(){
         waitProgram( x );
     };
