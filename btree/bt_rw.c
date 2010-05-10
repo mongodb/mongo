@@ -35,7 +35,8 @@ __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep)
  *	Return a database page, reading as necessary.
  */
 int
-__wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
+__wt_page_in(WT_TOC *toc,
+    u_int32_t addr, u_int32_t size, WT_PAGE **pagep, u_int32_t flags)
 {
 	DB *db;
 	ENV *env;
@@ -56,6 +57,7 @@ __wt_page_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 	cache = ienv->cache;
 
 	WT_ASSERT(env, size % WT_FRAGMENT == 0);
+	WT_ENV_FCHK_ASSERT(env, "__wt_page_in", flags, WT_APIMASK_WT_PAGE_IN);
 
 retry:	/* Search the cache for the page. */
 	found = 0;
@@ -99,6 +101,10 @@ retry:	/* Search the cache for the page. */
 		}
 		__wt_hazard_clear(toc, e->page);
 	}
+
+	/* Optionally, only return existing cache entries. */
+	if (LF_ISSET(WT_CACHE_ONLY))
+		return (WT_NOTFOUND);
 
 	__wt_cache_in_serial(toc, addr, size, pagep, ret);
 	if (ret == WT_RESTART) {
@@ -152,6 +158,15 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	return (WT_RESTART);
 }
 
+/*
+ * __wt_page_out --
+ *	Return a page to the cache.
+ */
+void
+__wt_page_out(WT_TOC *toc, WT_PAGE *page)
+{
+	__wt_hazard_clear(toc, page);
+}
 
 /*
  * __wt_page_read --

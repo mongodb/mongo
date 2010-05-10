@@ -58,7 +58,7 @@ __wt_bt_page_in(
 
 	db = toc->db;
 
-	WT_RET((__wt_page_in(toc, addr, size, &page)));
+	WT_RET((__wt_page_in(toc, addr, size, &page, 0)));
 
 	/* Optionally build the in-memory version of the page. */
 	if (inmem && page->indx_count == 0)
@@ -98,11 +98,7 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 		WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 	}
 
-	/*
-	 * Clearing the hazard reference technically belongs in the cache layer,
-	 * but this is a trivial function already.
-	 */
-	__wt_hazard_clear(toc, page);
+	__wt_page_out(toc, page);
 }
 
 /*

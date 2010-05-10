@@ -578,6 +578,8 @@ flags['bt_page_out'] = [
 	'MODIFIED' ]
 flags['bt_search_key_row'] = [
 	'INSERT' ]
+flags['wt_page_in'] = [
+	'CACHE_ONLY' ]
 
 ###################################################
 # Structure flag declarations

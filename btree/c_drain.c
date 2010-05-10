@@ -99,105 +99,6 @@ __wt_drain_hazard_compare(const void *a, const void *b)
 }
 
 /*
- * __wt_drain_sync --
- *	Flush all of the pages for any specified sync calls.
- */
-int
-__wt_drain_sync(ENV *env, int *didworkp)
-{
-	DB *db;
-	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e, **drain;
-	WT_SYNC_REQ *sr, *sr_end;
-	WT_TOC *toc;
-	u_int32_t drain_elem, i, j;
-	void (*f)(const char *, u_int64_t);
-
-	cache = env->ienv->cache;
-
-	/* Check if we need to run. */
-	sr = cache->sync_request;
-	sr_end =
-	    sr + sizeof(cache->sync_request) / sizeof(cache->sync_request[0]);
-	for (toc = NULL; sr < sr_end; ++sr)
-		if (sr->toc != NULL) {
-			/*
-			 * We only do a single sync per call; that's OK, if by
-			 * some chance there is more than one sync request, we
-			 * will find it on our next loop.
-			 */
-			toc = sr->toc;
-			f = sr->f;
-
-			/* We've got it -- clear the slot. */
-			sr->toc = NULL;
-			WT_MEMORY_FLUSH;
-			break;
-		}
-	if (toc == NULL)
-		return (0);
-	db = toc->db;
-
-	drain = cache->drain;
-	drain_elem = 0;
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
-		/*
-		 * Skip pages that aren't ours to take -- pinned pages are OK,
-		 * we're not discarding the pages from memory.
-		 */
-		if (e->state != WT_OK)
-			continue;
-
-		/*
-		 * We only want modified pages from the specified database.
-		 * There's an obvious race here, where we're flushing pages
-		 * while other threads are modifying them -- that's OK, sync
-		 * offers no guarantees in the face of other writers.
-		 */
-		if (e->db != db || !e->page->modified)
-			continue;
-
-		/*
-		 * If a page is marked as useless, clear its read generation
-		 * number so we'll choose it.  We're rather do this in when
-		 * returning a page to the cache, but we don't have a reference
-		 * to the WT_CACHE_ENTRY at that point.
-		 */
-		if (F_ISSET(e->page, WT_DISCARD))
-			e->read_gen = 0;
-
-		/* Allocate more space as necessary. */
-		if (drain_elem * sizeof(WT_CACHE_ENTRY *) >= cache->drain_len) {
-			WT_RET(__wt_realloc(env, &cache->drain_len,
-			    (drain_elem + 100) * sizeof(WT_CACHE_ENTRY *),
-			    &cache->drain));
-			drain = cache->drain + drain_elem;
-		}
-
-		*drain++ = e;
-		++drain_elem;
-	}
-	cache->drain_elem = drain_elem;
-
-	if (drain_elem != 0) {
-		WT_VERBOSE(env, WT_VERB_CACHE, (env,
-		    "cache flushing file %s, %lu of %llu total cache pages",
-		    db->idb->name, (u_long)drain_elem,
-		    (u_quad)WT_STAT(cache->stats, CACHE_PAGES_INUSE)));
-
-		__wt_drain_write(toc, f);
-
-		cache->drain_elem = 0;
-		*didworkp = 1;
-	}
-
-	/* Wake the caller. */
-	__wt_unlock(env, toc->mtx);
-
-	return (0);
-}
-
-/*
  * __wt_drain_trickle --
  *	Select a group of pages to trickle out.
  */
@@ -323,10 +224,8 @@ __wt_drain_write(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 	stats = cache->stats;
 
 	/*
-	 * Sort the pages for writing; we'd like to write leaf pages first so
-	 * we minimize the I/O we do during reconcilation.  This is almost
-	 * certainly not enough, we'll want to do better planning than this
-	 * at some point.
+	 * Sort the pages for writing -- we write them in level order so that
+	 * reconciliation updates naturally flow up the tree.
 	 */
 	qsort(cache->drain, (size_t)cache->drain_elem,
 	    sizeof(WT_CACHE_ENTRY *), __wt_drain_compare_level);

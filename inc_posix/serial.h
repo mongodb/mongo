@@ -69,16 +69,3 @@ typedef struct {
 #define	__wt_flist_free_unpack(toc, _flistp) do {\
 	_flistp = ((__wt_flist_free_args *)(toc)->wq_args)->flistp;\
 } while (0)
-
-typedef struct {
-	void (*f)(const char *, u_int64_t);
-} __wt_sync_args;
-#define	 __wt_sync_serial(toc, _f, ret) do {\
-	__wt_sync_args _args;\
-	_args.f = _f;\
-	(ret) = __wt_toc_serialize_func(\
-	    toc, WT_WORKQ_SYNC, __wt_sync_serial_func, &_args);\
-} while (0)
-#define	__wt_sync_unpack(toc, _f) do {\
-	_f = ((__wt_sync_args *)(toc)->wq_args)->f;\
-} while (0)

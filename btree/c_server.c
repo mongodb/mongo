@@ -90,13 +90,6 @@ __wt_cache_server(void *arg)
 		if (!read_lockout)
 			WT_ERR(__wt_cache_server_read(env, &didwork));
 
-		/*
-		 * Instead of using our WT_TOC handle when flushing a file, we
-		 * use the caller's.  There's no strong reason, either could be
-		 * made to work.
-		 */
-		WT_ERR(__wt_drain_sync(env, &didwork));
-
 		if (read_lockout || bytes_inuse > bytes_max) {
 			WT_VERBOSE(env, WT_VERB_SERVERS, (env,
 			    "cache trickle running: read lockout %sset, "

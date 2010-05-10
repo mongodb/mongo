@@ -21,7 +21,8 @@ __wt_bt_ovfl_in(WT_TOC *toc, u_int32_t addr, u_int32_t size, WT_PAGE **pagep)
 
 	db = toc->db;
 
-	WT_RET(__wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, size), &page));
+	WT_RET(
+	    __wt_page_in(toc, addr, WT_HDR_BYTES_TO_ALLOC(db, size), &page, 0));
 
 	*pagep = page;
 	return (0);

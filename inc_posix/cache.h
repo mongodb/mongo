@@ -13,7 +13,6 @@ extern "C" {
 struct __wt_cache_entry;	typedef struct __wt_cache_entry WT_CACHE_ENTRY;
 struct __wt_cache_hb;		typedef struct __wt_cache_hb WT_CACHE_HB;
 struct __wt_read_req;		typedef struct __wt_read_req WT_READ_REQ;
-struct __wt_sync_req;		typedef struct __wt_sync_req WT_SYNC_REQ;
 
 /*
  * WT_READ_REQ --
@@ -26,16 +25,6 @@ struct __wt_read_req {
 	WT_CACHE_ENTRY			/* Cache slot */
 		  *entry;
 	WT_PAGE  **pagep;		/* Returned page */
-};
-
-/*
- * WT_SYNC_REQ --
- *	Encapsulation of a sync request.
- */
-struct __wt_sync_req {
-	WT_TOC	  *toc;			/* Requesting thread */
-					/* Progress callback */
-	void (*f)(const char *, u_int64_t);
 };
 
 /*
@@ -69,9 +58,6 @@ struct __wt_cache {
 	u_int32_t    hb_size;		/* Number of hash buckets */
 
 	WT_READ_REQ read_request[20];	/* Cache read requests:
-					   slot available if toc is NULL. */
-
-	WT_SYNC_REQ sync_request[20];	/* Cache sync requests:
 					   slot available if toc is NULL. */
 
 #define	WT_CACHE_PAGE_IN(c, bytes) do {					\

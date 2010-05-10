@@ -465,6 +465,7 @@ char	*wiredtiger_version(int *, int *, int *);
  * API flags section: BEGIN
  */
 #define	WT_ASCII_ENGLISH				0x00000008
+#define	WT_CACHE_ONLY					0x00000001
 #define	WT_COLUMN					0x00000004
 #define	WT_CREATE					0x00000001
 #define	WT_DEBUG					0x00000002
@@ -522,6 +523,7 @@ char	*wiredtiger_version(int *, int *, int *);
 #define	WT_APIMASK_IENV					0x00000003
 #define	WT_APIMASK_WIREDTIGER_ENV_INIT			0x00000001
 #define	WT_APIMASK_WT_PAGE				0x00000003
+#define	WT_APIMASK_WT_PAGE_IN				0x00000001
 #define	WT_APIMASK_WT_TOC_CLOSE				0x00000000
 /*
  * API flags section: END

@@ -43,11 +43,6 @@ serial['flist_free'] = Serial(
 	'WT_WORKQ_SPIN',
 	['WT_FLIST *flistp/flistp'])
 
-serial['sync'] = Serial(
-	'sync',
-	'WT_WORKQ_SYNC',
-	 ['void (*f)(const char *, u_int64_t)/f'])
-
 # func_serial --
 #	Loop through the serial dictionary and output #defines to schedule
 #	work for the workQ thread.
