@@ -142,7 +142,20 @@ namespace mongo {
         const char * ns = "local.oplog.$main";
         Client::Context ctx(ns);
         
-        if ( nsdetails( ns ) ) {
+        NamespaceDetails * nsd = nsdetails( ns );
+        if ( nsd ) {
+            
+            if ( cmdLine.oplogSize != 0 ){
+                int o = (int)(nsd->storageSize() / ( 1024 * 1024 ) );
+                int n = (int)(cmdLine.oplogSize / ( 1024 * 1024 ) );
+                if ( n != o ){
+                    stringstream ss;
+                    ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ")";
+                    log() << ss.str() << endl;
+                    throw UserException( 13257 , ss.str() );
+                }
+            }
+
             DBDirectClient c;
             BSONObj lastOp = c.findOne( ns, Query().sort( BSON( "$natural" << -1 ) ) );
             if ( !lastOp.isEmpty() ) {
