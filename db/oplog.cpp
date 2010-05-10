@@ -150,7 +150,7 @@ namespace mongo {
                 int n = (int)(cmdLine.oplogSize / ( 1024 * 1024 ) );
                 if ( n != o ){
                     stringstream ss;
-                    ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ")";
+                    ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ") see: http://dochub.mongodb.org/core/increase-oplog";
                     log() << ss.str() << endl;
                     throw UserException( 13257 , ss.str() );
                 }
