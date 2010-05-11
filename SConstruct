@@ -1567,7 +1567,7 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "db/" , "client/" , "bson/" ]:
+for id in [ "", "util/", "db/" , "client/" , "bson/", "bson/util/"]:
     env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
 
 #lib
