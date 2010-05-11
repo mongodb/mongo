@@ -209,7 +209,7 @@ namespace mongo {
             if( strcmp(v[i]+20,v[j]+20) == 0 ) {
                 for( int x = 1; ; x++ ) {
                     if( j+x == i ) return j;
-                    if( i+x>=v.size() ) return -1;
+                    if( i+x>=(int) v.size() ) return -1;
                     if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
                 }
                 return -1;
@@ -238,7 +238,7 @@ namespace mongo {
         bool first = true;
         s << "<pre>\n";
         vector<const char *> v = _rsLog.get();
-        for( int i = 0; i < v.size(); i++ ) {
+        for( int i = 0; i < (int)v.size(); i++ ) {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
