@@ -21,6 +21,7 @@
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/hostandport.h"
+#include "rstime.h"
 #include "rs_config.h"
 
 namespace mongo {
@@ -122,7 +123,7 @@ namespace mongo {
             bool _dead;
         public:
             const HostAndPort _h;
-            const int _id; // ordinal
+            const unsigned _id; // ordinal
         private:
             double _health;
             time_t _lastHeartbeat;
