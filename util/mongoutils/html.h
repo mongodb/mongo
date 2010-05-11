@@ -42,7 +42,8 @@ namespace mongoutils {
             ss << "<tr><td>" << a << "</td><td>" << b << "</td></tr>\n";
             return ss.str();
         }
-        inline string td(double x) { 
+        template <class T>
+        inline string td(T x) { 
             stringstream ss;
             ss << "<td>" << x << "</td>";
             return ss.str();

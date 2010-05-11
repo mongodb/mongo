@@ -22,13 +22,13 @@
 namespace mongo {
     void exitCleanly( int code );
     
-    /* Operation sequence #.  A combination of current second plus an ordinal value.
-     */
     struct ClockSkewException : public DBException {
         virtual const char* what() const throw() { return "clock skew exception"; }
-        virtual int getCode(){ return 20001; }
+        virtual int getCode() const { return 20001; }
     };
-    
+
+    /* Operation sequence #.  A combination of current second plus an ordinal value.
+     */
 #pragma pack(4)
     class OpTime {
         unsigned i;

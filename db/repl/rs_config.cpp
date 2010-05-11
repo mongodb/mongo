@@ -174,7 +174,7 @@ namespace mongo {
         clear();
         int level = 2;
         DEV level = 0;
-        log(0) << "replSet load config from: " << h.toString() << rsLog;
+        //log(0) << "replSet load config from: " << h.toString() << rsLog;
 
         auto_ptr<DBClientCursor> c;
         try {
@@ -208,7 +208,7 @@ namespace mongo {
             version = -1;
         }
         catch( DBException& e) { 
-            log(level) << "replSet couldn't load config " << h.toString() << ' ' << e.what() << rsLog;
+            log(level) << "replSet load config couldn't load " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
@@ -216,7 +216,7 @@ namespace mongo {
         uassert(13109, "multiple rows in " + rsConfigNs + " not supported", !c->more());
         from(o);
         _ok = true;
-        log(level) << "replSet load ok" << rsLog;
+        log(level) << "replSet load config ok " << h.toString() << rsLog;
     }
 
 }

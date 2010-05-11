@@ -38,14 +38,15 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : _self(0), elect(this) {
+    ReplSet::ReplSet(string cfgString) : _self(0), elect(this), _mgr(this) {
         _myState = STARTUP;
 
         const char *p = cfgString.c_str(); 
         const char *slash = strchr(p, '/');
         uassert(13093, "bad --replSet config string format is: <setname>/<seedhost1>,<seedhost2>[,...]", slash != 0 && p != slash);
         _name = string(p, slash-p);
-        log() << "replSet " << cfgString << rsLog;
+
+        log() << "replSet startup " << cfgString << rsLog;
 
         set<HostAndPort> seedSet;
         vector<HostAndPort> *seeds = new vector<HostAndPort>;
@@ -79,12 +80,14 @@ namespace mongo {
         //for( vector<HostAndPort>::iterator i = seeds->begin(); i != seeds->end(); i++ )
         //    addMemberIfMissing(*i);
 
+        log() << "replSet load config from various servers..." << rsLog;
+
         loadConfig();
 
         for( Member *m = head(); m; m = m->next() )
             seedSet.erase(m->_h);
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
-            log() << "replSet warning: seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
     
     }
@@ -178,8 +181,8 @@ namespace mongo {
             }
             break;
         }
-        startupStatusMsg = "?";
-        startupStatus = FINISHME;
+        startupStatusMsg = "? started";
+        startupStatus = STARTED;
     }
 
     /* called at startup */

@@ -439,6 +439,7 @@
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="repl.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
+    <ClCompile Include="repl\manager.cpp" />
     <ClCompile Include="repl\rs_mod.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="reccache.cpp" />
@@ -551,6 +552,7 @@
   <ItemGroup>
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
+    <None Include="repl\notes.txt" />
     <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
@@ -568,6 +570,7 @@
     <ClInclude Include="reci.h" />
     <ClInclude Include="recstore.h" />
     <ClInclude Include="repl\connections.h" />
+    <ClInclude Include="repl\rstime.h" />
     <ClInclude Include="storage.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
