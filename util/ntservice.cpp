@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "ntservice.h"
+#include <direct.h>
 
 #if defined(_WIN32)
 
@@ -32,17 +33,26 @@ namespace mongo {
     }
     
     bool ServiceController::installService( const std::wstring& serviceName, const std::wstring& displayName, const std::wstring& serviceDesc, int argc, char* argv[] ) {
+        assert(argc >= 1);
+
+        stringstream commandLine;
+
+        if ( strchr(argv[0], ':') ) { // a crude test for fully qualified path
+            commandLine << '"' << argv[0] << "\" ";
+        } else {
+            char buffer[256];
+            assert( _getcwd(buffer, 256) );
+            commandLine << '"' << buffer << '\\' << argv[0] << "\" ";
+        }
         
-        std::string commandLine;
-        
-        for ( int i = 0; i < argc; i++ ) {
+        for ( int i = 1; i < argc; i++ ) {
 			std::string arg( argv[ i ] );
 			
 			// replace install command to indicate process is being started as a service
 			if ( arg == "--install" )
 				arg = "--service";
 				
-			commandLine += arg + " ";
+			commandLine << arg << "  ";
 		}
 		
 		SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
@@ -50,7 +60,7 @@ namespace mongo {
 			return false;
 		
 		std::basic_ostringstream< TCHAR > commandLineWide;
-        commandLineWide << commandLine.c_str();
+        commandLineWide << commandLine.str().c_str();
 
 		// create new service
 		SC_HANDLE schService = ::CreateService( schSCManager, serviceName.c_str(), displayName.c_str(),
