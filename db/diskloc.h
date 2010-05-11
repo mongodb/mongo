@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "jsobj.h"
+
 namespace mongo {
 
 #pragma pack(1)
@@ -30,7 +32,6 @@ namespace mongo {
     class DeletedRecord;
     class Extent;
     class BtreeBucket;
-    class BSONObj;
     class MongoDataFile;
 
     class DiskLoc {
@@ -86,6 +87,10 @@ namespace mongo {
             return ss.str();
         }
         operator string() const { return toString(); }
+
+        BSONObj toBSONObj() const {
+            return BSON( "file" << fileNo << "offset" << ofs );
+        }
 
         int& GETOFS() {
             return ofs;

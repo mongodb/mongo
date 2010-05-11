@@ -50,7 +50,7 @@ namespace mongo {
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline void fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js) {
+    inline void fillQueryResultFromObj(BufBuilder& bb, FieldMatcher *filter, BSONObj& js, DiskLoc* loc=NULL) {
         if ( filter ) {
             BSONObjBuilder b( bb );
             BSONObjIterator i( js );
@@ -65,6 +65,13 @@ namespace mongo {
                     filter->append( b , e );
                 }
             }
+            if (loc)
+                b.append("$diskLoc", loc->toBSONObj());
+            b.done();
+        } else if (loc) {
+            BSONObjBuilder b( bb );
+            b.appendElements(js);
+            b.append("$diskLoc", loc->toBSONObj());
             b.done();
         } else {
             bb.append((void*) js.objdata(), js.objsize());
@@ -79,17 +86,24 @@ namespace mongo {
         KeyType order;
         unsigned approxSize;
 
-        void _add(BSONObj& k, BSONObj o) {
-            best.insert(make_pair(k,o));
+        void _add(BSONObj& k, BSONObj o, DiskLoc* loc) {
+            if (!loc){
+                best.insert(make_pair(k,o));
+            } else {
+                BSONObjBuilder b;
+                b.appendElements(o);
+                b.append("$diskLoc", loc->toBSONObj());
+                best.insert(make_pair(k, b.obj()));
+            }
         }
 
-        void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i) {
+        void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
             const BSONObj& worstBestKey = i->first;
             int c = worstBestKey.woCompare(k, order.pattern);
             if ( c > 0 ) {
                 // k is better, 'upgrade'
                 best.erase(i);
-                _add(k, o);
+                _add(k, o, loc);
             }
         }
 
@@ -105,20 +119,20 @@ namespace mongo {
             return best.size();
         }
 
-        void add(BSONObj o) {
+        void add(BSONObj o, DiskLoc* loc) {
             assert( o.isValid() );
             BSONObj k = order.getKeyFromObject(o);
             if ( (int) best.size() < limit ) {
                 approxSize += k.objsize();
                 uassert( 10128 ,  "too much key data for sort() with no index.  add an index or specify a smaller limit", approxSize < 1 * 1024 * 1024 );
-                _add(k, o);
+                _add(k, o, loc);
                 return;
             }
             BestMap::iterator i;
             assert( best.end() != best.begin() );
             i = best.end();
             i--;
-            _addIfBetter(k, o, i);
+            _addIfBetter(k, o, i, loc);
         }
 
         void _fill(BufBuilder& b, FieldMatcher *filter, int& nout, BestMap::iterator begin, BestMap::iterator end) {

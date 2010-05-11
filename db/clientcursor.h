@@ -39,6 +39,7 @@ namespace mongo {
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
+    class ParsedQuery;
 
     /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
     */
@@ -127,6 +128,7 @@ namespace mongo {
             return _lastLoc;
         }
 
+        shared_ptr< ParsedQuery > pq;
         shared_ptr< FieldMatcher > fields; // which fields query wants returned
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
