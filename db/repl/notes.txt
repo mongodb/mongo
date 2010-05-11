@@ -1,0 +1,15 @@
+replica set notes
+
+health.h 
+  struct HealthOptions
+  requestHeartbeat()
+
+health.cpp
+  startHealthThreads()
+  requestHeartbeat()
+  cmd replSetHeartbeat
+  FeedbackThread calls requestHeartbeat
+
+
+
+
