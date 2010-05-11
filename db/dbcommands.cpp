@@ -1744,6 +1744,9 @@ namespace mongo {
             result.append( "errmsg" , "not master" );
             return false;
         }
+
+        if ( c->adminOnly() )
+            log( 2 ) << "command: " << cmdObj << endl;
         
         if ( c->locktype() == Command::NONE ){
             // we also trust that this won't crash
@@ -1756,23 +1759,12 @@ namespace mongo {
      
         bool needWriteLock = c->locktype() == Command::WRITE;
         
-        if ( ! c->requiresAuth() && 
-             ( ai->isAuthorizedReads( dbname ) && 
-               ! ai->isAuthorized( dbname ) ) ){
-            // this means that they can read, but not write
-            // so only get a read lock
-            needWriteLock = false;
-        }
-        
         if ( ! needWriteLock ){
             assert( ! c->logTheOp() );
         }
 
         mongolock lk( needWriteLock );
         Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
-        
-        if ( c->adminOnly() )
-            log( 2 ) << "command: " << cmdObj << endl;
         
         try {
             string errmsg;
