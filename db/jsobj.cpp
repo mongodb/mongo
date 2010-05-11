@@ -1243,8 +1243,10 @@ namespace mongo {
 
     unsigned OID::_machine = (unsigned) security.getNonceInitSafe();
     void OID::newState(){
+        unsigned before = _machine;
         // using fresh Security object to avoid buffered devrandom
-        _machine = (unsigned) Security().getNonce();
+        _machine = (unsigned)security.getNonce();
+        assert( _machine != before );
     }
     
     void OID::init( string s ){
