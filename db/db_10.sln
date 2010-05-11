@@ -22,7 +22,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", "{2F760952-C71B-4865-998F-AABAE96D1373}"
 	ProjectSection(SolutionItems) = preProject
-		..\util\mmap_posix.cpp = ..\util\mmap_posix.cpp
 		..\util\processinfo_darwin.cpp = ..\util\processinfo_darwin.cpp
 		..\util\processinfo_linux2.cpp = ..\util\processinfo_linux2.cpp
 		..\util\processinfo_none.cpp = ..\util\processinfo_none.cpp
