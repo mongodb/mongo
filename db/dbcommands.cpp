@@ -765,7 +765,7 @@ namespace mongo {
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ){
                 BSONObj o = *i;
-                db.insert( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o );
+                theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
             result.append( "ok" , 1 );
