@@ -133,6 +133,11 @@ namespace mongo {
                 result.append( "utf8" , globalScriptEngine->utf8Ok() );
                 bb.done();
             }
+            if ( cmdObj["oidReset"].trueValue() ){
+                result.append( "oidMachineOld" , OID::staticMachine() );
+                OID::newState();
+            }
+            result.append( "oidMachine" , OID::staticMachine() );
             return true;
         }
         
