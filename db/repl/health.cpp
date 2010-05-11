@@ -127,7 +127,7 @@ namespace mongo {
             }
         }
     };
-
+    
     void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
         s << tr();
         {
@@ -150,7 +150,7 @@ namespace mongo {
             s << td(h.str());
         }
         s << td(config().votes);
-        s << td(_lastHeartbeatErrMsg.get());
+        s << td( red(_lastHeartbeatErrMsg.get(),health()==0) );
         s << _tr();
     }
 

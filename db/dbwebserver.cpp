@@ -260,14 +260,16 @@ namespace mongo {
         string _replSet() { 
             stringstream s;
             s << start("Replica Set Status " + getHostName());
-            s << p( a("/", "back", "Home") );
-            s << p( "See also " + a("/replSetGetStatus?text", "", "replSetGetStatus") + '.' );
+            s << p( a("/", "back", "Home") + " | " + 
+                    a("/local/system.replset/?html=1", "", "View config") + " | " +
+                    a("/replSetGetStatus?text", "", "replSetGetStatus")
+                    );
 
             if( theReplSet == 0 ) { 
                 if( cmdLine.replSet.empty() ) 
                     s << p("Not using --replSet");
                 else 
-                    s << p("Not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initialized") + '.');
+                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initialized") + '.');
             }
             else {
                 try {
@@ -595,13 +597,15 @@ namespace mongo {
 
             headers.push_back( (string)"x-action: " + action );
             headers.push_back( (string)"x-ns: " + fullns );
-            headers.push_back( "Content-Type: text/plain;charset=utf-8" );
+
+            bool html = false;
+
 
             stringstream ss;
 
             if ( method == "GET" ) {
                 responseCode = 200;
-                handleRESTQuery( fullns , action , params , responseCode , ss  );
+                html = handleRESTQuery( fullns , action , params , responseCode , ss  );
             }
             else if ( method == "POST" ) {
                 responseCode = 201;
@@ -614,14 +618,20 @@ namespace mongo {
                 out() << "don't know how to handle a [" << method << "]" << endl;
             }
 
+            if( html ) 
+                headers.push_back("Content-Type: text/html;charset=utf-8");
+            else
+                headers.push_back("Content-Type: text/plain;charset=utf-8");
+
             responseMsg = ss.str();
         }
 
-        void handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
+        bool handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
             Timer t;
 
+            int html = _getOption( params["html"] , 0 ); 
             int skip = _getOption( params["skip"] , 0 );
-            int num = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
+            int num  = _getOption( params["limit"] , _getOption( params["count" ] , 1000 ) ); // count is old, limit is new
 
             int one = 0;
             if ( params["one"].type() == String && tolower( params["one"].valuestr()[0] ) == 't' ) {
@@ -655,35 +665,63 @@ namespace mongo {
 
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
             uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
+
             if ( one ) {
                 if ( cursor->more() ) {
                     BSONObj obj = cursor->next();
-                    out << obj.jsonString() << '\n';
+                    out << obj.jsonString(Strict,html?1:0) << '\n';
                 }
                 else {
                     responseCode = 404;
                 }
-                return;
+                return html != 0;
             }
 
-            out << "{\n";
-            out << "  \"offset\" : " << skip << ",\n";
-            out << "  \"rows\": [\n";
+            if( html )  {
+                string title = string("Query ") + ns;
+                out << start(title) 
+                    << p(title)
+                    << "<pre>";
+            } else {
+                out << "{\n";
+                out << "  \"offset\" : " << skip << ",\n";
+                out << "  \"rows\": [\n";
+            }
 
             int howMany = 0;
             while ( cursor->more() ) {
-                if ( howMany++ )
+                if ( howMany++ && html )
                     out << " ,\n";
                 BSONObj obj = cursor->next();
-                out << "    " << obj.jsonString();
-
+                if( html ) {
+                    if( out.tellp() > 4 * 1024 * 1024 ) {
+                        out << "Stopping output: more than 4MB returned and in html mode\n";
+                        break;
+                    }
+                    out << obj.jsonString(Strict, html?1:0) << "\n\n";
+                }
+                else {
+                    if( out.tellp() > 50 * 1024 * 1024 ) // 50MB limit - we are using ram
+                        break;
+                    out << "    " << obj.jsonString();
+                }
+                
             }
-            out << "\n  ],\n\n";
 
-            out << "  \"total_rows\" : " << howMany << " ,\n";
-            out << "  \"query\" : " << query.jsonString() << " ,\n";
-            out << "  \"millis\" : " << t.millis() << '\n';
-            out << "}\n";
+            if( html ) { 
+                out << "</pre>\n";
+                if( howMany == 0 ) out << p("Collection is empty");
+                out << _end();
+            }
+            else {
+                out << "\n  ],\n\n";
+                out << "  \"total_rows\" : " << howMany << " ,\n";
+                out << "  \"query\" : " << query.jsonString() << " ,\n";
+                out << "  \"millis\" : " << t.millis() << '\n';
+                out << "}\n";
+            }
+
+            return html != 0;
         }
 
         // TODO Generate id and revision per couch POST spec
