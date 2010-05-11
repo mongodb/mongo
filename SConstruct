@@ -884,7 +884,8 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             return True
 
         if failIfNotFound:
-            print( "can't find library " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
+            print( "can't find or link against library " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
+            print( "see config.log for more information" )
             Exit(1)
 
         return False
