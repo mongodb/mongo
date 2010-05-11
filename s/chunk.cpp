@@ -58,13 +58,21 @@ namespace mongo {
             _manager->getShardKey().compare( obj , getMax() ) < 0;
     }
 
+    bool Chunk::minIsInf() const {
+        return _manager->getShardKey().globalMin().woCompare( getMin() ) == 0;
+    }
+
+    bool Chunk::maxIsInf() const {
+        return _manager->getShardKey().globalMax().woCompare( getMax() ) == 0;
+    }
+    
     BSONObj Chunk::pickSplitPoint() const{
         int sort = 0;
         
-        if ( _manager->getShardKey().globalMin().woCompare( getMin() ) == 0 ){
+        if ( minIsInf() ){
             sort = 1;
         }
-        else if ( _manager->getShardKey().globalMax().woCompare( getMax() ) == 0 ){
+        else if ( maxIsInf() ){
             sort = -1;
         }
         
@@ -264,7 +272,12 @@ namespace mongo {
     bool Chunk::splitIfShould( long dataWritten ){
         _dataWritten += dataWritten;
         
-        if ( _dataWritten < MaxChunkSize / 5 )
+        int myMax = MaxChunkSize;
+        if ( minIsInf() || maxIsInf() ){
+            myMax = (int)( (double)myMax * .9 );
+        }
+
+        if ( _dataWritten < myMax / 5 )
             return false;
         
         if ( ! chunkSplitLock.lock_try(0) )
@@ -283,7 +296,7 @@ namespace mongo {
         }
 
         long size = getPhysicalSize();
-        if ( size < MaxChunkSize )
+        if ( size < myMax )
             return false;
         
         log() << "autosplitting " << _ns << " size: " << size << " shard: " << toString() << endl;

@@ -86,7 +86,10 @@ namespace mongo {
         
         void getFilter( BSONObjBuilder& b ) const;
         BSONObj getFilter() const{ BSONObjBuilder b; getFilter( b ); return b.obj(); }
-            
+        
+        // if min/max key is pos/neg infinity
+        bool minIsInf() const;
+        bool maxIsInf() const;
 
         BSONObj pickSplitPoint() const;
         Chunk * split();
