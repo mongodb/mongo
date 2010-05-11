@@ -147,6 +147,7 @@ namespace mongo {
             fclose(stdin);
             freopen("/dev/null", "r", stdin);
 
+            setupCoreSignals();
             setupSignals();
         }
 #endif
@@ -164,6 +165,16 @@ namespace mongo {
         }
 
         return true;
+    }
+    
+    void ignoreSignal( int signal ){
+    }
+
+    void setupCoreSignals(){
+#if !defined(_WIN32)
+        assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
+        assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
+#endif
     }
 
     class CmdGetCmdLineOpts : Command{

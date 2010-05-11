@@ -119,11 +119,18 @@ namespace mongo {
         virtual bool requiresAuth() {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
             uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );
+            
+            // write security will be enforced in DBDirectClient
+            mongolock lk( ai->isAuthorized( dbname.c_str() ) );
+            Client::Context ctx( dbname );
+            
+
             return dbEval(dbname.c_str(), cmdObj, result, errmsg);
         }
     } cmdeval;
