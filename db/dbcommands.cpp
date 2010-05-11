@@ -1546,15 +1546,16 @@ namespace mongo {
 
             } else { // update
 
-                if (origQuery.isEmpty()){
-                    q = idQuery;
-                } else if (origQuery["_id"].eoo()){
-                    // need to include original query for $ positional operator
-                    BSONObjBuilder b;
-                    b.append(out["_id"]);
-                    b.appendElements(origQuery);
-                    q = Query(b.obj());
-                } // else use existing q object with _id field
+                // need to include original query for $ positional operator
+                BSONObjBuilder b;
+                b.append(out["_id"]);
+                BSONObjIterator it(origQuery);
+                while (it.more()){
+                    BSONElement e = it.next();
+                    if (strcmp(e.fieldName(), "_id"))
+                        b.append(e);
+                }
+                q = Query(b.obj());
 
                 BSONElement update = cmdObj["update"];
                 uassert(12516, "must specify remove or update", !update.eoo());
