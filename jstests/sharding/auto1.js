@@ -40,7 +40,7 @@ for ( ; i<1500; i++ ){
 assert.eq( 3 , s.config.chunks.count() , "shard didn't split A " );
 s.printChunks();
 
-for ( ; i<3000; i++ ){
+for ( ; i<2800; i++ ){
     coll.save( { num : i , s : bigString } );
 }
 
