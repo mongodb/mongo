@@ -921,10 +921,9 @@ namespace mongo {
                                                     idx.head,
                                                     dl, *changes[x].added[i], ordering, /*dupsAllowed*/true, idx);
                     }
-                    catch (AssertionException&) {
+                    catch (AssertionException& e) {
                         ss << " exception update index ";
-                        out() << " caught assertion update index " << idx.indexNamespace() << '\n';
-                        problem() << " caught assertion update index " << idx.indexNamespace() << endl;
+                        problem() << " caught assertion update index " << idx.indexNamespace() << " " << e << endl;
                     }
                 }
             }
