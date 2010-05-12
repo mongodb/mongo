@@ -393,7 +393,7 @@ namespace mongo {
             return;
         }
         
-        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty();
+        bool normalQuery = hint_.isEmpty() && min_.isEmpty() && max_.isEmpty() && query_.getField( "$or" ).eoo();
 
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
@@ -544,7 +544,51 @@ namespace mongo {
             op.setExceptionMessage( "Caught unknown exception" );
         }        
     }
+    
+    MultiPlanScanner::MultiPlanScanner( const char *ns,
+                                       const BSONObj &query,
+                                       const BSONObj &order,
+                                       const BSONElement *hint,
+                                       bool honorRecordedPlan,
+                                       const BSONObj &min,
+                                       const BSONObj &max ) :
+    _ns( ns ),
+    _or( !query.getField( "$or" ).eoo() ),
+    _query( query.getOwned() ),
+    _i() {
+//    _fros( ns, query ) {
+        // eventually implement (some of?) these
+        if ( !order.isEmpty() || hint || !honorRecordedPlan || !min.isEmpty() || !max.isEmpty() ) {
+            _or = false;
+        }
+        if ( !_or ) {
+            _currentQps.reset( new QueryPlanSet( ns, query, order, hint, honorRecordedPlan, min, max ) );
+            _n = 1; // only one run
+        } else {
+            BSONElement e = query.getField( "$or" );
+            massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
+            _n = e.embeddedObject().nFields();
+        }
+    }
 
+    shared_ptr< QueryOp > MultiPlanScanner::runOpOnce( QueryOp &op ) {
+        massert( 13271, "can't run more ops", mayRunMore() );
+        if ( !_or ) {
+            ++_i;
+            return _currentQps->runOp( op );
+        }
+        _currentQps.reset( new QueryPlanSet( _ns, nextSimpleQuery(), BSONObj() ) );
+        return _currentQps->runOp( op );
+    }
+    
+    shared_ptr< QueryOp > MultiPlanScanner::runOp( QueryOp &op ) {
+        shared_ptr< QueryOp > ret = runOpOnce( op );
+        while( mayRunMore() ) {
+            ret = runOpOnce( *ret );
+        }
+        return ret;
+    }    
+    
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );

@@ -254,7 +254,7 @@ namespace mongo {
         return true;
     }
     
-    void Matcher::parseOr( const BSONElement &e, bool subMatcher, vector< shared_ptr< Matcher > > &matchers ) {
+    void Matcher::parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers ) {
         uassert( 13090, "recursive $or/$nor not allowed", !subMatcher );
         uassert( 13086, "$or/$nor must be a nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
         BSONObjIterator j( e.embeddedObject() );
@@ -742,7 +742,7 @@ namespace mongo {
         
         if ( _orMatchers.size() > 0 ) {
             bool match = false;
-            for( vector< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+            for( list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
                 i != _orMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
                 // matched within $or, and at this point we've already loaded the
@@ -758,7 +758,7 @@ namespace mongo {
         }
         
         if ( _norMatchers.size() > 0 ) {
-            for( vector< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+            for( list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
                 i != _norMatchers.end(); ++i ) {
                 // SERVER-205 don't submit details - we don't want to track field
                 // matched within $nor, and at this point we've already loaded the

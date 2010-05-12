@@ -128,7 +128,7 @@ namespace mongo {
        set your db SavedContext first
     */
     bool Helpers::findOne(const char *ns, BSONObj query, BSONObj& result, bool requireIndex) { 
-        QueryPlanSet s( ns, query, BSONObj(), 0, !requireIndex );
+        MultiPlanScanner s( ns, query, BSONObj(), 0, !requireIndex );
         FindOne original( requireIndex );
         shared_ptr< FindOne > res = s.runOp( original );
         massert( 10302 ,  res->exceptionMessage(), res->complete() );

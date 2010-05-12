@@ -153,6 +153,12 @@ namespace mongo {
             return jsobj.toString();
         }
 
+//        void popOr() {
+//            massert( 13261, "no or to pop", !_orMatchers.empty() );
+//            _norMatchers.push_back( _orMatchers.front() );
+//            _orMatchers.pop_front();
+//        }
+        
     private:
         void addBasic(const BSONElement &e, int c, bool isNot) {
             // TODO May want to selectively ignore these element types based on op type.
@@ -167,7 +173,7 @@ namespace mongo {
         int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
 
         bool parseOrNor( const BSONElement &e, bool subMatcher );
-        void parseOr( const BSONElement &e, bool subMatcher, vector< shared_ptr< Matcher > > &matchers );
+        void parseOr( const BSONElement &e, bool subMatcher, list< shared_ptr< Matcher > > &matchers );
 
         Where *where;                    // set if query uses $where
         BSONObj jsobj;                  // the query pattern.  e.g., { name: "joe" }
@@ -190,8 +196,8 @@ namespace mongo {
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;
-        vector< shared_ptr< Matcher > > _orMatchers;
-        vector< shared_ptr< Matcher > > _norMatchers;
+        list< shared_ptr< Matcher > > _orMatchers;
+        list< shared_ptr< Matcher > > _norMatchers;
 
         friend class CoveredIndexMatcher;
     };

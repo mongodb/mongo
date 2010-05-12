@@ -50,7 +50,10 @@ namespace mongo {
     public:
         FieldRange( const BSONElement &e = BSONObj().firstElement() , bool isNot=false , bool optimize=true );
         const FieldRange &operator&=( const FieldRange &other );
-    const FieldRange &operator|=( const FieldRange &other );
+        const FieldRange &operator|=( const FieldRange &other );
+        // does not remove fully contained ranges (eg [1,3] - [2,2] doesn't remove anything)
+        // in future we can change so that an or on $in:[3] combined with $in:{$gt:2} doesn't scan 3 a second time
+        const FieldRange &operator-=( const FieldRange &other );
         BSONElement min() const { assert( !empty() ); return _intervals[ 0 ]._lower._bound; }
         BSONElement max() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
         bool minInclusive() const { assert( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
@@ -74,6 +77,7 @@ namespace mongo {
 
     private:
         BSONObj addObj( const BSONObj &o );
+        void finishOperation( const vector< FieldInterval > &newIntervals, const FieldRange &other );
         vector< FieldInterval > _intervals;
         vector< BSONObj > _objData;
         string _special;
@@ -155,6 +159,7 @@ namespace mongo {
     // determine index limits
     class FieldRangeSet {
     public:
+        friend class FieldRangeOrSet;
         FieldRangeSet( const char *ns, const BSONObj &query , bool optimize=true );
         const FieldRange &range( const char *fieldName ) const {
             map< string, FieldRange >::const_iterator f = _ranges.find( fieldName );
@@ -170,7 +175,6 @@ namespace mongo {
             return count;
         }
         const char *ns() const { return _ns; }
-        BSONObj query() const { return _query; }
         // if fields is specified, order fields of returned object to match those of 'fields'
         BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         bool matchPossible() const {
@@ -182,16 +186,63 @@ namespace mongo {
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
         string getSpecial() const;
+        // intended to handle sets without _orSets
+        const FieldRangeSet &operator-=( const FieldRangeSet &other ) {
+            for( map< string, FieldRange >::const_iterator i = other._ranges.begin();
+                i != other._ranges.end(); ++i ) {
+                map< string, FieldRange >::iterator f = _ranges.find( i->first.c_str() );
+                if ( f != _ranges.end() )
+                    f->second -= i->second;
+            }
+            return *this;
+        }
+        BSONObj query() const { return _query; }
     private:
+        void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
         static FieldRange *trivialRange_;
         static FieldRange &trivialRange();
         mutable map< string, FieldRange > _ranges;
-        vector< FieldRangeSet > _orSets;
         const char *_ns;
         BSONObj _query;
     };
 
+    // generages FieldRangeSet objects, accounting for or clauses
+//    class FieldRangeOrSet {
+//    public:
+//        FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize=true );
+//        // if there's a trivial or clause, we won't use or ranges to help with scanning
+//        bool trivialOr() const {
+//            for( list< FieldRangeSet >::const_iterator i = _orSets.begin(); i != _orSets.end(); ++i ) {
+//                if ( i->nNontrivialRanges() == 0 ) {
+//                    return true;
+//                }
+//            }
+//            return false;
+//        }
+//        bool orFinished() const { return _orFound && _orSets.empty(); }
+//        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
+//        void popOrClause() {
+//            massert( 13260, "no or clause to pop", !orFinished() );
+//            const FieldRangeSet &toPop = _orSets.front();
+//            list< FieldRangeSet >::iterator i = _orSets.begin();
+//            ++i;
+//            while( i != _orSets.end() ) {
+//                *i -= toPop;
+//                if( !i->matchPossible() ) {
+//                    i = _orSets.erase( i );
+//                } else {
+//                    ++i;
+//                }
+//            }
+//            _orSets.pop_front();
+//        }
+//    private:
+//        FieldRangeSet _baseSet;
+//        list< FieldRangeSet > _orSets;
+//        bool _orFound;
+//    };
+    
     /**
        used for doing field limiting
      */
