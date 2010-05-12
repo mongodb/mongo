@@ -213,13 +213,13 @@ namespace mongo {
         }
 
         void append( Message& m ) {
-            assert( m.data->len <= 1300 );
+            assert( m.header()->len <= 1300 );
 
-            if ( len() + m.data->len > 1300 )
+            if ( len() + m.header()->len > 1300 )
                 flush();
 
-            memcpy( _cur , m.data , m.data->len );
-            _cur += m.data->len;
+            memcpy( _cur , m.singleData() , m.header()->len );
+            _cur += m.header()->len;
         }
 
         void flush() {
@@ -410,7 +410,7 @@ namespace mongo {
     }
     
     void MessagingPort::reply(Message& received, Message& response) {
-        say(/*received.from, */response, received.data->id);
+        say(/*received.from, */response, received.header()->id);
     }
 
     void MessagingPort::reply(Message& received, Message& response, MSGID responseTo) {
@@ -419,21 +419,21 @@ namespace mongo {
 
     bool MessagingPort::call(Message& toSend, Message& response) {
         mmm( out() << "*call()" << endl; )
-        MSGID old = toSend.data->id;
+        MSGID old = toSend.header()->id;
         say(/*to,*/ toSend);
         while ( 1 ) {
             bool ok = recv(response);
             if ( !ok )
                 return false;
             //out() << "got response: " << response.data->responseTo << endl;
-            if ( response.data->responseTo == toSend.data->id )
+            if ( response.header()->responseTo == toSend.header()->id )
                 break;
             out() << "********************" << endl;
-            out() << "ERROR: MessagingPort::call() wrong id got:" << (unsigned)response.data->responseTo << " expect:" << (unsigned)toSend.data->id << endl;
-            out() << "  toSend op: " << toSend.data->operation() << " old id:" << (unsigned)old << endl;
-            out() << "  response msgid:" << (unsigned)response.data->id << endl;
-            out() << "  response len:  " << (unsigned)response.data->len << endl;
-            out() << "  response op:  " << response.data->operation() << endl;
+            out() << "ERROR: MessagingPort::call() wrong id got:" << (unsigned)response.header()->responseTo << " expect:" << (unsigned)toSend.header()->id << endl;
+            out() << "  toSend op: " << toSend.operation() << " old id:" << (unsigned)old << endl;
+            out() << "  response msgid:" << (unsigned)response.header()->id << endl;
+            out() << "  response len:  " << (unsigned)response.header()->len << endl;
+            out() << "  response op:  " << response.operation() << endl;
             out() << "  farEnd: " << farEnd << endl;
             assert(false);
             response.reset();
@@ -443,14 +443,14 @@ namespace mongo {
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
-        assert( toSend.data );
+        assert( !toSend.empty() );
         mmm( out() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
-        toSend.data->id = nextMessageId();
-        toSend.data->responseTo = responseTo;
+        toSend.header()->id = nextMessageId();
+        toSend.header()->responseTo = responseTo;
 
         if ( piggyBackData && piggyBackData->len() ) {
             mmm( out() << "*     have piggy back" << endl; )
-            if ( ( piggyBackData->len() + toSend.data->len ) > 1300 ) {
+            if ( ( piggyBackData->len() + toSend.header()->len ) > 1300 ) {
                 // won't fit in a packet - so just send it off
                 piggyBackData->flush();
             }
@@ -460,14 +460,36 @@ namespace mongo {
                 return;
             }
         }
-
-        send( (char*)toSend.data, toSend.data->len, "say" );
+        
+        vector< pair< char *, int > > all = toSend.allData();
+        vector< struct iovec > d( all.size() );
+        for( unsigned i = 0; i < all.size(); ++i ) {
+            d[ i ].iov_base = all[ i ].first;
+            d[ i ].iov_len = all[ i ].second;
+        }
+        struct msghdr meta;
+        memset( &meta, 0, sizeof( meta ) );
+        meta.msg_iov = &d[ 0 ];
+        meta.msg_iovlen = d.size();
+        send( meta, "say" );
     }
 
-    // sends all data or throws an exception
     void MessagingPort::send( const char * data , int len, const char *context ){
-        while( len > 0 ) {
-            int ret = ::send( sock , data , len , portSendFlags );
+        struct iovec d;
+        d.iov_base = const_cast< char * >( data );
+        d.iov_len = len;
+        struct msghdr meta;
+        memset( &meta, 0, sizeof( meta ) );
+        meta.msg_iov = &d;
+        meta.msg_iovlen = 1;
+        send( meta, context );
+    }
+    
+    // sends all data or throws an exception
+    // the meta argument may be modified
+    void MessagingPort::send( struct msghdr &meta, const char *context ){
+        while( meta.msg_iovlen > 0 ) {
+            int ret = ::sendmsg( sock , &meta , portSendFlags );
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
                     log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
@@ -479,9 +501,17 @@ namespace mongo {
                     }
                 }
             } else {
-                assert( ret <= len );
-                len -= ret;
-                data += ret;
+                struct iovec *& i = meta.msg_iov;
+                while( ret > 0 ) {
+                    if ( i->iov_len > unsigned( ret ) ) {
+                        i->iov_len -= ret;
+                        ret = 0;
+                    } else {
+                        ret -= i->iov_len;
+                        ++i;
+                        --(meta.msg_iovlen);
+                    }
+                }
             }
         }
     }
@@ -519,15 +549,15 @@ namespace mongo {
     
     void MessagingPort::piggyBack( Message& toSend , int responseTo ) {
 
-        if ( toSend.data->len > 1300 ) {
+        if ( toSend.header()->len > 1300 ) {
             // not worth saving because its almost an entire packet
             say( toSend );
             return;
         }
 
         // we're going to be storing this, so need to set it up
-        toSend.data->id = nextMessageId();
-        toSend.data->responseTo = responseTo;
+        toSend.header()->id = nextMessageId();
+        toSend.header()->responseTo = responseTo;
 
         if ( ! piggyBackData )
             piggyBackData = new PiggyBackData( this );

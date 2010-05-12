@@ -44,8 +44,8 @@ public:
                 break;
             }
 
-            int oldId = m.data->id;
-            if ( m.data->operation() == dbQuery || m.data->operation() == dbMsg || m.data->operation() == dbGetMore ) {
+            int oldId = m.header()->id;
+            if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
                 Message response;
                 dest.port().call( m, response );
                 mp_.reply( m, response, oldId );

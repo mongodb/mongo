@@ -48,7 +48,7 @@ namespace mongo {
         }
         if ( !connector->call( toSend, *m, false ) )
             return false;
-        if ( ! m->data )
+        if ( m->empty() )
             return false;
         dataReceived();
         return true;
@@ -92,7 +92,7 @@ namespace mongo {
     }
 
     void DBClientCursor::dataReceived() {
-        QueryResult *qr = (QueryResult *) m->data;
+        QueryResult *qr = (QueryResult *) m->singleData();
         resultFlags = qr->resultFlags();
         
         if ( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) {

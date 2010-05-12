@@ -90,6 +90,7 @@ namespace mongo {
 
         // send len or throw SocketException
         void send( const char * data , int len, const char *context );
+        void send( struct msghdr &meta, const char *context );
         // recv len or throw SocketException
         void recv( char * data , int len );
         
@@ -177,66 +178,100 @@ namespace mongo {
     class Message {
     public:
         Message() {
-            data = 0;
-            freeIt = false;
+            _freeIt = false;
         }
-        Message( void * _data , bool _freeIt ) {
-            data = (MsgData*)_data;
-            freeIt = _freeIt;
+        Message( void * data , bool freeIt ) {
+            _setData( reinterpret_cast< MsgData* >( data ), freeIt );
         };
         ~Message() {
             reset();
         }
         
-        SockAddr from;
-        MsgData *data;
+        SockAddr _from;
 
-        int operation() const {
-            return data->operation();
+        MsgData *header() const { return reinterpret_cast< MsgData* > ( _data[ 0 ].first ); }
+        int operation() const { return header()->operation(); }
+        
+        MsgData *singleData() const {
+            massert( 13273, "single data buffer expected", _data.size() == 1 );
+            return header();
         }
 
+        const vector< pair< char *, int > > &allData() const { return _data; }
+        
+        bool empty() const { return _data.empty(); }
+        
+        // concat multiple buffers - noop if <2 buffers already, otherwise can be expensive copy
+        // can get rid of this if we make response handling smarter
+        void concat() {
+            if ( _data.size() < 2 ) {
+                return;
+            }
+            
+            assert( _freeIt );
+            int totalSize = 0;
+            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                totalSize += i->second;
+            }
+            char *buf = (char*)malloc( totalSize );
+            char *p = buf;
+            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                memcpy( p, i->first, i->second );
+                p += i->second;
+            }
+            reset();
+            setData( reinterpret_cast< MsgData* >( buf ), true );
+        }
+        
         Message& operator=(Message& r) {
-            assert( data == 0 );
-            data = r.data;
-            assert( r.freeIt );
-            r.freeIt = false;
-            r.data = 0;
-            freeIt = true;
+            assert( _data.empty() );
+            assert( r._freeIt );
+            _data = r._data;
+            r._freeIt = false;
+            r._data.clear();
+            _freeIt = true;
             return *this;
         }
 
         void reset() {
-            if ( freeIt && data )
-                free(data);
-            data = 0;
-            freeIt = false;
+            if ( _freeIt ) {
+                for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                    free(i->first);
+                }
+            }
+            _data.clear();
+            _freeIt = false;
         }
 
-        void setData(MsgData *d, bool _freeIt) {
-            assert( data == 0 );
-            freeIt = _freeIt;
-            data = d;
+        void setData(MsgData *d, bool freeIt) {
+            assert( _data.empty() );
+            _setData( d, freeIt );
         }
         void setData(int operation, const char *msgtxt) {
             setData(operation, msgtxt, strlen(msgtxt)+1);
         }
         void setData(int operation, const char *msgdata, size_t len) {
-            assert(data == 0);
+            assert( _data.empty() );
             size_t dataLen = len + sizeof(MsgData) - 4;
             MsgData *d = (MsgData *) malloc(dataLen);
             memcpy(d->_data, msgdata, len);
             d->len = fixEndian(dataLen);
             d->setOperation(operation);
-            freeIt= true;
-            data = d;
+            _setData( d, true );
         }
 
         bool doIFreeIt() {
-            return freeIt;
+            return _freeIt;
         }
 
     private:
-        bool freeIt;
+        void _setData( MsgData *d, bool freeIt ) {
+            _freeIt = freeIt;
+            _data.push_back( make_pair( reinterpret_cast< char * >( d ), d->len ) );
+        }
+        // byte buffer(s) - the first must contain at least a full MsgData
+        vector< pair< char*, int > > _data;
+        bool _freeIt;
     };
 
     class SocketException : public DBException {

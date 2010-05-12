@@ -49,7 +49,7 @@ namespace mongo {
             bool ok = c.call( r.m(), response);
 
             {
-                QueryResult *qr = (QueryResult *) response.data;
+                QueryResult *qr = (QueryResult *) response.singleData();
                 if ( qr->resultFlags() & QueryResult::ResultFlag_ShardConfigStale ){
                     dbcon.done();
                     throw StaleConfigException( r.getns() , "Strategy::doQuery" );
@@ -113,7 +113,7 @@ namespace mongo {
                         int len;
 
                         Message m( (void*)data["msg"].binData( len ) , false );
-                        massert( 10427 ,  "invalid writeback message" , m.data->valid() );                        
+                        massert( 10427 ,  "invalid writeback message" , m.header()->valid() );                        
 
                         grid.getDBConfig( ns )->getChunkManager( ns , true );
                         
