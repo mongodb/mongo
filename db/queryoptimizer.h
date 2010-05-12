@@ -82,7 +82,7 @@ namespace mongo {
     // each clone its own query plan.
     class QueryOp {
     public:
-        QueryOp() : complete_(), qp_(), error_() {}
+        QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
         virtual ~QueryOp() {}
         
         /** this gets called after a query plan is set? ERH 2/16/10 */
@@ -96,23 +96,25 @@ namespace mongo {
                     to generate QueryOps for the subsequent plan set.
         */
         virtual QueryOp *clone() const = 0;
-        bool complete() const { return complete_; }
-        bool error() const { return error_; }
-        string exceptionMessage() const { return exceptionMessage_; }
-        const QueryPlan &qp() const { return *qp_; }
+        bool complete() const { return _complete; }
+        bool error() const { return _error; }
+        string exceptionMessage() const { return _exceptionMessage; }
+        const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
-        void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
         void setExceptionMessage( const string &exceptionMessage ) {
-            error_ = true;
-            exceptionMessage_ = exceptionMessage;
+            _error = true;
+            _exceptionMessage = exceptionMessage;
         }
     protected:
-        void setComplete() { complete_ = true; }
+        void setComplete() { _complete = true; }
+        void setStop() { setComplete(); _stopRequested = true; }
     private:
-        bool complete_;
-        string exceptionMessage_;
-        const QueryPlan *qp_;
-        bool error_;
+        bool _complete;
+        bool _stopRequested;
+        string _exceptionMessage;
+        const QueryPlan *_qp;
+        bool _error;
     };
     
     // Set of candidate query plans for a particular query.  Used for running
