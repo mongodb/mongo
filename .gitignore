@@ -28,8 +28,6 @@
 *.pdb
 *.manifest
 *.gch
-*.vcproj.*
-*.vcxproj.*
 *.*sdf
 *.psess
 *#
