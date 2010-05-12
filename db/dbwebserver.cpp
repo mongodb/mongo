@@ -262,8 +262,9 @@ namespace mongo {
             s << start("Replica Set Status " + getHostName());
             s << p( a("/", "back", "Home") + " | " + 
                     a("/local/system.replset/?html=1", "", "View config") + " | " +
-                    a("/replSetGetStatus?text", "", "replSetGetStatus")
-                    );
+                    a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
+                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
+                  );
 
             if( theReplSet == 0 ) { 
                 if( cmdLine.replSet.empty() ) 

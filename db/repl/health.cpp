@@ -146,11 +146,13 @@ namespace mongo {
             time_t now = time(0);
             if( hb == 0 ) h << "never"; 
             else {
-                if( now > hb ) h << now-hb; 
+                time_t diff = now-hb;
+                if( now > hb ) h << diff;
                 else h << 0;
-                h << " secs ago";
+                if( diff == 1 ) h << "sec ago";
+                else h << "secs ago";
             }
-            s << td( red(h.str(), !ok) );
+            s << td(h.str());
         }
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(state()));
@@ -188,14 +190,17 @@ namespace mongo {
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 0};
         s << table(h);
-        s << tr() << td(_self->fullName()) <<
-            td("1") << 
-            td("") << 
-            td("") << 
-            td(ToString(_self->config().votes)) << 
-            td(stateAsHtml(_myState)) << 
-            td("self") << 
-            _tr();
+        {
+            /* self row */
+            s << tr() << td(_self->fullName()) <<
+                td("1") << 
+                td("self") << 
+                td("") << 
+                td(ToString(_self->config().votes)) << 
+                td(stateAsHtml(_myState));
+            s << td( _self->_lastHeartbeatErrMsg.get() );
+            s << _tr();
+        }
         Member *m = head();
         while( m ) {
             m->summarizeAsHtml(s);
@@ -270,7 +275,9 @@ namespace mongo {
         // add self
         {
             HostAndPort h(getHostName(), cmdLine.port);
-            v.push_back( BSON( "name" << h.toString() << "self" << true ) );
+            v.push_back( 
+                BSON( "name" << h.toString() << "self" << true << 
+                "errmsg" << _self->_lastHeartbeatErrMsg.get() ) );
         }
 
         while( m ) {

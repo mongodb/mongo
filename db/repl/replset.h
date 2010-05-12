@@ -110,6 +110,7 @@ namespace mongo {
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
+
             bool _dead;
             double _health;
             time_t _lastHeartbeat;
@@ -137,7 +138,8 @@ namespace mongo {
         class Manager : boost::noncopyable {
             ReplSet *_rs;
             int _primary;
-            const Member* findPrimary();
+            const Member* findOtherPrimary();
+            void noteARemoteIsPrimary(const Member *);
         public:
             Manager(ReplSet *rs);
             void checkNewState();
