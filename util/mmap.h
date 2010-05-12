@@ -46,6 +46,9 @@ namespace mongo {
         }
     };
 
+    /** template for what a new storage engine's class definition must implement 
+        PRELIMINARY - subject to change.
+    */
     class MFTemplate : public MongoFile {
     protected:
         virtual void close();
@@ -53,15 +56,33 @@ namespace mongo {
     public:
         virtual long length();
 
+        /** pointer to a range of space in this storage unit */
         class Pointer {
         public:
+            /** retried address of buffer at offset 'offset' withing the storage unit. returned range is a contiguous 
+                buffer reflecting what is in storage.  caller will not read or write past 'len'.
+
+                note calls may be received that are at different points in a range and different lengths. however 
+                for now assume that on writes, if a call is made, previously returned addresses are no longer valid. i.e.
+                  p = at(10000, 500);
+                  q = at(10000, 600);
+                after the second call it is ok if p is invalid.
+            */
             void* at(int offset, int len);
-			void grow(int offset, int len);
+
+            /** indicate that we wrote to the range (from a previous at() call) and that it needs 
+                flushing to disk.
+                */
+            void written(int offset, int len);
+
             bool isNull() const;
         };
 
-        Pointer map( const char *filename );
-        Pointer map(const char *_filename, long &length, int options=0);
+        /** commit written() calls from above. */
+        void commit();
+        
+        Pointer open(const char *filename);
+        Pointer open(const char *_filename, long &length, int options=0);
     };
 
     class MemoryMappedFile : public MongoFile {
@@ -85,7 +106,10 @@ namespace mongo {
         
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map( const char *filename );
-        /*Pointer pmap( const char *filename ) {
+
+        /*To replace map():
+        
+          Pointer open( const char *filename ) {
             void *p = map(filename);
             uassert(13077, "couldn't open/map file", p);
             return Pointer(p);
