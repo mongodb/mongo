@@ -230,7 +230,16 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\js\src\js.lib">
+    <Library Include="..\..\js\js64r.lib">
+      <Filter>misc and third party</Filter>
+    </Library>
+    <Library Include="..\..\js\js32d.lib">
+      <Filter>misc and third party</Filter>
+    </Library>
+    <Library Include="..\..\js\js32r.lib">
+      <Filter>misc and third party</Filter>
+    </Library>
+    <Library Include="..\..\js\js64d.lib">
       <Filter>misc and third party</Filter>
     </Library>
   </ItemGroup>
@@ -583,14 +592,14 @@
     <ClCompile Include="..\db\repl\rs_config.cpp">
       <Filter>replsets</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\repl\rs_mod.cpp">
-      <Filter>replsets</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\btree.cpp">
       <Filter>btree related</Filter>
     </ClCompile>
     <ClCompile Include="..\db\btreecursor.cpp">
       <Filter>btree related</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\repl\manager.cpp">
+      <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

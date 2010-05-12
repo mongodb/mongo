@@ -37,20 +37,15 @@ namespace mongo {
     */
     class ReplSet {
     public:
-        bool isMaster(const char *client) { 
-            //zzz
-            /* todo replset */
-            return false;
-        }
-        void fillIsMaster(BSONObjBuilder&);
-
         static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, STARTED=5 } startupStatus;
         static string startupStatusMsg;
 
+        void fatal();
+        bool isMaster(const char *client);
+        void fillIsMaster(BSONObjBuilder&);
         bool ok() const { return _myState != FATAL; }
-
-        /* @return replica set's logical name */
-        string getName() const { return _name; }
+        
+        string getName() const { return _name; } /* @return replica set's logical name */
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
@@ -100,15 +95,9 @@ namespace mongo {
 
     public:
         struct Member : public List1<Member>::Base {
-            Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
-                _config(c), _h(h), 
-                _id(ord) { 
-                _dead = false;
-                _lastHeartbeat = 0;
-                _upSince = 0;
-                _health = -1.0;
-                _state = UNKNOWN;
-            }
+            Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c);
+            const HostAndPort _h;
+            const unsigned _id; // ordinal
             string fullName() const { return _h.toString(); }
             double health() const { return _health; }
             time_t upSince() const { return _upSince; }
@@ -117,23 +106,22 @@ namespace mongo {
             bool up() const { return health() > 0; }
             void summarizeAsHtml(stringstream& s) const;
             ReplSet::State state() const { return _state; }
+            DiagStr _lastHeartbeatErrMsg;
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             bool _dead;
-        public:
-            const HostAndPort _h;
-            const unsigned _id; // ordinal
-        private:
             double _health;
             time_t _lastHeartbeat;
             time_t _upSince;
             ReplSet::State _state;
-        public:
-            DiagStr _lastHeartbeatErrMsg;
         };
 
+        const Member* currentPrimary() const { return _currentPrimary; }
+
     private:
+        const Member *_currentPrimary;
+
         static string stateAsStr(State state);
         static string stateAsHtml(State state);
 
@@ -146,17 +134,33 @@ namespace mongo {
         friend class FeedbackThread;
 
     public:
-        void fatal() { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
-
-    public:
         class Manager : boost::noncopyable {
             ReplSet *_rs;
             int _primary;
+            const Member* findPrimary();
         public:
             Manager(ReplSet *rs);
             void checkNewState();
         } _mgr;
 
     };
+
+    inline void ReplSet::fatal() 
+    { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
+
+    inline ReplSet::Member::Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
+        _h(h), _id(ord), _config(c)
+    { 
+        _dead = false;
+        _lastHeartbeat = 0;
+        _upSince = 0;
+        _health = -1.0;
+        _state = UNKNOWN;
+    }
+
+    inline bool ReplSet::isMaster(const char *client) {         
+        /* todo replset */
+        return false;
+    }
 
 }

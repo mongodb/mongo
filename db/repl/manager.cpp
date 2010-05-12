@@ -27,12 +27,21 @@ namespace mongo {
         SELFPRIMARY = -1
     };
 
+    const ReplSet::Member * ReplSet::Manager::findPrimary() { 
+        return 0;
+    }
+
     ReplSet::Manager::Manager(ReplSet *rs) : _rs(rs), _primary(NOPRIMARY)
     { 
     }
 
+    /** called as the health threads get new results */
     void ReplSet::Manager::checkNewState() {
         log() << "checkNewState " << rsLog;
+
+        const ReplSet::Member *p = _rs->currentPrimary();
+
+        const ReplSet::Member *p2 = findPrimary();
     }
 
 }
