@@ -640,11 +640,11 @@ namespace mongo {
             {
                 const FieldInterval& fi = *it;
                 assert(fi.valid());
-                BSONObj minObj = BSON(field.fieldName() << fi.lower_.bound_);
-                BSONObj maxObj = BSON(field.fieldName() << fi.upper_.bound_);
+                BSONObj minObj = BSON(field.fieldName() << fi._lower._bound);
+                BSONObj maxObj = BSON(field.fieldName() << fi._upper._bound);
                 ChunkRangeMap::const_iterator min, max;
-                min = (fi.lower_.inclusive_ ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
-                max = (fi.upper_.inclusive_ ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
+                min = (fi._lower._inclusive ? _chunkRanges.upper_bound(minObj) : _chunkRanges.lower_bound(minObj));
+                max = (fi._upper._inclusive ? _chunkRanges.upper_bound(maxObj) : _chunkRanges.lower_bound(maxObj));
 
                 assert(min != _chunkRanges.ranges().end());
 

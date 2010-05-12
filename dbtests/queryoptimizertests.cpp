@@ -130,7 +130,7 @@ namespace QueryOptimizerTests {
         class TwoGt : public Gt {
             virtual BSONObj query() { return BSON( "a" << GT << 0 << GT << 1 ); }                        
         };        
-        
+
         class EqGte : public Eq {
             virtual BSONObj query() { return BSON( "a" << 1 << "a" << GTE << 1 ); }            
         };
@@ -146,10 +146,10 @@ namespace QueryOptimizerTests {
         struct RegexBase : Base {
             void run() { //need to only look at first interval
                 FieldRangeSet s( "ns", query() );
-                checkElt( lower(), s.range( "a" ).intervals()[0].lower_.bound_ );
-                checkElt( upper(), s.range( "a" ).intervals()[0].upper_.bound_ );
-                ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).intervals()[0].lower_.inclusive_ );
-                ASSERT_EQUALS( upperInclusive(), s.range( "a" ).intervals()[0].upper_.inclusive_ );
+                checkElt( lower(), s.range( "a" ).intervals()[0]._lower._bound );
+                checkElt( upper(), s.range( "a" ).intervals()[0]._upper._bound );
+                ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).intervals()[0]._lower._inclusive );
+                ASSERT_EQUALS( upperInclusive(), s.range( "a" ).intervals()[0]._upper._inclusive );
             }
         };
 
@@ -325,9 +325,9 @@ namespace QueryOptimizerTests {
 				vector< FieldInterval >::const_iterator j = intervals.begin();
 				double expected[] = { 3, 5, 9 };
 				for( int i = 0; i < 3; ++i, ++j ) {
-					ASSERT_EQUALS( expected[ i ], j->lower_.bound_.number() );
-					ASSERT( j->lower_.inclusive_ );
-					ASSERT( j->lower_ == j->upper_ );
+					ASSERT_EQUALS( expected[ i ], j->_lower._bound.number() );
+					ASSERT( j->_lower._inclusive );
+					ASSERT( j->_lower == j->_upper );
 				}
 				ASSERT( j == intervals.end() );
 			}

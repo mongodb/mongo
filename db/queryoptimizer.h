@@ -139,6 +139,9 @@ namespace mongo {
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
         PlanPtr getBestGuess() const;
+        
+        //for testing
+        const FieldRangeSet &fbs() const { return fbs_; }
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
