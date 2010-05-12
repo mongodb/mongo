@@ -570,7 +570,7 @@ namespace mongo {
                 
                 // if only one $or clause, use it - this works with our first cut hack way of rewriting queries
                 if ( strcmp( e.fieldName(), "$or" ) == 0 ) {                                                                                                                                                        
-                    massert( 13258, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
+                    massert( 13272, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                     BSONObjIterator j( e.embeddedObject() );
                     if ( j.more() ) { // could be assert instead
                         BSONElement f = j.next();
