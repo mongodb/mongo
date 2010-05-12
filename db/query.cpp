@@ -324,7 +324,7 @@ namespace mongo {
                         last = c->currLoc();
                         BSONObj js = c->current();
 
-                        fillQueryResultFromObj(b, cc->fields.get(), js, (cc->pq->showDiskLoc() ? &last : 0));
+                        fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
