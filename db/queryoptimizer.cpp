@@ -258,6 +258,8 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
+        log() << "query: " << query_ << endl;
+        
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << query_ );
         plans_.clear();
         mayRecordPlan_ = true;
@@ -389,6 +391,7 @@ namespace mongo {
         if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
+            log() << "just table scan" << endl;
             addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
             return;
         }
@@ -397,6 +400,7 @@ namespace mongo {
 
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
+            log() << "checking index: " << i << endl;
             IndexDetails& id = d->idx(i);
             const IndexSpec& spec = id.getSpec();
             IndexSuitability suitability = HELPFUL;
@@ -555,10 +559,11 @@ namespace mongo {
     _ns( ns ),
     _or( !query.getField( "$or" ).eoo() ),
     _query( query.getOwned() ),
-    _i() {
+    _i(),
+    _honorRecordedPlan( honorRecordedPlan ) {
 //    _fros( ns, query ) {
         // eventually implement (some of?) these
-        if ( !order.isEmpty() || hint || !honorRecordedPlan || !min.isEmpty() || !max.isEmpty() ) {
+        if ( !order.isEmpty() || hint || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
         if ( !_or ) {
@@ -569,6 +574,7 @@ namespace mongo {
             massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
             _n = e.embeddedObject().nFields();
         }
+        log() << "_or: " << _or << endl;
     }
 
     shared_ptr< QueryOp > MultiPlanScanner::runOpOnce( QueryOp &op ) {
@@ -577,13 +583,13 @@ namespace mongo {
             ++_i;
             return _currentQps->runOp( op );
         }
-        _currentQps.reset( new QueryPlanSet( _ns, nextSimpleQuery(), BSONObj() ) );
+        _currentQps.reset( new QueryPlanSet( _ns, nextSimpleQuery(), BSONObj(), 0, _honorRecordedPlan ) );
         return _currentQps->runOp( op );
     }
     
     shared_ptr< QueryOp > MultiPlanScanner::runOp( QueryOp &op ) {
         shared_ptr< QueryOp > ret = runOpOnce( op );
-        while( mayRunMore() ) {
+        while( !ret->stopRequested() && mayRunMore() ) {
             ret = runOpOnce( *ret );
         }
         return ret;

@@ -109,7 +109,7 @@ namespace mongo {
             }
             if ( matcher_->matches( c_->currKey(), c_->currLoc() ) ) {
                 one_ = c_->current();
-                setComplete();
+                setStop();
             } else {
                 c_->advance();
             }

@@ -98,6 +98,7 @@ namespace mongo {
         virtual QueryOp *clone() const = 0;
         bool complete() const { return _complete; }
         bool error() const { return _error; }
+        bool stopRequested() const { return _stopRequested; }
         string exceptionMessage() const { return _exceptionMessage; }
         const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
@@ -268,6 +269,7 @@ namespace mongo {
         auto_ptr< QueryPlanSet > _currentQps;
         int _i;
         int _n;
+        bool _honorRecordedPlan;
     };
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
