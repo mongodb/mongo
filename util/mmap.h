@@ -20,7 +20,7 @@
 namespace mongo {
 
     /* the administrative-ish stuff here */
-    class MongoFile { 
+    class MongoFile : boost::noncopyable { 
     protected:
         virtual void close() = 0;
         virtual void flush(bool sync) = 0;
@@ -28,13 +28,12 @@ namespace mongo {
         void created(); /* subclass must call after create */
         void destroyed(); /* subclass must call in destructor */
     public:
+        virtual ~MongoFile() {}
         virtual long length() = 0;
 
         enum Options {
             SEQUENTIAL = 1 // hint - e.g. FILE_FLAG_SEQUENTIAL_SCAN on windows
         };
-
-        virtual ~MongoFile() {}
 
         static int flushAll( bool sync ); // returns n flushed
         static long long totalMappedLength();
@@ -49,7 +48,7 @@ namespace mongo {
     /** template for what a new storage engine's class definition must implement 
         PRELIMINARY - subject to change.
     */
-    class MFTemplate : public MongoFile {
+    class StorageContainerTemplate : public MongoFile {
     protected:
         virtual void close();
         virtual void flush(bool sync);
