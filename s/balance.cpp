@@ -164,7 +164,10 @@ namespace mongo {
         assert( cm );
         
         Chunk& c = cm->findChunk( chunkToMove["min"].Obj() );
-        assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        if ( c.getMin().woCompare( chunkToMove["min"].Obj() ) ){
+            log() << "balancer: weird chunk issue  c: " << c << " min: " << chunkToMove["min"].Obj() << endl;
+            assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        }
         
         string errmsg;
         if ( c.moveAndCommit( Shard::make( to ) , errmsg ) ){
