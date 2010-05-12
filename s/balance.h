@@ -32,6 +32,11 @@ namespace mongo {
 
     private:
         bool shouldIBalance( DBClientBase& conn );
+        
+        /**
+         * @return true if everything is ok
+         */
+        bool checkOIDs();
 
         /**
          * @return number of collections balanced

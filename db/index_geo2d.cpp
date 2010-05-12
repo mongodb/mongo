@@ -467,10 +467,19 @@ namespace mongo {
             return sqrt( ( dx * dx ) + ( dy * dy ) );
         }
 
-        double size( const GeoHash& a ) const {
+        double sizeDiag( const GeoHash& a ) const {
             GeoHash b = a;
             b.move( 1 , 1 );
             return distance( a , b );
+        }
+
+        double sizeEdge( const GeoHash& a ) const {
+	    double ax,ay,bx,by;
+            GeoHash b = a;
+            b.move( 1 , 1 );
+	    _unconvert( a, ax, ay );
+	    _unconvert( b, bx, by );
+	    return (abs(ax-bx));
         }
 
         const IndexDetails* getDetails() const {
@@ -543,7 +552,7 @@ namespace mongo {
         
         Box( const Geo2dType * g , const GeoHash& hash )
             : _min( g , hash ) , 
-              _max( _min._x + g->size( hash ) , _min._y + g->size( hash ) ){
+              _max( _min._x + g->sizeEdge( hash ) , _min._y + g->sizeEdge( hash ) ){
         }
         
         Box( double x , double y , double size )
@@ -1056,14 +1065,14 @@ namespace mongo {
             if ( _found && _prefix.constrains() ){
                 // 2
                 Point center( _spec , _n );
-                double boxSize = _spec->size( _prefix );
+                double boxSize = _spec->sizeEdge( _prefix );
                 double farthest = hopper->farthest();
                 if ( farthest > boxSize )
                     boxSize = farthest;
                 Box want( center._x - ( boxSize / 2 ) , center._y - ( boxSize / 2 ) , boxSize );
-                while ( _spec->size( _prefix ) < boxSize )
+                while ( _spec->sizeEdge( _prefix ) < boxSize )
                     _prefix = _prefix.up();
-                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->size( _prefix ) << endl;
+                log(1) << "want: " << want << " found:" << _found << " hash size:" << _spec->sizeEdge( _prefix ) << endl;
                 
                 for ( int x=-1; x<=1; x++ ){
                     for ( int y=-1; y<=1; y++ ){

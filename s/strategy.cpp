@@ -142,10 +142,13 @@ namespace mongo {
         
     private:
         string _addr;
-        static map<string,WriteBackListener*> _cache;
 
+        static map<string,WriteBackListener*> _cache;
+        static mongo::mutex _lock;
+        
     public:
         static void init( DBClientBase& conn ){
+            scoped_lock lk( _lock );
             WriteBackListener*& l = _cache[conn.getServerAddress()];
             if ( l )
                 return;
@@ -156,7 +159,7 @@ namespace mongo {
     };
 
     map<string,WriteBackListener*> WriteBackListener::_cache;
-    
+    mongo::mutex WriteBackListener::_lock;
 
     void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...

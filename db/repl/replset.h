@@ -21,6 +21,7 @@
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/hostandport.h"
+#include "rstime.h"
 #include "rs_config.h"
 
 namespace mongo {
@@ -43,7 +44,7 @@ namespace mongo {
         }
         void fillIsMaster(BSONObjBuilder&);
 
-        static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, FINISHME=5 } startupStatus;
+        static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, STARTED=5 } startupStatus;
         static string startupStatusMsg;
 
         bool ok() const { return _myState != FATAL; }
@@ -60,7 +61,7 @@ namespace mongo {
         ReplSet(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
-        void go() { startHealthThreads(); }
+        void go() { _myState = STARTUP2; startHealthThreads(); }
 
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
@@ -86,6 +87,17 @@ namespace mongo {
             bool electSelf();
         } elect;
 
+    private:
+        enum State {
+            STARTUP,
+            PRIMARY,
+            SECONDARY,
+            RECOVERING,
+            FATAL,
+            STARTUP2,
+            UNKNOWN /* remote node not yet reached */
+        } _myState;
+
     public:
         struct Member : public List1<Member>::Base {
             Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
@@ -95,6 +107,7 @@ namespace mongo {
                 _lastHeartbeat = 0;
                 _upSince = 0;
                 _health = -1.0;
+                _state = UNKNOWN;
             }
             string fullName() const { return _h.toString(); }
             double health() const { return _health; }
@@ -103,29 +116,24 @@ namespace mongo {
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
             bool up() const { return health() > 0; }
             void summarizeAsHtml(stringstream& s) const;
+            ReplSet::State state() const { return _state; }
         private:
             friend class FeedbackThread; // feedbackthread is the primary writer to these objects
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             bool _dead;
         public:
             const HostAndPort _h;
-            const int _id; // ordinal
+            const unsigned _id; // ordinal
         private:
             double _health;
             time_t _lastHeartbeat;
             time_t _upSince;
+            ReplSet::State _state;
         public:
             DiagStr _lastHeartbeatErrMsg;
         };
 
     private:
-        enum State {
-            STARTUP,
-            PRIMARY,
-            SECONDARY,
-            RECOVERING,
-            FATAL
-        } _myState;
         static string stateAsStr(State state);
         static string stateAsHtml(State state);
 
@@ -139,6 +147,15 @@ namespace mongo {
 
     public:
         void fatal() { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
+
+    public:
+        class Manager : boost::noncopyable {
+            ReplSet *_rs;
+            int _primary;
+        public:
+            Manager(ReplSet *rs);
+            void checkNewState();
+        } _mgr;
 
     };
 

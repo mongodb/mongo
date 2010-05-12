@@ -33,6 +33,7 @@ DBQuery.prototype.help = function(){
     print( "\t.forEach( func )" )
     print( "\t.print() - output to console in full pretty format" )
     print( "\t.map( func )" )
+    print( "\t.showDiskLoc() - adds a $diskLoc field to each returned object" )
     
 }
 
@@ -197,6 +198,10 @@ DBQuery.prototype.min = function( min ) {
 
 DBQuery.prototype.max = function( max ) {
     return this._addSpecial( "$max" , max );
+}
+
+DBQuery.prototype.showDiskLoc = function() {
+    return this._addSpecial( "$showDiskLoc" , true);
 }
 
 DBQuery.prototype.forEach = function( func ){

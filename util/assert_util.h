@@ -88,8 +88,8 @@ namespace mongo {
         virtual string toString() const {
             return what();
         }
-        virtual int getCode() = 0;
-        operator string() const { return toString(); }
+        virtual int getCode() const = 0;
+        operator string() const { stringstream ss; ss << getCode() << " " << what(); return ss.str(); }
     };
     
     class AssertionException : public DBException {
@@ -104,7 +104,7 @@ namespace mongo {
         virtual bool isUserAssertion() {
             return false;
         }
-        virtual int getCode(){ return code; }
+        virtual int getCode() const { return code; }
         virtual const char* what() const throw() { return msg.c_str(); }
 
         /* true if an interrupted exception - see KillCurrentOp */

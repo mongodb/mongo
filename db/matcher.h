@@ -205,12 +205,12 @@ namespace mongo {
     // If match succeeds on index key, then attempt to match full document.
     class CoveredIndexMatcher : boost::noncopyable {
     public:
-        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
+        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
         bool matches(const BSONObj &o){ return _docMatcher.matches( o ); }
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 );
         bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
         bool needRecord(){ return _needRecord; }
-
+        
         Matcher& docMatcher() { return _docMatcher; }
     private:
         Matcher _keyMatcher;

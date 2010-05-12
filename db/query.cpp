@@ -331,7 +331,7 @@ namespace mongo {
                         last = c->currLoc();
                         BSONObj js = c->current();
 
-                        fillQueryResultFromObj(b, cc->fields.get(), js);
+                        fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
                              (ntoreturn==0 && b.len()>1*1024*1024) ) {
@@ -564,7 +564,7 @@ namespace mongo {
                     
                     if ( _inMemSort ) {
                         // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                        _so->add( _pq.returnKey() ? _c->currKey() : _c->current() );
+                        _so->add( _pq.returnKey() ? _c->currKey() : _c->current(), _pq.showDiskLoc() ? &cl : 0 );
                     }
                     else if ( _ntoskip > 0 ) {
                         _ntoskip--;
@@ -587,7 +587,7 @@ namespace mongo {
                             else {
                                 BSONObj js = _c->current();
                                 assert( js.isValid() );
-                                fillQueryResultFromObj( _buf , _pq.getFields() , js );
+                                fillQueryResultFromObj( _buf , _pq.getFields() , js , (_pq.showDiskLoc() ? &cl : 0));
                             }
                             _n++;
                             if ( ! _c->supportGetMore() ){
@@ -674,7 +674,8 @@ namespace mongo {
     /* run a query -- includes checking for and running a Command */
     auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop ) {
         StringBuilder& ss = curop.debug().str;
-        ParsedQuery pq( q );
+        shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
+        ParsedQuery& pq( *pq_shared );
         const char *ns = q.ns;
         int ntoskip = q.ntoskip;
         BSONObj jsobj = q.query;
@@ -780,7 +781,7 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
             
-        if ( ! explain && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+        if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             nscanned = 1;
 
             bool nsFound = false;
@@ -837,6 +838,7 @@ namespace mongo {
             DEV out() << "  query has more, cursorid: " << cursorid << endl;
             cc->matcher = dqo.matcher();
             cc->pos = n;
+            cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();
             cc->originalMessage = m;
             cc->updateLocation();

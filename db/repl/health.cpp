@@ -87,7 +87,7 @@ namespace mongo {
     /* poll every other set member to check its status */
     class FeedbackThread : public BackgroundJob {
     public:
-        ReplSet::Member *m;
+        ReplSet::Member *m; 
 
     private:
         void down() {
@@ -123,11 +123,12 @@ namespace mongo {
                     down();
                     m->_lastHeartbeatErrMsg.set("connect/transport error");
                 }
+                theReplSet->_mgr.checkNewState();
                 sleepsecs(2);
             }
         }
     };
-
+    
     void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
         s << tr();
         {
@@ -135,7 +136,9 @@ namespace mongo {
             u << "http://" << _h.host() << ':' << (_h.port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
-        s << td(health());
+        double h = health();
+        bool ok = h > 0;
+        s << td(h);
         s << td(upSince());
         {
             stringstream h;
@@ -147,10 +150,11 @@ namespace mongo {
                 else h << 0;
                 h << " secs ago";
             }
-            s << td(h.str());
+            s << td( red(h.str(), !ok) );
         }
         s << td(config().votes);
-        s << td(_lastHeartbeatErrMsg.get());
+        s << td(ReplSet::stateAsStr(state()));
+        s << td( red(_lastHeartbeatErrMsg.get(),!ok) );
         s << _tr();
     }
 
@@ -160,7 +164,8 @@ namespace mongo {
         if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
         if( s == RECOVERING ) return a("", "recovering/resyncing; after recovery usually auto-transitions to secondary", "RECOVERING");
         if( s == FATAL ) return a("", "something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.", "FATAL");
-        return "???";
+        if( s == STARTUP2 ) return a("", "loaded config, still determining who is primary", "STARTUP2");
+        return "";
     }
 
     string ReplSet::stateAsStr(State s) { 
@@ -169,25 +174,26 @@ namespace mongo {
         if( s == SECONDARY ) return "SECONDARY";
         if( s == RECOVERING ) return "RECOVERING";
         if( s == FATAL ) return "FATAL";
-        return "???";
+        if( s == STARTUP2 ) return "STARTUP2";
+        return "";
     }
 
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
-        s << tr("My state:", stateAsHtml(_myState));
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
         const char *h[] = {"Member", "Up", "Uptime", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
-            "Votes", "Status", 0};
+            "Votes", "State", "Status", 0};
         s << table(h);
         s << tr() << td(_self->fullName()) <<
             td("1") << 
             td("") << 
             td("") << 
             td(ToString(_self->config().votes)) << 
+            td(stateAsHtml(_myState)) << 
             td("self") << 
             _tr();
         Member *m = head();
@@ -203,7 +209,7 @@ namespace mongo {
             if( strcmp(v[i]+20,v[j]+20) == 0 ) {
                 for( int x = 1; ; x++ ) {
                     if( j+x == i ) return j;
-                    if( i+x>=v.size() ) return -1;
+                    if( i+x>=(int) v.size() ) return -1;
                     if( strcmp(v[i+x]+20,v[j+x]+20) ) return -1;
                 }
                 return -1;
@@ -232,7 +238,7 @@ namespace mongo {
         bool first = true;
         s << "<pre>\n";
         vector<const char *> v = _rsLog.get();
-        for( int i = 0; i < v.size(); i++ ) {
+        for( int i = 0; i < (int)v.size(); i++ ) {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {

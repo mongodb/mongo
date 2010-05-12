@@ -164,7 +164,10 @@ namespace mongo {
         assert( cm );
         
         Chunk& c = cm->findChunk( chunkToMove["min"].Obj() );
-        assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        if ( c.getMin().woCompare( chunkToMove["min"].Obj() ) ){
+            log() << "balancer: weird chunk issue  c: " << c << " min: " << chunkToMove["min"].Obj() << endl;
+            assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        }
         
         string errmsg;
         if ( c.moveAndCommit( Shard::make( to ) , errmsg ) ){
@@ -215,6 +218,34 @@ namespace mongo {
 
         conn.setWriteConcern( w);
     }
+    
+    bool Balancer::checkOIDs(){
+        vector<Shard> all;
+        Shard::getAllShards( all );
+        
+        map<int,Shard> oids;
+        
+        for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ){
+            Shard s = *i;
+            BSONObj f = s.runCommand( "admin" , "features" );
+            if ( f["oidMachine"].isNumber() ){
+                int x = f["oidMachine"].numberInt();
+                if ( oids.count(x) == 0 ){
+                    oids[x] = s;
+                }
+                else {
+                    log() << "error: 2 machines have " << x << " as oid machine piece " << s.toString() << " and " << oids[x].toString() << endl;
+                    s.runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
+                    oids[x].runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
+                    return false;
+                }
+            }
+            else {
+                log() << "warning: oidMachine not set on: " << s.toString() << endl;
+            }
+        }
+        return true;
+    }
 
     void Balancer::run(){
 
@@ -228,6 +259,7 @@ namespace mongo {
         }
         
         ping();
+        checkOIDs();
 
         while ( ! inShutdown() ){
             sleepsecs( 15 );
@@ -236,6 +268,10 @@ namespace mongo {
                 ShardConnection conn( configServer.getPrimary() );
                 ping( conn.conn() );
                 
+                if ( ! checkOIDs() ){
+                    uassert( 13258 , "oids broken after resetting!" , checkOIDs() );
+                }
+                                    
                 int numBalanced = 0;
                 if ( shouldIBalance( conn.conn() ) ){
                     numBalanced = balance( conn.conn() );

@@ -679,14 +679,14 @@ namespace mongo {
     
     class UpdateOp : public QueryOp {
     public:
-        UpdateOp() : _nscanned() {}
+        UpdateOp( bool hasPositionalField ) : _nscanned(), _hasPositionalField( hasPositionalField ){}
         virtual void init() {
             BSONObj pattern = qp().query();
             _c = qp().newCursor();
             if ( ! _c->ok() )
                 setComplete();
             else
-                _matcher.reset( new CoveredIndexMatcher( pattern, qp().indexKey() ) );
+                _matcher.reset( new CoveredIndexMatcher( pattern, qp().indexKey() , _hasPositionalField ) );
         }
         virtual void next() {
             if ( ! _c->ok() ) {
@@ -710,7 +710,7 @@ namespace mongo {
 
         virtual bool mayRecordPlan() const { return false; }
         virtual QueryOp *clone() const {
-            return new UpdateOp();
+            return new UpdateOp( _hasPositionalField );
         }
         
         shared_ptr< Cursor > c() { return _c; }
@@ -720,6 +720,7 @@ namespace mongo {
     private:
         shared_ptr< Cursor > _c;
         long long _nscanned;
+        bool _hasPositionalField;
         auto_ptr< CoveredIndexMatcher > _matcher;
         MatchDetails _details;
     };
@@ -759,7 +760,7 @@ namespace mongo {
         long long nscanned = 0;
         MultiPlanScanner mps( ns, patternOrig, BSONObj() );
         while( mps.mayRunMore() ) {
-            UpdateOp original;
+            UpdateOp original( mods.get() && mods->hasDynamicArray() );
             shared_ptr< UpdateOp > u = mps.runOpOnce( original );
             massert( 10401 ,  u->exceptionMessage(), u->complete() );
             
