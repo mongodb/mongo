@@ -96,6 +96,7 @@ namespace mongo {
         }
 
         log() << "replSet todo elect self as primary primary" << rsLog;
+        _rs->_self->_lastHeartbeatErrMsg.set("todo code #2");
     }
 
 

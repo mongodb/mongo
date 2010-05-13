@@ -269,8 +269,10 @@ namespace mongo {
             if( theReplSet == 0 ) { 
                 if( cmdLine.replSet.empty() ) 
                     s << p("Not using --replSet");
-                else 
-                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initialized") + '.');
+                else  {
+                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated") 
+                           + ".<br>" + ReplSet::startupStatusMsg);
+                }
             }
             else {
                 try {

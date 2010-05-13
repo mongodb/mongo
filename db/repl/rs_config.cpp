@@ -29,8 +29,14 @@ namespace mongo {
 
     void ReplSetConfig::save() { 
         check();
-        BSONObj o = asBson();
-        Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
+        log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
+        MemoryMappedFile::flushAll(true);
+        { 
+            writelock lk("admin.");
+            BSONObj o = asBson();
+            Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
+            MemoryMappedFile::flushAll(true);
+        }
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const { 
@@ -177,9 +183,8 @@ namespace mongo {
         //log(0) << "replSet load config from: " << h.toString() << rsLog;
 
         auto_ptr<DBClientCursor> c;
+        int v = -5;
         try {
-            version = -5;
-
             if( h.isSelf() ) {
                 ;
             }
@@ -192,33 +197,40 @@ namespace mongo {
                 int theirVersion;
                 BSONObj info;
                 bool ok = requestHeartbeat(setname, h.toString(), info, -2, theirVersion);
-                if( !ok ) {
-                    log() << "replSet TEMP !ok heartbeating " << h.toString() << " on cfg load" << rsLog;
-                    if( !info.isEmpty() ) log() << "replSet TEMP response was: " << info.toString() << rsLog;
-                    return;
+                if( info["rs"].trueValue() ) { 
+                    // yes, it is a replicate set, although perhaps not yet initialized
                 }
-                if( !info["rs"].trueValue() ) { 
-                    stringstream ss;
-                    ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
-                    cout << "TEMP " << info.toString() << endl;
-                    msgassertedNoTrace(13260, ss.str().c_str()); // not caught as not a user exception - we want it not caught
-                    //for python: uassert(13260, "", false);
+                else {
+                    if( !ok ) {
+                        log() << "replSet TEMP !ok heartbeating " << h.toString() << " on cfg load" << rsLog;
+                        if( !info.isEmpty() ) log() << "replSet TEMP response was: " << info.toString() << rsLog;
+                        return;
+                    }
+                    { 
+                        stringstream ss;
+                        ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
+                        cout << "TEMP " << info.toString() << endl;
+                        msgassertedNoTrace(13260, ss.str().c_str()); // not caught as not a user exception - we want it not caught
+                        //for python err# checker: uassert(13260, "", false);
+                    }
                 }
             }
 
-            version = -4;
+            v = -4;
             ScopedConn conn(h.toString());
-            version = -3;
+            v = -3;
             c = conn->query(rsConfigNs);
-            if( c.get() == 0 )
-                return;
+            if( c.get() == 0 ) {
+                version = v; return;
+            }
             if( !c->more() ) {
-                version = -2; /* -2 is a sentinel - see ReplSetConfig::empty() */
+                version = EMPTYCONFIG;
                 return;
             }
             version = -1;
         }
         catch( DBException& e) { 
+            version = v;
             log(level) << "replSet load config couldn't load " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }

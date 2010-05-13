@@ -1,6 +1,6 @@
 // helpers for testing repl sets
 // run
-//   mongo --shell testing.js
+//   mongo --shell <host:port> testing.js
 
 cfg = {
     _id: 'asdf',
@@ -13,6 +13,8 @@ cfg = {
 db = db.getSisterDB("admin");
 local = db.getSisterDB("local");
 
-print("\nswitched to admin db\n");
+print("\nswitched to admin db");
+print("cfg = samp replset config");
+print("rc = runCommand\n");
 
 function rc(c) { return db.runCommand(c); }

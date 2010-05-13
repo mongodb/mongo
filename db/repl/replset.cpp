@@ -18,6 +18,7 @@
 #include "../cmdline.h"
 #include "../../util/sock.h"
 #include "replset.h"
+#include "../client.h"
 
 namespace mongo { 
 
@@ -96,8 +97,8 @@ namespace mongo {
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
     string ReplSet::startupStatusMsg;
 
-    void ReplSet::setFrom(ReplSetConfig& c) { 
-        _cfg.reset( new ReplSetConfig(c) );
+    void ReplSet::setFrom(ReplSetConfig& c, bool save) { 
+        _cfg = new ReplSetConfig(c);
         assert( _cfg->ok() );
         assert( _name.empty() || _name == _cfg->_id );
         _name = _cfg->_id;
@@ -117,20 +118,27 @@ namespace mongo {
             }
         }
         assert( me == 1 );
+
+        if( save ) { 
+            _cfg->save();
+        }
     }
 
     void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
         int v = -1;
         ReplSetConfig *highest = 0;
+        int myVersion = -2000;
+        int n = 0;
         for( vector<ReplSetConfig>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) { 
             ReplSetConfig& cfg = *i;
+            if( ++n == 1 ) myVersion = cfg.version;
             if( cfg.ok() && cfg.version > v ) { 
                 highest = &cfg;
                 v = cfg.version;
             }
         }
         assert( highest );
-        setFrom(*highest);
+        setFrom(*highest, highest->version > myVersion && highest->version >= 0);
     }
 
     void ReplSet::loadConfig() {
@@ -155,7 +163,7 @@ namespace mongo {
 
                     if( nempty == (int) configs.size() ) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (uninitialized?)";
+                        startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         log() << "replSet have you ran replSetInitiate yet?" << rsLog;
                         log() << "replSet sleeping 1 minute and will try again." << rsLog;
@@ -186,8 +194,9 @@ namespace mongo {
         startupStatus = STARTED;
     }
 
-    /* called at startup */
+    /* forked as a thread during startup */
     void startReplSets() {
+        Client::initThread("startReplSets");
         mongo::lastError.reset( new LastError() );
         try { 
             assert( theReplSet == 0 );
@@ -202,6 +211,7 @@ namespace mongo {
             if( theReplSet ) 
                 theReplSet->fatal();
         }
+        cc().shutdown();
     }
 
 }
