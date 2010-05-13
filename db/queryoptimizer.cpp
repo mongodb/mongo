@@ -258,8 +258,6 @@ namespace mongo {
     }
     
     void QueryPlanSet::init() {
-        log() << "query: " << query_ << endl;
-        
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << query_ );
         plans_.clear();
         mayRecordPlan_ = true;
@@ -391,7 +389,6 @@ namespace mongo {
         if ( !fbs_.matchPossible() || ( fbs_.nNontrivialRanges() == 0 && order_.isEmpty() ) ||
             ( !order_.isEmpty() && !strcmp( order_.firstElement().fieldName(), "$natural" ) ) ) {
             // Table scan plan
-            log() << "just table scan" << endl;
             addPlan( PlanPtr( new QueryPlan( d, -1, fbs_, order_ ) ), checkFirst );
             return;
         }
@@ -400,7 +397,6 @@ namespace mongo {
 
         PlanSet plans;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            log() << "checking index: " << i << endl;
             IndexDetails& id = d->idx(i);
             const IndexSpec& spec = id.getSpec();
             IndexSuitability suitability = HELPFUL;

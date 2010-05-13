@@ -375,9 +375,6 @@ namespace mongo {
             query_ = qp().query();
             c_ = qp().newCursor();
             
-            log() << "query: " << query_ << endl;
-            log() << "index: " << c_->toString() << endl;
-            
             _matcher.reset( new CoveredIndexMatcher( query_, c_->indexKeyPattern() ) );
             if ( qp().exactKeyMatch() && ! _matcher->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );

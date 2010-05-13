@@ -259,7 +259,6 @@ namespace mongo {
             }
             ++_i;
             BSONObj ret = b.obj();
-            log() << "next simple: " << ret << endl;
             return ret;
         }
         const char * _ns;

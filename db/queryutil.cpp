@@ -576,7 +576,6 @@ namespace mongo {
                         BSONElement f = j.next();
                         massert( 13259, "$or array must contain objects", f.type() == Object );
                         if ( !j.more() ) { // if only one $or field, subfields are all required
-                            log() << "processing $or fields" << endl;
                             BSONObjIterator k( f.embeddedObject() );
                             while( k.more() ) {
                                 processQueryField( k.next(), optimize );
@@ -592,7 +591,6 @@ namespace mongo {
                 
                 processQueryField( e, optimize );
             }   
-            log() << "n non: " << nNontrivialRanges() << endl;
         }
 
 //    FieldRangeOrSet::FieldRangeOrSet( const char *ns, const BSONObj &query , bool optimize )
