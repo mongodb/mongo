@@ -178,26 +178,37 @@ namespace mongo {
 
         auto_ptr<DBClientCursor> c;
         try {
-            ScopedConn conn(h.toString());
-            version = -4;
+            version = -5;
 
-            {
+            if( h.isSelf() ) {
+                ;
+            }
+            else {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
                 size_t sl = cmdLine.replSet.find('/');
                 assert( sl != string::npos );
                 string setname = cmdLine.replSet.substr(0, sl);
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
+                int theirVersion;
                 BSONObj info;
-                bool ok = conn->runCommand("admin", cmd, info);
+                bool ok = requestHeartbeat(setname, h.toString(), info, -2, theirVersion);
+                if( !ok ) {
+                    log() << "replSet TEMP !ok heartbeating " << h.toString() << " on cfg load" << rsLog;
+                    if( !info.isEmpty() ) log() << "replSet TEMP response was: " << info.toString() << rsLog;
+                    return;
+                }
                 if( !info["rs"].trueValue() ) { 
                     stringstream ss;
                     ss << "replSet error: member " << h.toString() << " is not in --replSet mode";
-                    msgassertedNoTrace(10000, ss.str().c_str()); // not caught as not a user exception - we want it not caught
+                    cout << "TEMP " << info.toString() << endl;
+                    msgassertedNoTrace(13260, ss.str().c_str()); // not caught as not a user exception - we want it not caught
+                    //for python: uassert(13260, "", false);
                 }
             }
 
+            version = -4;
+            ScopedConn conn(h.toString());
             version = -3;
-
             c = conn->query(rsConfigNs);
             if( c.get() == 0 )
                 return;

@@ -61,6 +61,7 @@ namespace mongo {
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
         void summarizeAsHtml(stringstream&) const;
+        const ReplSetConfig& config() { return *_cfg.get(); }
 
     private:
         string _name;
@@ -119,6 +120,7 @@ namespace mongo {
         };
 
         const Member* currentPrimary() const { return _currentPrimary; }
+        const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
 
     private:
         const Member *_currentPrimary;

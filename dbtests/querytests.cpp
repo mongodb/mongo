@@ -1005,7 +1005,9 @@ namespace QueryTests {
                 for( int j = -1; j < i; ++j ) {
                     auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "ts" << GTE << j ), 0, 0, 0, QueryOption_OplogReplay );
                     ASSERT( c->more() );
-                    ASSERT_EQUALS( ( j > min ? j : min ), c->next()[ "ts" ].numberInt() );
+                    BSONObj next = c->next();
+                    ASSERT( !next[ "ts" ].eoo() );
+                    ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
             }
         }
@@ -1014,6 +1016,40 @@ namespace QueryTests {
         int _old;
     };
 
+    class FindingStartPartiallyFull : public CollectionBase {
+    public:
+        FindingStartPartiallyFull() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
+            __findingStartInitialTimeout = 0;
+        }
+        ~FindingStartPartiallyFull() {
+            __findingStartInitialTimeout = _old;
+        }
+        
+        void run() {
+            BSONObj info;
+            ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "size" << 10000 << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
+            
+            int i = 0;
+            for( ; i < 150; client().insert( ns(), BSON( "ts" << i++ ) ) );
+            
+            for( int k = 0; k < 5; ++k ) {
+                client().insert( ns(), BSON( "ts" << i++ ) );
+                int min = client().query( ns(), Query().sort( BSON( "$natural" << 1 ) ) )->next()[ "ts" ].numberInt();            
+                for( int j = -1; j < i; ++j ) {
+                    auto_ptr< DBClientCursor > c = client().query( ns(), QUERY( "ts" << GTE << j ), 0, 0, 0, QueryOption_OplogReplay );
+                    ASSERT( c->more() );
+                    BSONObj next = c->next();
+                    ASSERT( !next[ "ts" ].eoo() );
+                    ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
+                }
+            }
+        }
+        
+    private:
+        int _old;
+    };
+        
+    
     class WhatsMyUri : public CollectionBase {
     public:
         WhatsMyUri() : CollectionBase( "whatsmyuri" ) {}
@@ -1137,6 +1173,7 @@ namespace QueryTests {
             add< HelperTest >();
             add< HelperByIdTest >();
             add< FindingStart >();
+            add< FindingStartPartiallyFull >();
             add< WhatsMyUri >();
             
             add< parsedtests::basic1 >();

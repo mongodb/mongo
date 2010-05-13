@@ -133,7 +133,7 @@ namespace mongo {
         shared_ptr<Cursor> _c;
         DiskLoc startLoc( const DiskLoc &rec ) {
             Extent *e = rec.rec()->myExtent( rec );
-            if ( e->myLoc != _qp.nsd()->capExtent )
+            if ( !_qp.nsd()->capLooped() || ( e->myLoc != _qp.nsd()->capExtent ) )
                 return e->firstRecord;
             // Likely we are on the fresh side of capExtent, so return first fresh record.
             // If we are on the stale side of capExtent, then the collection is small and it
@@ -141,14 +141,22 @@ namespace mongo {
             return _qp.nsd()->capFirstNewRecord;
         }
         
+        // should never have an empty extent in the oplog, so don't worry about that case
         DiskLoc prevLoc( const DiskLoc &rec ) {
             Extent *e = rec.rec()->myExtent( rec );
-            if ( e->xprev.isNull() )
-                e = _qp.nsd()->lastExtent.ext();
-            else
-                e = e->xprev.ext();
-            if ( e->myLoc != _qp.nsd()->capExtent )
-                return e->firstRecord;
+            if ( _qp.nsd()->capLooped() ) {
+                if ( e->xprev.isNull() )
+                    e = _qp.nsd()->lastExtent.ext();
+                else
+                    e = e->xprev.ext();
+                if ( e->myLoc != _qp.nsd()->capExtent )
+                    return e->firstRecord;
+            } else {
+                if ( !e->xprev.isNull() ) {
+                    e = e->xprev.ext();
+                    return e->firstRecord;
+                }
+            }
             return DiskLoc(); // reached beginning of collection
         }
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() ) {
