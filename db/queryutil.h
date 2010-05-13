@@ -223,7 +223,7 @@ namespace mongo {
 //        bool orFinished() const { return _orFound && _orSets.empty(); }
 //        // removes first or clause, and removes the field ranges it covers from all subsequent or clauses
 //        void popOrClause() {
-//            massert( 13260, "no or clause to pop", !orFinished() );
+//            massert( 13274, "no or clause to pop", !orFinished() );
 //            const FieldRangeSet &toPop = _orSets.front();
 //            list< FieldRangeSet >::iterator i = _orSets.begin();
 //            ++i;

@@ -574,7 +574,7 @@ namespace mongo {
                     BSONObjIterator j( e.embeddedObject() );
                     if ( j.more() ) { // could be assert instead
                         BSONElement f = j.next();
-                        massert( 13259, "$or array must contain objects", f.type() == Object );
+                        massert( 13275, "$or array must contain objects", f.type() == Object );
                         if ( !j.more() ) { // if only one $or field, subfields are all required
                             BSONObjIterator k( f.embeddedObject() );
                             while( k.more() ) {
