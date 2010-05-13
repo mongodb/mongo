@@ -121,16 +121,20 @@ class TestServerFailure(TestFailure):
         return 'mongod not ok after test %s' % self.path
 
 def runTest(path):
-    ext = os.path.splitext(path)[1]
+    (ignore, ext) = os.path.splitext(path)
     if ext == ".js":
         argv=[shellExecutable, "--port", mongodPort, path]
     elif ext in ["", ".exe"]:
         argv=[path, "--port", mongodPort]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
-    print "Executing test: " + " ".join(argv)
+    print " *******************************************"
+    print "         Test : " + os.path.basename(path) + " ..."
+    t1=time.time()
     p = Popen(argv)
     r = p.wait()
+    t2=time.time()
+    print "                " + str((t2-t1)*1000) + "ms"
     if r != 0:
         raise TestExitFailure(path, r)
     if Popen( [ mongodExecutable, "msg", "ping", mongodPort ], stdout=PIPE ).communicate()[0].count( "****ok" ) == 0:
