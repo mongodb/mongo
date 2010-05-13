@@ -23,7 +23,6 @@ namespace mongo {
 
     int ReplSet::Consensus::totalVotes() const { 
         static int complain = 0;
-        Member *m =rs.head();
         int vTot = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) { 
             vTot += m->config().votes;
@@ -34,7 +33,6 @@ namespace mongo {
     }
 
     bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
-        Member *m =rs.head();
         int vUp = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) { 
             vUp += m->up() ? m->config().votes : 0;
@@ -91,6 +89,7 @@ namespace mongo {
         for( list<eptr>::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
             if( (*i)->ok ) {
                 int v = (*i)->result["vote"].Int();
+                tally += v;
             }
         }
         if( tally*2 > totalVotes() ) {
