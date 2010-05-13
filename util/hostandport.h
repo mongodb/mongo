@@ -40,7 +40,7 @@ namespace mongo {
         static HostAndPort fromString(string s) {
             const char *p = s.c_str();
             uassert(13110, "HostAndPort: bad config string", *p);
-            const char *colon = strchr(p, ':');
+            const char *colon = strrchr(p, ':');
             HostAndPort m;
             if( colon ) {
                 int port = atoi(colon+1);
@@ -98,7 +98,7 @@ namespace mongo {
     }
 
     inline bool HostAndPort::isLocalHost() const { 
-        return _host == "localhost" || _host == "127.0.0.1";
+        return _host == "localhost" || _host == "127.0.0.1" || _host == "::1";
     }
 
 }
