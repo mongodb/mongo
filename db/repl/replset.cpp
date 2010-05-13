@@ -18,7 +18,7 @@
 #include "../cmdline.h"
 #include "../../util/sock.h"
 #include "replset.h"
-#include "../db/client.h"
+#include "../client.h"
 
 namespace mongo { 
 
