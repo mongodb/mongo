@@ -1276,6 +1276,7 @@ namespace mongo {
         GroupCommand() : Command("group"){}
         virtual LockType locktype() const { return READ; } 
         virtual bool slaveOk() const { return true; }
+        virtual bool slaveOverrideOk() { return true; }
         virtual void help( stringstream &help ) const {
             help << "http://www.mongodb.org/display/DOCS/Aggregation";
         }
