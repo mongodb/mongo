@@ -227,7 +227,7 @@ namespace mongo {
             else {
                 Chunk& c = manager->findChunk( chunkFinder );
                 doWrite( dbUpdate , r , c.getShard() );
-                c.splitIfShould( d.msg().data->dataLen() );
+                c.splitIfShould( d.msg().header()->dataLen() );
             }
 
         }

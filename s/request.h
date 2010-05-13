@@ -41,7 +41,7 @@ namespace mongo {
             return _d.getns();
         }
         int op() const {
-            return _m.data->operation();
+            return _m.operation();
         }
         bool expectResponse() const {
             return op() == dbQuery || op() == dbGetMore;

@@ -58,7 +58,7 @@ namespace QueryTests {
         }
         static void addIndex( const BSONObj &key ) {
             BSONObjBuilder b;
-            b.append( "name", "index" );
+            b.append( "name", key.firstElement().fieldName() );
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();
@@ -127,6 +127,19 @@ namespace QueryTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
             string err;
             ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+        }
+    };
+    
+    class FindOne : public Base {
+    public:
+        void run() {
+            addIndex( BSON( "b" << 1 ) );
+            addIndex( BSON( "c" << 1 ) );
+            insert( BSON( "b" << 2 << "_id" << 0 ) );
+            insert( BSON( "c" << 3 << "_id" << 1 ) );
+            BSONObj ret;
+            ASSERT( Helpers::findOne( ns(), fromjson( "{$or:[{b:2},{c:3}]}" ), ret, true ) );
+            ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
         }
     };
 
@@ -1123,6 +1136,7 @@ namespace QueryTests {
             add< CountFields >();
             add< CountQueryFields >();
             add< CountIndexedRegex >();
+            add< FindOne >();
             add< BoundedKey >();
             add< GetMore >();
             add< PositiveLimit >();

@@ -1334,7 +1334,7 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
                 matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
@@ -1469,7 +1469,7 @@ namespace mongo {
             BSONObj query = getQuery( cmdObj );
             
             BSONElementSet values;
-            shared_ptr<Cursor> cursor = QueryPlanSet(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
+            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
             auto_ptr<CoveredIndexMatcher> matcher;
             if ( ! query.isEmpty() )
                 matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );

@@ -59,6 +59,7 @@ namespace mongo {
         }
         virtual void init() {
             c_ = qp().newCursor();
+            // FIXME originalQuery won't work for $or
             _matcher.reset( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
         }
         virtual void next() {
@@ -126,76 +127,82 @@ namespace mongo {
         uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
 
         long long nDeleted = 0;
-        QueryPlanSet s( ns, pattern, BSONObj() );
-        int best = 0;
-        DeleteOp original( justOne, best );
-        shared_ptr< DeleteOp > bestOp = s.runOp( original );
-        shared_ptr<Cursor> creal = bestOp->newCursor();
-        
-        if( !creal->ok() )
-            return nDeleted;
-
-        CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
-
-        auto_ptr<ClientCursor> cc( new ClientCursor(QueryOption_NoCursorTimeout, creal, ns) );
-        cc->setDoingDeletes( true );
-
-        CursorId id = cc->cursorid;
-        
-        unsigned long long nScanned = 0;
-        do {
-            if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
-                if ( ! cc->yield() ){
-                    cc.release(); // has already been deleted elsewhere
-                    break;
-                }
-            }
+        MultiPlanScanner s( ns, pattern, BSONObj() );
+        while( s.mayRunMore() ) {
+            int best = 0;
+            DeleteOp original( justOne, best );
+            shared_ptr< DeleteOp > bestOp = s.runOpOnce( original );
+            shared_ptr<Cursor> creal = bestOp->newCursor();
             
-            // this way we can avoid calling updateLocation() every time (expensive)
-            // as well as some other nuances handled
+            if( !creal->ok() )
+                return nDeleted;
+            
+            CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
+            
+            auto_ptr<ClientCursor> cc( new ClientCursor(QueryOption_NoCursorTimeout, creal, ns) );
             cc->setDoingDeletes( true );
             
-            DiskLoc rloc = cc->c->currLoc();
-            BSONObj key = cc->c->currKey();
+            CursorId id = cc->cursorid;
             
-            cc->c->advance();
-            
-            if ( ! matcher.matches( key , rloc ) )
-                continue;
-            
-            assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-
-            if ( !justOne ) {
-                /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
-                   blocks.  here we might call millions of times which would be bad.
-                */
-                cc->c->noteLocation();
-            }
-            
-            if ( logop ) {
-                BSONElement e;
-                if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
-                    BSONObjBuilder b;
-                    b.append( e );
-                    bool replJustOne = true;
-                    logOp( "d", ns, b.done(), 0, &replJustOne );
-                } else {
-                    problem() << "deleted object without id, not logging" << endl;
+            unsigned long long nScanned = 0;
+            do {
+                if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
+                    if ( ! cc->yield() ){
+                        cc.release(); // has already been deleted elsewhere
+                        break;
+                    }
                 }
+                
+                // this way we can avoid calling updateLocation() every time (expensive)
+                // as well as some other nuances handled
+                cc->setDoingDeletes( true );
+                
+                DiskLoc rloc = cc->c->currLoc();
+                BSONObj key = cc->c->currKey();
+                
+                cc->c->advance();
+                
+                if ( ! matcher.matches( key , rloc ) )
+                    continue;
+                
+                assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+                
+                if ( !justOne ) {
+                    /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
+                     blocks.  here we might call millions of times which would be bad.
+                     */
+                    cc->c->noteLocation();
+                }
+                
+                if ( logop ) {
+                    BSONElement e;
+                    if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                        BSONObjBuilder b;
+                        b.append( e );
+                        bool replJustOne = true;
+                        logOp( "d", ns, b.done(), 0, &replJustOne );
+                    } else {
+                        problem() << "deleted object without id, not logging" << endl;
+                    }
+                }
+                
+                theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+                nDeleted++;
+                if ( justOne ) {
+                    break;
+                }
+                cc->c->checkLocation();
+                
+            } while ( cc->c->ok() );
+
+            if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
+                cc.release();
             }
-
-            theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
-            nDeleted++;
-            if ( justOne )
+            if ( justOne && nDeleted ) {
                 break;
-            cc->c->checkLocation();
-            
-        } while ( cc->c->ok() );
-
-        if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
-            cc.release();
+            }
         }
-
+              
         return nDeleted;
     }
 
@@ -358,19 +365,22 @@ namespace mongo {
 
     class CountOp : public QueryOp {
     public:
-        CountOp( const BSONObj &spec ) : spec_( spec ), count_(), bc_() {}
+        CountOp( const BSONObj &spec ) :
+        count_(),
+        skip_( spec["skip"].numberLong() ),
+        limit_( spec["limit"].numberLong() ),
+        bc_() {}
+        
         virtual void init() {
-            query_ = spec_.getObjectField( "query" );
+            query_ = qp().query();
             c_ = qp().newCursor();
+            
             _matcher.reset( new CoveredIndexMatcher( query_, c_->indexKeyPattern() ) );
             if ( qp().exactKeyMatch() && ! _matcher->needRecord() ) {
                 query_ = qp().simplifiedQuery( qp().indexKey() );
                 bc_ = dynamic_cast< BtreeCursor* >( c_.get() );
                 bc_->forgetEndKey();
             }
-            
-            skip_ = spec_["skip"].numberLong();
-            limit_ = spec_["limit"].numberLong();
         }
 
         virtual void next() {
@@ -404,7 +414,11 @@ namespace mongo {
             c_->advance();
         }
         virtual QueryOp *clone() const {
-            return new CountOp( spec_ );
+            CountOp *ret = new CountOp( BSONObj() );
+            ret->count_ = count_;
+            ret->skip_ = skip_;
+            ret->limit_ = limit_;
+            return ret;
         }
         long long count() const { return count_; }
         virtual bool mayRecordPlan() const { return true; }
@@ -424,7 +438,6 @@ namespace mongo {
             count_++;
         }
 
-        BSONObj spec_;
         long long count_;
         long long skip_;
         long long limit_;
@@ -461,7 +474,7 @@ namespace mongo {
             }
             return num;
         }
-        QueryPlanSet qps( ns, query, BSONObj() );
+        MultiPlanScanner qps( ns, query, BSONObj() );
         CountOp original( cmd );
         shared_ptr< CountOp > res = qps.runOp( original );
         if ( !res->complete() ) {
@@ -498,6 +511,7 @@ namespace mongo {
             } else {
                 _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
             }
+            // FIXME get query right way
             _matcher.reset(new CoveredIndexMatcher( qp().query() , qp().indexKey()));
 
             if ( qp().scanAndOrderRequired() ) {
@@ -798,11 +812,11 @@ namespace mongo {
         
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ){
-            QueryPlanSet qps( ns, query, order );
+            MultiPlanScanner qps( ns, query, order );
             if ( qps.usingPrerecordedPlan() )
                 oldPlan = qps.explain();
         }
-        QueryPlanSet qps( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() );
+        MultiPlanScanner qps( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() );
         UserQueryOp original( pq );
         shared_ptr< UserQueryOp > o = qps.runOp( original );
         UserQueryOp &dqo = *o;

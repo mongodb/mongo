@@ -82,7 +82,7 @@ namespace mongo {
     // each clone its own query plan.
     class QueryOp {
     public:
-        QueryOp() : complete_(), qp_(), error_() {}
+        QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
         virtual ~QueryOp() {}
         
         /** this gets called after a query plan is set? ERH 2/16/10 */
@@ -91,26 +91,31 @@ namespace mongo {
         virtual bool mayRecordPlan() const = 0;
         
         /** @return a copy of the inheriting class, which will be run with its own
-                    query plan.
+                    query plan.  If multiple plan sets are required for an $or query,
+                    the QueryOp of the winning plan from a given set will be cloned
+                    to generate QueryOps for the subsequent plan set.
         */
         virtual QueryOp *clone() const = 0;
-        bool complete() const { return complete_; }
-        bool error() const { return error_; }
-        string exceptionMessage() const { return exceptionMessage_; }
-        const QueryPlan &qp() const { return *qp_; }
+        bool complete() const { return _complete; }
+        bool error() const { return _error; }
+        bool stopRequested() const { return _stopRequested; }
+        string exceptionMessage() const { return _exceptionMessage; }
+        const QueryPlan &qp() const { return *_qp; }
         // To be called by QueryPlanSet::Runner only.
-        void setQueryPlan( const QueryPlan *qp ) { qp_ = qp; }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; }
         void setExceptionMessage( const string &exceptionMessage ) {
-            error_ = true;
-            exceptionMessage_ = exceptionMessage;
+            _error = true;
+            _exceptionMessage = exceptionMessage;
         }
     protected:
-        void setComplete() { complete_ = true; }
+        void setComplete() { _complete = true; }
+        void setStop() { setComplete(); _stopRequested = true; }
     private:
-        bool complete_;
-        string exceptionMessage_;
-        const QueryPlan *qp_;
-        bool error_;
+        bool _complete;
+        bool _stopRequested;
+        string _exceptionMessage;
+        const QueryPlan *_qp;
+        bool _error;
     };
     
     // Set of candidate query plans for a particular query.  Used for running
@@ -134,10 +139,12 @@ namespace mongo {
         shared_ptr< T > runOp( T &op ) {
             return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
         }
-        const FieldRangeSet &fbs() const { return fbs_; }
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
         PlanPtr getBestGuess() const;
+        
+        //for testing
+        const FieldRangeSet &fbs() const { return fbs_; }
     private:
         void addOtherPlans( bool checkFirst );
         void addPlan( PlanPtr plan, bool checkFirst ) {
@@ -170,6 +177,100 @@ namespace mongo {
         string _special;
     };
 
+    // Handles $or type queries by generating a QueryPlanSet for each $or clause
+    // NOTE on our $or implementation: In our current qo implementation we don't
+    // keep statistics on our data, but we can conceptualize the problem of
+    // selecting an index when statistics exist for all index ranges.  The
+    // d-hitting set problem on k sets and n elements can be reduced to the
+    // problem of index selection on k $or clauses and n index ranges (where
+    // d is the max number of indexes, and the number of ranges n is unbounded).
+    // In light of the fact that d-hitting set is np complete, and we don't even
+    // track statistics (so cost calculations are expensive) our first
+    // implementation uses the following greedy approach: We take one $or clause
+    // at a time and treat each as a separate query for index selection purposes.
+    // But if an index range is scanned for a particular $or clause, we eliminate
+    // that range from all subsequent clauses.  One could imagine an opposite
+    // implementation where we select indexes based on the union of index ranges
+    // for all $or clauses, but this can have much poorer worst case behavior.
+    // (An index range that suits one $or clause may not suit another, and this
+    // is worse than the typical case of index range choice staleness because
+    // with $or the clauses may likely be logically distinct.)  The greedy
+    // implementation won't do any worse than all the $or clauses individually,
+    // and it can often do better.  In the first cut we are intentionally using
+    // QueryPattern tracking to record successful plans on $or queries for use by
+    // subsequent $or queries, even though there may be a significant aggregate
+    // $nor component that would not be represented in QueryPattern.
+    class MultiPlanScanner {
+    public:
+        MultiPlanScanner( const char *ns,
+                         const BSONObj &query,
+                         const BSONObj &order,
+                         const BSONElement *hint = 0,
+                         bool honorRecordedPlan = true,
+                         const BSONObj &min = BSONObj(),
+                         const BSONObj &max = BSONObj() );
+        shared_ptr< QueryOp > runOp( QueryOp &op );
+        template< class T >
+        shared_ptr< T > runOp( T &op ) {
+            return dynamic_pointer_cast< T >( runOp( static_cast< QueryOp& >( op ) ) );
+        }       
+        shared_ptr< QueryOp > runOpOnce( QueryOp &op );
+        template< class T >
+        shared_ptr< T > runOpOnce( T &op ) {
+            return dynamic_pointer_cast< T >( runOpOnce( static_cast< QueryOp& >( op ) ) );
+        }       
+        bool mayRunMore() const { return _i < _n; }
+        BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
+        bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
+        QueryPlanSet::PlanPtr getBestGuess() const { assertNotOr(); return _currentQps->getBestGuess(); }
+    private:
+        //temp
+        void assertNotOr() const {
+            massert( 13266, "not implemented for $or query", !_or );
+        }
+        // temp (and yucky)
+        BSONObj nextSimpleQuery() {
+            massert( 13267, "only generate simple query if $or", _or );
+            massert( 13270, "no more simple queries", mayRunMore() );
+            BSONObjBuilder b;
+            BSONArrayBuilder norb;
+            BSONObjIterator i( _query );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+                    massert( 13269, "$nor must be array", e.type() == Array );
+                    BSONObjIterator j( e.embeddedObject() );
+                    while( j.more() ) {
+                        norb << j.next();
+                    }
+                } else if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+                    BSONObjIterator j( e.embeddedObject() );
+                    for( int k = 0; k < _i; ++k ) {
+                        norb << j.next();
+                    }
+                    b << "$or" << BSON_ARRAY( j.next() );
+                } else {
+                    b.append( e );
+                }
+            }
+            BSONArray nor = norb.arr();
+            if ( !nor.isEmpty() ) {
+                b << "$nor" << nor;
+            }
+            ++_i;
+            BSONObj ret = b.obj();
+            return ret;
+        }
+        const char * _ns;
+        bool _or;
+        BSONObj _query;
+//        FieldRangeOrSet _fros;
+        auto_ptr< QueryPlanSet > _currentQps;
+        int _i;
+        int _n;
+        bool _honorRecordedPlan;
+    };
+    
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
 

@@ -41,8 +41,8 @@
 
 namespace mongo {
 
-    inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.data, m.data->len); }
-    inline void opwrite(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.data, m.data->len); }
+    inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
+    inline void opwrite(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.singleData(), m.header()->len); }
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
@@ -161,7 +161,7 @@ namespace mongo {
 
     static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m ){
         bool ok = true;
-        MSGID responseTo = m.data->id;
+        MSGID responseTo = m.header()->id;
 
         DbMessage d(m);
         QueryMessage q(d);
@@ -210,7 +210,7 @@ namespace mongo {
         dbresponse.responseTo = responseTo;
         
         if ( op.shouldDBProfile( 0 ) ){
-            op.debug().str << " bytes:" << resp->data->dataLen();
+            op.debug().str << " bytes:" << resp->header()->dataLen();
         }
 
         return ok;
@@ -220,9 +220,9 @@ namespace mongo {
     bool assembleResponse( Message &m, DbResponse &dbresponse, const SockAddr &client ) {
 
         // before we lock...
-        int op = m.data->operation();
+        int op = m.operation();
         bool isCommand = false;
-        const char *ns = m.data->_data + 4;
+        const char *ns = m.singleData()->_data + 4;
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
@@ -292,7 +292,7 @@ namespace mongo {
         }
         else if ( op == dbMsg ) {
             // deprecated - replaced by commands
-            char *p = m.data->_data;
+            char *p = m.singleData()->_data;
             int len = strlen(p);
             if ( len > 400 )
                 out() << curTimeMillis() % 10000 <<
@@ -306,10 +306,10 @@ namespace mongo {
                 resp->setData( opReply , "i am fine - dbMsg deprecated");
 
             dbresponse.response = resp;
-            dbresponse.responseTo = m.data->id;
+            dbresponse.responseTo = m.header()->id;
         }
         else {
-            const char *ns = m.data->_data + 4;
+            const char *ns = m.singleData()->_data + 4;
             char cl[256];
             nsToDatabase(ns, cl);
             if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) { 
@@ -382,7 +382,7 @@ namespace mongo {
 
     void killCursors(int n, long long *ids);
     void receivedKillCursors(Message& m) {
-        int *x = (int *) m.data->_data;
+        int *x = (int *) m.singleData()->_data;
         x++; // reserved
         int n = *x++;
         uassert( 13004 , "sent 0 cursors to kill" , n >= 1 );
@@ -433,11 +433,11 @@ namespace mongo {
         BSONObj query = d.nextJsObj();
 
         assert( d.moreJSObjs() );
-        assert( query.objsize() < m.data->dataLen() );
+        assert( query.objsize() < m.header()->dataLen() );
         BSONObj toupdate = d.nextJsObj();
         uassert( 10055 , "update object too large", toupdate.objsize() <= MaxBSONObjectSize);
-        assert( toupdate.objsize() < m.data->dataLen() );
-        assert( query.objsize() + toupdate.objsize() < m.data->dataLen() );
+        assert( toupdate.objsize() < m.header()->dataLen() );
+        assert( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
         {
@@ -518,10 +518,10 @@ namespace mongo {
 
         Message *resp = new Message();
         resp->setData(msgdata, true);
-        ss << " bytes:" << resp->data->dataLen();
+        ss << " bytes:" << resp->header()->dataLen();
         ss << " nreturned:" << msgdata->nReturned;
         dbresponse.response = resp;
-        dbresponse.responseTo = m.data->id;
+        dbresponse.responseTo = m.header()->id;
 
         return ok;
     }
@@ -583,6 +583,7 @@ namespace mongo {
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse );
         assert( dbResponse.response );
+        dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
         return true;
     }

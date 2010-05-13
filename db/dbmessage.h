@@ -80,8 +80,9 @@ namespace mongo {
     class DbMessage {
     public:
         DbMessage(const Message& _m) : m(_m) {
-            theEnd = _m.data->_data + _m.data->dataLen();
-            int *r = (int *) _m.data->_data;
+            // for received messages, Message has only one buffer
+            theEnd = _m.singleData()->_data + _m.header()->dataLen();
+            int *r = (int *) _m.singleData()->_data;
             reserved = *r;
             r++;
             data = (const char *) r;
@@ -205,7 +206,7 @@ namespace mongo {
             if ( d.moreJSObjs() ) {
                 fields = d.nextJsObj();
             }
-            queryOptions = d.msg().data->dataAsInt();
+            queryOptions = d.msg().header()->dataAsInt();
         }
     };
 
@@ -233,7 +234,7 @@ namespace mongo {
         qr->nReturned = nReturned;
         b.decouple();
         Message resp(qr, true);
-        p->reply(requestMsg, resp, requestMsg.data->id);
+        p->reply(requestMsg, resp, requestMsg.header()->id);
     }
 
 } // namespace mongo
@@ -270,7 +271,7 @@ namespace mongo {
         Message *resp = new Message();
         resp->setData(msgdata, true); // transport will free
         dbresponse.response = resp;
-        dbresponse.responseTo = m.data->id;
+        dbresponse.responseTo = m.header()->id;
     }
 
 } // namespace mongo

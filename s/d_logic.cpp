@@ -499,7 +499,7 @@ namespace mongo {
             return false;
         }
 
-        int op = m.data->operation();
+        int op = m.operation();
         if ( op < 2000 
              || op >= 3000 
              || op == dbGetMore  // cursors are weird
@@ -507,7 +507,7 @@ namespace mongo {
             return false;
 
         
-        const char *ns = m.data->_data + 4;
+        const char *ns = m.singleData()->_data + 4;
         string errmsg;
         if ( shardVersionOk( ns , errmsg ) ){
             return false;
@@ -536,7 +536,7 @@ namespace mongo {
             resp->setData( qr , true );
             
             dbresponse.response = resp;
-            dbresponse.responseTo = m.data->id;
+            dbresponse.responseTo = m.header()->id;
             return true;
         }
         
@@ -548,8 +548,8 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
         b.append( "ns" , ns );
-        b.appendBinData( "msg" , m.data->len , bdtCustom , (char*)(m.data) );
-        log() << "writing back msg with len: " << m.data->len << " op: " << m.data->_operation << endl;
+        b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
+        log() << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
         clientQueues[clientID->str()]->push( b.obj() );
 
         return true;

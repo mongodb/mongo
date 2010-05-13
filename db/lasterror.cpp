@@ -135,7 +135,7 @@ namespace mongo {
     
     void prepareErrForNewRequest( Message &m, LastError * err ) {
         // a killCursors message shouldn't affect last error
-        if ( m.data->operation() == dbKillCursors ) {
+        if ( m.operation() == dbKillCursors ) {
             err->disabled = true;
         } else {
             err->disabled = false;
@@ -146,7 +146,7 @@ namespace mongo {
     LastError * LastErrorHolder::startRequest( Message& m , int clientId ) {
 
         if ( clientId == 0 )
-            clientId = m.data->id & 0xFFFF0000;
+            clientId = m.header()->id & 0xFFFF0000;
         setID( clientId );
 
         LastError * le = _get( true );

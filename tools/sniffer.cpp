@@ -206,16 +206,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     if ( bytesRemainingInMessage[ c ] == 0 ) {
         m.setData( (MsgData*)payload , false );
-        if ( !m.data->valid() ) {
+        if ( !m.header()->valid() ) {
             cerr << "Invalid message start, skipping packet." << endl;
             return;
         }
-        if ( size_payload > m.data->len ) {
+        if ( size_payload > m.header()->len ) {
             cerr << "Multiple messages in packet, skipping packet." << endl;
             return;
         }
-        if ( size_payload < m.data->len ) {
-            bytesRemainingInMessage[ c ] = m.data->len - size_payload;
+        if ( size_payload < m.header()->len ) {
+            bytesRemainingInMessage[ c ] = m.header()->len - size_payload;
             messageBuilder[ c ].reset( new BufBuilder() );
             messageBuilder[ c ]->append( (void*)payload, size_payload );
             return;
@@ -242,8 +242,8 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
          << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
          << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
          << " " << d.getns()
-         << "  " << m.data->len << " bytes "
-         << " id:" << hex << m.data->id << dec << "\t" << m.data->id;
+         << "  " << m.header()->len << " bytes "
+         << " id:" << hex << m.header()->id << dec << "\t" << m.header()->id;
 
     processMessage( c , m );
 }
@@ -251,13 +251,13 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 void processMessage( Connection& c , Message& m ){
     DbMessage d(m);
 
-    if ( m.data->operation() == mongo::opReply )
-        cout << " - " << m.data->responseTo;
+    if ( m.operation() == mongo::opReply )
+        cout << " - " << m.header()->responseTo;
     cout << endl;
 
-    switch( m.data->operation() ){
+    switch( m.operation() ){
     case mongo::opReply:{
-        mongo::QueryResult* r = (mongo::QueryResult*)m.data;
+        mongo::QueryResult* r = (mongo::QueryResult*)m.singleData();
         cout << "\treply" << " n:" << r->nReturned << " cursorId: " << r->cursorId << endl;
         if ( r->nReturned ){
             mongo::BSONObj o( r->data() , 0 );
@@ -296,26 +296,26 @@ void processMessage( Connection& c , Message& m ){
         break;
     }
     case mongo::dbKillCursors:{
-        int *x = (int *) m.data->_data;
+        int *x = (int *) m.singleData()->_data;
         x++; // reserved
         int n = *x;
         cout << "\tkillCursors n: " << n << endl;
         break;
     }
     default:
-        cerr << "*** CANNOT HANDLE TYPE: " << m.data->operation() << endl;
+        cerr << "*** CANNOT HANDLE TYPE: " << m.operation() << endl;
     }
 
     if ( !forwardAddress.empty() ) {
-        if ( m.data->operation() != mongo::opReply ) {
+        if ( m.operation() != mongo::opReply ) {
             boost::shared_ptr<DBClientConnection> conn = forwarder[ c ];
             if ( !conn ) {
                 conn.reset(new DBClientConnection( true ));
                 conn->connect( forwardAddress );
                 forwarder[ c ] = conn;
             }
-            if ( m.data->operation() == mongo::dbQuery || m.data->operation() == mongo::dbGetMore ) {
-                if ( m.data->operation() == mongo::dbGetMore ) {
+            if ( m.operation() == mongo::dbQuery || m.operation() == mongo::dbGetMore ) {
+                if ( m.operation() == mongo::dbGetMore ) {
                     DbMessage d( m );
                     d.pullInt();
                     long long &cId = d.pullInt64();
@@ -323,7 +323,7 @@ void processMessage( Connection& c , Message& m ){
                 }
                 Message response;
                 conn->port().call( m, response );
-                QueryResult *qr = (QueryResult *) response.data;
+                QueryResult *qr = (QueryResult *) response.singleData();
                 if ( !( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) ) {
                     if ( qr->cursorId != 0 ) {
                         lastCursor[ c ] = qr->cursorId;
@@ -337,7 +337,7 @@ void processMessage( Connection& c , Message& m ){
         } else {
             Connection r = c.reverse();
             long long myCursor = lastCursor[ r ];
-            QueryResult *qr = (QueryResult *) m.data;
+            QueryResult *qr = (QueryResult *) m.singleData();
             long long yourCursor = qr->cursorId;
             if ( ( qr->resultFlags() & QueryResult::ResultFlag_CursorNotFound ) )
                 yourCursor = 0;
@@ -367,7 +367,7 @@ void processDiagLog( const char * file ){
     long read = 0;
     while ( read < length ){
         Message m(pos,false);
-        int len = m.data->len;
+        int len = m.header()->len;
         DbMessage d(m);
         cout << len << " " << d.getns() << endl;
         
