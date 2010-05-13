@@ -529,6 +529,7 @@ namespace mongo {
 //                while( ret > 0 ) {
 //                    if ( i->iov_len > unsigned( ret ) ) {
 //                        i->iov_len -= ret;
+//                        i->iov_base += ret;
 //                        ret = 0;
 //                    } else {
 //                        ret -= i->iov_len;
