@@ -461,24 +461,21 @@ namespace mongo {
             }
         }
         
-#if defined(_WIN32)
-        send( (char*)toSend.singleData(), toSend.heade()->len, "say" );
-#else
-        vector< pair< char *, int > > all = toSend.allData();
-        vector< struct iovec > d( all.size() );
-        for( unsigned i = 0; i < all.size(); ++i ) {
-            d[ i ].iov_base = all[ i ].first;
-            d[ i ].iov_len = all[ i ].second;
-        }
-        struct msghdr meta;
-        memset( &meta, 0, sizeof( meta ) );
-        meta.msg_iov = &d[ 0 ];
-        meta.msg_iovlen = d.size();
-        send( meta, "say" );
-#endif
+
+        send( (char*)toSend.singleData(), toSend.header()->len, "say" );
+//        vector< pair< char *, int > > all = toSend.allData();
+//        vector< struct iovec > d( all.size() );
+//        for( unsigned i = 0; i < all.size(); ++i ) {
+//            d[ i ].iov_base = all[ i ].first;
+//            d[ i ].iov_len = all[ i ].second;
+//        }
+//        struct msghdr meta;
+//        memset( &meta, 0, sizeof( meta ) );
+//        meta.msg_iov = &d[ 0 ];
+//        meta.msg_iovlen = d.size();
+//        send( meta, "say" );
     }
 
-#if defined(_WIN32)
     // sends all data or throws an exception
     void MessagingPort::send( const char * data , int len, const char *context ){
         while( len > 0 ) {
@@ -500,49 +497,49 @@ namespace mongo {
             }
         }
     }
-#else
-    void MessagingPort::send( const char * data , int len, const char *context ){
-        struct iovec d;
-        d.iov_base = const_cast< char * >( data );
-        d.iov_len = len;
-        struct msghdr meta;
-        memset( &meta, 0, sizeof( meta ) );
-        meta.msg_iov = &d;
-        meta.msg_iovlen = 1;
-        send( meta, context );
-    }
-    
-    // sends all data or throws an exception
-    // the meta argument may be modified
-    void MessagingPort::send( struct msghdr &meta, const char *context ){
-        while( meta.msg_iovlen > 0 ) {
-            int ret = ::sendmsg( sock , &meta , portSendFlags );
-            if ( ret == -1 ) {
-                if ( errno != EAGAIN || _timeout == 0 ) {
-                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
-                    throw SocketException();                    
-                } else {
-                    if ( !serverAlive( farEnd.toString() ) ) {
-                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
-                        throw SocketException();                        
-                    }
-                }
-            } else {
-                struct iovec *& i = meta.msg_iov;
-                while( ret > 0 ) {
-                    if ( i->iov_len > unsigned( ret ) ) {
-                        i->iov_len -= ret;
-                        ret = 0;
-                    } else {
-                        ret -= i->iov_len;
-                        ++i;
-                        --(meta.msg_iovlen);
-                    }
-                }
-            }
-        }
-    }
-#endif
+
+//    void MessagingPort::send( const char * data , int len, const char *context ){
+//        struct iovec d;
+//        d.iov_base = const_cast< char * >( data );
+//        d.iov_len = len;
+//        struct msghdr meta;
+//        memset( &meta, 0, sizeof( meta ) );
+//        meta.msg_iov = &d;
+//        meta.msg_iovlen = 1;
+//        send( meta, context );
+//    }
+//    
+//    // sends all data or throws an exception
+//    // the meta argument may be modified
+//    void MessagingPort::send( struct msghdr &meta, const char *context ){
+//        while( meta.msg_iovlen > 0 ) {
+//            int ret = ::sendmsg( sock , &meta , portSendFlags );
+//            if ( ret == -1 ) {
+//                if ( errno != EAGAIN || _timeout == 0 ) {
+//                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
+//                    throw SocketException();                    
+//                } else {
+//                    if ( !serverAlive( farEnd.toString() ) ) {
+//                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+//                        throw SocketException();                        
+//                    }
+//                }
+//            } else {
+//                struct iovec *& i = meta.msg_iov;
+//                while( ret > 0 ) {
+//                    if ( i->iov_len > unsigned( ret ) ) {
+//                        i->iov_len -= ret;
+//                        ret = 0;
+//                    } else {
+//                        ret -= i->iov_len;
+//                        ++i;
+//                        --(meta.msg_iovlen);
+//                    }
+//                }
+//            }
+//        }
+//    }
+
     void MessagingPort::recv( char * buf , int len ){
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
