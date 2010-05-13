@@ -92,7 +92,7 @@ namespace mongo {
         void send( const char * data , int len, const char *context );
 #if !defined(_WIN32)
         void send( struct msghdr &meta, const char *context );
-#end
+#endif
         // recv len or throw SocketException
         void recv( char * data , int len );
         
