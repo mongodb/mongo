@@ -461,6 +461,9 @@ namespace mongo {
             }
         }
         
+#if defined(_WIN32)
+        send( (char*)toSend.singleData(), toSend.heade()->len, "say" );
+#else
         vector< pair< char *, int > > all = toSend.allData();
         vector< struct iovec > d( all.size() );
         for( unsigned i = 0; i < all.size(); ++i ) {
@@ -472,8 +475,32 @@ namespace mongo {
         meta.msg_iov = &d[ 0 ];
         meta.msg_iovlen = d.size();
         send( meta, "say" );
+#endif
     }
 
+#if defined(_WIN32)
+    // sends all data or throws an exception
+    void MessagingPort::send( const char * data , int len, const char *context ){
+        while( len > 0 ) {
+            int ret = ::send( sock , data , len , portSendFlags );
+            if ( ret == -1 ) {
+                if ( errno != EAGAIN || _timeout == 0 ) {
+                    log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
+                    throw SocketException();                    
+                } else {
+                    if ( !serverAlive( farEnd.toString() ) ) {
+                        log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+                        throw SocketException();                        
+                    }
+                }
+            } else {
+                assert( ret <= len );
+                len -= ret;
+                data += ret;
+            }
+        }
+    }
+#else
     void MessagingPort::send( const char * data , int len, const char *context ){
         struct iovec d;
         d.iov_base = const_cast< char * >( data );
@@ -515,7 +542,7 @@ namespace mongo {
             }
         }
     }
-    
+#endif
     void MessagingPort::recv( char * buf , int len ){
         while( len > 0 ) {
             int ret = ::recv( sock , buf , len , portRecvFlags );
