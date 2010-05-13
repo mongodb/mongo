@@ -68,7 +68,8 @@ namespace mongo {
 		    BSONObjBuilder b;
 		    dropCollection( ns, err, b );
 		    i = _tempCollections.erase(i);
-		    ++i;
+                    if ( i!=_tempCollections.end() )
+                        ++i;
 		}
 		catch ( ... ){
 		    log() << "error dropping temp collection: " << ns << endl;
