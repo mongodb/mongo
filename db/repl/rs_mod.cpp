@@ -46,7 +46,7 @@ namespace mongo {
                     }
                 }
                 catch(...) { }
-                if( !ok ) {
+                if( !ok && !res["rs"].trueValue() ) {
                     if( !res.isEmpty() )
                         log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
                     uasserted(13144, "need all members up to initiate, not ok: " + i->h.toString());
@@ -89,6 +89,7 @@ namespace mongo {
             }
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
+                result.append("startupStatusMsg", ReplSet::startupStatusMsg);
                 errmsg = "all members and seeds must be reachable to initiate set";
                 result.append("info", cmdLine.replSet);
                 return false;
@@ -108,11 +109,9 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-                log() << newConfig.toString() << rsLog;
+                //log() << newConfig.toString() << rsLog;
 
-                MemoryMappedFile::flushAll(true);
                 newConfig.save();
-                MemoryMappedFile::flushAll(true);
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
@@ -121,9 +120,20 @@ namespace mongo {
 
             log() << "replSet replSetInitiate Config now saved locally.  Should come online in about a minute." << rsLog;
             result.append("info", "Config now saved locally.  Should come online in about a minute.");
+            ReplSet::startupStatus = ReplSet::SOON;
+            ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";
 
             return true;
         }
     } cmdReplSetInitiate;
+
+    /*void ReplSet::receivedNewConfig(BSONObj cfg) { 
+        writelock lk("admin.");
+        ReplSetConfig c(cfg);
+        if( c.version <= config().version ) { 
+            log() << "replSet info received new config v" << c.version << " but our v" << config().version << " is already newer" << rsLog;
+            return;
+        }
+    }*/
 
 }

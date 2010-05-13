@@ -36,6 +36,7 @@ namespace mongo {
 namespace mongo { 
 
     using namespace mongoutils::html;
+    using namespace bson;
 
     static RamLog _rsLog;
     Tee *rsLog = &_rsLog;
@@ -58,7 +59,6 @@ namespace mongo {
                 errmsg = "incompatible replset protocol version";
                 return false;
             }
-            result.append("rs", true);
             string s = string(cmdObj.getStringField("replSetHeartbeat"))+'/';
             if( !startsWith(cmdLine.replSet, s ) ) {
                 errmsg = "repl set names do not match";
@@ -67,18 +67,23 @@ namespace mongo {
                 result.append("mismatch", true);
                 return false;
             }
+            result.append("rs", true);
             if( theReplSet == 0 ) { 
                 errmsg = "still initializing";
                 return false;
             }
-            if( theReplSet->getName() != cmdObj.getStringField("replSetHeartbeat") ) { 
+
+            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) { 
                 errmsg = "repl set names do not match (2)";
                 result.append("mismatch", true);
                 return false;
             }
-            /* todo: send our state*/
-            result.append("set", theReplSet->getName());
-            result.append("v", theReplSet->config().version);
+            result.append("set", theReplSet->name());
+            result.append("state", theReplSet->state());
+            int v = theReplSet->config().version;
+            result.append("v", v);
+//            if( v > cmdObj["v"].Int() )
+//                result << "config" << theReplSet->config().asBson();
             return true;
         }
     } cmdReplSetHeartbeat;
@@ -111,8 +116,13 @@ namespace mongo {
                 try { 
                     BSONObj info;
                     int theirConfigVersion = -10000;
-                    bool ok = requestHeartbeat(theReplSet->getName(), m->fullName(), info, theReplSet->config().version, theirConfigVersion);
+                    bool ok = requestHeartbeat(theReplSet->name(), m->fullName(), info, theReplSet->config().version, theirConfigVersion);
                     m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
+                    {
+                        be state = info["state"];
+                        if( state.ok() )
+                            m->_state = (ReplSet::State) state.Int();
+                    }
                     if( ok ) {
                         if( m->_upSince == 0 ) {
                             log() << "replSet " << m->fullName() << " is now up" << rsLog;
@@ -120,6 +130,11 @@ namespace mongo {
                         }
                         m->_health = 1.0;
                         m->_lastHeartbeatErrMsg.set("");
+
+                        be cfg = info["config"];
+                        if( cfg.ok() ) {
+                            //theReplSet->receivedNewConfig(cfg.Obj());
+                        }
                     }
                     else { 
                         down();
@@ -136,6 +151,26 @@ namespace mongo {
         }
     };
     
+    string ago(time_t t) { 
+        if( t == 0 ) return "";
+
+        time_t x = time(0) - t;
+        stringstream s;
+        if( x < 180 ) {
+            s << x << " sec";
+            if( x != 1 ) s << 's';
+        }
+        else if( x < 3600 ) {
+            s.precision(2);
+            s << x / 60.0 << " mins";
+        }
+        else { 
+            s.precision(2);
+            s << x / 3600.0 << " hrs";
+        }
+        return s.str();
+    }
+
     void ReplSet::Member::summarizeAsHtml(stringstream& s) const { 
         s << tr();
         {
@@ -146,20 +181,13 @@ namespace mongo {
         double h = health();
         bool ok = h > 0;
         s << td(h);
-        s << td(upSince());
+        s << td(ago(upSince()));
         {
-            stringstream h;
+            string h;
             time_t hb = lastHeartbeat();
-            time_t now = time(0);
-            if( hb == 0 ) h << "never"; 
-            else {
-                time_t diff = now-hb;
-                if( now > hb ) h << diff;
-                else h << 0;
-                if( diff == 1 ) h << "sec ago";
-                else h << "secs ago";
-            }
-            s << td(h.str());
+            if( hb == 0 ) h = "never"; 
+            else h = ago(hb) + " ago";
+            s << td(h);
         }
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(state()));
@@ -187,13 +215,16 @@ namespace mongo {
         return "";
     }
 
+    extern time_t started;
+
     void ReplSet::summarizeAsHtml(stringstream& s) const { 
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
         s << _table();
 
-        const char *h[] = {"Member", "Up", "Uptime", 
+        const char *h[] = {"Member", "Up", 
+            "<a title=\"length of time we have been continuously connected to the other member with no reconnects\">cctime</a>", 
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 0};
         s << table(h);
@@ -201,8 +232,8 @@ namespace mongo {
             /* self row */
             s << tr() << td(_self->fullName()) <<
                 td("1") << 
-                td("self") << 
-                td("") << 
+                td(ago(started)) << 
+                td("(self)") << 
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
             s << td( _self->_lastHeartbeatErrMsg.get() );
@@ -297,7 +328,7 @@ namespace mongo {
             v.push_back(bb.obj());
             m = m->next();
         }
-        b.append("set", getName());
+        b.append("set", name());
         b.appendDate("date", time(0));
         b.append("myState", _myState);
         b.append("members", v);

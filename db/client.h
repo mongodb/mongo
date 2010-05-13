@@ -172,24 +172,18 @@ namespace mongo {
         
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
-
-        CurOp* curop() { return _curOp; }
-        
+        CurOp* curop() { return _curOp; }        
         Context* getContext(){ return _context; }
         Database* database() {  return _context ? _context->db() : 0; }
-        const char *ns() { return _context->ns(); }
+        const char *ns() const { return _context->ns(); }
+        const char *desc() const { return _desc; }
         
         Client(const char *desc);
         ~Client();
 
-        const char *desc() const { return _desc; }
-
-        void addTempCollection( const string& ns ){
-            _tempCollections.push_back( ns );
-        }
-        
-	void dropTempCollectionsInDB(const string db);
-	void dropAllTempCollectionsInDB(const string db);
+        void addTempCollection( const string& ns ) { _tempCollections.push_back( ns ); }
+        void dropTempCollectionsInDB(const string db);
+        void dropAllTempCollectionsInDB(const string db);
 
         void setLastOp( const OpTime& op ){
             _lastOp = op;

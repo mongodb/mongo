@@ -70,7 +70,7 @@ namespace mongo {
         ReplSet::Member& me = *rs._self;
         electCmd = BSON(
                "replSetElect" << 1 <<
-               "set" << rs.getName() << 
+               "set" << rs.name() << 
                "who" << me.fullName() << 
                "whoid" << me._id << 
                "cfgver" << rs._cfg->version

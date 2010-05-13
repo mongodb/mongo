@@ -37,15 +37,30 @@ namespace mongo {
     */
     class ReplSet {
     public:
-        static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, STARTED=5 } startupStatus;
+        static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, STARTED=5, SOON=6 } startupStatus;
         static string startupStatusMsg;
+
+        enum State {
+            STARTUP,
+            PRIMARY,
+            SECONDARY,
+            RECOVERING,
+            FATAL,
+            STARTUP2,
+            UNKNOWN /* remote node not yet reached */
+        };
+
+    private: 
+        State _myState;
+
+    public:
 
         void fatal();
         bool isMaster(const char *client);
         void fillIsMaster(BSONObjBuilder&);
         bool ok() const { return _myState != FATAL; }
-        
-        string getName() const { return _name; } /* @return replica set's logical name */
+        State state() const { return _myState; }        
+        string name() const { return _name; } /* @return replica set's logical name */
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
@@ -61,19 +76,20 @@ namespace mongo {
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
         void summarizeAsHtml(stringstream&) const;
-        const ReplSetConfig& config() { return *_cfg.get(); }
+        const ReplSetConfig& config() { return *_cfg; }
+        void receivedNewConfig(BSONObj);
 
     private:
         string _name;
         const vector<HostAndPort> *_seeds;
-        auto_ptr<ReplSetConfig> _cfg;
+        ReplSetConfig *_cfg;
 
         /** load our configuration from admin.replset.  try seed machines too. 
             throws exception if a problem.
         */
         void loadConfig();
         void finishLoadingConfig(vector<ReplSetConfig>& v);
-        void setFrom(ReplSetConfig& c);
+        void setFrom(ReplSetConfig& c, bool save);
 
         struct Consensus {
             ReplSet &rs;
@@ -82,17 +98,6 @@ namespace mongo {
             bool aMajoritySeemsToBeUp() const;
             bool electSelf();
         } elect;
-
-    private:
-        enum State {
-            STARTUP,
-            PRIMARY,
-            SECONDARY,
-            RECOVERING,
-            FATAL,
-            STARTUP2,
-            UNKNOWN /* remote node not yet reached */
-        } _myState;
 
     public:
         struct Member : public List1<Member>::Base {

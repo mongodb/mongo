@@ -25,17 +25,10 @@
 
 namespace mongo { 
 
-    /**
-    " + rsConfigNs + "
-
-    This collection has one object per server in the set.  
-
-    See "Replical Sets Configuration" on mongodb.org wiki for details on the format.
-    */
-
     const string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
+        enum { EMPTYCONFIG = -2 };
     public:
         /* if something is misconfigured, throws an exception. 
         if couldn't be queried or is just blank, ok() will be false.
@@ -63,8 +56,8 @@ namespace mongo {
         string md5;
         BSONObj getLastErrorDefaults;
 
-        // true if could connect, and there is no cfg object there at all
-        bool empty() const { return version == -2; }
+        /** @return true if could connect, and there is no cfg object there at all */
+        bool empty() const { return version == EMPTYCONFIG; }
 
         string toString() const { return asBson().toString(); }
 
@@ -72,12 +65,12 @@ namespace mongo {
         void check() const;
 
         void save(); // to local db
+        BSONObj asBson() const;
 
     private:
         bool _ok;
         void from(BSONObj);
         void clear();
-        BSONObj asBson() const;
     };
 
 }
