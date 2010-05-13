@@ -21,7 +21,7 @@
 namespace mongo {
 
     /* throws */
-    bool requestHeartbeat(string setname, string memberFullName, BSONObj& result);
+    bool requestHeartbeat(string setname, string memberFullName, BSONObj& result, int myConfigVersion, int& theirConfigVersion);
 
     struct HealthOptions { 
         HealthOptions() { 

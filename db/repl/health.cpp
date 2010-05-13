@@ -54,11 +54,16 @@ namespace mongo {
                 errmsg = "not a replset member";
                 return false;
             }
+            if( cmdObj["pv"].Int() != 1 ) { 
+                errmsg = "incompatible replset protocol version";
+                return false;
+            }
             result.append("rs", true);
-            if( !startsWith(cmdLine.replSet, cmdObj.getStringField("replSetHeartbeat")+'/' ) ) {
+            string s = string(cmdObj.getStringField("replSetHeartbeat"))+'/';
+            if( !startsWith(cmdLine.replSet, s ) ) {
                 errmsg = "repl set names do not match";
-                cout << cmdLine.replSet << endl;
-                cout << cmdObj.getStringField("replSetHeartbeat") << endl;
+                cout << "cmdline: " << cmdLine.replSet << endl;
+                cout << "s: " << s << endl;
                 result.append("mismatch", true);
                 return false;
             }
@@ -73,13 +78,14 @@ namespace mongo {
             }
             /* todo: send our state*/
             result.append("set", theReplSet->getName());
+            result.append("v", theReplSet->config().version);
             return true;
         }
     } cmdReplSetHeartbeat;
 
     /* throws dbexception */
-    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result) { 
-        BSONObj cmd = BSON( "replSetHeartbeat" << setName );
+    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion) { 
+        BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 );
         ScopedConn conn(memberFullName);
         return conn->runCommand("admin", cmd, result);
     }
@@ -104,7 +110,8 @@ namespace mongo {
             while( 1 ) {
                 try { 
                     BSONObj info;
-                    bool ok = requestHeartbeat(theReplSet->getName(), m->fullName(), info);
+                    int theirConfigVersion = -10000;
+                    bool ok = requestHeartbeat(theReplSet->getName(), m->fullName(), info, theReplSet->config().version, theirConfigVersion);
                     m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
                     if( ok ) {
                         if( m->_upSince == 0 ) {

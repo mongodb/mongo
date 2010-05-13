@@ -86,8 +86,8 @@ namespace mongo {
         int p = _port == -1 ? CmdLine::DefaultDBPort : _port;
         if( p != cmdLine.port )
             return false;
-        assert( _host != "localhost" && _host != "127.0.0.1" );
-        return sameStart(getHostName().c_str(), _host.c_str());
+        
+        return sameStart(getHostName().c_str(), _host.c_str()) || isLocalHost();
     }
 
     inline string HostAndPort::toString() const {

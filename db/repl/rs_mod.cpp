@@ -31,12 +31,20 @@ using namespace bson;
 namespace mongo { 
 
     /* throws */ 
-    static void checkAllMembersUpAndPreInit(const ReplSetConfig& cfg) {
+    static void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg) {
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             BSONObj res;
             {
                 bool ok = false;
-                try { ok = requestHeartbeat(cfg._id, i->h.toString(), res); }
+                try { 
+                    int theirVersion = -1000;
+                    ok = requestHeartbeat(cfg._id, i->h.toString(), res, -1, theirVersion); 
+                    if( theirVersion >= cfg.version ) { 
+                        stringstream ss;
+                        ss << "replSet member " << i->h.toString() << " has too new a config version (" << theirVersion << ") to reconfigure";
+                        uasserted(13259, ss.str());
+                    }
+                }
                 catch(...) { }
                 if( !ok ) {
                     if( !res.isEmpty() )
@@ -96,7 +104,7 @@ namespace mongo {
 
                 log() << "replSet replSetInitiate config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
 
-                checkAllMembersUpAndPreInit(newConfig);
+                checkAllMembersUpForConfigChange(newConfig);
 
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
