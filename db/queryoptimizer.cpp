@@ -563,9 +563,11 @@ namespace mongo {
     _honorRecordedPlan( honorRecordedPlan ) {
 //    _fros( ns, query ) {
         // eventually implement (some of?) these
-        if ( !order.isEmpty() || hint || !min.isEmpty() || !max.isEmpty() ) {
+        log() << "_or?: " << _or << endl;
+        if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
+        log() << "_or: " << _or << endl;
         if ( !_or ) {
             _currentQps.reset( new QueryPlanSet( ns, query, order, hint, honorRecordedPlan, min, max ) );
             _n = 1; // only one run
@@ -574,7 +576,6 @@ namespace mongo {
             massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
             _n = e.embeddedObject().nFields();
         }
-        log() << "_or: " << _or << endl;
     }
 
     shared_ptr< QueryOp > MultiPlanScanner::runOpOnce( QueryOp &op ) {
