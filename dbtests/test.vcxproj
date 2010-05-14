@@ -256,6 +256,7 @@
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
+    <ClCompile Include="..\db\repl\rs_initiate.cpp" />
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>

@@ -1,5 +1,4 @@
-/* @file rs_mod.cpp code related to modifications of the replica set's configuration 
-   such as set initiation
+/* @file rs_initiate.cpp
    */
 
 /**

@@ -239,9 +239,6 @@
     <ClCompile Include="repl\manager.cpp">
       <Filter>replset</Filter>
     </ClCompile>
-    <ClCompile Include="repl\rs_mod.cpp">
-      <Filter>replset</Filter>
-    </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
       <Filter>pcre</Filter>
     </ClCompile>
@@ -319,6 +316,9 @@
     </ClCompile>
     <ClCompile Include="..\util\processinfo_win32.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\rs_initiate.cpp">
+      <Filter>replset</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

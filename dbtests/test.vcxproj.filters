@@ -601,6 +601,9 @@
     <ClCompile Include="..\db\repl\manager.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\repl\rs_initiate.cpp">
+      <Filter>replsets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
