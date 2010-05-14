@@ -128,6 +128,7 @@ namespace mongo {
         static mongo::mutex mutex;
         static int doneSetup;
         stringstream ss;
+        char _dummy[32];
     public:
         static int magicNumber(){
             return 1717;
@@ -136,12 +137,18 @@ namespace mongo {
             // this ensures things are sane
             if ( doneSetup == 1717 ){
                 scoped_lock lk(mutex);
+                
                 string s = ss.str();
+                const char * cc = s.c_str();
+                
+                time_t_to_String( time(0) , _dummy );
+                strncpy( (char*)cc , _dummy , 20 );
+                
                 if( t ) t->write(s);
                 cout << s;
                 cout.flush();
             }
-            ss.str("");
+            _init();
         }
 
         /** note these are virtual */
@@ -190,15 +197,18 @@ namespace mongo {
         }
 
         Logstream& prolog() {
-            char now[64];
-            time_t_to_String(time(0), now);
-            now[20] = 0;
-            ss << now;
             return *this;
         }
 
     private:
         static thread_specific_ptr<Logstream> tsp;
+        Logstream(){
+            _init();
+        }
+        void _init(){
+            ss.str("");
+            ss.write( _dummy , 20 );
+        }
     public:
         static Logstream& get() {
             Logstream *p = tsp.get();
