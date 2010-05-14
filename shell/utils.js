@@ -647,7 +647,7 @@ tojsonObject = function( x, indent , nolint ){
         return x.tojson(indent,nolint);
     }
     
-    if ( typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
+    if ( x.constructor && typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
         return x.constructor.tojson( x, indent , nolint );
     }
 
