@@ -166,23 +166,8 @@ namespace mongo {
 #define assert MONGO_assert
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-    inline void uassert(unsigned msgid, string msg, bool expr) {
-        if( !expr ) uasserted(msgid, msg.c_str());
-    }
-
-    template<class T>
-    inline void uassert(unsigned msgid, string msg, const T&t , bool expr) {
-        if( !expr ){
-            stringstream ss;
-            ss << msg << " " << t.toString();
-            uasserted(msgid, ss.str());
-        }
-    }
-
-
-    inline void uassert(unsigned msgid, const char * msg, bool expr) {
-        if( !expr ) uasserted(msgid, msg);
-    }
+#define MONGO_uassert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
+#define uassert MONGO_uassert
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( (!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -193,21 +178,8 @@ namespace mongo {
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-    inline void massert(unsigned msgid, string msg, bool expr) {
-        if( !expr) msgasserted(msgid, msg.c_str());
-    }
-    inline void massert(unsigned msgid, const char * msg, bool expr) {
-        if( !expr) msgasserted(msgid, msg);
-    }
-    template<typename T>
-    inline void massert(unsigned msgid, const string& msg, const T& t, bool expr) {
-        if ( ! expr ){
-            stringstream ss;
-            ss << msg << " " << (string)t;
-            string s = ss.str();
-            msgasserted( msgid, s.c_str() );
-        }
-    }
+#define MONGO_massert(msgid, msg, expr) (void)( (!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
+#define massert MONGO_massert
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
