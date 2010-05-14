@@ -653,6 +653,9 @@
     <ClInclude Include="..\util\mongoutils\html.h">
       <Filter>mongoutils</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\mongoutils\str.h">
+      <Filter>mongoutils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

@@ -560,6 +560,7 @@
     <ClInclude Include="..\pcre-7.4\config.h" />
     <ClInclude Include="..\pcre-7.4\pcre.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
+    <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="repl.h" />

@@ -22,11 +22,13 @@
 #include "../cmdline.h"
 #include "../commands.h"
 #include "../../util/mmap.h"
+#include "../../util/mongoutils/str.h"
 #include "health.h"
 #include "replset.h"
 #include "rs_config.h"
 
 using namespace bson;
+using namespace mongoutils;
 
 namespace mongo { 
 
@@ -110,6 +112,8 @@ namespace mongo {
                 log() << "replSet replSetInitiate all members seem up" << rsLog;
 
                 //log() << newConfig.toString() << rsLog;
+
+                string z = str::after("abcde", 'c');
 
                 newConfig.saveConfigEverywhere( theReplSet->memberHostnames() );
             }

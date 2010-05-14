@@ -256,10 +256,18 @@ namespace mongo {
         }
         
     private:
+        string hostname() { 
+            stringstream s;
+            s << getHostName();
+            if( mongo::cmdLine.port != CmdLine::DefaultDBPort ) 
+                s << ':' << mongo::cmdLine.port;
+            return s.str();
+        }
+
         /* /_replSet show replica set status in html format */
         string _replSet() { 
             stringstream s;
-            s << start("Replica Set Status " + getHostName());
+            s << start("Replica Set Status " + hostname());
             s << p( a("/", "back", "Home") + " | " + 
                     a("/local/system.replset/?html=1", "", "View config") + " | " +
                     a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
@@ -454,7 +462,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << "mongod " << getHostName() << ":" << mongo::cmdLine.port;
+                z << "mongod " << hostname();
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);

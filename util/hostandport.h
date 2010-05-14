@@ -32,7 +32,6 @@ namespace mongo {
             */
         HostAndPort(string s);
 
-
         /** @param p port number. -1 is ok to use default. */
         HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
 

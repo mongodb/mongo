@@ -68,7 +68,7 @@ namespace mongo {
             {
                 HostAndPort m;
                 try {
-                    m = HostAndPort(p, comma-p);
+                    m = HostAndPort( string(p, comma-p) );
                 }
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);
@@ -174,16 +174,16 @@ namespace mongo {
                         startupStatusMsg = "can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         log() << "replSet have you ran replSetInitiate yet?" << rsLog;
-                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
+                        log() << "replSet sleeping 20sec and will try again." << rsLog;
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
                         startupStatusMsg = "can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)";
                         log() << "replSet can't get " << rsConfigNs << " config from self or any seed." << rsLog;
-                        log() << "replSet sleeping 1 minute and will try again." << rsLog;
+                        log() << "replSet sleeping 20sec and will try again." << rsLog;
                     }
 
-                    sleepsecs(60);
+                    sleepsecs(20);
                     continue;
                 }
                 finishLoadingConfig(configs);
