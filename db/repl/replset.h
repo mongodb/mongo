@@ -77,7 +77,6 @@ namespace mongo {
         void summarizeStatus(BSONObjBuilder&) const;
         void summarizeAsHtml(stringstream&) const;
         const ReplSetConfig& config() { return *_cfg; }
-        void receivedNewConfig(BSONObj);
 
     private:
         string _name;

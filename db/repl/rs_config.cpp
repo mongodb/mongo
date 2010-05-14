@@ -49,6 +49,20 @@ namespace mongo {
         }
     }
 
+    
+    /*static*/ 
+    void ReplSetConfig::receivedNewConfig(BSONObj cfg) { 
+        if( theReplSet )
+            return; // this is for initial setup only, so far. todo
+
+        ReplSetConfig c(cfg);
+
+        writelock lk("admin.");
+        if( theReplSet ) 
+            return;
+        c.saveConfigLocally();
+    }
+
     bo ReplSetConfig::MemberCfg::asBson() const { 
         bob b;
         b << "_id" << _id;
