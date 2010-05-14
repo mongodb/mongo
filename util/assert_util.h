@@ -199,6 +199,15 @@ namespace mongo {
     inline void massert(unsigned msgid, const char * msg, bool expr) {
         if( !expr) msgasserted(msgid, msg);
     }
+    template<typename T>
+    inline void massert(unsigned msgid, const string& msg, const T& t, bool expr) {
+        if ( ! expr ){
+            stringstream ss;
+            ss << msg << " " << (string)t;
+            string s = ss.str();
+            msgasserted( msgid, s.c_str() );
+        }
+    }
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
