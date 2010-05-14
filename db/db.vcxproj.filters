@@ -644,17 +644,14 @@
     <ClInclude Include="..\client\dbclient.h">
       <Filter>dbclient</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\mongoutils\circularstringlist.h">
-      <Filter>util\mongoutils</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\mongoutils\html.h">
-      <Filter>util\mongoutils</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\ramlog.h">
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="repl\rstime.h">
       <Filter>replset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\mongoutils\html.h">
+      <Filter>mongoutils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -682,8 +679,8 @@
     <Filter Include="dbclient">
       <UniqueIdentifier>{932baf83-ba80-49e5-8280-f1b9c8dbbde6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="util\mongoutils">
-      <UniqueIdentifier>{6f2cd465-1a57-4068-ba98-947623a60727}</UniqueIdentifier>
+    <Filter Include="mongoutils">
+      <UniqueIdentifier>{cc5d96e6-1805-422b-804d-adcb367dc721}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -698,11 +695,11 @@
     <None Include="repl\testing.js">
       <Filter>replset</Filter>
     </None>
-    <None Include="..\util\mongoutils\README">
-      <Filter>util\mongoutils</Filter>
-    </None>
     <None Include="repl\notes.txt">
       <Filter>replset</Filter>
+    </None>
+    <None Include="..\util\mongoutils\README">
+      <Filter>mongoutils</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
