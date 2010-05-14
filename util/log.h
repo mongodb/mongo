@@ -20,6 +20,10 @@
 #include <string.h>
 #include <errno.h>
 
+#ifndef _WIN32
+//#include <syslog.h>
+#endif
+
 namespace mongo {
 
     using boost::shared_ptr;
@@ -145,6 +149,9 @@ namespace mongo {
                 strncpy( (char*)cc , _dummy , 20 );
                 
                 if( t ) t->write(s);
+#ifndef _WIN32
+                //syslog( LOG_INFO , "%s" , cc );
+#endif
                 cout << s;
                 cout.flush();
             }
