@@ -206,9 +206,10 @@ namespace mongo {
                             uassert(13123, "Can't modify shard key's value", ! manager->getShardKey().partOfShardKey(field));
                         }
                     }
-                }
-                else if ( manager->hasShardKey( toupdate ) && manager->getShardKey().compare( query , toupdate ) ){
-                    throw UserException( 8014 , "change would move shards!" );
+                } else if ( manager->hasShardKey( toupdate ) ){
+                    uassert( 8014, "change would move shards!", manager->getShardKey().compare( query , toupdate ) == 0 );
+                } else {
+                    uasserted(12376, "shard key must be in update object");
                 }
             }
             
