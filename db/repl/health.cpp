@@ -82,8 +82,8 @@ namespace mongo {
             result.append("state", theReplSet->state());
             int v = theReplSet->config().version;
             result.append("v", v);
-//            if( v > cmdObj["v"].Int() )
-//                result << "config" << theReplSet->config().asBson();
+            if( v > cmdObj["v"].Int() )
+                result << "config" << theReplSet->config().asBson();
             return true;
         }
     } cmdReplSetHeartbeat;
@@ -133,7 +133,7 @@ namespace mongo {
 
                         be cfg = info["config"];
                         if( cfg.ok() ) {
-                            //theReplSet->receivedNewConfig(cfg.Obj());
+                            ReplSetConfig::receivedNewConfig(cfg.Obj());
                         }
                     }
                     else { 

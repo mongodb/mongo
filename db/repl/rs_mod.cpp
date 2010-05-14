@@ -131,13 +131,4 @@ namespace mongo {
         }
     } cmdReplSetInitiate;
 
-    /*void ReplSet::receivedNewConfig(BSONObj cfg) { 
-        writelock lk("admin.");
-        ReplSetConfig c(cfg);
-        if( c.version <= config().version ) { 
-            log() << "replSet info received new config v" << c.version << " but our v" << config().version << " is already newer" << rsLog;
-            return;
-        }
-    }*/
-
 }
