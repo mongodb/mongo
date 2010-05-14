@@ -40,8 +40,7 @@ class mongod(object):
         except Exception, e:
             print >> sys.stderr, "error shutting down mongod"
             print >> sys.stderr, e
-            return not isinstance(value, Exception)
-
+        return not isinstance(value, Exception)
 
     def ensureTestDirs(self):
         utils.ensureDir( "/tmp/unittest/" )
@@ -86,11 +85,13 @@ class mongod(object):
 #        return startMongodWithArgs("--master", "--oplogSize", "10")
     
     def stop(self):
+        print "FOO"
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
-        if self.proc.poll() is not None:
-            raise Exception( "Failed to start mongod" )
+        # ???
+        #if self.proc.poll() is not None:
+        #    raise Exception( "Failed to start mongod" )
         try:
             # This function not available in Python 2.5
             self.proc.terminate()
@@ -135,8 +136,9 @@ def runTest(path):
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
     t1=time.time()
-    p = Popen(argv)
-    r = p.wait()
+    # FIXME: we don't handle the case where the subprocess
+    # hangs... that's bad.
+    r = call(argv)
     t2=time.time()
     print "                " + str((t2-t1)*1000) + "ms"
     if r != 0:
