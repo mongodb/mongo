@@ -361,11 +361,10 @@ namespace mongo {
 
             if( replSet ) {
                 if( theReplSet == 0 ) { 
-                    result.append("ismaster", 0);
-                    result.append("ok", false);
-                    result.append("msg", "replSet still trying to initialize");
+                    result.append("ismaster", false);
+                    errmsg = "replSet still trying to initialize";
                     result.append("info", ReplSet::startupStatusMsg);
-                    return true;
+                    return false;
                 }
                 theReplSet->fillIsMaster(result);
                 return true;

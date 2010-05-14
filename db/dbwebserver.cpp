@@ -269,7 +269,7 @@ namespace mongo {
             stringstream s;
             s << start("Replica Set Status " + hostname());
             s << p( a("/", "back", "Home") + " | " + 
-                    a("/local/system.replset/?html=1", "", "View config") + " | " +
+                    a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
                     a("/replSetGetStatus?text", "", "replSetGetStatus") + " | " +
                     a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
                   );
@@ -689,7 +689,7 @@ namespace mongo {
             }
 
             if( html )  {
-                string title = string("Query ") + ns;
+                string title = string("query ") + ns;
                 out << start(title) 
                     << p(title)
                     << "<pre>";
@@ -701,7 +701,7 @@ namespace mongo {
 
             int howMany = 0;
             while ( cursor->more() ) {
-                if ( howMany++ && html )
+                if ( howMany++ && html == 0 )
                     out << " ,\n";
                 BSONObj obj = cursor->next();
                 if( html ) {
@@ -716,7 +716,6 @@ namespace mongo {
                         break;
                     out << "    " << obj.jsonString();
                 }
-                
             }
 
             if( html ) { 

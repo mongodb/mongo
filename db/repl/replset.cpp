@@ -34,7 +34,6 @@ namespace mongo {
     }
 
     void ReplSet::fillIsMaster(BSONObjBuilder& b) {
-        log() << "hellO" << rsLog;
         b.append("ismaster", 0);
         b.append("ok", false);
         b.append("msg", "not yet implemented");

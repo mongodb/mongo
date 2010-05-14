@@ -553,6 +553,7 @@
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
     <None Include="repl\notes.txt" />
+    <None Include="repl\test.html" />
     <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
