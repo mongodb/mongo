@@ -26,8 +26,15 @@ namespace mongo {
       */
     struct HostAndPort { 
         HostAndPort() : _port(-1) { }
-        
-        HostAndPort(string h, int p = -1) : _host(h), _port(p) { }
+
+        /** From a string hostname[:portnumber] 
+            Throws user assertion if bad config string or bad port #.
+            */
+        HostAndPort(string s);
+
+
+        /** @param p port number. -1 is ok to use default. */
+        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
 
         HostAndPort(const SockAddr& sock ) 
             : _host( sock.getAddr() ) , _port( sock.getPort() ){
@@ -35,20 +42,6 @@ namespace mongo {
 
         static HostAndPort me() { 
             return HostAndPort("localhost", cmdLine.port);
-        }
-
-        static HostAndPort fromString(string s) {
-            const char *p = s.c_str();
-            uassert(13110, "HostAndPort: bad config string", *p);
-            const char *colon = strrchr(p, ':');
-            HostAndPort m;
-            if( colon ) {
-                int port = atoi(colon+1);
-                uassert(13095, "HostAndPort: bad port #", port > 0);
-                return HostAndPort(string(p,colon-p),port);
-            }
-            // no port specified.
-            return HostAndPort(p);
         }
 
         bool operator<(const HostAndPort& r) const { return _host < r._host || (_host==r._host&&_port<r._port); }
@@ -62,6 +55,7 @@ namespace mongo {
         string toString() const; 
 
         string host() const { return _host; }
+
         int port() const { return _port >= 0 ? _port : cmdLine.port; }
 
     private:
@@ -99,6 +93,23 @@ namespace mongo {
 
     inline bool HostAndPort::isLocalHost() const { 
         return _host == "localhost" || _host == "127.0.0.1" || _host == "::1";
+    }
+
+    inline HostAndPort::HostAndPort(string s) {
+        const char *p = s.c_str();
+        uassert(13110, "HostAndPort: bad config string", *p);
+        const char *colon = strrchr(p, ':');
+        if( colon ) {
+            int port = atoi(colon+1);
+            uassert(13095, "HostAndPort: bad port #", port > 0);
+            _host = string(p,colon-p);
+            _port = port;
+        }
+        else {
+            // no port specified.
+            _host = p;
+            _port = -1;
+        }
     }
 
 }

@@ -136,7 +136,7 @@ namespace mongo {
                 string s;
                 try {
                     s = mobj["host"].String();
-                    m.h = HostAndPort::fromString(s);
+                    m.h = HostAndPort(s);
                 }
                 catch(...) { throw "bad or missing host field?"; }
                 m.arbiterOnly = mobj.getBoolField("arbiterOnly");

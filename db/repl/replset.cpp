@@ -60,7 +60,7 @@ namespace mongo {
             {
                 HostAndPort m;
                 try {
-                    m = HostAndPort::fromString(string(p, comma-p));
+                    m = HostAndPort(p, comma-p);
                 }
                 catch(...) {
                     uassert(13114, "bad --replSet seed hostname", false);

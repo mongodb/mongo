@@ -1,4 +1,5 @@
-// syncclusterconnection.h
+// @file syncclusterconnection.h
+
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -23,8 +24,18 @@
 namespace mongo {
 
     /**
-     * this is a connection to a cluster of servers that operate as one
-     * for super high durability
+     * This is a connection to a cluster of servers that operate as one
+     * for super high durability.
+     * 
+     * Write operations are two-phase.  First, all nodes are asked to fsync. If successful
+     * everywhere, the write is sent everywhere and then followed by an fsync.  There is no 
+     * rollback if a problem occurs during the second phase.  Naturally, with all these fsyncs, 
+     * these operations will be quite slow -- use sparingly.
+     * 
+     * Read operations are sent to a single random node.
+     * 
+     * The class checks if a command is read or write style, and sends to a single 
+     * node if a read lock command and to all in two phases with a write style command.
      */
     class SyncClusterConnection : public DBClientBase {
     public:
@@ -34,7 +45,6 @@ namespace mongo {
         SyncClusterConnection( string commaSeparated );
         SyncClusterConnection( string a , string b , string c );
         ~SyncClusterConnection();
-        
         
         /**
          * @return true if all servers are up and ready for writes
