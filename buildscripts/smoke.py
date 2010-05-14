@@ -7,6 +7,7 @@ import utils
 import time
 import socket
 from optparse import OptionParser
+import atexit
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -14,14 +15,15 @@ shellExecutable = "./mongo"
 continueOnFailure = False
 oneMongodPerTest = False
 
+tests = []
+winners = []
+losers = {}
 # grumble
 class nothing(object):
     def __enter__(self):
         return self
     def __exit__(self, type, value, traceback):
-        if value:
-            print >> sys.stderr, ">>>%s" % value
-#            raise value
+        return not isinstance(value, Exception)
 
 class mongod(object):
     def __init__(self, *args):
@@ -38,8 +40,8 @@ class mongod(object):
         except Exception, e:
             print >> sys.stderr, "error shutting down mongod"
             print >> sys.stderr, e
-            if value:
-                raise value
+            return not isinstance(value, Exception)
+
 
     def ensureTestDirs(self):
         utils.ensureDir( "/tmp/unittest/" )
@@ -100,11 +102,13 @@ class mongod(object):
                 from os import kill
                 kill( self.proc.pid, 15 )
         self.proc.wait()
+        sys.stderr.flush()
+        sys.stdout.flush()
     
 class Bug(Exception):
     pass
 
-class TestFailure(object):
+class TestFailure(Exception):
     pass
 
 class TestExitFailure(TestFailure):
@@ -144,8 +148,6 @@ def runTest(path):
     print ""
 
 def runTests(tests):
-    winners = []
-    losers = {}
     with nothing() if oneMongodPerTest else mongod() as nevermind:
         for test in tests:
             try:
@@ -154,25 +156,26 @@ def runTests(tests):
                 winners.append(test)
             except TestFailure, f:
                 try:
+                    print f
                     losers[f.path] = f.status
                     raise f
                 # If the server's hosed and we're not in oneMongodPerTest
                 # mode, there's nothing else we can do.
                 except TestServerFailure, f: 
                     if not oneMongodPerTest:
-                        report(winners, losers)
-                        exit(1)
+                        return 2
                 except TestFailure, f:
                     if not continueOnFailure:
-                        report(winners, losers)
-                        exit(1)
+                        return 1
+    return 0
 
-    return (winners, losers)
-
-def report(winners, losers):
+def report():
     print "%d test%s succeeded" % (len(winners), '' if len(winners) == 1 else 's')
+    num_missed = len(tests) - (len(winners) + len(losers.keys()))
+    if num_missed:
+        print "%d tests didn't get run" % num_missed
     if losers:
-        print "The following tests failed:"
+        print "The following tests failed (with exit code):"
         for loser in losers:
             print "%s\t%d" % (loser, losers[loser])
 
@@ -202,18 +205,18 @@ def main():
     continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
     oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
     
+    global tests
     if options.File:
         if options.File == '-':
             tests = sys.stdin.readlines()
         else:
             with open(options.File) as f:
                 tests = f.readlines()
-
     tests = [t.rstrip('\n') for t in tests]
 
-    (winners, losers) = runTests(tests)
-    report(winners, losers)
-    return 0
+    return runTests(tests)
+
+atexit.register(report)
 
 if __name__ == "__main__":
     main()
