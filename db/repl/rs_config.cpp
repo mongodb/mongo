@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "replset.h"
 #include "../../client/dbclient.h"
+#include "../../client/syncclusterconnection.h"
 #include "../../util/hostandport.h"
 #include "../dbhelpers.h"
 #include "connections.h"
@@ -27,7 +28,7 @@ using namespace bson;
 
 namespace mongo { 
 
-    void ReplSetConfig::save() { 
+    void ReplSetConfig::saveConfigLocally() { 
         check();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         MemoryMappedFile::flushAll(true);
@@ -37,6 +38,17 @@ namespace mongo {
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
             MemoryMappedFile::flushAll(true);
         }
+    }
+
+    void ReplSetConfig::saveConfigEverywhere(const list<HostAndPort>& L) { 
+        SyncClusterConnection c(L);
+        BSONObj o = asBson();
+        BSONObjBuilder q;
+        q.append( o["_id"] );
+        c.update(rsConfigNs, 
+                 q.obj(), 
+                 o, 
+                 /*upsert=*/true, /*multi=*/false);
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const { 

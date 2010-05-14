@@ -25,6 +25,14 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
+    list<HostAndPort> ReplSet::memberHostnames() const { 
+        list<HostAndPort> L;
+        L.push_back(_self->_h);
+        for( Member *m = _members.head(); m; m = m->next() )
+            L.push_back(m->_h);
+        return L;
+    }
+
     void ReplSet::fillIsMaster(BSONObjBuilder& b) {
         log() << "hellO" << rsLog;
         b.append("ismaster", 0);
@@ -97,7 +105,7 @@ namespace mongo {
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
     string ReplSet::startupStatusMsg;
 
-    void ReplSet::setFrom(ReplSetConfig& c, bool save) { 
+    void ReplSet::initFromConfig(ReplSetConfig& c) { //, bool save) { 
         _cfg = new ReplSetConfig(c);
         assert( _cfg->ok() );
         assert( _name.empty() || _name == _cfg->_id );
@@ -119,9 +127,9 @@ namespace mongo {
         }
         assert( me == 1 );
 
-        if( save ) { 
+/*        if( save ) { 
             _cfg->save();
-        }
+        }*/
     }
 
     void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
@@ -138,7 +146,7 @@ namespace mongo {
             }
         }
         assert( highest );
-        setFrom(*highest, highest->version > myVersion && highest->version >= 0);
+        initFromConfig(*highest);//, highest->version > myVersion && highest->version >= 0);
     }
 
     void ReplSet::loadConfig() {

@@ -23,6 +23,21 @@
 // error codes 8000-8009
 
 namespace mongo {
+
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L)  {
+        int n = 0;
+        {
+            stringstream s;
+            int n=0;
+            for( list<HostAndPort>::const_iterator i = L.begin(); i != L.end(); i++ ) {
+                if( ++n > 1 ) s << ',';
+                s << i->toString();
+            }
+            _address = s.str();
+        }
+        for( list<HostAndPort>::const_iterator i = L.begin(); i != L.end(); i++ )
+            _connect( i->toString() );
+    }
     
     SyncClusterConnection::SyncClusterConnection( string commaSeperated ){
         _address = commaSeperated;

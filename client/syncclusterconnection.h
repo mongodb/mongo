@@ -42,6 +42,7 @@ namespace mongo {
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */
+        SyncClusterConnection( const list<HostAndPort> & );
         SyncClusterConnection( string commaSeparated );
         SyncClusterConnection( string a , string b , string c );
         ~SyncClusterConnection();
@@ -73,40 +74,26 @@ namespace mongo {
 
         virtual void update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi );
 
-        virtual string toString(){
-            return _toString();
-        }
-
         virtual bool call( Message &toSend, Message &response, bool assertOk );
         virtual void say( Message &toSend );
         virtual void sayPiggyBack( Message &toSend );
         
         virtual string getServerAddress() const { return _address; }
-
-        virtual bool isFailed() const { 
-            return false; 
-        }
+        virtual bool isFailed() const { return false; }
+        virtual string toString() { return _toString(); }
 
     private:
-        
         SyncClusterConnection( SyncClusterConnection& prev );
-
-        string _toString() const;
-        
+        string _toString() const;        
         bool _commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
-
         auto_ptr<DBClientCursor> _queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
                                                 const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
-        
         int _lockType( const string& name );
-
         void _checkLast();
-        
         void _connect( string host );
 
         string _address;
         vector<DBClientConnection*> _conns;
-        
         map<string,int> _lockTypes;
         mongo::mutex _mutex;
     };

@@ -111,7 +111,7 @@ namespace mongo {
 
                 //log() << newConfig.toString() << rsLog;
 
-                newConfig.save();
+                newConfig.saveConfigEverywhere( theReplSet->memberHostnames() );
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;

@@ -89,7 +89,7 @@ namespace mongo {
         */
         void loadConfig();
         void finishLoadingConfig(vector<ReplSetConfig>& v);
-        void setFrom(ReplSetConfig& c, bool save);
+        void initFromConfig(ReplSetConfig& c);//, bool save);
 
         struct Consensus {
             ReplSet &rs;
@@ -124,6 +124,7 @@ namespace mongo {
             ReplSet::State _state;
         };
 
+        list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
 

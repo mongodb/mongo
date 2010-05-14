@@ -64,7 +64,9 @@ namespace mongo {
         /** validate the settings. does not call check() on each member, you have to do that separately. */
         void check() const;
 
-        void save(); // to local db
+        void saveConfigLocally(); // to local db
+        void saveConfigEverywhere(const list<HostAndPort> &);
+
         BSONObj asBson() const;
 
     private:
