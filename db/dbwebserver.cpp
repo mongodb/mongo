@@ -691,7 +691,7 @@ namespace mongo {
             if( html )  {
                 string title = string("query ") + ns;
                 out << start(title) 
-                    << p(title + "<br>" + a("?","","json"))
+                    << p(title)
                     << "<pre>";
             } else {
                 out << "{\n";
