@@ -728,7 +728,6 @@ namespace mongo {
         Client::Context ctx( ns , dbpath , &lk );
 
         replVerifyReadsOk(pq);
-        //uassert( ?? , "not master" , isMaster() || pq.hasOption( QueryOption_SlaveOk ) || replSettings.slave == SimpleSlave );
 
         BSONElement hint = useHints ? pq.getHint() : BSONElement();
         bool explain = pq.isExplain();

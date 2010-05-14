@@ -106,9 +106,6 @@
     <ClCompile Include="..\util\message_server_port.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\miniwebserver.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\mmap.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -142,82 +139,7 @@
     <ClCompile Include="..\client\parallel.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_chartables.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_compile.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_config.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_dfa_exec.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_exec.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_fullinfo.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_get.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_globals.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_info.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_maketables.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_newline.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_ord2utf8.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_refcount.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_scanner.cc">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_stringpiece.cc">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_study.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_tables.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_try_flipped.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_ucp_searchfuncs.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_valid_utf8.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_version.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcre_xclass.c">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pcre-7.4\pcreposix.c">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="pdfile.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\processinfo_win32.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="query.cpp">
@@ -319,6 +241,84 @@
     </ClCompile>
     <ClCompile Include="repl\rs_mod.cpp">
       <Filter>replset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcreposix.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_chartables.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_compile.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_config.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_dfa_exec.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_exec.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_fullinfo.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_get.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_globals.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_info.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_maketables.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_newline.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_ord2utf8.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_refcount.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_scanner.cc">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_stringpiece.cc">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_study.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_tables.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_try_flipped.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_ucp_searchfuncs.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_valid_utf8.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_version.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcre_xclass.c">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
+      <Filter>pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\miniwebserver.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_win32.cpp">
+      <Filter>util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -439,9 +439,6 @@
     <ClInclude Include="..\util\log.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\lruishmap.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="matcher.h">
       <Filter>src</Filter>
     </ClInclude>
@@ -461,9 +458,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="minilex.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\miniwebserver.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mmap.h">
@@ -490,13 +484,7 @@
     <ClInclude Include="..\bson\ordering.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\pcre-7.4\pcre.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="pdfile.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\processinfo.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\grid\protocol.h">
@@ -656,6 +644,18 @@
     <ClInclude Include="..\util\mongoutils\str.h">
       <Filter>mongoutils</Filter>
     </ClInclude>
+    <ClInclude Include="..\pcre-7.4\pcre.h">
+      <Filter>pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\lruishmap.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\miniwebserver.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\processinfo.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -685,6 +685,12 @@
     <Filter Include="mongoutils">
       <UniqueIdentifier>{cc5d96e6-1805-422b-804d-adcb367dc721}</UniqueIdentifier>
     </Filter>
+    <Filter Include="pcre">
+      <UniqueIdentifier>{fa527226-9b03-4f17-8e4c-80d31fb1e449}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="replset\test stuff">
+      <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc">
@@ -692,17 +698,18 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\SConstruct">
-      <Filter>src</Filter>
-    </None>
-    <None Include="repl\testing.js">
-      <Filter>replset</Filter>
-    </None>
     <None Include="repl\notes.txt">
       <Filter>replset</Filter>
     </None>
     <None Include="..\util\mongoutils\README">
       <Filter>mongoutils</Filter>
+    </None>
+    <None Include="..\SConstruct" />
+    <None Include="repl\testing.js">
+      <Filter>replset\test stuff</Filter>
+    </None>
+    <None Include="repl\test.html">
+      <Filter>replset\test stuff</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

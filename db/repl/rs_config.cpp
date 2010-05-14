@@ -28,6 +28,15 @@ using namespace bson;
 
 namespace mongo { 
 
+    list<HostAndPort> ReplSetConfig::otherMemberHostnames() const { 
+        list<HostAndPort> L;
+        for( vector<MemberCfg>::const_iterator i = members.begin(); i != members.end(); i++ ) {
+            if( !i->h.isSelf() )
+                L.push_back(i->h);
+        }
+        return L;
+    }
+
     void ReplSetConfig::saveConfigLocally() { 
         check();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
@@ -38,17 +47,6 @@ namespace mongo {
             Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
             MemoryMappedFile::flushAll(true);
         }
-    }
-
-    void ReplSetConfig::saveConfigEverywhere(const list<HostAndPort>& L) { 
-        SyncClusterConnection c(L);
-        BSONObj o = asBson();
-        BSONObjBuilder q;
-        q.append( o["_id"] );
-        c.update(rsConfigNs, 
-                 q.obj(), 
-                 o, 
-                 /*upsert=*/true, /*multi=*/false);
     }
 
     bo ReplSetConfig::MemberCfg::asBson() const { 

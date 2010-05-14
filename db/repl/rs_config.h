@@ -56,6 +56,8 @@ namespace mongo {
         string md5;
         BSONObj getLastErrorDefaults;
 
+        list<HostAndPort> otherMemberHostnames() const; // except self
+
         /** @return true if could connect, and there is no cfg object there at all */
         bool empty() const { return version == EMPTYCONFIG; }
 
@@ -65,7 +67,7 @@ namespace mongo {
         void check() const;
 
         void saveConfigLocally(); // to local db
-        void saveConfigEverywhere(const list<HostAndPort> &);
+        string saveConfigEverywhere(); // returns textual info on what happened
 
         BSONObj asBson() const;
 

@@ -115,7 +115,7 @@ namespace mongo {
 
                 string z = str::after("abcde", 'c');
 
-                newConfig.saveConfigEverywhere( theReplSet->memberHostnames() );
+                newConfig.saveConfigLocally();
             }
             catch( DBException& e ) { 
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
