@@ -1053,7 +1053,7 @@ namespace mongo {
         BSONObj last = conn->findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
             BSONElement ts = last.getField( "ts" );
-            massert( 10386 ,  "non Date ts found", ts.type() == Date || ts.type() == Timestamp );
+            massert( 10386 ,  (string)"non Date ts found:" + last.jsonString() , ts.type() == Date || ts.type() == Timestamp );
             syncedTo = OpTime( ts.date() );
         }        
     }
