@@ -38,7 +38,12 @@ namespace mongo {
             sprintf( name , "/proc/%d/stat"  , pid );
   
             FILE * f = fopen( name , "r");
-            
+            if ( ! f ){
+                stringstream ss;
+                ss << "couldn't open [" << name << "] " << errnoWithDescription();
+                string s = ss.str();
+                msgassertedNoTrace( 13276 , s.c_str() );
+            }
             int found = fscanf(f,
                    "%d %s %c "
                    "%d %d %d %d %d "
