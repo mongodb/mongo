@@ -128,7 +128,7 @@ namespace mongo {
                 throw;
             }
 
-            log() << "replSet replSetInitiate Config now saved locally.  Should come online in about a minute." << rsLog;
+            log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
             result.append("info", "Config now saved locally.  Should come online in about a minute.");
             ReplSet::startupStatus = ReplSet::SOON;
             ReplSet::startupStatusMsg = "Received replSetInitiate - should come online shortly.";

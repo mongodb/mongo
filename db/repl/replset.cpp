@@ -131,7 +131,8 @@ namespace mongo {
         }*/
     }
 
-    void ReplSet::finishLoadingConfig(vector<ReplSetConfig>& cfgs) { 
+    // Our own config must be the first one.
+    void ReplSet::_loadConfigFinish(vector<ReplSetConfig>& cfgs) { 
         int v = -1;
         ReplSetConfig *highest = 0;
         int myVersion = -2000;
@@ -145,7 +146,12 @@ namespace mongo {
             }
         }
         assert( highest );
-        initFromConfig(*highest);//, highest->version > myVersion && highest->version >= 0);
+        initFromConfig(*highest);
+        if( highest->version > myVersion && highest->version >= 0 ) { 
+            log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
+            writelock lk("admin.");
+            highest->saveConfigLocally();
+        }
     }
 
     void ReplSet::loadConfig() {
@@ -185,7 +191,7 @@ namespace mongo {
                     sleepsecs(20);
                     continue;
                 }
-                finishLoadingConfig(configs);
+                _loadConfigFinish(configs);
             }
             catch(DBException& e) { 
                 startupStatus = BADCONFIG;
