@@ -228,7 +228,13 @@ namespace mongo {
             "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>", 
             "Votes", "State", "Status", 0};
         s << table(h);
+
+        /* this is to sort the member rows by their ordinal _id, so they show up in the same 
+           order on all the different web ui's; that is less confusing for the operator. */
+        map<int, stringstream> mp;
+
         {
+            stringstream& s = mp[_self->_id];
             /* self row */
             s << tr() << td(_self->fullName()) <<
                 td("1") << 
@@ -241,9 +247,12 @@ namespace mongo {
         }
         Member *m = head();
         while( m ) {
-            m->summarizeAsHtml(s);
+            m->summarizeAsHtml(mp[m->_id]);
             m = m->next();
         }
+
+        for( map<int,stringstream>::const_iterator i = mp.begin(); i != mp.end(); i++ )
+            s << i->second.str();
         s << _table();
     }
 

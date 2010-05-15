@@ -9,6 +9,13 @@ cfg = {
         { _id : 2, host : "dm_hp:27002" }
         ]
 };
+c2 = {
+    _id: 'asdf',
+    members: [
+        { _id: 0, host: "dmthink" },
+        { _id: 2, host: "dmthink:27002" }
+        ]
+};
 
 db = db.getSisterDB("admin");
 local = db.getSisterDB("local");

@@ -33,7 +33,7 @@ namespace mongoutils {
         using namespace std;
 
         inline string _end() { return "</body></html>"; }
-        inline string _table() { return "</table>"; }
+        inline string _table() { return "</table>\n\n"; }
         inline string _tr() { return "</tr>\n"; }
 
         inline string tr() { return "<tr>"; }
@@ -54,7 +54,7 @@ namespace mongoutils {
 
         inline string table(const char *headers[] = 0, bool border = true) { 
             stringstream ss;
-            ss << "<table " 
+            ss << "\n<table " 
                 << (border?"border=1 ":"")
                 << "cellpadding=2 cellspacing=0>\n";
             if( headers ) { 
