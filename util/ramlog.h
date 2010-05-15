@@ -46,7 +46,7 @@ namespace mongo {
         }
         vector<const char *> get() const {
             vector<const char *> v;
-            for( unsigned i = h; i != (h+n)%N; i=(i+1)%N )
+            for( unsigned x=0, i=h; x++ < n; i=(i+1)%N )
                 v.push_back(lines[i]);
             return v;
         }
