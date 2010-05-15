@@ -86,8 +86,8 @@ namespace mongo {
         /** load our configuration from admin.replset.  try seed machines too. 
             throws exception if a problem.
         */
+        void _loadConfigFinish(vector<ReplSetConfig>& v);
         void loadConfig();
-        void finishLoadingConfig(vector<ReplSetConfig>& v);
         void initFromConfig(ReplSetConfig& c);//, bool save);
 
         struct Consensus {
