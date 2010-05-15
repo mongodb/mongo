@@ -196,7 +196,7 @@ namespace mongo {
         
         stringstream ss;
         ss << "unauthorized for db [" << _db->name << "] lock type: " << lockState << endl;
-        massert( 10057 , ss.str() , 0 );
+        uasserted( 10057 , ss.str() );
     }
 
     Client::Context::~Context() {
