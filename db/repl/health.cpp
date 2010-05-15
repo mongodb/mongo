@@ -231,10 +231,10 @@ namespace mongo {
 
         /* this is to sort the member rows by their ordinal _id, so they show up in the same 
            order on all the different web ui's; that is less confusing for the operator. */
-        map<int, stringstream> mp;
+        map<int,string> mp;
 
         {
-            stringstream& s = mp[_self->_id];
+            stringstream s;
             /* self row */
             s << tr() << td(_self->fullName()) <<
                 td("1") << 
@@ -244,15 +244,18 @@ namespace mongo {
                 td(stateAsHtml(_myState));
             s << td( _self->_lastHeartbeatErrMsg.get() );
             s << _tr();
+			mp[_self->_id] = s.str();
         }
         Member *m = head();
         while( m ) {
-            m->summarizeAsHtml(mp[m->_id]);
+			stringstream s;
+            m->summarizeAsHtml(s);
+			mp[m->_id] = s.str();
             m = m->next();
         }
 
-        for( map<int,stringstream>::const_iterator i = mp.begin(); i != mp.end(); i++ )
-            s << i->second.str();
+        for( map<int,string>::const_iterator i = mp.begin(); i != mp.end(); i++ )
+            s << i->second;
         s << _table();
     }
 
