@@ -656,6 +656,10 @@ DB.prototype.serverStatus = function(){
     return this._adminCommand( "serverStatus" );
 }
 
+DB.prototype.serverCmdLineOpts = function(){
+    return this._adminCommand( "getCmdLineOpts" );
+}
+
 DB.prototype.version = function(){
     return this.serverBuildInfo().version;
 }
