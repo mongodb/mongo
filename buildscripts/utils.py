@@ -51,3 +51,15 @@ def ensureDir( name ):
         os.makedirs( d )
         if not os.path.exists( d ):
             raise "Failed to create dir: " + name
+
+def didMongodStart( port=27017 , timeout=20 ):
+    while timeout > 0:
+        time.sleep( 1 )
+        try:
+            checkMongoPort( port )
+            return True
+        except Exception,e:
+            print( e )
+            timeout = timeout - 1
+    return False
+
