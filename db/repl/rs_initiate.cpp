@@ -33,6 +33,13 @@ namespace mongo {
 
     /* throws */ 
     static void checkAllMembersUpForConfigChange(const ReplSetConfig& cfg) {
+        int me = 0;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ )
+            if( i->h.isSelf() )
+                me++;
+        uassert(13278, "bad config?", me > 1);
+        uassert(13279, "can't find self in the replset config", me == 1);
+
         for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
             BSONObj res;
             {
