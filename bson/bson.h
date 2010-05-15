@@ -59,6 +59,9 @@ namespace mongo {
         if( !expr )
             throw bson::assertion();
     }
+    inline void msgasserted(int msgid, const char *msg) { 
+        throw bson::assertion();
+    }
     inline void massert(unsigned msgid, std::string msg, bool expr) { 
         if(!expr) { 
             std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;

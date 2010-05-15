@@ -33,7 +33,7 @@ namespace mongo {
 
     using namespace std;
 
-#if defined(_WIN32)
+#if defined(_DEBUG)
     const bool debug=true;
 #else
     const bool debug=false;

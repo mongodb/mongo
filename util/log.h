@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include "../bson/util/builder.h"
 
 #ifndef _WIN32
 //#include <syslog.h>
@@ -132,22 +133,20 @@ namespace mongo {
         static mongo::mutex mutex;
         static int doneSetup;
         stringstream ss;
-        char _dummy[32];
     public:
         static int magicNumber(){
             return 1717;
         }
         void flush(Tee *t = 0) {
             // this ensures things are sane
-            if ( doneSetup == 1717 ){
+            if ( doneSetup == 1717 ) {
+                BufBuilder b(512);
+                time_t_to_String( time(0) , b.grow(20) );
+                b.append( ss.str() );
+                const char *s = b.buf();
+
                 scoped_lock lk(mutex);
-                
-                string s = ss.str();
-                const char * cc = s.c_str();
-                
-                time_t_to_String( time(0) , _dummy );
-                strncpy( (char*)cc , _dummy , 20 );
-                
+
                 if( t ) t->write(s);
 #ifndef _WIN32
                 //syslog( LOG_INFO , "%s" , cc );
@@ -214,7 +213,6 @@ namespace mongo {
         }
         void _init(){
             ss.str("");
-            ss.write( _dummy , 20 );
         }
     public:
         static Logstream& get() {

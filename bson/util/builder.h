@@ -26,12 +26,15 @@ namespace mongo {
 
     class StringBuilder;
 
+    void msgasserted(int msgid, const char *msg);
+
     class BufBuilder {
     public:
         BufBuilder(int initsize = 512) : size(initsize) {
             if ( size > 0 ) {
                 data = (char *) malloc(size);
-                assert(data != 0);
+                if( data == 0 )
+                    msgasserted(10000, "out of memory BufBuilder");
             } else {
                 data = 0;
             }
@@ -59,14 +62,11 @@ namespace mongo {
         }
 
         /* leave room for some stuff later */
-        void skip(int n) {
-            grow(n);
-        }
+        char* skip(int n) { return grow(n); }
 
         /* note this may be deallocated (realloced) if you keep writing. */
-        char* buf() {
-            return data;
-        }
+        char* buf() { return data; }
+        const char* buf() const { return data; }
 
         /* assume ownership of the buffer - you must then free it */
         void decouple() {
@@ -112,7 +112,6 @@ namespace mongo {
             l = newLen;
         }
 
-    private:
         /* returns the pre-grow write position */
         char* grow(int by) {
             int oldlen = l;
@@ -123,13 +122,15 @@ namespace mongo {
                     a = 512;
                 if ( l > a )
                     a = l + 16 * 1024;
-                assert( a < 64 * 1024 * 1024 );
+                if( a > 64 * 1024 * 1024 )
+                    msgasserted(10000, "BufBuilder grow() > 64MB");
                 data = (char *) realloc(data, a);
                 size= a;
             }
             return data + oldlen;
         }
 
+    private:
         char *data;
         int l;
         int size;
@@ -152,7 +153,6 @@ namespace mongo {
             int z = sprintf( _buf.grow(maxSize) , macro , (val) );  \
             _buf.l = prev + z; \
             return *this; 
-        
 
         StringBuilder& operator<<( double x ){
             SBNUM( x , 25 , "%g" );

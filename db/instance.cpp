@@ -241,7 +241,6 @@ namespace mongo {
                         return true;
                     }
                 }
-
             }
             else {
                 opread(m);
