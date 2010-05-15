@@ -71,7 +71,7 @@ namespace mongo {
         in fact "nyc1.foo.com" and "nyc1.acme.com" are treated the same - 
         we oly look up to the first period.
     */
-    inline bool sameHostname(const string&& a, const string& b) {
+    inline bool sameHostname(const string& a, const string& b) {
         return str::before(a, '.') == str::before(b, '.');
     }
 
