@@ -54,7 +54,6 @@ namespace mongo {
         State _myState;
 
     public:
-
         void fatal();
         bool isMaster(const char *client);
         void fillIsMaster(BSONObjBuilder&);
@@ -66,8 +65,7 @@ namespace mongo {
            replsetname/host1,host2:port,...
            where :port is optional.
 
-           throws exception if a problem initializing.
-        */
+           throws exception if a problem initializing. */
         ReplSet(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
@@ -90,12 +88,15 @@ namespace mongo {
         void loadConfig();
         void initFromConfig(ReplSetConfig& c);//, bool save);
 
-        struct Consensus {
+        class Consensus {
             ReplSet &rs;
-            Consensus(ReplSet *t) : rs(*t) { }
+            bool inprog;
+            void _electSelf();
+        public:
+            Consensus(ReplSet *t) : rs(*t),inprog(false) { }
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
-            bool electSelf();
+            void electSelf();
         } elect;
 
     public:

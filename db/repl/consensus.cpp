@@ -64,7 +64,7 @@ namespace mongo {
 
     static const int VETO = -10000;
 
-    bool ReplSet::Consensus::electSelf() {
+    void ReplSet::Consensus::_electSelf() {
         ReplSet::Member& me = *rs._self;
         electCmd = BSON(
                "replSetElect" << 1 <<
@@ -96,11 +96,26 @@ namespace mongo {
             if( time(0) - start > 30 ) {
                 // defensive; should never happen as we have timeouts on connection and operation for our conn
                 log() << "replSet too much time passed during election, ignoring result" << rsLog;
-                return false;
             }
-            return true;
+            /* succeeded. */
+            rs._myState = PRIMARY;
+            log() << "replSet elected self as primary" << rsLog;
+            return;
         } 
-        return false;
+    }
+
+    void ReplSet::Consensus::electSelf() {
+        static mutex m;
+        {
+            scoped_lock lk(m);
+            if( inprog ) return;
+            inprog = true;
+        }
+        try { _electSelf(); } catch(...) { }
+        {
+            scoped_lock lk(m);
+            inprog = false;
+        }
     }
 
 }
