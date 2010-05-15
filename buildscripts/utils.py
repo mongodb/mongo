@@ -52,6 +52,14 @@ def ensureDir( name ):
         if not os.path.exists( d ):
             raise "Failed to create dir: " + name
 
+def checkMongoPort( port=27017 ):
+    sock = socket.socket()
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    sock.settimeout(1)
+    sock.connect(("localhost", port))
+    sock.close()
+
+
 def didMongodStart( port=27017 , timeout=20 ):
     while timeout > 0:
         time.sleep( 1 )
