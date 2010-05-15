@@ -19,8 +19,11 @@
 
 #include "sock.h"
 #include "../db/cmdline.h"
-
+#include "mongoutils/str.h"
+ 
 namespace mongo { 
+
+    using namespace mongoutils;
 
     /** helper for manipulating host:port connection endpoints. 
       */
@@ -63,16 +66,13 @@ namespace mongo {
         int _port; // -1 indicates unspecified
     };
 
-    /** returns true if strings share a common starting prefix */
-    inline bool sameStart(const char *p, const char *q) {
-        while( 1 ) {
-            if( *p == 0 || *q == 0 )
-                return true;
-            if( *p != *q )
-                break;
-            p++; q++;
-        }
-        return false;
+    /** returns true if strings seem to be the same hostname.
+        "nyc1" and "nyc1.acme.com" are treated as the same.
+        in fact "nyc1.foo.com" and "nyc1.acme.com" are treated the same - 
+        we oly look up to the first period.
+    */
+    inline bool sameHostname(const string&& a, const string& b) {
+        return str::before(a, '.') == str::before(b, '.');
     }
 
     inline bool HostAndPort::isSelf() const { 
@@ -80,7 +80,7 @@ namespace mongo {
         if( p != cmdLine.port )
             return false;
         
-        return sameStart(getHostName().c_str(), _host.c_str()) || isLocalHost();
+        return sameHostname(getHostName(), _host) || isLocalHost();
     }
 
     inline string HostAndPort::toString() const {
