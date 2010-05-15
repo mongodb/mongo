@@ -56,7 +56,6 @@ namespace mongo {
         AtomicUInt _opNum;
         char _ns[Namespace::MaxNsLen+2];
         struct SockAddr _remote;
-        
         char _queryBuf[256];
         
         void resetQuery(int x=0) { *((int *)_queryBuf) = x; }
@@ -243,8 +242,8 @@ namespace mongo {
         
         BSONObj infoNoauth();
 
-        string getRemoteString( bool incPort = true ){
-            return _remote.toString(incPort);
+        string getRemoteString( bool includePort = true ){
+            return _remote.toString(includePort);
         }
 
         ProgressMeter& setMessage( const char * msg , long long progressMeterTotal = 0 , int secondsBetween = 3 ){

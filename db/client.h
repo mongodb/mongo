@@ -169,7 +169,7 @@ namespace mongo {
         BSONObj _remoteId;
 
     public:
-        
+        string clientAddress() const;
         AuthenticationInfo * getAuthenticationInfo(){ return &_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
         CurOp* curop() { return _curOp; }        

@@ -195,7 +195,7 @@ namespace mongo {
         _client->_context = _oldContext; // note: _oldContext may be null
         
         stringstream ss;
-        ss << "unauthorized for db [" << _db->name << "] lock type: " << lockState << endl;
+        ss << "unauthorized db:" << _db->name << " lock type:" << lockState << " client:" << _client->clientAddress() << endl;
         uasserted( 10057 , ss.str() );
     }
 
@@ -203,6 +203,12 @@ namespace mongo {
         DEV assert( _client == currentClient.get() );
         _client->_curOp->leave( this );
         _client->_context = _oldContext; // note: _oldContext may be null
+    }
+
+    string Client::clientAddress() const {
+        if( _curOp )
+            return _curOp->getRemoteString(false);
+        return "";
     }
 
     string Client::toString() const {

@@ -175,14 +175,12 @@ namespace mongo {
         catch ( AssertionException& e ) {
             ok = false;
             op.debug().str << " exception ";
-            LOGSOME problem() << " Caught Assertion in query ns:" << q.ns << ' ' << e.toString() << '\n';
-            if( q.ntoskip || q.ntoreturn )
-                log() << "   ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << '\n';
-            if ( q.query.valid() ) {
-                if( !q.query.isEmpty() )
-                    log() << "   query:" << q.query.toString() << endl;
-            } else
-                log() << "   query object is not valid!" << endl;
+            LOGSOME { 
+                log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
+                    (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
+                if( q.ntoskip || q.ntoreturn )
+                    log() << " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
+            }
 
             BSONObjBuilder err;
             err.append("$err", e.msg.empty() ? "assertion during query" : e.msg);
@@ -281,8 +279,7 @@ namespace mongo {
         bool log = logLevel >= 1;
         
         if ( op == dbQuery ) {
-            if ( ! receivedQuery(c , dbresponse, m ) )
-                log = true;
+            receivedQuery(c , dbresponse, m );
         }
         else if ( op == dbGetMore ) {
             DEV log = true;
