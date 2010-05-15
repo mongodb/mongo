@@ -197,9 +197,11 @@ namespace mongo {
             case BSONObj::opALL:
                 all = true;
             case BSONObj::opIN:
+                uassert( 13276 , "$in needs an array" , fe.isABSONObj() );
                 basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
                 break;
             case BSONObj::NIN:
+                uassert( 13277 , "$nin needs an array" , fe.isABSONObj() );
                 haveNeg = true;
                 basics.push_back( ElementMatcher( e , op , fe.embeddedObject(), isNot ) );
                 break;
