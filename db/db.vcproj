@@ -1524,6 +1524,10 @@
 					RelativePath="..\util\concurrency\value.h"
 					>
 				</File>
+				<File
+					RelativePath="..\util\concurrency\vars.cpp"
+					>
+				</File>
 			</Filter>
 			<Filter
 				Name="web"
@@ -1775,6 +1779,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\repl\manager.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\repl\replset.cpp"
 				>
 			</File>
@@ -1795,7 +1803,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\repl\rs_mod.cpp"
+				RelativePath=".\repl\rs_initiate.cpp"
 				>
 			</File>
 		</Filter>

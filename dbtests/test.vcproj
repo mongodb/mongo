@@ -1210,6 +1210,22 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="concurrency"
+				>
+				<File
+					RelativePath="..\util\concurrency\list.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\concurrency\value.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\concurrency\vars.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="shard"
@@ -1371,6 +1387,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\db\repl\manager.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\db\repl\replset.cpp"
 				>
 			</File>
@@ -1383,7 +1403,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\db\repl\rs_mod.cpp"
+				RelativePath="..\db\repl\rs_initiate.cpp"
 				>
 			</File>
 		</Filter>
