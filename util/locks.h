@@ -20,22 +20,22 @@
 
 #pragma once
 
-#if defined(_WIN32)
-
 #if BOOST_VERSION >= 103500
+  #define BOOST_RWLOCK
+#else
+
+  #if defined(_WIN32)
+    #error need boost >= 1.35 for windows
+  #endif
+ 
+  #include <pthread.h>
+
+#endif
+
+#ifdef BOOST_RWLOCK
 #include <boost/thread/shared_mutex.hpp>
 #undef assert
 #define assert MONGO_assert
-#else
-#error need boost >= 1.35 for windows
-#endif
-
-#define BOOST_RWLOCK
-
-#else
-
-#include <pthread.h>
-
 #endif
 
 namespace mongo {
