@@ -659,7 +659,7 @@ namespace mongo {
                 if ( ! name.find( "filter_" ) == 0 )
                     continue;
 
-                const char * field = name.substr( 7 ).c_str();
+                string field = name.substr(7);
                 const char * val = e.valuestr();
 
                 char * temp;
@@ -667,13 +667,12 @@ namespace mongo {
                 // TODO: this is how i guess if something is a number.  pretty lame right now
                 double number = strtod( val , &temp );
                 if ( temp != val )
-                    queryBuilder.append( field , number );
+                    queryBuilder.append( field.c_str() , number );
                 else
-                    queryBuilder.append( field , val );
+                    queryBuilder.append( field.c_str() , val );
             }
 
             BSONObj query = queryBuilder.obj();
-
             auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
             uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
 
