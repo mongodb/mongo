@@ -20,28 +20,46 @@
 
 namespace mongo { 
 
-/** this string COULD be mangled but with the double buffering, assuming writes 
+    /** this string COULD be mangled but with the double buffering, assuming writes 
     are infrequent, it's unlikely.  thus, this is reasonable for lockless setting of 
     diagnostic strings, where their content isn't critical.
     */
-class DiagStr { 
-    char buf1[256];
-    char buf2[256];
-    char *p;
-public:
-    DiagStr() {
-        memset(buf1, 0, 256);
-        memset(buf2, 0, 256);
-        p = buf1;
-    }
+    class DiagStr { 
+        char buf1[256];
+        char buf2[256];
+        char *p;
+    public:
+        DiagStr() {
+            memset(buf1, 0, 256);
+            memset(buf2, 0, 256);
+            p = buf1;
+        }
 
-    const char * get() const { return p; }
+        const char * get() const { return p; }
 
-    void set(const char *s) {
-        char *q = (p==buf1) ? buf2 : buf1;
-        strncpy(q, s, 255);
-        p = q;
-    }
-};
+        void set(const char *s) {
+            char *q = (p==buf1) ? buf2 : buf1;
+            strncpy(q, s, 255);
+            p = q;
+        }
+    };
+
+    extern mutex _atomicMutex;
+
+    /** atomic wrapper for a value.  enters a mutex on each access.  must 
+        be copyable.
+    */
+    template<typename T>
+    class Atomic : boost::noncopyable {
+        T val;
+    public:
+        void operator=(const T& a) { 
+            scoped_lock lk(_atomicMutex);
+            val = a; }
+
+        operator T() const { 
+            scoped_lock lk(_atomicMutex);
+            return val; }
+    };
 
 }

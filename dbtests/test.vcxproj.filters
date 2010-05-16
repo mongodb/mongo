@@ -47,6 +47,9 @@
     <Filter Include="btree related">
       <UniqueIdentifier>{4fff2dbf-30c4-4295-8db8-d513c1e36220}</UniqueIdentifier>
     </Filter>
+    <Filter Include="util\concurrency">
+      <UniqueIdentifier>{d499fdba-b256-4b12-af20-cdd1ae1addff}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -222,6 +225,12 @@
     </ClInclude>
     <ClInclude Include="..\db\btree.h">
       <Filter>btree related</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\list.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\value.h">
+      <Filter>util\concurrency</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -603,6 +612,9 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\rs_initiate.cpp">
       <Filter>replsets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\vars.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

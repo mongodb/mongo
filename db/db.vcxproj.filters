@@ -320,11 +320,11 @@
     <ClCompile Include="repl\rs_initiate.cpp">
       <Filter>replset</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\vars.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\util\concurrency\value.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="client.h">
       <Filter>src</Filter>
     </ClInclude>
@@ -428,9 +428,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="lasterror.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\concurrency\list.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\util\locks.h">
@@ -659,6 +656,12 @@
     <ClInclude Include="repl\rsmember.h">
       <Filter>replset</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\list.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\value.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -693,6 +696,9 @@
     </Filter>
     <Filter Include="replset\test stuff">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\concurrency">
+      <UniqueIdentifier>{8e6fe846-2833-45bb-b13b-c0f0d4d38593}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
