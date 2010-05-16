@@ -96,6 +96,7 @@ namespace mongo {
     }
 
     /* poll every other set member to check its status */
+    /*
     class FeedbackThread : public BackgroundJob {
     public:
         ReplSet::Member *m; 
@@ -149,7 +150,7 @@ namespace mongo {
                 sleepsecs(2);
             }
         }
-    };
+    };*/
     
     string ago(time_t t) { 
         if( t == 0 ) return "";
@@ -175,27 +176,27 @@ namespace mongo {
         s << tr();
         {
             stringstream u;
-            u << "http://" << _h.host() << ':' << (_h.port() + 1000) << "/_replSet";
+            u << "http://" << m().h().host() << ':' << (m().h().port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
-        double h = health();
+        double h = m().health;
         bool ok = h > 0;
         s << td(h);
-        s << td(ago(upSince()));
+        s << td(ago(m().upSince));
         {
             string h;
-            time_t hb = lastHeartbeat();
+            time_t hb = m().lastHeartbeat;
             if( hb == 0 ) h = "never"; 
             else h = ago(hb) + " ago";
             s << td(h);
         }
         s << td(config().votes);
-        s << td(ReplSet::stateAsStr(state()));
-        s << td( red(_lastHeartbeatErrMsg.get(),!ok) );
+        s << td(ReplSet::stateAsStr(m().state));
+        s << td( red(m().lastHeartbeatMsg.get(),!ok) );
         s << _tr();
     }
 
-    string ReplSet::stateAsHtml(State s) { 
+    string ReplSet::stateAsHtml(MemberState s) { 
         if( s == STARTUP ) return a("", "serving still starting up, or still trying to initiate the set", "STARTUP");
         if( s == PRIMARY ) return a("", "this server thinks it is primary", "PRIMARY");
         if( s == SECONDARY ) return a("", "this server thinks it is a secondary (slave mode)", "SECONDARY");
@@ -205,7 +206,7 @@ namespace mongo {
         return "";
     }
 
-    string ReplSet::stateAsStr(State s) { 
+    string ReplSet::stateAsStr(MemberState s) { 
         if( s == STARTUP ) return "STARTUP";
         if( s == PRIMARY ) return "PRIMARY";
         if( s == SECONDARY ) return "SECONDARY";
@@ -242,15 +243,15 @@ namespace mongo {
                 td("(self)") << 
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
-            s << td( _self->_lastHeartbeatErrMsg.get() );
+            s << td( _self->lhb().get() );
             s << _tr();
-			mp[_self->_id] = s.str();
+			mp[_self->m().id()] = s.str();
         }
         Member *m = head();
         while( m ) {
 			stringstream s;
             m->summarizeAsHtml(s);
-			mp[m->_id] = s.str();
+			mp[m->m().id()] = s.str();
             m = m->next();
         }
 
@@ -327,16 +328,16 @@ namespace mongo {
             HostAndPort h(getHostName(), cmdLine.port);
             v.push_back( 
                 BSON( "name" << h.toString() << "self" << true << 
-                "errmsg" << _self->_lastHeartbeatErrMsg.get() ) );
+                "errmsg" << _self->lhb().get() ) );
         }
 
         while( m ) {
             BSONObjBuilder bb;
             bb.append("name", m->fullName());
-            bb.append("health", m->health());
-            bb.append("uptime", (unsigned) (m->upSince() ? (time(0)-m->upSince()) : 0));
-            bb.appendDate("lastHeartbeat", m->lastHeartbeat());
-            bb.append("errmsg", m->_lastHeartbeatErrMsg.get());
+            bb.append("health", m->m().health);
+            bb.append("uptime", (unsigned) (m->m().upSince ? (time(0)-m->m().upSince) : 0));
+            bb.appendDate("lastHeartbeat", m->m().lastHeartbeat);
+            bb.append("errmsg", m->lhb().get());
             v.push_back(bb.obj());
             m = m->next();
         }
@@ -347,6 +348,8 @@ namespace mongo {
     }
 
     void ReplSet::startHealthThreads() {
+        /* TODO TODO TODO */
+        /*
         Member* m = _members.head();
         while( m ) {
             FeedbackThread *f = new FeedbackThread();
@@ -354,6 +357,7 @@ namespace mongo {
             f->go();
             m = m->next();
         }
+        */
     }
 
 }

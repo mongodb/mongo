@@ -32,7 +32,7 @@ namespace mongo {
         Member *m = _rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->state() == PRIMARY ) {
+            if( m->m().state == PRIMARY ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }
@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     void ReplSet::Manager::noteARemoteIsPrimary(const Member *m) { 
-        _rs->_self->_lastHeartbeatErrMsg.set("finish code #1");
+        _rs->_self->lhb().set("finish code #1");
         log() << "replSet finish notearemoteisprimary " << m->fullName() << rsLog;
     }
 
@@ -91,11 +91,11 @@ namespace mongo {
 
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !_rs->elect.aMajoritySeemsToBeUp() ) { 
-                _rs->_self->_lastHeartbeatErrMsg.set("can't see a majority, won't elect self");
+                _rs->_self->lhb().set("can't see a majority, won't elect self");
                 return;
             }
 
-            _rs->_self->_lastHeartbeatErrMsg.set("");
+            _rs->_self->lhb().set("");
         }
         _rs->elect.electSelf();
     }

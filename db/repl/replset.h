@@ -22,6 +22,7 @@
 #include "../../util/concurrency/value.h"
 #include "../../util/hostandport.h"
 #include "rstime.h"
+#include "rsmember.h"
 #include "rs_config.h"
 
 namespace mongo {
@@ -37,28 +38,20 @@ namespace mongo {
     */
     class ReplSet {
     public:
-        static enum StartupStatus { PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, EMPTYUNREACHABLE=4, STARTED=5, SOON=6 } startupStatus;
+        static enum StartupStatus { 
+            PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, 
+            EMPTYUNREACHABLE=4, STARTED=5, SOON=6 } startupStatus;
         static string startupStatusMsg;
 
-        enum State {
-            STARTUP,
-            PRIMARY,
-            SECONDARY,
-            RECOVERING,
-            FATAL,
-            STARTUP2,
-            UNKNOWN /* remote node not yet reached */
-        };
-
     private: 
-        State _myState;
+        MemberState _myState;
 
     public:
         void fatal();
         bool isMaster(const char *client);
         void fillIsMaster(BSONObjBuilder&);
         bool ok() const { return _myState != FATAL; }
-        State state() const { return _myState; }        
+        MemberState state() const { return _myState; }        
         string name() const { return _name; } /* @return replica set's logical name */
 
         /* cfgString format is 
@@ -101,29 +94,16 @@ namespace mongo {
 
     public:
         struct Member : public List1<Member>::Base {
-            Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c);
-            const HostAndPort _h;
-            const unsigned _id; // ordinal
-            string fullName() const { return _h.toString(); }
-            double health() const { return _health; }
-            time_t upSince() const { return _upSince; }
-            time_t lastHeartbeat() const { return _lastHeartbeat; }
+            Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
+            string fullName() const { return m().h().toString(); }
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
-            bool up() const { return health() > 0; }
             void summarizeAsHtml(stringstream& s) const;
-            ReplSet::State state() const { return _state; }
-            DiagStr _lastHeartbeatErrMsg;
+            const RSMember& m() const { return _m; }
+            DiagStr& lhb() { return _m.lastHeartbeatMsg; }
         private:
-            friend class FeedbackThread; // feedbackthread is the primary writer to these objects
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
-
-            bool _dead;
-            double _health;
-            time_t _lastHeartbeat;
-            time_t _upSince;
-            ReplSet::State _state;
+            RSMember _m;
         };
-
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
@@ -131,8 +111,8 @@ namespace mongo {
     private:
         const Member *_currentPrimary;
 
-        static string stateAsStr(State state);
-        static string stateAsHtml(State state);
+        static string stateAsStr(MemberState state);
+        static string stateAsHtml(MemberState state);
 
         Member *_self;
         /* all members of the set EXCEPT self. */
@@ -158,15 +138,8 @@ namespace mongo {
     inline void ReplSet::fatal() 
     { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
 
-    inline ReplSet::Member::Member(HostAndPort h, int ord, const ReplSetConfig::MemberCfg *c) : 
-        _h(h), _id(ord), _config(c)
-    { 
-        _dead = false;
-        _lastHeartbeat = 0;
-        _upSince = 0;
-        _health = -1.0;
-        _state = UNKNOWN;
-    }
+    inline ReplSet::Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
+        _m(h, ord), _config(c) { }
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */

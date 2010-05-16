@@ -656,6 +656,9 @@
     <ClInclude Include="..\util\processinfo.h">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="repl\rsmember.h">
+      <Filter>replset</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

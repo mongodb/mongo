@@ -27,9 +27,9 @@ namespace mongo {
 
     list<HostAndPort> ReplSet::memberHostnames() const { 
         list<HostAndPort> L;
-        L.push_back(_self->_h);
+        L.push_back(_self->m().h());
         for( Member *m = _members.head(); m; m = m->next() )
-            L.push_back(m->_h);
+            L.push_back(m->m().h());
         return L;
     }
 
@@ -94,7 +94,7 @@ namespace mongo {
         loadConfig();
 
         for( Member *m = head(); m; m = m->next() )
-            seedSet.erase(m->_h);
+            seedSet.erase(m->m().h());
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
             log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
