@@ -26,7 +26,6 @@
 namespace mongo {
 
 #pragma pack(1)
-
     struct _KeyNode {
         DiskLoc prevChildBucket; // the lchild
         DiskLoc recordLoc; // location of the record associated with the key
@@ -60,7 +59,6 @@ namespace mongo {
             return !isUnused();
         }
     };
-
 #pragma pack()
 
     class BucketBasics;
@@ -75,7 +73,6 @@ namespace mongo {
     };
 
 #pragma pack(1)
-
     /* this class is all about the storage management */
     class BucketBasics {
         friend class BtreeBuilder;
@@ -187,7 +184,9 @@ namespace mongo {
         }
         char data[4];
     };
+#pragma pack()
 
+#pragma pack(1)
     class BtreeBucket : public BucketBasics {
         friend class BtreeCursor;
     public:
@@ -262,13 +261,15 @@ namespace mongo {
         // simply builds and returns a dup key error message string
         static string dupKeyError( const IndexDetails& idx , const BSONObj& key );
     };
+#pragma pack()
 
     class BtreeCursor : public Cursor {
     public:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
 
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const BoundList &_bounds, int _direction );
-
+        ~BtreeCursor(){
+        }
         virtual bool ok() {
             return !bucket.isNull();
         }
@@ -287,7 +288,6 @@ namespace mongo {
              otherwise, marks loc as sent.
              @return true if the loc has not been seen
         */
-        set<DiskLoc> dups;
         virtual bool getsetdup(DiskLoc loc) {
             if( multikey ) { 
                 pair<set<DiskLoc>::iterator, bool> p = dups.insert(loc);
@@ -375,6 +375,7 @@ namespace mongo {
         void initInterval();
 
         friend class BtreeBucket;
+        set<DiskLoc> dups;
         NamespaceDetails *d;
         int idxNo;
         BSONObj startKey;
@@ -392,9 +393,9 @@ namespace mongo {
         BoundList bounds_;
         unsigned boundIndex_;
         const IndexSpec& _spec;
+
     };
 
-#pragma pack()
 
     inline bool IndexDetails::hasKey(const BSONObj& key) { 
         return head.btree()->exists(*this, head, key, Ordering::make(keyPattern()));
