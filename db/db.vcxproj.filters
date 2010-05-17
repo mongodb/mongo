@@ -320,6 +320,9 @@
     <ClCompile Include="..\util\concurrency\vars.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\task.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client.h">
@@ -667,6 +670,9 @@
     </ClInclude>
     <ClInclude Include="..\client\parallel.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\task.h">
+      <Filter>util\concurrency</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

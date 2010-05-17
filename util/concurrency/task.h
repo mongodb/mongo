@@ -1,4 +1,4 @@
-// vars.cpp
+// @file task.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,11 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "value.h"
+#pragma once
 
 namespace mongo { 
 
-    mutex _atomicMutex;
 
 }

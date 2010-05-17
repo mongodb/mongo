@@ -237,6 +237,7 @@
     <ClInclude Include="..\db\security.h" />
     <ClInclude Include="..\util\builder.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
+    <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
     <ClInclude Include="..\util\file.h" />
     <ClInclude Include="..\util\goodies.h" />
@@ -532,6 +533,7 @@
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\matcher.cpp" />
+    <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="..\db\namespace.cpp" />

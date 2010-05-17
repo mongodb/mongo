@@ -232,6 +232,9 @@
     <ClInclude Include="..\util\concurrency\value.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\task.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc">
@@ -611,6 +614,9 @@
       <Filter>replsets</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\vars.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\task.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
