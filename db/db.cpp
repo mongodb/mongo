@@ -43,6 +43,7 @@
 #include "module.h"
 #include "cmdline.h"
 #include "stats/snapshots.h"
+#include "../util/concurrency/task.h"
 
 namespace mongo {
 

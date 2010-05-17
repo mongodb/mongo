@@ -18,17 +18,79 @@
 
 #include "pch.h"
 #include "task.h"
+//#include "../goodies.h"
 
 namespace mongo { 
 
     namespace task { 
-    
-        Task::~Task() { }
 
-        void Task::run() { }
+/*
+#define MS_VC_EXCEPTION 0x406D1388
 
-        void fork(const shared_ptr<Task>& t) { 
-            cout << "not yet implemented" << endl;
+#pragma pack(push,8)
+typedef struct tagTHREADNAME_INFO
+{
+   DWORD dwType; // Must be 0x1000.
+   LPCSTR szName; // Pointer to name (in user addr space).
+   DWORD dwThreadID; // Thread ID (-1=caller thread).
+   DWORD dwFlags; // Reserved for future use, must be zero.
+} THREADNAME_INFO;
+#pragma pack(pop)
+
+void SetThreadName( DWORD dwThreadID, char* threadName)
+{
+   Sleep(10);
+   THREADNAME_INFO info;
+   info.dwType = 0x1000;
+   info.szName = threadName;
+   info.dwThreadID = dwThreadID;
+   info.dwFlags = 0;
+
+   __try
+   {
+      RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+   }
+   __except(EXCEPTION_EXECUTE_HANDLER)
+   {
+   }
+}
+*/
+
+        Task::Task() { 
+            n = 0;
+            repeat = 0;
+        }
+
+        void Task::halt() { repeat = 0; }
+
+        void Task::run() { 
+            //SetThreadName(-1, "A Task");
+            assert( n == 0 );
+            while( 1 ) {
+                n++;
+                try { 
+                    doWork();
+                } 
+                catch(...) { }
+                if( repeat == 0 )
+                    break;
+                sleepmillis(repeat);
+            }
+            me.reset();
+        }
+
+        void Task::begin(shared_ptr<Task> t) {
+            me = t;
+            go();
+        }
+
+        void fork(shared_ptr<Task> t) { 
+            t->begin(t);
+        }
+
+        void repeat(shared_ptr<Task> t, unsigned millis) { 
+            t->repeat = millis;
+            t->begin(t);
         }
     
     }
