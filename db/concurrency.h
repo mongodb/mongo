@@ -204,8 +204,8 @@ namespace mongo {
 
     extern MongoMutex &dbMutex;
 
-    void dbunlocking_write();
-    void dbunlocking_read();
+    inline void dbunlocking_write() { }
+    inline void dbunlocking_read() { }
 
     struct writelock {
         writelock(const string& ns) {

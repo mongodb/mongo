@@ -244,17 +244,17 @@ public:
    call 
 */
 
-inline void dbunlocking_read() { 
+//inline void dbunlocking_read() { 
     /*
     Client *c = currentClient.get();
     if ( c )
         c->top.clientStop();
     */
-}
+//}
 
-inline void dbunlocking_write() { 
-    theRecCache.ejectOld();
-	dbunlocking_read();
-}
+//inline void dbunlocking_write() { 
+    //theRecCache.ejectOld();
+//	dbunlocking_read();
+//}
 
 } /*namespace*/
