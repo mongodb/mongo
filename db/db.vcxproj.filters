@@ -726,7 +726,6 @@
     <None Include="repl\test.html">
       <Filter>replset\test stuff</Filter>
     </None>
-    <None Include="icon1.ico" />
     <None Include="mongo.ico" />
   </ItemGroup>
   <ItemGroup>

@@ -552,7 +552,6 @@
   <ItemGroup>
     <None Include="..\SConstruct" />
     <None Include="..\util\mongoutils\README" />
-    <None Include="icon1.ico" />
     <None Include="mongo.ico" />
     <None Include="repl\notes.txt" />
     <None Include="repl\test.html" />
