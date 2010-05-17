@@ -225,88 +225,88 @@
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\client\connpool.cpp">
-      <Filter>dbclient</Filter>
+      <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\client\dbclient.cpp">
-      <Filter>dbclient</Filter>
+      <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\client\dbclientcursor.cpp">
-      <Filter>dbclient</Filter>
+      <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="repl\manager.cpp">
       <Filter>replset</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_chartables.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_compile.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_config.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_dfa_exec.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_exec.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_fullinfo.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_get.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_globals.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_info.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_maketables.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_newline.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_ord2utf8.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_refcount.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_scanner.cc">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_stringpiece.cc">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_study.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_tables.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_try_flipped.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_ucp_searchfuncs.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_valid_utf8.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_version.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcre_xclass.c">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\pcre-7.4\pcrecpp.cc">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\util\miniwebserver.cpp">
       <Filter>util</Filter>
@@ -621,10 +621,10 @@
       <Filter>replset</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
-      <Filter>dbclient</Filter>
+      <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\client\dbclient.h">
-      <Filter>dbclient</Filter>
+      <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\util\ramlog.h">
       <Filter>util</Filter>
@@ -633,13 +633,13 @@
       <Filter>replset</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\html.h">
-      <Filter>mongoutils</Filter>
+      <Filter>util\mongoutils</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\str.h">
-      <Filter>mongoutils</Filter>
+      <Filter>util\mongoutils</Filter>
     </ClInclude>
     <ClInclude Include="..\pcre-7.4\pcre.h">
-      <Filter>pcre</Filter>
+      <Filter>util\pcre</Filter>
     </ClInclude>
     <ClInclude Include="..\util\lruishmap.h">
       <Filter>util</Filter>
@@ -658,6 +658,15 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\value.h">
       <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientcursor.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\gridfs.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\parallel.h">
+      <Filter>client</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -682,20 +691,20 @@
     <Filter Include="helpers">
       <UniqueIdentifier>{df246f95-eee7-44f5-88dc-b89b385c525e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="dbclient">
-      <UniqueIdentifier>{932baf83-ba80-49e5-8280-f1b9c8dbbde6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="mongoutils">
-      <UniqueIdentifier>{cc5d96e6-1805-422b-804d-adcb367dc721}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="pcre">
-      <UniqueIdentifier>{fa527226-9b03-4f17-8e4c-80d31fb1e449}</UniqueIdentifier>
-    </Filter>
     <Filter Include="replset\test stuff">
       <UniqueIdentifier>{4a1ea357-1077-4ad1-85b4-db48a6e1eb46}</UniqueIdentifier>
     </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{8e6fe846-2833-45bb-b13b-c0f0d4d38593}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\mongoutils">
+      <UniqueIdentifier>{cc5d96e6-1805-422b-804d-adcb367dc721}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\pcre">
+      <UniqueIdentifier>{fa527226-9b03-4f17-8e4c-80d31fb1e449}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="client">
+      <UniqueIdentifier>{932baf83-ba80-49e5-8280-f1b9c8dbbde6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -708,7 +717,7 @@
       <Filter>replset</Filter>
     </None>
     <None Include="..\util\mongoutils\README">
-      <Filter>mongoutils</Filter>
+      <Filter>util\mongoutils</Filter>
     </None>
     <None Include="..\SConstruct" />
     <None Include="repl\testing.js">
@@ -717,6 +726,8 @@
     <None Include="repl\test.html">
       <Filter>replset\test stuff</Filter>
     </None>
+    <None Include="icon1.ico" />
+    <None Include="mongo.ico" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
