@@ -842,8 +842,12 @@ namespace mongo {
                     
                     bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
                     
-                    if ( indexHack )
-                        c->noteLocation();
+                    if ( indexHack ){
+                        if ( cc.get() )
+                            cc->updateLocation();
+                        else
+                            c->noteLocation();
+                    }
                     
                     if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ){
                         mss->applyModsInPlace();// const_cast<BSONObj&>(onDisk) );
