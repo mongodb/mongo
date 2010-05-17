@@ -42,6 +42,8 @@ namespace mongo {
         int x = 1;
         if ( setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &x, sizeof(x)) )
             out() << "ERROR: disableNagle failed" << endl;
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            out() << "ERROR: SO_KEEPALIVE failed" << endl;
     }
     inline void prebindOptions( int sock ) {
     }
@@ -84,7 +86,12 @@ namespace mongo {
 #endif
 
         if ( setsockopt(sock, level, TCP_NODELAY, (char *) &x, sizeof(x)) )
-            log() << "ERROR: disableNagle failed" << endl;
+            log() << "ERROR: disableNagle failed: " << errnoWithDescription() << endl;
+
+#ifdef SO_KEEPALIVE
+        if ( setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &x, sizeof(x)) )
+            log() << "ERROR: SO_KEEPALIVE failed: " << errnoWithDescription() << endl;
+#endif
 
     }
     inline void prebindOptions( int sock ) {
