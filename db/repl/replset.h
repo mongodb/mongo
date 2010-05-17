@@ -139,7 +139,7 @@ namespace mongo {
     { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
 
     inline ReplSet::Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
-        _m(h, ord), _config(c) { }
+        _config(c), _m(h, ord) { }
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */

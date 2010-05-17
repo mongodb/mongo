@@ -46,7 +46,7 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : _self(0), elect(this), _mgr(this) {
+    ReplSet::ReplSet(string cfgString) : elect(this), _self(0), _mgr(this) {
         _myState = STARTUP;
         _currentPrimary = 0;
 
