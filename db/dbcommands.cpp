@@ -862,8 +862,6 @@ namespace mongo {
         }
         virtual LockType locktype() const { return READ; } 
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            static DBDirectClient db;
-
             string ns = dbname;
             ns += ".";
             {
@@ -874,22 +872,27 @@ namespace mongo {
             }
             ns += ".chunks"; // make this an option in jsobj
 
-            BSONObjBuilder query;
-            query.appendAs( jsobj["filemd5"] , "files_id" );
-            Query q( query.obj() );
-            q.sort( BSON( "files_id" << 1 << "n" << 1 ) );
-
             md5digest d;
             md5_state_t st;
             md5_init(&st);
 
-            dbtemprelease temp;
+            BSONObj query = BSON( "files_id" << jsobj["filemd5"] );
+            BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , q );
+            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str(), query, sort).getBestGuess()->newCursor();
+            scoped_ptr<CoveredIndexMatcher> matcher (new CoveredIndexMatcher(query, cursor->indexKeyPattern()));
+
             int n = 0;
-            while ( cursor->more() ){
-                BSONObj c = cursor->nextSafe();
-                BSONElement ne = c["n"];
+            while ( cursor->ok() ){
+                if ( ! matcher->matchesCurrent( cursor.get() ) ){
+                    cursor->advance();
+                    continue;
+                }
+
+                BSONObj obj = cursor->current();
+                cursor->advance();
+
+                BSONElement ne = obj["n"];
                 assert(ne.isNumber());
                 int myn = ne.numberInt();
                 if ( n != myn ){
@@ -898,11 +901,13 @@ namespace mongo {
                 }
 
                 int len;
-                const char * data = c["data"].binData( len );
+                const char * data = obj["data"].binData( len );
                 md5_append( &st , (const md5_byte_t*)(data + 4) , len - 4 );
 
                 n++;
+
             }
+
             md5_finish(&st, d);
 
             result.append( "md5" , digestToString( d ) );
