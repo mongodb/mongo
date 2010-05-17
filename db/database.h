@@ -114,7 +114,7 @@ namespace mongo {
             namespaceIndex.init();
             if ( n < 0 || n >= DiskLoc::MaxFiles ) {
                 out() << "getFile(): n=" << n << endl;
-#if !defined(_RECSTORE)
+#if 0
                 if( n >= RecCache::Base && n <= RecCache::Base+1000 )
                     massert( 10294 , "getFile(): bad file number - using recstore db w/nonrecstore db build?", false);
 #endif

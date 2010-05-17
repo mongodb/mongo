@@ -18,17 +18,11 @@
 
 #include "pch.h"
 #include "pdfile.h"
-#include "reccache.h"
+//#include "reccache.h"
 #include "rec.h"
 #include "db.h"
 
 namespace mongo {
-
-void writerThread();
-
-#if defined(_RECSTORE)
-    static int inited;
-#endif
 
 // pick your store for indexes by setting this typedef
 // this doesn't need to be an ifdef, we can make it dynamic
@@ -37,6 +31,14 @@ RecStoreInterface *btreeStore = new CachedBasicRecStore();
 #else
 MongoMemMapped_RecStore *btreeStore = new MongoMemMapped_RecStore();
 #endif
+
+#if 0
+
+#if defined(_RECSTORE)
+    static int inited;
+#endif
+
+void writerThread();
 
 void BasicRecStore::init(const char *fn, unsigned recsize)
 { 
@@ -73,5 +75,7 @@ void BasicRecStore::init(const char *fn, unsigned recsize)
     }
 #endif
 }
+
+#endif
 
 }

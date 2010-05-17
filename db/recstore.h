@@ -18,6 +18,8 @@
 
 #pragma once
 
+#error deprecated
+
 #include "../util/file.h"
 
 namespace mongo { 

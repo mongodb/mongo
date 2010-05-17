@@ -74,7 +74,7 @@ namespace mongo {
     void startReplSets();
     void startReplication();
     void pairWith(const char *remoteEnd, const char *arb);
-    void setRecCacheSize(unsigned MB);
+    //void setRecCacheSize(unsigned MB);
 
     void exitCleanly( ExitCode code );
 
@@ -886,7 +886,8 @@ int main(int argc, char* argv[], char *envp[] )
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
             uassert( 10037 , "bad --cacheSize arg", x > 0);
-            setRecCacheSize(x);
+            log() << "--cacheSize option not currently supported" << endl;
+            //setRecCacheSize(x);
         }
 		if (params.count("port") == 0 ) { 
 			if( params.count("configsvr") ) {
@@ -1131,5 +1132,5 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 
 } // namespace mongo
 
-#include "recstore.h"
-#include "reccache.h"
+//#include "recstore.h"
+//#include "reccache.h"

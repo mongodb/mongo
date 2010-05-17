@@ -154,9 +154,6 @@
     <ClCompile Include="..\util\ramstore.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="reccache.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="repl.cpp">
       <Filter>src</Filter>
     </ClCompile>

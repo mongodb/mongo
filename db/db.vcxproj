@@ -443,7 +443,6 @@
     <ClCompile Include="repl\manager.cpp" />
     <ClCompile Include="repl\rs_initiate.cpp" />
     <ClCompile Include="repl_block.cpp" />
-    <ClCompile Include="reccache.cpp" />
     <ClCompile Include="storage.cpp" />
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient.cpp" />

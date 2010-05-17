@@ -18,13 +18,15 @@
 
 #include "pch.h"
 #include "pdfile.h"
-#include "reccache.h"
+//#include "reccache.h"
 #include "rec.h"
 #include "db.h"
 
+#error deprecated - do not include in project
+
 namespace mongo {
 
-RecCache theRecCache(BucketSize);
+//RecCache theRecCache(BucketSize);
 
 // 100k * 8KB = 800MB
 unsigned RecCache::MAXNODES = 50000;
