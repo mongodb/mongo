@@ -31,7 +31,7 @@ namespace mongo {
        WARNING concurrency: the vfunctions below are called back from within a 
        ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
     */
-    class Cursor {
+    class Cursor : boost::noncopyable {
     public:
         virtual ~Cursor() {}
         virtual bool ok() = 0;
