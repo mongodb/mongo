@@ -35,9 +35,7 @@ namespace mongo {
     public:
         virtual ~Cursor() {}
         virtual bool ok() = 0;
-        bool eof() {
-            return !ok();
-        }
+        bool eof() { return !ok(); }
         virtual Record* _current() = 0;
         virtual BSONObj current() = 0;
         virtual DiskLoc currLoc() = 0;
@@ -79,9 +77,7 @@ namespace mongo {
         
         virtual bool supportGetMore() = 0;
 
-        virtual string toString() {
-            return "abstract?";
-        }
+        virtual string toString() { return "abstract?"; }
 
         /* used for multikey index traversal to avoid sending back dups. see Matcher::matches().
            if a multikey index traversal:
