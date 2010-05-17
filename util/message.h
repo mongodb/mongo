@@ -89,8 +89,13 @@ namespace mongo {
         virtual HostAndPort remote() const;
 
         // send len or throw SocketException
-        void send( const char * data , int len, const char *context );
-//        void send( struct msghdr &meta, const char *context );
+        void send( const char * data , int len, const char *context ) {
+            vector< pair< char *, int > > temp;
+            temp.push_back( make_pair( const_cast< char * >( data ), len ) );
+            send( temp, context );
+        }
+        void send( const vector< pair< char *, int > > &data, const char *context );
+
         // recv len or throw SocketException
         void recv( char * data , int len );
         
