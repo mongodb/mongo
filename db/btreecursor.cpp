@@ -41,6 +41,7 @@ namespace mongo {
     {
         audit();
         init();
+        DEV assert( dups.size() == 0 );
     }
 
     BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const vector< pair< BSONObj, BSONObj > > &_bounds, int _direction )
@@ -58,6 +59,7 @@ namespace mongo {
         assert( !bounds_.empty() );
         audit();
         initInterval();
+        DEV assert( dups.size() == 0 );
     }
 
     void BtreeCursor::audit() {
