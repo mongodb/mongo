@@ -27,7 +27,7 @@
 #include "lasterror.h"
 #include "security.h"
 #include "json.h"
-#include "reccache.h"
+//#include "reccache.h"
 #include "replpair.h"
 #include "../s/d_logic.h"
 #include "../util/file_allocator.h"
@@ -606,7 +606,7 @@ namespace mongo {
         return new DBDirectClient();
     }
 
-    void recCacheCloseAll();
+    //void recCacheCloseAll();
 
     mongo::mutex exitMutex;
     int numExitCalls = 0;
@@ -692,7 +692,7 @@ namespace mongo {
         rawOut( ss3.str() );
 
         // should we be locked here?  we aren't. might be ok as-is.
-        recCacheCloseAll();
+        //recCacheCloseAll();
         
 #if !defined(_WIN32) && !defined(__sunos__)
         if ( lockFile ){

@@ -32,6 +32,8 @@
 
 #pragma once
 
+#error deprecated 
+
 #include "reci.h"
 #include "recstore.h"
 

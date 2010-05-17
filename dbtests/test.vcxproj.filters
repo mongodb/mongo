@@ -325,9 +325,6 @@
     <ClCompile Include="..\pcre-7.4\pcreposix.c">
       <Filter>misc and third party\pcre</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\reccache.cpp">
-      <Filter>storage related</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\storage.cpp">
       <Filter>storage related</Filter>
     </ClCompile>

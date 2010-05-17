@@ -499,7 +499,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\db\reccache.cpp" />
     <ClCompile Include="..\db\storage.cpp" />
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient.cpp" />
