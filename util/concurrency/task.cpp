@@ -21,4 +21,16 @@
 
 namespace mongo { 
 
+    namespace task { 
+    
+        Task::~Task() { }
+
+        void Task::run() { }
+
+        void fork(const shared_ptr<Task>& t) { 
+            cout << "not yet implemented" << endl;
+        }
+    
+    }
+
 }

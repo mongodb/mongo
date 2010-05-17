@@ -18,7 +18,36 @@
 
 #pragma once
 
+#include "../background.h"
+
 namespace mongo { 
 
+    namespace task { 
+
+        class Task : protected BackgroundJob { 
+            virtual void run();
+        protected:
+            virtual void go() = 0;
+        public:
+            virtual ~Task();
+        };
+
+        void fork(const shared_ptr<Task>& t);
+
+        /*** Example ***
+        inline void sample() { 
+            class Sample : public Task { 
+            public:
+                int result;
+                virtual void go() { result = 1234; }
+                Sample() : result(0) { }
+            };
+            shared_ptr<Sample> q( new Sample() );
+            fork(q);
+            cout << q->result << endl; // could print 1234 or 0.
+        }
+        */
+
+    }
 
 }
