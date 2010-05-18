@@ -51,7 +51,7 @@ void setThreadName(const char *name)
    }
 }
 #else
-    void setThreadName(string s) { }
+    void setThreadName(const char *) { }
 #endif
 
     vector<UnitTest*> *UnitTest::tests = 0;
