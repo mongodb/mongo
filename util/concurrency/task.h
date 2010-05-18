@@ -18,7 +18,50 @@
 
 #pragma once
 
+#include "../background.h"
+
 namespace mongo { 
 
+    namespace task { 
+
+        class Task : private BackgroundJob {
+        protected:
+            virtual void doWork() = 0;
+        public:
+            Task();
+
+            /** for a repeating task, stop after current invocation ends. */
+            void halt();
+
+        private:
+            shared_ptr<Task> me;
+            unsigned n, repeat;
+            friend void fork(shared_ptr<Task> t);
+            friend void repeat(shared_ptr<Task> t, unsigned millis);
+            virtual void run();
+            void begin(shared_ptr<Task>);
+        };
+
+        /* run once */
+        void fork(shared_ptr<Task> t);
+
+        /* run doWork() over and over, with a pause between runs of millis */
+        void repeat(shared_ptr<Task> t, unsigned millis);
+
+        /*** Example ***
+        inline void sample() { 
+            class Sample : public Task { 
+            public:
+                int result;
+                virtual void doWork() { result = 1234; }
+                Sample() : result(0) { }
+            };
+            shared_ptr<Sample> q( new Sample() );
+            fork(q);
+            cout << q->result << endl; // could print 1234 or 0.
+        }
+        */
+
+    }
 
 }
