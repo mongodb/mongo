@@ -22,6 +22,7 @@
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/task.h"
+#include "../../util/concurrency/msg.h"
 #include "../../util/mongoutils/html.h"
 #include "../../util/goodies.h"
 #include "../../util/ramlog.h"
@@ -29,6 +30,14 @@
 #include "connections.h"
 
 namespace mongo { 
+
+    class JustTesting : public task::Port<int> {
+    protected:
+        void got(const int& msg) { }
+    public:
+        virtual string name() { return "ASD"; }
+        JustTesting() { }
+    } jt;
 
     using namespace bson;
 
