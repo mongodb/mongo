@@ -442,7 +442,11 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
-            help << "{ cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
+            help << "{ cloneCollection: <namespace>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
+                "\nCopies a collection from one server to another. Do not use on a single server as the destination "
+                "is placed at the same db.collection (namespace) as the source.\n"
+                "Warning: the local copy of 'ns' is emptied before the copying begins. Any existing data will be lost there."
+                ;
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
@@ -450,9 +454,16 @@ namespace mongo {
                 errmsg = "missing 'from' parameter";
                 return false;
             }
+            {
+                HostAndPort h(fromhost);
+                if( h.isLocalHost() ) { 
+                    errmsg = "can't copy from self";
+                    return false;
+                }
+            }
             string collection = cmdObj.getStringField("cloneCollection");
             if ( collection.empty() ) {
-                errmsg = "missing cloneCollection spec";
+                errmsg = "bad 'cloneCollection' value";
                 return false;
             }
             BSONObj query = cmdObj.getObjectField("query");
