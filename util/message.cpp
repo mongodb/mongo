@@ -460,13 +460,37 @@ namespace mongo {
                 return;
             }
         }
-        
 
         send( toSend.allData(), "say" );
     }
 
     // sends all data or throws an exception
     void MessagingPort::send( const vector< pair< char *, int > > &data, const char *context ){
+#if defined(_WIN32)
+        // TODO use scatter/gather api
+        for( vector< pair< char *, int > >::const_iterator i = data.begin(); i != data.end(); ++i ) {
+            char * data = i->first;
+            int len = i->second;
+            while( len > 0 ) {
+                int ret = ::send( sock , data , len , portSendFlags );
+                if ( ret == -1 ) {
+                    if ( errno != EAGAIN || _timeout == 0 ) {
+                        log(_logLevel) << "MessagingPort " << context << " send() " << errnoWithDescription() << ' ' << farEnd.toString() << endl;
+                        throw SocketException();                    
+                    } else {
+                        if ( !serverAlive( farEnd.toString() ) ) {
+                            log(_logLevel) << "MessagingPort " << context << " send() remote dead " << farEnd.toString() << endl;
+                            throw SocketException();                        
+                        }
+                    }
+                } else {
+                    assert( ret <= len );
+                    len -= ret;
+                    data += ret;
+                }
+            }
+        }
+#else
         vector< struct iovec > d( data.size() );
         for( unsigned i = 0; i < data.size(); ++i ) {
             d[ i ].iov_base = data[ i ].first;
@@ -504,6 +528,7 @@ namespace mongo {
                 }
             }
         }
+#endif
     }
 
     void MessagingPort::recv( char * buf , int len ){
