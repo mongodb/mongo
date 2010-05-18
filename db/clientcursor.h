@@ -159,8 +159,7 @@ namespace mongo {
             }
 
             bool stillOk(){
-                delete _unlock;
-                _unlock = 0;
+                relock();
                 
                 if ( ClientCursor::find( _id , false ) == 0 ){
                     // i was deleted
@@ -169,6 +168,11 @@ namespace mongo {
                 
                 _cc->_doingDeletes = _doingDeletes;
                 return true;
+            }
+
+            void relock(){
+                delete _unlock;
+                _unlock = 0;
             }
             
             ClientCursor * _cc;
