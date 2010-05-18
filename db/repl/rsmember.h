@@ -30,13 +30,20 @@ namespace mongo {
         double health;
         time_t upSince;
         time_t lastHeartbeat;
-        DiagStr lastHeartbeatMsg;
+        string lastHeartbeatMsg;
+        bool changed(const RSMember& old) const;
     };
 
     inline RSMember::RSMember(const HostAndPort& h, unsigned id) :
-      _h(h), _id(id) { 
+    _h(h), _id(id) { 
           state = UNKNOWN;
           health = -1.0;
-          lastHeartbeat = upSince = 0; }
+          lastHeartbeat = upSince = 0; 
+    }
+
+    inline bool RSMember::changed(const RSMember& old) const { 
+        return health != old.health ||
+               state != old.state;
+    }
 
 }

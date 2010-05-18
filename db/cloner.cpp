@@ -442,12 +442,12 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
-            help << " example: { cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
+            help << "{ cloneCollection: <collection ns>, from: <hostname>, query: <query> }";
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
-                errmsg = "missing from spec";
+                errmsg = "missing 'from' parameter";
                 return false;
             }
             string collection = cmdObj.getStringField("cloneCollection");

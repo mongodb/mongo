@@ -60,6 +60,13 @@ namespace mongo {
         operator T() const { 
             scoped_lock lk(_atomicMutex);
             return val; }
+
+        class tran : private scoped_lock {
+            Atomic<T>& _a;
+        public:
+            tran(Atomic<T>& a) : scoped_lock(_atomicMutex) { }
+            T& ref() { return _a; }
+        };
     };
 
 }

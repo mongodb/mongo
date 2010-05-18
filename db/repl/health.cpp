@@ -21,6 +21,7 @@
 #include "../../client/dbclient.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
+#include "../../util/concurrency/task.h"
 #include "../../util/mongoutils/html.h"
 #include "../../util/goodies.h"
 #include "../../util/ramlog.h"
@@ -96,41 +97,33 @@ namespace mongo {
     }
 
     /* poll every other set member to check its status */
-    /*
-    class FeedbackThread : public BackgroundJob {
+    class ReplSetHealthPoll : public task::Task {
     public:
-        ReplSet::Member *m; 
+        Atomic<RSMember> m;
 
-    private:
-        void down() {
-            m->_health = 0.0;
-            if( m->_upSince ) {
-                m->_upSince = 0;
-                log() << "replSet " << m->fullName() << " is now down" << rsLog;
-            }
-        }
-
-    public:
-        void run() { 
-            mongo::lastError.reset( new LastError() );
-            while( 1 ) {
+        string name() { return "ReplSetHealthPoll"; }
+        void doWork() { 
+            mongo::lastError.initThread();
+            {
+                RSMember mem = m;
+                RSMember old = mem;
                 try { 
                     BSONObj info;
                     int theirConfigVersion = -10000;
-                    bool ok = requestHeartbeat(theReplSet->name(), m->fullName(), info, theReplSet->config().version, theirConfigVersion);
-                    m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
+                    bool ok = requestHeartbeat(theReplSet->name(), mem.h().toString(), info, theReplSet->config().version, theirConfigVersion);
+                    mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
                     {
                         be state = info["state"];
                         if( state.ok() )
-                            m->_state = (ReplSet::State) state.Int();
+                            mem.state = (MemberState) state.Int();
                     }
                     if( ok ) {
-                        if( m->_upSince == 0 ) {
-                            log() << "replSet " << m->fullName() << " is now up" << rsLog;
-                            m->_upSince = m->_lastHeartbeat;
+                        if( mem.upSince == 0 ) {
+                            log() << "replSet " << mem.h().toString() << " is now up" << rsLog;
+                            mem.upSince = mem.lastHeartbeat;
                         }
-                        m->_health = 1.0;
-                        m->_lastHeartbeatErrMsg.set("");
+                        mem.health = 1.0;
+                        mem.lastHeartbeatMsg = "";
 
                         be cfg = info["config"];
                         if( cfg.ok() ) {
@@ -138,19 +131,30 @@ namespace mongo {
                         }
                     }
                     else { 
-                        down();
-                        m->_lastHeartbeatErrMsg.set(info.getStringField("errmsg"));
+                        down(mem, info.getStringField("errmsg"));
                     }
                 }
                 catch(...) { 
-                    down();
-                    m->_lastHeartbeatErrMsg.set("connect/transport error");
+                    down(mem, "connect/transport error");             
                 }
-                theReplSet->_mgr.checkNewState();
+                m = mem;
+                if( mem.changed(old) ) {
+                    log() << "TODO FINISH code checknewstate" << rsLog;
+                    // theReplSet->_mgr.checkNewState();
+                }
                 sleepsecs(2);
             }
         }
-    };*/
+    private:
+        void down(RSMember& mem, string msg) {
+            mem.health = 0.0;
+            if( mem.upSince ) {
+                mem.upSince = 0;
+                log() << "replSet " << mem.h().toString() << " is now down" << rsLog;
+            }
+            mem.lastHeartbeatMsg = msg;
+        }
+    };
     
     string ago(time_t t) { 
         if( t == 0 ) return "";
@@ -192,7 +196,7 @@ namespace mongo {
         }
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(m().state));
-        s << td( red(m().lastHeartbeatMsg.get(),!ok) );
+        s << td( red(m().lastHeartbeatMsg,!ok) );
         s << _tr();
     }
 
@@ -243,7 +247,7 @@ namespace mongo {
                 td("(self)") << 
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
-            s << td( _self->lhb().get() );
+            s << td( _self->lhb() );
             s << _tr();
 			mp[_self->m().id()] = s.str();
         }
@@ -328,7 +332,7 @@ namespace mongo {
             HostAndPort h(getHostName(), cmdLine.port);
             v.push_back( 
                 BSON( "name" << h.toString() << "self" << true << 
-                "errmsg" << _self->lhb().get() ) );
+                      "errmsg" << _self->lhb() ) );
         }
 
         while( m ) {
@@ -337,7 +341,7 @@ namespace mongo {
             bb.append("health", m->m().health);
             bb.append("uptime", (unsigned) (m->m().upSince ? (time(0)-m->m().upSince) : 0));
             bb.appendDate("lastHeartbeat", m->m().lastHeartbeat);
-            bb.append("errmsg", m->lhb().get());
+            bb.append("errmsg", m->lhb());
             v.push_back(bb.obj());
             m = m->next();
         }

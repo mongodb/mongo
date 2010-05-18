@@ -119,6 +119,13 @@ namespace mongo {
         
         remove( id );
     }
+
+    /** ok to call more than once. */
+    void LastErrorHolder::initThread() { 
+        if( _tl.get() ) return;
+        assert( _id.get() == 0 );
+        _tl.reset( new LastError() );
+    }
     
     void LastErrorHolder::reset( LastError * le ){
         int id = _id.get();
