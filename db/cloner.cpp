@@ -456,7 +456,7 @@ namespace mongo {
             }
             {
                 HostAndPort h(fromhost);
-                if( h.isLocalHost() ) { 
+                if( h.isSelf() ) { 
                     errmsg = "can't copy from self";
                     return false;
                 }
