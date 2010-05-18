@@ -31,6 +31,7 @@
 
 namespace mongo { 
 
+    /*
     class JustTesting : public task::Port<int> {
     protected:
         void got(const int& msg) { }
@@ -38,6 +39,7 @@ namespace mongo {
         virtual string name() { return "ASD"; }
         JustTesting() { }
     } jt;
+    */
 
     using namespace bson;
 
