@@ -26,6 +26,7 @@ namespace mongo {
     
     class Balancer : public BackgroundJob {
     public:
+        string name() { return "Balancer"; }
         Balancer();
         
         void run();

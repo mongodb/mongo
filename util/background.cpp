@@ -32,6 +32,12 @@ namespace mongo {
         assert( us->state == NotStarted );
         us->state = Running;
         grab = 0;
+
+        {
+            string nm = us->name();
+            setThreadName(nm.c_str());
+        }
+
         try {
             us->run();
         }

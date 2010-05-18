@@ -292,6 +292,7 @@ public:
     class ClientCursorMonitor : public BackgroundJob {
     public:
         void run();
+        string name() { return "ClientCursorMonitor"; }
     };
 
     extern ClientCursorMonitor clientCursorMonitor;

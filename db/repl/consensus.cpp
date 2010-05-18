@@ -43,6 +43,7 @@ namespace mongo {
     static BSONObj electCmd;
     
     class E : public BackgroundJob { 
+        string name() { return "Consensus::E"; }
         void run() { 
             ok = 0;
             log() << "not done" << rsLog;

@@ -407,6 +407,7 @@ namespace mongo {
      */
     class DataFileSync : public BackgroundJob {
     public:
+        string name() { return "DataFileSync"; }
         void run(){
             log(1) << "will flush memory every: " << _sleepsecs << " seconds" << endl;
             int time_flushing = 0;
