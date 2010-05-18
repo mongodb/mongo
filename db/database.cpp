@@ -61,4 +61,9 @@ namespace mongo {
         massert( 12506 , errmsg , setProfilingLevel( cmdLine.defaultProfile , errmsg ) );
     }
 
+    bool Database::validDBName( const string& ns ){
+        size_t good = strcspn( ns.c_str() , "/\\." );
+        return good == ns.size();
+    }
+
 } // namespace mongo

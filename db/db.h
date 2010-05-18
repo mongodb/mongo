@@ -139,6 +139,12 @@ namespace mongo {
     private:
         
         string _todb( const string& ns ) const {
+            string d = __todb( ns );
+            uassert( 13280 , (string)"invalid db name: " + ns , Database::validDBName( d ) );            
+            return d;
+        }
+
+        string __todb( const string& ns ) const {
             size_t i = ns.find( '.' );
             if ( i == string::npos ){
                 uassert( 13074 , "db name can't be empty" , ns.size() );
