@@ -452,7 +452,7 @@ namespace mongo {
                     if ( e.fieldName() != string( "ok" ) )
                         result.append( e );
                 }
-                return ( ret.getIntField("ok") == 1 );
+                return ret["ok"].trueValue();
             }
 
             int was = cmdObj.getIntField("i_was");
@@ -498,7 +498,7 @@ namespace mongo {
         b.append("your_port", remotePort);
         BSONObj cmd = b.done();
         BSONObj res = conn->findOne("admin.$cmd", cmd);
-        if ( res.getIntField("ok") != 1 ) {
+        if ( ! res["ok"].trueValue() ){
             string message = method + " negotiate failed";
             problem() << message << ": " << res.toString() << '\n';
             setMasterLocked(State_Confused, message.c_str());
