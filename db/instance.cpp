@@ -171,6 +171,7 @@ namespace mongo {
         
         try {
             msgdata = runQuery(m, q, op ).release();
+            assert( msgdata );
         }
         catch ( AssertionException& e ) {
             ok = false;

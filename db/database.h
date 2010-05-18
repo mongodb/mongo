@@ -198,6 +198,8 @@ namespace mongo {
         bool setProfilingLevel( int newLevel , string& errmsg );
 
         void finishInit();
+
+        static bool validDBName( const string& ns );
         
         vector<MongoDataFile*> files;
         string name; // "alleyinsider"
