@@ -20,7 +20,6 @@
 namespace mongo {
 
 #pragma pack(1)
-    
     /**	Object ID type.
         BSON objects typically have an _id field for the object id.  This field should be the first 
         member of the object when present.  class OID is a special type that is a 12 byte id which 

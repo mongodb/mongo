@@ -378,18 +378,6 @@ private:
                 massert( 10334 , s , 0 );
             }
         }
-/*
-#pragma pack(1)
-        static struct EmptyObject {
-            EmptyObject() {
-                len = 5;
-                jstype = EOO;
-            }
-            int len;
-            char jstype;
-        } emptyObject;
-#pragma pack()
-*/
     };
     ostream& operator<<( ostream &s, const BSONObj &o );
     ostream& operator<<( ostream &s, const BSONElement &e );

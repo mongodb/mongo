@@ -26,7 +26,6 @@
 
 namespace mongo {
 
-#pragma pack(1)
 
     class Record;
     class DeletedRecord;
@@ -34,6 +33,7 @@ namespace mongo {
     class BtreeBucket;
     class MongoDataFile;
 
+#pragma pack(1)
     class DiskLoc {
         int fileNo; /* this will be volume, file #, etc. */
         int ofs;
@@ -151,7 +151,6 @@ namespace mongo {
 
         MongoDataFile& pdf() const;
     };
-
 #pragma pack()
 
     const DiskLoc minDiskLoc(0, 1);

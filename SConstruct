@@ -268,6 +268,11 @@ AddOption("--sharedclient",
           action="store",
           help="build a libmongoclient.so/.dll")
 
+AddOption("--smokedbprefix",
+          dest="smokedbprefix",
+          action="store",
+          help="prefix to dbpath et al. for smoke tests")
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
@@ -381,7 +386,7 @@ if GetOption( "extralib" ) is not None:
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", "util/sock.cpp" ,  "util/util.cpp" , "util/message.cpp" , 
-                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/debug_util.cpp",
+                 "util/assert_util.cpp" , "util/httpclient.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/thread_pool.cpp", "util/password.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp" )
@@ -1241,6 +1246,11 @@ elif not onlyServer:
 
 testEnv.Alias( "dummySmokeSideEffect", [], [] )
 
+if GetOption( 'smokedbprefix') is not None:
+    smokeDbPrefix = GetOption( 'smokedbprefix')
+else:
+    smokeDbPrefix = ''
+    
 def addSmoketest( name, deps, actions ):
     if type( actions ) == type( list() ):
         actions = [ testSetup ] + actions
@@ -1261,15 +1271,15 @@ def ensureDir( name ):
             Exit( 1 )
 
 def ensureTestDirs():
-    ensureDir( "/tmp/unittest/" )
-    ensureDir( "/data/" )
-    ensureDir( "/data/db/" )
+    ensureDir( smokeDbPrefix + "/tmp/unittest/" )
+    ensureDir( smokeDbPrefix + "/data/" )
+    ensureDir( smokeDbPrefix + "/data/db/" )
 
 def testSetup( env , target , source ):
     ensureTestDirs()
 
 if len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "test":
-    ensureDir( "/tmp/unittest/" );
+    ensureDir( smokeDbPrefix + "/tmp/unittest/" );
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] , [ test[ 0 ].abspath ] )
 addSmoketest( "smokePerf", [ "perftest" ] , [ perftest[ 0 ].abspath ] )
@@ -1347,7 +1357,7 @@ def startMongodWithArgs(*args):
     mongodForTestsPort = "32000"
     import os
     ensureTestDirs()
-    dirName = "/data/db/sconsTests/"
+    dirName = smokeDbPrefix + "/data/db/sconsTests/"
     ensureDir( dirName )
     from subprocess import Popen
     mongodForTests = Popen([mongod[0].abspath, "--port", mongodForTestsPort,
