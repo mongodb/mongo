@@ -619,6 +619,9 @@
     <ClCompile Include="..\util\concurrency\task.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\repl\heartbeat.cpp">
+      <Filter>replsets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

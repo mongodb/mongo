@@ -22,6 +22,7 @@ namespace mongo {
         HostAndPort _h;
         unsigned _id;
     public:
+        RSMember() : _id(0xffffffff) { }
         RSMember(const HostAndPort& h, unsigned id);
         bool up() const { return health > 0; }
         const HostAndPort& h() const { return _h; }

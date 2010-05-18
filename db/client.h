@@ -232,6 +232,7 @@ namespace mongo {
         setThreadName(desc);
         assert( currentClient.get() == 0 );
         currentClient.reset( new Client(desc) );
+        mongo::lastError.initThread();
     }
 
     inline Client::GodScope::GodScope(){

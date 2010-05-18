@@ -32,7 +32,6 @@ namespace mongo {
 
             /** for a repeating task, stop after current invocation ends. */
             void halt();
-
         private:
             shared_ptr<Task> me;
             unsigned n, repeat;
