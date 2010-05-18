@@ -4,6 +4,8 @@ t.save( {} );
 t.save( {} );
 t.save( {} );
 
+assert.eq( 3 , t.find().count() , "A0" );
+
 db.getMongo().getDB( "admin" ).runCommand( {closeAllDatabases:1} );
 
 function test( want , msg ){
@@ -11,9 +13,9 @@ function test( want , msg ){
     assert.eq( want , res.clientCursors_size , msg + " " + tojson( res ) );
 }
 
-test( 0 , "A0" );
-assert.eq( 3 , t.find().count() , "A1" );
-assert.eq( 3 , t.find( {} ).count() , "A2" );
-assert.eq( 2, t.find( {} ).limit( 2 ).itcount() , "A3" );
+test( 0 , "A1" );
+assert.eq( 3 , t.find().count() , "A2" );
+assert.eq( 3 , t.find( {} ).count() , "A3" );
+assert.eq( 2, t.find( {} ).limit( 2 ).itcount() , "A4" );
 test( 1 , "B1" );
 
