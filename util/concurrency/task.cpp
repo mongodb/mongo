@@ -106,7 +106,7 @@ namespace mongo {
                 {
                     boost::mutex::scoped_lock lk(m);
                     while( d.empty() )
-                        c.wait(m);
+                        c.wait(lk);
                     a = d.front();
                     d.pop_front();
                 }
