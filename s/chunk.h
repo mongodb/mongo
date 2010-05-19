@@ -327,6 +327,8 @@ namespace mongo {
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;
 
+        bool _isValid() const;
+
         /**
          * @return number of Chunk matching the query or -1 for all chunks.
          */
