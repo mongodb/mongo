@@ -29,24 +29,14 @@
 
 namespace mongo {
     extern BSONObj id_obj;
-    Message _runQuery(Message& m, QueryMessage& q ){
+    void runQuery(Message& m, QueryMessage& q, Message &response ){
         CurOp op( &(cc()) );
         op.ensureStarted();
-        Message b;
-        {
-            Message response;
-            runQuery( m , q , op, response );
-            MsgData *a = response.header();
-            b = response;
-            MsgData *bb = b.header();
-            cout << "z";
-        }
-        double x = 99;
-        cout << "z";
-        MsgData *c = b.header();
-        double qqx = 99;
-        cout << "zzzzzzzzzzzzzzzzzzzzzzzz" << qqx << endl;
-        return b;
+        runQuery( m , q , op, response );
+    }
+    void runQuery(Message& m, QueryMessage& q ){
+        Message response;
+        runQuery( m, q, response );
     }
 } // namespace mongo
 
@@ -789,29 +779,15 @@ namespace QueryOptimizerTests {
                 log() << "end QueryMissingNs" << endl;
             }
             void run() {
-                {
-                    Message m;
-                    assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );
-                    stringstream ss;
-
-                    cout << "a" << endl;
-                    {
-                        cout << "b" << endl;
-                        DbMessage d(m);
-                        cout << "c" << endl;
-                        QueryMessage q(d);
-                        cout << "d" << endl;
-                        Message x = _runQuery(m, q);
-                        MsgData *md = x.header();
-                        QueryResult *qr = (QueryResult *) md;
-                        ASSERT_EQUALS( 0, qr->nReturned );
-                        cout << "e" << endl;
-                    }
-                    cout << "tmp" << endl;
-                }
-                cout << "tmp" << endl;
-
+                Message m;
+                assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );
+                DbMessage d(m);
+                QueryMessage q(d);
+                Message ret;
+                runQuery( m, q, ret );
+                ASSERT_EQUALS( 0, ((QueryResult*)ret.header())->nReturned );
             }
+
         };
         
         class UnhelpfulIndex : public Base {
@@ -1082,7 +1058,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m);
                     QueryMessage q(d);
-                    _runQuery( m, q);
+                    runQuery( m, q);
                 }
                 ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
                 
@@ -1091,7 +1067,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m2);
                     QueryMessage q(d);
-                    _runQuery( m2, q);
+                    runQuery( m2, q);
                 }
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
                 ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
