@@ -895,7 +895,7 @@ namespace mongo {
                 BSONObj obj = cursor->current();
                 cursor->advance();
 
-                ClientCursor::YieldLock yield = cc->yieldHold();
+                ClientCursor::YieldLock yield (cc.get());
                 try {
 
                     BSONElement ne = obj["n"];

@@ -479,7 +479,7 @@ namespace mongo {
                             
                             num++;
                             if ( num % 100 == 0 ){
-                                ClientCursor::YieldLock yield = cursor->yieldHold();
+                                ClientCursor::YieldLock yield (cursor.get());
                                 Timer t;
                                 mrtl->checkSize();
                                 inReduce += t.micros();
@@ -554,7 +554,7 @@ namespace mongo {
                                 continue;
                             }
                         
-                            ClientCursor::YieldLock yield = cursor->yieldHold();
+                            ClientCursor::YieldLock yield (cursor.get());
                                 
                             state.finalReduce( all );
                             

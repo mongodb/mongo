@@ -148,11 +148,11 @@ namespace mongo {
          */
         bool yield();
 
-        struct YieldLock {
-            YieldLock( ClientCursor * cc )
+        struct YieldLock : boost::noncopyable {
+            explicit YieldLock( ClientCursor * cc )
                 : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
                 cc->updateLocation();
-                _unlock = new dbtempreleasecond();
+                _unlock.reset(new dbtempreleasecond());
             }
             ~YieldLock(){
                 assert( ! _unlock );
@@ -171,21 +171,17 @@ namespace mongo {
             }
 
             void relock(){
-                delete _unlock;
-                _unlock = 0;
+                _unlock.reset();
             }
             
+        private:
             ClientCursor * _cc;
             CursorId _id;
             bool _doingDeletes;
 
-            dbtempreleasecond * _unlock;
+            scoped_ptr<dbtempreleasecond> _unlock;
 
         };
-
-        YieldLock yieldHold(){
-            return YieldLock( this );
-        }
 
         // --- some pass through helpers for Cursor ---
 
