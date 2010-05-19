@@ -551,7 +551,7 @@ namespace mongo {
                 return;
             }
 
-            sleepmicros(1);
+            sleepmillis(10 * (3-tries));
         }
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 tries. Giving up");
         
