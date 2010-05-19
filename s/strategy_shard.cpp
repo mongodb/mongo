@@ -243,7 +243,7 @@ namespace mongo {
 
             vector<shared_ptr<ChunkRange> > chunks;
             manager->getChunksForQuery( chunks , pattern );
-            cout << "delete : " << pattern << " \t " << chunks.size() << " justOne: " << justOne << endl;
+            log(2) << "delete : " << pattern << " \t " << chunks.size() << " justOne: " << justOne << endl;
             if ( chunks.size() == 1 ){
                 doWrite( dbDelete , r , chunks[0]->getShard() );
                 return;

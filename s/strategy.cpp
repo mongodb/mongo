@@ -186,7 +186,6 @@ namespace mongo {
         if ( sequenceNumber == officialSequenceNumber )
             return;
         
-        printStackTrace();
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
                << " version: " << version << " manager: " << manager
