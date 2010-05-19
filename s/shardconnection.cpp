@@ -38,7 +38,7 @@ namespace mongo {
 
 
         Nullstream& debug( Status * s = 0 , const string& addr = "" ){
-            static int ll = 0;
+            static int ll = 9;
 
             if ( logLevel < ll )
                 return nullstream;
