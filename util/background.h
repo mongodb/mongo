@@ -51,7 +51,7 @@ namespace mongo {
         */
         virtual void run() = 0;
         virtual string name() = 0;
-
+        virtual void ending() { } // hook for post processing if desired after everything else done. not called when deleteSelf=true
     public:
         enum State {
             NotStarted,

@@ -45,7 +45,9 @@ namespace mongo {
             log() << "uncaught exception in BackgroundJob" << endl;
         }
         us->state = Done;
-        if ( us->deleteSelf )
+        bool delSelf = us->deleteSelf;
+        us->ending();
+        if( delSelf ) 
             delete us;
     }
 

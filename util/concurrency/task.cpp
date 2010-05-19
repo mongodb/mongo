@@ -19,12 +19,30 @@
 #include "pch.h"
 #include "task.h"
 #include "../goodies.h"
+#include "../unittest.h"
+//#include "../../boosted/any.hpp"
+#include "boost/thread/condition.hpp"
 
 namespace mongo { 
 
     namespace task { 
 
+        /*void foo() { 
+            boost::mutex m;
+            boost::mutex::scoped_lock lk(m);
+            boost::condition cond;
+            cond.wait(lk);
+            cond.notify_one();
+        }*/
+
         Task::Task() { 
+/*            {
+                cout << "TEME<EMEMEMP" << endl;
+                boosted::any a;
+                a = 3;
+                a = string("AAA");
+            }*/
+
             n = 0;
             repeat = 0;
         }
@@ -43,8 +61,9 @@ namespace mongo {
                     break;
                 sleepmillis(repeat);
             }
-            me.reset();
         }
+
+        void Task::ending() { me.reset(); }
 
         void Task::begin(shared_ptr<Task> t) {
             me = t;
@@ -59,7 +78,37 @@ namespace mongo {
             t->repeat = millis;
             t->begin(t);
         }
-    
-    }
 
+    }
+}
+
+#include "msg.h"
+
+namespace mongo {
+    namespace task {
+
+        /* tests for messaging - see msg.h */
+
+        /*
+        class JustTesting : public Port<int> {
+        protected:
+            void got(const int& msg) { }
+        public:
+            virtual string name() { return "ASD"; }
+            JustTesting() { }
+        };    
+
+        struct JTTest : public UnitTest {
+            void run() { 
+                foo();
+                JustTesting *jt = new JustTesting();
+                shared_ptr<Task> tp = jt->taskPtr();
+                Task *t = tp.get();
+                fork( tp );
+                cout << "POKSDFFDSFDSFDSFDSFDS" << endl;
+
+            } 
+        } juttt;
+        */
+    }
 }

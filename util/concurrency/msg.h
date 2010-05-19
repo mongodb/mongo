@@ -34,25 +34,21 @@ namespace mongo {
             /** send a message to the port */
             void send(const T& msg);
 
-            /** spawns a thread for the port receiver */
-            Port();
+            /** typical usage is: task::fork( foo.task() ); */
+            shared_ptr<Task> taskPtr() { return shared_ptr<Task>(static_cast<Task*>(this)); }
+
+            Port() { }
+            virtual ~Port() { 
+                cout << "TEMP PORT DONE " << endl;
+            }
 
         private:
             void doWork();
-            shared_ptr<Task> _me;
             mongo::mutex a,b;
         };
 
         template<class T>
-        inline Port<T>::Port() : 
-          _me( static_cast<Task*>(this) ) 
-        { 
-            fork(_me);
-        }
-
-        template<class T>
         inline void Port<T>::doWork() { 
-
         }
 
     }
