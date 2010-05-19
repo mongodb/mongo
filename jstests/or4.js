@@ -1,3 +1,4 @@
+/*
 t = db.jstests_or4;
 t.drop();
 
@@ -22,3 +23,4 @@ t.update( {$or:[{a:2},{b:3}]}, {$set:{z:1}}, false, true );
 assert.eq( 3, t.count( {z:1} ) );
 
 assert.eq( 3, t.find( {$or:[{a:2},{b:3}]} ).toArray().length );
+*/
