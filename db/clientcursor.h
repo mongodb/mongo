@@ -149,7 +149,7 @@ namespace mongo {
         bool yield();
 
         struct YieldLock : boost::noncopyable {
-            explicit YieldLock( ClientCursor * cc )
+            explicit YieldLock( ptr<ClientCursor> cc )
                 : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
                 cc->updateLocation();
                 _unlock.reset(new dbtempreleasecond());
