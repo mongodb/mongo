@@ -104,7 +104,7 @@ namespace mongo {
             return;
         info = _comment;
         if ( n != state && !cmdLine.quiet )
-            log() << "pair: setting master=" << n << " was " << state << endl;
+            tlog() << "pair: setting master=" << n << " was " << state << endl;
         state = n;
     }
 
@@ -121,7 +121,7 @@ namespace mongo {
         auto_ptr<DBClientConnection> conn( newClientConnection() );
         string errmsg;
         if ( !conn->connect(arbHost.c_str(), errmsg) ) {
-            log() << "repl:   cantconn arbiter " << errmsg << endl;
+            tlog() << "repl:   cantconn arbiter " << errmsg << endl;
             setMasterLocked(State_CantArb, "can't connect to arb");
             return;
         }

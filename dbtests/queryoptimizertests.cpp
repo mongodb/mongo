@@ -774,6 +774,10 @@ namespace QueryOptimizerTests {
         
         class QueryMissingNs : public Base {
         public:
+            QueryMissingNs() { log() << "querymissingns starts" << endl; }
+            ~QueryMissingNs() {
+                log() << "end QueryMissingNs" << endl;
+            }
             void run() {
                 Message m;
                 assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );

@@ -65,6 +65,7 @@ void setThreadName(const char *name)
     const char * (*getcurns)() = default_getcurns;
 
     int logLevel = 0;
+    int tlogLevel = 0;
     mongo::mutex Logstream::mutex;
     int Logstream::doneSetup = Logstream::magicNumber();
     

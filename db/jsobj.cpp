@@ -30,7 +30,6 @@
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
 #include <boost/static_assert.hpp>
-#include <boost/any.hpp>
 #undef assert
 #define assert MONGO_assert
 

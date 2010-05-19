@@ -472,7 +472,7 @@ namespace mongo {
             flushOpLog( ss );
             out() << ss.str() << endl;
             if ( !cmdLine.quiet )
-                log() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
+                tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
             result.append( "was" , was );
             return true;
         }
@@ -592,7 +592,7 @@ namespace mongo {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             NamespaceDetails *d = nsdetails(nsToDrop.c_str());
             if ( !cmdLine.quiet )
-                log() << "CMD: drop " << nsToDrop << endl;
+                tlog() << "CMD: drop " << nsToDrop << endl;
             if ( d == 0 ) {
                 errmsg = "ns not found";
                 return false;
@@ -689,7 +689,7 @@ namespace mongo {
             string toDeleteNs = dbname + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
             if ( !cmdLine.quiet )
-                log() << "CMD: dropIndexes " << toDeleteNs << endl;
+                tlog() << "CMD: dropIndexes " << toDeleteNs << endl;
             if ( d ) {
                 BSONElement f = jsobj.getField("index");
                 if ( f.type() == String ) {

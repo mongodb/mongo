@@ -77,6 +77,8 @@ namespace mongo {
         Result * Result::cur = 0;
 
         Result * Suite::run(){
+            tlogLevel = -1;
+
             log(1) << "\t about to setupTests" << endl;
             setupTests();
             log(1) << "\t done setupTests" << endl;

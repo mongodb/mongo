@@ -870,7 +870,7 @@ namespace mongo {
             ClientCursor *cc = new ClientCursor(queryOptions, cursor, ns);
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
-            DEV out() << "  query has more, cursorid: " << cursorid << endl;
+            DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
             cc->matcher = dqo.matcher();
             cc->pos = n;
             cc->pq = pq_shared;
@@ -878,9 +878,9 @@ namespace mongo {
             cc->originalMessage = m;
             cc->updateLocation();
             if ( !cc->c->ok() && cc->c->tailable() ) {
-                DEV out() << "  query has no more but tailable, cursorid: " << cursorid << endl;
+                DEV tlog() << "  query has no more but tailable, cursorid: " << cursorid << endl;
             } else {
-                DEV out() << "  query has more, cursorid: " << cursorid << endl;
+                DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
             }
         }
 

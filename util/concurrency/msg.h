@@ -18,42 +18,38 @@
 
 #pragma once
 
+#include <deque>
 #include "task.h"
 
 namespace mongo { 
 
     namespace task { 
 
-        template<class T>
+        /** See task::PortUnitTest in task.cpp for an example of usage.
+        */
         class Port : private Task { 
         protected:
-            /** implement a receiver of messages for the port. */
-            virtual void got(const T& msg) = 0;
-            virtual string name() = 0;
+            /** implement a receiver of messages for the port. 
+                @return false to stop the port / terminate the thread (i.e. you want to return true)
+            */
+            virtual bool got(const any& msg) = 0;
+            virtual string name() = 0; // names the thread
         public:
             /** send a message to the port */
-            void send(const T& msg);
+            void send(const any& msg);
 
-            /** spawns a thread for the port receiver */
-            Port();
+            /** typical usage is: task::fork( foo.task() ); */
+            shared_ptr<Task> taskPtr() { return shared_ptr<Task>(static_cast<Task*>(this)); }
+
+            Port() { }
+            virtual ~Port() { }
 
         private:
             void doWork();
-            shared_ptr<Task> _me;
-            mongo::mutex a,b;
+            deque<any> d;
+            boost::mutex m;
+            boost::condition c;
         };
-
-        template<class T>
-        inline Port<T>::Port() : 
-          _me( static_cast<Task*>(this) ) 
-        { 
-            fork(_me);
-        }
-
-        template<class T>
-        inline void Port<T>::doWork() { 
-
-        }
 
     }
 

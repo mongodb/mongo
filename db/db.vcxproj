@@ -560,6 +560,7 @@
     <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\boost_pieces\any.hpp" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\gridfs.h" />
     <ClInclude Include="..\client\parallel.h" />

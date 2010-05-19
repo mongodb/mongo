@@ -682,7 +682,7 @@ namespace JSTests {
                 b = bb.obj();
             }
             
-            cout << "ELIOT: " << b.jsonString() << endl;
+            //cout << "ELIOT: " << b.jsonString() << endl;
             s->setThis( &b );
             // its ok  if this is handled by js, just can't create a c++ exception
             s->invoke( "x=this.x.length;" , BSONObj() ); 

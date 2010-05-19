@@ -28,18 +28,10 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
+#include "../../util/unittest.h"
+
 
 namespace mongo { 
-
-    /*
-    class JustTesting : public task::Port<int> {
-    protected:
-        void got(const int& msg) { }
-    public:
-        virtual string name() { return "ASD"; }
-        JustTesting() { }
-    } jt;
-    */
 
     using namespace bson;
 
