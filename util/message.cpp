@@ -493,9 +493,13 @@ namespace mongo {
         }
 #else
         vector< struct iovec > d( data.size() );
-        for( unsigned i = 0; i < data.size(); ++i ) {
-            d[ i ].iov_base = data[ i ].first;
-            d[ i ].iov_len = data[ i ].second;
+        int i = 0;
+        for( vector< pair< char *, int > >::const_iterator j = data.begin(); j != data.end(); ++j ) {
+            if ( j->second > 0 ) {
+                d[ i ].iov_base = j->first;
+                d[ i ].iov_len = j->second;
+                ++i;
+            }
         }
         struct msghdr meta;
         memset( &meta, 0, sizeof( meta ) );
