@@ -27,6 +27,15 @@
 
 namespace mongo {
 
+    inline bool allOfType(BSONType type, const BSONObj& o){
+        BSONObjIterator it(o);
+        while(it.more()){
+            if (it.next().type() != type)
+                return false;
+        }
+        return true;
+    }
+
     RWLock chunkSplitLock;
 
     // -------  Shard --------
@@ -499,7 +508,7 @@ namespace mongo {
         _key( pattern ) , _unique( unique ) , 
         _sequenceNumber(  ++NextSequenceNumber ) {
         
-        _load();
+        _reload();
         
         if ( _chunks.size() == 0 ){
             Chunk * c = new Chunk( this );
@@ -529,9 +538,23 @@ namespace mongo {
     
     void ChunkManager::_reload(){
         rwlock lk( _lock , true );
-        _chunks.clear();
-        _chunkMap.clear();
-        _load();
+
+        int tries = 3;
+        while (tries--){
+            _chunks.clear();
+            _chunkMap.clear();
+            _chunkRanges.clear();
+            _load();
+
+            if (_isValid()){
+                _chunkRanges.reloadAll(_chunkMap);
+                return;
+            }
+
+            sleepmillis(10 * (3-tries));
+        }
+        msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 tries. Giving up");
+        
     }
 
     void ChunkManager::_load(){
@@ -553,10 +576,30 @@ namespace mongo {
             c->_id = d["_id"].wrap().getOwned();
         }
         conn.done();
-
-        _chunkRanges.reloadAll(_chunkMap);
     }
 
+    bool ChunkManager::_isValid() const {
+#define ENSURE(x) if(!(x)) return false;
+
+        ENSURE(_chunks.size() == _chunkMap.size());
+
+        if (_chunks.empty())
+            return true;
+
+        // Check endpoints
+        ENSURE(allOfType(MinKey, _chunkMap.begin()->second->getMin()));
+        ENSURE(allOfType(MaxKey, prior(_chunkMap.end())->second->getMax()));
+
+        // Make sure there are no gaps or overlaps
+        for (ChunkMap::const_iterator it=boost::next(_chunkMap.begin()), end=_chunkMap.end(); it != end; ++it){
+            ChunkMap::const_iterator last = prior(it);
+            ENSURE(it->second->getMin() == last->second->getMax());
+        }
+
+        return true;
+
+#undef ENSURE
+    }
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
         return _key.hasShardKey( obj );
@@ -850,15 +893,6 @@ namespace mongo {
     }
 
     
-    inline bool allOfType(BSONType type, const BSONObj& o){
-        BSONObjIterator it(o);
-        while(it.more()){
-            if (it.next().type() != type)
-                return false;
-        }
-        return true;
-    }
-
     void ChunkRangeManager::assertValid() const{
         if (_ranges.empty())
             return;
