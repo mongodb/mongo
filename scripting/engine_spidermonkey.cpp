@@ -1494,7 +1494,7 @@ namespace mongo {
             ss << " " << report->filename << ":" << report->lineno;
         }
 
-        log() << ss.str() << endl;
+        tlog() << ss.str() << endl;
 
         if ( currentScope.get() ){
             currentScope->gotError( ss.str() );

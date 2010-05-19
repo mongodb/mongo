@@ -88,7 +88,7 @@ namespace mongo {
 
     void msgasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
-        log() << "Assertion: " << msgid << ":" << msg << endl;
+        tlog() << "Assertion: " << msgid << ":" << msg << endl;
         lastAssert[2].set(msg, getDbContext().c_str(), "", 0);
         raiseError(msgid,msg && *msg ? msg : "massert failure");
         breakpoint();

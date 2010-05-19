@@ -224,6 +224,7 @@ namespace mongo {
     };
 
     extern int logLevel;
+    extern int tlogLevel;
 
     inline Nullstream& out( int level = 0 ) {
         if ( level > logLevel )
@@ -243,6 +244,14 @@ namespace mongo {
         if ( level > logLevel )
             return nullstream;
         return Logstream::get();
+    }
+
+    /** logging which we may not want during unit tests runs.
+        set tlogLevel to -1 to suppress tlog() output in a test program. */
+    inline Nullstream& tlog( int level = 0 ) {
+        if ( level > tlogLevel || level > logLevel )
+            return nullstream;
+        return Logstream::get().prolog();
     }
 
     inline Nullstream& log( int level ) {

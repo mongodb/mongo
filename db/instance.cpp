@@ -353,7 +353,7 @@ namespace mongo {
                 /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
             } else {
                 ss << ' ' << ms << "ms";
-                mongo::log() << ss.str() << endl;
+                mongo::tlog() << ss.str() << endl;
             }
         }
         

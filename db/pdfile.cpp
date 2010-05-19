@@ -157,7 +157,7 @@ namespace mongo {
             sz = 1000000000;
         int z = ((int)sz) & 0xffffff00;
         assert( z > len );
-        DEV log() << "initialExtentSize(" << len << ") returns " << z << endl;
+        DEV tlog() << "initialExtentSize(" << len << ") returns " << z << endl;
         return z;
     }
 
@@ -395,7 +395,7 @@ namespace mongo {
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
-        DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+        DEV tlog() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
                   << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
         return e;
     }
@@ -1016,7 +1016,7 @@ namespace mongo {
 
         Timer t;
 
-        log() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
+        tlog() << "Buildindex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique();
         bool dropDups = idx.dropDups() || inDBRepair;
@@ -1220,7 +1220,7 @@ namespace mongo {
 
     // throws DBException
     static void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) { 
-        log() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
+        tlog() << "building new index on " << idx.keyPattern() << " for " << ns << ( background ? " background" : "" ) << endl;
         Timer t;
 		unsigned long long n;
 
@@ -1237,7 +1237,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
 		}
-        log() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
+        tlog() << "done for " << n << " records " << t.millis() / 1000.0 << "secs" << endl;
     }
 
     /* add keys to indexes for a new record */
