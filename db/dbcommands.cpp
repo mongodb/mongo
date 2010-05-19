@@ -862,8 +862,6 @@ namespace mongo {
         }
         virtual LockType locktype() const { return READ; } 
         bool run(const string& dbname, BSONObj& jsobj, string& errmsg, BSONObjBuilder& result, bool fromRepl ){
-            static DBDirectClient db;
-
             string ns = dbname;
             ns += ".";
             {
@@ -874,35 +872,63 @@ namespace mongo {
             }
             ns += ".chunks"; // make this an option in jsobj
 
-            BSONObjBuilder query;
-            query.appendAs( jsobj["filemd5"] , "files_id" );
-            Query q( query.obj() );
-            q.sort( BSON( "files_id" << 1 << "n" << 1 ) );
-
             md5digest d;
             md5_state_t st;
             md5_init(&st);
 
-            dbtemprelease temp;
+            BSONObj query = BSON( "files_id" << jsobj["filemd5"] );
+            BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , q );
+            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str(), query, sort).getBestGuess()->newCursor();
+            scoped_ptr<CoveredIndexMatcher> matcher (new CoveredIndexMatcher(query, cursor->indexKeyPattern()));
+            scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
+
             int n = 0;
-            while ( cursor->more() ){
-                BSONObj c = cursor->nextSafe();
-                BSONElement ne = c["n"];
-                assert(ne.isNumber());
-                int myn = ne.numberInt();
-                if ( n != myn ){
-                    log() << "should have chunk: " << n << " have:" << myn << endl;
-                    uassert( 10040 ,  "chunks out of order" , n == myn );
+            while ( cursor->ok() ){
+                if ( ! matcher->matchesCurrent( cursor.get() ) ){
+                    log() << "**** NOT MATCHING ****" << endl;
+                    PRINT(cursor->current());
+                    cursor->advance();
+                    continue;
                 }
 
-                int len;
-                const char * data = c["data"].binData( len );
-                md5_append( &st , (const md5_byte_t*)(data + 4) , len - 4 );
+                BSONObj obj = cursor->current();
+                cursor->advance();
 
-                n++;
+                ClientCursor::YieldLock yield = cc->yieldHold();
+                try {
+
+                    BSONElement ne = obj["n"];
+                    assert(ne.isNumber());
+                    int myn = ne.numberInt();
+                    if ( n != myn ){
+                        log() << "should have chunk: " << n << " have:" << myn << endl;
+
+                        DBDirectClient client;
+                        Query q(query);
+                        q.sort(sort);
+                        auto_ptr<DBClientCursor> c = client.query(ns, q);
+                        while(c->more())
+                            PRINT(c->nextSafe());
+
+                        uassert( 10040 ,  "chunks out of order" , n == myn );
+                    }
+
+                    int len;
+                    const char * data = obj["data"].binData( len );
+                    md5_append( &st , (const md5_byte_t*)(data + 4) , len - 4 );
+
+                    n++;
+                } catch (...) {
+                    yield.relock(); // needed before yield goes out of scope
+                    throw;
+                }
+
+                if ( ! yield.stillOk() ){
+                    uasserted(13281, "File deleted during filemd5 command");
+                }
             }
+
             md5_finish(&st, d);
 
             result.append( "md5" , digestToString( d ) );
