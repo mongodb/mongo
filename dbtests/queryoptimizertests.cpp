@@ -29,10 +29,12 @@
 
 namespace mongo {
     extern BSONObj id_obj;
-    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q ){
+    Message runQuery(Message& m, QueryMessage& q ){
         CurOp op( &(cc()) );
         op.ensureStarted();
-        return runQuery( m , q , op );
+        Message response;
+        runQuery( m , q , op, response );
+        return response;
     }
 } // namespace mongo
 
@@ -777,7 +779,7 @@ namespace QueryOptimizerTests {
 
                 DbMessage d(m);
                 QueryMessage q(d);
-                ASSERT_EQUALS( 0, runQuery( m, q)->nReturned );
+                ASSERT_EQUALS( 0, ((QueryResult*)runQuery( m, q).header())->nReturned );
             }
         };
         
