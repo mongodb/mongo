@@ -492,7 +492,7 @@ namespace mongo {
     class UserQueryOp : public QueryOp {
     public:
         
-        UserQueryOp( const ParsedQuery& pq ) :
+        UserQueryOp( const ParsedQuery& pq, Message &response, const BSONObj &explainSuffix, CurOp &curop ) :
         //int ntoskip, int ntoreturn, const BSONObj &order, bool wantMore,
         //                   bool explain, FieldMatcher *filter, int queryOptions ) :
             _buf( 32768 ) , // TODO be smarter here
@@ -502,7 +502,10 @@ namespace mongo {
             _n(0),
             _inMemSort(false),
             _saveClientCursor(false),
-            _oplogReplay( pq.hasOption( QueryOption_OplogReplay) )
+            _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
+            _response( response ),
+            _explainSuffix( explainSuffix ),
+            _curop( curop )
         {}
         
         virtual void init() {
@@ -614,6 +617,7 @@ namespace mongo {
             _c->advance();            
         }
 
+        // this plan won, so set data for response broadly
         void finish() {
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
@@ -629,16 +633,33 @@ namespace mongo {
             if ( _c->tailable() )
                 _saveClientCursor = true;
 
+            if ( _pq.isExplain()) {
+                BSONObjBuilder builder;
+                builder.append("cursor", _c->toString());
+                builder.appendArray("indexBounds", _c->prettyIndexBounds());
+                builder.appendNumber("nscanned", nscanned() );
+                builder.appendNumber("nscannedObjects", nscannedObjects() );
+                builder.append("n", _n);
+                if ( scanAndOrderRequired() )
+                    builder.append("scanAndOrder", true);
+                builder.append("millis", _curop.elapsedMillis());
+                builder.appendElements( _explainSuffix );
+                BSONObj obj = builder.done();
+                fillQueryResultFromObj(_buf, 0, obj);
+                _n = 1;
+            }            
+            
+            _response.appendData( _buf.buf(), _buf.len() );
+            _buf.decouple();
             setComplete();            
         }
         
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
         
         virtual QueryOp *clone() const {
-            return new UserQueryOp( _pq );
+            return new UserQueryOp( _pq, _response, _explainSuffix, _curop );
         }
 
-        BufBuilder &builder() { return _buf; }
         bool scanAndOrderRequired() const { return _inMemSort; }
         shared_ptr<Cursor> cursor() { return _c; }
         auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
@@ -668,10 +689,14 @@ namespace mongo {
         bool _saveClientCursor;
         bool _oplogReplay;
         auto_ptr< FindingStartCursor > _findingStartCursor;
+        
+        Message &_response;
+        const BSONObj &_explainSuffix;
+        CurOp &_curop;
     };
     
     /* run a query -- includes checking for and running a Command */
-    auto_ptr< QueryResult > runQuery(Message& m, QueryMessage& q, CurOp& curop ) {
+    void runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         StringBuilder& ss = curop.debug().str;
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
@@ -697,7 +722,6 @@ namespace mongo {
         BSONObjBuilder cmdResBuf;
         long long cursorid = 0;
         
-        auto_ptr< QueryResult > qr;
         int n = 0;
         
         Client& c = cc();
@@ -710,6 +734,7 @@ namespace mongo {
                 ss << " command: " << jsobj;
                 curop.markCommand();
                 n = 1;
+                auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
                 qr->setResultFlagsToOk();
@@ -720,8 +745,9 @@ namespace mongo {
                 qr->cursorId = cursorid;
                 qr->startingFrom = 0;
                 qr->nReturned = n;
+                result.setData( qr.release(), true );
             }
-            return qr;
+            return;
         }
         
         // regular query
@@ -796,6 +822,7 @@ namespace mongo {
                     n = 1;
                     fillQueryResultFromObj( bb , pq.getFields() , resObject );
                 }
+                auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
                 bb.decouple();
                 qr->setResultFlagsToOk();
@@ -804,8 +831,9 @@ namespace mongo {
                 qr->setOperation(opReply);
                 qr->cursorId = cursorid;
                 qr->startingFrom = 0;
-                qr->nReturned = n;       
-                return qr;
+                qr->nReturned = n;      
+                result.setData( qr.release(), true );
+                return;
             }     
         }
         
@@ -818,7 +846,16 @@ namespace mongo {
                 oldPlan = qps.explain();
         }
         MultiPlanScanner qps( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() );
-        UserQueryOp original( pq );
+        BSONObj explainSuffix;
+        if ( explain ) {
+            BSONObjBuilder bb;
+            if ( !oldPlan.isEmpty() )
+                bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
+            if ( hint.eoo() )
+                bb.appendElements(qps.explain());            
+            explainSuffix = bb.obj();
+        }
+        UserQueryOp original( pq, result, explainSuffix, curop );
         shared_ptr< UserQueryOp > o = qps.runOp( original );
         UserQueryOp &dqo = *o;
         massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
@@ -846,35 +883,16 @@ namespace mongo {
                 DEV out() << "  query has more, cursorid: " << cursorid << endl;
             }
         }
-        if ( explain ) {
-            BSONObjBuilder builder;
-            builder.append("cursor", cursor->toString());
-            builder.appendArray("indexBounds", cursor->prettyIndexBounds());
-            builder.appendNumber("nscanned", dqo.nscanned() );
-            builder.appendNumber("nscannedObjects", dqo.nscannedObjects() );
-            builder.append("n", n);
-            if ( dqo.scanAndOrderRequired() )
-                builder.append("scanAndOrder", true);
-            builder.append("millis", curop.elapsedMillis());
-            if ( !oldPlan.isEmpty() )
-                builder.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
-            if ( hint.eoo() )
-                builder.appendElements(qps.explain());
-            BSONObj obj = builder.done();
-            fillQueryResultFromObj(dqo.builder(), 0, obj);
-            n = 1;
-        }
-        qr.reset( (QueryResult *) dqo.builder().buf() );
-        dqo.builder().decouple();
+
+        QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
         qr->setResultFlagsToOk();
-        qr->len = dqo.builder().len();
+        qr->len = result.totalLen();
         ss << " reslen:" << qr->len;
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = n;
 
-        
         int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
         if ( dbprofile || duration >= cmdLine.slowMS ) {
@@ -886,7 +904,7 @@ namespace mongo {
             ss << jsobj << ' ';
         }
         ss << " nreturned:" << n;
-        return qr;        
+        return;
     }    
     
 } // namespace mongo

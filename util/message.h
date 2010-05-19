@@ -89,8 +89,13 @@ namespace mongo {
         virtual HostAndPort remote() const;
 
         // send len or throw SocketException
-        void send( const char * data , int len, const char *context );
-//        void send( struct msghdr &meta, const char *context );
+        void send( const char * data , int len, const char *context ) {
+            vector< pair< char *, int > > temp;
+            temp.push_back( make_pair( const_cast< char * >( data ), len ) );
+            send( temp, context );
+        }
+        void send( const vector< pair< char *, int > > &data, const char *context );
+
         // recv len or throw SocketException
         void recv( char * data , int len );
         
@@ -223,12 +228,12 @@ namespace mongo {
             setData( reinterpret_cast< MsgData* >( buf ), true );
         }
         
+        // vector swap() so this is fast
         Message& operator=(Message& r) {
             assert( _data.empty() );
             assert( r._freeIt );
-            _data = r._data;
+            _data.swap( r._data );
             r._freeIt = false;
-            r._data.clear();
             _freeIt = true;
             return *this;
         }
@@ -247,6 +252,11 @@ namespace mongo {
             assert( _data.empty() );
             _setData( d, freeIt );
         }
+        // assumes message will free everything
+        void appendData(char *d, int size) {
+            _freeIt = true;
+            _data.push_back( make_pair( d, size ) );
+        }
         void setData(int operation, const char *msgtxt) {
             setData(operation, msgtxt, strlen(msgtxt)+1);
         }
@@ -264,6 +274,14 @@ namespace mongo {
             return _freeIt;
         }
 
+        int totalLen() const {
+            int tot = 0;
+            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                tot += i->second;
+            }
+            return tot;
+        }
+        
     private:
         void _setData( MsgData *d, bool freeIt ) {
             _freeIt = freeIt;

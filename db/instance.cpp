@@ -165,13 +165,13 @@ namespace mongo {
 
         DbMessage d(m);
         QueryMessage q(d);
-        QueryResult* msgdata;
+        auto_ptr< Message > resp( new Message() );
 
         CurOp& op = *(c.curop());
         
         try {
-            msgdata = runQuery(m, q, op ).release();
-            assert( msgdata );
+            runQuery(m, q, op, *resp);
+            assert( !resp->empty() );
         }
         catch ( AssertionException& e ) {
             ok = false;
@@ -192,7 +192,7 @@ namespace mongo {
             b.append((void*) errObj.objdata(), errObj.objsize());
 
             // todo: call replyToQuery() from here instead of this!!! see dbmessage.h
-            msgdata = (QueryResult *) b.buf();
+            QueryResult * msgdata = (QueryResult *) b.buf();
             b.decouple();
             QueryResult *qr = msgdata;
             qr->_resultFlags() = QueryResult::ResultFlag_ErrSet;
@@ -201,17 +201,17 @@ namespace mongo {
             qr->cursorId = 0;
             qr->startingFrom = 0;
             qr->nReturned = 1;
-
+            resp.reset( new Message() );
+            resp->setData( msgdata, true );
         }
-        Message *resp = new Message();
-        resp->setData(msgdata, true); // transport will free
-        dbresponse.response = resp;
-        dbresponse.responseTo = responseTo;
-        
+
         if ( op.shouldDBProfile( 0 ) ){
             op.debug().str << " bytes:" << resp->header()->dataLen();
         }
-
+        
+        dbresponse.response = resp.release();
+        dbresponse.responseTo = responseTo;
+        
         return ok;
     }
 
