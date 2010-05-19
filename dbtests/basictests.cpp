@@ -243,8 +243,6 @@ namespace BasicTests {
         
     };
 
-/* [dm] this test doesn't apply anymore as ussert is no longer a macro
-
     class AssertTests {
     public:
 
@@ -270,7 +268,6 @@ namespace BasicTests {
             ASSERT_EQUALS( 1 , x );
         }
     };
-*/
 
     namespace ArrayTests {
         class basic1 {
@@ -359,6 +356,15 @@ namespace BasicTests {
             ASSERT_EQUALS( -1 , lexNumCmp( "a.0.b" , "a.1" ) );
         }
     };
+
+    class DatabaseValidNames {
+    public:
+        void run(){
+            ASSERT( Database::validDBName( "foo" ) );
+            ASSERT( ! Database::validDBName( "foo/bar" ) );
+            ASSERT( ! Database::validDBName( "foo.bar" ) );
+        }
+    };
     
     class All : public Suite {
     public:
@@ -375,10 +381,12 @@ namespace BasicTests {
             add< stringbuildertests::reset2 >();
 
             add< sleeptest >();
-//            add< AssertTests >();
+            add< AssertTests >();
             
             add< ArrayTests::basic1 >();
             add< LexNumCmp >();
+
+            add< DatabaseValidNames >();
         }
     } myall;
     

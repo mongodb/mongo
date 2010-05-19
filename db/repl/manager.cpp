@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     void ReplSet::Manager::noteARemoteIsPrimary(const Member *m) { 
-        _rs->_self->lhb().set("finish code #1");
+        _rs->_self->lhb() = "finish code #1";
         log() << "replSet finish notearemoteisprimary " << m->fullName() << rsLog;
     }
 
@@ -91,11 +91,11 @@ namespace mongo {
 
             /* no one seems to be primary.  shall we try to elect ourself? */
             if( !_rs->elect.aMajoritySeemsToBeUp() ) { 
-                _rs->_self->lhb().set("can't see a majority, won't elect self");
+                _rs->_self->lhb() = "can't see a majority, won't elect self";
                 return;
             }
 
-            _rs->_self->lhb().set("");
+            _rs->_self->lhb() = "";
         }
         _rs->elect.electSelf();
     }

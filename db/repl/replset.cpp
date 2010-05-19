@@ -210,7 +210,6 @@ namespace mongo {
     /* forked as a thread during startup */
     void startReplSets() {
         Client::initThread("startReplSets");
-        mongo::lastError.reset( new LastError() );
         try { 
             assert( theReplSet == 0 );
             if( cmdLine.replSet.empty() ) {

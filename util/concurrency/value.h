@@ -53,6 +53,8 @@ namespace mongo {
     class Atomic : boost::noncopyable {
         T val;
     public:
+        Atomic<T>() { }
+
         void operator=(const T& a) { 
             scoped_lock lk(_atomicMutex);
             val = a; }
@@ -60,6 +62,13 @@ namespace mongo {
         operator T() const { 
             scoped_lock lk(_atomicMutex);
             return val; }
+
+        class tran : private scoped_lock {
+            Atomic<T>& _a;
+        public:
+            tran(Atomic<T>& a) : scoped_lock(_atomicMutex) { }
+            T& ref() { return _a; }
+        };
     };
 
 }

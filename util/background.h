@@ -50,6 +50,7 @@ namespace mongo {
             after this returns, deleted if deleteSelf true.
         */
         virtual void run() = 0;
+        virtual string name() = 0;
 
     public:
         enum State {

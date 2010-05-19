@@ -21,6 +21,7 @@
 #include "../../client/dbclient.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
+#include "../../util/concurrency/task.h"
 #include "../../util/mongoutils/html.h"
 #include "../../util/goodies.h"
 #include "../../util/ramlog.h"
@@ -41,117 +42,6 @@ namespace mongo {
     static RamLog _rsLog;
     Tee *rsLog = &_rsLog;
 
-    /* { replSetHeartbeat : <setname> } */
-    class CmdReplSetHeartbeat : public Command {
-    public:
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return false; }
-        virtual bool logTheOp() { return false; }
-        virtual LockType locktype() const { return NONE; }
-        virtual void help( stringstream &help ) const { help<<"internal"; }
-        CmdReplSetHeartbeat() : Command("replSetHeartbeat") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !replSet ) {
-                errmsg = "not a replset member";
-                return false;
-            }
-            if( cmdObj["pv"].Int() != 1 ) { 
-                errmsg = "incompatible replset protocol version";
-                return false;
-            }
-            string s = string(cmdObj.getStringField("replSetHeartbeat"))+'/';
-            if( !startsWith(cmdLine.replSet, s ) ) {
-                errmsg = "repl set names do not match";
-                cout << "cmdline: " << cmdLine.replSet << endl;
-                cout << "s: " << s << endl;
-                result.append("mismatch", true);
-                return false;
-            }
-            result.append("rs", true);
-            if( theReplSet == 0 ) { 
-                errmsg = "still initializing";
-                return false;
-            }
-
-            if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) { 
-                errmsg = "repl set names do not match (2)";
-                result.append("mismatch", true);
-                return false;
-            }
-            result.append("set", theReplSet->name());
-            result.append("state", theReplSet->state());
-            int v = theReplSet->config().version;
-            result.append("v", v);
-            if( v > cmdObj["v"].Int() )
-                result << "config" << theReplSet->config().asBson();
-            return true;
-        }
-    } cmdReplSetHeartbeat;
-
-    /* throws dbexception */
-    bool requestHeartbeat(string setName, string memberFullName, BSONObj& result, int myCfgVersion, int& theirCfgVersion) { 
-        BSONObj cmd = BSON( "replSetHeartbeat" << setName << "v" << myCfgVersion << "pv" << 1 );
-        ScopedConn conn(memberFullName);
-        return conn->runCommand("admin", cmd, result);
-    }
-
-    /* poll every other set member to check its status */
-    /*
-    class FeedbackThread : public BackgroundJob {
-    public:
-        ReplSet::Member *m; 
-
-    private:
-        void down() {
-            m->_health = 0.0;
-            if( m->_upSince ) {
-                m->_upSince = 0;
-                log() << "replSet " << m->fullName() << " is now down" << rsLog;
-            }
-        }
-
-    public:
-        void run() { 
-            mongo::lastError.reset( new LastError() );
-            while( 1 ) {
-                try { 
-                    BSONObj info;
-                    int theirConfigVersion = -10000;
-                    bool ok = requestHeartbeat(theReplSet->name(), m->fullName(), info, theReplSet->config().version, theirConfigVersion);
-                    m->_lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
-                    {
-                        be state = info["state"];
-                        if( state.ok() )
-                            m->_state = (ReplSet::State) state.Int();
-                    }
-                    if( ok ) {
-                        if( m->_upSince == 0 ) {
-                            log() << "replSet " << m->fullName() << " is now up" << rsLog;
-                            m->_upSince = m->_lastHeartbeat;
-                        }
-                        m->_health = 1.0;
-                        m->_lastHeartbeatErrMsg.set("");
-
-                        be cfg = info["config"];
-                        if( cfg.ok() ) {
-                            ReplSetConfig::receivedNewConfig(cfg.Obj());
-                        }
-                    }
-                    else { 
-                        down();
-                        m->_lastHeartbeatErrMsg.set(info.getStringField("errmsg"));
-                    }
-                }
-                catch(...) { 
-                    down();
-                    m->_lastHeartbeatErrMsg.set("connect/transport error");
-                }
-                theReplSet->_mgr.checkNewState();
-                sleepsecs(2);
-            }
-        }
-    };*/
-    
     string ago(time_t t) { 
         if( t == 0 ) return "";
 
@@ -192,7 +82,7 @@ namespace mongo {
         }
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(m().state));
-        s << td( red(m().lastHeartbeatMsg.get(),!ok) );
+        s << td( red(m().lastHeartbeatMsg,!ok) );
         s << _tr();
     }
 
@@ -243,7 +133,7 @@ namespace mongo {
                 td("(self)") << 
                 td(ToString(_self->config().votes)) << 
                 td(stateAsHtml(_myState));
-            s << td( _self->lhb().get() );
+            s << td( _self->lhb() );
             s << _tr();
 			mp[_self->m().id()] = s.str();
         }
@@ -328,7 +218,7 @@ namespace mongo {
             HostAndPort h(getHostName(), cmdLine.port);
             v.push_back( 
                 BSON( "name" << h.toString() << "self" << true << 
-                "errmsg" << _self->lhb().get() ) );
+                      "errmsg" << _self->lhb() ) );
         }
 
         while( m ) {
@@ -337,7 +227,7 @@ namespace mongo {
             bb.append("health", m->m().health);
             bb.append("uptime", (unsigned) (m->m().upSince ? (time(0)-m->m().upSince) : 0));
             bb.appendDate("lastHeartbeat", m->m().lastHeartbeat);
-            bb.append("errmsg", m->lhb().get());
+            bb.append("errmsg", m->lhb());
             v.push_back(bb.obj());
             m = m->next();
         }
@@ -347,21 +237,4 @@ namespace mongo {
         b.append("members", v);
     }
 
-    void ReplSet::startHealthThreads() {
-        /* TODO TODO TODO */
-        /*
-        Member* m = _members.head();
-        while( m ) {
-            FeedbackThread *f = new FeedbackThread();
-            f->m = m;
-            f->go();
-            m = m->next();
-        }
-        */
-    }
-
 }
-
-/* todo:
-   stop bg job and delete on removefromset
-*/

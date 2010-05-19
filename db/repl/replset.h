@@ -99,7 +99,7 @@ namespace mongo {
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
             void summarizeAsHtml(stringstream& s) const;
             const RSMember& m() const { return _m; }
-            DiagStr& lhb() { return _m.lastHeartbeatMsg; }
+            string lhb() { return _m.lastHeartbeatMsg; }
         private:
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             RSMember _m;

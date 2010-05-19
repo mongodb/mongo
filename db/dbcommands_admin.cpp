@@ -289,6 +289,7 @@ namespace mongo {
     class FSyncCommand : public Command {
         class LockDBJob : public BackgroundJob { 
         protected:
+            string name() { return "lockdbjob"; }
             void run() { 
                 Client::initThread("fsyncjob");
                 Client& c = cc();

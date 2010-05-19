@@ -24,15 +24,19 @@ namespace mongo {
 
     namespace task { 
 
+        /** abstraction around threads.  simpler than BackgroundJob which is used behind the scenes.
+            a shared_ptr is kept to the task - both by the task while running and the caller.  that way 
+            the task object gets cleaned up once the last reference goes away. 
+        */
         class Task : private BackgroundJob {
         protected:
             virtual void doWork() = 0;
+            virtual string name() = 0;
         public:
             Task();
 
             /** for a repeating task, stop after current invocation ends. */
             void halt();
-
         private:
             shared_ptr<Task> me;
             unsigned n, repeat;
@@ -42,10 +46,10 @@ namespace mongo {
             void begin(shared_ptr<Task>);
         };
 
-        /* run once */
+        /** run once */
         void fork(shared_ptr<Task> t);
 
-        /* run doWork() over and over, with a pause between runs of millis */
+        /** run doWork() over and over, with a pause between runs of millis */
         void repeat(shared_ptr<Task> t, unsigned millis);
 
         /*** Example ***

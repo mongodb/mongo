@@ -80,7 +80,7 @@ namespace mongo {
 
     class WriteBackListener : public BackgroundJob {
     protected:
-        
+        string name() { return "WriteBackListener"; }
         WriteBackListener( const string& addr ) : _addr( addr ){
             cout << "creating WriteBackListener for: " << addr << endl;
         }

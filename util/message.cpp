@@ -305,6 +305,7 @@ namespace mongo {
         void run() {
             res = ::connect(sock, farEnd.raw(), farEnd.addressSize);
         }
+        string name() { return "ConnectBG"; }
     };
 
     bool MessagingPort::connect(SockAddr& _far)

@@ -229,8 +229,10 @@ namespace mongo {
        call this when your thread starts. 
     */
     inline void Client::initThread(const char *desc) {
+        setThreadName(desc);
         assert( currentClient.get() == 0 );
         currentClient.reset( new Client(desc) );
+        mongo::lastError.initThread();
     }
 
     inline Client::GodScope::GodScope(){

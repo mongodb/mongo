@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    void setThreadName(const char * name);
+
     template<class T>
     inline string ToString(const T& t) { 
         stringstream s;

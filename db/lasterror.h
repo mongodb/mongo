@@ -75,7 +75,10 @@ namespace mongo {
         LastError * _get( bool create = false ); // may return a disabled LastError
 
         void reset( LastError * le );
-        
+
+        /** ok to call more than once. */
+        void initThread();
+
         /**
          * id of 0 means should use thread local management
          */
