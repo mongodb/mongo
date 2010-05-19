@@ -395,7 +395,7 @@ namespace mongo {
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
-        DEV tlog() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
+        DEV log() << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x" << hex << offset
                   << " emptyLoc:" << hex << emptyLoc.getOfs() << dec << endl;
         return e;
     }
