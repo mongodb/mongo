@@ -29,12 +29,24 @@
 
 namespace mongo {
     extern BSONObj id_obj;
-    Message runQuery(Message& m, QueryMessage& q ){
+    Message _runQuery(Message& m, QueryMessage& q ){
         CurOp op( &(cc()) );
         op.ensureStarted();
-        Message response;
-        runQuery( m , q , op, response );
-        return response;
+        Message b;
+        {
+            Message response;
+            runQuery( m , q , op, response );
+            MsgData *a = response.header();
+            b = response;
+            MsgData *bb = b.header();
+            cout << "z";
+        }
+        double x = 99;
+        cout << "z";
+        MsgData *c = b.header();
+        double qqx = 99;
+        cout << "zzzzzzzzzzzzzzzzzzzzzzzz" << qqx << endl;
+        return b;
     }
 } // namespace mongo
 
@@ -623,7 +635,7 @@ namespace QueryOptimizerTests {
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
             }
-            ~Base() {
+            virtual ~Base() {
                 if ( !nsd() )
                     return;
                 NamespaceDetailsTransient::_get( ns() ).clearQueryCache();
@@ -777,13 +789,28 @@ namespace QueryOptimizerTests {
                 log() << "end QueryMissingNs" << endl;
             }
             void run() {
-                Message m;
-                assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );
-                stringstream ss;
+                {
+                    Message m;
+                    assembleRequest( "unittests.missingNS", BSONObj(), 0, 0, 0, 0, m );
+                    stringstream ss;
 
-                DbMessage d(m);
-                QueryMessage q(d);
-                ASSERT_EQUALS( 0, ((QueryResult*)runQuery( m, q).header())->nReturned );
+                    cout << "a" << endl;
+                    {
+                        cout << "b" << endl;
+                        DbMessage d(m);
+                        cout << "c" << endl;
+                        QueryMessage q(d);
+                        cout << "d" << endl;
+                        Message x = _runQuery(m, q);
+                        MsgData *md = x.header();
+                        QueryResult *qr = (QueryResult *) md;
+                        ASSERT_EQUALS( 0, qr->nReturned );
+                        cout << "e" << endl;
+                    }
+                    cout << "tmp" << endl;
+                }
+                cout << "tmp" << endl;
+
             }
         };
         
@@ -1055,7 +1082,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m);
                     QueryMessage q(d);
-                    runQuery( m, q);
+                    _runQuery( m, q);
                 }
                 ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );
                 
@@ -1064,7 +1091,7 @@ namespace QueryOptimizerTests {
                 {
                     DbMessage d(m2);
                     QueryMessage q(d);
-                    runQuery( m2, q);
+                    _runQuery( m2, q);
                 }
                 ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::_get( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) ) == 0 );                
                 ASSERT_EQUALS( 2, NamespaceDetailsTransient::_get( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ) ).pattern() ) );
