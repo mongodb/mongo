@@ -17,10 +17,10 @@
 */
 
 #include "pch.h"
+#include "boost/any.hpp"
 #include "task.h"
 #include "../goodies.h"
 #include "../unittest.h"
-//#include "../../boosted/any.hpp"
 #include "boost/thread/condition.hpp"
 
 namespace mongo { 
@@ -36,12 +36,15 @@ namespace mongo {
         }*/
 
         Task::Task() { 
-/*            {
-                cout << "TEME<EMEMEMP" << endl;
-                boosted::any a;
+            {
+                
+                any a;
                 a = 3;
                 a = string("AAA");
-            }*/
+                string x = any_cast<string>(a);
+                if( a.type() == typeid(int) )
+                    cout << "won't print" << endl;
+            }
 
             n = 0;
             repeat = 0;
