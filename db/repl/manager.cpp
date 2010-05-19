@@ -52,10 +52,7 @@ namespace mongo {
 
     /** called as the health threads get new results */
     void ReplSet::Manager::checkNewState() {
-        static mongo::mutex m;
         {
-            scoped_lock lk(m);
-
             const Member *p = _rs->currentPrimary();
             const Member *p2 = findOtherPrimary();
             try { p2 = findOtherPrimary(); }
@@ -101,8 +98,18 @@ namespace mongo {
     }
 
     bool ReplSet::Manager::got(const any& msg) {
-        assert( CheckNewState == any_cast<Messages>(msg) );
-        checkNewState();
+        if( msg.type() == typeid(Messages) ) { 
+            assert( CheckNewState == any_cast<Messages>(msg) );
+            checkNewState();
+        }
+        else if( msg.type() == typeid(BSONObj) ) { 
+            log() << "replSet todo finish code in replset manager: call receivedNewConfig" << rsLog;
+            BSONObj o = any_cast<BSONObj>(msg);
+            log() << "replSet " << o.toString() << rsLog;
+        }
+        else { 
+            assert(false);
+        }
         return true;
     }
 

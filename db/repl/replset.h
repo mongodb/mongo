@@ -84,10 +84,9 @@ namespace mongo {
 
         class Consensus {
             ReplSet &rs;
-            bool inprog;
             void _electSelf();
         public:
-            Consensus(ReplSet *t) : rs(*t),inprog(false) { }
+            Consensus(ReplSet *t) : rs(*t) { }
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
             void electSelf();

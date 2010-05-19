@@ -209,7 +209,11 @@ namespace mongo {
         startupStatus = STARTED;
     }
 
-    /* forked as a thread during startup */
+    /* forked as a thread during startup 
+       it can run quite a while looking for config.  but once found, 
+       a separate thread takes over as ReplSet::Manager, and this thread
+       terminates.
+    */
     void startReplSets() {
         Client::initThread("startReplSets");
         try { 
@@ -221,9 +225,9 @@ namespace mongo {
             (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
-            log() << "replSet Caught exception in management thread: " << e.what() << rsLog;
+            log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;
             if( theReplSet ) 
-                theReplSet->fatal();
+                theReplSet->fatal(); // concurrency: this maybe should be a message.
         }
         cc().shutdown();
     }

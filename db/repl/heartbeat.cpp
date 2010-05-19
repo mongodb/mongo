@@ -97,7 +97,6 @@ namespace mongo {
         ReplSetHealthPoll() {}
         string name() { return "ReplSetHealthPoll"; }
         void doWork() { 
-            mongo::lastError.initThread();
             RSMember mem = m;
             RSMember old = mem;
             try { 
@@ -120,7 +119,8 @@ namespace mongo {
 
                     be cfg = info["config"];
                     if( cfg.ok() ) {
-                        ReplSetConfig::receivedNewConfig(cfg.Obj());
+                        // received a new config
+                        theReplSet->mgr->send(cfg.Obj().copy());
                     }
                 }
                 else { 

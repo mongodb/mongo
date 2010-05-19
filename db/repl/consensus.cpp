@@ -106,17 +106,7 @@ namespace mongo {
     }
 
     void ReplSet::Consensus::electSelf() {
-        static mutex m;
-        {
-            scoped_lock lk(m);
-            if( inprog ) return;
-            inprog = true;
-        }
         try { _electSelf(); } catch(...) { }
-        {
-            scoped_lock lk(m);
-            inprog = false;
-        }
     }
 
 }
