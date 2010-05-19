@@ -146,9 +146,6 @@ namespace mongo {
             ClientConnections::get()->done( _addr , _conn );
             _conn = 0;
         }
-        else {
-            log() << "ERROR: done called twice?" << endl;
-        }
     }
 
     void ShardConnection::kill(){
