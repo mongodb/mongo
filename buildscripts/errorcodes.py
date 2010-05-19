@@ -9,7 +9,7 @@ def getAllSourceFiles( arr=None , prefix="." ):
         arr = []
 
     for x in os.listdir( prefix ):
-        if x.startswith( "." ) or x.startswith( "pcre-" ) or x.startswith( "32bit" ) or x.startswith( "mongodb-" ):
+        if x.startswith( "." ) or x.startswith( "pcre-" ) or x.startswith( "32bit" ) or x.startswith( "mongodb-" ) or x.startswith("debian"):
             continue
         full = prefix + "/" + x
         if os.path.isdir( full ):
@@ -19,7 +19,7 @@ def getAllSourceFiles( arr=None , prefix="." ):
                 arr.append( full )
 
     return arr
-    
+
 assertNames = [ "uassert" , "massert" ]
 
 def assignErrorCodes():
