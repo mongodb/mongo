@@ -87,31 +87,57 @@ namespace mongo {
 
 #include "msg.h"
 
+/* class Task::Port */
+
 namespace mongo {
     namespace task {
 
-        /* tests for messaging - see msg.h */
+        void Port::send(const any& msg) { 
+            {
+                boost::mutex::scoped_lock lk(m);
+                d.push_back(msg);
+            }
+            c.notify_one();
+        }
 
-        /*
-        class JustTesting : public Port<int> {
+        void Port::doWork() { 
+            while( 1 ) { 
+                any a;
+                {
+                    boost::mutex::scoped_lock lk(m);
+                    while( d.empty() )
+                        c.wait(m);
+                    a = d.front();
+                    d.pop_front();
+                }
+                try {
+                    if( !got(a) )
+                        break;
+                } catch(std::exception& e) { 
+                    log() << "Port::doWork() exception " << e.what() << endl;
+                }
+            }
+        }
+        
+        class PortTest : public Port {
         protected:
             void got(const int& msg) { }
         public:
-            virtual string name() { return "ASD"; }
-            JustTesting() { }
+            virtual bool got(const any& msg) { 
+                assert( any_cast<int>(msg) <= 55 );
+                return any_cast<int>(msg) != 55;
+            }
+            virtual string name() { return "PortTest"; }
         };    
 
-        struct JTTest : public UnitTest {
+        struct PortUnitTest : public UnitTest {
             void run() { 
-                foo();
-                JustTesting *jt = new JustTesting();
-                shared_ptr<Task> tp = jt->taskPtr();
-                Task *t = tp.get();
+                PortTest *p = new PortTest();
+                shared_ptr<Task> tp = p->taskPtr();
                 fork( tp );
-                cout << "POKSDFFDSFDSFDSFDSFDS" << endl;
-
+                p->send(3);
+                p->send(55);
             } 
-        } juttt;
-        */
+        } portunittest;
     }
 }
