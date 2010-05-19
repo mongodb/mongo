@@ -77,7 +77,7 @@ namespace mongo {
         }
         
         if ( sort ){
-            ShardConnection conn( getShard() );
+            ScopedDbConnection conn( getShard().getConnString() );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
@@ -101,7 +101,7 @@ namespace mongo {
                 return _manager->getShardKey().extractKey( end );
         }
         
-        ShardConnection conn( getShard() );
+        ScopedDbConnection conn( getShard().getConnString() );
         BSONObj result;
         if ( ! conn->runCommand( "admin" , BSON( "medianKey" << _ns
                                                  << "keyPattern" << _manager->getShardKey().key()
@@ -203,7 +203,7 @@ namespace mongo {
             filter = b.obj();
         }
         
-        ShardConnection fromconn( from );
+        ScopedDbConnection fromconn( from.getConnString() );
 
         BSONObj startRes;
         bool worked = fromconn->runCommand( "admin" ,
@@ -340,7 +340,7 @@ namespace mongo {
     }
 
     long Chunk::getPhysicalSize() const{
-        ShardConnection conn( getShard() );
+        ScopedDbConnection conn( getShard().getConnString() );
         
         BSONObj result;
         uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" , 
@@ -358,7 +358,7 @@ namespace mongo {
 
     template <typename ChunkType>
     inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
-        ShardConnection conn( chunk->getShard() );
+        ScopedDbConnection conn( chunk->getShard().getConnString() );
         
         BSONObj f = chunk->getFilter();
         if ( ! filter.isEmpty() )
@@ -474,7 +474,7 @@ namespace mongo {
     }
     
     void Chunk::ensureIndex(){
-        ShardConnection conn( getShard() );
+        ScopedDbConnection conn( getShard().getConnString() );
         conn->ensureIndex( _ns , _manager->getShardKey().key() , _manager->_unique );
         conn.done();
     }
@@ -537,7 +537,7 @@ namespace mongo {
     void ChunkManager::_load(){
         Chunk temp(0);
         
-        ShardConnection conn( temp.modelServer() );
+        ScopedDbConnection conn( temp.modelServer() );
 
         auto_ptr<DBClientCursor> cursor = conn->query( temp.getNS() , BSON( "ns" <<  _ns ) );
         while ( cursor->more() ){

@@ -97,7 +97,8 @@ poolStats( "after checking itcount" )
 o = db.data.findOne();
 o.x = 16;
 db.data.save( o );
-assert.eq( 16 , db.data.findOne( { _id : o._id } ).x , "x1 - did save fail?" );
+o = db.data.findOne( { _id : o._id } )
+assert.eq( 16 , o.x , "x1 - did save fail? " + tojson(o) );
 
 poolStats( "at end" )
 

@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "shard.h"
 #include "config.h"
+#include "request.h"
 #include <set>
 
 namespace mongo {
@@ -65,7 +66,6 @@ namespace mongo {
             scoped_lock lk( _mutex );
             
             map<string,Shard>::iterator i = _lookup.find( ident );
-            if ( i == _lookup.end() ) printStackTrace();
             uassert( 13129 , (string)"can't find shard for: " + ident , i != _lookup.end() );
             return i->second;        
         }
@@ -167,4 +167,6 @@ namespace mongo {
         _mapped = obj.getFieldDotted( "mem.mapped" ).numberLong();
         _writeLock = 0; // TOOD
     }
+
+
 }

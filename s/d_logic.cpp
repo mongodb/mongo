@@ -321,7 +321,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
                 
-                ShardConnection conn( to );
+                ScopedDbConnection conn( to );
                 ok = conn->runCommand( "admin" , 
                                             BSON( "startCloneCollection" << ns <<
                                                   "from" << from <<
@@ -402,7 +402,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
                 
-                ShardConnection conn( to );
+                ScopedDbConnection conn( to );
                 ok = conn->runCommand( "admin" , 
                                        BSON( "finishCloneCollection" << finishToken ) ,
                                        res );

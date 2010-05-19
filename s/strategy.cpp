@@ -31,6 +31,8 @@ namespace mongo {
         ShardConnection dbcon( shard );
         DBClientBase &_c = dbcon.conn();
         
+        checkShardVersion( _c , r.getns() );
+
         /* TODO FIX - do not case and call DBClientBase::say() */
         DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
         c.port().say( r.m() );
@@ -184,6 +186,7 @@ namespace mongo {
         if ( sequenceNumber == officialSequenceNumber )
             return;
         
+        printStackTrace();
         log(2) << " have to set shard version for conn: " << &conn << " ns:" << ns 
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber 
                << " version: " << version << " manager: " << manager
@@ -229,7 +232,7 @@ namespace mongo {
     }
 
     bool lockNamespaceOnServer( const Shard& shard, const string& ns ){
-        ShardConnection conn( shard );
+        ScopedDbConnection conn( shard.getConnString() );
         bool res = lockNamespaceOnServer( conn.conn() , ns );
         conn.done();
         return res;

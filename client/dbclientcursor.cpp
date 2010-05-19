@@ -20,6 +20,7 @@
 #include "../db/dbmessage.h"
 #include "../db/cmdline.h"
 #include "connpool.h"
+#include "../s/shard.h"
 
 namespace mongo {
 
@@ -151,6 +152,14 @@ namespace mongo {
     }
 
     void DBClientCursor::attach( ScopedDbConnection * conn ){
+        assert( _scopedHost.size() == 0 );
+        assert( connector == conn->get() );
+        _scopedHost = conn->getHost();
+        conn->done();
+        connector = 0;
+    }
+
+    void DBClientCursor::attach( ShardConnection * conn ){
         assert( _scopedHost.size() == 0 );
         assert( connector == conn->get() );
         _scopedHost = conn->getHost();
