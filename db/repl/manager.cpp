@@ -52,7 +52,7 @@ namespace mongo {
 
     /** called as the health threads get new results */
     void ReplSet::Manager::checkNewState() {
-        static mutex m;
+        static mongo::mutex m;
         {
             scoped_lock lk(m);
 
@@ -98,6 +98,12 @@ namespace mongo {
             _rs->_self->lhb() = "";
         }
         _rs->elect.electSelf();
+    }
+
+    bool ReplSet::Manager::got(const any& msg) {
+        assert( CheckNewState == any_cast<Messages>(msg) );
+        checkNewState();
+        return true;
     }
 
 }

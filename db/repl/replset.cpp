@@ -46,7 +46,10 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : elect(this), _self(0), _mgr(this) {
+    ReplSet::ReplSet(string cfgString) : elect(this), 
+        _self(0), 
+        mgr( new Manager(this) )
+    {
         _myState = STARTUP;
         _currentPrimary = 0;
 
@@ -98,7 +101,6 @@ namespace mongo {
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
             log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
-    
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
