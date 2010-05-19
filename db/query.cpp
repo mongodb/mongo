@@ -106,7 +106,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOneOrig, bool logop, bool god) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db 
@@ -130,7 +130,7 @@ namespace mongo {
         MultiPlanScanner s( ns, pattern, BSONObj() );
         while( s.mayRunMore() ) {
             int best = 0;
-            DeleteOp original( justOne, best );
+            DeleteOp original( justOneOrig, best );
             shared_ptr< DeleteOp > bestOp = s.runOpOnce( original );
             shared_ptr<Cursor> creal = bestOp->newCursor();
             
@@ -145,6 +145,7 @@ namespace mongo {
             CursorId id = cc->cursorid;
             
             unsigned long long nScanned = 0;
+            bool justOne = justOneOrig;
             do {
                 if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
                     if ( ! cc->yield() ){
@@ -159,8 +160,9 @@ namespace mongo {
                 
                 DiskLoc rloc = cc->c->currLoc();
                 BSONObj key = cc->c->currKey();
-                
-                cc->c->advance();
+
+                if ( ! cc->c->advance() )
+                    justOne = true;
                 
                 if ( ! matcher.matches( key , rloc ) )
                     continue;
