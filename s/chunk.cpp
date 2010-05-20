@@ -552,7 +552,9 @@ namespace mongo {
                 return;
             }
 
+            _printChunks();
             sleepmillis(10 * (3-tries));
+            sleepsecs(10);
         }
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 tries. Giving up");
         
@@ -580,7 +582,7 @@ namespace mongo {
     }
 
     bool ChunkManager::_isValid() const {
-#define ENSURE(x) if(!(x)) return false;
+#define ENSURE(x) do { if(!(x)) { log() << "ChunkManager::_isValid failed: " #x << endl; return false; } } while(0)
 
         ENSURE(_chunks.size() == _chunkMap.size());
 
@@ -600,6 +602,12 @@ namespace mongo {
         return true;
 
 #undef ENSURE
+    }
+
+    void ChunkManager::_printChunks() const {
+        for (ChunkMap::const_iterator it=_chunkMap.begin(), end=_chunkMap.end(); it != end; ++it) {
+            log() << *it->second << endl;
+        }
     }
 
     bool ChunkManager::hasShardKey( const BSONObj& obj ){
