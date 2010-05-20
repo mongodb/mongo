@@ -46,6 +46,10 @@ assert.eq = function( a , b , msg ){
     doassert( "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg );
 }
 
+assert.eq.automsg = function( a, b ) {
+    assert.eq( eval( a ), eval( b ), "[" + a + "] != [" + b + "]" );
+}
+
 assert.neq = function( a , b , msg ){
     if ( assert._debug && msg ) print( "in assert for: " + msg );
     if ( a != b )

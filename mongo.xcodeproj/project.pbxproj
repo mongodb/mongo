@@ -482,7 +482,6 @@
 		93A8CD190F33B7AF00C92B85 /* mmap_win.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mmap_win.cpp; path = util/mmap_win.cpp; sourceTree = SOURCE_ROOT; };
 		93AEC57A10E94749005DF720 /* insert.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = insert.js; sourceTree = "<group>"; };
 		93AF75500F216D0300994C66 /* jsontests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsontests.cpp; sourceTree = "<group>"; };
-		93B06F4A1188A741002BFD7A /* dollar.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dollar.js; sourceTree = "<group>"; };
 		93B4A81A0F1C01B4000C862C /* security.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = security.cpp; sourceTree = "<group>"; };
 		93B4A81B0F1C01D8000C862C /* lasterror.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = lasterror.cpp; sourceTree = "<group>"; };
 		93B4A8290F1C024C000C862C /* cursor.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cursor.cpp; sourceTree = "<group>"; };
@@ -801,7 +800,6 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
-				93B06F4A1188A741002BFD7A /* dollar.js */,
 				93E8A53411752FCE0025F7F8 /* or3.js */,
 				93E8A4D01174EEAF0025F7F8 /* or2.js */,
 				93E8A4381173E6480025F7F8 /* or1.js */,
