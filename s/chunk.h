@@ -328,6 +328,7 @@ namespace mongo {
         static AtomicUInt NextSequenceNumber;
 
         bool _isValid() const;
+        void _printChunks() const;
 
         /**
          * @return number of Chunk matching the query or -1 for all chunks.
