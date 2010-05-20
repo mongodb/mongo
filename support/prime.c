@@ -68,8 +68,8 @@ __wt_prime(u_int32_t n)
 	};
 	u_int i;
 
-	for (i = 0; i < sizeof(t) / sizeof(t[0]); ++i)
+	for (i = 0; i < WT_ELEMENTS(t); ++i)
 		if (t[i].value > n)
 			return (t[i].prime);
-	return (t[sizeof(t) / sizeof(t[0]) - 1].prime);
+	return (t[WT_ELEMENTS(t) - 1].prime);
 }
