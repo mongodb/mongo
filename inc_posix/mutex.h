@@ -10,16 +10,28 @@
 /*
  * Atomic writes:
  *
- * WiredTiger requires variables of type u_int32_t and pointers (void *), be
- * written atomically.  If that's not guaranteed for your processor, you won't
- * be able to make this software run reliably.
+ * WiredTiger requires variables of type wt_atomic_t and pointers (void *), be
+ * written atomically, in a single cycle.
  *
- * This does not require write ordering, only that if a 32-bit memory location
- * or a pointer is simultaneously written by two threads of control, the result
- * will be one or the other of the two values, not a combination of both.  This
- * softare does NOT require atomic writes for 64-bit memory locations, allowing
- * it to run on 32-bit memory bus architectures.
+ * None of the wt_atomic_t values are counters, that is, they are boolean types,
+ * valued either 0 or 1.  To keep in-memory structures smaller, we use a 32-bit
+ * type on 64-bit machines, which is OK if the compiler doesn't accumulate two
+ * 32-bit chunks into a single 64-bit write, that is, there needs to be a single
+ * load/store of 32-bits, not a load/store of 64-bits, where the 64-bits is
+ * comprised of two adjacent 32-bit memory locations.  If that can happen, you
+ * must increase the size of the wt_atomic_t type to a type guaranteed to be
+ * written atomically in a single cycle.
  *
+ * WiredTiger doesn't require write ordering, only that when a wt_atomic_t type
+ * or pointer is simultaneously written by two threads of control, the result is
+ * one or the other of the two values, not some combination of both.
+ *
+ * WiredTiger doesn't require atomic writes for any 64-bit memory locations and
+ * can run on machines with a 32-bit memory bus.
+ */
+typedef u_int32_t wt_atomic_t;
+
+/*
  * Atomic writes are often associated with memory barriers, implemented by the
  * WT_MEMORY_FLUSH macro.   The WT_MEMORY_FLUSH macro ensures memory stores by
  * the processor, made before the WT_MEMORY_FLUSH call, be visible to all
