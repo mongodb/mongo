@@ -435,7 +435,7 @@ namespace mongo {
             }
             
             if ( limit_ > 0 && count_ >= limit_ ){
-                setComplete();
+                setStop();
                 return;
             }
 
