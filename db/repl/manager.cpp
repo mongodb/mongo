@@ -32,7 +32,7 @@ namespace mongo {
         Member *m = _rs->head();
         Member *p = 0;
         while( m ) {
-            if( m->m().state == PRIMARY ) {
+            if( m->state() == PRIMARY ) {
                 if( p ) throw "twomasters"; // our polling is asynchronous, so this is often ok.
                 p = m;
             }

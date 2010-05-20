@@ -97,6 +97,17 @@ def drivers():
                     raise Exception('unknown archive format %s' % archive)
                 filename = driver_filename_format % (lang, release, extension)
                 get(url, filename)
+        # ugh ugh ugh
+        if lang == 'csharp' and release != 'master':
+            url = 'http://github.com/downloads/samus/mongodb-csharp/MongoDBDriver-Release-%.zip' % (release)
+            filename = 'MongoDBDriver-Release-%.zip' % (release)
+            get(url, filename)
+        if lang == 'java' and release != 'master':
+            get('http://github.com/downloads/mongodb/mongo-java-driver/mongo-%s.jar' % (release), 'mongo-%s.jar' % (release))
+        # I have no idea what's going on with the PHP zipfiles.
+        if lang == 'php' and release == '1.0.6':
+            get('http://github.com/downloads/mongodb/mongo-php-driver/mongo-1.0.6-php5.2-osx.zip', 'mongo-1.0.6-php5.2-osx.zip')
+            get('http://github.com/downloads/mongodb/mongo-php-driver/mongo-1.0.6-php5.3-osx.zip', 'mongo-1.0.6-php5.3-osx.zip')
 
 def docs():
     # FIXME: in principle, the doc PDFs could be out of date.
@@ -122,7 +133,7 @@ if len(sys.argv) > 1:
 print """NOTE: the md5sums for all the -latest tarballs are out of
 date.  You will probably see warnings as this script runs.  (If you
 don't, feel free to delete this note.)"""
-#core_server()
+core_server()
 drivers()
 docs()
 extras()

@@ -66,7 +66,7 @@ namespace mongo {
         s << tr();
         {
             stringstream u;
-            u << "http://" << m().h().host() << ':' << (m().h().port() + 1000) << "/_replSet";
+            u << "http://" << h().host() << ':' << (h().port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
         double h = m().health;
@@ -81,7 +81,7 @@ namespace mongo {
             s << td(h);
         }
         s << td(config().votes);
-        s << td(ReplSet::stateAsStr(m().state));
+        s << td(ReplSet::stateAsStr(state()));
         s << td( red(m().lastHeartbeatMsg,!ok) );
         s << _tr();
     }
