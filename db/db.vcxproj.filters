@@ -326,6 +326,9 @@
     <ClCompile Include="repl\heartbeat.cpp">
       <Filter>replset</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\shardconnection.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client.h">

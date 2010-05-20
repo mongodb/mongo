@@ -199,6 +199,7 @@
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp" />
     <ClCompile Include="request.cpp" />
+    <ClCompile Include="shardconnection.cpp" />
     <ClCompile Include="s_only.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="shard.cpp" />

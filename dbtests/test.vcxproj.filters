@@ -622,6 +622,9 @@
     <ClCompile Include="..\db\repl\heartbeat.cpp">
       <Filter>replsets</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\shardconnection.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
