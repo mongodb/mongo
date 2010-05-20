@@ -41,10 +41,9 @@ __wt_page_in(WT_TOC *toc,
 	DB *db;
 	ENV *env;
 	IDB *idb;
-	IENV *ienv;
 	WT_CACHE *cache;
 	WT_CACHE_ENTRY *e;
-	WT_CACHE_HB *hb;
+	WT_PAGE *page;
 	u_int32_t i;
 	int found, ret;
 
@@ -53,25 +52,26 @@ __wt_page_in(WT_TOC *toc,
 	db = toc->db;
 	env = toc->env;
 	idb = db->idb;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	cache = env->ienv->cache;
 
 	WT_ASSERT(env, size % WT_FRAGMENT == 0);
 	WT_ENV_FCHK_ASSERT(env, "__wt_page_in", flags, WT_APIMASK_WT_PAGE_IN);
 
 retry:	/* Search the cache for the page. */
-	found = 0;
-	hb = &cache->hb[WT_HASH(cache, addr)];
-	WT_CACHE_FOREACH_PAGE(cache, hb, e, i)
-		if (e->addr == addr && e->db == db && e->state == WT_OK) {
+	found = ret = 0;
+	for (i = WT_CACHE_ENTRY_CHUNK,
+	    e = cache->hb[WT_ADDR_HASH(cache, addr)];;) {
+		if (e->db == db && e->addr == addr && e->state == WT_OK) {
 			found = 1;
 			break;
 		}
+		WT_CACHE_ENTRY_NEXT(e, i);
+	}
 
 	/*
 	 * The memory location making this page "real" is the WT_CACHE_ENTRY's
 	 * state field, which can be reset from WT_OK to WT_DRAIN at any time
-	 * by the cache server.
+	 * by the cache drain server.
 	 *
 	 * Add the page to the WT_TOC's hazard list (which flushes the write),
 	 * then see if the state field is still WT_OK.  If it's still WT_OK,
@@ -80,26 +80,19 @@ retry:	/* Search the cache for the page. */
 	 * sets the WT_DRAIN state, flushes memory, and then checks the hazard
 	 * references).
 	 *
-	 * If for any reason, we can't get the page we want, ask the I/O server
-	 * to get it for us and go to sleep.  The I/O server is expensive, but
+	 * If for any reason, we can't get the page we want, ask the read server
+	 * to get it for us and go to sleep.  The read server is expensive, but
 	 * serializes all the hard cases.
 	 */
-	if (found) {
-		__wt_hazard_set(toc, e->page);
-		if (e->state == WT_OK) {
-			/*
-			 * Update the generation number and clear any discard
-			 * flag, it's clearly wrong.
-			 */
-			e->read_gen = ++ienv->read_gen;
-			F_CLR(e->page, WT_DISCARD);
-			*pagep = e->page;
+	if (found && __wt_hazard_set(toc, e, NULL)) {
+		/* Update the generation number. */
+		page = e->page;
+		page->lru = ++cache->lru;
+		*pagep = page;
 
-			WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
-			WT_STAT_INCR(cache->stats, CACHE_HIT);
-			return (0);
-		}
-		__wt_hazard_clear(toc, e->page);
+		WT_STAT_INCR(idb->stats, DB_CACHE_HIT);
+		WT_STAT_INCR(cache->stats, CACHE_HIT);
+		return (0);
 	}
 
 	/* Optionally, only return existing cache entries. */
@@ -123,7 +116,6 @@ static int
 __wt_cache_in_serial_func(WT_TOC *toc)
 {
 	ENV *env;
-	IENV *ienv;
 	WT_CACHE *cache;
 	WT_PAGE **pagep;
 	WT_READ_REQ *rr, *rr_end;
@@ -132,29 +124,17 @@ __wt_cache_in_serial_func(WT_TOC *toc)
 	__wt_cache_in_unpack(toc, addr, size, pagep);
 
 	env = toc->env;
-	ienv = env->ienv;
-	cache = ienv->cache;
+	cache = env->ienv->cache;
 
 	/* Find an empty slot and enter the read request. */
 	rr = cache->read_request;
-	rr_end =
-	    rr + sizeof(cache->read_request) / sizeof(cache->read_request[0]);
+	rr_end = rr + WT_ELEMENTS(cache->read_request);
 	for (; rr < rr_end; ++rr)
 		if (rr->toc == NULL) {
-			/*
-			 * Fill in the arguments, flush memory, then the WT_TOC
-			 * field that turns the slot on.
-			 */
-			rr->addr = addr;
-			rr->size = size;
-			rr->entry = NULL;
-			rr->pagep = pagep;
-			WT_MEMORY_FLUSH;
-			rr->toc = toc;
-			WT_MEMORY_FLUSH;
+			WT_READ_REQ_SET(rr, toc, addr, size, pagep);
 			return (0);
 		}
-	__wt_api_env_errx(env, "cache server read request table full");
+	__wt_api_env_errx(env, "read server request table full");
 	return (WT_RESTART);
 }
 

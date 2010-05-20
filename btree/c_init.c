@@ -18,9 +18,7 @@ __wt_cache_create(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e;
-	WT_CACHE_HB *hb;
-	u_int32_t i, j;
+	u_int32_t i;
 	int ret;
 
 	ienv = env->ienv;
@@ -29,8 +27,8 @@ __wt_cache_create(ENV *env)
 	WT_RET(__wt_calloc(env, 1, sizeof(WT_CACHE), &ienv->cache));
 	cache = ienv->cache;
 
-	WT_ERR(__wt_mtx_alloc(env, "cache server", 1, &cache->mtx_server));
-	WT_ERR(__wt_mtx_alloc(env, "cache I/O", 1, &cache->mtx_io));
+	WT_ERR(__wt_mtx_alloc(env, "cache drain server", 1, &cache->mtx_drain));
+	WT_ERR(__wt_mtx_alloc(env, "cache read server", 1, &cache->mtx_read));
 
 	/*
 	 * Initialize the cache hash buckets.
@@ -40,39 +38,72 @@ __wt_cache_create(ENV *env)
 	 */
 	cache->hb_size = env->cache_hash_size == 0 ?
 	    __wt_prime(env->cache_size * 32) : env->cache_hash_size;
-	WT_ERR(
-	    __wt_calloc(env, cache->hb_size, sizeof(WT_CACHE_HB), &cache->hb));
+	WT_ERR(__wt_calloc(
+	    env, cache->hb_size, sizeof(cache->hb[0]), &cache->hb));
 	WT_VERBOSE(env, WT_VERB_CACHE, (env,
 		"cache initialization: %lu MB, %lu hash buckets",
 		(u_long)env->cache_size, (u_long)cache->hb_size));
 
 	/*
 	 * Create an array of WT_CACHE_ENTRY structures in each bucket -- we
-	 * allocate 10 to start with, which is larger than the 4 we calculated
-	 * above.  This #define isn't in the usual place, because it being
-	 * wrong means there's something wrong with the above calculation.
+	 * allocate 20 to start with, much larger than the 4 we calculated
+	 * above.   Note we allocate one extra one, which serves as the fake
+	 * entry, used to reference the next chunk of entries if we have to
+	 * grow the structure.
 	 */
-#define	WT_CACHE_ENTRY_DEFAULT	10
-	for (i = 0; i < cache->hb_size; ++i) {
-		hb = &cache->hb[i];
-		WT_ERR(__wt_calloc(env, WT_CACHE_ENTRY_DEFAULT,
-		    sizeof(WT_CACHE_ENTRY), &hb->entry));
-		hb->entry_size = WT_CACHE_ENTRY_DEFAULT;
-		for (e = hb->entry, j = 0; j < WT_CACHE_ENTRY_DEFAULT; ++e, ++j)
-			e->state = WT_EMPTY;
-	}
+	for (i = 0; i < cache->hb_size; ++i)
+		WT_ERR(__wt_calloc(env, WT_CACHE_ENTRY_CHUNK + 1,
+		    sizeof(WT_CACHE_ENTRY), &cache->hb[i]));
 
 	WT_ERR(__wt_stat_alloc_cache_stats(env, &cache->stats));
 
 	WT_STAT_SET(
 	    cache->stats, CACHE_BYTES_MAX, env->cache_size * WT_MEGABYTE);
 	WT_STAT_SET(
-	    cache->stats, CACHE_MAX_BUCKET_ENTRIES, WT_CACHE_ENTRY_DEFAULT);
+	    cache->stats, CACHE_MAX_BUCKET_ENTRIES, WT_CACHE_ENTRY_CHUNK);
 
 	return (0);
 
 err:	(void)__wt_cache_destroy(env);
 	return (ret);
+}
+
+/*
+ * __wt_cache_pages_inuse --
+ *	Return the number of pages in use.
+ */
+u_int64_t
+__wt_cache_pages_inuse(WT_CACHE *cache)
+{
+	u_int64_t pages_in, pages_out;
+
+	/*
+	 * Other threads of control may be modifying these fields -- we don't
+	 * need exact values, but we do not want garbage, so read first, then
+	 * use local variables for calculation, ensuring a reasonable return.
+	 */
+	pages_in = cache->stat_pages_in;
+	pages_out = cache->stat_pages_out;
+	return (pages_in > pages_out ? pages_in - pages_out : 0);
+}
+
+/*
+ * __wt_cache_bytes_inuse --
+ *	Return the number of bytes in use.
+ */
+u_int64_t
+__wt_cache_bytes_inuse(WT_CACHE *cache)
+{
+	u_int64_t bytes_in, bytes_out;
+
+	/*
+	 * Other threads of control may be modifying these fields -- we don't
+	 * need exact values, but we do not want garbage, so read first, then
+	 * use local variables for calculation, ensuring a reasonable return.
+	 */
+	bytes_in = cache->stat_bytes_in;
+	bytes_out = cache->stat_bytes_out;
+	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }
 
 /*
@@ -88,6 +119,8 @@ __wt_cache_stats(ENV *env)
 	cache = env->ienv->cache;
 	stats = cache->stats;
 
+	WT_STAT_SET(stats, CACHE_BYTES_INUSE, __wt_cache_bytes_inuse(cache));
+	WT_STAT_SET(stats, CACHE_PAGES_INUSE, __wt_cache_pages_inuse(cache));
 	WT_STAT_SET(stats, CACHE_HASH_BUCKETS, cache->hb_size);
 }
 
@@ -100,8 +133,7 @@ __wt_cache_destroy(ENV *env)
 {
 	IENV *ienv;
 	WT_CACHE *cache;
-	WT_CACHE_ENTRY *e;
-	WT_CACHE_HB *hb;
+	WT_CACHE_ENTRY *e, *etmp;
 	u_int32_t i, j;
 	int ret;
 
@@ -113,45 +145,51 @@ __wt_cache_destroy(ENV *env)
 		return (0);
 
 	/*
-	 * Discard all pages -- no server support needed, this is done when the
-	 * environment is closed, after all threads of control have exited the
-	 * cache.
+	 * Discard all pages -- no hazard references needed, this is done when
+	 * the environment is closed, after all threads of control have exited
+	 * the cache.
 	 *
 	 * There shouldn't be any modified pages, because all of the databases
 	 * have been closed.
 	 */
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
-		if (e->state != WT_EMPTY)
-			__wt_bt_page_discard(env, e->page);
+	for (i = 0; i < cache->hb_size; ++i)
+		for (j = WT_CACHE_ENTRY_CHUNK, e = cache->hb[i];;) {
+			if (e->state != WT_EMPTY)
+				__wt_bt_page_discard(env, e->page);
+			WT_CACHE_ENTRY_NEXT(e, j);
+		}
 
-	/* Discard all hash bucket entries. */
+	/* Discard all hash bucket WT_CACHE_ENTRY arrays. */
 	for (i = 0; i < cache->hb_size; ++i) {
-		hb = &cache->hb[i];
-		__wt_free(env,
-		    hb->entry, hb->entry_size * sizeof(WT_CACHE_ENTRY));
+		e = cache->hb[i];
+		do {
+			etmp = (WT_CACHE_ENTRY *)e[WT_CACHE_ENTRY_CHUNK].db;
+			__wt_free(env, e, WT_CACHE_ENTRY_CHUNK * sizeof(*e));
+		} while ((e = etmp) != NULL);
 	}
 
 	/* Discard and destroy mutexes. */
-	if (cache->mtx_server != NULL)
-		(void)__wt_mtx_destroy(env, cache->mtx_server);
-	if (cache->mtx_io != NULL)
-		__wt_mtx_destroy(env, cache->mtx_io);
+	if (cache->mtx_drain != NULL)
+		(void)__wt_mtx_destroy(env, cache->mtx_drain);
+	if (cache->mtx_read != NULL)
+		__wt_mtx_destroy(env, cache->mtx_read);
 
 	/* Discard allocated memory, and clear. */
 	__wt_free(env, cache->stats, 0);
-	__wt_free(env, cache->hb, cache->hb_size * sizeof(WT_CACHE_HB));
-	__wt_free(env, cache->recbuf, cache->recbuf_size);
+	__wt_free(env, cache->hb, cache->hb_size * sizeof(cache->hb[0]));
 	__wt_free(env, ienv->cache, sizeof(WT_CACHE));
 
 	return (ret);
 }
 
 #ifdef HAVE_DIAGNOSTIC
+static const char *__wt_cache_dump_state(WT_CACHE_ENTRY *);
+
 /*
  * __wt_cache_dump --
  *	Dump a cache.
  */
-int
+void
 __wt_cache_dump(ENV *env)
 {
 	IENV *ienv;
@@ -162,23 +200,34 @@ __wt_cache_dump(ENV *env)
 	ienv = env->ienv;
 	cache = ienv->cache;
 
-	__wt_msg(env,
-	    "cache dump (%llu pages): ==========",
-	    WT_STAT(cache->stats, CACHE_PAGES_INUSE));
+	__wt_msg(env, "cache dump (%llu pages)", __wt_cache_pages_inuse(cache));
 
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j)
-		switch (e->state) {
-		case WT_EMPTY:
-			__wt_msg(env, "\tempty");
-			break;
-		case WT_OK:
-		case WT_DRAIN:
-			__wt_msg(env,
-			    "\t%p {addr/size: %lu: %lu, state: %s}",
-			    e->page, (u_long)e->addr, (u_long)e->page->size,
-			    e->state == WT_OK ? "OK" : "cache-drain");
-			break;
+	for (i = 0; i < cache->hb_size; ++i) {
+		__wt_msg(env, "==== cache bucket %lu", (u_long)i);
+		for (j = WT_CACHE_ENTRY_CHUNK, e = cache->hb[i];;) {
+			if (e->state != WT_EMPTY) {
+				__wt_msg(env,
+				    "{db: %p, addr: %6lu, state: %s}",
+				    e->db,
+				    (u_long)e->addr, __wt_cache_dump_state(e));
+			}
+
+			WT_CACHE_ENTRY_NEXT(e, j);
 		}
-	return (0);
+	}
+}
+
+static const char *
+__wt_cache_dump_state(WT_CACHE_ENTRY *e)
+{
+	switch (e->state) {
+	case WT_EMPTY:
+		return ("empty");
+	case WT_DRAIN:
+		return ("drain");
+	case WT_OK:
+		return ("OK");
+	}
+	return ("unknown");
 }
 #endif

@@ -9,7 +9,7 @@
 
 #include "wt_internal.h"
 
-static int __wt_cache_drain(WT_TOC *, void (*)(const char *, u_int64_t));
+static int __wt_cache_sync_drain(WT_TOC *, void (*)(const char *, u_int64_t));
 
 /*
  * __wt_cache_sync --
@@ -28,7 +28,7 @@ __wt_cache_sync(
 	ret = 0;
 
 	/* Write dirty pages from the cache. */
-	WT_RET(__wt_cache_drain(toc, f));
+	WT_RET(__wt_cache_sync_drain(toc, f));
 
 	/* Optionally flush the file to the backing disk. */
 	if (!LF_ISSET(WT_OSWRITE))
@@ -39,7 +39,6 @@ __wt_cache_sync(
 
 typedef struct __wt_sync_list {
 	u_int32_t addr;				/* Address */
-	u_int32_t size;				/* Bytes */
 	u_int8_t  level;			/* Level */
 } WT_SYNC_LIST;
 
@@ -63,11 +62,11 @@ __wt_sync_compare_level(const void *a, const void *b)
 }
 
 /*
- * __wt_cache_drain --
+ * __wt_cache_sync_drain --
  *	Flush all modified pages for the caller's DB handle.
  */
 static int
-__wt_cache_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
+__wt_cache_sync_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 {
 	ENV *env;
 	DB *db;
@@ -87,53 +86,59 @@ __wt_cache_drain(WT_TOC *toc, void (*f)(const char *, u_int64_t))
 
 	drain_base = NULL;
 	drain_elem = drain_len = 0;
-	WT_CACHE_FOREACH_PAGE_ALL(cache, e, i, j) {
-		/*
-		 * Skip pages we either don't care about or which are in play
-		 * in some way.
-		 */
-		if (e->db != db || e->state != WT_OK)
-			continue;
-		page = e->page;
+	for (i = 0; i < cache->hb_size; ++i)
+		for (j = WT_CACHE_ENTRY_CHUNK, e = cache->hb[i];;) {
+			/*
+			 * Skip pages we either don't care about or which are
+			 * in play in some way.
+			 */
+			if (e->db != db || e->state != WT_OK)
+				goto loop;
 
-		/*
-		 * Sync is just another reader of the cache, so has to obey the
-		 * standard reader protocol.  Get a hazard reference: if the
-		 * page isn't available for any reason, discard the reference
-		 * and continue.
-		 */
-		__wt_hazard_set(toc, page);
-		if (e->state != WT_OK)
-			goto next;
+			/*
+			 * Sync is just another reader of the cache, and must
+			 * obey the reader protocol.  Get a hazard reference:
+			 * if the page isn't available for any reason, forget
+			 * about it.
+			 */
+			if (!__wt_hazard_set(toc, e, NULL))
+				goto loop;;
 
-		/*
-		 * Leaf pages are reconciled immediately -- we could wait, but
-		 * no reason not to just do it now (plus, it gives the OS a
-		 * start on lazily writing leaf pages to disk, in the face of
-		 * a future fsync).
-		 */
-		if (page->hdr->level == WT_LLEAF) {
-			if (f != NULL && ++fcnt % 10 == 0)
-				f(toc->name, fcnt);
-			if (page->modified)
-				WT_ERR(__wt_bt_rec_page(toc, page));
-			goto next;
-		}
+			/* Ignore clean pages. */
+			page = e->page;
+			if (!WT_PAGE_MODIFY_ISSET(page))
+				goto next;
 
-		/* Allocate more space as necessary, and remember this page. */
-		if (drain_elem * sizeof(drain_base[0]) >= drain_len) {
-			WT_ERR(__wt_realloc(env, &drain_len,
-			    (drain_elem + 100) * sizeof(drain_base[0]),
-			    &drain_base));
-			drain = drain_base + drain_elem;
-		}
-		drain->addr = page->addr;
-		drain->size = page->size;
-		drain->level = page->hdr->level;
-		++drain;
-		++drain_elem;
+			/*
+			 * Leaf pages are reconciled immediately -- we could
+			 * wait, but no reason not to just do it now (plus,
+			 * it gives the OS a start on lazily writing leaf pages
+			 * to disk, in the face of a future fsync).
+			 */
+			if (page->hdr->level == WT_LLEAF) {
+				if (f != NULL && ++fcnt % 10 == 0)
+					f(toc->name, fcnt);
+				(void)__wt_bt_rec_page(toc, page);
+				goto next;
+			}
 
-next:		__wt_hazard_clear(toc, page);
+			/*
+			 * Allocate more space as necessary, and remember this
+			 * page.
+			 */
+			if (drain_elem * sizeof(drain_base[0]) >= drain_len) {
+				WT_ERR(__wt_realloc(env, &drain_len,
+				    (drain_elem + 100) * sizeof(drain_base[0]),
+				    &drain_base));
+				drain = drain_base + drain_elem;
+			}
+			drain->addr = page->addr;
+			drain->level = page->hdr->level;
+			++drain;
+			++drain_elem;
+
+next:			__wt_hazard_clear(toc, page);
+loop:			WT_CACHE_ENTRY_NEXT(e, j);
 	}
 
 	/*
@@ -152,7 +157,7 @@ next:		__wt_hazard_clear(toc, page);
 	qsort(drain_base,
 	    (size_t)drain_elem, sizeof(drain_base[0]), __wt_sync_compare_level);
 
-	/* Reconcile any modified pages. */
+	/* Reconcile the pages. */
 	for (drain = drain_base; drain_elem > 0; ++drain, --drain_elem) {
 		if (f != NULL && ++fcnt % 10 == 0)
 			f(toc->name, fcnt);
@@ -163,7 +168,7 @@ next:		__wt_hazard_clear(toc, page);
 		 * have been reconciled and written by some other thread.
 		 */
 		switch (ret = __wt_page_in(
-		    toc, drain->addr, drain->size, &page, WT_CACHE_ONLY)) {
+		    toc, drain->addr, 0, &page, WT_CACHE_ONLY)) {
 		case 0:				/* In the cache */
 			break;
 		case WT_NOTFOUND:		/* Not in the cache */
@@ -172,10 +177,7 @@ next:		__wt_hazard_clear(toc, page);
 			goto err;
 		}
 
-		/* If the page is dirty, reconcile it. */
-		if (page->modified)
-			WT_ERR(__wt_bt_rec_page(toc, page));
-
+		(void)__wt_bt_rec_page(toc, page);
 		__wt_page_out(toc, page);
 	}
 
