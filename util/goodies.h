@@ -775,7 +775,7 @@ namespace mongo {
         ptr(T* p) : _p(p) {} // needed for NULL
         template<typename U> ptr(U* p) : _p(p) {}
         template<typename U> ptr(const ptr<U>& p) : _p(p) {}
-        template<typename U> ptr(const shared_ptr<U>& p) : _p(p.get()) {}
+        template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const scoped_ptr<U>& p) : _p(p.get()) {}
         //template<typename U> ptr(const auto_ptr<U>& p) : _p(p.get()) {}
         
@@ -783,7 +783,7 @@ namespace mongo {
         ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
         template<typename U> ptr& operator= (U* p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const shared_ptr<U>& p) { _p = p.get(); return *this; }
+        template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
         template<typename U> ptr& operator= (const scoped_ptr<U>& p) { _p = p.get(); return *this; }
         //template<typename U> ptr& operator= (const auto_ptr<U>& p) { _p = p.get(); return *this; }
 
