@@ -176,28 +176,34 @@ struct __wt_page {
 	u_int32_t indx_count;		/* Entry count */
 
 	/*
+	 * The page's LRU access generation is set on each cache retrieval and
+	 * used to find pages no longer useful in the cache.
+	 */
+	u_int32_t lru;			/* Read generation */
+
+	/*
 	 * The page modified flag is not a bit-flag because it's not locked and
 	 * we don't want to lose an update because of a read-modify-write cycle.
 	 * Any thread of control holding a hazard reference can set the modify
-	 * flag (and we don't care if they race, since it's an atomic update);
-	 * only the cache drain server clears the modify flag (after checking
-	 * that no thread of control holds a hazard reference).
-	 *
-	 * There is no need to flush memory or declare the field volatile, as
-	 * threads marking the page dirty must hold a hazard reference, and
-	 * clearing the hazard reference will flush memory, including this set.
+	 * flag (and we don't care if they race, since it's an atomic update).
+	 * The write must be flushed before the hazard reference is released, so
+	 * we do it explicitly: the thread setting the modified flag may be the
+	 * workQ thread, the thread with the hazard reference is not involved.
 	 */
-	u_int32_t modified;		/* Page needs to be written */
+	wt_atomic_t modified;		/* Page is modified */
+#define	WT_PAGE_MODIFY_ISSET(p)						\
+	((p)->modified)
+#define	WT_PAGE_MODIFY_SET_AND_FLUSH(p) do {				\
+	(p)->modified = 1;						\
+	WT_MEMORY_FLUSH;						\
+} while (0);
+#define	WT_PAGE_MODIFY_CLR_AND_FLUSH(p) do {				\
+	(p)->modified = 0;						\
+	WT_MEMORY_FLUSH;						\
+} while (0);
 
 	u_int32_t flags;
 };
-/*
- * WT_PAGE_SIZE is the expected structure size --  we check at startup to ensure
- * the compiler hasn't inserted padding.  The WT_PAGE structure is in-memory, so
- * padding it won't break the world, but we don't want to waste space, and there
- * are a lot of these structures.
- */
-#define	WT_PAGE_SIZE		44
 
 /*
  * WT_PAGE_HDR --
