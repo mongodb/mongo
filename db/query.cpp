@@ -134,6 +134,7 @@ namespace mongo {
             shared_ptr< DeleteOp > bestOp = s.runOpOnce( original );
             shared_ptr<Cursor> creal = bestOp->newCursor();
             
+            //TODO continue
             if( !creal->ok() )
                 return nDeleted;
             
@@ -200,7 +201,7 @@ namespace mongo {
             if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
                 cc.release();
             }
-            if ( justOne && nDeleted ) {
+            if ( justOneOrig && nDeleted ) {
                 break;
             }
         }
