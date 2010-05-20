@@ -25,7 +25,6 @@ __wt_bt_build_verify(void)
 		{ sizeof(WT_ITEM), WT_ITEM_SIZE, 0, "WT_ITEM" },
 		{ sizeof(WT_OFF), WT_OFF_SIZE, sizeof(u_int32_t), "WT_OFF" },
 		{ sizeof(WT_OVFL), WT_OVFL_SIZE, sizeof(u_int32_t), "WT_OVFL" },
-		{ sizeof(WT_PAGE), WT_PAGE_SIZE, 0, "WT_PAGE" },
 		{ sizeof(WT_PAGE_DESC), WT_PAGE_DESC_SIZE, 0, "WT_PAGE_DESC" },
 		{ sizeof(WT_PAGE_HDR),
 		    WT_PAGE_HDR_SIZE, sizeof(u_int32_t), "WT_PAGE_HDR" },
@@ -36,7 +35,7 @@ __wt_bt_build_verify(void)
 	 * The compiler had better not have padded our structures -- make
 	 * sure the page header structure is exactly what we expect.
 	 */
-	for (lp = list; lp < list + sizeof(list) / sizeof(list[0]); ++lp) {
+	for (lp = list; lp < list + WT_ELEMENTS(list); ++lp) {
 		if (lp->s == lp->c)
 			continue;
 		__wt_api_env_errx(NULL,
@@ -47,7 +46,7 @@ __wt_bt_build_verify(void)
 	}
 
 	/* There are also structures that must be aligned correctly. */
-	for (lp = list; lp < list + sizeof(list) / sizeof(list[0]); ++lp) {
+	for (lp = list; lp < list + WT_ELEMENTS(list); ++lp) {
 		if (lp->align == 0 || WT_ALIGN(lp->s, lp->align) == lp->s)
 			continue;
 		__wt_api_env_errx(NULL,
