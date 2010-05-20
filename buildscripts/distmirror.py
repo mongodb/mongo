@@ -13,8 +13,16 @@ import time
 import hashlib
 import warnings
 
-def report(url, filename):
+written_files = []
+def get(url, filename):
+    # A little safety check.
+    if filename in written_files:
+        raise Exception('not overwriting file %s (already written in this session)' % filename)
+    else:
+        written_files.append(filename)
     print "downloading %s to %s" % (url, filename)    
+    open(filename, 'w').write(urllib2.urlopen(url).read())
+
 
 def checkmd5(md5str, filename):
     m = hashlib.md5()
@@ -35,7 +43,7 @@ versions = ("1.4.2", "1.5.1", "latest")
 url_format = "http://downloads.mongodb.org/%s/mongodb-%s-%s.%s"
 filename_format = "mongodb-%s-%s.%s"
 
-def do_it():
+def core_server():
     for version in versions:
         for (os, architectures, archives) in osarches:
             for architecture in architectures:
@@ -55,21 +63,56 @@ def do_it():
                     # ugh ugh
                     md5url = url+'.md5' if architecture != 'src' else None
                     filename = filename_format % (osarch, version2, archive)
-                    report(url, filename)
-                    open(filename, 'w').write(urllib2.urlopen(url).read())
+                    get(url, filename)
                     if md5url:
                         print "fetching md5 url " + md5url
                         md5str = urllib2.urlopen(md5url).read()
                         checkmd5(md5str, filename)
 
+def drivers():
+    # Drivers... FIXME: drivers.
+    driver_url_format = "http://github.com/mongodb/mongo-%s-driver/%s/%s"
+    driver_filename_format = "mongo-%s-driver-%s.%s"
+    drivers=(("python", ("1.6", "master"), ("zipball", "tarball"), None),
+             ("ruby", ("0.20", "master"), ("zipball", "tarball"), None),
+             ("c", ("v0.1", "master"), ("zipball", "tarball"), None),
+             # FIXME: PHP, Java, and Csharp also have zips and jars of
+             # precompiled relesaes.
+             ("php", ("1.0.6", "master"), ("zipball", "tarball"), None),
+             ("java", ("r1.4", "r2.0rc1", "master"), ("zipball", "tarball"), None),
+             # And Csharp is in a different github place, too.
+             ("csharp", ("0.82.2", "master"), ("zipball", "tarball"),
+              "http://github.com/samus/mongodb-%s/%s/%s"),
+             )
+
+    for (lang, releases, archives, url_format) in drivers:
+        for release in releases:
+            for archive in archives:
+                url = (url_format if url_format else driver_url_format) % (lang, archive, release) 
+                if archive == 'zipball':
+                    extension = 'zip'
+                elif archive == 'tarball':
+                    extension = 'tgz'
+                else:
+                    raise Exception('unknown archive format %s' % archive)
+                filename = driver_filename_format % (lang, release, extension)
+                get(url, filename)
+
+def docs():
     # FIXME: in principle, the doc PDFs could be out of date.
     docs_url = time.strftime("http://downloads.mongodb.org/docs/mongodb-docs-%Y-%m-%d.pdf")
     docs_filename = time.strftime("mongodb-docs-%Y-%m-%d.pdf")
-    report(docs_url, docs_filename)
-    open(docs_filename, 'w').write(urllib2.urlopen(docs_url).read())
+    get(docs_url, docs_filename)
 
-    # Drivers... FIXME: drivers.
-    #langs=("c", "java", "python", "php", "perl")
+def extras():
+    # Extras
+    extras = ("http://media.mongodb.org/zips.json", )
+    for extra in extras:
+        if extra.rfind('/') > -1:
+            filename = extra[extra.rfind('/')+1:]
+        else: 
+            raise Exception('URL %s lacks a slash?' % extra)
+        get(extra, filename)
 
 if len(sys.argv) > 1: 
     dir=sys.argv[1]
@@ -79,4 +122,7 @@ if len(sys.argv) > 1:
 print """NOTE: the md5sums for all the -latest tarballs are out of
 date.  You will probably see warnings as this script runs.  (If you
 don't, feel free to delete this note.)"""
-do_it()
+#core_server()
+drivers()
+docs()
+extras()
