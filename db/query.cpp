@@ -134,9 +134,8 @@ namespace mongo {
             shared_ptr< DeleteOp > bestOp = s.runOpOnce( original );
             shared_ptr<Cursor> creal = bestOp->newCursor();
             
-            //TODO continue
             if( !creal->ok() )
-                return nDeleted;
+                continue;
             
             CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
             

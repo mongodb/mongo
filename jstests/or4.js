@@ -11,7 +11,10 @@ t.save( {a:2,b:3} );
 assert.eq.automsg( "3", "t.count( {$or:[{a:2},{b:3}]} )" );
 assert.eq.automsg( "2", "t.count( {$or:[{a:2},{a:2}]} )" );
 t.remove({ $or: [{ a: 2 }, { b: 3}] });
+assert.eq.automsg( "0", "t.count()" );
 
+t.save( {b:3} );
+t.remove({ $or: [{ a: 2 }, { b: 3}] });
 assert.eq.automsg( "0", "t.count()" );
 
 t.save( {a:2} );
