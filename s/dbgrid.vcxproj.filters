@@ -255,6 +255,9 @@
     <ClCompile Include="..\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="shardconnection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="gridconfig.h">
@@ -313,8 +316,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\js\src\js.lib">
-      <Filter>libs_etc</Filter>
-    </Library>
+    <Library Include="..\..\js\js32d.lib" />
+    <Library Include="..\..\js\js32r.lib" />
+    <Library Include="..\..\js\js64d.lib" />
+    <Library Include="..\..\js\js64r.lib" />
   </ItemGroup>
 </Project>
