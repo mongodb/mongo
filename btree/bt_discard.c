@@ -24,20 +24,36 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 {
 	DB *db;
 	ENV *env;
-	WT_CACHE *cache;
 	WT_PAGE *rp;
 	WT_PAGE_HDR *hdr;
 	u_int32_t max;
+	int ret;
 
 	db = toc->db;
 	env = toc->env;
-	cache = env->ienv->cache;
 	hdr = page->hdr;
+
+	/*
+	 * It's possible (albeit unlikely) for a page to be reconciled by two
+	 * different threads at the same time -- it happens when Db.sync and
+	 * the cache thread's trickle processing select the same buffer.  We
+	 * could fix that by changing the Db.sync call to "schedule" the sync
+	 * with the cache thread, but I'd rather keep the possibility of having
+	 * more than one reconciliation thread running, I don't know if a single
+	 * reconciliation thread is going to be sufficient in the long term.
+	 *
+	 * Serialize reconciliation -- make sure we're the only thread working
+	 * this page.  A non-zero return means we didn't get the page.
+	 */
+	__wt_bt_rec_serial(toc, page, ret);
+	if (ret != 0)
+		return (0);
 
 	switch (hdr->type) {
 	case WT_PAGE_DESCRIPT:
 	case WT_PAGE_OVFL:
-		return (__wt_page_write(db, page));
+		ret = __wt_page_write(db, page);
+		goto done;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_DUP_LEAF:
@@ -54,18 +70,15 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(db);
 	}
 
-	/*
-	 * There's one reconciliation buffer, stored in the cache structure.
-	 * Make sure it's big enough.
-	 */
-	if (cache->recbuf_size < max)
+	/* Make sure the TOC's buffer is big enough. */
+	if (toc->scratch.mem_size < max)
 		WT_RET(__wt_realloc(
-		    env, &cache->recbuf_size, max, &cache->recbuf));
+		    env, &toc->scratch.mem_size, max, &toc->scratch.data));
 
 	/* Initialize the reconciliation buffer as a replacement page. */
-	rp = (WT_PAGE *)cache->recbuf;
+	rp = (WT_PAGE *)toc->scratch.data;
 	rp->size = max;
-	memcpy(cache->recbuf, page->hdr, WT_PAGE_HDR_SIZE);
+	memcpy(toc->scratch.data, page->hdr, WT_PAGE_HDR_SIZE);
 	__wt_bt_set_ff_and_sa_from_addr(rp, WT_PAGE_BYTE(rp));
 
 	switch (hdr->type) {
@@ -87,6 +100,34 @@ __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(db);
 	}
 
+done:
+	return (0);
+}
+
+/*
+ * __wt_bt_rec_serial_func --
+ *	Serialize page reconciliation.
+ */
+int
+__wt_bt_rec_serial_func(WT_TOC *toc)
+{
+	WT_PAGE *page;
+
+	__wt_bt_rec_unpack(toc, page);
+
+	/* If the page isn't dirty, we're done. */
+	if (!WT_PAGE_MODIFY_ISSET(page))
+		return (1);
+
+	/*
+	 * Clear the modification flag.  This doesn't sound safe, because the
+	 * cache thread might decide to discard this page as "clean".  That's
+	 * not correct, because we're either holding a hazard reference and we
+	 * finish our write before releasing our hazard reference, or, we're
+	 * the cache drain server, and there's no other thread that can discard
+	 * the page.
+	 */
+	WT_PAGE_MODIFY_CLR_AND_FLUSH(page);
 	return (0);
 }
 
@@ -186,6 +227,7 @@ __wt_bt_page_discard(ENV *env, WT_PAGE *page)
 	u_int32_t i;
 	void *bp, *ep;
 
+	WT_ASSERT(env, page->modified == 0);
 	WT_ENV_FCHK_ASSERT(
 	    env, "__wt_bt_page_discard", page->flags, WT_APIMASK_WT_PAGE);
 
