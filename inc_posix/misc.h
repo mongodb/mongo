@@ -25,6 +25,9 @@ extern "C" {
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))
 #define	WT_MAX(a, b)	((a) < (b) ? (b) : (a))
 
+/* Elements in an array. */
+#define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
+
 /* Flag check for API functions. */
 #define	WT_ENV_FCHK_RET(env, name, f, mask, ret)			\
 	if ((f) & ~(mask))						\
