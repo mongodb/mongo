@@ -124,10 +124,6 @@ int
 __wt_cache_destroy(ENV *env);
 void
 __wt_cache_dump(ENV *env);
-void
-__wt_workq_read_server(ENV *env);
-void *
-__wt_cache_read_server(void *arg);
 int
 __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep);
 int
@@ -139,6 +135,10 @@ int
 __wt_page_read(DB *db, WT_PAGE *page);
 int
 __wt_page_write(DB *db, WT_PAGE *page);
+void
+__wt_workq_read_server(ENV *env);
+void *
+__wt_cache_read_server(void *arg);
 int
 __wt_cache_sync(
     WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
