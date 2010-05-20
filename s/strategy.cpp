@@ -28,10 +28,8 @@ namespace mongo {
     // ----- Strategy ------
 
     void Strategy::doWrite( int op , Request& r , const Shard& shard ){
-        ShardConnection dbcon( shard );
+        ShardConnection dbcon( shard , r.getns() );
         DBClientBase &_c = dbcon.conn();
-        
-        checkShardVersion( _c , r.getns() );
 
         /* TODO FIX - do not case and call DBClientBase::say() */
         DBClientConnection&c = dynamic_cast<DBClientConnection&>(_c);
@@ -42,10 +40,8 @@ namespace mongo {
 
     void Strategy::doQuery( Request& r , const Shard& shard ){
         try{
-            ShardConnection dbcon( shard );
+            ShardConnection dbcon( shard , r.getns() );
             DBClientBase &c = dbcon.conn();
-            
-            checkShardVersion( c , r.getns() );
             
             Message response;
             bool ok = c.call( r.m(), response);
@@ -72,8 +68,7 @@ namespace mongo {
     }
     
     void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj ){
-        ShardConnection dbcon( shard );
-        checkShardVersion( dbcon.conn() , ns );
+        ShardConnection dbcon( shard , ns );
         dbcon->insert( ns , obj );
         dbcon.done();
     }

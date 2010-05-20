@@ -197,7 +197,7 @@ namespace mongo {
     void Balancer::ping(){
         assert( _myid.size() && _started );
         try {
-            ShardConnection conn( configServer.getPrimary() );
+            ScopedDbConnection conn( configServer.getPrimary() );
             ping( conn.conn() );
             conn.done();
         }
@@ -265,7 +265,7 @@ namespace mongo {
             sleepsecs( 15 );
             
             try {
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
                 ping( conn.conn() );
                 
                 if ( ! checkOIDs() ){

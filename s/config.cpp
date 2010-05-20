@@ -232,7 +232,7 @@ namespace mongo {
         
         // 4
         {
-            ShardConnection conn( _primary );
+            ScopedDbConnection conn( _primary );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -243,7 +243,7 @@ namespace mongo {
         
         // 5
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ){
-            ShardConnection conn( *i );
+            ScopedDbConnection conn( *i );
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ){
                 errmsg = res.toString();
@@ -287,7 +287,7 @@ namespace mongo {
     /* --- Grid --- */
     
     bool Grid::knowAboutShard( string name ) const{
-        ShardConnection conn( configServer.getPrimary() );
+        ShardConnection conn( configServer.getPrimary() , "" );
         BSONObj shard = conn->findOne( "config.shards" , BSON( "host" << name ) );
         conn.done();
         return ! shard.isEmpty();
@@ -345,7 +345,7 @@ namespace mongo {
     }
 
     unsigned long long Grid::getNextOpTime() const {
-        ShardConnection conn( configServer.getPrimary() );
+        ScopedDbConnection conn( configServer.getPrimary() );
         
         BSONObj result;
         massert( 10421 ,  "getoptime failed" , conn->simpleCommand( "admin" , &result , "getoptime" ) );
@@ -414,7 +414,7 @@ namespace mongo {
     
     bool ConfigServer::allUp( string& errmsg ){
         try {
-            ShardConnection conn( _primary );
+            ScopedDbConnection conn( _primary );
             conn->getLastError();
             conn.done();
             return true;
@@ -428,7 +428,7 @@ namespace mongo {
     }
     
     int ConfigServer::dbConfigVersion(){
-        ShardConnection conn( _primary );
+        ScopedDbConnection conn( _primary );
         int version = dbConfigVersion( conn.conn() );
         conn.done();
         return version;
@@ -454,7 +454,7 @@ namespace mongo {
     void ConfigServer::reloadSettings(){
         set<string> got;
         
-        ShardConnection conn( _primary );
+        ScopedDbConnection conn( _primary );
         auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
         while ( c->more() ){
             BSONObj o = c->next();
@@ -505,7 +505,7 @@ namespace mongo {
         static bool createdCapped = false;
         static AtomicUInt num;
         
-        ShardConnection conn( _primary );
+        ScopedDbConnection conn( _primary );
         
         if ( ! createdCapped ){
             conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );

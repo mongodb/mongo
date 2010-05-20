@@ -56,7 +56,7 @@ namespace mongo {
             
         private:
             bool _passthrough(const string& db,  DBConfig * conf, const BSONObj& cmdObj , BSONObjBuilder& result ){
-                ShardConnection conn( conf->getPrimary() );
+                ShardConnection conn( conf->getPrimary() , "" );
                 BSONObj res;
                 bool ok = conn->runCommand( db , cmdObj , res );
                 result.appendElements( res );
@@ -178,7 +178,7 @@ namespace mongo {
                 DBConfig * conf = grid.getDBConfig( dbName , false );
                 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ){
-                    ShardConnection conn( conf->getPrimary() );
+                    ShardConnection conn( conf->getPrimary() , fullns );
                     result.append( "n" , (double)conn->count( fullns , filter ) );
                     conn.done();
                     return true;
@@ -228,7 +228,7 @@ namespace mongo {
                 long long storageSize=0;
                 int nindexes=0;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ){
-                    ShardConnection conn( *i );
+                    ShardConnection conn( *i , fullns );
                     BSONObj res;
                     if ( ! conn->runCommand( dbName , cmdObj , res ) ){
                         errmsg = "failed on shard: " + res.toString();
@@ -314,7 +314,7 @@ namespace mongo {
                 for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     shared_ptr<ChunkRange> c = *i;
 
-                    ShardConnection conn( c->getShard() );
+                    ShardConnection conn( c->getShard() , fullns );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , fixCmdObj(cmdObj, c) , res );
                     conn.done();
@@ -402,7 +402,7 @@ namespace mongo {
                 for ( vector<shared_ptr<ChunkRange> >::iterator i = chunks.begin() ; i != chunks.end() ; i++ ){
                     shared_ptr<ChunkRange> c = *i;
 
-                    ShardConnection conn( c->getShard() );
+                    ShardConnection conn( c->getShard() , fullns );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     conn.done();
@@ -462,7 +462,7 @@ namespace mongo {
 
                 const Chunk& chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
                 
-                ShardConnection conn( chunk.getShard() );
+                ShardConnection conn( chunk.getShard() , fullns );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();
@@ -564,7 +564,7 @@ namespace mongo {
                 timingBuilder.append( "shards" , t.millis() );
 
                 Timer t2;
-                ShardConnection conn( conf->getPrimary() );
+                ShardConnection conn( conf->getPrimary() , fullns );
                 BSONObj finalResult;
                 if ( ! conn->runCommand( dbName , finalCmd.obj() , finalResult ) ){
                     errmsg = "final reduce failed: ";

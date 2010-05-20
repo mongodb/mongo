@@ -164,9 +164,9 @@ namespace mongo {
 
     class ShardConnection {
     public:
-        ShardConnection( const Shard * s );
-        ShardConnection( const Shard& s );
-        ShardConnection( const string& addr );
+        ShardConnection( const Shard * s , const string& ns );
+        ShardConnection( const Shard& s , const string& ns );
+        ShardConnection( const string& addr , const string& ns );
 
         void done();
         void kill();
@@ -189,11 +189,14 @@ namespace mongo {
         string getHost() const {
             return _addr;
         }
+
+        static void sync();
         
     private:
         void _init();
         
         string _addr;
+        string _ns;
         DBClientBase* _conn;
     };
 }

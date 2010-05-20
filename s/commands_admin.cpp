@@ -173,7 +173,7 @@ namespace mongo {
         public:
             ListDatabaseCommand() : GridAdminCmd("listdatabases") { }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
 
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.databases" , BSONObj() );
 
@@ -234,14 +234,14 @@ namespace mongo {
                     return false;
                 }
 
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
 
                 log() << "movePrimary: moving " << dbname << " primary from: " << config->getPrimary().toString() << " to: " << to << endl;
 
                 // TODO LOCKING: this is not safe with multiple mongos
 
 
-                ShardConnection toconn( to );
+                ScopedDbConnection toconn( to );
 
                 // TODO AARON - we need a clone command which replays operations from clone start to now
                 //              using a seperate smaller oplog
@@ -255,7 +255,7 @@ namespace mongo {
                     return false;
                 }
 
-                ShardConnection fromconn( config->getPrimary() );
+                ScopedDbConnection fromconn( config->getPrimary() );
 
                 config->setPrimary( to );
                 config->save( true );
@@ -346,7 +346,7 @@ namespace mongo {
                 
                 ShardKeyPattern proposedKey( key );
                 {
-                    ShardConnection conn( config->getPrimary() );
+                    ScopedDbConnection conn( config->getPrimary() );
                     BSONObjBuilder b; 
                     b.append( "ns" , ns ); 
                     b.appendBool( "unique" , true ); 
@@ -427,6 +427,8 @@ namespace mongo {
             virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ) = 0;
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                ShardConnection::sync();
+
                 string ns = cmdObj[_name.c_str()].valuestrsafe();
                 if ( ns.size() == 0 ){
                     errmsg = "no ns";
@@ -504,6 +506,8 @@ namespace mongo {
                 help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
+                ShardConnection::sync();
+
                 Timer t;
                 string ns = cmdObj["movechunk"].valuestrsafe();
                 if ( ns.size() == 0 ){
@@ -559,7 +563,7 @@ namespace mongo {
                 help << "list all shards of the system";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
 
                 vector<BSONObj> all;
                 auto_ptr<DBClientCursor> cursor = conn->query( "config.shards" , BSONObj() );
@@ -583,7 +587,7 @@ namespace mongo {
                 help << "add a new shard to the system";
             }
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
                 
                 
                 string host = cmdObj["addshard"].valuestrsafe();
@@ -633,7 +637,7 @@ namespace mongo {
                 }
                 
                 try {
-                    ShardConnection newShardConn( host );
+                    ScopedDbConnection newShardConn( host );
                     newShardConn->getLastError();
                     newShardConn.done();
                 }
@@ -673,7 +677,7 @@ namespace mongo {
                     return 0;
                 }
 
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
 
                 BSONObj server = BSON( "host" << cmdObj["removeshard"].valuestrsafe() );
                 conn->remove( "config.shards" , server );
@@ -792,7 +796,7 @@ namespace mongo {
                 if ( shards->size() == 1 ){
                     string theShard = *(shards->begin() );
                     result.append( "theshard" , theShard.c_str() );
-                    ShardConnection conn( theShard );
+                    ShardConnection conn( theShard , "" );
                     BSONObj res;
                     bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                     result.appendElements( res );
@@ -803,7 +807,7 @@ namespace mongo {
                 vector<string> errors;
                 for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ){
                     string theShard = *i;
-                    ShardConnection conn( theShard );
+                    ShardConnection conn( theShard , "" );
                     string temp = conn->getLastError();
                     if ( temp.size() )
                         errors.push_back( temp );

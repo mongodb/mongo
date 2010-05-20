@@ -26,6 +26,8 @@ db.foo2.save( { _id : 4 , num : 20 } );
 s.adminCommand( { split : "test.foo2" , middle : { num : 10 } } );
 s.adminCommand( { movechunk : "test.foo2" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
 
+print( "a: " + a.foo2.count() );
+print( "b: " + b.foo2.count() );
 assert( a.foo2.count() > 0 && a.foo2.count() < 4 , "se1" );
 assert( b.foo2.count() > 0 && b.foo2.count() < 4 , "se2" );
 assert.eq( 4 , db.foo2.count() , "se3" );
