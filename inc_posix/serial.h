@@ -1,8 +1,8 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
-	WT_PAGE *page;
-	WT_REPL *new;
+	WT_PAGE * page;
+	WT_REPL * new;
 } __wt_bt_del_args;
 #define	 __wt_bt_del_serial(toc, _page, _new, ret) do {\
 	__wt_bt_del_args _args;\
@@ -17,7 +17,7 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	WT_PAGE *page;
+	WT_PAGE * page;
 } __wt_bt_rec_args;
 #define	 __wt_bt_rec_serial(toc, _page, ret) do {\
 	__wt_bt_rec_args _args;\
@@ -30,9 +30,9 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	WT_ROW_INDX *indx;
-	WT_REPL *repl;
-	void *data;
+	WT_ROW_INDX * indx;
+	WT_REPL * repl;
+	void * data;
 	u_int32_t size;
 } __wt_bt_repl_args;
 #define	 __wt_bt_repl_serial(toc, _indx, _repl, _data, _size, ret) do {\
@@ -54,7 +54,7 @@ typedef struct {
 typedef struct {
 	u_int32_t addr;
 	u_int32_t size;
-	WT_PAGE **pagep;
+	WT_PAGE ** pagep;
 } __wt_cache_in_args;
 #define	 __wt_cache_in_serial(toc, _addr, _size, _pagep, ret) do {\
 	__wt_cache_in_args _args;\
@@ -71,7 +71,7 @@ typedef struct {
 } while (0)
 
 typedef struct {
-	WT_FLIST *flistp;
+	WT_FLIST * flistp;
 } __wt_flist_free_args;
 #define	 __wt_flist_free_serial(toc, _flistp, ret) do {\
 	__wt_flist_free_args _args;\
