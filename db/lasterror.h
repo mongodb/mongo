@@ -110,7 +110,8 @@ namespace mongo {
     inline void raiseError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
-            DEV log() << "warning: lastError==0 can't report:" << msg << '\n';
+            /* might be intentional (non-user thread) */
+            DEV log() << "warning dev: lastError==0 won't report:" << msg << '\n';
         } else if ( le->disabled ) {
             log() << "lastError disabled, can't report: " << msg << endl;
         } else {

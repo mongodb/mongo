@@ -24,7 +24,9 @@
 #include <stack>
 
 namespace mongo {
-
+    
+    class ShardConnection;
+    
 	/** Queries return a cursor object */
     class DBClientCursor : boost::noncopyable {
     public:
@@ -139,6 +141,7 @@ namespace mongo {
         void decouple() { _ownCursor = false; }
         
         void attach( ScopedDbConnection * conn );
+        void attach( ShardConnection * conn );
         
     private:
         friend class DBClientBase;

@@ -46,7 +46,10 @@ namespace mongo {
     }
 */
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
-    ReplSet::ReplSet(string cfgString) : elect(this), _self(0), _mgr(this) {
+    ReplSet::ReplSet(string cfgString) : elect(this), 
+        _self(0), 
+        mgr( new Manager(this) )
+    {
         _myState = STARTUP;
         _currentPrimary = 0;
 
@@ -98,7 +101,6 @@ namespace mongo {
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
             log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
-    
     }
 
     ReplSet::StartupStatus ReplSet::startupStatus = PRESTART;
@@ -207,7 +209,11 @@ namespace mongo {
         startupStatus = STARTED;
     }
 
-    /* forked as a thread during startup */
+    /* forked as a thread during startup 
+       it can run quite a while looking for config.  but once found, 
+       a separate thread takes over as ReplSet::Manager, and this thread
+       terminates.
+    */
     void startReplSets() {
         Client::initThread("startReplSets");
         try { 
@@ -219,9 +225,9 @@ namespace mongo {
             (theReplSet = new ReplSet(cmdLine.replSet))->go();
         }
         catch(std::exception& e) { 
-            log() << "replSet Caught exception in management thread: " << e.what() << rsLog;
+            log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;
             if( theReplSet ) 
-                theReplSet->fatal();
+                theReplSet->fatal(); // concurrency: this maybe should be a message.
         }
         cc().shutdown();
     }

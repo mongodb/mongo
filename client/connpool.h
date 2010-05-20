@@ -56,10 +56,11 @@ namespace mongo {
         mongo::mutex _mutex;
         map<string,PoolForHost*> _pools; // servername -> pool
         list<DBConnectionHook*> _hooks;
-        
+
+    public:        
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
-    public:
+
         void flush();
         DBClientBase *get(const string& host);
         void release(const string& host, DBClientBase *c) {

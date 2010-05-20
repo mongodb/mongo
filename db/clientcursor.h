@@ -148,19 +148,18 @@ namespace mongo {
          */
         bool yield();
 
-        struct YieldLock {
-            YieldLock( ClientCursor * cc )
+        struct YieldLock : boost::noncopyable {
+            explicit YieldLock( ptr<ClientCursor> cc )
                 : _cc( cc ) , _id( cc->cursorid ) , _doingDeletes( cc->_doingDeletes ) {
                 cc->updateLocation();
-                _unlock = new dbtempreleasecond();
+                _unlock.reset(new dbtempreleasecond());
             }
             ~YieldLock(){
                 assert( ! _unlock );
             }
 
             bool stillOk(){
-                delete _unlock;
-                _unlock = 0;
+                relock();
                 
                 if ( ClientCursor::find( _id , false ) == 0 ){
                     // i was deleted
@@ -170,18 +169,19 @@ namespace mongo {
                 _cc->_doingDeletes = _doingDeletes;
                 return true;
             }
+
+            void relock(){
+                _unlock.reset();
+            }
             
+        private:
             ClientCursor * _cc;
             CursorId _id;
             bool _doingDeletes;
 
-            dbtempreleasecond * _unlock;
+            scoped_ptr<dbtempreleasecond> _unlock;
 
         };
-
-        YieldLock yieldHold(){
-            return YieldLock( this );
-        }
 
         // --- some pass through helpers for Cursor ---
 

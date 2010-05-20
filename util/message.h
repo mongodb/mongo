@@ -228,6 +228,10 @@ namespace mongo {
             setData( reinterpret_cast< MsgData* >( buf ), true );
         }
         
+        Message(Message& r) { 
+            *this = r;
+        }
+
         // vector swap() so this is fast
         Message& operator=(Message& r) {
             assert( _data.empty() );

@@ -22,6 +22,7 @@
 #include "../db/queryutil.h"
 #include "../db/dbmessage.h"
 #include "../s/util.h"
+#include "../s/shard.h"
 
 namespace mongo {
     
@@ -55,7 +56,7 @@ namespace mongo {
             q = concatQuery( q , extra );
         }
 
-        ScopedDbConnection conn( server );
+        ShardConnection conn( server );
         checkShardVersion( conn.conn() , _ns );
 
         if ( logLevel >= 5 ){
@@ -317,7 +318,7 @@ namespace mongo {
         shared_ptr<CommandResult> res = *_grab;
         _grab = 0;
         
-        ScopedDbConnection conn( res->_server );
+        ShardConnection conn( res->_server );
         res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
         res->_done = true;
     }

@@ -8,7 +8,7 @@ placeCheck = function( num ){
     print("shard2 step: " + num );
 }
 
-s = new ShardingTest( "shard2" , 2 , 6 );
+s = new ShardingTest( "shard2" , 2 , 2 );
 
 db = s.getDB( "test" );
 
@@ -26,7 +26,7 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
-s.adminCommand( "connpoolsync" );
+db.getLastError();
 
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
 assert.eq( 3 , db.foo.find().length() , "not right on shard" );
@@ -59,18 +59,18 @@ placeCheck( 3 );
 // test inserts go to right server/shard
 
 db.foo.save( { num : 3 , name : "bob" } );
-s.adminCommand( "connpoolsync" );
+db.getLastError();
 assert.eq( 1 , primary.foo.find().length() , "after move insert go wrong place?" );
 assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
 db.foo.save( { num : -2 , name : "funny man" } );
-s.adminCommand( "connpoolsync" );
+db.getLastError();
 assert.eq( 2 , primary.foo.find().length() , "after move insert go wrong place?" );
 assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
 
 db.foo.save( { num : 0 , name : "funny guy" } );
-s.adminCommand( "connpoolsync" );
+db.getLastError();
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
 assert.eq( 4 , secondary.foo.find().length() , "boundary B" );
 

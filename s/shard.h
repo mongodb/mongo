@@ -164,35 +164,36 @@ namespace mongo {
 
     class ShardConnection {
     public:
-        ShardConnection( const Shard * s )
-            : _conn( s->getConnString() ){
-        }
+        ShardConnection( const Shard * s );
+        ShardConnection( const Shard& s );
+        ShardConnection( const string& addr );
 
-        ShardConnection( const Shard& s )
-            : _conn( s.getConnString() ){
-        }
-        
-        ShardConnection( const string& addr )
-            : _conn( addr ){
-        }
+        void done();
+        void kill();
 
-        void done(){
-            _conn.done();
-        }
-        
-        void kill(){
-            _conn.kill();
-        }
-        
         DBClientBase& conn(){
-            return _conn.conn();
+            assert( _conn );
+            return *_conn;
         }
         
         DBClientBase* operator->(){
-            return _conn.get();
+            assert( _conn );
+            return _conn;
+        }
+
+        DBClientBase* get(){
+            assert( _conn );
+            return _conn;
+        }
+
+        string getHost() const {
+            return _addr;
         }
         
     private:
-        ScopedDbConnection _conn;
+        void _init();
+        
+        string _addr;
+        DBClientBase* _conn;
     };
 }

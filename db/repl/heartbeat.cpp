@@ -97,7 +97,6 @@ namespace mongo {
         ReplSetHealthPoll() {}
         string name() { return "ReplSetHealthPoll"; }
         void doWork() { 
-            mongo::lastError.initThread();
             RSMember mem = m;
             RSMember old = mem;
             try { 
@@ -120,7 +119,8 @@ namespace mongo {
 
                     be cfg = info["config"];
                     if( cfg.ok() ) {
-                        ReplSetConfig::receivedNewConfig(cfg.Obj());
+                        // received a new config
+                        theReplSet->mgr->send(cfg.Obj().copy());
                     }
                 }
                 else { 
@@ -132,8 +132,7 @@ namespace mongo {
             }
             m = mem;
             if( mem.changed(old) ) {
-                log() << "TODO FINISH code checknewstate" << rsLog;
-                // theReplSet->_mgr.checkNewState();
+                theReplSet->mgr->send(ReplSet::Manager::CheckNewState);
             }
         }
 
@@ -152,7 +151,9 @@ namespace mongo {
         note ReplSet object is only created once we get a config - so this won't run 
         until the initiation.
     */
-    void ReplSet::startHealthThreads() {
+    void ReplSet::startThreads() {
+        task::fork(mgr->taskPtr());
+
         Member* m = _members.head();
         while( m ) {
             ReplSetHealthPoll *task = new ReplSetHealthPoll();
@@ -161,6 +162,8 @@ namespace mongo {
             task::repeat(shared_ptr<task::Task>(task), 2000);
             m = m->next();
         }
+
+        mgr->send(Manager::CheckNewState);
     }
 
 }

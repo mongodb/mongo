@@ -20,6 +20,7 @@
 
 #include "../../util/concurrency/list.h"
 #include "../../util/concurrency/value.h"
+#include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
 #include "rstime.h"
 #include "rsmember.h"
@@ -62,7 +63,7 @@ namespace mongo {
         ReplSet(string cfgString);
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
-        void go() { _myState = STARTUP2; startHealthThreads(); }
+        void go() { _myState = STARTUP2; startThreads(); }
 
         // for replSetGetStatus command
         void summarizeStatus(BSONObjBuilder&) const;
@@ -83,10 +84,9 @@ namespace mongo {
 
         class Consensus {
             ReplSet &rs;
-            bool inprog;
             void _electSelf();
         public:
-            Consensus(ReplSet *t) : rs(*t),inprog(false) { }
+            Consensus(ReplSet *t) : rs(*t) { }
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
             void electSelf();
@@ -119,19 +119,25 @@ namespace mongo {
         List1<Member> _members;
         Member* head() const { return _members.head(); }
 
-        void startHealthThreads();
+        void startThreads();
         friend class FeedbackThread;
 
     public:
-        class Manager : boost::noncopyable {
+        class Manager : public task::Port {
+            string name() { return "ReplSet::Manager"; }
+            bool got(const any&);
             ReplSet *_rs;
             int _primary;
             const Member* findOtherPrimary();
             void noteARemoteIsPrimary(const Member *);
+            void checkNewState();
         public:
             Manager(ReplSet *rs);
-            void checkNewState();
-        } _mgr;
+            enum Messages { 
+                CheckNewState
+            };
+        };
+        shared_ptr<Manager> mgr;
 
     };
 

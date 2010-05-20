@@ -175,15 +175,25 @@ namespace mongo {
 
             // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
             // which is possible as keys may have been deleted.
-            if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
+            int x = 0;
+            while( 1 ) {
+                if ( b->keyAt(keyOfs).woEqual(keyAtKeyOfs) &&
                     b->k(keyOfs).recordLoc == locAtKeyOfs ) {
-                if ( !b->k(keyOfs).isUsed() ) {
-                    /* we were deleted but still exist as an unused
-                       marker key. advance.
-                    */
-                    skipUnusedKeys();
+                        if ( !b->k(keyOfs).isUsed() ) {
+                            /* we were deleted but still exist as an unused
+                            marker key. advance.
+                            */
+                            skipUnusedKeys();
+                        }
+                        return;
                 }
-                return;
+
+                /* we check one key earlier too, in case a key was just deleted.  this is 
+                   important so that multi updates are reasonably fast.
+                   */
+                if( keyOfs == 0 || x++ )
+                    break;
+                keyOfs--;
             }
         }
 
