@@ -36,7 +36,7 @@ namespace mongo {
             return 0;
         
         if ( cur == 0 ){
-            ShardConnection conn( _primary );
+            ScopedDbConnection conn( _primary );
             conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             pool.flush();
             assert( VERSION == dbConfigVersion( conn.conn() ) );
@@ -55,7 +55,7 @@ namespace mongo {
                 return -9;
             }
             
-            ShardConnection conn( _primary );
+            ScopedDbConnection conn( _primary );
             
             // do a backup
             string backupName;

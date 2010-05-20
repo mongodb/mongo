@@ -31,7 +31,7 @@ namespace mongo {
 
             list<BSONObj> all;
             {
-                ShardConnection conn( configServer.getPrimary() );
+                ScopedDbConnection conn( configServer.getPrimary() );
                 auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , Query() );
                 while ( c->more() ){
                     all.push_back( c->next().getOwned() );
@@ -119,7 +119,7 @@ namespace mongo {
 
     
     BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
-        ShardConnection conn( this );
+        ScopedDbConnection conn( this );
         BSONObj res;
         bool ok = conn->runCommand( db , cmd , res );
         if ( ! ok ){

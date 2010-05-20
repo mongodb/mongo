@@ -35,7 +35,7 @@ namespace mongo {
     bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
         int vUp = rs._self->config().votes;
         for( Member *m = rs.head(); m; m=m->next() ) { 
-            vUp += m->m().up() ? m->config().votes : 0;
+            vUp += m->hbinfo().up() ? m->config().votes : 0;
         }
         return vUp * 2 > totalVotes();
     }
@@ -71,12 +71,12 @@ namespace mongo {
                "replSetElect" << 1 <<
                "set" << rs.name() << 
                "who" << me.fullName() << 
-               "whoid" << me.m().id() << 
+               "whoid" << me.hbinfo().id() << 
                "cfgver" << rs._cfg->version
             );
         list<eptr> jobs;
         list<BackgroundJob*> _jobs;
-        for( Member *m = rs.head(); m; m=m->next() ) if( m->m().up() ) {
+        for( Member *m = rs.head(); m; m=m->next() ) if( m->hbinfo().up() ) {
             E *e = new E();
             e->m = m;
             jobs.push_back(eptr(e)); _jobs.push_back(e);

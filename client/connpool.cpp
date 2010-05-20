@@ -22,6 +22,7 @@
 #include "connpool.h"
 #include "../db/commands.h"
 #include "syncclusterconnection.h"
+#include "../s/shard.h"
 
 namespace mongo {
 
@@ -144,6 +145,14 @@ namespace mongo {
             }
             kill();
         }
+    }
+
+    ScopedDbConnection::ScopedDbConnection(const Shard& shard )
+        : _host( shard.getConnString() ) , _conn( pool.get(_host) ){
+    }
+    
+    ScopedDbConnection::ScopedDbConnection(const Shard* shard )
+        : _host( shard->getConnString() ) , _conn( pool.get(_host) ){
     }
 
 

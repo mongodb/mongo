@@ -54,7 +54,7 @@ namespace mongo {
         ClientConnections(){
             debug() << " NEW  " << endl;
         }
-
+        
         ~ClientConnections(){
             debug() << " KILLING  " << endl;
             for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
@@ -101,7 +101,24 @@ namespace mongo {
             s->avail.push( conn );
             debug( s , addr ) << "PUSHING: " << conn << endl;
         }
-
+        
+        void sync(){
+            scoped_lock lk( _mutex );
+            for ( map<string,Status*>::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ){
+                string addr = i->first;
+                Status* ss = i->second;
+                assert( ss );
+                std::stack<DBClientBase*>& s = ss->avail;
+                while ( ! s.empty() ){
+                    DBClientBase* conn = s.top();
+                    conn->getLastError();
+                    pool.release( addr , conn );
+                    s.pop();
+                }
+            }
+            _hosts.clear();
+        }
+        
         map<string,Status*> _hosts;
         mongo::mutex _mutex;
 
@@ -121,24 +138,29 @@ namespace mongo {
 
     thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 
-    ShardConnection::ShardConnection( const Shard * s )
-        : _addr( s->getConnString() ){
+    ShardConnection::ShardConnection( const Shard * s , const string& ns )
+        : _addr( s->getConnString() ) , _ns( ns ) {
         _init();
     }
 
-    ShardConnection::ShardConnection( const Shard& s )
-        : _addr( s.getConnString() ){
+    ShardConnection::ShardConnection( const Shard& s , const string& ns )
+        : _addr( s.getConnString() ) , _ns( ns ) {
         _init();
     }
     
-    ShardConnection::ShardConnection( const string& addr )
-        : _addr( addr ){
+    ShardConnection::ShardConnection( const string& addr , const string& ns )
+        : _addr( addr ) , _ns( ns ) {
         _init();
     }
     
     void ShardConnection::_init(){
         assert( _addr.size() );
         _conn = ClientConnections::get()->get( _addr );
+
+        if ( _ns.size() ){
+            checkShardVersion( *_conn , _ns );
+        }
+        
     }
 
     void ShardConnection::done(){
@@ -153,5 +175,9 @@ namespace mongo {
             delete _conn;
             _conn = 0;
         }
+    }
+
+    void ShardConnection::sync(){
+        ClientConnections::get()->sync();
     }
 }

@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    class Shard;
+
     struct PoolForHost {
         PoolForHost()
             : created(0){}
@@ -115,6 +117,9 @@ namespace mongo {
             : _host( host ) , _conn( conn ){
         }
         
+        ScopedDbConnection(const Shard& shard );
+        ScopedDbConnection(const Shard* shard );
+
         string getHost() const { return _host; }
 
         /** Force closure of the connection.  You should call this if you leave it in

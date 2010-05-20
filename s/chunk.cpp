@@ -86,8 +86,7 @@ namespace mongo {
         }
         
         if ( sort ){
-            ScopedDbConnection conn( getShard().getConnString() );
-            checkShardVersion( conn.conn() , _ns );
+            ShardConnection conn( getShard().getConnString() , _ns );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
@@ -368,7 +367,7 @@ namespace mongo {
 
     template <typename ChunkType>
     inline long countObjectsHelper(const ChunkType* chunk, const BSONObj& filter){
-        ScopedDbConnection conn( chunk->getShard().getConnString() );
+        ShardConnection conn( chunk->getShard().getConnString() , chunk->getManager()->getns() );
         
         BSONObj f = chunk->getFilter();
         if ( ! filter.isEmpty() )
@@ -799,7 +798,7 @@ namespace mongo {
         
         // delete data from mongod
         for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ShardConnection conn( i->first );
+            ScopedDbConnection conn( i->first );
             conn->dropCollection( _ns );
             conn.done();
         }
@@ -813,13 +812,13 @@ namespace mongo {
         
         // remove chunk data
         Chunk temp(0);
-        ShardConnection conn( temp.modelServer() );
+        ScopedDbConnection conn( temp.modelServer() );
         conn->remove( temp.getNS() , BSON( "ns" << _ns ) );
         conn.done();
         log(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;                
         
         for ( map<Shard,ShardChunkVersion>::iterator i=seen.begin(); i!=seen.end(); i++ ){
-            ShardConnection conn( i->first );
+            ScopedDbConnection conn( i->first );
             BSONObj res;
             if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
                 throw UserException( 8071 , (string)"OH KNOW, cleaning up after drop failed: " + res.toString() );

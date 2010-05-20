@@ -56,8 +56,7 @@ namespace mongo {
             q = concatQuery( q , extra );
         }
 
-        ShardConnection conn( server );
-        checkShardVersion( conn.conn() , _ns );
+        ShardConnection conn( server , _ns );
 
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
@@ -318,7 +317,7 @@ namespace mongo {
         shared_ptr<CommandResult> res = *_grab;
         _grab = 0;
         
-        ShardConnection conn( res->_server );
+        ScopedDbConnection conn( res->_server );
         res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
         res->_done = true;
     }

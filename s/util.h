@@ -28,23 +28,21 @@
 namespace mongo {
     
     /** 
-        your config info for a given shard/chunk is out of date */
-    class StaleConfigException : public std::exception {
+     * your config info for a given shard/chunk is out of date 
+     */
+    class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns , const string& msg){
+        StaleConfigException( const string& ns , const string& raw){
+            code = 9996;
             stringstream s;
-            s << "StaleConfigException ns: " << ns << " " << msg;
-            _msg = s.str();
-            log(1) << _msg << endl;
+            s << "StaleConfigException ns: " << ns << " " << raw;
+            msg = s.str();
+            log(1) << msg << endl;
         }
-
-        virtual ~StaleConfigException() throw(){}
         
-        virtual const char* what() const throw(){
-            return _msg.c_str();
-        }
+        virtual ~StaleConfigException() throw(){}
+
     private:
-        string _msg;
     };
 
     void checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false );

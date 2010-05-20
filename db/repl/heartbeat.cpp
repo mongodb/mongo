@@ -91,15 +91,15 @@ namespace mongo {
 
     /* poll every other set member to check its status */
     class ReplSetHealthPoll : public task::Task {
-    public:
         HostAndPort h;
-        Atomic<RSMember> m;
+        HeartbeatInfo m;
+    public:
+        ReplSetHealthPoll(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
-        ReplSetHealthPoll() {}
         string name() { return "ReplSetHealthPoll"; }
         void doWork() { 
-            RSMember mem = m;
-            RSMember old = mem;
+            HeartbeatInfo mem = m;
+            HeartbeatInfo old = mem;
             try { 
                 BSONObj info;
                 int theirConfigVersion = -10000;
@@ -132,13 +132,14 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
+            theReplSet->mgr->send(mem);
             if( mem.changed(old) ) {
                 theReplSet->mgr->send(ReplSet::Manager::CheckNewState);
             }
         }
 
     private:
-        void down(RSMember& mem, string msg) {
+        void down(HeartbeatInfo& mem, string msg) {
             mem.health = 0.0;
             if( mem.upSince ) {
                 mem.upSince = 0;
@@ -157,9 +158,7 @@ namespace mongo {
 
         Member* m = _members.head();
         while( m ) {
-            ReplSetHealthPoll *task = new ReplSetHealthPoll();
-            RSMember x = m->m();
-            task->m = m->m();
+            ReplSetHealthPoll *task = new ReplSetHealthPoll(m->h(), m->hbinfo());
             task::repeat(shared_ptr<task::Task>(task), 2000);
             m = m->next();
         }
