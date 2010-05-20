@@ -98,7 +98,7 @@ namespace mongo {
             string fullName() const { return h().toString(); }
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
             void summarizeAsHtml(stringstream& s) const;
-            const RSMember& m() const { return _m; }
+            const HeartbeatInfo& hbinfo() const { return _m; }
             string lhb() { return _m.lastHeartbeatMsg; }
             MemberState state() const { return _state; }
             const HostAndPort& h() const { return _h; }
@@ -106,7 +106,7 @@ namespace mongo {
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             HostAndPort _h;
             MemberState _state;
-            RSMember _m;
+            HeartbeatInfo _m;
 
         };
         list<HostAndPort> memberHostnames() const;

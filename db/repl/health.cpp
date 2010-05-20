@@ -69,20 +69,20 @@ namespace mongo {
             u << "http://" << h().host() << ':' << (h().port() + 1000) << "/_replSet";
             s << td( a(u.str(), "", fullName()) );
         }
-        double h = m().health;
+        double h = hbinfo().health;
         bool ok = h > 0;
         s << td(h);
-        s << td(ago(m().upSince));
+        s << td(ago(hbinfo().upSince));
         {
             string h;
-            time_t hb = m().lastHeartbeat;
+            time_t hb = hbinfo().lastHeartbeat;
             if( hb == 0 ) h = "never"; 
             else h = ago(hb) + " ago";
             s << td(h);
         }
         s << td(config().votes);
         s << td(ReplSet::stateAsStr(state()));
-        s << td( red(m().lastHeartbeatMsg,!ok) );
+        s << td( red(hbinfo().lastHeartbeatMsg,!ok) );
         s << _tr();
     }
 
@@ -135,13 +135,13 @@ namespace mongo {
                 td(stateAsHtml(_myState));
             s << td( _self->lhb() );
             s << _tr();
-			mp[_self->m().id()] = s.str();
+			mp[_self->hbinfo().id()] = s.str();
         }
         Member *m = head();
         while( m ) {
 			stringstream s;
             m->summarizeAsHtml(s);
-			mp[m->m().id()] = s.str();
+			mp[m->hbinfo().id()] = s.str();
             m = m->next();
         }
 
@@ -224,9 +224,9 @@ namespace mongo {
         while( m ) {
             BSONObjBuilder bb;
             bb.append("name", m->fullName());
-            bb.append("health", m->m().health);
-            bb.append("uptime", (unsigned) (m->m().upSince ? (time(0)-m->m().upSince) : 0));
-            bb.appendDate("lastHeartbeat", m->m().lastHeartbeat);
+            bb.append("health", m->hbinfo().health);
+            bb.append("uptime", (unsigned) (m->hbinfo().upSince ? (time(0)-m->hbinfo().upSince) : 0));
+            bb.appendDate("lastHeartbeat", m->hbinfo().lastHeartbeat);
             bb.append("errmsg", m->lhb());
             v.push_back(bb.obj());
             m = m->next();
