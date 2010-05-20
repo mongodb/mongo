@@ -17,6 +17,19 @@ typedef struct {
 } while (0)
 
 typedef struct {
+	WT_PAGE *page;
+} __wt_bt_rec_args;
+#define	 __wt_bt_rec_serial(toc, _page, ret) do {\
+	__wt_bt_rec_args _args;\
+	_args.page = _page;\
+	(ret) = __wt_toc_serialize_func(\
+	    toc, WT_WORKQ_SPIN, __wt_bt_rec_serial_func, &_args);\
+} while (0)
+#define	__wt_bt_rec_unpack(toc, _page) do {\
+	_page = ((__wt_bt_rec_args *)(toc)->wq_args)->page;\
+} while (0)
+
+typedef struct {
 	WT_ROW_INDX *indx;
 	WT_REPL *repl;
 	void *data;

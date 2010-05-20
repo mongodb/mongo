@@ -68,6 +68,8 @@ int
 __wt_bt_key_process(WT_TOC *toc, WT_ROW_INDX *ip, DBT *dbt);
 int
 __wt_bt_rec_page(WT_TOC *toc, WT_PAGE *page);
+int
+__wt_bt_rec_serial_func(WT_TOC *toc);
 void
 __wt_bt_page_discard(ENV *env, WT_PAGE *page);
 int
@@ -104,20 +106,28 @@ int
 __wt_bt_repl_alloc(ENV *env, WT_REPL *repl, WT_REPL **newp);
 int
 __wt_bt_search_row(WT_TOC *toc, DBT *key, u_int32_t flags);
-int
-__wt_drain_trickle(WT_TOC *toc, int *didworkp);
+void
+__wt_workq_drain_server(ENV *env);
+void *
+__wt_cache_drain_server(void *arg);
+void
+__wt_drain_dump(ENV *env, const char *tag);
 int
 __wt_cache_create(ENV *env);
+u_int64_t
+__wt_cache_pages_inuse(WT_CACHE *cache);
+u_int64_t
+__wt_cache_bytes_inuse(WT_CACHE *cache);
 void
 __wt_cache_stats(ENV *env);
 int
 __wt_cache_destroy(ENV *env);
-int
+void
 __wt_cache_dump(ENV *env);
+void
+__wt_workq_read_server(ENV *env);
 void *
 __wt_cache_read_server(void *arg);
-int
-__wt_cache_server_read(void *arg, int *didworkp);
 int
 __wt_page_alloc(WT_TOC *toc, u_int32_t size, WT_PAGE **pagep);
 int
@@ -129,10 +139,6 @@ int
 __wt_page_read(DB *db, WT_PAGE *page);
 int
 __wt_page_write(DB *db, WT_PAGE *page);
-void
-__wt_workq_cache_server(ENV *env);
-void *
-__wt_cache_server(void *arg);
 int
 __wt_cache_sync(
     WT_TOC *toc, void (*f)(const char *, u_int64_t), u_int32_t flags);
@@ -341,8 +347,8 @@ int
 __wt_flist_sched(WT_TOC *toc);
 int
 __wt_flist_free_serial_func(WT_TOC *toc);
-void
-__wt_hazard_set(WT_TOC *toc, WT_PAGE *page);
+int
+__wt_hazard_set(WT_TOC *toc, WT_CACHE_ENTRY *e, WT_PAGE *page);
 void
 __wt_hazard_clear(WT_TOC *toc, WT_PAGE *page);
 void
