@@ -71,7 +71,7 @@ __wt_toc_serialize_func(
 		 * Don't do arithmetic comparisons (even equality) on enum's,
 		 * it makes some compilers/lint tools angry.
 		 */
-		for (done = 0; !done; __wt_yield())
+		for (done = 0; !done;) {
 			switch (toc->wq_state) {
 			case WT_WORKQ_SPIN:
 				break;
@@ -79,9 +79,10 @@ __wt_toc_serialize_func(
 				done = 1;
 				break;
 			}
+			__wt_yield();
+		}
 		break;
 	case WT_WORKQ_READ:
-	case WT_WORKQ_SYNC:
 		__wt_lock(toc->env, toc->mtx);
 
 		/* The workQ thread can quit worrying about us. */
@@ -90,7 +91,6 @@ __wt_toc_serialize_func(
 	default:
 	case WT_WORKQ_NONE:
 	case WT_WORKQ_READ_SCHED:
-	case WT_WORKQ_SYNC_SCHED:
 		return (WT_ERROR);
 	}
 	return (toc->wq_ret);
