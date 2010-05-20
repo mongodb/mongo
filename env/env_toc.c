@@ -213,10 +213,6 @@ __wt_toc_print_state(WT_TOC *toc)
 		return ("read scheduled");
 	case WT_WORKQ_SPIN:
 		return ("spin");
-	case WT_WORKQ_SYNC:
-		return ("sync");
-	case WT_WORKQ_SYNC_SCHED:
-		return ("sync scheduled");
 	case WT_WORKQ_NONE:
 		return ("none");
 	}
