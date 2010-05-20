@@ -90,11 +90,11 @@ __wt_bt_page_out(WT_TOC *toc, WT_PAGE **pagep, u_int32_t flags)
 
 	/* The caller may have decided the page isn't worth keeping around. */
 	if (LF_ISSET(WT_DISCARD))
-		F_SET(page, WT_DISCARD);
+		page->lru = 0;
 
 	/* The caller may have dirtied the page. */
 	if (LF_ISSET(WT_MODIFIED)) {
-		page->modified = 1;
+		WT_PAGE_MODIFY_SET_AND_FLUSH(page);
 		WT_ASSERT(toc->env, __wt_bt_verify_page(toc, page, NULL) == 0);
 	}
 
