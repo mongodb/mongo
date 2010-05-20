@@ -370,9 +370,9 @@ namespace BasicTests {
     public:
         void run(){
             scoped_ptr<int> p1 (new int(1));
-            shared_ptr<int> p2 (new int(2));
+            boost::shared_ptr<int> p2 (new int(2));
             scoped_ptr<const int> p3 (new int(3));
-            shared_ptr<const int> p4 (new int(4));
+            boost::shared_ptr<const int> p4 (new int(4));
 
             //non-const
             ASSERT_EQUALS( p1.get() , ptr<int>(p1) );
@@ -380,7 +380,7 @@ namespace BasicTests {
             ASSERT_EQUALS( p2.get() , ptr<int>(p2.get()) ); // T* constructor
             ASSERT_EQUALS( p2.get() , ptr<int>(ptr<int>(p2)) ); // copy constructor
             ASSERT_EQUALS( *p2      , *ptr<int>(p2)); 
-            ASSERT_EQUALS( p2.get() , ptr<shared_ptr<int> >(&p2)->get() ); // operator->
+            ASSERT_EQUALS( p2.get() , ptr<boost::shared_ptr<int> >(&p2)->get() ); // operator->
 
             //const
             ASSERT_EQUALS( p1.get() , ptr<const int>(p1) );
@@ -392,7 +392,7 @@ namespace BasicTests {
             ASSERT_EQUALS( p2.get() , ptr<const int>(ptr<const int>(p2)) );
             ASSERT_EQUALS( p2.get() , ptr<const int>(ptr<int>(p2)) ); // constizing copy constructor
             ASSERT_EQUALS( *p2      , *ptr<int>(p2)); 
-            ASSERT_EQUALS( p2.get() , ptr<const shared_ptr<int> >(&p2)->get() );
+            ASSERT_EQUALS( p2.get() , ptr<const boost::shared_ptr<int> >(&p2)->get() );
 
             //bool context
             ASSERT( ptr<int>(p1) );
