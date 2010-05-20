@@ -135,7 +135,7 @@ namespace mongo {
             shared_ptr<Cursor> creal = bestOp->newCursor();
             
             if( !creal->ok() )
-                return nDeleted;
+                continue;
             
             CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
             
@@ -200,7 +200,7 @@ namespace mongo {
             if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
                 cc.release();
             }
-            if ( justOne && nDeleted ) {
+            if ( justOneOrig && nDeleted ) {
                 break;
             }
         }
