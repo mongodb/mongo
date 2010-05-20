@@ -94,8 +94,7 @@ namespace mongo {
         HostAndPort h;
         HeartbeatInfo m;
     public:
-        ReplSetHealthPoll(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm)
-        { }
+        ReplSetHealthPoll(const HostAndPort& hh, const HeartbeatInfo& mm) : h(hh), m(mm) { }
 
         string name() { return "ReplSetHealthPoll"; }
         void doWork() { 
@@ -133,6 +132,7 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
+            theReplSet->mgr->send(mem);
             if( mem.changed(old) ) {
                 theReplSet->mgr->send(ReplSet::Manager::CheckNewState);
             }

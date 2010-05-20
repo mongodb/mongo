@@ -102,6 +102,8 @@ namespace mongo {
             string lhb() { return _m.lastHeartbeatMsg; }
             MemberState state() const { return _state; }
             const HostAndPort& h() const { return _h; }
+            unsigned id() const { return _m.id(); }
+            friend class ReplSet;
         private:
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             HostAndPort _h;
@@ -112,6 +114,7 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
+        void updateHBInfo(const HeartbeatInfo& h);
 
     private:
         const Member *_currentPrimary;

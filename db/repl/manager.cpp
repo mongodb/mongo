@@ -107,6 +107,10 @@ namespace mongo {
             BSONObj o = any_cast<BSONObj>(msg);
             log() << "replSet " << o.toString() << rsLog;
         }
+        else if( msg.type() == typeid(HeartbeatInfo) ) {
+            const HeartbeatInfo& h = any_cast<const HeartbeatInfo&>(msg);
+            _rs->updateHBInfo(h);
+        }
         else { 
             assert(false);
         }
