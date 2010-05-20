@@ -625,6 +625,9 @@
     <ClCompile Include="..\s\shardconnection.cpp">
       <Filter>shard</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_util.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
