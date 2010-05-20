@@ -27,6 +27,7 @@ for ( j=0; j<30; j++ ){
     
 }
 s.adminCommand( "connpoolsync" );
+db.getLastError();
 
 print( "done inserting data" );
 

@@ -87,6 +87,7 @@ namespace mongo {
         
         if ( sort ){
             ScopedDbConnection conn( getShard().getConnString() );
+            checkShardVersion( conn.conn() , _ns );
             Query q;
             if ( sort == 1 )
                 q.sort( _manager->getShardKey().key() );
