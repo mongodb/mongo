@@ -82,8 +82,7 @@ __wt_bt_del_serial_func(WT_TOC *toc)
 	repl->data[repl->repl_next].data = WT_DATA_DELETED;
 	WT_MEMORY_FLUSH;
 	++repl->repl_next;
-	WT_MEMORY_FLUSH;
-	page->modified = 1;
+	WT_PAGE_MODIFY_SET_AND_FLUSH(page);
 
 	return (0);
 }
