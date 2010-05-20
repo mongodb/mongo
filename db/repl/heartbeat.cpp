@@ -92,6 +92,7 @@ namespace mongo {
     /* poll every other set member to check its status */
     class ReplSetHealthPoll : public task::Task {
     public:
+        HostAndPort h;
         Atomic<RSMember> m;
 
         ReplSetHealthPoll() {}
@@ -102,16 +103,16 @@ namespace mongo {
             try { 
                 BSONObj info;
                 int theirConfigVersion = -10000;
-                bool ok = requestHeartbeat(theReplSet->name(), mem.h().toString(), info, theReplSet->config().version, theirConfigVersion);
+                bool ok = requestHeartbeat(theReplSet->name(), h.toString(), info, theReplSet->config().version, theirConfigVersion);
                 mem.lastHeartbeat = time(0); // we set this on any response - we don't get this far if couldn't connect because exception is thrown
                 {
                     be state = info["state"];
                     if( state.ok() )
-                        mem.state = (MemberState) state.Int();
+                        mem.hbstate = (MemberState) state.Int();
                 }
                 if( ok ) {
                     if( mem.upSince == 0 ) {
-                        log() << "replSet " << mem.h().toString() << " is now up" << rsLog;
+                        log() << "replSet info " << h.toString() << " is now up" << rsLog;
                         mem.upSince = mem.lastHeartbeat;
                     }
                     mem.health = 1.0;
@@ -141,7 +142,7 @@ namespace mongo {
             mem.health = 0.0;
             if( mem.upSince ) {
                 mem.upSince = 0;
-                log() << "replSet " << mem.h().toString() << " is now down" << rsLog;
+                log() << "replSet info " << h.toString() << " is now down" << rsLog;
             }
             mem.lastHeartbeatMsg = msg;
         }
