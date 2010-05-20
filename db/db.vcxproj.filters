@@ -683,6 +683,9 @@
     <ClInclude Include="..\boost_pieces\any.hpp">
       <Filter>util\boost_pieces</Filter>
     </ClInclude>
+    <ClInclude Include="repl\multicmd.h">
+      <Filter>replset</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

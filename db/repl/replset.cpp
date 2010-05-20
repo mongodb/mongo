@@ -28,7 +28,8 @@ namespace mongo {
     void ReplSet::updateHBInfo(const HeartbeatInfo& h) { 
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
-                m->_m = h;
+                m->_hbinfo = h;
+                return;
             }
         }
     }

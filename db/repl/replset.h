@@ -98,18 +98,17 @@ namespace mongo {
             string fullName() const { return h().toString(); }
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
             void summarizeAsHtml(stringstream& s) const;
-            const HeartbeatInfo& hbinfo() const { return _m; }
-            string lhb() { return _m.lastHeartbeatMsg; }
+            const HeartbeatInfo& hbinfo() const { return _hbinfo; }
+            string lhb() { return _hbinfo.lastHeartbeatMsg; }
             MemberState state() const { return _state; }
             const HostAndPort& h() const { return _h; }
-            unsigned id() const { return _m.id(); }
+            unsigned id() const { return _hbinfo.id(); }
             friend class ReplSet;
         private:
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             HostAndPort _h;
             MemberState _state;
-            HeartbeatInfo _m;
-
+            HeartbeatInfo _hbinfo;
         };
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
@@ -153,7 +152,7 @@ namespace mongo {
     { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
 
     inline ReplSet::Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
-        _h(h), _config(c), _m(ord) { }
+        _h(h), _config(c), _hbinfo(ord) { }
 
     inline bool ReplSet::isMaster(const char *client) {         
         /* todo replset */
