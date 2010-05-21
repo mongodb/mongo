@@ -897,7 +897,7 @@ namespace mongo {
         QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
         qr->setResultFlagsToOk();
-        qr->len = result.totalLen();
+        // qr->len is updated automatically by appendData()
         ss << " reslen:" << qr->len;
         qr->setOperation(opReply);
         qr->startingFrom = 0;

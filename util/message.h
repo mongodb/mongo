@@ -89,11 +89,7 @@ namespace mongo {
         virtual HostAndPort remote() const;
 
         // send len or throw SocketException
-        void send( const char * data , int len, const char *context ) {
-            vector< pair< char *, int > > temp;
-            temp.push_back( make_pair( const_cast< char * >( data ), len ) );
-            send( temp, context );
-        }
+        void send( const char * data , int len, const char *context );
         void send( const vector< pair< char *, int > > &data, const char *context );
 
         // recv len or throw SocketException
@@ -182,34 +178,38 @@ namespace mongo {
 
     class Message {
     public:
-        Message() {
-            _freeIt = false;
-        }
-        Message( void * data , bool freeIt ) {
+        // we assume here that a vector with initial size 0 does no allocation (0 is the default, but wanted to make it explicit).
+        Message() : _buf( 0 ), _data( 0 ), _freeIt( false ) {}
+        Message( void * data , bool freeIt ) :
+            _buf( 0 ), _data( 0 ), _freeIt( false ) {
             _setData( reinterpret_cast< MsgData* >( data ), freeIt );
         };
+        Message(Message& r) : _buf( 0 ), _data( 0 ), _freeIt( false ) { 
+            *this = r;
+        }
         ~Message() {
             reset();
         }
         
         SockAddr _from;
 
-        MsgData *header() const { return reinterpret_cast< MsgData* > ( _data[ 0 ].first ); }
+        MsgData *header() const {
+            assert( !empty() );
+            return _buf ? _buf : reinterpret_cast< MsgData* > ( _data[ 0 ].first );
+        }
         int operation() const { return header()->operation(); }
         
         MsgData *singleData() const {
-            massert( 13273, "single data buffer expected", _data.size() == 1 );
+            massert( 13273, "single data buffer expected", _buf );
             return header();
         }
 
-        const vector< pair< char *, int > > &allData() const { return _data; }
-        
-        bool empty() const { return _data.empty(); }
+        bool empty() const { return !_buf && _data.empty(); }
         
         // concat multiple buffers - noop if <2 buffers already, otherwise can be expensive copy
         // can get rid of this if we make response handling smarter
         void concat() {
-            if ( _data.size() < 2 ) {
+            if ( _buf || empty() ) {
                 return;
             }
             
@@ -225,18 +225,18 @@ namespace mongo {
                 p += i->second;
             }
             reset();
-            setData( reinterpret_cast< MsgData* >( buf ), true );
+            _setData( (MsgData*)buf, true );
         }
         
-        Message(Message& r) { 
-            *this = r;
-        }
-
         // vector swap() so this is fast
         Message& operator=(Message& r) {
-            assert( _data.empty() );
+            assert( empty() );
             assert( r._freeIt );
-            _data.swap( r._data );
+            _buf = r._buf;
+            r._buf = 0;
+            if ( r._data.size() > 0 ) {
+                _data.swap( r._data );
+            }
             r._freeIt = false;
             _freeIt = true;
             return *this;
@@ -244,28 +244,46 @@ namespace mongo {
 
         void reset() {
             if ( _freeIt ) {
+                if ( _buf ) {
+                    free( _buf );
+                }
                 for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
                     free(i->first);
                 }
             }
+            _buf = 0;
             _data.clear();
             _freeIt = false;
         }
 
-        void setData(MsgData *d, bool freeIt) {
-            assert( _data.empty() );
-            _setData( d, freeIt );
-        }
+        // use to add a buffer
         // assumes message will free everything
         void appendData(char *d, int size) {
-            _freeIt = true;
+            if ( empty() ) {
+                MsgData *md = (MsgData*)d;
+                md->len = size; // can be updated later if more buffers added
+                _setData( md, true );
+                return;
+            }
+            assert( _freeIt );
+            if ( _buf ) {
+                _data.push_back( make_pair( (char*)_buf, _buf->len ) );
+                _buf = 0;
+            }
             _data.push_back( make_pair( d, size ) );
+            header()->len += size;
+        }
+        
+        // use to set first buffer if empty
+        void setData(MsgData *d, bool freeIt) {
+            assert( empty() );
+            _setData( d, freeIt );
         }
         void setData(int operation, const char *msgtxt) {
             setData(operation, msgtxt, strlen(msgtxt)+1);
         }
         void setData(int operation, const char *msgdata, size_t len) {
-            assert( _data.empty() );
+            assert( empty() );
             size_t dataLen = len + sizeof(MsgData) - 4;
             MsgData *d = (MsgData *) malloc(dataLen);
             memcpy(d->_data, msgdata, len);
@@ -278,20 +296,25 @@ namespace mongo {
             return _freeIt;
         }
 
-        int totalLen() const {
-            int tot = 0;
-            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
-                tot += i->second;
+        void send( MessagingPort &p, const char *context ) {
+            if ( empty() ) {
+                return;
             }
-            return tot;
+            if ( _buf != 0 ) {
+                p.send( (char*)_buf, _buf->len, context );
+            } else {
+                p.send( _data, context );
+            }
         }
         
     private:
         void _setData( MsgData *d, bool freeIt ) {
             _freeIt = freeIt;
-            _data.push_back( make_pair( reinterpret_cast< char * >( d ), d->len ) );
+            _buf = d;
         }
-        // byte buffer(s) - the first must contain at least a full MsgData
+        // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
+        MsgData * _buf;
+        // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage instead
         vector< pair< char*, int > > _data;
         bool _freeIt;
     };
