@@ -502,6 +502,7 @@ namespace mongo {
             _ntoskip( pq.getSkip() ) ,
             _nscanned(0), _nscannedObjects(0),
             _n(0),
+            _oldN(0),
             _inMemSort(false),
             _saveClientCursor(false),
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
@@ -579,7 +580,7 @@ namespace mongo {
                     else {
                         if ( _pq.isExplain() ) {
                             _n++;
-                            if ( _n >= _pq.getNumToReturn() && !_pq.wantMore() ) {
+                            if ( n() >= _pq.getNumToReturn() && !_pq.wantMore() ) {
                                 // .limit() was used, show just that much.
                                 finish();
                                 return;
@@ -598,12 +599,12 @@ namespace mongo {
                             }
                             _n++;
                             if ( ! _c->supportGetMore() ){
-                                if ( _pq.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ){
+                                if ( _pq.enough( n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ){
                                     finish();
                                     return;
                                 }
                             }
-                            else if ( _pq.enoughForFirstBatch( _n , _buf.len() ) ){
+                            else if ( _pq.enoughForFirstBatch( n() , _buf.len() ) ){
                                 /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                                 if ( mayCreateCursor1 ) {
                                     _c->advance();
@@ -663,7 +664,7 @@ namespace mongo {
         
         virtual QueryOp *clone() const {
             UserQueryOp *ret = new UserQueryOp( _pq, _response, _explainSuffix, _curop );
-            ret->_n = _n;
+            ret->_oldN = _n;
             // do these when implement explain - store total or per or clause?
 //            ret->_nscanned = _nscanned;
 //            ret->_nscannedObjects = _nscannedObjects;
@@ -673,7 +674,7 @@ namespace mongo {
         bool scanAndOrderRequired() const { return _inMemSort; }
         shared_ptr<Cursor> cursor() { return _c; }
         auto_ptr< CoveredIndexMatcher > matcher() { return _matcher; }
-        int n() const { return _n; }
+        int n() const { return _oldN + _n; }
         long long nscanned() const { return _nscanned; }
         long long nscannedObjects() const { return _nscannedObjects; }
         bool saveClientCursor() const { return _saveClientCursor; }
@@ -686,6 +687,7 @@ namespace mongo {
         long long _nscanned;
         long long _nscannedObjects;
         int _n; // found so far
+        int _oldN;
         
         MatchDetails _details;
 
