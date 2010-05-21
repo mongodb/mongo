@@ -23,7 +23,6 @@
 #pragma once
 
 #include <limits>
-#include <list>
 
 namespace mongo {
 
