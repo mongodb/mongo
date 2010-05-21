@@ -16,17 +16,15 @@
 
 #include "pch.h"
 #include "replset.h"
-#include "connections.h"
-#include "../../util/background.h"
+#include "multicmd.h"
 
 namespace mongo { 
 
     int ReplSet::Consensus::totalVotes() const { 
         static int complain = 0;
         int vTot = rs._self->config().votes;
-        for( Member *m = rs.head(); m; m=m->next() ) { 
+        for( Member *m = rs.head(); m; m=m->next() ) 
             vTot += m->config().votes;
-        }
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
             log() << "replSet warning: total number of votes is even - considering giving one member an extra vote" << rsLog;
         return vTot;
@@ -34,62 +32,36 @@ namespace mongo {
 
     bool ReplSet::Consensus::aMajoritySeemsToBeUp() const {
         int vUp = rs._self->config().votes;
-        for( Member *m = rs.head(); m; m=m->next() ) { 
+        for( Member *m = rs.head(); m; m=m->next() ) 
             vUp += m->hbinfo().up() ? m->config().votes : 0;
-        }
         return vUp * 2 > totalVotes();
     }
-
-    static BSONObj electCmd;
-    
-    class E : public BackgroundJob { 
-        string name() { return "Consensus::E"; }
-        void run() { 
-            ok = 0;
-            log() << "not done" << rsLog;
-            try { 
-                ScopedConn c(m->fullName());
-                if( c->runCommand("admin", electCmd, result) )
-                    ok++;
-            }
-            catch(DBException&) { 
-                DEV log() << "replSet dev caught dbexception on electCmd" << rsLog;
-            }
-        }
-    public:
-        BSONObj result;
-        int ok;
-        ReplSet::Member *m;
-    };
-    typedef shared_ptr<E> eptr;
 
     static const int VETO = -10000;
 
     void ReplSet::Consensus::_electSelf() {
         ReplSet::Member& me = *rs._self;
-        electCmd = BSON(
+        BSONObj electCmd = BSON(
                "replSetElect" << 1 <<
                "set" << rs.name() << 
                "who" << me.fullName() << 
                "whoid" << me.hbinfo().id() << 
                "cfgver" << rs._cfg->version
             );
-        list<eptr> jobs;
-        list<BackgroundJob*> _jobs;
-        for( Member *m = rs.head(); m; m=m->next() ) if( m->hbinfo().up() ) {
-            E *e = new E();
-            e->m = m;
-            jobs.push_back(eptr(e)); _jobs.push_back(e);
-        }
+
+        list<Target> L;
+        for( Member *m = rs.head(); m; m=m->next() )
+            if( m->hbinfo().up() )
+                L.push_back( Target(m->fullName()) );
 
         time_t start = time(0);
-        BackgroundJob::go(_jobs);
-        BackgroundJob::wait(_jobs,5);
+        multiCommand(electCmd, L);
 
-        int tally = me.config().votes; // me votes yes.
-        for( list<eptr>::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
-            if( (*i)->ok ) {
-                int v = (*i)->result["vote"].Int();
+        int tally = me.config().votes; // we vote yes. ?
+        for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
+            cout << "TEMP electres: " << i->result.toString() << endl;
+            if( i->ok ) {
+                int v = i->result["vote"].Int();
                 tally += v;
             }
         }
