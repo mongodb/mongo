@@ -46,9 +46,14 @@ namespace mongo {
         b.append("ismaster", 0);
         b.append("ok", false);
         b.append("msg", "not yet implemented");
-        //list<HostAndPort> L = memberHostnames();
-        //list<string> hosts;
-        //b.append("hosts", hosts);
+        {
+            BSONObjBuilder a;
+            int n = 0;
+            a.append("0", _self->h().toString());
+            for( Member *m = _members.head(); m; m = m->next() )
+                a.append(BSONObjBuilder::numStr(n++).c_str(), m->h().toString());
+            b.appendArray("hosts", a.done());
+        }
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

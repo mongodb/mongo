@@ -100,7 +100,7 @@ namespace mongo {
         /** add a subobject as a member with type Array.  Thus arr object should have "0", "1", ...
             style fields in it.
         */
-        BSONObjBuilder& appendArray(const char *fieldName, BSONObj subObj) {
+        BSONObjBuilder& appendArray(const char *fieldName, const BSONObj &subObj) {
             _b.append((char) Array);
             _b.append(fieldName);
             _b.append((void *) subObj.objdata(), subObj.objsize());
@@ -489,7 +489,6 @@ namespace mongo {
         static string numStr( int i ) {
             if (i>=0 && i<100)
                 return numStrs[i];
-
             stringstream o;
             o << i;
             return o.str();
@@ -526,13 +525,6 @@ namespace mongo {
         BSONObjIterator iterator() const ;
         
     private:
-        // Append the provided arr object as an array.
-        void marshalArray( const char *fieldName, const BSONObj &arr ) {
-            _b.append( (char) Array );
-            _b.append( fieldName );
-            _b.append( (void *) arr.objdata(), arr.objsize() );
-        }
-        
         char* _done() {
             _s.endField();
             _b.append((char) EOO);
@@ -639,7 +631,7 @@ namespace mongo {
         BSONObjBuilder arrBuilder;
         for ( unsigned int i = 0; i < vals.size(); ++i )
             arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
-        marshalArray( fieldName, arrBuilder.done() );
+        appendArray( fieldName, arrBuilder.done() );
         return *this;
     }
 
@@ -650,7 +642,7 @@ namespace mongo {
         int n = 0;
         for( list<T>::const_iterator i = vals.begin(); i != vals.end(); i++ )
             arrBuilder.append( numStr(n++).c_str(), *i );
-        marshalArray( fieldName, arrBuilder.done() );
+        appendArray( fieldName, arrBuilder.done() );
         return *this;
     }
     
