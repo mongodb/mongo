@@ -46,6 +46,9 @@ namespace mongo {
         b.append("ismaster", 0);
         b.append("ok", false);
         b.append("msg", "not yet implemented");
+        //list<HostAndPort> L = memberHostnames();
+        //list<string> hosts;
+        //b.append("hosts", hosts);
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */

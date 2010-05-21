@@ -23,6 +23,7 @@
 #pragma once
 
 #include <limits>
+#include <list>
 
 namespace mongo {
 
@@ -438,21 +439,10 @@ namespace mongo {
 
         /** Append an array of values. */
         template < class T >
-        BSONObjBuilder& append( const char *fieldName, const vector< T >& vals ) {
-            BSONObjBuilder arrBuilder;
-            for ( unsigned int i = 0; i < vals.size(); ++i )
-                arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
-            marshalArray( fieldName, arrBuilder.done() );
-            return *this;
-        }
+        BSONObjBuilder& append( const char *fieldName, const vector< T >& vals );
 
-        /* Append an array of ints 
-           void appendArray( const char *fieldName, const vector< int >& vals ) {
-           BSONObjBuilder arrBuilder;
-           for ( unsigned i = 0; i < vals.size(); ++i )
-           arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
-           marshalArray( fieldName, arrBuilder.done() );
-           }*/
+        template < class T >
+        BSONObjBuilder& append( const char *fieldName, const list< T >& vals );
 
         /** The returned BSONObj will free the buffer when it is finished. */
         BSONObj obj() {
@@ -644,4 +634,24 @@ namespace mongo {
         BSONObjBuilder _b;
     };
 
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const char *fieldName, const vector< T >& vals ) {
+        BSONObjBuilder arrBuilder;
+        for ( unsigned int i = 0; i < vals.size(); ++i )
+            arrBuilder.append( numStr( i ).c_str(), vals[ i ] );
+        marshalArray( fieldName, arrBuilder.done() );
+        return *this;
+    }
+
+    /** Append list of values as a BSON array. */
+    template < class T >
+    inline BSONObjBuilder& BSONObjBuilder::append( const char *fieldName, const list< T >& vals ) {
+        BSONObjBuilder arrBuilder;
+        int n = 0;
+        for( list<T>::const_iterator i = vals.begin(); i != vals.end(); i++ )
+            arrBuilder.append( numStr(n++).c_str(), *i );
+        marshalArray( fieldName, arrBuilder.done() );
+        return *this;
+    }
+    
 }
