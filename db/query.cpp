@@ -664,6 +664,7 @@ namespace mongo {
         virtual QueryOp *clone() const {
             UserQueryOp *ret = new UserQueryOp( _pq, _response, _explainSuffix, _curop );
             ret->_n = _n;
+            // do these when implement explain - store total or per or clause?
 //            ret->_nscanned = _nscanned;
 //            ret->_nscannedObjects = _nscannedObjects;
             return ret;
