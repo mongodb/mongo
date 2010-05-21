@@ -23,7 +23,6 @@
 #pragma once
 
 #include <limits>
-#include <list>
 
 namespace mongo {
 
@@ -635,12 +634,11 @@ namespace mongo {
         return *this;
     }
 
-    /** Append list of values as a BSON array. */
     template < class T >
     inline BSONObjBuilder& BSONObjBuilder::append( const char *fieldName, const list< T >& vals ) {
         BSONObjBuilder arrBuilder;
         int n = 0;
-        for( list<T>::const_iterator i = vals.begin(); i != vals.end(); i++ )
+        for( typename list< T >::const_iterator i = vals.begin(); i != vals.end(); i++ )
             arrBuilder.append( numStr(n++).c_str(), *i );
         appendArray( fieldName, arrBuilder.done() );
         return *this;
