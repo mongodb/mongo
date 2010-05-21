@@ -259,6 +259,9 @@ namespace mongo {
         // use to add a buffer
         // assumes message will free everything
         void appendData(char *d, int size) {
+            if ( size <= 0 ) {
+                return;
+            }
             if ( empty() ) {
                 MsgData *md = (MsgData*)d;
                 md->len = size; // can be updated later if more buffers added
