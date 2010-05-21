@@ -20,7 +20,6 @@ static void __wt_drain_write(WT_TOC *);
 
 #ifdef HAVE_DIAGNOSTIC
 static void __wt_drain_hazard_validate(ENV *, WT_CACHE_ENTRY *);
-static void __wt_drain_list(ENV *, const char *);
 #endif
 
 /*
