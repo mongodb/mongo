@@ -30,12 +30,11 @@ __wt_bt_page_alloc(
 	WT_RET((__wt_page_alloc(toc, size, &page)));
 
 	/* In-memory page structure: the space-available and first-free byte. */
-	__wt_bt_set_ff_and_sa_from_addr(page, WT_PAGE_BYTE(page));
+	__wt_bt_set_ff_and_sa_from_offset(page, WT_PAGE_BYTE(page));
 
 	/*
 	 * Generally, the default values of 0 on page are correct; set the type
-	 * and the level, and set the related page addresses to the "unset"
-	 * value.
+	 * and the level.
 	 */
 	hdr = page->hdr;
 	hdr->type = (u_int8_t)type;
@@ -141,6 +140,14 @@ __wt_bt_page_inmem(DB *db, WT_PAGE *page)
 	WT_ILLEGAL_FORMAT(db);
 	}
 
+	/*
+	 * XXX
+	 * We don't yet have a free-list on which to put empty pages -- for
+	 * now, we handle them.
+	 */
+	if (nindx == 0)
+		return (0);
+
 	/* Allocate an array of WT_{ROW,COL}_INDX structures for the page. */
 	switch (hdr->type) {
 	case WT_PAGE_COL_FIX:
@@ -237,7 +244,7 @@ __wt_bt_page_inmem_item_int(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries / 2;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -311,7 +318,7 @@ __wt_bt_page_inmem_row_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = indx_count;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -345,7 +352,7 @@ __wt_bt_page_inmem_col_int(WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)off);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)off);
 	return (0);
 }
 
@@ -378,7 +385,7 @@ __wt_bt_page_inmem_col_leaf(WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -422,7 +429,7 @@ __wt_bt_page_inmem_dup_leaf(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = hdr->u.entries;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)item);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)item);
 	return (0);
 }
 
@@ -465,7 +472,7 @@ __wt_bt_page_inmem_col_fix(DB *db, WT_PAGE *page)
 	page->indx_count = hdr->u.entries;
 	page->records = records;
 
-	__wt_bt_set_ff_and_sa_from_addr(page, (u_int8_t *)p);
+	__wt_bt_set_ff_and_sa_from_offset(page, (u_int8_t *)p);
 	return (0);
 }
 
