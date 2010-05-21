@@ -559,8 +559,7 @@ namespace mongo {
     _honorRecordedPlan( honorRecordedPlan ) {
 //    _fros( ns, query ) {
         // eventually implement (some of?) these
-        // current hint test prevents _or when doing a full query, which we want right now since we need to implement other stuff before turning that on
-        if ( !order.isEmpty() || ( hint /*&& !hint->eoo()*/ ) || !min.isEmpty() || !max.isEmpty() ) {
+        if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
         if ( !_or ) {

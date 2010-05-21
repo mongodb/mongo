@@ -511,7 +511,10 @@ namespace mongo {
         {}
         
         virtual void init() {
-            _buf.skip( sizeof( QueryResult ) );
+            // only need to put the QueryResult fields there if we're building the first buffer in the message.
+            if ( _response.empty() ) {
+                _buf.skip( sizeof( QueryResult ) );
+            }
             
             if ( _oplogReplay ) {
                 _findingStartCursor.reset( new FindingStartCursor( qp() ) );
@@ -659,7 +662,11 @@ namespace mongo {
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
         
         virtual QueryOp *clone() const {
-            return new UserQueryOp( _pq, _response, _explainSuffix, _curop );
+            UserQueryOp *ret = new UserQueryOp( _pq, _response, _explainSuffix, _curop );
+            ret->_n = _n;
+//            ret->_nscanned = _nscanned;
+//            ret->_nscannedObjects = _nscannedObjects;
+            return ret;
         }
 
         bool scanAndOrderRequired() const { return _inMemSort; }
