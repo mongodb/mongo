@@ -37,7 +37,7 @@ __wt_bt_build_verify(void);
 int
 __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy);
 void
-__wt_bt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *p);
+__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p);
 const char *
 __wt_bt_hdr_type(WT_PAGE_HDR *hdr);
 const char *

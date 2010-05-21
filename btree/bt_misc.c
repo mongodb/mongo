@@ -90,12 +90,12 @@ __wt_bt_data_copy_to_dbt(DB *db, u_int8_t *data, size_t len, DBT *copy)
 }
 
 /*
- * __wt_bt_set_ff_and_sa_from_p --
+ * __wt_bt_set_ff_and_sa_from_offset --
  *	Set the page's first-free and space-available values from an
  *	address positioned one past the last used byte on the page.
  */
 void
-__wt_bt_set_ff_and_sa_from_addr(WT_PAGE *page, u_int8_t *p)
+__wt_bt_set_ff_and_sa_from_offset(WT_PAGE *page, u_int8_t *p)
 {
 	page->first_free = p;
 	page->space_avail = page->size - (u_int)(p - (u_int8_t *)page->hdr);
