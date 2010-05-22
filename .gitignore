@@ -27,7 +27,7 @@
 *.idb
 *.pdb
 *.manifest
-*.vcxproj.user
+*.user
 *.gch
 *.*sdf
 *.psess
