@@ -106,29 +106,21 @@ namespace mongo {
         }
 
         /* for more than 10 indexes -- see NamespaceDetails::Extra */
-        string extraName() { 
-            string s = string(buf) + "$extra";
-            massert( 10348 , "ns name too long", s.size() < MaxNsLen);
+        string extraName(int i) {
+            char ex[] = "$extra";
+            ex[5] += i;
+            string s = string(buf) + ex;
+            massert( 10348 , "$extra: ns name too long", s.size() < MaxNsLen);
             return s;
         }
         bool isExtra() const { 
-            const char *p = strstr(buf, "$extra");
-            return p && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
+            const char *p = strstr(buf, "$extr");
+            return p && p[5] && p[6] == 0; //==0 important in case an index uses name "$extra_1" for example
         }
-        bool hasDollarSign() const {
-            return strstr( buf , "$" ) > 0;
-        }
-
-        void kill() {
-            buf[0] = 0x7f;
-        }
-
-        bool operator==(const char *r) {
-            return strcmp(buf, r) == 0;
-        }
-        bool operator==(const Namespace& r) {
-            return strcmp(buf, r.buf) == 0;
-        }
+        bool hasDollarSign() const { return strchr( buf , '$' ) > 0;  }
+        void kill() { buf[0] = 0x7f; }
+        bool operator==(const char *r) const { return strcmp(buf, r) == 0; }
+        bool operator==(const Namespace& r) const { return strcmp(buf, r.buf) == 0; }
         int hash() const {
             unsigned x = 0;
             const char *p = buf;
@@ -622,7 +614,7 @@ namespace mongo {
         /* extra space for indexes when more than 10 */
         NamespaceDetails::Extra* allocExtra(const char *ns) { 
             Namespace n(ns);
-            Namespace extra(n.extraName().c_str()); // throws userexception if ns name too long
+            Namespace extra(n.extraName(0).c_str()); // throws userexception if ns name too long
             NamespaceDetails *d = details(ns);
             massert( 10350 ,  "allocExtra: base ns missing?", d );
             assert( d->extraOffset == 0 );
@@ -652,11 +644,13 @@ namespace mongo {
             Namespace n(ns);
             ht->kill(n);
 
-            try {
-                Namespace extra(n.extraName().c_str());
-                ht->kill(extra);
+            for( int i = 0; i<=1; i++ ) {
+                try {
+                    Namespace extra(n.extraName(i).c_str());
+                    ht->kill(extra);
+                }
+                catch(DBException&) { }
             }
-            catch(DBException&) { }
         }
 
         bool find(const char *ns, DiskLoc& loc) {
