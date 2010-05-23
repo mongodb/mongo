@@ -371,7 +371,7 @@ namespace mongo {
                     conn.done();
                 }
                 
-                log() << "CMD: shardcollection: " << cmdObj << endl;
+                tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
                 config->shardCollection( ns , key , cmdObj["unique"].trueValue() );
                 config->save( true );
@@ -535,7 +535,7 @@ namespace mongo {
                 
                 Shard to = Shard::make( toString );
 
-                log() << "CMD: movechunk: " << cmdObj << endl;
+                tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManager * info = config->getChunkManager( ns );
                 Chunk& c = info->findChunk( find );
