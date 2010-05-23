@@ -178,23 +178,48 @@ namespace mongo {
         enum { NIndexesExtra = 30,
                NIndexesBase  = 10
         };
-        struct Extra { 
-            // note we could use this field for more chaining later, so don't waste it:
-            unsigned long long reserved1; 
+        class Extra { 
+            long _next;
+            unsigned long reserved4; 
+            Extra(const Extra&) { assert(false); }
+            Extra& operator=(const Extra& r) { assert(false); }
+        public:
+            Extra() { }
+            long ofsFrom(NamespaceDetails *d) { 
+                return ((char *) this) - ((char *) d);
+            }
             IndexDetails details[NIndexesExtra];
+            void init() { 
+                memset(this, 0, sizeof(Extra));
+            }
+            Extra* next(NamespaceDetails *d) { 
+                if( _next == 0 ) return 0;
+                return (Extra*) (((char *) d) + _next);
+            }
+            void setNext(long ofs) { _next = ofs;  }
+            void copy(NamespaceDetails *d, const Extra& e) { 
+                memcpy(this, &e, sizeof(Extra));
+                _next = 0;
+            }
+        private:
             unsigned reserved2;
             unsigned reserved3;
         };
         Extra* extra() { 
-            assert( extraOffset );
+            if( extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + extraOffset);
         }
+
     public:
+        /* add extra space for indexes when more than 10 */
+        Extra* allocExtra(const char *ns, int nindexessofar);
+
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
-        enum { NIndexesMax = 40 };
+        enum { NIndexesMax = 64 };
 
-        BOOST_STATIC_ASSERT( NIndexesMax == NIndexesBase + NIndexesExtra );
+        BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
+        BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
 
         /* called when loaded from disk */
         void onLoad(const Namespace& k);
@@ -282,7 +307,15 @@ namespace mongo {
         IndexDetails& idx(int idxNo) {
             if( idxNo < NIndexesBase ) 
                 return _indexes[idxNo];
-            return extra()->details[idxNo-NIndexesBase];
+            Extra *e = extra();
+            massert(13282, "missing Extra", e);
+            int i = idxNo - NIndexesBase;
+            if( i >= NIndexesExtra ) {
+                e = e->next(this);
+                massert(13283, "missing Extra", e);
+                i -= NIndexesExtra;
+            }
+            return e->details[i];
         }
         IndexDetails& backgroundIdx() { 
             DEV assert(backgroundIndexBuildInProgress);
@@ -294,22 +327,16 @@ namespace mongo {
             int i;
             int n;
             NamespaceDetails *d;
-            Extra *e;
             IndexIterator(NamespaceDetails *_d) { 
                 d = _d;
                 i = 0;
                 n = d->nIndexes;
-                if( n > NIndexesBase )
-                    e = d->extra();
             }
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
             IndexDetails& next() { 
-                int k = i;
-                i++;
-                return k < NIndexesBase ? d->_indexes[k] : 
-                    e->details[k-10];
+                return d->idx(i++);
             }
         };
 
@@ -581,23 +608,20 @@ namespace mongo {
     class NamespaceIndex {
         friend class NamespaceCursor;
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
-    public:
 
+    public:
         NamespaceIndex(const string &dir, const string &database) :
-          ht( 0 ),
-          dir_( dir ),
-          database_( database ) {}
+          ht( 0 ), dir_( dir ), database_( database ) {}
 
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
-        
+
         void init();
 
         void add_ns(const char *ns, DiskLoc& loc, bool capped) {
             NamespaceDetails details( loc, capped );
 			add_ns( ns, details );
         }
-
 		void add_ns( const char *ns, const NamespaceDetails &details ) {
             init();
             Namespace n(ns);
@@ -610,23 +634,6 @@ namespace mongo {
                 return -1;
             return ((char *) d) -  (char *) ht->nodes;
         }*/
-
-        /* extra space for indexes when more than 10 */
-        NamespaceDetails::Extra* allocExtra(const char *ns) { 
-            Namespace n(ns);
-            Namespace extra(n.extraName(0).c_str()); // throws userexception if ns name too long
-            NamespaceDetails *d = details(ns);
-            massert( 10350 ,  "allocExtra: base ns missing?", d );
-            assert( d->extraOffset == 0 );
-            massert( 10351 ,  "allocExtra: extra already exists", ht->get(extra) == 0 );
-            NamespaceDetails::Extra temp;
-            memset(&temp, 0, sizeof(temp));
-            uassert( 10082 ,  "allocExtra: too many namespaces/collections", ht->put(extra, (NamespaceDetails&) temp));
-            NamespaceDetails::Extra *e = (NamespaceDetails::Extra *) ht->get(extra);
-            d->extraOffset = ((char *) e) - ((char *) d);
-            assert( d->extra() == e );
-            return e;
-        }
 
         NamespaceDetails* details(const char *ns) {
             if ( !ht )
@@ -667,6 +674,8 @@ namespace mongo {
         }
 
         void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
+
+        NamespaceDetails::Extra* newExtra(const char *ns, int n, NamespaceDetails *d);
 
     private:
         boost::filesystem::path path() const;

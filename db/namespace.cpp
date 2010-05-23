@@ -568,28 +568,76 @@ namespace mongo {
         return loc;
     }
 
+    /* extra space for indexes when more than 10 */
+    NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
+        assert( i >= 0 && i <= 1 );
+        Namespace n(ns);
+        Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
+        
+        massert( 10350 ,  "allocExtra: base ns missing?", d );
+        massert( 10351 ,  "allocExtra: extra already exists", ht->get(extra) == 0 );
+
+        NamespaceDetails::Extra temp;
+        temp.init();
+        uassert( 10082 ,  "allocExtra: too many namespaces/collections", ht->put(extra, (NamespaceDetails&) temp));
+        NamespaceDetails::Extra *e = (NamespaceDetails::Extra *) ht->get(extra);
+        return e;
+    }
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {
+        NamespaceIndex *ni = nsindex(ns);
+        int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
+        Extra *e = ni->newExtra(ns, i, this);
+        long ofs = e->ofsFrom(this);
+        if( i == 0 ) {
+            assert( extraOffset == 0 );
+            extraOffset = ofs;
+            assert( extra() == e );
+        }
+        else { 
+            Extra *hd = extra();
+            assert( hd->next(this) == 0 );
+            hd->setNext(ofs);
+        }
+        return e;
+    }
+
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
         assert( nsdetails(thisns) == this );
 
-        if( nIndexes == NIndexesBase && extraOffset == 0 ) { 
-            nsindex(thisns)->allocExtra(thisns);
+        IndexDetails *id;
+        try {
+            id = &idx(nIndexes);
+        }
+        catch(DBException&) { 
+            allocExtra(thisns, nIndexes);
+            id = &idx(nIndexes);
         }
 
-        IndexDetails& id = idx(nIndexes);
         nIndexes++;
         if ( resetTransient )
             NamespaceDetailsTransient::get_w(thisns).addedIndex();
-        return id;
+        return *id;
     }
 
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) { 
-        if( extraOffset ) {
-            extraOffset = 0; // so allocExtra() doesn't assert.
-            Extra *e = nsindex(thisns)->allocExtra(thisns);
-            memcpy(e, src->extra(), sizeof(Extra));
-        } 
+        extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
+        Extra *se = src->extra();
+        int n = NIndexesBase;
+        if( se ) {
+            Extra *e = allocExtra(thisns, n);
+            while( 1 ) {
+                n += NIndexesExtra;
+                e->copy(this, *se);
+                se = se->next(src);
+                if( se == 0 ) break;
+                Extra *nxt = allocExtra(thisns, n);
+                e->setNext( nxt->ofsFrom(this) );
+                e = nxt;
+            } 
+            assert( extraOffset );
+        }
     }
 
     /* returns index of the first index in which the field is present. -1 if not present.

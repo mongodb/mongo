@@ -48,6 +48,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "jstests", "jstests", "{F5ABFB2C-A34F-48C1-9B5F-01D456AF6C57}"
 	ProjectSection(SolutionItems) = preProject
 		..\jstests\index_many.js = ..\jstests\index_many.js
+		..\jstests\indexapi.js = ..\jstests\indexapi.js
+		..\jstests\objid5.js = ..\jstests\objid5.js
 	EndProjectSection
 EndProject
 Global
