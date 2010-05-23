@@ -610,6 +610,10 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[], char *envp[] )
 {
+    cout << sizeof(NamespaceDetails::ExtraOld) << endl;
+    cout << sizeof(NamespaceDetails::Extra) << endl;
+    cout << sizeof(NamespaceDetails) << endl;
+
     static StaticObserver staticObserver;
     getcurns = ourgetns;
 

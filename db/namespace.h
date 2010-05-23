@@ -178,6 +178,14 @@ namespace mongo {
         enum { NIndexesExtra = 30,
                NIndexesBase  = 10
         };
+    public:
+        struct ExtraOld {
+            // note we could use this field for more chaining later, so don't waste it:
+            unsigned long long reserved1;
+            IndexDetails details[NIndexesExtra];
+            unsigned reserved2;
+            unsigned reserved3;
+        };
         class Extra { 
             long _next;
             unsigned long reserved4; 
