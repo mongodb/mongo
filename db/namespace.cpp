@@ -42,6 +42,32 @@ namespace mongo {
         0x400000, 0x800000
     };
 
+    NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
+        /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
+        firstExtent = lastExtent = capExtent = loc;
+        datasize = nrecords = 0;
+        lastExtentSize = 0;
+        nIndexes = 0;
+        capped = _capped;
+        max = 0x7fffffff;
+        paddingFactor = 1.0;
+        flags = 0;
+        capFirstNewRecord = DiskLoc();
+        // Signal that we are on first allocation iteration through extents.
+        capFirstNewRecord.setInvalid();
+        // For capped case, signal that we are doing initial extent allocation.
+        if ( capped )
+            deletedList[ 1 ].setInvalid();
+		assert( sizeof(dataFileVersion) == 2 );
+		dataFileVersion = 0;
+		indexFileVersion = 0;
+        multiKeyIndexBits = 0;
+        reservedA = 0;
+        extraOffset = 0;
+        backgroundIndexBuildInProgress = 0;
+        memset(reserved, 0, sizeof(reserved));
+    }
+
     bool NamespaceIndex::exists() const {
         return !MMF::exists(path());
     }
