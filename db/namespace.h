@@ -187,16 +187,20 @@ namespace mongo {
             unsigned reserved3;
         };
         class Extra { 
-            long _next;
-            unsigned long reserved4; 
-            Extra(const Extra&) { assert(false); }
-            Extra& operator=(const Extra& r) { assert(false); return *this; }
+            long long _next;
+		public:
+            IndexDetails details[NIndexesExtra];
+		private:
+            unsigned reserved2;
+            unsigned reserved3;
+
+			Extra(const Extra&) { assert(false); }
+			Extra& operator=(const Extra& r) { assert(false); return *this; }
         public:
             Extra() { }
             long ofsFrom(NamespaceDetails *d) { 
                 return ((char *) this) - ((char *) d);
             }
-            IndexDetails details[NIndexesExtra];
             void init() { 
                 memset(this, 0, sizeof(Extra));
             }
@@ -209,10 +213,8 @@ namespace mongo {
                 memcpy(this, &e, sizeof(Extra));
                 _next = 0;
             }
-        private:
-            unsigned reserved2;
-            unsigned reserved3;
         };
+
         Extra* extra() { 
             if( extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + extraOffset);
@@ -228,6 +230,8 @@ namespace mongo {
 
         BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
         BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
 
         /* called when loaded from disk */
         void onLoad(const Namespace& k);
@@ -502,6 +506,8 @@ namespace mongo {
        todo: cleanup code, need abstractions and separation
     */
     class NamespaceDetailsTransient : boost::noncopyable {
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 );
+
         /* general ------------------------------------------------------------- */
     private:
         string _ns;
