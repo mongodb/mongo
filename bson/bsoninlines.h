@@ -22,6 +22,10 @@
 
 namespace mongo {
 
+    inline BSONObjIterator BSONObj::begin() { 
+        return BSONObjIterator(*this);
+    }
+
     inline BSONObj BSONElement::embeddedObjectUserCheck() const {
         uassert( 10065 ,  "invalid parameter: expected an object", isABSONObj() );
         return BSONObj(value());

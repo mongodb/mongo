@@ -40,7 +40,7 @@ namespace mongo {
             _pos = jso.objdata() + 4;
             _theend = jso.objdata() + sz;
         }
-        
+
         BSONObjIterator( const char * start , const char * end ){
             _pos = start + 4;
             _theend = end;
@@ -60,6 +60,15 @@ namespace mongo {
             _pos += e.size( checkEnd ? (int)(_theend - _pos) : -1 );
             return e;
         }
+
+        void operator++() { next(); }
+        void operator++(int) { next(); }
+
+        BSONElement operator*() {
+            assert( _pos < _theend );
+            return BSONElement(_pos, -1);
+        }
+
     private:
         const char* _pos;
         const char* _theend;
