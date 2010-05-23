@@ -182,7 +182,7 @@ namespace mongo {
             long _next;
             unsigned long reserved4; 
             Extra(const Extra&) { assert(false); }
-            Extra& operator=(const Extra& r) { assert(false); }
+            Extra& operator=(const Extra& r) { assert(false); return *this; }
         public:
             Extra() { }
             long ofsFrom(NamespaceDetails *d) { 
@@ -607,7 +607,6 @@ namespace mongo {
     */
     class NamespaceIndex {
         friend class NamespaceCursor;
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
     public:
         NamespaceIndex(const string &dir, const string &database) :
