@@ -325,7 +325,7 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;
 
     void repairDatabases() {
-        LastError * le = lastError.get( true );
+		//        LastError * le = lastError.get( true );
         Client::GodScope gs;
         log(1) << "enter repairDatabases" << endl;
         
@@ -491,12 +491,12 @@ namespace mongo {
         {
             stringstream ss;
             ss << "dbpath (" << dbpath << ") does not exist";
-            massert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
+            uassert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         }
         {
             stringstream ss;
             ss << "repairpath (" << repairpath << ") does not exist";
-            massert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
+            uassert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
         }
         
         acquirePathLock();

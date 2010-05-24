@@ -27,7 +27,7 @@
 *.idb
 *.pdb
 *.manifest
-*.vcxproj.user
+*.user
 *.gch
 *.*sdf
 *.psess
@@ -79,10 +79,12 @@ mongostat
 *.tar.gz
 
 mongodb-*
+mongo-cxx-driver-*
 
 #libs
 libmongoclient.*
 libmongotestfiles.*
+libmongoshellfiles.*
 
 # examples
 firstExample

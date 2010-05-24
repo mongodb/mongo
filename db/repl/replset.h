@@ -113,7 +113,7 @@ namespace mongo {
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
-        void updateHBInfo(const HeartbeatInfo& h);
+        void msgUpdateHBInfo(HeartbeatInfo);
 
     private:
         const Member *_currentPrimary;
@@ -131,18 +131,15 @@ namespace mongo {
 
     public:
         class Manager : public task::Port {
-            string name() { return "ReplSet::Manager"; }
             bool got(const any&);
             ReplSet *_rs;
             int _primary;
             const Member* findOtherPrimary();
             void noteARemoteIsPrimary(const Member *);
-            void checkNewState();
         public:
             Manager(ReplSet *rs);
-            enum Messages { 
-                CheckNewState
-            };
+            void msgReceivedNewConfig(BSONObj) { assert(false); }
+            void msgCheckNewState();
         };
         shared_ptr<Manager> mgr;
 

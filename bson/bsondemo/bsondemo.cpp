@@ -1,4 +1,10 @@
-/** @file bsondemo.cpp */
+/** @file bsondemo.cpp 
+
+    Example of use of BSON from C++.
+
+    Requires boost (headers only).
+    Works headers only (the parts actually exercised herein that is - some functions require .cpp files).
+*/
 
 #include "../bson.h"
 #include <iostream>
@@ -7,9 +13,17 @@
 using namespace std;
 using namespace bson;
 
+void iter(bo o) { 
+    /* iterator example */
+    cout << "\niter()\n";
+    for( bo::iterator i(o); i.more(); ) { 
+        cout << ' ' << i.next().toString() << '\n';
+    }
+}
+
 int main()
 {
-	cout << "build bits: " << 8 * sizeof(char *) << endl;
+	cout << "build bits: " << 8 * sizeof(char *) << '\n' <<  endl;
 
     /* a bson object defaults on construction to { } */
     bo empty;
@@ -72,5 +86,6 @@ int main()
     x.vals(strs);
     cout << strs.size() << " strings, first one: " << strs[0] << endl;
 
+    iter(y);
 	return 0;
 }

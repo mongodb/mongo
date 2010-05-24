@@ -37,6 +37,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <boost/utility.hpp>
 
 namespace bson { 
     class assertion : public std::exception { 

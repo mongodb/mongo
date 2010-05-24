@@ -259,7 +259,7 @@ namespace mongo {
                 break;
         }
         ctmLast = ctm;
-        DEV tlog() << "  alloccursorid " << x << endl;
+        //DEV tlog() << "  alloccursorid " << x << endl;
         return x;
     }
 

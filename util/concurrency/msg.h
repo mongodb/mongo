@@ -25,30 +25,24 @@ namespace mongo {
 
     namespace task { 
 
-        /** See task::PortUnitTest in task.cpp for an example of usage.
-        */
         class Port : private Task { 
-        protected:
-            /** implement a receiver of messages for the port. 
-                @return false to stop the port / terminate the thread (i.e. you want to return true)
-            */
-            virtual bool got(const any& msg) = 0;
-            virtual string name() = 0; // names the thread
         public:
             /** send a message to the port */
-            void send(const any& msg);
+            void send( boost::function<void()> );
 
             /** typical usage is: task::fork( foo.task() ); */
             shared_ptr<Task> taskPtr() { return shared_ptr<Task>(static_cast<Task*>(this)); }
 
-            Port() { }
+            Port(string name) : _name(name) { }
             virtual ~Port() { }
 
         private:
+            virtual string name() { return _name; }
             void doWork();
-            deque<any> d;
+            deque< boost::function<void()> > d;
             boost::mutex m;
             boost::condition c;
+            string _name;
         };
 
     }

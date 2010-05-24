@@ -48,7 +48,7 @@ namespace mongo {
             string dropns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             
             if ( !cmdLine.quiet )
-                log() << "CMD: clean " << dropns << endl;
+                tlog() << "CMD: clean " << dropns << endl;
             
             NamespaceDetails *d = nsdetails(dropns.c_str());
             
@@ -83,7 +83,7 @@ namespace mongo {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             NamespaceDetails * d = nsdetails( ns.c_str() );
             if ( !cmdLine.quiet )
-                log() << "CMD: validate " << ns << endl;
+                tlog() << "CMD: validate " << ns << endl;
 
             if ( ! d ){
                 errmsg = "ns not found";

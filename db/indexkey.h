@@ -25,6 +25,7 @@
 
 namespace mongo {
 
+    class Cursor;
     class IndexSpec;
     class IndexType; // TODO: this name sucks
     class IndexPlugin;

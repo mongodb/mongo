@@ -42,6 +42,32 @@ namespace mongo {
         0x400000, 0x800000
     };
 
+    NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
+        /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
+        firstExtent = lastExtent = capExtent = loc;
+        datasize = nrecords = 0;
+        lastExtentSize = 0;
+        nIndexes = 0;
+        capped = _capped;
+        max = 0x7fffffff;
+        paddingFactor = 1.0;
+        flags = 0;
+        capFirstNewRecord = DiskLoc();
+        // Signal that we are on first allocation iteration through extents.
+        capFirstNewRecord.setInvalid();
+        // For capped case, signal that we are doing initial extent allocation.
+        if ( capped )
+            deletedList[ 1 ].setInvalid();
+		assert( sizeof(dataFileVersion) == 2 );
+		dataFileVersion = 0;
+		indexFileVersion = 0;
+        multiKeyIndexBits = 0;
+        reservedA = 0;
+        extraOffset = 0;
+        backgroundIndexBuildInProgress = 0;
+        memset(reserved, 0, sizeof(reserved));
+    }
+
     bool NamespaceIndex::exists() const {
         return !MMF::exists(path());
     }
@@ -148,6 +174,7 @@ namespace mongo {
     }
 
     void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
+		BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
         {
             // defensive code: try to make us notice if we reference a deleted record
             (unsigned&) (((Record *) d)->data) = 0xeeeeeeee;
@@ -568,28 +595,76 @@ namespace mongo {
         return loc;
     }
 
+    /* extra space for indexes when more than 10 */
+    NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
+        assert( i >= 0 && i <= 1 );
+        Namespace n(ns);
+        Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
+        
+        massert( 10350 ,  "allocExtra: base ns missing?", d );
+        massert( 10351 ,  "allocExtra: extra already exists", ht->get(extra) == 0 );
+
+        NamespaceDetails::Extra temp;
+        temp.init();
+        uassert( 10082 ,  "allocExtra: too many namespaces/collections", ht->put(extra, (NamespaceDetails&) temp));
+        NamespaceDetails::Extra *e = (NamespaceDetails::Extra *) ht->get(extra);
+        return e;
+    }
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {
+        NamespaceIndex *ni = nsindex(ns);
+        int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
+        Extra *e = ni->newExtra(ns, i, this);
+        long ofs = e->ofsFrom(this);
+        if( i == 0 ) {
+            assert( extraOffset == 0 );
+            extraOffset = ofs;
+            assert( extra() == e );
+        }
+        else { 
+            Extra *hd = extra();
+            assert( hd->next(this) == 0 );
+            hd->setNext(ofs);
+        }
+        return e;
+    }
+
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
         assert( nsdetails(thisns) == this );
 
-        if( nIndexes == NIndexesBase && extraOffset == 0 ) { 
-            nsindex(thisns)->allocExtra(thisns);
+        IndexDetails *id;
+        try {
+            id = &idx(nIndexes);
+        }
+        catch(DBException&) { 
+            allocExtra(thisns, nIndexes);
+            id = &idx(nIndexes);
         }
 
-        IndexDetails& id = idx(nIndexes);
         nIndexes++;
         if ( resetTransient )
             NamespaceDetailsTransient::get_w(thisns).addedIndex();
-        return id;
+        return *id;
     }
 
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) { 
-        if( extraOffset ) {
-            extraOffset = 0; // so allocExtra() doesn't assert.
-            Extra *e = nsindex(thisns)->allocExtra(thisns);
-            memcpy(e, src->extra(), sizeof(Extra));
-        } 
+        extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
+        Extra *se = src->extra();
+        int n = NIndexesBase;
+        if( se ) {
+            Extra *e = allocExtra(thisns, n);
+            while( 1 ) {
+                n += NIndexesExtra;
+                e->copy(this, *se);
+                se = se->next(src);
+                if( se == 0 ) break;
+                Extra *nxt = allocExtra(thisns, n);
+                e->setNext( nxt->ofsFrom(this) );
+                e = nxt;
+            } 
+            assert( extraOffset );
+        }
     }
 
     /* returns index of the first index in which the field is present. -1 if not present.

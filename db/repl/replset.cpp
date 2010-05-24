@@ -25,7 +25,7 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
-    void ReplSet::updateHBInfo(const HeartbeatInfo& h) { 
+    void ReplSet::msgUpdateHBInfo(HeartbeatInfo h) { 
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
                 m->_hbinfo = h;
