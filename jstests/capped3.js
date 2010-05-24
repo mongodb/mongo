@@ -24,8 +24,9 @@ i = 999;
 while( c.hasNext() ) {
     assert.eq( i--, c.next().i, "E" );
 }
-print( "i: " + i );
-print( "stats: " + tojson( t2.stats() ) );
+//print( "i: " + i );
+var str = tojson( t2.stats() );
+//print( "stats: " + tojson( t2.stats() ) );
 assert( i < 990, "F" );
 
 t.drop();

@@ -325,7 +325,7 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;
 
     void repairDatabases() {
-        LastError * le = lastError.get( true );
+		//        LastError * le = lastError.get( true );
         Client::GodScope gs;
         log(1) << "enter repairDatabases" << endl;
         

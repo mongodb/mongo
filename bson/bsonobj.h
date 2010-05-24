@@ -346,8 +346,11 @@ namespace mongo {
         template <class T>
         void vals(list<T> &) const;
 
-private:
         friend class BSONObjIterator;
+        typedef BSONObjIterator iterator;
+        BSONObjIterator begin();
+
+private:
         class Holder {
         public:
             Holder( const char *objdata ) :

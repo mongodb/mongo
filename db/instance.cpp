@@ -330,13 +330,13 @@ namespace mongo {
                         receivedKillCursors(m);
                     }
                     else {
-                        out() << "    operation isn't supported: " << op << endl;
+                        mongo::log() << "    operation isn't supported: " << op << endl;
                         currentOp.done();
                         log = true;
                     }
                 }
                 catch ( AssertionException& e ) {
-                    problem() << " Caught Assertion in " << opToString(op) << " , continuing" << endl;
+                    tlog() << " Caught Assertion in " << opToString(op) << " , continuing" << endl;
                     ss << " exception " + e.toString();
                     log = true;
                 }

@@ -739,7 +739,7 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
-            log() << "CMD: reIndex " << toDeleteNs << endl;
+            tlog() << "CMD: reIndex " << toDeleteNs << endl;
             BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs.c_str());
 
             if ( ! d ){

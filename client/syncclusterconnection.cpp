@@ -25,7 +25,6 @@
 namespace mongo {
 
     SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L)  {
-        int n = 0;
         {
             stringstream s;
             int n=0;
