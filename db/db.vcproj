@@ -980,10 +980,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\reccache.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\reccache.h"
 				>
 			</File>
@@ -1521,6 +1517,18 @@
 					>
 				</File>
 				<File
+					RelativePath="..\util\concurrency\msg.h"
+					>
+				</File>
+				<File
+					RelativePath="..\util\concurrency\task.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\util\concurrency\task.h"
+					>
+				</File>
+				<File
 					RelativePath="..\util\concurrency\value.h"
 					>
 				</File>
@@ -1650,6 +1658,10 @@
 				RelativePath="..\s\d_logic.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\s\shardconnection.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="scripting"
@@ -1772,6 +1784,10 @@
 			</File>
 			<File
 				RelativePath=".\repl\health.h"
+				>
+			</File>
+			<File
+				RelativePath=".\repl\heartbeat.cpp"
 				>
 			</File>
 			<File

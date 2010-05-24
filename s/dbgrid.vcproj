@@ -229,6 +229,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\shardconnection.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\shardkey.cpp"
 				>
 			</File>
