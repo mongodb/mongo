@@ -390,7 +390,6 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", 
                  "util/thread_pool.cpp", "util/password.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp s/shardconnection.cpp" )
-commonFiles += [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
 
 #mmap stuff
 
@@ -419,12 +418,16 @@ serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
+scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
+
 if usesm:
-    coreServerFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    scriptingFiles += [ "scripting/engine_spidermonkey.cpp" ]
 elif usev8:
-    coreServerFiles += [ Glob( "scripting/*v8*.cpp" ) ]
+    scriptingFiles += [ Glob( "scripting/*v8*.cpp" ) ]
 else:
-    coreServerFiles += [ "scripting/engine_none.cpp" ]
+    scriptingFiles += [ "scripting/engine_none.cpp" ]
+
+coreServerFiles += scriptingFiles
 
 coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "db/cmdline.cpp" ]
@@ -1180,7 +1183,7 @@ elif not onlyServer:
         shell32BitFiles = coreShellFiles
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
-        for f in coreServerFiles:
+        for f in scriptingFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." )
         shellEnv.Append( CPPPATH=["32bit/"] )
