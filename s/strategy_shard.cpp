@@ -148,13 +148,13 @@ namespace mongo {
                     
                 }
                 
-                Chunk& c = manager->findChunk( o );
-                log(4) << "  server:" << c.getShard().toString() << " " << o << endl;
-                insert( c.getShard() , r.getns() , o );
+                ChunkPtr c = manager->findChunk( o );
+                log(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                insert( c->getShard() , r.getns() , o );
 
                 r.gotInsert();
                 
-                c.splitIfShould( o.objsize() );
+                c->splitIfShould( o.objsize() );
             }            
         }
 
@@ -226,9 +226,9 @@ namespace mongo {
                 }
             }
             else {
-                Chunk& c = manager->findChunk( chunkFinder );
-                doWrite( dbUpdate , r , c.getShard() );
-                c.splitIfShould( d.msg().header()->dataLen() );
+                ChunkPtr c = manager->findChunk( chunkFinder );
+                doWrite( dbUpdate , r , c->getShard() );
+                c->splitIfShould( d.msg().header()->dataLen() );
             }
 
         }

@@ -40,9 +40,10 @@ namespace mongo {
     class ChunkObjUnitTest;
 
     typedef unsigned long long ShardChunkVersion;
+    typedef shared_ptr<Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
-    typedef map<BSONObj,Chunk*,BSONObjCmp> ChunkMap;
+    typedef map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
     typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
     
     /**
@@ -92,8 +93,8 @@ namespace mongo {
         bool maxIsInf() const;
 
         BSONObj pickSplitPoint() const;
-        Chunk * split();
-        Chunk * split( const BSONObj& middle );
+        ChunkPtr split();
+        ChunkPtr split( const BSONObj& middle );
 
         /**
          * @return size of shard in bytes
@@ -114,7 +115,7 @@ namespace mongo {
          * moves either this shard or newShard if it makes sense too
          * @return whether or not a shard was moved
          */
-        bool moveIfShould( Chunk * newShard = 0 );
+        bool moveIfShould( ChunkPtr newShard = ChunkPtr() );
 
         bool moveAndCommit( const Shard& to , string& errmsg );
 
@@ -155,6 +156,8 @@ namespace mongo {
         // transient stuff
 
         long _dataWritten;
+        
+        ChunkPtr _this;
 
         // methods, etc..
         
@@ -256,11 +259,11 @@ namespace mongo {
         }
         
         int numChunks(){ rwlock lk( _lock , false ); return _chunks.size(); }
-        Chunk* getChunk( int i ){ rwlock lk( _lock , false ); return _chunks[i]; }
+        ChunkPtr getChunk( int i ){ rwlock lk( _lock , false ); return _chunks[i]; }
         bool hasShardKey( const BSONObj& obj );
 
-        Chunk& findChunk( const BSONObj& obj , bool retry = false );
-        Chunk* findChunkOnServer( const Shard& shard ) const;
+        ChunkPtr findChunk( const BSONObj& obj , bool retry = false );
+        ChunkPtr findChunkOnServer( const Shard& shard ) const;
         
         ShardKeyPattern& getShardKey(){  return _key; }
         const ShardKeyPattern& getShardKey() const {  return _key; }
@@ -310,7 +313,7 @@ namespace mongo {
         ShardKeyPattern _key;
         bool _unique;
         
-        vector<Chunk*> _chunks;
+        vector<ChunkPtr> _chunks;
         map<string,unsigned long long> _maxMarkers;
 
         ChunkMap _chunkMap;
@@ -344,7 +347,7 @@ namespace mongo {
         bool operator()( const Chunk &l, const Chunk &r ) const {
             return _cmp(l.getMin(), r.getMin());
         }
-        bool operator()( const Chunk *l, const Chunk *r ) const {
+        bool operator()( const ptr<Chunk> l, const ptr<Chunk> r ) const {
             return operator()(*l, *r);
         }
 

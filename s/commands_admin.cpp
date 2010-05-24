@@ -424,7 +424,7 @@ namespace mongo {
                     ;
             }
 
-            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ) = 0;
+            virtual bool _split( BSONObjBuilder& result , string&errmsg , const string& ns , ChunkManager * manager , ChunkPtr old , BSONObj middle ) = 0;
 
             bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool){
                 ShardConnection::sync();
@@ -452,7 +452,7 @@ namespace mongo {
                 }
                 
                 ChunkManager * info = config->getChunkManager( ns );
-                Chunk& old = info->findChunk( find );
+                ChunkPtr old = info->findChunk( find );
 
                 return _split( result , errmsg , ns , info , old , cmdObj.getObjectField( "middle" ) );
             }
@@ -464,14 +464,14 @@ namespace mongo {
         class SplitValueCommand : public SplitCollectionHelper {
         public:
             SplitValueCommand() : SplitCollectionHelper( "splitvalue" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , ChunkPtr old , BSONObj middle ){
 
-                result << "shardinfo" << old.toString();
+                result << "shardinfo" << old->toString();
 
                 result.appendBool( "auto" , middle.isEmpty() );
 
                 if ( middle.isEmpty() )
-                    middle = old.pickSplitPoint();
+                    middle = old->pickSplitPoint();
 
                 result.append( "middle" , middle );
 
@@ -484,14 +484,14 @@ namespace mongo {
         class SplitCollection : public SplitCollectionHelper {
         public:
             SplitCollection() : SplitCollectionHelper( "split" ){}
-            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , Chunk& old , BSONObj middle ){
-
+            virtual bool _split( BSONObjBuilder& result , string& errmsg , const string& ns , ChunkManager * manager , ChunkPtr old , BSONObj middle ){
+                assert( old.get() );
                 log() << "splitting: " << ns << "  shard: " << old << endl;
 
                 if ( middle.isEmpty() )
-                    old.split();
+                    old->split();
                 else
-                    old.split( middle );
+                    old->split( middle );
 
                 return true;
             }
@@ -538,15 +538,15 @@ namespace mongo {
                 tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManager * info = config->getChunkManager( ns );
-                Chunk& c = info->findChunk( find );
-                const Shard& from = c.getShard();
+                ChunkPtr c = info->findChunk( find );
+                const Shard& from = c->getShard();
 
                 if ( from == to ){
                     errmsg = "that chunk is already on that shard";
                     return false;
                 }
                 
-                if ( ! c.moveAndCommit( to , errmsg ) )
+                if ( ! c->moveAndCommit( to , errmsg ) )
                     return false;
 
                 result.append( "millis" , t.millis() );
