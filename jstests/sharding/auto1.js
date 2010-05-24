@@ -17,8 +17,7 @@ var i=0;
 for ( ; i<500; i++ ){
     coll.save( { num : i , s : bigString } );
 }
-
-s.adminCommand( "connpoolsync" );
+db.getLastError();
 
 primary = s.getServer( "test" ).getDB( "test" );
 
