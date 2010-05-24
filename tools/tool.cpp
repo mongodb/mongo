@@ -113,6 +113,16 @@ namespace mongo {
             return EXIT_BADOPTIONS;
         }
 
+        // hide password from ps output
+        for (int i=0; i < (argc-1); ++i){
+            if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--password")){
+                char* arg = argv[i+1];
+                while (*arg){
+                    *arg++ = 'x';
+                }
+            }
+        }
+
         if ( _params.count( "help" ) ){
             printHelp(cout);
             return 0;
