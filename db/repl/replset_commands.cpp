@@ -48,8 +48,7 @@ namespace mongo {
             }
             if( theReplSet == 0 ) {
                 result.append("startupStatus", ReplSet::startupStatus);
-                errmsg = ReplSet::startupStatusMsg.empty() ? 
-                    errmsg = "replset unknown error 1" : ReplSet::startupStatusMsg;
+                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 1" : ReplSet::startupStatusMsg;
                 return false;
             }
 
