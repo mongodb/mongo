@@ -21,15 +21,15 @@
 
 namespace mongo { 
 
-    class CmdReplSetElect : public Command {
-    public:
+    class ReplSetCommand : public Command { 
+    protected:
+        ReplSetCommand(const char * s) : Command(s) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help << "internal"; }
-        CmdReplSetElect() : Command("replSetElect") { }
-        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) { 
                 errmsg = "not running with --replSet";
                 return false;
@@ -39,6 +39,29 @@ namespace mongo {
                 errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
                 return false;
             }
+            return true;
+        }
+    };
+
+    class CmdReplSetFresh : public ReplSetCommand { 
+    public:
+        CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
+    private:
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
+            errmsg = "not done";
+            return false;
+        }
+    } cmdReplSetFresh;
+
+    class CmdReplSetElect : public ReplSetCommand {
+    public:
+        CmdReplSetElect() : ReplSetCommand("replSetElect") { }
+    private:
+        virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if( !check(errmsg, result) )
+                return false;
             theReplSet->elect.electCmdReceived(cmdObj, result);
             return true;
         }
@@ -81,15 +104,16 @@ namespace mongo {
 
     /* todo: threading **************** !!!!!!!!!!!!!!!! */
     void ReplSet::Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder& b) { 
-        string name = cmd["name"].String();
+        log() << "replSet TEMP ELECT " << cmd.toString() << rsLog;
+        string set = cmd["set"].String();
         unsigned whoid = cmd["whoid"].Int();
         int cfgver = cmd["cfgver"].Int();
         OID round = cmd["round"].OID();
         int myver = rs.config().version;
 
         int vote = 0;
-        if( name != rs.name() ) { 
-            log() << "replSet error received an elect request for '" << name << "' but our set name is '" << rs.name() << "'" << rsLog;
+        if( set != rs.name() ) { 
+            log() << "replSet error received an elect request for '" << set << "' but our set name is '" << rs.name() << "'" << rsLog;
 
         }
         else if( myver < cfgver ) { 
@@ -101,8 +125,10 @@ namespace mongo {
             vote = -10000;
         }
         else {
-            try { 
+            try {
                 vote = yea(whoid);
+                rs.relinquish();
+                log() << "replSet info voting yea" << rsLog;
             }
             catch(VoteException&) { 
                 log() << "replSet voting no already voted for another" << rsLog;
@@ -113,11 +139,43 @@ namespace mongo {
         b.append("round", round);
     }
 
+    void ReplSet::getTargets(list<Target>& L) { 
+        for( Member *m = head(); m; m=m->next() )
+            if( m->hbinfo().up() )
+                L.push_back( Target(m->fullName()) );
+    }
+
+    bool ReplSet::Consensus::weAreFreshest() {
+        BSONObj cmd = BSON(
+               "replSetFresh" << 1 <<
+               "set" << rs.name() << 
+               "who" << rs._self->fullName() << 
+               "cfgver" << rs._cfg->version );
+        list<Target> L;
+        rs.getTargets(L);
+        multiCommand(cmd, L);
+        int nok = 0;
+        for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
+            if( i->ok ) {
+                nok++;
+                if( i->result["fresher"].trueValue() )
+                    return false;
+            }
+        }
+        log() << "replSet temp we are freshest, nok:" << nok << rsLog; 
+        return true;
+    }
+
     void ReplSet::Consensus::_electSelf() {
-        log() << "replSet info electSelf" << rsLog;
+        if( !weAreFreshest() ) { 
+            log() << "replSet info not going to elect self, we are not freshest" << rsLog;
+            return;
+        }
+
         time_t start = time(0);
         ReplSet::Member& me = *rs._self;        
         int tally = yea( me.id() );
+        log() << "replSet info electSelf" << rsLog;
 
         BSONObj electCmd = BSON(
                "replSetElect" << 1 <<
@@ -129,14 +187,12 @@ namespace mongo {
             );
 
         list<Target> L;
-        for( Member *m = rs.head(); m; m=m->next() )
-            if( m->hbinfo().up() )
-                L.push_back( Target(m->fullName()) );
-
+        rs.getTargets(L);
         multiCommand(electCmd, L);
 
         for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-            cout << "TEMP elect res: " << i->result.toString() << endl;
+            log() << "replSet TEMP elect res: " << i->result.toString() << rsLog;
+            Target& t = *i;
             if( i->ok ) {
                 int v = i->result["vote"].Int();
                 tally += v;
@@ -148,12 +204,11 @@ namespace mongo {
                 log() << "replSet too much time passed during election, ignoring result" << rsLog;
             }
             /* succeeded. */
-            rs._myState = PRIMARY;
-            log() << "replSet elected self as primary" << rsLog;
+            rs.assumePrimary();
             return;
         } 
         else { 
-            log() << "replSet couldn't elect self, majority not achieved tally:" << tally << rsLog;
+            log() << "replSet couldn't elect self, only received " << tally << " votes" << rsLog;
         }
     }
 

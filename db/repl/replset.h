@@ -28,9 +28,9 @@
 
 namespace mongo {
 
+    struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
-
     extern Tee *rsLog;
 
     /* information about the entire repl set, such as the various servers in the set, and their state */
@@ -51,6 +51,9 @@ namespace mongo {
         bool ok() const { return _myState != FATAL; }
         MemberState state() const { return _myState; }        
         string name() const { return _name; } /* @return replica set's logical name */
+
+        void relinquish();
+        void assumePrimary();
 
         /* cfgString format is 
            replsetname/host1,host2:port,...
@@ -89,6 +92,7 @@ namespace mongo {
             Atomic<LastYea> ly;
             unsigned yea(unsigned memberId); // throws VoteException
             void _electSelf();
+            bool weAreFreshest();
         public:
             Consensus(ReplSet *t) : rs(*t) { }
             int totalVotes() const;
@@ -98,38 +102,40 @@ namespace mongo {
         } elect;
 
     public:
-        struct Member : public List1<Member>::Base {
+        class Member : public List1<Member>::Base {
+        public:
             Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c);
+
             string fullName() const { return h().toString(); }
             const ReplSetConfig::MemberCfg& config() const { return *_config; }
-            void summarizeAsHtml(stringstream& s) const;
             const HeartbeatInfo& hbinfo() const { return _hbinfo; }
             string lhb() { return _hbinfo.lastHeartbeatMsg; }
-            MemberState state() const { return _state; }
+            MemberState state() const { return _hbinfo.hbstate; }
             const HostAndPort& h() const { return _h; }
             unsigned id() const { return _hbinfo.id(); }
+
+            void summarizeAsHtml(stringstream& s) const;
             friend class ReplSet;
         private:
             const ReplSetConfig::MemberCfg *_config; /* todo: when this changes??? */
             HostAndPort _h;
-            MemberState _state;
             HeartbeatInfo _hbinfo;
         };
         list<HostAndPort> memberHostnames() const;
         const Member* currentPrimary() const { return _currentPrimary; }
+        bool primary() const { return _myState == PRIMARY; }
         const ReplSetConfig::MemberCfg& myConfig() const { return _self->config(); }
         void msgUpdateHBInfo(HeartbeatInfo);
 
     private:
         const Member *_currentPrimary;
-        Member *_self;
-        /* all members of the set EXCEPT self. */
-        List1<Member> _members;
+        Member *_self;        
+        List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
         class Manager : public task::Port {
             bool got(const any&);
-            ReplSet *_rs;
+            ReplSet *rs;
             int _primary;
             const Member* findOtherPrimary();
             void noteARemoteIsPrimary(const Member *);
@@ -142,6 +148,7 @@ namespace mongo {
 
     private:
         Member* head() const { return _members.head(); }
+        void getTargets(list<Target>&);
         static string stateAsStr(MemberState state);
         static string stateAsHtml(MemberState state);
         void startThreads();

@@ -25,6 +25,21 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
+    void ReplSet::assumePrimary() { 
+        _myState = PRIMARY;
+        _currentPrimary = _self;
+        log() << "replSet self is now primary" << rsLog;
+    }
+
+    void ReplSet::relinquish() { 
+        if( state() == PRIMARY ) {
+            _myState = RECOVERING;
+            log() << "replSet info relinquished primary state" << rsLog;
+        }
+        else if( state() == STARTUP2 )
+            _myState = RECOVERING;
+    }
+
     void ReplSet::msgUpdateHBInfo(HeartbeatInfo h) { 
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {

@@ -46,7 +46,7 @@ namespace mongo {
         void run() {
             try { 
                 ScopedConn c(d.toHost);
-                c->runCommand("admin", cmd, d.result);
+                d.ok = c->runCommand("admin", cmd, d.result);
             }
             catch(DBException&) { 
                 DEV log() << "dev caught dbexception on multiCommand " << d.toHost << rsLog;

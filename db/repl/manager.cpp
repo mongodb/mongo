@@ -29,7 +29,7 @@ namespace mongo {
 
     /* check members OTHER THAN US to see if they think they are primary */
     const ReplSet::Member * ReplSet::Manager::findOtherPrimary() { 
-        Member *m = _rs->head();
+        Member *m = rs->head();
         Member *p = 0;
         while( m ) {
             if( m->state() == PRIMARY ) {
@@ -38,83 +38,64 @@ namespace mongo {
             }
             m = m->next();
         }
+        if( p ) 
+            noteARemoteIsPrimary(p);
         return p;
     }
 
-    ReplSet::Manager::Manager(ReplSet *rs) : task::Port("ReplSet::Manager"), _rs(rs), _primary(NOPRIMARY)
+    ReplSet::Manager::Manager(ReplSet *_rs) : task::Port("ReplSet::Manager"), rs(_rs), _primary(NOPRIMARY)
     { 
     }
 
     void ReplSet::Manager::noteARemoteIsPrimary(const Member *m) { 
-        _rs->_self->lhb() = "finish code #1";
-        log() << "replSet finish notearemoteisprimary " << m->fullName() << rsLog;
+        if( !rs->primary() )
+            rs->_currentPrimary = m;
+        rs->_self->lhb() = "";
     }
 
     /** called as the health threads get new results */
     void ReplSet::Manager::msgCheckNewState() {
-        {
-            const Member *p = _rs->currentPrimary();
-            const Member *p2 = findOtherPrimary();
-            try { p2 = findOtherPrimary(); }
-            catch(string s) { 
-                /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
-                log() << "replSet warning DIAG TODO " << s << rsLog;
-                return;
-            }
-
-            if( p == p2 && p ) return;
-
-            if( p2 ) { 
-                /* someone else thinks they are primary. */
-                if( p == p2 ) // already match
-                    return;
-                if( p == 0 )
-                    noteARemoteIsPrimary(p2); return;
-                if( p != _rs->_self )
-                    noteARemoteIsPrimary(p2); return;
-                /* we thought we were primary, yet now someone else thinks they are. */
-                if( !_rs->elect.aMajoritySeemsToBeUp() )
-                    noteARemoteIsPrimary(p2); return;
-                /* ignore for now, keep thinking we are master */
-                return;
-            }
-
-            if( p ) { 
-                /* we are already primary, and nothing significant out there has changed. */
-                /* todo: if !aMajoritySeemsToBeUp, relinquish */
-                assert( p == _rs->_self );
-                return;
-            }
-
-            /* no one seems to be primary.  shall we try to elect ourself? */
-            if( !_rs->elect.aMajoritySeemsToBeUp() ) { 
-                _rs->_self->lhb() = "can't see a majority, won't elect self";
-                return;
-            }
-
-            _rs->_self->lhb() = "";
+        const Member *p = rs->currentPrimary();
+        const Member *p2;
+        try { p2 = findOtherPrimary(); }
+        catch(string s) { 
+            /* two other nodes think they are primary (asynchronously polled) -- wait for things to settle down. */
+            log() << "replSet warning DIAG TODO 2primary" << s << rsLog;
+            return;
         }
-        _rs->elect.electSelf();
+
+        if( p == p2 && p ) return;
+
+        if( p2 ) { 
+            /* someone else thinks they are primary. */
+            if( p == p2 ) // already match
+                return;
+            if( p == 0 )
+                noteARemoteIsPrimary(p2); return;
+            if( p != rs->_self )
+                noteARemoteIsPrimary(p2); return;
+            /* we thought we were primary, yet now someone else thinks they are. */
+            if( !rs->elect.aMajoritySeemsToBeUp() )
+                noteARemoteIsPrimary(p2); return;
+            /* ignore for now, keep thinking we are master */
+            return;
+        }
+
+        if( p ) { 
+            /* we are already primary, and nothing significant out there has changed. */
+            /* todo: if !aMajoritySeemsToBeUp, relinquish */
+            assert( p == rs->_self );
+            return;
+        }
+
+        /* no one seems to be primary.  shall we try to elect ourself? */
+        if( !rs->elect.aMajoritySeemsToBeUp() ) { 
+            rs->_self->lhb() = "can't see a majority, won't consider electing self";
+            return;
+        }
+
+        rs->_self->lhb() = "";
+        rs->elect.electSelf();
     }
-
-/*    bool ReplSet::Manager::got(const any& msg) {
-        if( msg.type() == typeid(Messages) ) { 
-            assert( CheckNewState == any_cast<Messages>(msg) );
-            checkNewState();
-        }
-        else if( msg.type() == typeid(BSONObj) ) { 
-            log() << "replSet todo finish code in replset manager: call receivedNewConfig" << rsLog;
-            BSONObj o = any_cast<BSONObj>(msg);
-            log() << "replSet " << o.toString() << rsLog;
-        }
-        else if( msg.type() == typeid(HeartbeatInfo) ) {
-            const HeartbeatInfo& h = any_cast<const HeartbeatInfo&>(msg);
-            _rs->updateHBInfo(h);
-        }
-        else { 
-            assert(false);
-        }
-        return true;
-    }*/
 
 }

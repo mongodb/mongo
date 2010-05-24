@@ -135,7 +135,11 @@ namespace mongo {
             }
             m = mem;
             theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
-            if( mem.changed(old) ) {
+
+            static time_t last = 0;
+            time_t now = time(0);
+            if( mem.changed(old) || now-last>4 ) {
+                last = now;
                 theReplSet->mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
             }
         }
