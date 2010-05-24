@@ -198,7 +198,7 @@ namespace mongo {
             if ( ! t )
                 *this << "null";
             else 
-                *this << t;
+                *this << *t;
             return *this;
         }
 
