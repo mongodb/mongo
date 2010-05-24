@@ -92,7 +92,7 @@ namespace mongo {
 namespace mongo {
     namespace task {
 
-        void Port::send(const any& msg) { 
+        void Port::send( boost::function<void()> msg ) { 
             {
                 boost::mutex::scoped_lock lk(m);
                 d.push_back(msg);
@@ -102,42 +102,21 @@ namespace mongo {
 
         void Port::doWork() { 
             while( 1 ) { 
-                any a;
+                boost::function<void()> f;
                 {
                     boost::mutex::scoped_lock lk(m);
                     while( d.empty() )
                         c.wait(lk);
-                    a = d.front();
+                    f = d.front();
                     d.pop_front();
                 }
                 try {
-                    if( !got(a) )
-                        break;
+                    f();
                 } catch(std::exception& e) { 
                     log() << "Port::doWork() exception " << e.what() << endl;
                 }
             }
         }
         
-        class PortTest : public Port {
-        protected:
-            void got(const int& msg) { }
-        public:
-            virtual bool got(const any& msg) { 
-                assert( any_cast<int>(msg) <= 55 );
-                return any_cast<int>(msg) != 55;
-            }
-            virtual string name() { return "PortTest"; }
-        };    
-
-        struct PortUnitTest : public UnitTest {
-            void run() { 
-                PortTest *p = new PortTest();
-                shared_ptr<Task> tp = p->taskPtr();
-                fork( tp );
-                p->send(3);
-                p->send(55);
-            } 
-        } portunittest;
     }
 }

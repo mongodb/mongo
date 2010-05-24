@@ -20,8 +20,6 @@ c2 = {
 db = db.getSisterDB("admin");
 local = db.getSisterDB("local");
 
-b = new Mongo("localhost:27002").getDB("admin");
-
 print("\n\ndb = admin db on localhost:27017");
 print("b = admin on localhost:27002");
 print("rc(x) = db.runCommand(x)");
@@ -33,3 +31,12 @@ print("\n\n");
 function rc(c) { return db.runCommand(c); }
 function i() { return rc({ replSetInitiate: cfg }); }
 function ism() { return rc("isMaster"); }
+
+b = 0;
+try {
+    b = new Mongo("localhost:27002").getDB("admin");
+}
+catch (e) {
+    print("\nCouldn't connect to b mongod instance\n");
+}
+

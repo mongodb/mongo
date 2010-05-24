@@ -41,7 +41,7 @@ namespace mongo {
         return p;
     }
 
-    ReplSet::Manager::Manager(ReplSet *rs) : _rs(rs), _primary(NOPRIMARY)
+    ReplSet::Manager::Manager(ReplSet *rs) : task::Port("ReplSet::Manager"), _rs(rs), _primary(NOPRIMARY)
     { 
     }
 
@@ -51,7 +51,7 @@ namespace mongo {
     }
 
     /** called as the health threads get new results */
-    void ReplSet::Manager::checkNewState() {
+    void ReplSet::Manager::msgCheckNewState() {
         {
             const Member *p = _rs->currentPrimary();
             const Member *p2 = findOtherPrimary();
@@ -97,7 +97,7 @@ namespace mongo {
         _rs->elect.electSelf();
     }
 
-    bool ReplSet::Manager::got(const any& msg) {
+/*    bool ReplSet::Manager::got(const any& msg) {
         if( msg.type() == typeid(Messages) ) { 
             assert( CheckNewState == any_cast<Messages>(msg) );
             checkNewState();
@@ -115,6 +115,6 @@ namespace mongo {
             assert(false);
         }
         return true;
-    }
+    }*/
 
 }
