@@ -317,9 +317,10 @@ namespace mongo {
             
 			bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
+            result.append("version", versionString);
             result.append("uptime",(double) (time(0)-started));
             result.appendDate( "localTime" , jsTime() );
-            
+
             {
                 BSONObjBuilder t;
 
@@ -339,6 +340,8 @@ namespace mongo {
                 
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
                 
+                t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );
+
                 ProcessInfo p;
                 if ( p.supported() ){
                     t.appendNumber( "resident" , p.getResidentSize() );
