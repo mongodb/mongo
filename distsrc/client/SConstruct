@@ -1,0 +1,36 @@
+
+import os
+
+AddOption( "--extrapath",
+           dest="extrapath",
+           type="string",
+           nargs=1,
+           action="store",
+           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+
+env = Environment()
+
+def addExtraLibs( s ):
+    for x in s.split(","):
+        env.Append( CPPPATH=[ x + "/include" ] )
+        env.Append( LIBPATH=[ x + "/lib" ] )
+        env.Append( LIBPATH=[ x + "/lib64" ] )
+
+if GetOption( "extrapath" ) is not None:
+    addExtraLibs( GetOption( "extrapath" ) )
+
+env.Append( CPPPATH=[ "mongo/" ] )
+
+env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
+
+allClientFiles = []
+allClientFiles += Glob( "mongo/*.cpp" )
+allClientFiles += Glob( "mongo/client/*.cpp" )
+allClientFiles += Glob( "mongo/s/*.cpp" )
+allClientFiles += Glob( "mongo/shell/*.cpp" )
+allClientFiles += Glob( "mongo/db/*.cpp" )
+allClientFiles += Glob( "mongo/scripting/*.cpp" )
+allClientFiles += Glob( "mongo/util/*.cpp" )
+allClientFiles += Glob( "mongo/util/*.c" )
+
+env.Library( "mongoclient" , allClientFiles )

@@ -331,6 +331,8 @@ else:
 if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
 
+distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
+
 extraLibPlaces = []
 
 def addExtraLibs( s ):
@@ -351,13 +353,34 @@ if GetOption( "extralib" ) is not None:
     for x in GetOption( "extralib" ).split( "," ):
         env.Append( LIBS=[ x ] )
 
-# class InstallSetup:
-#     binaries = True
-#     clientSrc = False
+class InstallSetup:
+    binaries = False
+    clientSrc = False
+    headers = False
+    bannerDir = None
+    headerRoot = "include"
 
-#     def default(self):
+    def __init__(self):
+        self.default()
+    
+    def default(self):
+        self.binaries = True
+        self.clientSrc = False
+        self.headers = False
+        self.bannerDir = None
+        self.headerRoot = "include"
+
+    def justClient(self):
+        self.binaries = False
+        self.clientSrc = True
+        self.headers = True
+        self.bannerDir = "distsrc/client/"
+        self.headerRoot = ""
         
-# installSetup = Installsetup()
+installSetup = InstallSetup()
+if distBuild:
+    installSetup.bannerDir = "distsrc"
+
 
 # ------    SOURCE FILE SETUP -----------
 
@@ -397,11 +420,11 @@ coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
 if usesm:
-    commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    coreServerFiles += [ "scripting/engine_spidermonkey.cpp" ]
 elif usev8:
-    commonFiles += [ Glob( "scripting/*v8*.cpp" ) ]
+    coreServerFiles += [ Glob( "scripting/*v8*.cpp" ) ]
 else:
-    commonFiles += [ "scripting/engine_none.cpp" ]
+    coreServerFiles += [ "scripting/engine_none.cpp" ]
 
 coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "db/cmdline.cpp" ]
@@ -445,12 +468,14 @@ nixLibPrefix = "lib"
 distName = GetOption( "distname" )
 dontReplacePackage = False
 
-distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 if distBuild:
     release = True
 
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
+    if installDir.find( "mongo-cxx-driver" ) >= 0:
+        installSetup.justClient()
+
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
@@ -1082,6 +1107,7 @@ clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 if GetOption( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
+env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientTests = []
 
@@ -1164,7 +1190,7 @@ elif not onlyServer:
     if weird:
         mongo = shellEnv.Program( "mongo" , shell32BitFiles )
     else:
-        shellEnv.Prepend( LIBS=[ "mongoclient"] )
+        shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
         mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
     if weird:
@@ -1468,6 +1494,9 @@ def checkGlibc(target,source,env):
 allBinaries = []
 
 def installBinary( e , name ):
+    if not installSetup.binaries:
+        return
+
     global allBinaries
 
     if windows:
@@ -1508,18 +1537,29 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "client/" , "bson/", "bson/util/"]:
-    env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
+if installSetup.headers:
+    for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
+        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.h" ) )
+        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.hpp" ) )
+
+if installSetup.clientSrc:
+    for x in allClientFiles:
+        x = str(x)
+        env.Install( installDir + "/mongo/" + x.rpartition( "/" )[0] , x )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix, clientLibName )
+if installSetup.binaries:
+    env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 
 #textfiles
-if distBuild or release:
-    #don't want to install these /usr/local/ for example
-    env.Install( installDir , "distsrc/README" )
-    env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
-    env.Install( installDir , "distsrc/GNU-AGPL-3.0" )
+if installSetup.bannerDir:
+    for x in os.listdir( installSetup.bannerDir ):
+        full = installSetup.bannerDir + "/" + x
+        if os.path.isdir( full ):
+            continue
+        if x.find( "~" ) >= 0:
+            continue
+        env.Install( installDir , full )
 
 #final alias
 env.Alias( "install" , installDir )
