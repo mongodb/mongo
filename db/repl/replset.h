@@ -22,6 +22,7 @@
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/msg.h"
 #include "../../util/hostandport.h"
+#include "../commands.h"
 #include "rstime.h"
 #include "rsmember.h"
 #include "rs_config.h"
@@ -166,5 +167,28 @@ namespace mongo {
         /* todo replset */
         return false;
     }
+
+    class ReplSetCommand : public Command { 
+    protected:
+        ReplSetCommand(const char * s) : Command(s) { }
+        virtual bool slaveOk() const { return true; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool logTheOp() { return false; }
+        virtual LockType locktype() const { return NONE; }
+        virtual void help( stringstream &help ) const { help << "internal"; }
+        bool check(string& errmsg, BSONObjBuilder& result) {
+            if( !replSet ) { 
+                errmsg = "not running with --replSet";
+                return false;
+            }
+            if( theReplSet == 0 ) {
+                result.append("startupStatus", ReplSet::startupStatus);
+                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg;
+                return false;
+            }
+            return true;
+        }
+    };
+
 
 }
