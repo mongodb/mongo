@@ -34,6 +34,20 @@ namespace mongoutils {
 
         using namespace std;
 
+        inline bool startsWith(const char *str, const char *prefix) {
+            size_t l = strlen(prefix);
+            if ( strlen(str) < l ) return false;
+            return strncmp(str, prefix, l) == 0;
+        }
+        inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
+
+        inline bool endsWith(string s, string p) { 
+            int l = p.size();
+            int x = s.size();
+            if( x < l ) return false;
+            return strncmp(s.c_str()+x-l, p.c_str(), l) == 0;
+        }
+
         /** find char x, and return rest of string thereafter, or "" if not found */
         inline const char * after(const char *s, char x) {
             const char *p = strchr(s, x);
@@ -41,6 +55,16 @@ namespace mongoutils {
         inline string after(const string& s, char x) {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? string(p+1) : ""; }
+
+        inline const char * after(const char *s, const char *x) {
+            const char *p = strstr(s, x);
+            return (p != 0) ? p+strlen(x) : ""; }
+        inline string after(string s, string x) {
+            const char *p = strstr(s.c_str(), x.c_str());
+            return (p != 0) ? string(p+x.size()) : ""; }
+
+        inline bool contains(string s, string x) { 
+            return strstr(s.c_str(), x.c_str()) != 0; }
 
         /** @return everything befor the character x, else entire string */
         inline string before(const string& s, char x) {

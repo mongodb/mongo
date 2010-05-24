@@ -171,13 +171,27 @@ namespace mongo {
         return v[i];
     }
 
-    static bool isWarning(const char *line) {
+    /*static bool isWarning(const char *line) {
         const char *p = strstr(line, "replSet ");
         if( p ) { 
             p += 8;
             return startsWith(p, "warning") || startsWith(p, "error");
         }
         return false;
+    }*/
+    static string color(string line) { 
+        string s = str::after(line, "replSet ");
+        if( str::startsWith(s, "warning") || startsWith(s, "error") )
+            return red(line);
+        if( str::startsWith(s, "info") ) {
+            if( str::endsWith(s, " up\n") )
+                return green(line);
+            if( str::endsWith(s, " down\n") )
+                return yellow(line);
+            return blue(line);
+        }
+
+        return line;
     }
 
     void fillRsLog(stringstream& s) {
@@ -188,7 +202,7 @@ namespace mongo {
             assert( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
-                s << red( clean(v,i), isWarning(v[i]) );
+                s << color( clean(v,i) );
             } else {
                 stringstream x;
                 x << string(v[i], 0, 20);

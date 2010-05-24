@@ -116,7 +116,7 @@ namespace mongo {
         for( Member *m = head(); m; m = m->next() )
             seedSet.erase(m->h());
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
-            log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
     }
 

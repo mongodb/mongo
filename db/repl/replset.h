@@ -41,13 +41,10 @@ namespace mongo {
     public:
         static enum StartupStatus { 
             PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, 
-            EMPTYUNREACHABLE=4, STARTED=5, SOON=6 } startupStatus;
+            EMPTYUNREACHABLE=4, STARTED=5, SOON=6 
+        } startupStatus;
         static string startupStatusMsg;
 
-    private: 
-        MemberState _myState;
-
-    public:
         void fatal();
         bool isMaster(const char *client);
         void fillIsMaster(BSONObjBuilder&);
@@ -58,7 +55,6 @@ namespace mongo {
         /* cfgString format is 
            replsetname/host1,host2:port,...
            where :port is optional.
-
            throws exception if a problem initializing. */
         ReplSet(string cfgString);
 
@@ -71,6 +67,7 @@ namespace mongo {
         const ReplSetConfig& config() { return *_cfg; }
 
     private:
+        MemberState _myState;
         string _name;
         const vector<HostAndPort> *_seeds;
         ReplSetConfig *_cfg;
@@ -90,13 +87,14 @@ namespace mongo {
                 unsigned who;
             };
             Atomic<LastYea> ly;
-            void yea(unsigned memberId);
+            unsigned yea(unsigned memberId); // throws VoteException
             void _electSelf();
         public:
             Consensus(ReplSet *t) : rs(*t) { }
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
             void electSelf();
+            void electCmdReceived(BSONObj, BSONObjBuilder&);
         } elect;
 
     public:
@@ -124,17 +122,9 @@ namespace mongo {
 
     private:
         const Member *_currentPrimary;
-
-        static string stateAsStr(MemberState state);
-        static string stateAsHtml(MemberState state);
-
         Member *_self;
         /* all members of the set EXCEPT self. */
         List1<Member> _members;
-        Member* head() const { return _members.head(); }
-
-        void startThreads();
-        friend class FeedbackThread;
 
     public:
         class Manager : public task::Port {
@@ -150,6 +140,13 @@ namespace mongo {
         };
         shared_ptr<Manager> mgr;
 
+    private:
+        Member* head() const { return _members.head(); }
+        static string stateAsStr(MemberState state);
+        static string stateAsHtml(MemberState state);
+        void startThreads();
+        friend class FeedbackThread;
+        friend class CmdReplSetElect;
     };
 
     inline void ReplSet::fatal() 
