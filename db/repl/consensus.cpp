@@ -39,6 +39,21 @@ namespace mongo {
 
     static const int VETO = -10000;
 
+    class VoteException : public std::exception {
+    };
+
+    const time_t LeaseTime = 30;
+
+    void ReplSet::Consensus::yea(unsigned memberId) {
+        Atomic<LastYea>::tran t(ly);
+        LastYea &ly = t.ref();
+        time_t now = time(0);
+        if( ly.when + LeaseTime >= now )
+            throw VoteException();
+        ly.when = now;
+        ly.who = memberId;
+    }
+
     void ReplSet::Consensus::_electSelf() {
         ReplSet::Member& me = *rs._self;
         BSONObj electCmd = BSON(

@@ -66,8 +66,8 @@ namespace mongo {
         class tran : private scoped_lock {
             Atomic<T>& _a;
         public:
-            tran(Atomic<T>& a) : scoped_lock(_atomicMutex) { }
-            T& ref() { return _a; }
+            tran(Atomic<T>& a) : scoped_lock(_atomicMutex), _a(a) { }
+            T& ref() { return _a.val; }
         };
     };
 

@@ -84,6 +84,13 @@ namespace mongo {
 
         class Consensus {
             ReplSet &rs;
+            struct LastYea { 
+                LastYea() : when(0), who(0xffffffff) { }
+                time_t when;
+                unsigned who;
+            };
+            Atomic<LastYea> ly;
+            void yea(unsigned memberId);
             void _electSelf();
         public:
             Consensus(ReplSet *t) : rs(*t) { }
