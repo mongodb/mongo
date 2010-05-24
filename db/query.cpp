@@ -543,7 +543,7 @@ namespace mongo {
             }
             
             if ( !_c->ok() ) {
-                finish();
+                finish( false );
                 return;
             }
             
@@ -554,7 +554,7 @@ namespace mongo {
             }
             
             if ( _pq.getMaxScan() && _nscanned >= _pq.getMaxScan() ){
-                finish();
+                finish( true ); //?
                 return;
             }
 
@@ -582,7 +582,7 @@ namespace mongo {
                             _n++;
                             if ( n() >= _pq.getNumToReturn() && !_pq.wantMore() ) {
                                 // .limit() was used, show just that much.
-                                finish();
+                                finish( true ); //?
                                 return;
                             }
                         }
@@ -600,7 +600,7 @@ namespace mongo {
                             _n++;
                             if ( ! _c->supportGetMore() ){
                                 if ( _pq.enough( n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ){
-                                    finish();
+                                    finish( true );
                                     return;
                                 }
                             }
@@ -613,7 +613,7 @@ namespace mongo {
                                         _saveClientCursor = true;
                                     }
                                 }
-                                finish();
+                                finish( true );
                                 return;
                             }
                         }
@@ -624,7 +624,7 @@ namespace mongo {
         }
 
         // this plan won, so set data for response broadly
-        void finish() {
+        void finish( bool stop ) {
             if ( _pq.isExplain() ) {
                 _n = _inMemSort ? _so->size() : _n;
             } 
@@ -657,7 +657,11 @@ namespace mongo {
             
             _response.appendData( _buf.buf(), _buf.len() );
             _buf.decouple();
-            setComplete();            
+            if ( stop ) {
+                setStop();
+            } else {
+                setComplete();
+            }
         }
         
         virtual bool mayRecordPlan() const { return _pq.getNumToReturn() != 1; }
@@ -857,18 +861,18 @@ namespace mongo {
             if ( qps.usingPrerecordedPlan() )
                 oldPlan = qps.explain();
         }
-        MultiPlanScanner qps( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() );
+        auto_ptr< MultiPlanScanner > qps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;
             if ( !oldPlan.isEmpty() )
                 bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
             if ( hint.eoo() )
-                bb.appendElements(qps.explain());            
+                bb.appendElements(qps->explain());            
             explainSuffix = bb.obj();
         }
         UserQueryOp original( pq, result, explainSuffix, curop );
-        shared_ptr< UserQueryOp > o = qps.runOp( original );
+        shared_ptr< UserQueryOp > o = qps->runOp( original );
         UserQueryOp &dqo = *o;
         massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
         n = dqo.n();
@@ -884,6 +888,7 @@ namespace mongo {
             cc->query = jsobj.getOwned();
             DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
             cc->matcher = dqo.matcher();
+            cc->_mps = qps;
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();
