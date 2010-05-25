@@ -52,6 +52,13 @@ def ensureDir( name ):
         if not os.path.exists( d ):
             raise "Failed to create dir: " + name
 
+
+def distinctAsString( arr ):
+    s = set()
+    for x in arr:
+        s.add( str(x) )
+    return list(s)
+
 def checkMongoPort( port=27017 ):
     sock = socket.socket()
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

@@ -69,7 +69,7 @@ namespace mongo {
         if ( _chunkManager ){
             if ( _chunkManager->numChunks() > 1 )
                 throw UserException( 8060 , "can't call primaryShard on a sharded collection" );
-            return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() ).getShard();
+            return _chunkManager->findChunk( _chunkManager->getShardKey().globalMin() )->getShard();
         }
         Shard s = _config->getShard( getns() );
         uassert( 10194 ,  "can't call primaryShard on a sharded collection!" , s.ok() );

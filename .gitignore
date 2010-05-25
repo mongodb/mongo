@@ -79,10 +79,12 @@ mongostat
 *.tar.gz
 
 mongodb-*
+mongo-cxx-driver-*
 
 #libs
 libmongoclient.*
 libmongotestfiles.*
+libmongoshellfiles.*
 
 # examples
 firstExample

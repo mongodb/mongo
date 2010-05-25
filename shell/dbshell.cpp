@@ -357,6 +357,16 @@ int _main(int argc, char* argv[]) {
         return mongo::EXIT_BADOPTIONS;
     }
 
+    // hide password from ps output
+    for (int i=0; i < (argc-1); ++i){
+        if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--password")){
+            char* arg = argv[i+1];
+            while (*arg){
+                *arg++ = 'x';
+            }
+        }
+    }
+
     if (params.count("shell")) {
         runShell = true;
     }

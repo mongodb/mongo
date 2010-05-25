@@ -86,6 +86,8 @@ namespace mongo {
                 pool.onHandedOut( c );
                 return c;
             }
+
+            debug() << "CREATING NEW CONNECTION" << endl;
             s->created++;
             return pool.get( addr );
         }

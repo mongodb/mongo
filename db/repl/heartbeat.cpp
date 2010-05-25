@@ -121,7 +121,9 @@ namespace mongo {
                     be cfg = info["config"];
                     if( cfg.ok() ) {
                         // received a new config
-                        theReplSet->mgr->send(cfg.Obj().copy());
+                        boost::function<void()> f = 
+                            boost::bind(&ReplSet::Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
+                        theReplSet->mgr->send(f);
                     }
                 }
                 else { 
@@ -132,9 +134,13 @@ namespace mongo {
                 down(mem, "connect/transport error");             
             }
             m = mem;
-            theReplSet->mgr->send(mem);
-            if( mem.changed(old) ) {
-                theReplSet->mgr->send(ReplSet::Manager::CheckNewState);
+            theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
+
+            static time_t last = 0;
+            time_t now = time(0);
+            if( mem.changed(old) || now-last>4 ) {
+                last = now;
+                theReplSet->mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
             }
         }
 
@@ -163,7 +169,7 @@ namespace mongo {
             m = m->next();
         }
 
-        mgr->send(Manager::CheckNewState);
+        mgr->send( boost::bind(&ReplSet::Manager::msgCheckNewState, theReplSet->mgr) );
     }
 
 }

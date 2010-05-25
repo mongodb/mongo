@@ -25,7 +25,22 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
-    void ReplSet::updateHBInfo(const HeartbeatInfo& h) { 
+    void ReplSet::assumePrimary() { 
+        _myState = PRIMARY;
+        _currentPrimary = _self;
+        log() << "replSet self is now primary" << rsLog;
+    }
+
+    void ReplSet::relinquish() { 
+        if( state() == PRIMARY ) {
+            _myState = RECOVERING;
+            log() << "replSet info relinquished primary state" << rsLog;
+        }
+        else if( state() == STARTUP2 )
+            _myState = RECOVERING;
+    }
+
+    void ReplSet::msgUpdateHBInfo(HeartbeatInfo h) { 
         for( Member *m = _members.head(); m; m=m->next() ) {
             if( m->id() == h.id() ) {
                 m->_hbinfo = h;
@@ -116,7 +131,7 @@ namespace mongo {
         for( Member *m = head(); m; m = m->next() )
             seedSet.erase(m->h());
         for( set<HostAndPort>::iterator i = seedSet.begin(); i != seedSet.end(); i++ ) {
-            log() << "replSet warning: command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+            log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
         }
     }
 

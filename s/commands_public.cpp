@@ -460,9 +460,9 @@ namespace mongo {
                 massert( 13091 , "how could chunk manager be null!" , cm );
                 uassert( 13092 , "GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id" << 1));
 
-                const Chunk& chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
+                ChunkPtr chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
                 
-                ShardConnection conn( chunk.getShard() , fullns );
+                ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
                 conn.done();

@@ -163,14 +163,20 @@ namespace mongo {
         ChunkManager * cm = cfg->getChunkManager( ns );
         assert( cm );
         
-        Chunk& c = cm->findChunk( chunkToMove["min"].Obj() );
-        if ( c.getMin().woCompare( chunkToMove["min"].Obj() ) ){
-            log() << "balancer: weird chunk issue  c: " << c << " min: " << chunkToMove["min"].Obj() << endl;
-            assert( c.getMin().woCompare( chunkToMove["min"].Obj() ) == 0 );
+        ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
+        if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+            // likely a split happened somewhere
+            cm = cfg->getChunkManager( ns , true );
+            assert( cm );
+            c = cm->findChunk( chunkToMove["min"].Obj() );
+            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) ){
+                log() << "balancer: chunk mismatch after reload, ignoring will retry issue cm: " << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
+                return false;
+            }
         }
         
         string errmsg;
-        if ( c.moveAndCommit( Shard::make( to ) , errmsg ) ){
+        if ( c->moveAndCommit( Shard::make( to ) , errmsg ) ){
             return true;
         }
 

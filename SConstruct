@@ -90,23 +90,6 @@ AddOption( "--static",
            help="fully static build")
 
 
-AddOption('--java',
-          dest='javaHome',
-          type='string',
-          default="/opt/java/",
-          nargs=1,
-          action='store',
-          metavar='DIR',
-          help='java home')
-
-AddOption('--nojni',
-          dest='nojni',
-          type="string",
-          nargs=0,
-          action="store",
-          help="turn off jni support" )
-
-
 AddOption('--usesm',
           dest='usesm',
           type="string",
@@ -120,13 +103,6 @@ AddOption('--usev8',
           nargs=0,
           action="store",
           help="use v8 for javascript" )
-
-AddOption('--usejvm',
-          dest='usejvm',
-          type="string",
-          nargs=0,
-          action="store",
-          help="use java for javascript" )
 
 AddOption('--asio',
           dest='asio',
@@ -290,7 +266,6 @@ boostLibs = [ "thread" , "filesystem" , "program_options" ]
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 nix = False
-useJavaHome = False
 linux = False
 linux64  = False
 darwin = False
@@ -312,11 +287,9 @@ static = not GetOption( "static" ) is None
 debugBuild = ( not GetOption( "debugBuild" ) is None ) or ( not GetOption( "debugBuildAndLogging" ) is None )
 debugLogging = not GetOption( "debugBuildAndLogging" ) is None
 noshell = not GetOption( "noshell" ) is None
-nojni = not GetOption( "nojni" ) is None
 
 usesm = not GetOption( "usesm" ) is None
 usev8 = not GetOption( "usev8" ) is None
-usejvm = not GetOption( "usejvm" ) is None
 
 asio = not GetOption( "asio" ) is None
 
@@ -355,12 +328,10 @@ if boostVersion is None:
 else:
     boostVersion = "-" + boostVersion
 
-if ( usesm and usejvm ):
-    print( "can't say usesm and usejvm at the same time" )
-    Exit(1)
-
-if ( not ( usesm or usejvm or usev8 or justClientLib) ):
+if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
+
+distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 
 extraLibPlaces = []
 
@@ -382,6 +353,35 @@ if GetOption( "extralib" ) is not None:
     for x in GetOption( "extralib" ).split( "," ):
         env.Append( LIBS=[ x ] )
 
+class InstallSetup:
+    binaries = False
+    clientSrc = False
+    headers = False
+    bannerDir = None
+    headerRoot = "include"
+
+    def __init__(self):
+        self.default()
+    
+    def default(self):
+        self.binaries = True
+        self.clientSrc = False
+        self.headers = False
+        self.bannerDir = None
+        self.headerRoot = "include"
+
+    def justClient(self):
+        self.binaries = False
+        self.clientSrc = True
+        self.headers = True
+        self.bannerDir = "distsrc/client/"
+        self.headerRoot = ""
+        
+installSetup = InstallSetup()
+if distBuild:
+    installSetup.bannerDir = "distsrc"
+
+
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = Split( "pch.cpp buildinfo.cpp db/common.cpp db/jsobj.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp shell/mongo.cpp" )
@@ -390,7 +390,6 @@ commonFiles += [ "util/background.cpp" , "util/mmap.cpp" , "util/ramstore.cpp", 
                  "util/thread_pool.cpp", "util/password.cpp" ]
 commonFiles += Glob( "util/*.c" )
 commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp s/shardconnection.cpp" )
-commonFiles += [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
 
 #mmap stuff
 
@@ -419,17 +418,16 @@ serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
 coreServerFiles += Glob( "db/stats/*.cpp" )
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
 
+scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" ]
+
 if usesm:
-    commonFiles += [ "scripting/engine_spidermonkey.cpp" ]
-    nojni = True
+    scriptingFiles += [ "scripting/engine_spidermonkey.cpp" ]
 elif usev8:
-    commonFiles += [ Glob( "scripting/*v8*.cpp" ) ]
-    nojni = True
-elif not (nojni or justClientLib) :
-    commonFiles += [ "scripting/engine_java.cpp" ]
+    scriptingFiles += [ Glob( "scripting/*v8*.cpp" ) ]
 else:
-    commonFiles += [ "scripting/engine_none.cpp" ]
-    nojni = True
+    scriptingFiles += [ "scripting/engine_none.cpp" ]
+
+coreServerFiles += scriptingFiles
 
 coreShardFiles = []
 shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" ,  "s/cursors.cpp" ,  "s/server.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" , "s/config.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "db/cmdline.cpp" ]
@@ -473,16 +471,14 @@ nixLibPrefix = "lib"
 distName = GetOption( "distname" )
 dontReplacePackage = False
 
-javaHome = GetOption( "javaHome" )
-javaVersion = "i386";
-javaLibs = []
-
-distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
 if distBuild:
     release = True
 
 if GetOption( "prefix" ):
     installDir = GetOption( "prefix" )
+    if installDir.find( "mongo-cxx-driver" ) >= 0:
+        installSetup.justClient()
+
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
@@ -506,12 +502,6 @@ if "darwin" == os.sys.platform:
     darwin = True
     platform = "osx" # prettier than darwin
 
-    if usejvm:
-        env.Append( CPPPATH=[ "-I/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Headers/" ] )
-
-    if not nojni:
-        env.Append( FRAMEWORKS=["JavaVM"] )
-
     if env["CXX"] is None:
         if os.path.exists( "/usr/bin/g++-4.2" ):
             env["CXX"] = "g++-4.2"
@@ -529,15 +519,10 @@ if "darwin" == os.sys.platform:
 
 elif "linux2" == os.sys.platform:
     linux = True
-    useJavaHome = True
-    javaOS = "linux"
     platform = "linux"
-
-    javaHome = choosePathExist( [ javaHome , "/usr/lib/jvm/java/" , os.environ.get( "JAVA_HOME" ) ] , "/usr/lib/jvm/java/" )
 
     if os.uname()[4] == "x86_64" and not force32:
         linux64 = True
-        javaVersion = "amd64"
         nixLibPrefix = "lib64"
         env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
@@ -555,9 +540,6 @@ elif "linux2" == os.sys.platform:
 elif "sunos5" == os.sys.platform:
      nix = True
      solaris = True
-     useJavaHome = True
-     javaHome = "/usr/lib/jvm/java-6-sun/"
-     javaOS = "solaris"
      env.Append( CPPDEFINES=[ "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
 
@@ -606,17 +588,10 @@ elif "win32" == os.sys.platform:
 
     boostLibs = []
 
-    if usesm:
-        env.Append( CPPPATH=[ "js/src/" ] )
-        env.Append(CPPPATH=["../js/src/"])
-        env.Append(LIBPATH=["../js/src"])
-        env.Append( CPPDEFINES=[ "OLDJS" ] )
-    elif not justClientLib:
-        javaHome = findVersion( "C:/Program Files/java/" ,
-                                [ "jdk" , "jdk1.6.0_10" ] )
-        env.Append( CPPPATH=[ javaHome + "/include" , javaHome + "/include/win32" ] )
-        env.Append( LIBPATH=[ javaHome + "/Lib" ] )
-        javaLibs += [ "jvm" ];
+    env.Append( CPPPATH=[ "js/src/" ] )
+    env.Append(CPPPATH=["../js/src/"])
+    env.Append(LIBPATH=["../js/src"])
+    env.Append( CPPDEFINES=[ "OLDJS" ] )
 
     winSDKHome = findVersion( [ "C:/Program Files/Microsoft SDKs/Windows/", "C:/Program Files (x86)/Microsoft SDKs/Windows/" ] ,
                               [ "v6.0" , "v6.0a" , "v6.1", "v7.0A" ] )
@@ -697,16 +672,6 @@ elif "win32" == os.sys.platform:
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
-
-if not nojni and useJavaHome:
-    env.Append( CPPPATH=[ javaHome + "include" , javaHome + "include/" + javaOS ] )
-    env.Append( LIBPATH=[ javaHome + "jre/lib/" + javaVersion + "/server" , javaHome + "jre/lib/" + javaVersion ] )
-
-    if not nojni:
-        javaLibs += [ "java" , "jvm" ]
-
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion + "/server" )
-    env.Append( LINKFLAGS="-Xlinker -rpath -Xlinker " + javaHome + "jre/lib/" + javaVersion  )
 
 if nix:
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
@@ -844,7 +809,7 @@ def bigLibString( myenv ):
     return s
 
 
-def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
+def doConfigure( myenv , needPcre=True , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
     myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
@@ -859,7 +824,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
             print( "can't find stdc++ library which is needed" );
             Exit(1)
 
-    def myCheckLib( poss , failIfNotFound=False , java=False , staticOnly=False):
+    def myCheckLib( poss , failIfNotFound=False , staticOnly=False):
 
         if type( poss ) != types.ListType :
             poss = [poss]
@@ -880,7 +845,7 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
                         return True
 
 
-        if release and not java and not windows and failIfNotFound:
+        if release and not windows and failIfNotFound:
             print( "ERROR: can't find static version of: " + str( poss ) + " in: " + str( allPlaces ) )
             Exit(1)
 
@@ -924,10 +889,6 @@ def doConfigure( myenv , needJava=True , needPcre=True , shell=False ):
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
-
-    if needJava:
-        for j in javaLibs:
-            myCheckLib( j , True , True )
 
     if nix and needPcre:
         myCheckLib( "pcrecpp" , True )
@@ -1149,6 +1110,7 @@ clientLibName = str( env.Library( "mongoclient" , allClientFiles )[0] )
 if GetOption( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
 env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
+env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientTests = []
 
@@ -1208,9 +1170,6 @@ elif not onlyServer:
         shellEnv.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib" , "/usr/lib"]) )
 
     l = shellEnv["LIBS"]
-    if linux64:
-        removeIfInList( l , "java" )
-        removeIfInList( l , "jvm" )
 
     removeIfInList( l , "pcre" )
     removeIfInList( l , "pcrecpp" )
@@ -1224,17 +1183,19 @@ elif not onlyServer:
         shell32BitFiles = coreShellFiles
         for f in allClientFiles:
             shell32BitFiles.append( "32bit/" + str( f ) )
+        for f in scriptingFiles:
+            shell32BitFiles.append( "32bit/" + str( f ) )
         shellEnv.VariantDir( "32bit" , "." )
         shellEnv.Append( CPPPATH=["32bit/"] )
     else:
         shellEnv.Prepend( LIBPATH=[ "." ] )
 
-    shellEnv = doConfigure( shellEnv , needPcre=False , needJava=False , shell=True )
+    shellEnv = doConfigure( shellEnv , needPcre=False , shell=True )
 
     if weird:
         mongo = shellEnv.Program( "mongo" , shell32BitFiles )
     else:
-        shellEnv.Prepend( LIBS=[ "mongoclient"] )
+        shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
         mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
     if weird:
@@ -1538,6 +1499,9 @@ def checkGlibc(target,source,env):
 allBinaries = []
 
 def installBinary( e , name ):
+    if not installSetup.binaries:
+        return
+
     global allBinaries
 
     if windows:
@@ -1578,20 +1542,29 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 # on a case-by-case basis.
 
 #headers
-for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "client/" , "bson/", "bson/util/"]:
-    env.Install( installDir + "/include/mongo/" + id , Glob( id + "*.h" ) )
+if installSetup.headers:
+    for id in [ "", "util/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
+        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.h" ) )
+        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.hpp" ) )
+
+if installSetup.clientSrc:
+    for x in allClientFiles:
+        x = str(x)
+        env.Install( installDir + "/mongo/" + x.rpartition( "/" )[0] , x )
 
 #lib
-env.Install( installDir + "/" + nixLibPrefix, clientLibName )
-if usejvm:
-    env.Install( installDir + "/" + nixLibPrefix + "/mongo/jars" , Glob( "jars/*" ) )
+if installSetup.binaries:
+    env.Install( installDir + "/" + nixLibPrefix, clientLibName )
 
 #textfiles
-if distBuild or release:
-    #don't want to install these /usr/local/ for example
-    env.Install( installDir , "distsrc/README" )
-    env.Install( installDir , "distsrc/THIRD-PARTY-NOTICES" )
-    env.Install( installDir , "distsrc/GNU-AGPL-3.0" )
+if installSetup.bannerDir:
+    for x in os.listdir( installSetup.bannerDir ):
+        full = installSetup.bannerDir + "/" + x
+        if os.path.isdir( full ):
+            continue
+        if x.find( "~" ) >= 0:
+            continue
+        env.Install( installDir , full )
 
 #final alias
 env.Alias( "install" , installDir )
