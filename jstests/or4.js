@@ -53,7 +53,8 @@ assert.eq.automsg( "3", "t.count( {z:1} )" );
 assert.eq.automsg( "3", "t.find( {$or:[{a:2},{b:3}]} ).toArray().length" );
 checkArrs( "t.find().toArray()", "t.find( {$or:[{a:2},{b:3}]} ).toArray()" );
 
-//t.save( {a:2} );
-//t.save( {a:2} );
+assert.eq.automsg( "3", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );
 
-//assert.eq.automsg( "3", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );
+t.save( {a:2} );
+
+assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );

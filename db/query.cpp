@@ -299,6 +299,8 @@ namespace mongo {
             
             start = cc->pos;
             Cursor *c = cc->c.get();
+            // TODO clean up
+            MultiCursor *mc = dynamic_cast< MultiCursor * >( c );
             c->checkLocation();
             DiskLoc last;
 
@@ -325,7 +327,8 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                if ( !cc->matcher->matches(c->currKey(), c->currLoc() ) ) {
+                CoveredIndexMatcher *matcher = mc ? &mc->matcher() : cc->matcher.get();
+                if ( !matcher->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << '\n';
@@ -336,6 +339,7 @@ namespace mongo {
                         last = c->currLoc();
                         BSONObj js = c->current();
 
+                        // show disk loc should be part of the main query, not in an $or clause, so this should be ok
                         fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
                         n++;
                         if ( (ntoreturn>0 && (n >= ntoreturn || b.len() > MaxBytesToReturnToClientAtOnce)) ||
@@ -479,9 +483,9 @@ namespace mongo {
             }
             return num;
         }
-        MultiPlanScanner qps( ns, query, BSONObj() );
+        MultiPlanScanner mps( ns, query, BSONObj() );
         CountOp original( cmd );
-        shared_ptr< CountOp > res = qps.runOp( original );
+        shared_ptr< CountOp > res = mps.runOp( original );
         if ( !res->complete() ) {
             log() << "Count with ns: " << ns << " and query: " << query
                   << " failed with exception: " << res->exceptionMessage()
@@ -858,22 +862,22 @@ namespace mongo {
         
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ){
-            MultiPlanScanner qps( ns, query, order );
-            if ( qps.usingPrerecordedPlan() )
-                oldPlan = qps.explain();
+            MultiPlanScanner mps( ns, query, order );
+            if ( mps.usingPrerecordedPlan() )
+                oldPlan = mps.explain();
         }
-        auto_ptr< MultiPlanScanner > qps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() ) );
+        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax() ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;
             if ( !oldPlan.isEmpty() )
                 bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
             if ( hint.eoo() )
-                bb.appendElements(qps->explain());            
+                bb.appendElements(mps->explain());            
             explainSuffix = bb.obj();
         }
         UserQueryOp original( pq, result, explainSuffix, curop );
-        shared_ptr< UserQueryOp > o = qps->runOp( original );
+        shared_ptr< UserQueryOp > o = mps->runOp( original );
         UserQueryOp &dqo = *o;
         massert( 10362 ,  dqo.exceptionMessage(), dqo.complete() );
         n = dqo.n();
@@ -882,13 +886,21 @@ namespace mongo {
             ss << " scanAndOrder ";
         shared_ptr<Cursor> cursor = dqo.cursor();
         log( 5 ) << "   used cursor: " << cursor.get() << endl;
-        if ( dqo.saveClientCursor() ) {
-            // the clientcursor now owns the Cursor* and 'c' is released:
-            ClientCursor *cc = new ClientCursor(queryOptions, cursor, ns);
+        if ( dqo.saveClientCursor() || mps->mayRunMore() ) {
+            ClientCursor *cc;
+            bool moreClauses = mps->mayRunMore();
+            if ( moreClauses ) {
+                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher() ) );
+                cc = new ClientCursor(queryOptions, multi, ns);
+            } else {
+                cc = new ClientCursor( queryOptions, cursor, ns );
+            }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
             DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
-            cc->matcher = dqo.matcher();
+            if ( !moreClauses ) {
+                cc->matcher = dqo.matcher();
+            }
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();

@@ -143,7 +143,7 @@ namespace mongo {
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
         PlanPtr getBestGuess() const;
-        
+        void setBestGuessOnly() { _bestGuessOnly = true; }
         //for testing
         const FieldRangeSet &fbs() const { return fbs_; }
     private:
@@ -176,6 +176,7 @@ namespace mongo {
         BSONObj min_;
         BSONObj max_;
         string _special;
+        bool _bestGuessOnly;
     };
 
     // Handles $or type queries by generating a QueryPlanSet for each $or clause
@@ -224,6 +225,7 @@ namespace mongo {
         BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
         bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
         QueryPlanSet::PlanPtr getBestGuess() const { assertNotOr(); return _currentQps->getBestGuess(); }
+        void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
         //temp
         void assertNotOr() const {
@@ -270,6 +272,7 @@ namespace mongo {
         int _i;
         int _n;
         bool _honorRecordedPlan;
+        bool _bestGuessOnly;
     };
     
     class MultiCursor : public Cursor {
@@ -291,6 +294,11 @@ namespace mongo {
             } else {
                 _c.reset( new BasicCursor( DiskLoc() ) );
             }
+        }
+        // used to handoff a query to a getMore()
+        MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, auto_ptr< CoveredIndexMatcher > matcher )
+        : _op( new NoOp() ), _c( c ), _mps( mps ), _matcher( matcher ) {
+            _mps->setBestGuessOnly();
         }
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -321,6 +329,16 @@ namespace mongo {
         }
         CoveredIndexMatcher &matcher() const { return *_matcher; }
     private:
+        class NoOp : public CursorOp {
+            virtual void init() { setComplete(); }
+            virtual void next() {}
+            virtual bool mayRecordPlan() const { return false; }
+            virtual QueryOp *clone() const { return new NoOp(); }
+            virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+            virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
+                return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
+            }
+        };
         void nextClause() {
             shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
             massert( 10401 , best->exceptionMessage(), best->complete() );
