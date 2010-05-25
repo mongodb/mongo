@@ -154,7 +154,7 @@ namespace mongo {
             return preallocateOnly ? 0 : p;
         }
 
-        MongoDataFile* addAFile( int sizeNeeded = 0, bool preallocateNextFile = false ) {
+        MongoDataFile* addAFile( int sizeNeeded, bool preallocateNextFile ) {
             int n = (int) files.size();
             MongoDataFile *ret = getFile( n, sizeNeeded );
             if ( preallocateNextFile )
@@ -168,12 +168,15 @@ namespace mongo {
             getFile( n, 0, true );
         }
 
-        MongoDataFile* suitableFile( int sizeNeeded ) {
+        MongoDataFile* suitableFile( int sizeNeeded, bool preallocate ) {
             MongoDataFile* f = newestFile();
+            if ( !f ) {
+                f = addAFile( sizeNeeded, preallocate );                
+            }
             for ( int i = 0; i < 8; i++ ) {
                 if ( f->getHeader()->unusedLength >= sizeNeeded )
                     break;
-                f = addAFile( sizeNeeded );
+                f = addAFile( sizeNeeded, preallocate );
                 if ( f->getHeader()->fileLength >= MongoDataFile::maxSize() ) // this is as big as they get so might as well stop
                     break;
             }
@@ -183,12 +186,16 @@ namespace mongo {
         Extent* allocExtent( const char *ns, int size, bool capped ) { 
             Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
             if( e ) return e;
-            return suitableFile( size )->createExtent( ns, size, capped );
+            return suitableFile( size, !capped )->createExtent( ns, size, capped );
         }
         
         MongoDataFile* newestFile() {
             int n = (int) files.size();
-            if ( n > 0 ) n--;
+            if ( n > 0 ) {
+                n--;
+            } else {
+                return 0;   
+            }
             return getFile(n);
         }
         
