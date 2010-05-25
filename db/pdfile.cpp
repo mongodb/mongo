@@ -209,7 +209,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                database->suitableFile( (int) size )->createExtent( ns, (int) size, newCapped );
+                database->suitableFile( (int) size, false )->createExtent( ns, (int) size, newCapped );
             }
         } else {
             while ( size > 0 ) {
@@ -217,11 +217,6 @@ namespace mongo {
                 int desiredExtentSize = (int) (size > max ? max : size);
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped );
                 size -= e->length;
-            }
-            if ( !newCapped ) {
-                // check if it's time to preallocate a new file, and if so queue that job for a bg thread
-                // safe to call this multiple times - the implementation will only preallocate one file
-                database->preallocateAFile();
             }
         }
 
