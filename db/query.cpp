@@ -299,8 +299,6 @@ namespace mongo {
             
             start = cc->pos;
             Cursor *c = cc->c.get();
-            // TODO clean up
-            MultiCursor *mc = dynamic_cast< MultiCursor * >( c );
             c->checkLocation();
             DiskLoc last;
 
@@ -327,8 +325,7 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                CoveredIndexMatcher *matcher = mc ? mc->matcher() : cc->matcher.get();
-                if ( !matcher->matches(c->currKey(), c->currLoc() ) ) {
+                if ( !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << '\n';
@@ -893,8 +890,8 @@ namespace mongo {
                 shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher() ) );
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {
+                cursor->setMatcher( dqo.matcher() );
                 cc = new ClientCursor( queryOptions, cursor, ns );
-                cc->matcher = dqo.matcher();
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
