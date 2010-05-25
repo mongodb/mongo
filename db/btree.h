@@ -356,6 +356,12 @@ namespace mongo {
         
         void forgetEndKey() { endKey = BSONObj(); }
 
+        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
+        
+        virtual void setMatcher( auto_ptr< CoveredIndexMatcher > matcher ) {
+            _matcher = matcher;
+        }
+        
     private:
         /* Our btrees may (rarely) have "unused" keys when items are deleted.
            Skip past them.
@@ -393,7 +399,7 @@ namespace mongo {
         BoundList bounds_;
         unsigned boundIndex_;
         const IndexSpec& _spec;
-
+        auto_ptr< CoveredIndexMatcher > _matcher;
     };
 
 

@@ -1498,13 +1498,10 @@ namespace mongo {
             BSONObj query = getQuery( cmdObj );
             
             BSONElementSet values;
-            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
-            auto_ptr<CoveredIndexMatcher> matcher;
-            if ( ! query.isEmpty() )
-                matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
+            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
 
             while ( cursor->ok() ){
-                if ( matcher.get() && ! matcher->matchesCurrent( cursor.get() ) ){
+                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
                     cursor->advance();
                     continue;
                 }

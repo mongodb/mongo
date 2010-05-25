@@ -760,10 +760,10 @@ namespace mongo {
         while ( c->ok() ) {
             nscanned++;
 
-            bool atomic = c->matcher().docMatcher().atomic();
+            bool atomic = c->matcher()->docMatcher().atomic();
                 
             // May have already matched in UpdateOp, but do again to get details set correctly
-            if ( ! c->matcher().matches( c->currKey(), c->currLoc(), &details ) ){
+            if ( ! c->matcher()->matches( c->currKey(), c->currLoc(), &details ) ){
                 c->advance();
                     
                 if ( nscanned % 256 == 0 && ! atomic ){

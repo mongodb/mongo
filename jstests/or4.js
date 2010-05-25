@@ -60,6 +60,9 @@ t.save( {a:2} );
 assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).batchSize( 2 ).toArray().length" );
 assert.eq.automsg( "4", "t.find( {$or:[{a:2},{b:3}]} ).snapshot().toArray().length" );
 
+t.save( {a:1,b:3} );
+assert.eq.automsg( "[1,2]", "t.distinct( 'a', {$or:[{a:2},{b:3}]} )" );
+
 t.remove( {} );
 
 t.save( {a:[1,2]} );

@@ -148,7 +148,7 @@ namespace mongo {
         unsigned long long nScanned = 0;
         bool justOne = justOneOrig;
         do {
-            if ( ++nScanned % 128 == 0 && !god && !creal->matcher().docMatcher().atomic() ) {
+            if ( ++nScanned % 128 == 0 && !god && !creal->matcher()->docMatcher().atomic() ) {
                 if ( ! cc->yield() ){
                     cc.release(); // has already been deleted elsewhere
                     break;
@@ -164,7 +164,7 @@ namespace mongo {
 
             // NOTE Calling advance() may change the matcher, so it's important 
             // to try to match first.
-            bool match = creal->matcher().matches( key , rloc );
+            bool match = creal->matcher()->matches( key , rloc );
             
             if ( ! cc->c->advance() )
                 justOne = true;
@@ -327,7 +327,7 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                CoveredIndexMatcher *matcher = mc ? &mc->matcher() : cc->matcher.get();
+                CoveredIndexMatcher *matcher = mc ? mc->matcher() : cc->matcher.get();
                 if ( !matcher->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
