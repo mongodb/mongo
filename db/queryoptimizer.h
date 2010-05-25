@@ -224,7 +224,6 @@ namespace mongo {
         bool mayRunMore() const { return _i < _n; }
         BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
         bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
-        QueryPlanSet::PlanPtr getBestGuess() const { assertNotOr(); return _currentQps->getBestGuess(); }
         void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
         //temp
@@ -325,7 +324,7 @@ namespace mongo {
                 advance();
             }
         }        
-        virtual bool supportGetMore() { return false; }
+        virtual bool supportGetMore() { return true; }
         // with update we could potentially get the same document on multiple
         // indexes, but update appears to already handle this with seenObjects
         // so we don't have to do anything special here.

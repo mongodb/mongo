@@ -198,9 +198,9 @@ namespace mongo {
         }
 
         bool currentMatches(){
-            if ( ! matcher.get() )
+            if ( ! c->matcher() )
                 return true;
-            return matcher->matchesCurrent( c.get() );
+            return c->matcher()->matchesCurrent( c.get() );
         }
 
         BSONObj current(){
