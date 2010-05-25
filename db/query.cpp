@@ -325,7 +325,8 @@ namespace mongo {
                     cc = 0;
                     break;
                 }
-                if ( !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
+                // in some cases (clone collection) there won't be a matcher
+                if ( c->matcher() && !c->matcher()->matches(c->currKey(), c->currLoc() ) ) {
                 }
                 else {
                     //out() << "matches " << c->currLoc().toString() << '\n';

@@ -882,13 +882,12 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str(), query, sort).getBestGuess()->newCursor();
-            scoped_ptr<CoveredIndexMatcher> matcher (new CoveredIndexMatcher(query, cursor->indexKeyPattern()));
+            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str(), query, sort);
             scoped_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
             int n = 0;
             while ( cursor->ok() ){
-                if ( ! matcher->matchesCurrent( cursor.get() ) ){
+                if ( ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
                     log() << "**** NOT MATCHING ****" << endl;
                     PRINT(cursor->current());
                     cursor->advance();
@@ -1363,13 +1362,10 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = MultiPlanScanner(ns.c_str() , query , BSONObj() ).getBestGuess()->newCursor();
-            auto_ptr<CoveredIndexMatcher> matcher;
-            if ( ! query.isEmpty() )
-                matcher.reset( new CoveredIndexMatcher( query , cursor->indexKeyPattern() ) );
+            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str() , query , BSONObj() );
 
             while ( cursor->ok() ){
-                if ( matcher.get() && ! matcher->matchesCurrent( cursor.get() ) ){
+                if ( cursor->matcher() && ! cursor->matcher()->matchesCurrent( cursor.get() ) ){
                     cursor->advance();
                     continue;
                 }
