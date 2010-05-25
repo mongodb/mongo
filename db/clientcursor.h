@@ -246,8 +246,6 @@ namespace mongo {
            */
         void updateLocation();
 
-        void cleanupByLocation(DiskLoc loc);
-        
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
                 return;

@@ -21,6 +21,7 @@
 #include "cursor.h"
 #include "jsobj.h"
 #include "queryutil.h"
+#include "matcher.h"
 
 namespace mongo {
     
@@ -142,7 +143,7 @@ namespace mongo {
         BSONObj explain() const;
         bool usingPrerecordedPlan() const { return usingPrerecordedPlan_; }
         PlanPtr getBestGuess() const;
-        
+        void setBestGuessOnly() { _bestGuessOnly = true; }
         //for testing
         const FieldRangeSet &fbs() const { return fbs_; }
     private:
@@ -175,6 +176,7 @@ namespace mongo {
         BSONObj min_;
         BSONObj max_;
         string _special;
+        bool _bestGuessOnly;
     };
 
     // Handles $or type queries by generating a QueryPlanSet for each $or clause
@@ -223,6 +225,7 @@ namespace mongo {
         BSONObj explain() const { assertNotOr(); return _currentQps->explain(); }
         bool usingPrerecordedPlan() const { assertNotOr(); return _currentQps->usingPrerecordedPlan(); }
         QueryPlanSet::PlanPtr getBestGuess() const { assertNotOr(); return _currentQps->getBestGuess(); }
+        void setBestGuessOnly() { _bestGuessOnly = true; }
     private:
         //temp
         void assertNotOr() const {
@@ -269,6 +272,83 @@ namespace mongo {
         int _i;
         int _n;
         bool _honorRecordedPlan;
+        bool _bestGuessOnly;
+    };
+    
+    class MultiCursor : public Cursor {
+    public:
+        class CursorOp : public QueryOp {
+        public:
+            virtual shared_ptr< Cursor > newCursor() const = 0;  
+            virtual auto_ptr< CoveredIndexMatcher > newMatcher() const = 0;
+        };
+        // takes ownership of 'op'
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, auto_ptr< CursorOp > op )
+        : _op( op ),
+        _mps( new MultiPlanScanner( ns, pattern, order ) ) {
+            if ( _mps->mayRunMore() ) {
+                nextClause();
+                if ( !ok() ) {
+                    advance();
+                }
+            } else {
+                _c.reset( new BasicCursor( DiskLoc() ) );
+            }
+        }
+        // used to handoff a query to a getMore()
+        MultiCursor( auto_ptr< MultiPlanScanner > mps, const shared_ptr< Cursor > &c, auto_ptr< CoveredIndexMatcher > matcher )
+        : _op( new NoOp() ), _c( c ), _mps( mps ), _matcher( matcher ) {
+            _mps->setBestGuessOnly();
+        }
+        virtual bool ok() { return _c->ok(); }
+        virtual Record* _current() { return _c->_current(); }
+        virtual BSONObj current() { return _c->current(); }
+        virtual DiskLoc currLoc() { return _c->currLoc(); }
+        virtual bool advance() {
+            _c->advance();
+            while( !ok() && _mps->mayRunMore() ) {
+                nextClause();
+            }
+            return ok();
+        }
+        virtual BSONObj currKey() const { return _c->currKey(); }
+        virtual DiskLoc refLoc() { return _c->refLoc(); }
+        virtual void noteLocation() { _c->noteLocation(); }
+        virtual void checkLocation() {
+            _c->checkLocation();
+            if ( !ok() ) {
+                advance();
+            }
+        }        
+        virtual bool supportGetMore() { return false; }
+        // with update we could potentially get the same document on multiple
+        // indexes, but update appears to already handle this with seenObjects
+        // so we don't have to do anything special here.
+        virtual bool getsetdup(DiskLoc loc) {
+            return _c->getsetdup( loc );   
+        }
+        CoveredIndexMatcher &matcher() const { return *_matcher; }
+    private:
+        class NoOp : public CursorOp {
+            virtual void init() { setComplete(); }
+            virtual void next() {}
+            virtual bool mayRecordPlan() const { return false; }
+            virtual QueryOp *clone() const { return new NoOp(); }
+            virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+            virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
+                return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
+            }
+        };
+        void nextClause() {
+            shared_ptr< CursorOp > best = _mps->runOpOnce( *_op );
+            massert( 10401 , best->exceptionMessage(), best->complete() );
+            _c = best->newCursor();
+            _matcher = best->newMatcher();
+        }
+        auto_ptr< CursorOp > _op;
+        shared_ptr< Cursor > _c;
+        auto_ptr< MultiPlanScanner > _mps;
+        auto_ptr< CoveredIndexMatcher > _matcher;
     };
     
     // NOTE min, max, and keyPattern will be updated to be consistent with the selected index.

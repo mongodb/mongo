@@ -239,7 +239,8 @@ namespace mongo {
     oldNScanned_( 0 ),
     honorRecordedPlan_( honorRecordedPlan ),
     min_( min.getOwned() ),
-    max_( max.getOwned() ) {
+    max_( max.getOwned() ),
+    _bestGuessOnly() {
         if ( hint && !hint->eoo() ) {
             hint_ = hint->wrap();
         }
@@ -426,7 +427,7 @@ namespace mongo {
             Runner r( *this, op );
             shared_ptr< QueryOp > res = r.run();
             // plans_.size() > 1 if addOtherPlans was called in Runner::run().
-            if ( res->complete() || plans_.size() > 1 )
+            if ( _bestGuessOnly || res->complete() || plans_.size() > 1 )
                 return res;
             {
                 scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
@@ -465,14 +466,19 @@ namespace mongo {
     shared_ptr< QueryOp > QueryPlanSet::Runner::run() {
         massert( 10369 ,  "no plans", plans_.plans_.size() > 0 );
         
-        if ( plans_.plans_.size() > 1 )
-            log(1) << "  running multiple plans" << endl;
-
         vector< shared_ptr< QueryOp > > ops;
-        for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
+        if ( plans_._bestGuessOnly ) {
             shared_ptr< QueryOp > op( op_.clone() );
-            op->setQueryPlan( i->get() );
-            ops.push_back( op );
+            op->setQueryPlan( plans_.getBestGuess().get() );
+            ops.push_back( op );            
+        } else {
+            if ( plans_.plans_.size() > 1 )
+                log(1) << "  running multiple plans" << endl;            
+            for( PlanSet::iterator i = plans_.plans_.begin(); i != plans_.plans_.end(); ++i ) {
+                shared_ptr< QueryOp > op( op_.clone() );
+                op->setQueryPlan( i->get() );
+                ops.push_back( op );
+            }
         }
 
         for( vector< shared_ptr< QueryOp > >::iterator i = ops.begin(); i != ops.end(); ++i ) {
@@ -503,7 +509,7 @@ namespace mongo {
             }
             if ( errCount == ops.size() )
                 break;
-            if ( plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
+            if ( !plans_._bestGuessOnly && plans_.usingPrerecordedPlan_ && nScanned > plans_.oldNScanned_ * 10 && plans_._special.empty() ) {
                 plans_.addOtherPlans( true );
                 PlanSet::iterator i = plans_.plans_.begin();
                 ++i;
@@ -556,7 +562,8 @@ namespace mongo {
     _or( !query.getField( "$or" ).eoo() ),
     _query( query.getOwned() ),
     _i(),
-    _honorRecordedPlan( honorRecordedPlan ) {
+    _honorRecordedPlan( honorRecordedPlan ),
+    _bestGuessOnly() {
 //    _fros( ns, query ) {
         // eventually implement (some of?) these
         if ( !order.isEmpty() || ( hint && !hint->eoo() ) || !min.isEmpty() || !max.isEmpty() ) {
