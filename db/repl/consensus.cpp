@@ -40,7 +40,9 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            theReplSet->elect.electCmdReceived(cmdObj, result);
+            //task::lam f = boost::bind(&ReplSet::Consensus::electCmdReceived, &theReplSet->elect, cmdObj, &result);
+            //theReplSet->mgr->call(f);
+            theReplSet->elect.electCmdReceived(cmdObj, &result);
             return true;
         }
     } cmdReplSetElect;
@@ -81,7 +83,8 @@ namespace mongo {
     }
 
     /* todo: threading **************** !!!!!!!!!!!!!!!! */
-    void ReplSet::Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder& b) { 
+    void ReplSet::Consensus::electCmdReceived(BSONObj cmd, BSONObjBuilder* _b) { 
+        BSONObjBuilder& b = *_b;
         log() << "replSet TEMP ELECT " << cmd.toString() << rsLog;
         string set = cmd["set"].String();
         unsigned whoid = cmd["whoid"].Int();

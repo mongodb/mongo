@@ -686,6 +686,9 @@
     <ClInclude Include="repl\multicmd.h">
       <Filter>replset</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\msg.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">

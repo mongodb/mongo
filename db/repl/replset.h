@@ -99,7 +99,7 @@ namespace mongo {
             int totalVotes() const;
             bool aMajoritySeemsToBeUp() const;
             void electSelf();
-            void electCmdReceived(BSONObj, BSONObjBuilder&);
+            void electCmdReceived(BSONObj, BSONObjBuilder*);
         } elect;
 
     public:

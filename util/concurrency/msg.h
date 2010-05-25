@@ -25,10 +25,12 @@ namespace mongo {
 
     namespace task { 
 
+        typedef boost::function<void()> lam;
+
         class Port : private Task { 
         public:
             /** send a message to the port */
-            void send( boost::function<void()> );
+            void send(lam);
 
             /** typical usage is: task::fork( foo.task() ); */
             shared_ptr<Task> taskPtr() { return shared_ptr<Task>(static_cast<Task*>(this)); }
@@ -36,10 +38,13 @@ namespace mongo {
             Port(string name) : _name(name) { }
             virtual ~Port() { }
 
+            /** send message but block until function completes */
+            void call(lam&);
+
         private:
             virtual string name() { return _name; }
             void doWork();
-            deque< boost::function<void()> > d;
+            deque<lam> d;
             boost::mutex m;
             boost::condition c;
             string _name;

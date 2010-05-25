@@ -36,16 +36,6 @@ namespace mongo {
         }*/
 
         Task::Task() { 
-            {
-                
-                any a;
-                a = 3;
-                a = string("AAA");
-                string x = any_cast<string>(a);
-                if( a.type() == typeid(int) )
-                    cout << "won't print" << endl;
-            }
-
             n = 0;
             repeat = 0;
         }
@@ -92,7 +82,32 @@ namespace mongo {
 namespace mongo {
     namespace task {
 
-        void Port::send( boost::function<void()> msg ) { 
+        struct Ret {
+            Ret() : done(false) { }
+            bool done;
+            boost::mutex m;
+            boost::condition c;
+            lam *msg;
+            void f() {
+                (*msg)();
+                done = true;
+                c.notify_one();
+            }
+        };
+
+        void Port::call( lam& msg ) {
+            Ret r;
+            r.msg = &msg;
+            lam f = boost::bind(&Ret::f, &r);
+            send(f);
+            {
+                boost::mutex::scoped_lock lk(r.m);
+                while( !r.done )
+                    r.c.wait(lk);
+            }
+        }
+
+        void Port::send( lam msg ) { 
             {
                 boost::mutex::scoped_lock lk(m);
                 d.push_back(msg);
@@ -102,7 +117,7 @@ namespace mongo {
 
         void Port::doWork() { 
             while( 1 ) { 
-                boost::function<void()> f;
+                lam f;
                 {
                     boost::mutex::scoped_lock lk(m);
                     while( d.empty() )
