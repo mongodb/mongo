@@ -54,6 +54,21 @@
 		93278F670F72D39400844664 /* strategy_shard.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = strategy_shard.cpp; sourceTree = "<group>"; };
 		932AC3EB0F4A5B34005BF8B0 /* queryoptimizertests.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = queryoptimizertests.cpp; sourceTree = "<group>"; };
 		932AC4310F4A5E9D005BF8B0 /* SConstruct */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SConstruct; sourceTree = "<group>"; };
+		932D854611AB912B002749FB /* array_match1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = array_match1.js; sourceTree = "<group>"; };
+		932D854711AB912B002749FB /* capped5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = capped5.js; sourceTree = "<group>"; };
+		932D854811AB912B002749FB /* datasize2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = datasize2.js; sourceTree = "<group>"; };
+		932D854911AB912B002749FB /* distinct_array1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = distinct_array1.js; sourceTree = "<group>"; };
+		932D854A11AB912B002749FB /* distinct_speed1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = distinct_speed1.js; sourceTree = "<group>"; };
+		932D854B11AB912B002749FB /* dropIndex.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = dropIndex.js; sourceTree = "<group>"; };
+		932D854C11AB912B002749FB /* error5.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = error5.js; sourceTree = "<group>"; };
+		932D854D11AB912B002749FB /* exists2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = exists2.js; sourceTree = "<group>"; };
+		932D854E11AB912B002749FB /* explain2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = explain2.js; sourceTree = "<group>"; };
+		932D854F11AB912B002749FB /* extent.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = extent.js; sourceTree = "<group>"; };
+		932D855011AB912B002749FB /* find_and_modify2.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find_and_modify2.js; sourceTree = "<group>"; };
+		932D855111AB912B002749FB /* find_and_modify3.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find_and_modify3.js; sourceTree = "<group>"; };
+		932D855211AB912B002749FB /* find7.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = find7.js; sourceTree = "<group>"; };
+		932D855311AB912B002749FB /* fm4.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = fm4.js; sourceTree = "<group>"; };
+		932D855411AB912B002749FB /* geo_box1.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = geo_box1.js; sourceTree = "<group>"; };
 		933A4D130F55A68600145C4B /* authTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = authTest.cpp; sourceTree = "<group>"; };
 		933A4D150F55A68600145C4B /* clientTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = clientTest.cpp; sourceTree = "<group>"; };
 		933A4D170F55A68600145C4B /* first.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = first.cpp; sourceTree = "<group>"; };
@@ -800,6 +815,21 @@
 		934BEB9A10DFFA9600178102 /* jstests */ = {
 			isa = PBXGroup;
 			children = (
+				932D854611AB912B002749FB /* array_match1.js */,
+				932D854711AB912B002749FB /* capped5.js */,
+				932D854811AB912B002749FB /* datasize2.js */,
+				932D854911AB912B002749FB /* distinct_array1.js */,
+				932D854A11AB912B002749FB /* distinct_speed1.js */,
+				932D854B11AB912B002749FB /* dropIndex.js */,
+				932D854C11AB912B002749FB /* error5.js */,
+				932D854D11AB912B002749FB /* exists2.js */,
+				932D854E11AB912B002749FB /* explain2.js */,
+				932D854F11AB912B002749FB /* extent.js */,
+				932D855011AB912B002749FB /* find_and_modify2.js */,
+				932D855111AB912B002749FB /* find_and_modify3.js */,
+				932D855211AB912B002749FB /* find7.js */,
+				932D855311AB912B002749FB /* fm4.js */,
+				932D855411AB912B002749FB /* geo_box1.js */,
 				93E8A53411752FCE0025F7F8 /* or3.js */,
 				93E8A4D01174EEAF0025F7F8 /* or2.js */,
 				93E8A4381173E6480025F7F8 /* or1.js */,

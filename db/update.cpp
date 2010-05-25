@@ -705,8 +705,8 @@ namespace mongo {
         virtual QueryOp *clone() const {
             return new UpdateOp( _hasPositionalField );
         }
-        
-        virtual shared_ptr< Cursor > newCursor() const { return qp().newCursor(); }
+        // already scanned to the first match, so return _c
+        virtual shared_ptr< Cursor > newCursor() const { return _c; }
         virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
             return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey(), _hasPositionalField ) );
         }
@@ -762,7 +762,8 @@ namespace mongo {
 
             bool atomic = c->matcher().docMatcher().atomic();
                 
-            if ( numModded > 0 && ! c->matcher().matches( c->currKey(), c->currLoc(), &details ) ){
+            // May have already matched in UpdateOp, but do again to get details set correctly
+            if ( ! c->matcher().matches( c->currKey(), c->currLoc(), &details ) ){
                 c->advance();
                     
                 if ( nscanned % 256 == 0 && ! atomic ){
