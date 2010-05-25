@@ -49,7 +49,7 @@ namespace mongo {
     extern bool useHints;
 
     // Just try to identify best plan.
-    class DeleteOp : public QueryOp {
+    class DeleteOp : public MultiCursor::CursorOp {
     public:
         DeleteOp( bool justOne, int& bestCount ) :
             justOne_( justOne ),
@@ -89,9 +89,13 @@ namespace mongo {
         }
         virtual bool mayRecordPlan() const { return !justOne_; }
         virtual QueryOp *clone() const {
+            bestCount_ = 0; // should be safe to reset this in contexts where clone() is called
             return new DeleteOp( justOne_, bestCount_ );
         }
-        shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
+        virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
+        virtual auto_ptr< CoveredIndexMatcher > newMatcher() const {
+            return auto_ptr< CoveredIndexMatcher >( new CoveredIndexMatcher( qp().query(), qp().indexKey() ) );
+        }
     private:
         bool justOne_;
         int count_;
@@ -127,82 +131,79 @@ namespace mongo {
         uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
 
         long long nDeleted = 0;
-        MultiPlanScanner s( ns, pattern, BSONObj() );
-        while( s.mayRunMore() ) {
-            int best = 0;
-            DeleteOp original( justOneOrig, best );
-            shared_ptr< DeleteOp > bestOp = s.runOpOnce( original );
-            shared_ptr<Cursor> creal = bestOp->newCursor();
-            
-            if( !creal->ok() )
-                continue;
-            
-            CoveredIndexMatcher matcher(pattern, creal->indexKeyPattern());
-            
-            auto_ptr<ClientCursor> cc( new ClientCursor(QueryOption_NoCursorTimeout, creal, ns) );
-            cc->setDoingDeletes( true );
-            
-            CursorId id = cc->cursorid;
-            
-            unsigned long long nScanned = 0;
-            bool justOne = justOneOrig;
-            do {
-                if ( ++nScanned % 128 == 0 && !god && !matcher.docMatcher().atomic() ) {
-                    if ( ! cc->yield() ){
-                        cc.release(); // has already been deleted elsewhere
-                        break;
-                    }
-                }
-                
-                // this way we can avoid calling updateLocation() every time (expensive)
-                // as well as some other nuances handled
-                cc->setDoingDeletes( true );
-                
-                DiskLoc rloc = cc->c->currLoc();
-                BSONObj key = cc->c->currKey();
 
-                if ( ! cc->c->advance() )
-                    justOne = true;
-                
-                if ( ! matcher.matches( key , rloc ) )
-                    continue;
-                
-                assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
-                
-                if ( !justOne ) {
-                    /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
-                     blocks.  here we might call millions of times which would be bad.
-                     */
-                    cc->c->noteLocation();
-                }
-                
-                if ( logop ) {
-                    BSONElement e;
-                    if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
-                        BSONObjBuilder b;
-                        b.append( e );
-                        bool replJustOne = true;
-                        logOp( "d", ns, b.done(), 0, &replJustOne );
-                    } else {
-                        problem() << "deleted object without id, not logging" << endl;
-                    }
-                }
-                
-                theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
-                nDeleted++;
-                if ( justOne ) {
+        int best = 0;
+        auto_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
+        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr ) );
+        
+        if( !creal->ok() )
+            return nDeleted;
+            
+        shared_ptr< Cursor > cPtr = creal;
+        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout, cPtr, ns) );
+        cc->setDoingDeletes( true );
+            
+        CursorId id = cc->cursorid;
+            
+        unsigned long long nScanned = 0;
+        bool justOne = justOneOrig;
+        do {
+            if ( ++nScanned % 128 == 0 && !god && !creal->matcher().docMatcher().atomic() ) {
+                if ( ! cc->yield() ){
+                    cc.release(); // has already been deleted elsewhere
                     break;
                 }
-                cc->c->checkLocation();
-                
-            } while ( cc->c->ok() );
-
-            if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
-                cc.release();
             }
-            if ( justOneOrig && nDeleted ) {
+                
+            // this way we can avoid calling updateLocation() every time (expensive)
+            // as well as some other nuances handled
+            cc->setDoingDeletes( true );
+                
+            DiskLoc rloc = cc->c->currLoc();
+            BSONObj key = cc->c->currKey();
+
+            // NOTE Calling advance() may change the matcher, so it's important 
+            // to try to match first.
+            bool match = creal->matcher().matches( key , rloc );
+            
+            if ( ! cc->c->advance() )
+                justOne = true;
+                
+            if ( ! match )
+                continue;
+                            
+            assert( !cc->c->getsetdup(rloc) ); // can't be a dup, we deleted it!
+                
+            if ( !justOne ) {
+                /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
+                    blocks.  here we might call millions of times which would be bad.
+                    */
+                cc->c->noteLocation();
+            }
+                
+            if ( logop ) {
+                BSONElement e;
+                if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                    BSONObjBuilder b;
+                    b.append( e );
+                    bool replJustOne = true;
+                    logOp( "d", ns, b.done(), 0, &replJustOne );
+                } else {
+                    problem() << "deleted object without id, not logging" << endl;
+                }
+            }
+
+            theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+            nDeleted++;
+            if ( justOne ) {
                 break;
             }
+            cc->c->checkLocation();
+                
+        } while ( cc->c->ok() );
+
+        if ( cc.get() && ClientCursor::find( id , false ) == 0 ){
+            cc.release();
         }
               
         return nDeleted;
@@ -888,7 +889,6 @@ namespace mongo {
             cc->query = jsobj.getOwned();
             DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
             cc->matcher = dqo.matcher();
-            cc->_mps = qps;
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();

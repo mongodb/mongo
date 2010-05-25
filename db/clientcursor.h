@@ -40,7 +40,6 @@ namespace mongo {
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;
-    class MultiPlanScanner;
 
     /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
     */
@@ -105,7 +104,6 @@ namespace mongo {
         /*const*/ CursorId cursorid;
         string ns;
         auto_ptr<CoveredIndexMatcher> matcher;
-        auto_ptr< MultiPlanScanner > _mps;
         shared_ptr<Cursor> c;
         int pos;                                 // # objects into the cursor so far 
         BSONObj query;
@@ -248,8 +246,6 @@ namespace mongo {
            */
         void updateLocation();
 
-        void cleanupByLocation(DiskLoc loc);
-        
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
                 return;
