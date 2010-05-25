@@ -894,13 +894,11 @@ namespace mongo {
                 cc = new ClientCursor(queryOptions, multi, ns);
             } else {
                 cc = new ClientCursor( queryOptions, cursor, ns );
+                cc->matcher = dqo.matcher();
             }
             cursorid = cc->cursorid;
             cc->query = jsobj.getOwned();
             DEV tlog() << "  query has more, cursorid: " << cursorid << endl;
-            if ( !moreClauses ) {
-                cc->matcher = dqo.matcher();
-            }
             cc->pos = n;
             cc->pq = pq_shared;
             cc->fields = pq.getFieldPtr();
