@@ -8,6 +8,7 @@ import time
 import socket
 from optparse import OptionParser
 import atexit
+import glob
 
 mongodExecutable = "./mongod"
 mongodPort = "32000"
@@ -85,7 +86,6 @@ class mongod(object):
 #        return startMongodWithArgs("--master", "--oplogSize", "10")
     
     def stop(self):
-        print "FOO"
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
@@ -125,10 +125,11 @@ class TestServerFailure(TestFailure):
     def __str__(self):
         return 'mongod not ok after test %s' % self.path
 
-def runTest(path):
+def runTest(test):
+    (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
     if ext == ".js":
-        argv=[shellExecutable, "--port", mongodPort, path]
+        argv=filter(lambda x:x, [shellExecutable, "--port", mongodPort] + [None if usedb else "--nodb"] + [path])
     elif ext in ["", ".exe"]:
         argv=[path, "--port", mongodPort]
     else:
@@ -182,32 +183,50 @@ def report():
             print "%s\t%d" % (loser, losers[loser])
 
 def main():
-    parser = OptionParser(usage="usage: smoke.py [OPTIONS] FILE*")
+    parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
+    parser.add_option('--mode', dest='mode', default='files',
+                      help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests.  (default "files")')
+    parser.add_option('--mongo-repo', dest='mongoRepo', default=None,
+                      help='Top-level directory of mongo checkout to use.  (default: script will make a guess)')
     parser.add_option('--mongod', dest='mongodExecutable', default='./mongod',
-                      help='Path to mongod to run (default "./mongod")')
+                      help='Path to mongod to run (default "./mongod" in the mongo repo)')
     parser.add_option('--port', dest='mongodPort', default="32000",
                       help='Port the mongod will bind to (default 32000)')
     parser.add_option('--mongo', dest='shellExecutable', default="./mongo",
-                      help='Path to mongo, for .js test files (default "./mongo")')
+                      help='Path to mongo, for .js test files (default "./mongo" in the mongo repo)')
     parser.add_option('--continue-on-failure', dest='continueOnFailure',
                       action="store_true", default=False,
-                      help='If supplied, continue testing even after a failure')
+                      help='If supplied, continue testing even after a test fails')
     parser.add_option('--one-mongod-per-test', dest='oneMongodPerTest',
                       action="store_true", default=False,
                       help='If supplied, run each test in a fresh mongod')
     parser.add_option('--from-file', dest='File',
-                      help="Run tests named in FILE, one test per line, '-' means stdin")
+                      help="Run tests/suites named in FILE, one test per line, '-' means stdin")
+    global tests
     (options, tests) = parser.parse_args()
-    
+
+    if options.mongoRepo:
+        mongoRepo = options.mongoRepo
+    else:
+        prefix = ''
+        while True:
+            if os.stat(prefix+'buildscripts'):
+                mongoRepo = os.path.normpath(prefix)
+                break
+            else:
+                prefix += '../'
+                # FIXME: will this be a device's root directory on
+                # Windows?
+                if os.path.samefile('/', prefix): 
+                    raise Exception("couldn't guess the mongo repository path")
 
     global mongodExecutable, mongodPort, shellExecutable, continueOnFailure, oneMongodPerTest
-    mongodExecutable = options.mongodExecutable if options.mongodExecutable else mongodExecutable
+    mongodExecutable = options.mongodExecutable if options.mongodExecutable else os.path.join(mongoRepo, mongodExecutable)
     mongodPort = options.mongodPort if options.mongodPort else mongodPort
-    shellExecutable = options.shellExecutable if options.shellExecutable else shellExecutable
+    shellExecutable = options.shellExecutable if options.shellExecutable else os.path.join(mmongoRepo, shellExecutable)
     continueOnFailure = options.continueOnFailure if options.continueOnFailure else continueOnFailure
     oneMongodPerTest = options.oneMongodPerTest if options.oneMongodPerTest else oneMongodPerTest
     
-    global tests
     if options.File:
         if options.File == '-':
             tests = sys.stdin.readlines()
@@ -216,6 +235,53 @@ def main():
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
 
+    # If we're in suite mode, tests is a list of names of sets of tests.
+    if options.mode == 'suite':
+        # Suites: smoke, smokePerf, smokeJs, smokeQuota, smokeJsPerf,
+        # smokeJsSlow, smokeParalell, smokeClone, smokeRepl, smokeDisk
+        suites = tests
+        tests = []
+        for suite in suites:
+            if suite == 'smoke':
+                (globstr, usedb) = ('test', False)
+            elif suite == 'smokePerf':
+                (globstr, usedb) = ('perftest', False)
+            elif suite == 'smokeClient':
+                (globstr, usedb) = ('*Test', False)
+                # (globstr, usedb) = ('*Example', False)
+            elif suite == 'smokeJs':
+                # FIXME: _runner.js seems equivalent to "[!_]*.js".
+                #(globstr, usedb) = ('_runner.js', True)
+                (globstr, usedb) = ('[!_]*.js', True)
+            elif suite == 'smokeQuota':
+                (globstr, usedb) = ('quota/*.js', True)
+            elif suite == 'smokeJsPerf':
+                (globstr, usedb) = ('perf/*.js', True)
+            elif suite == 'smokeJsSlow':
+                (globstr, usedb) = ('slow/*.js', True)
+            elif suite == 'smokeParallel':
+                (globstr, usedb) = ('parallel/*', True)
+            elif suite == 'smokeClone':
+                (globstr, usedb) = ('clone/*.js', False)
+            elif suite == 'smokeRepl':
+                (globstr, usedb) = ('repl/*.js', False)
+            elif suite == 'smokeAuth':
+                (globstr, usedb) = ('auth/*.js', False)
+            elif suite == 'smokeSharding':
+                (globstr, usedb) = ('sharding/*.js', False)
+            elif suite == 'smokeTool':
+                (globstr, usedb) = ('tool/*.js', False)
+            else:
+                raise Exception('unknown test suite %s' % suite)
+
+            globstr = mongoRepo+('/jstests/' if globstr.endswith('.js') else '/')+globstr
+            print globstr
+            print glob.glob(globstr)
+            tests += [(path, usedb) for path in glob.glob(globstr)]
+    elif options.mode == 'files':
+        tests = [(os.path.abspath(test), True) for test in tests]
+
+    print tests
     return runTests(tests)
 
 atexit.register(report)
