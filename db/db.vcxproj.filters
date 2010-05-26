@@ -680,13 +680,13 @@
     <ClInclude Include="..\util\concurrency\task.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
-    <ClInclude Include="..\boost_pieces\any.hpp">
-      <Filter>util\boost_pieces</Filter>
-    </ClInclude>
     <ClInclude Include="repl\multicmd.h">
       <Filter>replset</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\msg.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mutex.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
   </ItemGroup>
@@ -726,9 +726,6 @@
     </Filter>
     <Filter Include="client">
       <UniqueIdentifier>{932baf83-ba80-49e5-8280-f1b9c8dbbde6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\boost_pieces">
-      <UniqueIdentifier>{3e9cf058-6d12-41ae-b65a-dc93aaafbf93}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

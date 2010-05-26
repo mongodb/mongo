@@ -1,4 +1,4 @@
-// goodies.h
+// @file goodies.h
 // miscellaneous junk
 
 /*    Copyright 2009 10gen Inc.
@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <sstream>
 #include "../bson/util/misc.h"
+#include "concurrency/mutex.h"
 
 namespace mongo {
 
@@ -276,48 +276,7 @@ namespace mongo {
         unsigned secs = xt.sec % 1024;
         return secs*1000000 + t;
     }
-    using namespace boost;
     
-    extern bool __destroyingStatics;
-    
-    // If you create a local static instance of this class, that instance will be destroyed
-    // before all global static objects are destroyed, so __destroyingStatics will be set
-    // to true before the global static variables are destroyed.
-    class StaticObserver : boost::noncopyable {
-    public:
-        ~StaticObserver() { __destroyingStatics = true; }
-    };
-    
-    // On pthread systems, it is an error to destroy a mutex while held.  Static global
-    // mutexes may be held upon shutdown in our implementation, and this way we avoid
-    // destroying them.
-    class mutex : boost::noncopyable {
-    public:
-        /* old boost doesn't support lock()...
-        void __lock() { _m->lock(); }
-        void __unlock() { _m->unlock(); }*/
-
-        mutex() { _m = new boost::mutex(); }
-        ~mutex() {
-            if( !__destroyingStatics ) {
-                delete _m;
-            }
-        }
-        class scoped_lock : boost::noncopyable {
-        public:
-            scoped_lock( mongo::mutex &m ) : _l( m.boost() ) {}
-            boost::mutex::scoped_lock &boost() { return _l; }
-        private:
-            boost::mutex::scoped_lock _l;
-        };
-    private:
-        boost::mutex &boost() { return *_m; }
-        boost::mutex *_m;
-    };
-    
-    typedef mongo::mutex::scoped_lock scoped_lock;
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
-
 // simple scoped timer
     class Timer {
     public:
@@ -776,7 +735,7 @@ namespace mongo {
         template<typename U> ptr(U* p) : _p(p) {}
         template<typename U> ptr(const ptr<U>& p) : _p(p) {}
         template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
-        template<typename U> ptr(const scoped_ptr<U>& p) : _p(p.get()) {}
+        template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
         //template<typename U> ptr(const auto_ptr<U>& p) : _p(p.get()) {}
         
         // assign to ptr<T>
@@ -784,7 +743,7 @@ namespace mongo {
         template<typename U> ptr& operator= (U* p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
-        template<typename U> ptr& operator= (const scoped_ptr<U>& p) { _p = p.get(); return *this; }
+        template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) { _p = p.get(); return *this; }
         //template<typename U> ptr& operator= (const auto_ptr<U>& p) { _p = p.get(); return *this; }
 
         // use
@@ -797,5 +756,8 @@ namespace mongo {
     private:
         T* _p;
     };
-    
+
+    /** Hmmmm */
+    using namespace boost;
+
 } // namespace mongo

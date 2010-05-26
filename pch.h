@@ -27,7 +27,57 @@
 #  include <windows.h>
 #endif
 
+#include <sstream>
 #include <string>
+#include <memory>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <map>
+#include <vector>
+#include <set>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sstream>
+#include <signal.h>
+#include "targetver.h"
+#include "time.h"
+#include "string.h"
+#include "limits.h"
+
+#include <boost/any.hpp>
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/program_options.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/smart_ptr.hpp>
+#include "boost/bind.hpp"
+#include "boost/function.hpp"
+#include <boost/thread/tss.hpp>
+#define BOOST_SPIRIT_THREADSAFE
+#include <boost/version.hpp>
+
+#if BOOST_VERSION >= 103800
+#define BOOST_SPIRIT_USE_OLD_NAMESPACE
+#include <boost/spirit/include/classic_core.hpp>
+#include <boost/spirit/include/classic_loops.hpp>
+#include <boost/spirit/include/classic_lists.hpp>
+#else
+#include <boost/spirit/core.hpp>
+#include <boost/spirit/utility/loops.hpp>
+#include <boost/spirit/utility/lists.hpp>
+#endif
+
+#include <boost/tuple/tuple.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/condition.hpp>
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/xtime.hpp>
+#undef assert
+#define assert MONGO_assert
 
 namespace mongo {
 
@@ -76,57 +126,6 @@ namespace mongo {
     bool inShutdown();
     
 } // namespace mongo
-
-#include <memory>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <map>
-#include <vector>
-#include <set>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sstream>
-#include <signal.h>
-
-#include "targetver.h"
-#include "time.h"
-#include "string.h"
-#include "limits.h"
-
-#include <boost/any.hpp>
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/binary_from_base64.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
-#include <boost/filesystem/convenience.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/smart_ptr.hpp>
-#include "boost/bind.hpp"
-#include "boost/function.hpp"
-#define BOOST_SPIRIT_THREADSAFE
-
-#include <boost/version.hpp>
-
-#if BOOST_VERSION >= 103800
-#define BOOST_SPIRIT_USE_OLD_NAMESPACE
-#include <boost/spirit/include/classic_core.hpp>
-#include <boost/spirit/include/classic_loops.hpp>
-#include <boost/spirit/include/classic_lists.hpp>
-#else
-#include <boost/spirit/core.hpp>
-#include <boost/spirit/utility/loops.hpp>
-#include <boost/spirit/utility/lists.hpp>
-#endif
-
-#include <boost/tuple/tuple.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/xtime.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
     using namespace boost::filesystem;

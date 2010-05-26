@@ -18,10 +18,6 @@
 
 #pragma once
 
-#include <boost/thread/tss.hpp>
-#undef assert
-#define assert MONGO_assert
-
 #include "nonce.h"
 #include "concurrency.h"
 

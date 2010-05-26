@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-#include "boost/any.hpp"
 #include "task.h"
 #include "../goodies.h"
 #include "../unittest.h"
@@ -77,7 +76,7 @@ namespace mongo {
 
 #include "msg.h"
 
-/* class Task::Port */
+/* task::Server */
 
 namespace mongo {
     namespace task {
@@ -87,7 +86,7 @@ namespace mongo {
             bool done;
             boost::mutex m;
             boost::condition c;
-            lam *msg;
+            const lam *msg;
             void f() {
                 (*msg)();
                 done = true;
@@ -95,7 +94,7 @@ namespace mongo {
             }
         };
 
-        void Port::call( lam& msg ) {
+        void Server::call( const lam& msg ) {
             Ret r;
             r.msg = &msg;
             lam f = boost::bind(&Ret::f, &r);
@@ -107,7 +106,7 @@ namespace mongo {
             }
         }
 
-        void Port::send( lam msg ) { 
+        void Server::send( lam msg ) { 
             {
                 boost::mutex::scoped_lock lk(m);
                 d.push_back(msg);
@@ -115,7 +114,7 @@ namespace mongo {
             c.notify_one();
         }
 
-        void Port::doWork() { 
+        void Server::doWork() { 
             while( 1 ) { 
                 lam f;
                 {
@@ -128,7 +127,7 @@ namespace mongo {
                 try {
                     f();
                 } catch(std::exception& e) { 
-                    log() << "Port::doWork() exception " << e.what() << endl;
+                    log() << "Server::doWork() exception " << e.what() << endl;
                 }
             }
         }
