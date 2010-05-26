@@ -57,7 +57,7 @@ namespace mongo {
         }
 
         ShardConnection conn( server , _ns );
-
+        
         if ( logLevel >= 5 ){
             log(5) << "ClusteredCursor::query (" << type() << ") server:" << server 
                    << " ns:" << _ns << " query:" << q << " num:" << num << 
@@ -65,7 +65,7 @@ namespace mongo {
         }
         
         auto_ptr<DBClientCursor> cursor = 
-            conn->query( _ns.c_str() , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
+            conn->query( _ns , q , num , 0 , ( _fields.isEmpty() ? 0 : &_fields ) , _options );
         
         if ( cursor->hasResultFlag( QueryResult::ResultFlag_ShardConfigStale ) )
             throw StaleConfigException( _ns , "ClusteredCursor::query" );
@@ -76,10 +76,22 @@ namespace mongo {
         return cursor;
     }
 
+    BSONObj ClusteredCursor::explain( const string& server , BSONObj extra ){
+        BSONObj q = _query;
+        if ( ! extra.isEmpty() ){
+            q = concatQuery( q , extra );
+        }
+
+        ShardConnection conn( server , _ns );
+        BSONObj o = conn->findOne( _ns , Query( q ).explain() );
+        conn.done();
+        return o;
+    }
+
     BSONObj ClusteredCursor::concatQuery( const BSONObj& query , const BSONObj& extraFilter ){
         if ( ! query.hasField( "query" ) )
             return _concatFilter( query , extraFilter );
-        
+
         BSONObjBuilder b;
         BSONObjIterator i( query );
         while ( i.more() ){
@@ -106,7 +118,45 @@ namespace mongo {
     BSONObj ClusteredCursor::explain(){
         BSONObjBuilder b;
         b.append( "clusteredType" , type() );
+
+        long long nscanned = 0;
+        long long nscannedObjects = 0;
+        long long n = 0;
+        long long millis = 0;
+        double numExplains = 0;
         
+        map<string,list<BSONObj> > out;
+        {
+            _explain( out );
+            
+            BSONObjBuilder x( b.subobjStart( "shards" ) );
+            for ( map<string,list<BSONObj> >::iterator i=out.begin(); i!=out.end(); ++i ){
+                string shard = i->first;
+                list<BSONObj> l = i->second;
+                BSONArrayBuilder y( x.subarrayStart( shard.c_str() ) );
+                for ( list<BSONObj>::iterator j=l.begin(); j!=l.end(); ++j ){
+                    BSONObj temp = *j;
+                    y.append( temp );
+
+                    nscanned += temp["nscanned"].numberLong();
+                    nscannedObjects += temp["nscannedObjects"].numberLong();
+                    n += temp["n"].numberLong();
+                    millis += temp["millis"].numberLong();
+                    numExplains++;
+                }
+                y.done();
+            }
+            x.done();
+        }
+
+        b.appendNumber( "nscanned" , nscanned );
+        b.appendNumber( "nscannedObjects" , nscannedObjects );
+        b.appendNumber( "n" , n );
+        b.appendNumber( "millisTotal" , millis );
+        b.append( "millisAvg" , (int)((double)millis / numExplains ) );
+        b.append( "numQueries" , (int)numExplains );
+        b.append( "numShards" , (int)out.size() );
+
         return b.obj();
     }
     
@@ -216,6 +266,14 @@ namespace mongo {
         return _current.next();
     }
 
+    void SerialServerClusteredCursor::_explain( map< string,list<BSONObj> >& out ){
+        for ( unsigned i=0; i<_servers.size(); i++ ){
+            ServerAndQuery& sq = _servers[i];
+            list<BSONObj> & l = out[sq._server];
+            l.push_back( explain( sq._server , sq._extra ) );
+        }
+    }
+
     // --------  ParallelSortClusteredCursor -----------
     
     ParallelSortClusteredCursor::ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , 
@@ -299,6 +357,15 @@ namespace mongo {
         _cursors[bestFrom].next();
             
         return best;
+    }
+
+    void ParallelSortClusteredCursor::_explain( map< string,list<BSONObj> >& out ){
+        for ( set<ServerAndQuery>::iterator i=_servers.begin(); i!=_servers.end(); ++i ){
+            const ServerAndQuery& sq = *i;
+            list<BSONObj> & l = out[sq._server];
+            l.push_back( explain( sq._server , sq._extra ) );
+        }
+
     }
 
     // -----------------

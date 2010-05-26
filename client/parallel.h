@@ -29,39 +29,6 @@
 namespace mongo {
 
     /**
-     * this is a cursor that works over a set of servers
-     * can be used in serial/paralellel as controlled by sub classes
-     */
-    class ClusteredCursor {
-    public:
-        ClusteredCursor( QueryMessage& q );
-        ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
-        virtual ~ClusteredCursor();
-
-        virtual bool more() = 0;
-        virtual BSONObj next() = 0;
-        
-        static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
-        
-        virtual string type() const = 0;
-
-        virtual BSONObj explain();
-
-    protected:
-        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
-
-        static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
-        
-        string _ns;
-        BSONObj _query;
-        int _options;
-        BSONObj _fields;
-
-        bool _done;
-    };
-
-
-    /**
      * holder for a server address and a query to run
      */
     class ServerAndQuery {
@@ -95,6 +62,44 @@ namespace mongo {
         BSONObj _extra;
         BSONObj _orderObject;
     };
+
+
+
+    /**
+     * this is a cursor that works over a set of servers
+     * can be used in serial/paralellel as controlled by sub classes
+     */
+    class ClusteredCursor {
+    public:
+        ClusteredCursor( QueryMessage& q );
+        ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
+        virtual ~ClusteredCursor();
+
+        virtual bool more() = 0;
+        virtual BSONObj next() = 0;
+        
+        static BSONObj concatQuery( const BSONObj& query , const BSONObj& extraFilter );
+        
+        virtual string type() const = 0;
+
+        virtual BSONObj explain();
+
+    protected:
+        auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
+        BSONObj explain( const string& server , BSONObj extraFilter = BSONObj() );
+        
+        static BSONObj _concatFilter( const BSONObj& filter , const BSONObj& extraFilter );
+        
+        virtual void _explain( map< string,list<BSONObj> >& out ) = 0;
+
+        string _ns;
+        BSONObj _query;
+        int _options;
+        BSONObj _fields;
+
+        bool _done;
+    };
+
 
     class FilteringClientCursor {
     public:
@@ -185,6 +190,8 @@ namespace mongo {
         virtual string type() const { return "SerialServer"; }
 
     private:
+        virtual void _explain( map< string,list<BSONObj> >& out );
+
         vector<ServerAndQuery> _servers;
         unsigned _serverIndex;
         
@@ -209,7 +216,9 @@ namespace mongo {
         virtual string type() const { return "ParallelSort"; }
     private:
         void _init();
-        
+
+        virtual void _explain( map< string,list<BSONObj> >& out );
+
         int _numServers;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;
