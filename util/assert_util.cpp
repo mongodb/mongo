@@ -19,6 +19,8 @@
 #include "assert_util.h"
 #include "assert.h"
 #include "file.h"
+#include <cmath>
+using namespace std;
 
 #ifndef _WIN32
 #include <cxxabi.h>
