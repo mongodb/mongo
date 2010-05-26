@@ -320,6 +320,7 @@ namespace mongo {
         ScopedDbConnection conn( res->_server );
         res->_ok = conn->runCommand( res->_db , res->_cmd , res->_res );
         res->_done = true;
+        conn.done();
     }
 
     shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd ){

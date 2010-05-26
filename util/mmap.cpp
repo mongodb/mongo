@@ -18,7 +18,7 @@
 #include "pch.h"
 #include "mmap.h"
 #include "processinfo.h"
-#include "locks.h"
+#include "concurrency/locks.h"
 
 namespace mongo {
 
