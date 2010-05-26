@@ -93,6 +93,7 @@ s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
 s.adminCommand( { movechunk : "test.foo4" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
 db.foo4.save( { num : 5 } );
 db.foo4.save( { num : 15 } );
+db.getLastError();
 s.sync();
 assert.eq( 1 , a.foo4.count() , "ua1" );
 assert.eq( 1 , b.foo4.count() , "ub1" );
