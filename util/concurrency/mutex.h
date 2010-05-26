@@ -73,13 +73,14 @@ namespace mongo {
         const char *_name;
 #endif
 
-        mutex(const char *name) 
 #if defined(_DEBUG)
+        mutex(const char *name) 
            : _name(name) 
+#else
+        mutex(const char *) 
 #endif
         { 
             _m = new boost::mutex(); 
-            name;
         }
         ~mutex() {
             if( !__destroyingStatics ) {
