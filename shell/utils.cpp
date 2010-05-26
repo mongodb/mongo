@@ -183,7 +183,7 @@ namespace mongo {
         map< pid_t, HANDLE > handles;
 #endif
         
-        mongo::mutex mongoProgramOutputMutex;
+        mongo::mutex mongoProgramOutputMutex("mongoProgramOutputMutex");
         stringstream mongoProgramOutput_;
 
         void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
