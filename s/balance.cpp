@@ -87,7 +87,19 @@ namespace mongo {
         auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::database , BSON( "partitioned" << true ) );
         while ( cursor->more() ){
             BSONObj db = cursor->next();
-            BSONObjIterator i( db["sharded"].Obj() );
+
+            // A database may be partitioned but not yet have a sharded collection. 
+            // 'cursor' will point to docs that do not contain the "sharded" key. Since 
+            // there'd be nothing to balance, we want to skip those here.
+
+            BSONElement shardedColls = db["sharded"];
+            if ( shardedColls.eoo() ){
+                log(3) << "balancer: skipping database with no sharded collection (" 
+                      << db["_id"].str() << ")" << endl;
+                continue;
+            }
+            
+            BSONObjIterator i( shardedColls.Obj() );
             while ( i.more() ){
                 BSONElement e = i.next();
                 BSONObj data = e.Obj().getOwned();
