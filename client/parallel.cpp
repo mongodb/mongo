@@ -103,6 +103,12 @@ namespace mongo {
         // TODO: should do some simplification here if possibl ideally
     }
 
+    BSONObj ClusteredCursor::explain(){
+        BSONObjBuilder b;
+        b.append( "clusteredType" , type() );
+        
+        return b.obj();
+    }
     
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )

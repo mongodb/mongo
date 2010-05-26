@@ -129,6 +129,10 @@ assert.eq( "funny man" , db.foo.find( { num : { $lt : 100 } } ).sort( { num : 1 
 
 placeCheck( 7 );
 
+
+print( "ELIOT: " + tojson( db.foo.find().explain() ) );
+
+
 // getMore
 assert.eq( 4 , db.foo.find().limit(-4).toArray().length , "getMore 1" );
 function countCursor( c ){

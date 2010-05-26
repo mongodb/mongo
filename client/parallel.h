@@ -45,6 +45,8 @@ namespace mongo {
         
         virtual string type() const = 0;
 
+        virtual BSONObj explain();
+
     protected:
         auto_ptr<DBClientCursor> query( const string& server , int num = 0 , BSONObj extraFilter = BSONObj() );
 
@@ -181,6 +183,7 @@ namespace mongo {
         virtual bool more();
         virtual BSONObj next();
         virtual string type() const { return "SerialServer"; }
+
     private:
         vector<ServerAndQuery> _servers;
         unsigned _serverIndex;

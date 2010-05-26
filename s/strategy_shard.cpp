@@ -93,6 +93,13 @@ namespace mongo {
             
             log(5) << "   cursor type: " << cursor->type() << endl;
             shardedCursorTypes.hit( cursor->type() );
+            
+            if ( query.isExplain() ){
+                BSONObj explain = cursor->explain();
+                replyToQuery( 0 , r.p() , r.m() , explain );
+                delete( cursor );
+                return;
+            }
 
             ShardedClientCursor * cc = new ShardedClientCursor( q , cursor );
             if ( ! cc->sendNextBatch( r ) ){
