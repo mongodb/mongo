@@ -22,6 +22,7 @@
 #include "dbtests.h"
 #include "../util/base64.h"
 #include "../util/array.h"
+#include "../util/text.h"
 
 namespace BasicTests {
 
@@ -408,6 +409,22 @@ namespace BasicTests {
         }
     };
 
+    struct StringSplitterTest {
+
+        void test( string s ){
+            vector<string> v = StringSplitter::split( s , "," );
+            ASSERT_EQUALS( s , StringSplitter::join( v , "," ) );
+        }
+
+        void run(){
+            test( "a" );
+            test( "a,b" );
+            test( "a,b,c" );
+        }
+    };
+
+
+
     class All : public Suite {
     public:
         All() : Suite( "basic" ){
@@ -431,6 +448,8 @@ namespace BasicTests {
             add< DatabaseValidNames >();
 
             add< PtrTests >();
+
+            add< StringSplitterTest >();
         }
     } myall;
     
