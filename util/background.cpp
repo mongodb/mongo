@@ -23,7 +23,7 @@
 namespace mongo {
 
     BackgroundJob *BackgroundJob::grab = 0;
-    mongo::mutex BackgroundJob::mutex;
+    mongo::mutex BackgroundJob::mutex("BackgroundJob");
 
     /* static */
     void BackgroundJob::thr() {

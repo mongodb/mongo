@@ -31,7 +31,7 @@
 namespace mongo {
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());    
-    mutex ScopedConn::mapMutex;
+    mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
 }
 
 namespace mongo { 

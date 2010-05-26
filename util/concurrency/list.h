@@ -36,7 +36,7 @@ class List1 : boost::noncopyable {
 public:
     /* next() and head() return 0 at end of list */
 
-    List1() : _head(0), _orphans(0) { }
+    List1() : _head(0), _m("List1"), _orphans(0) { }
 
     class Base {
         friend class List1;

@@ -156,7 +156,7 @@ namespace mongo {
     };
 
     map<string,WriteBackListener*> WriteBackListener::_cache;
-    mongo::mutex WriteBackListener::_lock;
+    mongo::mutex WriteBackListener::_lock("WriteBackListener");
 
     void checkShardVersion( DBClientBase& conn , const string& ns , bool authoritative ){
         // TODO: cache, optimize, etc...

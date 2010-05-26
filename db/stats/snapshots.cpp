@@ -55,7 +55,7 @@ namespace mongo {
     }
 
     Snapshots::Snapshots(int n)
-        : _n(n)
+        : _lock("Snapshots"), _n(n)
         , _snapshots(new SnapshotData[n])
         , _loc(0)
         , _stored(0)

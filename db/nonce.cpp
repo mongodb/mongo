@@ -49,7 +49,7 @@ namespace mongo {
     }
     
     nonce Security::getNonce(){
-        static mongo::mutex m;
+        static mongo::mutex m("getNonce");
         scoped_lock lk(m);
 
 		/* question/todo: /dev/random works on OS X.  is it better 

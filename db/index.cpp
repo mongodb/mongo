@@ -201,7 +201,7 @@ namespace mongo {
                 return false;
             }
             sourceCollection = nsdetails(sourceNS.c_str());
-            log() << "info: creating collection " << sourceNS << " on add index\n";
+            tlog() << "info: creating collection " << sourceNS << " on add index\n";
             assert( sourceCollection );
         }
 

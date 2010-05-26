@@ -60,7 +60,7 @@ namespace mongo {
             OpTime * loc;
         };
 
-        SlaveTracking(){
+        SlaveTracking() : _mutex("SlaveTracking") {
             _dirty = false;
             _started = false;
         }

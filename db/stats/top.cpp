@@ -176,7 +176,7 @@ namespace mongo {
     TopOld::UsageMap TopOld::_snapshotB;
     TopOld::UsageMap &TopOld::_snapshot = TopOld::_snapshotA;
     TopOld::UsageMap &TopOld::_nextSnapshot = TopOld::_snapshotB;
-    mongo::mutex TopOld::topMutex;
+    mongo::mutex TopOld::topMutex("topMutex");
 
 
 }

@@ -503,10 +503,10 @@ namespace mongo {
             free( dst );
 
             if ( ! res ){
-                cout << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
+                tlog() << "decode failed. probably invalid utf-8 string [" << c << "]" << endl;
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
-                    cout << "\t why: " << toString( v ) << endl;
+                    tlog() << "\t why: " << toString( v ) << endl;
                 throw InvalidUTF8Exception();
             }
 
@@ -669,7 +669,7 @@ namespace mongo {
             }
             }
 
-            cout << "toval: unknown type: " << e.type() << endl;
+            log() << "toval: unknown type: " << (int) e.type() << endl;
             uassert( 10218 ,  "not done: toval" , 0 );
             return 0;
         }

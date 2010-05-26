@@ -27,6 +27,7 @@
 #  include <windows.h>
 #endif
 
+#include <ctime>
 #include <sstream>
 #include <string>
 #include <memory>
@@ -46,8 +47,6 @@
 #include "limits.h"
 
 #include <boost/any.hpp>
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -57,19 +56,9 @@
 #include "boost/bind.hpp"
 #include "boost/function.hpp"
 #include <boost/thread/tss.hpp>
+#include "boost/detail/endian.hpp"
 #define BOOST_SPIRIT_THREADSAFE
 #include <boost/version.hpp>
-
-#if BOOST_VERSION >= 103800
-#define BOOST_SPIRIT_USE_OLD_NAMESPACE
-#include <boost/spirit/include/classic_core.hpp>
-#include <boost/spirit/include/classic_loops.hpp>
-#include <boost/spirit/include/classic_lists.hpp>
-#else
-#include <boost/spirit/core.hpp>
-#include <boost/spirit/utility/loops.hpp>
-#include <boost/spirit/utility/lists.hpp>
-#endif
 
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread/thread.hpp>
@@ -129,7 +118,10 @@ namespace mongo {
 
 namespace mongo {
     using namespace boost::filesystem;
+    void asserted(const char *msg, const char *file, unsigned line);
 }
+
+#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include "util/debug_util.h"
 #include "util/goodies.h"

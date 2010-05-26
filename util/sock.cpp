@@ -20,7 +20,7 @@
 
 namespace mongo {
 
-    static mongo::mutex sock_mutex;
+    static mongo::mutex sock_mutex("sock_mutex");
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }

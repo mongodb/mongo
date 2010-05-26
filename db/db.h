@@ -18,7 +18,6 @@
 
 #include "../pch.h"
 #include "../util/message.h"
-#include "boost/version.hpp"
 #include "concurrency.h"
 #include "pdfile.h"
 #include "client.h"

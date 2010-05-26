@@ -51,7 +51,7 @@ namespace mongo {
             return l;
         }
         
-        ClientConnections(){
+        ClientConnections() : _mutex("ClientConnections") {
             debug() << " NEW  " << endl;
         }
         

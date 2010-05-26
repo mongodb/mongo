@@ -146,12 +146,6 @@ namespace mongo {
         }
     };
 
-} // namespace mongo
-
-#include <ctime>
-
-namespace mongo {
-
     inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
 #if defined(_WIN32)
         if ( local )
@@ -339,12 +333,6 @@ namespace mongo {
         return strcmp(p + a - b, suffix) == 0;
     }
 
-} // namespace mongo
-
-#include "boost/detail/endian.hpp"
-
-namespace mongo {
-
     inline unsigned long swapEndian(unsigned long x) {
         return
             ((x & 0xff) << 24) |
@@ -529,7 +517,7 @@ namespace mongo {
 
     class TicketHolder {
     public:
-        TicketHolder( int num ){
+        TicketHolder( int num ) : _mutex("TicketHolder") {
             _outof = num;
             _num = num;
         }

@@ -584,6 +584,9 @@
     <ClInclude Include="repl\multicmd.h" />
     <ClInclude Include="repl\rsmember.h" />
     <ClInclude Include="repl\rstime.h" />
+    <ClInclude Include="stats\counters.h" />
+    <ClInclude Include="stats\snapshots.h" />
+    <ClInclude Include="stats\top.h" />
     <ClInclude Include="storage.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
