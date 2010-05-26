@@ -59,7 +59,7 @@ namespace mongo {
             return _config->isShardingEnabled();
         }
         
-        ChunkManager * getChunkManager() const {
+        ChunkManagerPtr getChunkManager() const {
             return _chunkManager;
         }
         
@@ -99,7 +99,7 @@ namespace mongo {
         
         MSGID _id;
         DBConfig * _config;
-        ChunkManager * _chunkManager;
+        ChunkManagerPtr _chunkManager;
         
         int _clientId;
         ClientInfo * _clientInfo;

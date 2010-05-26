@@ -436,11 +436,13 @@ serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" ]
 serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
 
 modules = []
+moduleNames = []
 
 for x in os.listdir( "db/modules/" ):
     if x.find( "." ) >= 0:
         continue
     print( "adding module: " + x )
+    moduleNames.append( x )
     modRoot = "db/modules/" + x + "/"
     serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
     modBuildFile = modRoot + "build.py"
@@ -781,6 +783,8 @@ def add_exe(target):
 
 def setupBuildInfoFile( outFile ):
     version = getGitVersion()
+    if len(moduleNames) > 0:
+        version = version + " modules: " + ','.join( moduleNames )
     sysInfo = getSysInfo()
     contents = '\n'.join([
         '#include "pch.h"',
@@ -1365,7 +1369,7 @@ testEnv.AlwaysBuild( "startMongodSmallOplog" );
 testEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
 
 def addMongodReqTargets( env, target, source ):
-    mongodReqTargets = [ "smokeClient", "smokeJs", "smokeQuota" ]
+    mongodReqTargets = [ "smokeClient", "smokeJs" ]
     for target in mongodReqTargets:
         testEnv.Depends( target, "startMongod" )
         testEnv.Depends( "smokeAll", target )

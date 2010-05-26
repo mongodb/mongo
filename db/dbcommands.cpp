@@ -1833,6 +1833,7 @@ namespace mongo {
        returns true if ran a cmd
     */
     bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+        cc().curop()->ensureStarted();
         string dbname = nsToDatabase( ns );
 
         if( logLevel >= 1 ) 
@@ -1859,6 +1860,7 @@ namespace mongo {
         BSONElement e = jsobj.firstElement();
         
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
+
         if ( c ){
             ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
         }
@@ -1866,10 +1868,12 @@ namespace mongo {
             anObjBuilder.append("errmsg", "no such cmd");
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
+
         anObjBuilder.append("ok", ok);
         BSONObj x = anObjBuilder.done();
         b.append((void*) x.objdata(), x.objsize());
+
         return true;
     }
-
+    
 } // namespace mongo

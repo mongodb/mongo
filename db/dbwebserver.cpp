@@ -499,7 +499,7 @@ namespace mongo {
             ss << "write locked:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
             {
                 Timer t;
-                readlocktry lk( "" , 2000 );
+                readlocktry lk( "" , 300 );
                 if ( lk.got() ){
                     ss << "time to get readlock: " << t.millis() << "ms\n";
                     doLockedStuff(ss);

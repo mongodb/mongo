@@ -29,6 +29,7 @@
 #include "../bson/util/atomic_int.h"
 #include "shardkey.h"
 #include "shard.h"
+#include "config.h"
 
 namespace mongo {
 
@@ -300,8 +301,11 @@ namespace mongo {
         unsigned long long getSequenceNumber(){
             return _sequenceNumber;
         }
-
-        void drop();
+        
+        /**
+         * @param me - so i don't get deleted before i'm done
+         */
+        void drop( ChunkManagerPtr me );
         
     private:
         

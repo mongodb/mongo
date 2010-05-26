@@ -37,11 +37,11 @@ namespace mongo {
 
     bool Balancer::shouldIBalance( DBClientBase& conn ){
         BSONObj x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
-        log(3) << "balancer: " << x << endl;
+        log(2) << "balancer: " << x << endl;
         
         if ( ! x.isEmpty() ){
             if ( x["who"].String() == _myid ){
-                log(3) << "balancer: i'm the current balancer" << endl;
+                log(2) << "balancer: i'm the current balancer" << endl;
                 return true;
             }
             
@@ -49,7 +49,7 @@ namespace mongo {
             massert( 13125 , (string)"can't find mongos: " + x["who"].String() , ! other.isEmpty() );
 
             int secsSincePing = (int)(( jsTime() - other["ping"].Date() ) / 1000 );
-            log(3) << "current balancer is: " << other << " ping delay(secs): " << secsSincePing << endl;
+            log(2) << "current balancer is: " << other << " ping delay(secs): " << secsSincePing << endl;
             
             if ( secsSincePing < ( 60 * 10 ) ){
                 return false;
@@ -101,7 +101,7 @@ namespace mongo {
 
             BSONElement shardedColls = db["sharded"];
             if ( shardedColls.eoo() ){
-                log(3) << "balancer: skipping database with no sharded collection (" 
+                log(2) << "balancer: skipping database with no sharded collection (" 
                       << db["_id"].str() << ")" << endl;
                 continue;
             }
@@ -121,7 +121,7 @@ namespace mongo {
     }
 
     bool Balancer::balance( DBClientBase& conn , const string& ns , const BSONObj& data ){
-        log(4) << "balancer: balance(" << ns << ")" << endl;
+        log(3) << "balancer: balance(" << ns << ")" << endl;
 
         map< string,vector<BSONObj> > shards;
         {
@@ -164,8 +164,8 @@ namespace mongo {
             }
         }
         
-        log(6) << "min: " << min.first << "\t" << min.second << endl;
-        log(6) << "max: " << max.first << "\t" << max.second << endl;
+        log(4) << "min: " << min.first << "\t" << min.second << endl;
+        log(4) << "max: " << max.first << "\t" << max.second << endl;
         
         if( (int)( max.second - min.second) < ( _balancedLastTime ? 2 : 8 ) )
             return false;
@@ -179,7 +179,7 @@ namespace mongo {
         DBConfig * cfg = grid.getDBConfig( ns );
         assert( cfg );
         
-        ChunkManager * cm = cfg->getChunkManager( ns );
+        ChunkManagerPtr cm = cfg->getChunkManager( ns );
         assert( cm );
         
         ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
@@ -287,7 +287,7 @@ namespace mongo {
         checkOIDs();
 
         while ( ! inShutdown() ){
-            sleepsecs( 15 );
+            sleepsecs( 10 );
             
             try {
                 ScopedDbConnection conn( configServer.getPrimary() );

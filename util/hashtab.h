@@ -108,8 +108,11 @@ namespace mongo {
             _buf = buf;
             //nodes = (Node *) buf;
 
-            assert( sizeof(Node) == 628 );
-            //out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
+            if ( sizeof(Node) != 628 ){
+                out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
+                assert( sizeof(Node) == 628 );
+            }
+
         }
 
         Type* get(const Key& k) {

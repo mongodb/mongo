@@ -39,7 +39,7 @@ namespace mongo {
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
 
-            ChunkManager * info = r.getChunkManager();
+            ChunkManagerPtr info = r.getChunkManager();
             assert( info );
             
             Query query( q.query );
@@ -125,7 +125,7 @@ namespace mongo {
             cursorCache.remove( id );
         }
         
-        void _insert( Request& r , DbMessage& d, ChunkManager* manager ){
+        void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ){
             
             while ( d.moreJSObjs() ){
                 BSONObj o = d.nextJsObj();
@@ -158,7 +158,7 @@ namespace mongo {
             }            
         }
 
-        void _update( Request& r , DbMessage& d, ChunkManager* manager ){
+        void _update( Request& r , DbMessage& d, ChunkManagerPtr manager ){
             int flags = d.pullInt();
             
             BSONObj query = d.nextJsObj();
@@ -233,7 +233,7 @@ namespace mongo {
 
         }
         
-        void _delete( Request& r , DbMessage& d, ChunkManager* manager ){
+        void _delete( Request& r , DbMessage& d, ChunkManagerPtr manager ){
 
             int flags = d.pullInt();
             bool justOne = flags & 1;
@@ -267,7 +267,7 @@ namespace mongo {
             log(3) << "write: " << ns << endl;
             
             DbMessage& d = r.d();
-            ChunkManager * info = r.getChunkManager();
+            ChunkManagerPtr info = r.getChunkManager();
             assert( info );
             
             if ( op == dbInsert ){
