@@ -29,6 +29,8 @@ namespace mongo {
     class Top {
 
     public:
+        Top() : _lock("Top") { }
+
         class UsageData {
         public:
             UsageData() : time(0) , count(0){}

@@ -29,7 +29,7 @@ namespace threadpool {
 
     // exported to the mongo namespace
     class ThreadPool : boost::noncopyable{
-        public:
+    public:
         explicit ThreadPool(int nThreads=8);
 
         // blocks until all tasks are complete (tasks_remaining() == 0)
@@ -61,7 +61,7 @@ namespace threadpool {
 
         int tasks_remaining() { return _tasksRemaining; }
 
-        private:
+    private:
         mongo::mutex _mutex;
         boost::condition _condition;
 

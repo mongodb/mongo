@@ -681,6 +681,7 @@ if nix:
 
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
+        env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
         env.Append( CPPFLAGS=" -O3" )
 

@@ -23,6 +23,38 @@
 namespace mongo { 
 
     extern bool __destroyingStatics;
+
+    class mutex;
+    class MutexDebugger { 
+        typedef const char * mid; // mid = mutex ID
+        boost::thread_specific_ptr< set<mid> > us;
+        map< mid, set<mid> > followers;
+        boost::mutex &x;
+        unsigned magic;
+    public:
+        void programEnding();
+        MutexDebugger() : x( *(new boost::mutex()) ), magic(0x12345678) { }
+        void entering(mid m) {
+            if( magic != 0x12345678 ) return;
+            set<mid> *preceeding = us.get();
+            if( preceeding == 0 )
+                us.reset( preceeding = new set<mid>() );
+            {
+                boost::mutex::scoped_lock lk(x);
+                followers[m];
+                for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
+                    followers[*i].insert(m);
+                    assert( followers[m].count(*i) == 0 );
+                }
+            }
+            preceeding->insert(m);
+        }
+        void leaving(mid m) { 
+            if( magic != 0x12345678 ) return;
+            us.get()->erase(m);
+        }
+    };
+    extern MutexDebugger mutexDebugger;
     
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so __destroyingStatics will be set
@@ -37,19 +69,40 @@ namespace mongo {
     // destroying them.
     class mutex : boost::noncopyable {
     public:
-        /* old boost doesn't support lock()...
-        void __lock() { _m->lock(); }
-        void __unlock() { _m->unlock(); }*/
+#if defined(_DEBUG)
+        const char *_name;
+#endif
 
-        mutex() { _m = new boost::mutex(); }
+#if defined(_DEBUG)
+        mutex(const char *name) 
+           : _name(name) 
+#else
+        mutex(const char *) 
+#endif
+        { 
+            _m = new boost::mutex(); 
+        }
         ~mutex() {
             if( !__destroyingStatics ) {
                 delete _m;
             }
         }
         class scoped_lock : boost::noncopyable {
+#if defined(_DEBUG)
+            mongo::mutex *mut;
+#endif
         public:
-            scoped_lock( mongo::mutex &m ) : _l( m.boost() ) {}
+            scoped_lock( mongo::mutex &m ) : _l( m.boost() ) {
+#if defined(_DEBUG)
+                mut = &m;
+                mutexDebugger.entering(mut->_name);
+#endif
+            }
+            ~scoped_lock() { 
+#if defined(_DEBUG)
+                mutexDebugger.leaving(mut->_name);
+#endif
+            }
             boost::mutex::scoped_lock &boost() { return _l; }
         private:
             boost::mutex::scoped_lock _l;
@@ -61,36 +114,5 @@ namespace mongo {
     
     typedef mutex::scoped_lock scoped_lock;
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
-#if 0
-    class MutexDebugger { 
-        typedef mutex * mid;
 
-        boost::thread_specific_ptr<int> foo;
-
-        boost::thread_specific_ptr< set<mid> > us;
-        map< mid, set<mid> > followers;
-        mutex x;
-    public:
-        void entering(mid m) {
-            set<mid> *preceeding = us.get();
-            if( preceeding == 0 )
-                us.reset( preceeding = new set<mid>() );
-
-            {
-                scoped_lock lk(x);
-                for( set<mid>::iterator i = preceeding->begin(); i != preceeding->end(); i++ ) { 
-                    followers[*i].insert(m);
-                    assert( followers[m].count(*i) == 0 );
-                }
-            }
-
-            preceeding->insert(m);
-
-
-        }
-        void leaving(mid m) { 
-            us.get()->erase(m);
-        }
-    };
-#endif
 }

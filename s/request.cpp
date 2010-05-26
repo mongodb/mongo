@@ -200,7 +200,7 @@ namespace mongo {
     }
         
     map<int,ClientInfo*> ClientInfo::_clients;
-    mongo::mutex ClientInfo::_clientsLock;
+    mongo::mutex ClientInfo::_clientsLock("_clientsLock");
     boost::thread_specific_ptr<ClientInfo> ClientInfo::_tlInfo;
 
 } // namespace mongo

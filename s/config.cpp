@@ -527,7 +527,6 @@ namespace mongo {
     ConfigServer configServer;    
     Grid grid;
 
-
     class DBConfigUnitTest : public UnitTest {
     public:
         void testInOut( DBConfig& c , BSONObj o ){

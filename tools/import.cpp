@@ -39,6 +39,7 @@ class Import : public Tool {
     const char * _sep;
     bool _ignoreBlanks;
     bool _headerLine;
+    bool _upsert;
     
     void _append( BSONObjBuilder& b , const string& fieldName , const string& data ){
         if ( b.appendAsNumber( fieldName , data ) )
@@ -137,11 +138,13 @@ public:
             ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
             ("drop", "drop collection first " )
             ("headerline","CSV,TSV only - use first line as headers")
+            ("upsert", "insert or update objects that already exist" )
             ;
         addPositionArg( "file" , 1 );
         _type = JSON;
         _ignoreBlanks = false;
         _headerLine = false;
+        _upsert = false;
     }
     
     int run(){
@@ -181,6 +184,10 @@ public:
 
         if ( hasParam( "ignoreBlanks" ) ){
             _ignoreBlanks = true;
+        }
+
+        if ( hasParam( "upsert" ) ){
+            _upsert = true;
         }
 
         if ( hasParam( "type" ) ){
@@ -237,10 +244,16 @@ public:
 
             try {
                 BSONObj o = parseLine( buf );
-                if ( _headerLine )
+                if ( _headerLine ){
                     _headerLine = false;
-                else
-                    conn().insert( ns.c_str() , o );
+                } else {
+                    BSONElement id = o["_id"];
+                    if (_upsert && !id.eoo()){
+                        conn().update( ns, QUERY("_id" << id), o, true);
+                    } else {
+                        conn().insert( ns.c_str() , o );
+                    }
+                }
             }
             catch ( std::exception& e ){
                 cout << "exception:" << e.what() << endl;

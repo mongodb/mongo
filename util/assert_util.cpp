@@ -19,6 +19,8 @@
 #include "assert_util.h"
 #include "assert.h"
 #include "file.h"
+#include <cmath>
+using namespace std;
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -112,7 +114,7 @@ namespace mongo {
         throw UserException( code , ss.str() );
     }
     
-    mongo::mutex *Assertion::_mutex = new mongo::mutex();
+    mongo::mutex *Assertion::_mutex = new mongo::mutex("Assertion");
 
     string Assertion::toString() {
         if( _mutex == 0 )

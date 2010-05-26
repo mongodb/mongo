@@ -60,6 +60,8 @@ namespace mongo {
         list<DBConnectionHook*> _hooks;
 
     public:        
+        DBConnectionPool() : _mutex("DBConnectionPool") { }
+
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
 

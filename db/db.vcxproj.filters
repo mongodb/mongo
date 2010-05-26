@@ -689,6 +689,15 @@
     <ClInclude Include="..\util\concurrency\mutex.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
+    <ClInclude Include="stats\counters.h">
+      <Filter>stats</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\snapshots.h">
+      <Filter>stats</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\top.h">
+      <Filter>stats</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="libs">
@@ -726,6 +735,9 @@
     </Filter>
     <Filter Include="client">
       <UniqueIdentifier>{932baf83-ba80-49e5-8280-f1b9c8dbbde6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="stats">
+      <UniqueIdentifier>{88f4374a-9d55-44a2-a234-c758cc4affa9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

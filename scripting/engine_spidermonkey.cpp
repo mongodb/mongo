@@ -669,7 +669,7 @@ namespace mongo {
             }
             }
 
-            log() << "toval: unknown type: " << (int)(e.type()) << endl;
+            log() << "toval: unknown type: " << (int) e.type() << endl;
             uassert( 10218 ,  "not done: toval" , 0 );
             return 0;
         }

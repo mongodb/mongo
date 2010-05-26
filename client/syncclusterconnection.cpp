@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L)  {
+    SyncClusterConnection::SyncClusterConnection( const list<HostAndPort> & L) : _mutex("SynClusterConnection") {
         {
             stringstream s;
             int n=0;
@@ -38,7 +38,7 @@ namespace mongo {
             _connect( i->toString() );
     }
     
-    SyncClusterConnection::SyncClusterConnection( string commaSeperated ){
+    SyncClusterConnection::SyncClusterConnection( string commaSeperated )  : _mutex("SyncClusterConnection") {
         _address = commaSeperated;
         string::size_type idx;
         while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ){
@@ -50,7 +50,7 @@ namespace mongo {
         uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string a , string b , string c ){
+    SyncClusterConnection::SyncClusterConnection( string a , string b , string c )  : _mutex("SyncClusterConnection") { 
         _address = a + "," + b + "," + c;
         // connect to all even if not working
         _connect( a );
@@ -58,7 +58,7 @@ namespace mongo {
         _connect( c );
     }
 
-    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev ){
+    SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev ) : _mutex("SyncClusterConnection") {
         assert(0);
     }
 

@@ -123,6 +123,7 @@ namespace mongo {
 
     class GenericCounter {
     public:
+        GenericCounter() : _mutex("GenericCounter") { }
         void hit( const string& name , int count=0 );
         BSONObj getObj();
     private:

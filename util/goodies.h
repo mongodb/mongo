@@ -517,7 +517,7 @@ namespace mongo {
 
     class TicketHolder {
     public:
-        TicketHolder( int num ){
+        TicketHolder( int num ) : _mutex("TicketHolder") {
             _outof = num;
             _num = num;
         }

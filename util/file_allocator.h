@@ -38,7 +38,7 @@ namespace mongo {
         */
     public:
 #if !defined(_WIN32)
-        FileAllocator() : failed_() {}
+        FileAllocator() : pendingMutex_("FileAllocator"), failed_() {}
 #endif
         void start() {
 #if !defined(_WIN32)

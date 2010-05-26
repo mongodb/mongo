@@ -737,7 +737,8 @@ namespace JSTests {
             
             {
                 BSONObj fromA = client.findOne( _a , BSONObj() );
-                cout << "Froma : " << fromA << endl;
+                assert( fromA.valid() );
+                //cout << "Froma : " << fromA << endl;
                 BSONObjBuilder b;
                 b.append( "b" , 18 );
                 b.appendDBRef( "c" , "dbref.a" , fromA["_id"].__oid() );

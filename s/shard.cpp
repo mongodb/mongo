@@ -26,7 +26,7 @@ namespace mongo {
     
     class StaticShardInfo {
     public:
-        
+        StaticShardInfo() : _mutex("StaticShardInfo") { }
         void reload(){
 
             list<BSONObj> all;
@@ -95,8 +95,7 @@ namespace mongo {
 
     private:
         map<string,Shard> _lookup;
-        mongo::mutex _mutex;
-        
+        mongo::mutex _mutex;        
     } staticShardInfo;
     
     void Shard::setAddress( const string& addr , bool authoritative ){
