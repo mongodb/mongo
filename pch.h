@@ -60,17 +60,6 @@
 #define BOOST_SPIRIT_THREADSAFE
 #include <boost/version.hpp>
 
-#if BOOST_VERSION >= 103800
-#define BOOST_SPIRIT_USE_OLD_NAMESPACE
-#include <boost/spirit/include/classic_core.hpp>
-#include <boost/spirit/include/classic_loops.hpp>
-#include <boost/spirit/include/classic_lists.hpp>
-#else
-#include <boost/spirit/core.hpp>
-#include <boost/spirit/utility/loops.hpp>
-#include <boost/spirit/utility/lists.hpp>
-#endif
-
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
