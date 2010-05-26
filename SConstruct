@@ -1442,6 +1442,9 @@ def getSystemInstallName():
         n += "-static"
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
+        
+    if len(moduleNames) > 0:
+        n += "-" + "-".join( moduleNames )
 
     try:
         import settings
