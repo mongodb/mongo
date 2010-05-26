@@ -34,11 +34,13 @@ public:
     
     bool _drop;
     bool _objcheck;
+    auto_ptr<Matcher> _matcher;
     
     Restore() : Tool( "restore" , true , "" , "" ) , _drop(false),_objcheck(false){
         add_options()
             ("drop" , "drop each collection before import" )
             ("objcheck" , "validate object before inserting" )
+            ("filter" , po::value<string>() , "filter to apply before inserting" )
             ;
         add_hidden_options()
             ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
@@ -55,6 +57,9 @@ public:
         path root = getParam("dir");
         _drop = hasParam( "drop" );
         _objcheck = hasParam( "objcheck" );
+        
+        if ( hasParam( "filter" ) )
+            _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
 
         /* If _db is not "" then the user specified a db name to restore as.
          *
@@ -155,6 +160,7 @@ public:
 
         long long read = 0;
         long long num = 0;
+        long long inserted = 0;
 
         const int BUF_SIZE = 1024 * 1024 * 5;
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
@@ -189,7 +195,11 @@ public:
                     cerr << "\t " << e << endl;
                 }
             }
-            conn().insert( ns.c_str() , o );
+            
+            if ( _matcher.get() == 0 || _matcher->matches( o ) ){
+                conn().insert( ns.c_str() , o );
+                inserted++;
+            }
 
             read += o.objsize();
             num++;
@@ -198,7 +208,10 @@ public:
         }
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        out() << "\t "  << m.hits() << " objects" << endl;
+        out() << "\t "  << m.hits() << " objects found" << endl;
+        if ( _matcher.get() )
+            out() << "\t "  << inserted << " objects inserted" << endl;
+            
     }
 };
 

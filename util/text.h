@@ -19,6 +19,8 @@ namespace mongo {
             if ( foo ){
                 string s( _big , foo - _big );
                 _big = foo + 1;
+                while ( *_big && strstr( _big , _splitter ) == _big )
+                    _big++;
                 return s;
             }
             
