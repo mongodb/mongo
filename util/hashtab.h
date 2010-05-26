@@ -109,7 +109,7 @@ namespace mongo {
             //nodes = (Node *) buf;
 
             if ( sizeof(Node) != 628 ){
-                out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << endl;
+                out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << endl;
                 assert( sizeof(Node) == 628 );
             }
 
