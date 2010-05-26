@@ -34,16 +34,34 @@ namespace mongo {
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
 
+    /** most operations on a ReplSet object should be done while locked. */
+    class RSBase : boost::noncopyable { 
+    private:
+        mutex m;
+        int _locked;
+    protected:
+        RSBase() : _locked(0) { }
+        class lock : scoped_lock { 
+            RSBase& _b;
+        public:
+            lock(RSBase* b) : scoped_lock(b->m), _b(*b) { b->_locked++; }
+            ~lock() { _b._locked--; }
+        };
+        bool locked() const { return _locked; }
+    };
+
     /* information about the entire repl set, such as the various servers in the set, and their state */
     /* note: We currently do not free mem when the set goes away - it is assumed the replset is a 
              singleton and long lived.
     */
-    class ReplSet {
+    class ReplSet : RSBase {
     public:
-        static enum StartupStatus { 
+        /** info on our state if the replset isn't yet "up".  for example, if we are pre-initiation. */
+        enum StartupStatus { 
             PRESTART=0, LOADINGCONFIG=1, BADCONFIG=2, EMPTYCONFIG=3, 
             EMPTYUNREACHABLE=4, STARTED=5, SOON=6 
-        } startupStatus;
+        };
+        static StartupStatus startupStatus;
         static string startupStatusMsg;
 
         void fatal();
@@ -134,7 +152,7 @@ namespace mongo {
         List1<Member> _members; /* all members of the set EXCEPT self. */
 
     public:
-        class Manager : public task::Port {
+        class Manager : public task::Server {
             bool got(const any&);
             ReplSet *rs;
             int _primary;
@@ -158,7 +176,11 @@ namespace mongo {
     };
 
     inline void ReplSet::fatal() 
-    { _myState = FATAL; log() << "replSet error fatal error, stopping replication" << rsLog; }
+    { 
+        lock l(this);
+        _myState = FATAL; 
+        log() << "replSet error fatal error, stopping replication" << rsLog; 
+    }
 
     inline ReplSet::Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c) : 
         _config(c), _h(h), _hbinfo(ord) { }

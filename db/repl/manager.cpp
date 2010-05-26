@@ -43,7 +43,7 @@ namespace mongo {
         return p;
     }
 
-    ReplSet::Manager::Manager(ReplSet *_rs) : task::Port("ReplSet::Manager"), rs(_rs), _primary(NOPRIMARY)
+    ReplSet::Manager::Manager(ReplSet *_rs) : task::Server("ReplSet::Manager"), rs(_rs), _primary(NOPRIMARY)
     { 
     }
 

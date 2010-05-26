@@ -259,7 +259,7 @@ namespace mongo {
         catch(std::exception& e) { 
             log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;
             if( theReplSet ) 
-                theReplSet->fatal(); // concurrency: this maybe should be a message.
+                theReplSet->fatal();
         }
         cc().shutdown();
     }

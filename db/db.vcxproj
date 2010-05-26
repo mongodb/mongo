@@ -561,7 +561,6 @@
     <None Include="repl\testing.js" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\boost_pieces\any.hpp" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\gridfs.h" />
     <ClInclude Include="..\client\parallel.h" />
@@ -569,6 +568,7 @@
     <ClInclude Include="..\pcre-7.4\config.h" />
     <ClInclude Include="..\pcre-7.4\pcre.h" />
     <ClInclude Include="..\util\concurrency\msg.h" />
+    <ClInclude Include="..\util\concurrency\mutex.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
