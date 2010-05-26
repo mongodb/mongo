@@ -58,9 +58,13 @@ namespace mongo {
             log() << "balancer: going to take over" << endl;
             // we want to take over, so fall through to below
         }
-        
-        OID hack;
-        hack.init();
+
+        // Taking over means replacing 'who' with this balancer's address. Note that
+        // to avoid any races, we use a compare-and-set strategy relying on the 
+        // incarnation of the previous balancer (the key 'x').
+
+        OID incarnation;
+        incarnation.init();
         
         BSONObjBuilder updateQuery;
         updateQuery.append( "_id" , "balancer" );
@@ -71,12 +75,15 @@ namespace mongo {
         
         conn.update( ShardNS::settings , 
                      updateQuery.obj() ,
-                     BSON( "$set" << BSON( "who" << _myid << "x" << hack ) ) ,
+                     BSON( "$set" << BSON( "who" << _myid << "x" << incarnation ) ) ,
                      true );
+
+        // If another balancer beats this one to the punch, the following query will see 
+        // the incarnation for that other guy.
         
         x = conn.findOne( ShardNS::settings , BSON( "_id" << "balancer" ) );
         log() << "balancer: after update: " << x << endl;
-        return _myid == x["who"].String() && hack == x["x"].OID();
+        return _myid == x["who"].String() && incarnation == x["x"].OID();
     }
     
     int Balancer::balance( DBClientBase& conn ){
