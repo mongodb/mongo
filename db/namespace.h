@@ -86,7 +86,7 @@ namespace mongo {
         }
     };
 
-#pragma pack(push,1)
+#pragma pack(1)
 	/* This helper class is used to make the HashMap below in NamespaceDetails */
     class Namespace {
     public:
@@ -145,7 +145,7 @@ namespace mongo {
 
         char buf[MaxNsLen];
     };
-#pragma pack(pop)
+#pragma pack()
 
 } // namespace mongo
 
@@ -165,7 +165,7 @@ namespace mongo {
 
     extern int bucketSizes[];
 
-#pragma pack(push,1)
+#pragma pack(1)
     /* this is the "header" for a collection that has all its details.  in the .ns file.
     */
     class NamespaceDetails {
@@ -441,7 +441,7 @@ namespace mongo {
         DiskLoc &firstDeletedInCapExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
     }; // NamespaceDetails
-#pragma pack(pop)
+#pragma pack()
 
     /* NamespaceDetailsTransient
 
