@@ -582,6 +582,8 @@ namespace mongo {
 using namespace mongo;
 
 #include <boost/program_options.hpp>
+#undef assert
+#define assert MONGO_assert
 
 namespace po = boost::program_options;
 

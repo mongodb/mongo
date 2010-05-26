@@ -27,6 +27,7 @@
 #  include <windows.h>
 #endif
 
+#include <ctime>
 #include <sstream>
 #include <string>
 #include <memory>
@@ -57,6 +58,7 @@
 #include "boost/bind.hpp"
 #include "boost/function.hpp"
 #include <boost/thread/tss.hpp>
+#include "boost/detail/endian.hpp"
 #define BOOST_SPIRIT_THREADSAFE
 #include <boost/version.hpp>
 
