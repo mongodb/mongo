@@ -47,8 +47,6 @@
 #include "limits.h"
 
 #include <boost/any.hpp>
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -120,7 +118,10 @@ namespace mongo {
 
 namespace mongo {
     using namespace boost::filesystem;
+    void asserted(const char *msg, const char *file, unsigned line);
 }
+
+#define MONGO_assert(_Expression) (void)( (!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include "util/debug_util.h"
 #include "util/goodies.h"
